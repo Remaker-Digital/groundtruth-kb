@@ -873,9 +873,11 @@ as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
 `.claude/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
-directive because they polled blindly — waking the harnesses on a fixed
-interval regardless of bridge activity — and must not be re-enabled as a
-substitute for the smart poller.
+directive because each fixed-interval tick spent an expensive resource —
+waking a harness into a full investigation — unconditionally, with no cheap
+deterministic gate (the fixed interval itself was negligibly cheap; the
+value/cost defect was the unconditional expensive spawn) — and must not be
+re-enabled as a substitute for the smart poller.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#os-poller).*
 

@@ -7313,18 +7313,18 @@ def main(argv: list[str] | None = None) -> int:
     # Persist interactive role overrides (marker files) per WI-4673
     if override_role and args.harness_name:
         try:
-            from scripts.gtkb_session_id import resolve_session_id, MARKER_CONTINUITY_ORDER
+            from scripts.gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id
             from scripts.workstream_focus import (
-                _write_session_role_marker,
-                _write_per_session_role_markers,
                 _candidate_marker_session_ids,
+                _write_per_session_role_markers,
+                _write_session_role_marker,
             )
         except ImportError:
-            from gtkb_session_id import resolve_session_id, MARKER_CONTINUITY_ORDER
+            from gtkb_session_id import MARKER_CONTINUITY_ORDER, resolve_session_id
             from workstream_focus import (
-                _write_session_role_marker,
-                _write_per_session_role_markers,
                 _candidate_marker_session_ids,
+                _write_per_session_role_markers,
+                _write_session_role_marker,
             )
 
         session_id = resolve_session_id(order=MARKER_CONTINUITY_ORDER)

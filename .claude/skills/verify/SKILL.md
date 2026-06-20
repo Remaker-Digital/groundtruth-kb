@@ -36,6 +36,10 @@ bridge protocol. Specifically:
 - It does **NOT** short-circuit Loyal Opposition's verdict. `VERIFIED` versus
   `NO-GO` is the reviewer's evidence-based decision; this skill only documents
   the file shape that decision is recorded in.
+- It does **NOT** allow file-only `VERIFIED` closure. A positive `VERIFIED`
+  verdict must be recorded through the helper's `--finalize-verified` path so
+  the verified work, implementation report, and verdict artifact are committed
+  by the same local git transaction.
 
 After the 2026-06-15 TAFE/dispatcher cutover, verdict files flow through the
 normal dispatcher-backed bridge write channel like any other bridge file.
@@ -91,6 +95,17 @@ Before writing the verdict file, the reviewer must:
    Slice 2 will provide a helper that computes candidate test commands.
 10. Execute the spec-derived tests and capture the exact commands run and the
    observed results.
+11. For a positive `VERIFIED` verdict, run the reviewed final body through the
+    atomic finalization helper instead of writing the verdict file directly:
+
+    ```text
+    python .claude/skills/verify/helpers/write_verdict.py --slug <slug> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
+    ```
+
+    Repeat `--include` for every verified implementation/report path that must
+    be in the final commit. The helper automatically includes the new
+    `VERIFIED` verdict file. If the helper fails, do not leave or manually
+    recreate a terminal `VERIFIED` bridge file.
 
 ## Verdict file template
 
@@ -131,6 +146,11 @@ zero-padded version number for the thread. Structure:
   required changes Prime Builder must address before resubmitting.
 - `## Commands Executed` — the exact shell commands run during the review with
   observed output excerpts.
+- `## Commit Finalization Evidence` — for a `VERIFIED` verdict only; the
+  helper appends this section when absent, recording the intended commit
+  subject and same-transaction path set. The final commit SHA is printed by the
+  helper after success and is intentionally not embedded in the committed
+  verdict file.
 - `## Owner Action Required` — optional; any owner decision the verdict
   surfaces (waiver request, blocking-gap disposition, scope clarification).
 - Copyright footer.
@@ -152,14 +172,18 @@ The verdict must honor these gates before `VERIFIED` is recorded:
 - **Missing cross-cutting specs.** If the applicability preflight reports a
   non-empty `missing_required_specs` list, issue `NO-GO` until the proposal or
   implementation report is revised to cite and satisfy those specifications.
+- **Commit finalization.** `VERIFIED` requires the atomic helper transaction.
+  The staging area must be clean before finalization, and the helper must commit
+  exactly the declared verified path set plus the new verdict artifact. Any
+  staging or commit failure means the review fails closed without terminal
+  bridge state.
 
 ## Cross-harness implementation notes
 
 The skill body is identical between Claude Code and Codex. The canonical file
 is `.claude/skills/verify/SKILL.md`; the Codex adapter is
-`.codex/skills/verify/SKILL.md` and carries the
-`<!-- GTKB-CODEX-SKILL-ADAPTER -->` generated marker. Do NOT edit the adapter
-directly — edit the canonical file and regenerate with
+`.codex/skills/verify/SKILL.md` and carries the generated adapter marker. Do
+NOT edit the adapter directly — edit the canonical file and regenerate with
 `python scripts/generate_codex_skill_adapters.py --update-registry` per
 `ADR-CODEX-HOOK-PARITY-FALLBACK-001`. The adapter's stored SHA in
 `.codex/skills/MANIFEST.json` and the harness-capability registry is the

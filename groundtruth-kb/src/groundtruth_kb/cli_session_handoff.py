@@ -185,6 +185,14 @@ def dispatcher_tick_cmd(ctx: click.Context, rules_path: Path | None, execute: bo
     help="Session identifier. Defaults to a deterministic id derived from the latest archived envelope.",
 )
 @click.option(
+    "--harness-name",
+    default=None,
+    help=(
+        "Optional explicit registered harness override. When omitted, explicit "
+        "--session-id scans registered harness archives for the matching envelope."
+    ),
+)
+@click.option(
     "--json",
     "json_output",
     is_flag=True,
@@ -195,6 +203,7 @@ def dispatcher_tick_cmd(ctx: click.Context, rules_path: Path | None, execute: bo
 def generate_cmd(
     ctx: click.Context,
     session_id: str | None,
+    harness_name: str | None,
     json_output: bool,
 ) -> None:
     """Generate the deterministic handoff prompt for a session.
@@ -212,6 +221,7 @@ def generate_cmd(
         result = generate(
             session_id=session_id,
             project_root=Path(config.project_root),
+            harness_name=harness_name,
         )
     except HandoffError as exc:
         raise click.ClickException(str(exc)) from exc

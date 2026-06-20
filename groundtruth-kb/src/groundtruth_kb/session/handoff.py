@@ -59,6 +59,7 @@ def generate(
     *,
     project_root: Path | None = None,
     db: KnowledgeDB | None = None,
+    harness_name: str | None = None,
 ) -> dict[str, Any]:
     """Generate the deterministic handoff prompt for a session.
 
@@ -71,6 +72,9 @@ def generate(
             (resolved relative to this module).
         db: Optional pre-bound ``KnowledgeDB``. Tests inject this; production
             opens the default database resolved from ``project_root``.
+        harness_name: Optional explicit registered harness-name override. When
+            omitted and ``session_id`` is supplied, the service resolves the
+            matching envelope by scanning registered archive directories.
 
     Returns:
         A dict with keys ``session_id``, ``prompt_markdown``, ``output_files``,
@@ -81,18 +85,33 @@ def generate(
             missing, or when bridge state cannot be read.
     """
     root = (project_root or _default_project_root()).resolve()
-    harness_name = _resolve_active_harness_name(root)
-    archive_dir = root / "harness-state" / harness_name / "session-envelope-archive"
-    if not archive_dir.exists():
-        raise HandoffError(
-            f"Session-envelope archive directory missing: {archive_dir}. "
-            "WI-4293 (session-envelope durability) must land before the handoff "
-            "service can read archived envelopes for harness '{harness_name}'.".format(
-                harness_name=harness_name,
+    if harness_name is not None:
+        resolved_harness_name = _validate_harness_name_override(root, harness_name)
+        archive_dir = root / "harness-state" / resolved_harness_name / "session-envelope-archive"
+        if not archive_dir.exists():
+            raise HandoffError(
+                f"Session-envelope archive directory missing: {archive_dir}. "
+                "WI-4293 (session-envelope durability) must land before the handoff "
+                "service can read archived envelopes for harness '{harness_name}'.".format(
+                    harness_name=resolved_harness_name,
+                )
             )
-        )
-
-    envelope_path = _select_envelope_for_session_id(archive_dir, session_id)
+        envelope_path = _select_envelope_for_session_id(archive_dir, session_id)
+    elif session_id is not None:
+        resolved_harness_name, envelope_path = _select_envelope_across_archives(root, session_id)
+        archive_dir = root / "harness-state" / resolved_harness_name / "session-envelope-archive"
+    else:
+        resolved_harness_name = _resolve_active_harness_name(root)
+        archive_dir = root / "harness-state" / resolved_harness_name / "session-envelope-archive"
+        if not archive_dir.exists():
+            raise HandoffError(
+                f"Session-envelope archive directory missing: {archive_dir}. "
+                "WI-4293 (session-envelope durability) must land before the handoff "
+                "service can read archived envelopes for harness '{harness_name}'.".format(
+                    harness_name=resolved_harness_name,
+                )
+            )
+        envelope_path = _select_envelope_for_session_id(archive_dir, None)
     if envelope_path is None:
         raise HandoffError(
             f"No archived session envelope found in {archive_dir}. "
@@ -182,6 +201,46 @@ def _default_project_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _registered_harnesses(project_root: Path) -> dict[str, Any]:
+    """Read registered harness identities through the canonical reader."""
+    identities_path = project_root / "harness-state" / "harness-identities.json"
+    try:
+        data = read_identity(project_root)
+    except HarnessStateError as exc:
+        raise HandoffError(f"Harness identities missing or unreadable: {identities_path}") from exc
+    harnesses = data.get("harnesses", {}) or data.get("identities", {}) or {}
+    if not isinstance(harnesses, dict) or not harnesses:
+        raise HandoffError(
+            f"No harnesses recorded in {identities_path}; cannot resolve active harness.",
+        )
+    return harnesses
+
+
+def _validate_harness_name_override(project_root: Path, harness_name: str) -> str:
+    """Validate an explicit harness override as a registered path segment."""
+    candidate = harness_name.strip()
+    if not candidate:
+        raise HandoffError("invalid harness name: empty")
+    if candidate in {".", ".."}:
+        raise HandoffError(f"invalid harness name: contains path syntax: {candidate!r}")
+    if any(separator in candidate for separator in ("/", "\\", ":")):
+        raise HandoffError(f"invalid harness name: contains path syntax: {candidate!r}")
+    if Path(candidate).is_absolute():
+        raise HandoffError(f"invalid harness name: absolute path: {candidate!r}")
+
+    harnesses = _registered_harnesses(project_root)
+    if candidate not in harnesses:
+        raise HandoffError(f"not a registered harness: {candidate}")
+
+    base = (project_root / "harness-state" / candidate).resolve()
+    archive_dir = (base / "session-envelope-archive").resolve()
+    try:
+        archive_dir.relative_to(base)
+    except ValueError as exc:
+        raise HandoffError(f"invalid harness name escapes registered harness directory: {candidate!r}") from exc
+    return candidate
+
+
 def _resolve_active_harness_name(project_root: Path) -> str:
     """Resolve the active host-local harness name via deterministic disambiguation.
 
@@ -189,32 +248,20 @@ def _resolve_active_harness_name(project_root: Path) -> str:
     ``bridge/gtkb-handoff-prompt-deterministic-service-impl-007.md``):
 
     1. Read ``harness-state/harness-identities.json``.
-    2. If any record carries ``status == "active"`` (legacy/test schema),
-       restrict the pool to those names; otherwise use every enumerated
-       harness as the pool. The live identities file omits ``status`` per
-       its current schema, so the directory-presence filter below is the
-       deterministic disambiguator on production checkouts.
-    3. Filter the pool to names whose
+    2. Use every enumerated harness as the candidate pool. ``status`` fields
+       are metadata only for this resolver and must not narrow the pool.
+    3. Filter that pool to names whose
        ``harness-state/<name>/session-envelope-archive`` directory exists.
     4. If exactly one candidate remains, return it.
     5. Otherwise raise ``HandoffError`` — alphabetic fallback would select a
        registered-but-non-present harness (e.g., ``antigravity`` sorting
        before ``claude`` / ``codex``).
+
+    This function is used only when both ``harness_name`` and ``session_id`` are
+    omitted. Explicit ``session_id`` calls scan registered archives directly.
     """
-    identities_path = project_root / "harness-state" / "harness-identities.json"
-    try:
-        data = read_identity(project_root)
-    except HarnessStateError as exc:
-        raise HandoffError(f"Harness identities missing or unreadable: {identities_path}") from exc
-    harnesses = data.get("harnesses", {}) or data.get("identities", {}) or {}
-    if not harnesses:
-        raise HandoffError(
-            f"No harnesses recorded in {identities_path}; cannot resolve active harness.",
-        )
-    explicit_active = [
-        name for name, record in harnesses.items() if isinstance(record, dict) and record.get("status") == "active"
-    ]
-    pool = explicit_active or list(harnesses.keys())
+    harnesses = _registered_harnesses(project_root)
+    pool = list(harnesses.keys())
     candidates = sorted(
         name for name in pool if (project_root / "harness-state" / name / "session-envelope-archive").is_dir()
     )
@@ -285,15 +332,9 @@ def _select_envelope_for_session_id(
 
     matches: list[Path] = []
     for candidate in candidates:
-        try:
-            env = json.loads(candidate.read_bytes().decode("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        canonical_id = _canonical_session_id_for_envelope(candidate)
+        if canonical_id is None:
             continue
-        explicit = env.get("session_id") if isinstance(env, dict) else None
-        if explicit is not None:
-            canonical_id = explicit
-        else:
-            canonical_id = _derive_session_id(env if isinstance(env, dict) else {}, candidate)
         if canonical_id == session_id:
             matches.append(candidate)
 
@@ -310,6 +351,56 @@ def _select_envelope_for_session_id(
         f"in {archive_dir} ({[m.name for m in matches]}). Archive envelopes must have "
         "distinct session_id values."
     )
+
+
+def _select_envelope_across_archives(project_root: Path, session_id: str) -> tuple[str, Path]:
+    """Resolve a session envelope by scanning all registered harness archives."""
+    harnesses = _registered_harnesses(project_root)
+    matches: list[tuple[str, Path]] = []
+    scanned_names: list[str] = []
+
+    for harness_name in sorted(harnesses.keys()):
+        archive_dir = project_root / "harness-state" / harness_name / "session-envelope-archive"
+        if not archive_dir.is_dir():
+            continue
+        scanned_names.append(harness_name)
+        for candidate in sorted(p for p in archive_dir.glob("*-session-envelope.json") if p.is_file()):
+            if _canonical_session_id_for_envelope(candidate) == session_id:
+                matches.append((harness_name, candidate))
+
+    if len(matches) == 1:
+        return matches[0]
+    if not scanned_names:
+        raise HandoffError(
+            "No registered harness has a session-envelope archive directory under "
+            f"{project_root / 'harness-state'}. WI-4293 (session-envelope durability) "
+            "must land before the handoff service can read archived envelopes.",
+        )
+    if not matches:
+        raise HandoffError(
+            f"No archived envelope matches session_id={session_id!r} in any scanned harness archive. "
+            f"Scanned: {scanned_names}."
+        )
+    harness_names = [name for name, _path in matches]
+    envelope_names = [f"{name}/{path.name}" for name, path in matches]
+    raise HandoffError(
+        f"Ambiguous archive selection: session_id={session_id!r} matches multiple envelopes "
+        f"in registered harness archives {harness_names}: {envelope_names}."
+    )
+
+
+def _canonical_session_id_for_envelope(envelope_path: Path) -> str | None:
+    """Return the explicit or derived session id for a readable envelope."""
+    try:
+        envelope = json.loads(envelope_path.read_bytes().decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return None
+    if not isinstance(envelope, dict):
+        return None
+    explicit = envelope.get("session_id")
+    if explicit is not None:
+        return str(explicit)
+    return _derive_session_id(envelope, envelope_path)
 
 
 def _derive_session_id(envelope: dict[str, Any], envelope_path: Path) -> str:

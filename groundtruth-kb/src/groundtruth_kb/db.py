@@ -25,9 +25,10 @@ import re
 import sqlite3
 import threading
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from groundtruth_kb.governance.credential_patterns import db_pattern_list
 
@@ -104,6 +105,11 @@ _CHROMA_COLLECTION_NAME = "deliberations"
 # operators on slow disks.
 _CHROMA_QUERY_TIMEOUT_SECONDS = float(os.environ.get("GTKB_CHROMA_QUERY_TIMEOUT_SECONDS") or "10")
 _CHROMA_QUERY_RETRIES = int(os.environ.get("GTKB_CHROMA_QUERY_RETRIES") or "1")
+_CHROMA_STALE_SEGMENT_ERROR_PATTERNS = (
+    "failed to apply logs",
+    "hnsw segment",
+    "error querying knn",
+)
 
 # WI-4453: the index/record path (collection.add) triggers the SAME first-embed
 # DefaultEmbeddingFunction model load as the query path, so `gt deliberations
@@ -148,6 +154,12 @@ def _call_with_timeout(fn: Callable[[], Any], timeout_seconds: float) -> Any:
     if "error" in box:
         raise box["error"]
     return box.get("value")
+
+
+def _is_chroma_stale_segment_error(exc: BaseException) -> bool:
+    """Return True for known stale/incompatible Chroma HNSW segment failures."""
+    message = str(exc).lower()
+    return any(pattern in message for pattern in _CHROMA_STALE_SEGMENT_ERROR_PATTERNS)
 
 
 WORK_ITEM_BACKLOG_COLUMNS = {
@@ -1351,7 +1363,18 @@ class KnowledgeDB:
         self._conn: sqlite3.Connection | None = None
         self._gate_registry = gate_registry
         self._check_same_thread = check_same_thread
+        self._last_deliberation_search_status: dict[str, Any] = {
+            "semantic_expected": bool(HAS_CHROMADB),
+            "semantic_attempted": False,
+            "semantic_succeeded": False,
+            "semantic_degraded": False,
+            "degradation_reason": None,
+        }
         self._ensure_schema()
+
+    def _deliberation_search_status(self) -> dict[str, Any]:
+        """Return metadata for the most recent ``search_deliberations`` call."""
+        return dict(self._last_deliberation_search_status)
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -8491,17 +8514,32 @@ class KnowledgeDB:
         # semantic set (FAB-17 / HYG-048) instead of crashing (the count() probe
         # was previously OUTSIDE the try) or hanging indefinitely. The SQLite
         # LIKE pass below always runs regardless of the semantic outcome.
+        semantic_status: dict[str, Any] = {
+            "semantic_expected": bool(HAS_CHROMADB),
+            "semantic_attempted": False,
+            "semantic_succeeded": False,
+            "semantic_degraded": False,
+            "degradation_reason": None,
+        }
+        self._last_deliberation_search_status = semantic_status
         semantic_results: list[dict[str, Any]] = []
         collection = self._get_chroma_collection()
+        if collection is None and semantic_status["semantic_expected"]:
+            semantic_status["semantic_degraded"] = True
+            semantic_status["degradation_reason"] = "collection_unavailable"
         if collection is not None:
             seen_delib_ids: dict[str, dict[str, Any]] = {}
             attempts = max(1, _CHROMA_QUERY_RETRIES + 1)
             for attempt in range(attempts):
                 try:
+                    semantic_status["semantic_attempted"] = True
                     seen_delib_ids = _call_with_timeout(
                         lambda: self._chroma_query_matches(collection, query, limit),
                         _CHROMA_QUERY_TIMEOUT_SECONDS,
                     )
+                    semantic_status["semantic_succeeded"] = True
+                    semantic_status["semantic_degraded"] = False
+                    semantic_status["degradation_reason"] = None
                     break
                 except TimeoutError as _chroma_timeout:  # intentional-catch: degrade to SQLite LIKE
                     _log.warning(
@@ -8510,8 +8548,19 @@ class KnowledgeDB:
                         _chroma_timeout,
                     )
                     seen_delib_ids = {}
+                    semantic_status["semantic_degraded"] = True
+                    semantic_status["degradation_reason"] = "timeout"
                     break  # a stalled store will stall again; do not retry a timeout
                 except Exception as _chroma_err:  # intentional-catch: ChromaDB fallback to SQLite LIKE
+                    if _is_chroma_stale_segment_error(_chroma_err):
+                        _log.warning(
+                            "ChromaDB stale/incompatible segment error, falling back to SQLite LIKE without retry: %s",
+                            _chroma_err,
+                        )
+                        seen_delib_ids = {}
+                        semantic_status["semantic_degraded"] = True
+                        semantic_status["degradation_reason"] = "stale_segment"
+                        break
                     _log.warning(
                         "ChromaDB search failed (attempt %d/%d), falling back to SQLite LIKE: %s",
                         attempt + 1,
@@ -8519,6 +8568,9 @@ class KnowledgeDB:
                         _chroma_err,
                     )
                     seen_delib_ids = {}
+                    if attempt + 1 >= attempts:
+                        semantic_status["semantic_degraded"] = True
+                        semantic_status["degradation_reason"] = "error"
                     continue
 
             if seen_delib_ids:

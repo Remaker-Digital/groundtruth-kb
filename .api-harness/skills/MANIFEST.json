@@ -55,7 +55,7 @@
       "capability_id": "skill.gtkb-propose",
       "description": "Scaffold a structurally compliant bridge proposal body (status token, project-linkage metadata, inline-JSON target_paths, seeded Prior Deliberations, spec-derived verification heading, required sections) and run a self-review checklist BEFORE filing, then hand off to gtkb-bridge-propose for the write. Use when starting a NEW bridge implementation proposal and you want it to clear the bridge-compliance gates on the first review instead of in a revise loop.",
       "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
-      "source_sha256": "7eb0ff541b66aad979a2a21db5dd7307f148fd9146bcf38f38f094c0e21a8b56"
+      "source_sha256": "c0f526b45d59eab1f8ad6b59dd4bb067054b27e53a4d754885e7f353dbc59590"
     },
     {
       "adapter_relative_path": ".api-harness/skills/check-deliberations/SKILL.md",
@@ -279,7 +279,7 @@
       "capability_id": "skill.verify",
       "description": "Author a Loyal Opposition post-implementation VERIFIED or NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate. Use when a post-implementation report enters the Loyal Opposition actionable queue, when asked to verify a post-implementation report, when authoring a VERIFIED/NO-GO verdict, or when reviewing an implementation report for spec-derived testing.",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
-      "source_sha256": "0803a8b901bf75aa8d0bb5235e1269643a127ff9c73e2d1f5a8f5c854b6c2140"
+      "source_sha256": "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
     }
   ],
   "generated_by": "scripts/generate_api_skill_adapters.py",

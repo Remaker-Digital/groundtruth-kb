@@ -20,13 +20,8 @@ EXPECTED_IDENTITIES = {
     "ollama": "D",
     "openrouter": "F",
 }
-EXPECTED_ROLE_BY_ID = {
-    "A": "prime-builder",
-    "B": "prime-builder",
-    "C": "loyal-opposition",
-    "D": "loyal-opposition",
-    "F": "loyal-opposition",
-}
+VALID_ROLES = {"prime-builder", "loyal-opposition"}
+VALID_STATUSES = {"active", "suspended"}
 
 
 def _read_json(relative_path: str) -> dict[str, Any]:
@@ -50,11 +45,28 @@ def test_durable_harness_identity_and_role_surfaces_cover_expected_harnesses() -
 
     registry_by_id = {row["id"]: row for row in registry["harnesses"]}
     assert set(EXPECTED_IDENTITIES.values()).issubset(registry_by_id)
-    for harness_id, expected_role in EXPECTED_ROLE_BY_ID.items():
+
+    active_rows = []
+    suspended_rows = []
+    for harness_name, harness_id in EXPECTED_IDENTITIES.items():
         row = registry_by_id[harness_id]
-        assert row["status"] == "active"
-        assert expected_role in row["role"]
-        assert expected_role in row["dispatch_tags"]
+        assert row["harness_name"] == harness_name
+        assert row["status"] in VALID_STATUSES
+        assert set(row["role"]).issubset(VALID_ROLES)
+        assert row["can_receive_dispatch"] is True
+        assert row["dispatch_tags"]
+        assert "headless" in row["invocation_surfaces"]
+
+        if row["status"] == "active":
+            active_rows.append(row)
+            assert row["role"]
+        else:
+            suspended_rows.append(row)
+            assert row["can_fire_events"] is False
+
+    assert any("prime-builder" in row["role"] for row in active_rows)
+    assert any("loyal-opposition" in row["role"] for row in active_rows)
+    assert all(row["status"] == "suspended" for row in suspended_rows)
 
     assert registry_by_id["A"]["event_driven_hooks"] is True
     assert registry_by_id["B"]["event_driven_hooks"] is True

@@ -32,7 +32,9 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 4. **File bridge** — read current TAFE/dispatcher bridge state and the
    status-bearing versioned files under `bridge/`; generated or cached startup
    counts are not live authority. The retired aggregate queue artifact must
-   not be recreated as a startup dependency.
+   not be recreated as a startup dependency. Treat bridge review independence
+   as session-context based: same-session review fails closed, same harness ID
+   alone is not a blocker, and missing author-session metadata fails closed.
 5. **Dashboard / backlog summary** — the generated startup service
    (`scripts/session_self_initialization.py`) emits the current-state summary;
    it is not authoritative after generation.
@@ -43,6 +45,7 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 ## Antigravity (Harness ID C) Overrides
 
 To minimize token cost and resource consumption, the Antigravity harness modifies the canonical startup order:
+- **Load Role Overlay**: Antigravity's optimized startup path must load the active role overlay (`config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`) appropriate to its resolved role to enforce role boundaries.
 - **Skip Rules/Logs Reads**: Antigravity is exempt from reading the extensive Phase B rule/log payload. It only loads essential baseline files (`CLAUDE.md`, `AGENTS.md`, `canonical-terminology.md`, `file-bridge-protocol.md`, `memory/MEMORY.md`).
 - **Omit Heavy Subprocesses**: Any startup dispatching or background scripts (e.g. `session_self_initialization.py`) must be run with `--fast-hook` and `--skip-bridge-maintenance` to skip reachability probes and PDF exports.
 

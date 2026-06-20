@@ -162,6 +162,32 @@ If a linked specification has no executed test coverage, Loyal Opposition must
 issue `NO-GO` unless the owner explicitly approves a documented waiver for that
 specific specification and risk.
 
+## Mandatory VERIFIED Commit-Finalization Gate
+
+A `VERIFIED` verdict is a commit-finalization outcome, not a file-only bridge
+status. Loyal Opposition MUST NOT leave a terminal `VERIFIED` bridge file in
+the worktree unless the same local transaction creates the git commit that
+contains:
+
+- the verified implementation/report paths; and
+- the new `VERIFIED` verdict artifact.
+
+The verification helper path is:
+
+```text
+python .claude/skills/verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
+```
+
+Reviewers first run the helper without `--finalize-verified` when they need
+Prior Deliberations seeding, then review and prune the draft. The final
+`--finalize-verified` invocation uses the reviewed body. The helper writes the
+next numbered verdict, stages only the declared verified path set plus that
+verdict, and runs a local `git commit`. If staging or commit creation fails, the
+helper removes the just-written `VERIFIED` verdict and fails closed. The verdict
+file records pre-commit evidence such as intended commit subject and staged path
+set; the final commit SHA is emitted by the helper after success and must not be
+self-embedded in the committed verdict file.
+
 ### Pre-File Code-Quality Gates (lint AND format are separate)
 
 Before filing a post-implementation report whose changes include Python files,
@@ -253,6 +279,21 @@ numbered bridge file.
 | ADVISORY | Loyal Opposition | Advisory report; actionable by Prime Builder in interactive sessions to trigger owner-deliberation / UAQ disposition; non-dispatchable for headless runs (`_derive_dispatchable` returns False). NOT awaiting GO/NO-GO/VERIFIED. |
 | DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
 
+## Review Independence Boundary
+
+Bridge review independence is determined by session context, not by harness ID
+alone. A review or verification is invalid when the reviewer session context is
+the same as the bridge artifact author's `author_session_context_id`, or when
+the author session metadata is missing or unreadable under the dispatcher
+fail-closed rules. The same harness may author a proposal in one session and
+review it in a different, unrelated session context only when the reviewer is
+operating under a valid Loyal Opposition role or dispatch context.
+
+Interactive sessions remain bound to the owner-declared resolved role for that
+session. An interactive session must not switch from Prime Builder to Loyal
+Opposition, or from Loyal Opposition to Prime Builder, merely because the same
+harness has a durable assignment or could be selected by headless dispatch.
+
 ## Body Status-Token Rule
 
 Versioned bridge files (`bridge/<slug>-NNN.md`) MUST begin with a canonical
@@ -340,7 +381,9 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 After Prime implements a GO'd proposal:
 1. Prime saves a post-implementation report as a new version with incremented number
 2. Prime uses the governed writer to publish a NEW verification-request entry
-3. Loyal Opposition reviews and responds with VERIFIED or NO-GO
+3. Loyal Opposition reviews and responds with NO-GO, or records VERIFIED only
+   through the commit-finalization helper so the verified work, implementation
+   report, and verdict artifact enter git history in the same local commit.
 
 ## Bridge State Maintenance
 

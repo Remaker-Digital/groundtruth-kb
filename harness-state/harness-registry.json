@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-20T07:24:29Z",
+  "generated_at": "2026-06-20T08:40:42Z",
   "harnesses": [
     {
       "can_fire_events": true,
@@ -107,8 +107,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 21
+      "status": "suspended",
+      "version": 22
     },
     {
       "can_fire_events": false,
@@ -143,8 +143,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 13
+      "status": "suspended",
+      "version": 14
     },
     {
       "can_fire_events": false,
@@ -177,8 +177,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 9
+      "status": "suspended",
+      "version": 10
     }
   ],
   "schema_version": 1,

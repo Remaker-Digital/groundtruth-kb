@@ -256,6 +256,14 @@ of truth. Do not treat harness-local operating-role.md files as live role author
 For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
 NO-GO. Run preflight checks and include their raw output in the verdict as advisory context for the Prime Builder. A nonzero preflight exit is a note to attach to the verdict body, not a rejection criterion. Your verdict (GO / NO-GO / VERIFIED) evaluates the substantive quality of the proposal or implementation report being reviewed — not whether every applicable cross-cutting spec appears in the linked specs list.
 
+For a positive post-implementation VERIFIED verdict, do not write the bridge
+file directly. Use the reviewed verdict body with the atomic finalization helper:
+python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
+The helper must create the local commit containing the verified path set and the
+new VERIFIED verdict artifact. If you cannot identify the verified path set or
+the helper cannot commit, fail closed and report NO-GO/blocker evidence instead
+of leaving a terminal VERIFIED file in the worktree.
+
 Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
 python scripts\\adr_dcl_clause_preflight.py --bridge-id <document-slug>

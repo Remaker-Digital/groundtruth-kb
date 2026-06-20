@@ -7450,6 +7450,190 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-18T21:35:29.051895Z
   answer: "Your questions have been answered: \"The VERIFIED quarantine fix is already committed. 48 unrelated/in-flight entries remain uncommitted. How should I handle the remaining tree?\"=\"Just remove the $null cruft\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1299
+  asked_at: 2026-06-18T22:01:10.454082Z
+  question: "My interactive session resolves to Loyal Opposition (via a stale/cross-session marker from session 6fe329df), blocking the prime-builder implementation claims the loop needs. Durable role is Prime Builder. How to resolve?"
+  options:
+    - "I'll re-assert: type ::init gtkb pb"
+    - "Clear the stale marker for me"
+    - "Keep me as Loyal Opposition"
+    - "Pause the loop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: de85ddc1bf1d4ac3
+  resolved_at: 2026-06-18T22:01:10.454082Z
+  answer: "Your questions have been answered: \"My interactive session resolves to Loyal Opposition (via a stale/cross-session marker from session 6fe329df), blocking the prime-builder implementation claims the loop needs. Durable role is Prime Builder. How to resolve?\"=\"::init gtkb pb\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1300
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "How many Activity Envelopes can be open at once in a session? (Your stated preference is single-active; this records it as a deliberate override of the prior 'up to 5 concurrent' design — DELIB-20260697/698.)"
+  options:
+    - "Single active (auto-close) (Recommended)"
+    - "Up to 5 concurrent"
+    - "Single + stack override"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cac145d3b655bec4
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"How many Activity Envelopes can be open at once in a session? (Your stated preference is single-active; this records it as a deliberate override of the prior 'up to 5 concurrent' design — DELIB-20260697/698.)\"=\"Single active (auto-close) (Recommended)\", \"Should the Activity Envelope mechanically carry the agent's stance/disposition and bias which tools are salient?\"=\"Yes — named & enforced (Recommended)\", \"What should ::init <subject> <role> do at the top of a message, given headless agents must honor it without blocking?\"=\"Minimal non-blocking identity (Recommended)\", \"How do we decide which activities are headless-eligible vs always-interactive?\"=\"Classify now by type (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1301
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "Should the Activity Envelope mechanically carry the agent's stance/disposition and bias which tools are salient?"
+  options:
+    - "Yes — named & enforced (Recommended)"
+    - "Yes — advisory only"
+    - "No — keep as prose"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0b067136e96fc498
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"How many Activity Envelopes can be open at once in a session? (Your stated preference is single-active; this records it as a deliberate override of the prior 'up to 5 concurrent' design — DELIB-20260697/698.)\"=\"Single active (auto-close) (Recommended)\", \"Should the Activity Envelope mechanically carry the agent's stance/disposition and bias which tools are salient?\"=\"Yes — named & enforced (Recommended)\", \"What should ::init <subject> <role> do at the top of a message, given headless agents must honor it without blocking?\"=\"Minimal non-blocking identity (Recommended)\", \"How do we decide which activities are headless-eligible vs always-interactive?\"=\"Classify now by type (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1302
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "What should ::init <subject> <role> do at the top of a message, given headless agents must honor it without blocking?"
+  options:
+    - "Minimal non-blocking identity (Recommended)"
+    - "Gate wait on interactive"
+    - "Keep current behavior"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 04244cdc337b233b
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"How many Activity Envelopes can be open at once in a session? (Your stated preference is single-active; this records it as a deliberate override of the prior 'up to 5 concurrent' design — DELIB-20260697/698.)\"=\"Single active (auto-close) (Recommended)\", \"Should the Activity Envelope mechanically carry the agent's stance/disposition and bias which tools are salient?\"=\"Yes — named & enforced (Recommended)\", \"What should ::init <subject> <role> do at the top of a message, given headless agents must honor it without blocking?\"=\"Minimal non-blocking identity (Recommended)\", \"How do we decide which activities are headless-eligible vs always-interactive?\"=\"Classify now by type (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1303
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "How do we decide which activities are headless-eligible vs always-interactive?"
+  options:
+    - "Classify now by type (Recommended)"
+    - "All headless-capable"
+    - "Defer to implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2c83c40d487d7001
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"How many Activity Envelopes can be open at once in a session? (Your stated preference is single-active; this records it as a deliberate override of the prior 'up to 5 concurrent' design — DELIB-20260697/698.)\"=\"Single active (auto-close) (Recommended)\", \"Should the Activity Envelope mechanically carry the agent's stance/disposition and bias which tools are salient?\"=\"Yes — named & enforced (Recommended)\", \"What should ::init <subject> <role> do at the top of a message, given headless agents must honor it without blocking?\"=\"Minimal non-blocking identity (Recommended)\", \"How do we decide which activities are headless-eligible vs always-interactive?\"=\"Classify now by type (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1304
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "When a host shifts from GT-KB scope to application-exclusive scope, how formal should that transition be? (You described: self-test → triage blocking WIs → drive to VERIFIED → flip config → record disposition.)"
+  options:
+    - "First-class procedure + project template (Recommended)"
+    - "Gate criteria only, ad hoc execution"
+    - "Defer — capture requirement, design later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4f39ef823af1f96c
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"When a host shifts from GT-KB scope to application-exclusive scope, how formal should that transition be? (You described: self-test → triage blocking WIs → drive to VERIFIED → flip config → record disposition.)\"=\"First-class procedure + project template (Recommended)\", \"Should every GT-KB-subject session be bound to defer to the public repo (released Main), then issues tracker + wiki, before contemplating GT-KB changes?\"=\"Standing enforced rule (Recommended)\", \"How should an application-scope session deliver a GT-KB-targeted fix/enhancement it is NOT allowed to implement?\"=\"Reuse bridge ADVISORY + advisory-router (Recommended)\", \"What should this deliberation produce, and where does it live relative to the existing envelope programs (WI-4482 explicit-hint, WI-3468 envelope grilling, agent-disposition)?\"=\"Advisory extending existing programs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1305
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "Should every GT-KB-subject session be bound to defer to the public repo (released Main), then issues tracker + wiki, before contemplating GT-KB changes?"
+  options:
+    - "Standing enforced rule (Recommended)"
+    - "Advisory guidance only"
+    - "Defer"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 623cbe3cdf0655ee
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"When a host shifts from GT-KB scope to application-exclusive scope, how formal should that transition be? (You described: self-test → triage blocking WIs → drive to VERIFIED → flip config → record disposition.)\"=\"First-class procedure + project template (Recommended)\", \"Should every GT-KB-subject session be bound to defer to the public repo (released Main), then issues tracker + wiki, before contemplating GT-KB changes?\"=\"Standing enforced rule (Recommended)\", \"How should an application-scope session deliver a GT-KB-targeted fix/enhancement it is NOT allowed to implement?\"=\"Reuse bridge ADVISORY + advisory-router (Recommended)\", \"What should this deliberation produce, and where does it live relative to the existing envelope programs (WI-4482 explicit-hint, WI-3468 envelope grilling, agent-disposition)?\"=\"Advisory extending existing programs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1306
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "How should an application-scope session deliver a GT-KB-targeted fix/enhancement it is NOT allowed to implement?"
+  options:
+    - "Reuse bridge ADVISORY + advisory-router (Recommended)"
+    - "New dedicated cross-scope artifact"
+    - "Public issues tracker only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2d31a562b8f8bebc
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"When a host shifts from GT-KB scope to application-exclusive scope, how formal should that transition be? (You described: self-test → triage blocking WIs → drive to VERIFIED → flip config → record disposition.)\"=\"First-class procedure + project template (Recommended)\", \"Should every GT-KB-subject session be bound to defer to the public repo (released Main), then issues tracker + wiki, before contemplating GT-KB changes?\"=\"Standing enforced rule (Recommended)\", \"How should an application-scope session deliver a GT-KB-targeted fix/enhancement it is NOT allowed to implement?\"=\"Reuse bridge ADVISORY + advisory-router (Recommended)\", \"What should this deliberation produce, and where does it live relative to the existing envelope programs (WI-4482 explicit-hint, WI-3468 envelope grilling, agent-disposition)?\"=\"Advisory extending existing programs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1307
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "What should this deliberation produce, and where does it live relative to the existing envelope programs (WI-4482 explicit-hint, WI-3468 envelope grilling, agent-disposition)?"
+  options:
+    - "Advisory extending existing programs (Recommended)"
+    - "New standalone project"
+    - "Fold into existing WIs, no umbrella"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 794e449acac2e0d4
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"When a host shifts from GT-KB scope to application-exclusive scope, how formal should that transition be? (You described: self-test → triage blocking WIs → drive to VERIFIED → flip config → record disposition.)\"=\"First-class procedure + project template (Recommended)\", \"Should every GT-KB-subject session be bound to defer to the public repo (released Main), then issues tracker + wiki, before contemplating GT-KB changes?\"=\"Standing enforced rule (Recommended)\", \"How should an application-scope session deliver a GT-KB-targeted fix/enhancement it is NOT allowed to implement?\"=\"Reuse bridge ADVISORY + advisory-router (Recommended)\", \"What should this deliberation produce, and where does it live relative to the existing envelope programs (WI-4482 explicit-hint, WI-3468 envelope grilling, agent-disposition)?\"=\"Advisory extending existing programs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1308
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "You said an ::open build would translate this advisory into a project + umbrella + ordered WIs for headless PB. But the activity vocab already has `build` (= software build/package, in code) AND a decided 'project-completion dispatch-envelope type' (WI-4297, DELIB-20260636 #3) that drives a program to VERIFIED by fanning out to headless workers. Which did you actually mean?"
+  options:
+    - "Plan-construction — reuse WI-4297 (Recommended)"
+    - "Overload `build` to mean both"
+    - "New verb for plan-construction"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e6bb00db9749a356
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"You said an ::open build would translate this advisory into a project + umbrella + ordered WIs for headless PB. But the activity vocab already has `build` (= software build/package, in code) AND a decided 'project-completion dispatch-envelope type' (WI-4297, DELIB-20260636 #3) that drives a program to VERIFIED by fanning out to headless workers. Which did you actually mean?\"=\"I was not suggesting that \"::open build\" would trigger all of those actions. Only that the work that gets done would be triggered by the contents of an \"::open build\" envelope. There may need to be other instructions as well  in order to classify/categorize and fan out specific work items. For example, we may decide that we would like to dispatch \"::init application pb\" artifacts containing \"::open build\" envelopes to certain harnesses or models, with instructions tailored for a \"build\" activity (e.g., a CLI tool that produces uniform, easy-to-parse-and-understand content related to code and artifact creation), while we dispatch \"::init application pb\" artifacts containing \"::open test\" to other harnesses/models with specific contents intended to drive execution of a test plan. The activity explicit hint is intended to help the agent correctly interpret and act (perhaps with explicit mechanical assistance) contents of the envelope. The activity explicit hint is not necessarily a directive to take action, although it may be a directive to acquire information and then - based on the explicit disposition of the role - take action depending on the information acquired. This would be the case for a new type of envelope, for example, called \"ops\" - in this case, the \"ops\" activity envelope would automatically cause the agent to retrieve a summary of the current status of the deployed application. In an interactive session, the agent should voluntarily (or mechanically) apply a set of decision criteria in order to produce a prioritized list of AUQ options for immediate user response (such as apply a patch, increase a scale threshold, approve an operational change, triage support cases and evaluate application user activity and explicit ops-related feedback.\", \"Your minimal-::init decision evolves a prior owner decision (DELIB-20260636 #5 set 'minimal open' on ::init = role/governance/bridge-surface/top-3/dashboard). How should I record the relationship in the advisory?\"=\"Refine #5: strip further + relocate options to ::open (Recommended)\", \"Three activity-vocabulary lists currently disagree. Code: {spec, build, test, deliberation, project}. Owner-grilled DELIB-20260636: {deliberation, build, test, push, project, upgrade, operation}. Explicit-hint spec: {spec, build, test, deliberation, project}. How should the advisory handle this drift?\"=\"Flag as drift defect + reconcile-to-canonical WI (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1309
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "Your minimal-::init decision evolves a prior owner decision (DELIB-20260636 #5 set 'minimal open' on ::init = role/governance/bridge-surface/top-3/dashboard). How should I record the relationship in the advisory?"
+  options:
+    - "Refine #5: strip further + relocate options to ::open (Recommended)"
+    - "Keep #5, add headless non-blocking gate only"
+    - "Defer reconciliation to build-out"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1ddf228d2cce8bc4
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"You said an ::open build would translate this advisory into a project + umbrella + ordered WIs for headless PB. But the activity vocab already has `build` (= software build/package, in code) AND a decided 'project-completion dispatch-envelope type' (WI-4297, DELIB-20260636 #3) that drives a program to VERIFIED by fanning out to headless workers. Which did you actually mean?\"=\"I was not suggesting that \"::open build\" would trigger all of those actions. Only that the work that gets done would be triggered by the contents of an \"::open build\" envelope. There may need to be other instructions as well  in order to classify/categorize and fan out specific work items. For example, we may decide that we would like to dispatch \"::init application pb\" artifacts containing \"::open build\" envelopes to certain harnesses or models, with instructions tailored for a \"build\" activity (e.g., a CLI tool that produces uniform, easy-to-parse-and-understand content related to code and artifact creation), while we dispatch \"::init application pb\" artifacts containing \"::open test\" to other harnesses/models with specific contents intended to drive execution of a test plan. The activity explicit hint is intended to help the agent correctly interpret and act (perhaps with explicit mechanical assistance) contents of the envelope. The activity explicit hint is not necessarily a directive to take action, although it may be a directive to acquire information and then - based on the explicit disposition of the role - take action depending on the information acquired. This would be the case for a new type of envelope, for example, called \"ops\" - in this case, the \"ops\" activity envelope would automatically cause the agent to retrieve a summary of the current status of the deployed application. In an interactive session, the agent should voluntarily (or mechanically) apply a set of decision criteria in order to produce a prioritized list of AUQ options for immediate user response (such as apply a patch, increase a scale threshold, approve an operational change, triage support cases and evaluate application user activity and explicit ops-related feedback.\", \"Your minimal-::init decision evolves a prior owner decision (DELIB-20260636 #5 set 'minimal open' on ::init = role/governance/bridge-surface/top-3/dashboard). How should I record the relationship in the advisory?\"=\"Refine #5: strip further + relocate options to ::open (Recommended)\", \"Three activity-vocabulary lists currently disagree. Code: {spec, build, test, deliberation, project}. Owner-grilled DELIB-20260636: {deliberation, build, test, push, project, upgrade, operation}. Explicit-hint spec: {spec, build, test, deliberation, project}. How should the advisory handle this drift?\"=\"Flag as drift defect + reconcile-to-canonical WI (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1310
+  asked_at: 2026-06-20T02:08:32.838577Z
+  question: "Three activity-vocabulary lists currently disagree. Code: {spec, build, test, deliberation, project}. Owner-grilled DELIB-20260636: {deliberation, build, test, push, project, upgrade, operation}. Explicit-hint spec: {spec, build, test, deliberation, project}. How should the advisory handle this drift?"
+  options:
+    - "Flag as drift defect + reconcile-to-canonical WI (Recommended)"
+    - "Adopt the DELIB-20260636 7-verb vocab now"
+    - "Defer — note it, out of scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 01deecff0e8f9784
+  resolved_at: 2026-06-20T02:08:32.838577Z
+  answer: "Your questions have been answered: \"You said an ::open build would translate this advisory into a project + umbrella + ordered WIs for headless PB. But the activity vocab already has `build` (= software build/package, in code) AND a decided 'project-completion dispatch-envelope type' (WI-4297, DELIB-20260636 #3) that drives a program to VERIFIED by fanning out to headless workers. Which did you actually mean?\"=\"I was not suggesting that \"::open build\" would trigger all of those actions. Only that the work that gets done would be triggered by the contents of an \"::open build\" envelope. There may need to be other instructions as well  in order to classify/categorize and fan out specific work items. For example, we may decide that we would like to dispatch \"::init application pb\" artifacts containing \"::open build\" envelopes to certain harnesses or models, with instructions tailored for a \"build\" activity (e.g., a CLI tool that produces uniform, easy-to-parse-and-understand content related to code and artifact creation), while we dispatch \"::init application pb\" artifacts containing \"::open test\" to other harnesses/models with specific contents intended to drive execution of a test plan. The activity explicit hint is intended to help the agent correctly interpret and act (perhaps with explicit mechanical assistance) contents of the envelope. The activity explicit hint is not necessarily a directive to take action, although it may be a directive to acquire information and then - based on the explicit disposition of the role - take action depending on the information acquired. This would be the case for a new type of envelope, for example, called \"ops\" - in this case, the \"ops\" activity envelope would automatically cause the agent to retrieve a summary of the current status of the deployed application. In an interactive session, the agent should voluntarily (or mechanically) apply a set of decision criteria in order to produce a prioritized list of AUQ options for immediate user response (such as apply a patch, increase a scale threshold, approve an operational change, triage support cases and evaluate application user activity and explicit ops-related feedback.\", \"Your minimal-::init decision evolves a prior owner decision (DELIB-20260636 #5 set 'minimal open' on ::init = role/governance/bridge-surface/top-3/dashboard). How should I record the relationship in the advisory?\"=\"Refine #5: strip further + relocate options to ::open (Recommended)\", \"Three activity-vocabulary lists currently disagree. Code: {spec, build, test, deliberation, project}. Owner-grilled DELIB-20260636: {deliberation, build, test, push, project, upgrade, operation}. Explicit-hint spec: {spec, build, test, deliberation, project}. How should the advisory handle this drift?\"=\"Flag as drift defect + reconcile-to-canonical WI (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1311
+  asked_at: 2026-06-20T09:15:58.414526Z
+  question: "Given the redesign vision already exists as WI-4438 (ACTIVE-ORCHESTRATION) and the reliability work exists in COST-OPTIMIZED-AUTODISPATCH, how should I land the deliberation?"
+  options:
+    - "Fold into existing (Recommended)"
+    - "New consolidation umbrella"
+    - "New separate project anyway"
+    - "Map full overlap first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ed1365d665c79593
+  resolved_at: 2026-06-20T09:15:58.414526Z
+  answer: "Your questions have been answered: \"Given the redesign vision already exists as WI-4438 (ACTIVE-ORCHESTRATION) and the reliability work exists in COST-OPTIMIZED-AUTODISPATCH, how should I land the deliberation?\"=\"Fold into existing (Recommended)\", \"The dispatch-reliability WIs marked VERIFIED are contradicted by live failures and were verified by the now-known-crashing cloud reviewers. What do you want done about that?\"=\"Re-verify live + re-open failures (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1312
+  asked_at: 2026-06-20T09:15:58.414526Z
+  question: "The dispatch-reliability WIs marked VERIFIED are contradicted by live failures and were verified by the now-known-crashing cloud reviewers. What do you want done about that?"
+  options:
+    - "Re-verify live + re-open failures (Recommended)"
+    - "Record as a finding for now"
+    - "Open a verification-integrity investigation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c991d09e2e175105
+  resolved_at: 2026-06-20T09:15:58.414526Z
+  answer: "Your questions have been answered: \"Given the redesign vision already exists as WI-4438 (ACTIVE-ORCHESTRATION) and the reliability work exists in COST-OPTIMIZED-AUTODISPATCH, how should I land the deliberation?\"=\"Fold into existing (Recommended)\", \"The dispatch-reliability WIs marked VERIFIED are contradicted by live failures and were verified by the now-known-crashing cloud reviewers. What do you want done about that?\"=\"Re-verify live + re-open failures (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

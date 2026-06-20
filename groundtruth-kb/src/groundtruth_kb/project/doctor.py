@@ -218,6 +218,7 @@ _LEGACY_ROOT_PATTERN_SCRIPT_NAMES = frozenset(
         "wrap_scan_hygiene.py",
     }
 )
+_LEGACY_ROOT_PATTERN_FILE_NAMES = frozenset({"hygiene-sweep-patterns.toml"})
 _LEGACY_ROOT_ALLOWED_CONTEXT_RE = re.compile(
     r"archive[- ]only|not a live|must not be (?:used|treated)|forbidden_aliases|retired|migration|migrate|"
     r"legacy[-_]root|hygiene|pattern|_LEGACY_ROOT_|No active control-surface",
@@ -1501,6 +1502,8 @@ def _iter_active_legacy_root_surfaces(target: Path) -> list[Path]:
 def _legacy_root_reference_is_allowed(relative_path: Path, lines: list[str], line_index: int) -> bool:
     """Classify archive/migration/hygiene mentions as non-live references."""
     if relative_path.name in _LEGACY_ROOT_PATTERN_SCRIPT_NAMES:
+        return True
+    if relative_path.name in _LEGACY_ROOT_PATTERN_FILE_NAMES:
         return True
     start = max(0, line_index - 2)
     end = min(len(lines), line_index + 3)
@@ -3950,6 +3953,105 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
     )
 
 
+_HARNESS_SCRATCHPAD_BOUNDARY_DOCS = (
+    Path("AGENTS.md"),
+    Path(".claude") / "rules" / "project-root-boundary.md",
+)
+_HARNESS_SCRATCHPAD_REQUIRED_TERMS = (
+    "harness-local scratchpads",
+    "non-authoritative",
+    "antigravity planning/brain files",
+    "codex automation memory",
+    "claude code auto-memory",
+    "`memory.md` hierarchy",
+    "formal gt-kb artifacts",
+    "implementation reports",
+    "verification verdicts",
+    "tests",
+    "doctor checks",
+    "bridge evidence",
+    "governed decisions",
+    "release evidence",
+    "dependency closure",
+    "promoted into governed in-root artifacts",
+)
+_HARNESS_SCRATCHPAD_POSITIVE_AUTHORITY_RE = re.compile(
+    r"\b(?:MEMORY\.md|auto-memory|scratchpads?|scratch/notepad|brain files?|"
+    r"Antigravity planning|Codex automation memory|Claude Code auto-memory|"
+    r"harness-local scratchpads?)\b.{0,120}\b(?:is|are|as|becomes?|counts as|"
+    r"serves as|source for|evidence for)\b.{0,120}\b(?:authoritative|canonical|"
+    r"source of truth|live dependency|formal artifact|implementation report|"
+    r"verification verdict|test evidence|doctor check|bridge evidence|"
+    r"governed decision|release evidence|dependency closure)\b",
+    re.IGNORECASE,
+)
+_HARNESS_SCRATCHPAD_NEGATION_RE = re.compile(
+    r"\b(?:non-authoritative|not authoritative|not canonical|cannot|must not|"
+    r"do not|does not|is not|are not|forbids?|outside the scope)\b",
+    re.IGNORECASE,
+)
+
+
+def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
+    """Verify harness-local scratchpads cannot become GT-KB authority.
+
+    Implements WI-4681 / ``DELIB-20260619-HARNESS-SCRATCHPAD-NON-AUTHORITY``.
+    The check is deliberately narrow: it validates the two operator-facing
+    boundary surfaces and fails if those surfaces regress to granting positive
+    authority to Antigravity planning/brain files, Codex automation memory,
+    Claude Code auto-memory, or the ``MEMORY.md`` hierarchy.
+    """
+    check_name = "Harness-local scratchpad non-authority boundary"
+    findings: list[str] = []
+
+    for rel in _HARNESS_SCRATCHPAD_BOUNDARY_DOCS:
+        path = target / rel
+        rel_text = rel.as_posix()
+        if not path.is_file():
+            findings.append(f"{rel_text} missing")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            findings.append(f"{rel_text} unreadable: {exc}")
+            continue
+
+        lowered = text.lower()
+        missing_terms = [term for term in _HARNESS_SCRATCHPAD_REQUIRED_TERMS if term not in lowered]
+        if missing_terms:
+            findings.append(f"{rel_text} missing required term(s): {', '.join(missing_terms)}")
+
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if not _HARNESS_SCRATCHPAD_POSITIVE_AUTHORITY_RE.search(line):
+                continue
+            if _HARNESS_SCRATCHPAD_NEGATION_RE.search(line):
+                continue
+            excerpt = line.strip()
+            if len(excerpt) > 160:
+                excerpt = excerpt[:157] + "..."
+            findings.append(f"{rel_text}:{line_number} grants scratchpad authority: {excerpt}")
+
+    if findings:
+        head = findings[0]
+        extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="fail",
+            message=f"{len(findings)} boundary finding(s); first: {head}{extra}",
+        )
+
+    docs = ", ".join(path.as_posix() for path in _HARNESS_SCRATCHPAD_BOUNDARY_DOCS)
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=f"scratchpad non-authority boundary declared and non-regressed in {docs}",
+    )
+
+
 _HARNESS_EXEC_SCAN_TARGETS = (
     Path("scripts") / "cross_harness_bridge_trigger.py",
     Path("scripts") / "verify_antigravity_dispatch.py",
@@ -5236,6 +5338,7 @@ def run_doctor(
         # target's argv head so a WinError-2-class launch regression surfaces
         # in the doctor rather than as a silent exit-127 in dispatch logs.
         checks.append(_check_harness_launchability(target))
+        checks.append(_check_harness_local_scratchpad_boundary(target))
         checks.append(_check_external_harness_exec_boundary(target))
         # IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
         # (Codex GO at -014): role-set schema validation + single-harness

@@ -14,6 +14,7 @@ from groundtruth_kb.bridge.proposal_autoload import (
     auto_project_metadata,
     auto_spec_links,
 )
+from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.cli import main
 from groundtruth_kb.cli_bridge_propose import build_propose_context, render_proposal_draft
 from groundtruth_kb.db import KnowledgeDB
@@ -139,6 +140,15 @@ def test_implementation_template_renders(project_dir: Path) -> None:
     assert f"Project Authorization: {AUTH_ID}" in rendered
     assert "## Specification Links" in rendered
     assert "${claim}" in rendered
+
+
+def test_template_bridge_kind_default_matches_taxonomy(project_dir: Path) -> None:
+    _seed_project(project_dir)
+    rendered = render_proposal_draft("implementation", _context(project_dir))
+    allowed_kinds = {kind.value for kind in BridgeKind}
+    assert f"bridge_kind: {BridgeKind.PRIME_PROPOSAL.value}" in rendered
+    assert BridgeKind.PRIME_PROPOSAL.value in allowed_kinds
+    assert "bridge_kind: implementation_proposal_draft" not in rendered
 
 
 def test_defect_fix_template_renders(project_dir: Path) -> None:

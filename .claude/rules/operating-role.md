@@ -151,20 +151,24 @@ keyword, and the receiver-side `STRICT_DROP` gate enforces durable set
 membership for headless dispatch. This is unchanged.
 
 An **interactive session** (no `GTKB_BRIDGE_POLLER_RUN_ID` env-var) MAY override
-the durable role for in-session surfaces by including the canonical init keyword
-`::init gtkb (pb|lo)` on an owner prompt. When declared, the session-stated role
-governs SessionStart disclosure rendering, the AXIS 2 Claude-native surface
+the durable role for in-session surfaces when the owner gives explicit role
+direction in the transcript, including the canonical init keyword
+`::init gtkb (pb|lo)` on an owner prompt. When declared, the transcript-defined
+role governs SessionStart disclosure rendering, the AXIS 2 Claude-native surface
 filter, the workstream-focus menu shape, MemBase `changed_by` attribution, and
-AUQ-keyed routing for the rest of the session. An interactive session with no
-init keyword falls back to the durable role. See `GOV-SESSION-ROLE-AUTHORITY-001`
-(authority split), `DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution
-table), and `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected
-alternatives).
+AUQ-keyed routing for the rest of the interactive context. An interactive
+session with no explicit role direction falls back to the durable role. See
+`GOV-SESSION-ROLE-AUTHORITY-001` (authority split),
+`DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution table),
+`ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives),
+`ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001` (persistence decision), and
+`DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001` (persistence constraints).
 
-The session-stated role is held in an ephemeral marker
-(`.claude/session/active-session-role.json`) that is invalidated at the next
-SessionStart; it carries no durable record and does not survive compaction or
-resume. **This does not weaken the durable-assignment invariant above**: the
-marker is ephemeral runtime state, not a rule file, so the rule that "no markdown
-rule file can override the durable role assignment map" remains exactly true.
-Durable role mutations still require the `gt mode set-role` transaction component.
+The transcript-defined role persists across compaction, resume, and contiguous
+SessionStart-like boundaries within the same interactive context until the owner
+explicitly changes it. Runtime marker files such as
+`.claude/session/active-session-role.json` may cache the resolved role for hook
+plumbing, but they carry no durable role record and are not the authority.
+**This does not weaken the durable-assignment invariant above**: transcript role
+does not mutate the durable role assignment map, and durable role mutations
+still require the `gt mode set-role` transaction component.

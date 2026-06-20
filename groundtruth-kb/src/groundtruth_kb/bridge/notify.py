@@ -47,8 +47,10 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
   closure, parking, index_reconciliation, thread_reconciliation,
   operational_state_change, candidate_spec_intake, implementation_report)
   have no Prime follow-up after a GO verdict.
-- ``VERIFIED`` / ``ADVISORY`` / ``DEFERRED`` / ``WITHDRAWN`` top status →
-  not actionable for either.
+- ``ADVISORY`` top status -> Prime Builder owner-visible disposition work,
+  but non-dispatchable for headless automation.
+- ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` top status -> not actionable
+  for either role.
 
 Phase-2 Ollama dispatch wiring keeps this module role-actionability-only.
 Harness-local readiness (Ollama shim, daemon, route/tool subset) is applied
@@ -72,20 +74,23 @@ from pathlib import Path
 from typing import Final
 
 from groundtruth_kb.bridge.detector import BridgeDocument, BridgeStatus, BridgeVersion, ParseResult
+from groundtruth_kb.bridge.disposition import (
+    BRIDGE_KIND_DISPATCHABLE_TOKENS,
+    BRIDGE_KIND_TERMINAL_TOKENS,
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    PRIME_ACTIONABLE_STATUSES,
+    dispatchable_for_status,
+    is_actionable_status_for_role,
+)
 from groundtruth_kb.bridge.routing import BridgeAgent
 
 NOTIFY_SUBDIR: Final[str] = "notifications"
 NOTIFY_SCHEMA_VERSION: Final[int] = 3
 
-# Per AGENTS.md:153-159 + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION.
-# VERIFIED/DEFERRED/WITHDRAWN are non-actionable for both Prime and Codex.
-# ADVISORY is actionable for Prime only (advisory disposition requires Prime
-# owner-deliberation/UAQ work) but remains non-dispatchable via
-# ``_derive_dispatchable`` so it never spawns a headless Prime session.
-ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = frozenset(
-    {BridgeStatus.GO.value, BridgeStatus.NO_GO.value, BridgeStatus.ADVISORY.value}
-)
-ACTIONABLE_STATUSES_FOR_CODEX: Final[frozenset[str]] = frozenset({BridgeStatus.NEW.value, BridgeStatus.REVISED.value})
+# Per AGENTS.md + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION.
+# These compatibility names are sourced from the shared disposition matrix.
+ACTIONABLE_STATUSES_FOR_PRIME: Final[frozenset[str]] = PRIME_ACTIONABLE_STATUSES
+ACTIONABLE_STATUSES_FOR_CODEX: Final[frozenset[str]] = LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 
 # Feature flag for kind-aware routing. =0 disables filtering and matches
 # pre-refinement behavior (all entries dispatchable=True via fallback).
@@ -96,41 +101,8 @@ KIND_AWARE_ROUTING_ENV_VAR: Final[str] = "GTKB_NOTIFY_KIND_AWARE_ROUTING"
 # more-specific tokens (e.g., "scoping" inside "implementation_scoping") win
 # before broader matches. Per smart-poller-kind-aware-routing-2026-04-30-009
 # REVISED-4 §1.1.
-_KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = (
-    "scoping",  # implementation_scoping, governance_scoping_proposal, scoping_proposal, scoping_addendum
-    "closure",
-    "parking",  # parking_acknowledgement
-    "index_reconciliation",
-    "thread_reconciliation",
-    "operational_state_change",
-    "candidate_spec_intake",
-    # Compliance-exempt non-implementation kinds — mirror of
-    # bridge-compliance-gate.py BRIDGE_KIND_METADATA_EXEMPT. A GO on these has no
-    # Prime implementation follow-up, so they must be dispatch-terminal; this
-    # prevents headless dispatch of owner-gated governance work (the forgery
-    # enabler). Per gtkb-bridge-kind-terminal-exempt-alignment GO at -004
-    # (WI GTKB-BRIDGE-POLLER-PRIME-CLASSIFICATION-REFINEMENT).
-    "governance_review",
-    "spec_intake",  # also matched by candidate_spec_intake above; explicit for symmetry
-    "loyal_opposition_advisory",
-    "governance_advisory",
-    # Post-implementation reports resolve through VERIFIED/NO-GO. A GO verdict
-    # over a report is a lifecycle anomaly and must not dispatch Prime as if it
-    # were implementation-start authority.
-    "post_implementation",  # post_implementation_report, post-implementation-report
-    "post_impl",  # post_impl_report
-    "implementation_report",
-)
-
-_KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = (
-    "implementation_proposal",
-    "implementation_slice",
-    "multiphase_implementation",
-    "fix",
-    "governance_proposal",
-    "architecture_proposal",
-    "prime_proposal",
-)
+_KIND_TERMINAL_TOKENS: Final[tuple[str, ...]] = BRIDGE_KIND_TERMINAL_TOKENS
+_KIND_DISPATCHABLE_TOKENS: Final[tuple[str, ...]] = BRIDGE_KIND_DISPATCHABLE_TOKENS
 
 # Bare "proposal", "review", "verification", and unrecognized kinds → ambiguous
 # → status-only fallback. Ambiguous entries are dispatched on actionable
@@ -242,15 +214,10 @@ def _derive_dispatchable(top_status: str, classification: str) -> bool:
       approval")
     - GO → ``classification != "terminal"`` (Prime filters terminal kinds,
       keeps everything else)
-    - VERIFIED / ADVISORY / DEFERRED / WITHDRAWN + others → False (not actionable)
+    - ADVISORY + others -> False for headless dispatch (Prime-visible/manual only)
+    - VERIFIED / DEFERRED / WITHDRAWN + others -> False (not actionable)
     """
-    if top_status in ACTIONABLE_STATUSES_FOR_CODEX:
-        return True
-    if top_status == BridgeStatus.NO_GO.value:
-        return True
-    if top_status == BridgeStatus.GO.value:
-        return classification != "terminal"
-    return False
+    return dispatchable_for_status(top_status, classification)
 
 
 @dataclass(frozen=True)
@@ -307,9 +274,9 @@ def _atomic_write_text(target: Path, content: str) -> None:
 
 def _is_actionable_for(status: str, recipient: BridgeAgent) -> bool:
     if recipient is BridgeAgent.PRIME:
-        return status in ACTIONABLE_STATUSES_FOR_PRIME
+        return is_actionable_status_for_role(status, "prime-builder")
     if recipient is BridgeAgent.CODEX:
-        return status in ACTIONABLE_STATUSES_FOR_CODEX
+        return is_actionable_status_for_role(status, "loyal-opposition")
     return False
 
 
@@ -348,7 +315,9 @@ def compute_actionable_pending(
 
     - ``GO`` / ``NO-GO`` → Prime list.
     - ``NEW`` / ``REVISED`` → Codex list.
-    - ``VERIFIED`` / ``ADVISORY`` / ``DEFERRED`` / ``WITHDRAWN`` → excluded
+    - ``ADVISORY`` -> Prime list, with ``dispatchable=False`` for headless
+      automation.
+    - ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` -> excluded
       (non-actionable for both per bridge protocol).
     - Documents whose top file is missing on disk are excluded (UNROUTABLE_FILE_MISSING
       semantic from P1 routing).
@@ -395,7 +364,8 @@ def compute_actionable_pending(
             actionable_for_prime.append(entry)
         elif status_str in ACTIONABLE_STATUSES_FOR_CODEX:
             actionable_for_codex.append(entry)
-        # VERIFIED/ADVISORY/DEFERRED/WITHDRAWN + anything else: not actionable, skip.
+        # VERIFIED/DEFERRED/WITHDRAWN + anything else: not actionable, skip.
+        # ADVISORY is handled above as Prime-visible but non-dispatchable.
 
     return actionable_for_prime, actionable_for_codex
 

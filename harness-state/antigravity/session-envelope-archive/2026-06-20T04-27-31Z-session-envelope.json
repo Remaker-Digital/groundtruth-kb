@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-20T04:27:31Z",
+  "envelope_schema_version": 1,
+  "harness_id": "C",
+  "harness_name": "antigravity",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-20T04:27:31Z",
+  "project_id": null,
+  "role": "loyal-opposition",
+  "role_asserted": null,
+  "role_resolved": "loyal-opposition",
+  "session_id": "C-2026-06-20T04-27-31Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .agent/skills/MANIFEST.json\n M .agent/skills/bridge/SKILL.md\n M .agent/skills/gtkb-propose/SKILL.md\n M .agent/skills/kb-session-wrap/SKILL.md\n M .agent/skills/proposal-review/SKILL.md\n M .agent/skills/verify/SKILL.md\n M .api-harness/skills/MANIFEST.json\n M .api-harness/skills/bridge/SKILL.md\n M .api-harness/skills/gtkb-propose/SKILL.md\n M .api-harness/skills/kb-session-wrap/SKILL.md\n M .api-harness/skills/proposal-review/SKILL.md\n M .api-harness/skills/verify/SKILL.md\n M .claude/hooks/bridge-compliance-gate.py\n M .claude/rules/canonical-terminology.md\n M .claude/rules/codex-review-gate.md\n M .claude/rules/file-bridge-protocol.md\n M .claude/rules/loyal-opposition.md\n M .claude/rules/operating-role.md\n M .claude/rules/prime-builder-role.md\n M .claude/rules/project-root-boundary.md\n M .claude/skills/bridge/helpers/scan_bridge.py\n M .claude/skills/gtkb-propose/SKILL.md\n M .claude/skills/verify/SKILL.md\n M .claude/skills/verify/helpers/write_verdict.py\n M AGENTS.md\n M CLAUDE.md\n M applications/Agent_Red/.gtkb-app-isolation.json\n M bridge/gtkb-harness-local-scratchpad-boundary-004.md\n M config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md\n M config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md\n M config/agent-control/SESSION-STARTUP-INDEX.md\n M groundtruth-kb/docs/reference/canonical-terminology-detail.md\n M groundtruth-kb/pyproject.toml\n M groundtruth-kb/src/groundtruth_kb/bridge/notify.py\n M groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py\n M groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py\n M groundtruth-kb/src/groundtruth_kb/db.py\n M groundtruth-kb/src/groundtruth_kb/project/doctor.py\n M groundtruth-kb/src/groundtruth_kb/session/handoff.py\n M groundtruth-kb/templates/hooks/bridge-compliance-gate.py\n M groundtruth-kb/tests/test_bridge_notify.py\n M groundtruth-kb/tests/test_cli_bridge_propose.py\n M groundtruth-kb/tests/test_doctor_legacy_root.py\n M groundtruth-kb/tests/test_governance_hooks.py\n M groundtruth-kb/uv.lock\n M harness-state/harness-registry.json\n M independent-progress-assessments/LOYAL-OPPOSITION-LOG.md\n M memory/MEMORY.md\n M memory/pending-owner-decisions.md\n M platform_tests/hooks/test_bridge_compliance_gate_hard_block_workspace.py\n M platform_tests/scripts/test_gtkb_propose_scaffold.py\n M platform_tests/scripts/test_ollama_dispatch_prompt_restructure.py\n M platform_tests/scripts/test_ollama_harness.py\n M platform_tests/scripts/test_openrouter_harness.py\n M platform_tests/scripts/test_scan_bridge.py\n M platform_tests/scripts/test_session_handoff_service.py\n M scripts/gtkb_propose_scaffold.py\n M scripts/ollama_harness.py\n M scripts/openrouter_harness.py\n M scripts/session_self_initialization.py\n?? $null\n?? .claude/skills/bridge/helpers/draft-4676-verdict.md\n?? .claude/skills/bridge/helpers/draft-4678-verdict.md\n?? .claude/skills/verify/helpers/_temp_verdict_gtkb-target-paths-coverage-preflight-006.md\n?? .claude/skills/verify/helpers/draft-004-body.md\n?? .claude/skills/verify/helpers/draft-gtkb-suppress-non-activatable-go-from-pb-scan-006-body.md\n?? .claude/skills/verify/helpers/draft-gtkb-target-paths-coverage-preflight-006-body.md\n?? .claude/skills/verify/helpers/draft-gtkb-wi4678-finalization-git-write-retry-002.md\n?? .claude/skills/verify/helpers/draft-gtkb-wi4678-git-write-finalization-002.md\n?? .claude/skills/verify/helpers/draft-wi4678-verdict-body.md\n?? .gtkb-tmp/\n?? .tmp-verdict-011-body.md\n?? adr_dcl_lo.json\n?? bridge/.draft-verdict-suppress-activatable.txt\n?? bridge/.draft-verdict-target-paths-coverage.txt\n?? bridge/agent-disposition-wi4589-external-mutation-gate-slice1-002.md\n?? bridge/agent-disposition-wi4589-external-mutation-gate-slice1-003.md\n?? bridge/agent-disposition-wi4591-bridge-disposition-workflow-slice1-002.md\n?? bridge/agent-disposition-wi4591-bridge-disposition-workflow-slice1-003.md\n?? bridge/agent-disposition-wi4592-cross-harness-protocol-parity-slice1-002.md",
+        "short_line_count": 145,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

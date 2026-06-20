@@ -78,8 +78,11 @@ Codex bridge scans are similarly owner-triggered in the Codex harness.
 The 2026-04-25 OS-poller halt was made after the former OS Claude poller
 (activated ~2026-04-23) was found to fire on a fixed interval regardless
 of bridge activity: 173 Claude capped-spawns/day at peak plus 92 Codex
-spawns/day, the great majority doing work without information. The defect
-was blind repetition, not the ~50k tokens each spawn consumed. The 2026-05-09 smart-poller retirement was made after a
+spawns/day, the great majority spawning a harness that found no actionable work
+waiting. The defect was not the fixed-interval check itself — that check was
+negligibly cheap — but that each tick spent an expensive resource (waking a
+harness into a full ~50k-token investigation) unconditionally, with no cheap
+deterministic gate in front of the spawn. The 2026-05-09 smart-poller retirement was made after a
 S321 daemon-dispatch-disabled incident exposed ongoing scoping ambiguity
 between interval-driven dispatch and event-driven dispatch (per
 `PB-INCIDENT-S321-DAEMON-DISPATCH-DISABLED-001`); the Slice 4 retirement
@@ -293,16 +296,18 @@ Do NOT, without explicit owner approval:
   tracked. The `!`-negation patterns added then remain in force for the rule
   files and PS1 scripts even though the retired hook itself is now removed.
 - **S308 (2026-04-25)**: Former OS Claude poller activation produced ~12.5M
-  tokens/day of background spawns (a ~10× jump), most doing work without
-  information because the poller fired on a fixed interval regardless of
-  bridge activity. Owner directive halted the retired pollers and removed the
+  tokens/day of background spawns (a ~10× jump), most spawning a harness that found no
+  actionable work, because each fixed-interval tick spawned a harness
+  unconditionally regardless of whether the bridge had changed. Owner directive halted the retired pollers and removed the
   freshness hook, restoring manual-trigger operation until smart-poller
   automation is available. The protocol itself was unaffected; after the
-  2026-06-15 cutover, TAFE-backed bridge state is canonical. Lesson: blind,
-  activity-independent automation — work
-  repeated whether or not there is anything to do — is the defect; automation
-  must be activity-driven and deterministic. The waste was work without
-  information, not token volume.
+  2026-06-15 cutover, TAFE-backed bridge state is canonical. Lesson: automation is
+  wasteful when it spends an expensive resource — principally agent
+  investigation tokens — without a commensurate chance of value; the cheap
+  fixed-interval check was never the defect, the unconditional expensive spawn
+  was. The remedy is to gate the expensive action behind a cheap, deterministic
+  check (the cross-harness trigger's actionable-signature check), evaluated as
+  relative value vs. cost per action.
 - **S339 (2026-05-09)**: Smart-poller retirement (Slice 4). Smart-poller
   scheduled task `GTKB-SmartBridgePoller` halted; runtime artifacts
   archived to `archive/smart-poller-2026-05-09/`; doctor's

@@ -35,6 +35,16 @@ PRETOOLUSE_HOOKS = [
 SESSIONSTART_HOOKS = ["session-start-governance.py"]
 USERPROMPTSUBMIT_HOOKS = ["delib-search-gate.py"]
 POSTTOOLUSE_HOOKS = ["delib-search-tracker.py"]
+WORK_INTENT_SESSION_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
 
 
 def _run_hook(
@@ -47,6 +57,13 @@ def _run_hook(
     run_env = os.environ.copy()
     if env:
         run_env.update(env)
+    try:
+        payload = json.loads(stdin_data or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    session_id = str(payload.get("session_id") or "test")
+    for env_var in WORK_INTENT_SESSION_ENV_VARS:
+        run_env[env_var] = session_id
     return subprocess.run(
         cmd,
         input=stdin_data or "{}",
@@ -565,22 +582,29 @@ def test_spec_before_code_match_via_migrated_db(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def _make_index(tmp_path: Path, entries: list[tuple[str, str, str]]) -> Path:
-    """Create bridge/INDEX.md with (doc_name, status, file_path) entries."""
+def _make_bridge_thread(tmp_path: Path, entries: list[tuple[str, str, str]]) -> Path:
+    """Create status-bearing versioned bridge files for hook routing."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir(exist_ok=True)
-    lines = ["# Bridge Index\n"]
-    for doc_name, status, file_path in entries:
-        lines.append(f"Document: {doc_name}")
-        lines.append(f"{status}: {file_path}")
-        lines.append("")
-    (bridge_dir / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
-    return bridge_dir / "INDEX.md"
+    for _doc_name, status, file_path in entries:
+        path = tmp_path / file_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text(f"{status}\n\n", encoding="utf-8")
+    return bridge_dir
+
+
+def _write_bridge_version(tmp_path: Path, slug: str, version: int, status: str) -> Path:
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    path = bridge_dir / f"{slug}-{version:03d}.md"
+    path.write_text(f"{status}\n\n", encoding="utf-8")
+    return path
 
 
 def test_bridge_compliance_go_entry(tmp_path):
     """Latest GO → pass (no target_paths in proposal → also pass)."""
-    _make_index(tmp_path, [("my-feature", "GO", "bridge/my-feature-002.md")])
+    _make_bridge_thread(tmp_path, [("my-feature", "GO", "bridge/my-feature-002.md")])
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -599,8 +623,7 @@ def test_bridge_compliance_no_frontmatter(tmp_path):
     """Latest NEW, no target_paths in proposal → pass."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text("Document: my-feature\nNEW: bridge/my-feature-001.md\n", encoding="utf-8")
-    (bridge_dir / "my-feature-001.md").write_text("# Proposal\n\nNo target_paths here.\n", encoding="utf-8")
+    (bridge_dir / "my-feature-001.md").write_text("NEW\n\n# Proposal\n\nNo target_paths here.\n", encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -619,11 +642,8 @@ def test_bridge_compliance_new_entry_match(tmp_path):
     """Latest NEW with frontmatter matching → ask with hookEventName."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n", encoding="utf-8"
-    )
     (bridge_dir / "auth-refactor-001.md").write_text(
-        '# Auth Refactor Proposal\n\ntarget_paths: ["src/auth.py"]\n\nSome content.\n',
+        'NEW\n\n# Auth Refactor Proposal\n\ntarget_paths: ["src/auth.py"]\n\nSome content.\n',
         encoding="utf-8",
     )
     payload = json.dumps(
@@ -647,10 +667,7 @@ def test_bridge_compliance_ask_has_additionalContext(tmp_path):
     """emit_ask for pending → both permissionDecisionReason and additionalContext."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n", encoding="utf-8"
-    )
-    (bridge_dir / "auth-refactor-001.md").write_text('target_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -670,13 +687,8 @@ def test_bridge_compliance_nogo_entry(tmp_path):
     """Latest NO-GO with matching frontmatter → ask."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNO-GO: bridge/auth-refactor-002.md\nNEW: bridge/auth-refactor-001.md\n",
-        encoding="utf-8",
-    )
-    (bridge_dir / "auth-refactor-002.md").write_text(
-        'target_paths: ["src/auth.py"]\n# NO-GO review\n', encoding="utf-8"
-    )
+    (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-002.md").write_text("NO-GO\n\n# NO-GO review\n", encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -696,10 +708,8 @@ def test_bridge_compliance_nogo_ask_has_additionalContext(tmp_path):
     """emit_ask for NO-GO → additionalContext == permissionDecisionReason."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNO-GO: bridge/auth-refactor-002.md\n", encoding="utf-8"
-    )
-    (bridge_dir / "auth-refactor-002.md").write_text('target_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-002.md").write_text("NO-GO\n\n# NO-GO review\n", encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -718,14 +728,11 @@ def test_bridge_compliance_revised_over_nogo(tmp_path):
     """Latest REVISED, historical NO-GO below → ask (pending flavor, not NO-GO)."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\n"
-        "REVISED: bridge/auth-refactor-003.md\n"
-        "NO-GO: bridge/auth-refactor-002.md\n"
-        "NEW: bridge/auth-refactor-001.md\n",
-        encoding="utf-8",
+    (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-002.md").write_text("NO-GO\n\n# NO-GO review\n", encoding="utf-8")
+    (bridge_dir / "auth-refactor-003.md").write_text(
+        'REVISED\n\ntarget_paths: ["src/auth.py"]\n# REVISED\n', encoding="utf-8"
     )
-    (bridge_dir / "auth-refactor-003.md").write_text('target_paths: ["src/auth.py"]\n# REVISED\n', encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -747,13 +754,9 @@ def test_bridge_compliance_go_over_nogo(tmp_path):
     """Latest GO, historical NO-GO below → pass."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\n"
-        "GO: bridge/auth-refactor-004.md\n"
-        "NO-GO: bridge/auth-refactor-002.md\n"
-        "NEW: bridge/auth-refactor-001.md\n",
-        encoding="utf-8",
-    )
+    (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-002.md").write_text("NO-GO\n\n# NO-GO review\n", encoding="utf-8")
+    (bridge_dir / "auth-refactor-004.md").write_text("GO\n\n# GO review\n", encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -844,13 +847,8 @@ def test_bridge_compliance_multi_doc_partial_match(tmp_path):
     """Two docs, one matching one not → only matching doc fires."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n\n"
-        "Document: unrelated-work\nNEW: bridge/unrelated-001.md\n",
-        encoding="utf-8",
-    )
-    (bridge_dir / "auth-refactor-001.md").write_text('target_paths: ["src/auth.py"]\n', encoding="utf-8")
-    (bridge_dir / "unrelated-001.md").write_text('target_paths: ["src/other.py"]\n', encoding="utf-8")
+    (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
+    (bridge_dir / "unrelated-work-001.md").write_text('NEW\n\ntarget_paths: ["src/other.py"]\n', encoding="utf-8")
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -931,11 +929,8 @@ def test_kb_not_markdown_configured_allowlist(tmp_path):
 
 def test_session_governance_clean(tmp_path):
     """No pending bridge entries → all-OK summary with SessionStart hookEventName."""
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: done-work\nVERIFIED: bridge/done-work-002.md\nNEW: bridge/done-work-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "done-work", 1, "NEW")
+    _write_bridge_version(tmp_path, "done-work", 2, "VERIFIED")
     payload = json.dumps(
         {
             "hook_event_name": "SessionStart",
@@ -953,10 +948,7 @@ def test_session_governance_clean(tmp_path):
 
 def test_session_governance_pending_entry(tmp_path):
     """One NEW bridge entry → summary names the entry."""
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text(
-        "Document: my-feature\nNEW: bridge/my-feature-001.md\n", encoding="utf-8"
-    )
+    _write_bridge_version(tmp_path, "my-feature", 1, "NEW")
     payload = json.dumps(
         {
             "hook_event_name": "SessionStart",
@@ -1026,12 +1018,7 @@ def test_hook_self_test_hookEventName_posttooluse():
 def test_delib_gate_tracker_e2e_same_context(tmp_path):
     """Gate warns → tracker records search → gate passes for same bridge context and topic."""
     # Set up an active bridge document so both hooks compute the same key
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "auth-refactor", 1, "NEW")
 
     # Step 1: Gate warns (no prior search)
     gate_payload = json.dumps(
@@ -1089,12 +1076,7 @@ def test_delib_gate_tracker_e2e_same_context(tmp_path):
 
 def test_delib_gate_tracker_e2e_same_doc_different_topic(tmp_path):
     """Same bridge doc, different topic → gate still warns (topic discrimination)."""
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-refactor\nNEW: bridge/auth-refactor-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "auth-refactor", 1, "NEW")
 
     # Tracker records a search about "auth refactor" with successful output
     tracker_payload = json.dumps(
@@ -1130,14 +1112,8 @@ def test_delib_gate_tracker_e2e_same_doc_different_topic(tmp_path):
 
 def test_delib_gate_tracker_e2e_different_context(tmp_path):
     """Tracker records for topic-a → gate still warns for different topic-b (different bridge doc)."""
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-
     # Create bridge with topic-a active
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: topic-a\nNEW: bridge/topic-a-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "topic-a", 1, "NEW")
 
     # Tracker records search while topic-a is active
     tracker_payload = json.dumps(
@@ -1154,10 +1130,8 @@ def test_delib_gate_tracker_e2e_different_context(tmp_path):
     assert result_track.returncode == 0
 
     # Now change bridge context to topic-b
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: topic-b\nNEW: bridge/topic-b-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "topic-a", 2, "VERIFIED")
+    _write_bridge_version(tmp_path, "topic-b", 1, "NEW")
 
     # Gate should warn — different active bridge doc means different key
     gate_payload = json.dumps(
@@ -1210,12 +1184,7 @@ def test_delib_gate_no_active_bridge_docs(tmp_path):
 
 def test_delib_tracker_failed_search_not_recorded(tmp_path):
     """Failed searches (error output) are not recorded and cannot satisfy the gate."""
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: widget-fix\nNEW: bridge/widget-fix-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "widget-fix", 1, "NEW")
 
     # Tracker receives a failed search command
     tracker_payload = json.dumps(
@@ -1423,12 +1392,7 @@ def test_delib_tracker_tool_response_overrides_tool_output(tmp_path):
 
 def test_delib_tracker_e2e_tool_response_gate_lifecycle(tmp_path):
     """Full gate lifecycle using documented tool_response payload shape."""
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: deploy-config\nNEW: bridge/deploy-config-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "deploy-config", 1, "NEW")
 
     # Step 1: Gate warns (no prior search)
     gate_payload = json.dumps(
@@ -1486,12 +1450,7 @@ def test_delib_tracker_failed_cmd_with_zero_results_stdout_not_recorded(tmp_path
     be treated as a successful empty search.
     """
     # Set up an active bridge doc so the gate would warn
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-hooks\nNEW: bridge/auth-hooks-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "auth-hooks", 1, "NEW")
 
     tracker_payload = json.dumps(
         {
@@ -1543,12 +1502,7 @@ def test_delib_tracker_ambiguous_output_not_recorded(tmp_path):
     and no explicit zero-results marker is not evidentiary and must not create
     a log entry.
     """
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(
-        "Document: auth-hooks\nNEW: bridge/auth-hooks-001.md\n",
-        encoding="utf-8",
-    )
+    _write_bridge_version(tmp_path, "auth-hooks", 1, "NEW")
 
     tracker_payload = json.dumps(
         {

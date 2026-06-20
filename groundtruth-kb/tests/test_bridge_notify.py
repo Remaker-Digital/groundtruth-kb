@@ -26,6 +26,15 @@ from types import SimpleNamespace
 def _notify() -> SimpleNamespace:
     """Lazy-import bridge.notify + dependencies per test_bridge_import_hygiene rule."""
     from groundtruth_kb.bridge.detector import parse_index
+    from groundtruth_kb.bridge.disposition import (
+        LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+        LOYAL_OPPOSITION_ROLE,
+        PRIME_ACTIONABLE_STATUSES,
+        PRIME_BUILDER_ROLE,
+        BridgeDisposition,
+        dispatchable_for_status,
+        disposition_for_status,
+    )
     from groundtruth_kb.bridge.notify import (
         ACTIONABLE_STATUSES_FOR_CODEX,
         ACTIONABLE_STATUSES_FOR_PRIME,
@@ -42,12 +51,19 @@ def _notify() -> SimpleNamespace:
     return SimpleNamespace(
         ACTIONABLE_STATUSES_FOR_CODEX=ACTIONABLE_STATUSES_FOR_CODEX,
         ACTIONABLE_STATUSES_FOR_PRIME=ACTIONABLE_STATUSES_FOR_PRIME,
+        BridgeDisposition=BridgeDisposition,
+        LOYAL_OPPOSITION_ACTIONABLE_STATUSES=LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+        LOYAL_OPPOSITION_ROLE=LOYAL_OPPOSITION_ROLE,
         NOTIFY_SCHEMA_VERSION=NOTIFY_SCHEMA_VERSION,
+        PRIME_ACTIONABLE_STATUSES=PRIME_ACTIONABLE_STATUSES,
+        PRIME_BUILDER_ROLE=PRIME_BUILDER_ROLE,
         ActionablePending=ActionablePending,
         BridgeAgent=BridgeAgent,
         NotificationArtifact=NotificationArtifact,
         clear_notification=clear_notification,
         compute_actionable_pending=compute_actionable_pending,
+        dispatchable_for_status=dispatchable_for_status,
+        disposition_for_status=disposition_for_status,
         parse_index=parse_index,
         read_notification=read_notification,
         update_notification=update_notification,
@@ -71,6 +87,43 @@ def _make_index_with_top_file(tmp_path: Path, doc_name: str, top_status: str, to
 
 
 # --- Tests for compute_actionable_pending ----------------------------------
+
+
+def test_shared_disposition_matrix_routes_statuses_by_role() -> None:
+    n = _notify()
+
+    assert n.disposition_for_status("NEW", n.LOYAL_OPPOSITION_ROLE).actionable is True
+    assert n.disposition_for_status("REVISED", n.LOYAL_OPPOSITION_ROLE).next_action == "review"
+    assert n.disposition_for_status("GO", n.PRIME_BUILDER_ROLE).actionable is True
+    assert n.disposition_for_status("NO-GO", n.PRIME_BUILDER_ROLE).next_action == "revise"
+
+
+def test_shared_disposition_matrix_advisory_is_manual_prime_only() -> None:
+    n = _notify()
+
+    prime = n.disposition_for_status("ADVISORY", n.PRIME_BUILDER_ROLE)
+    loyal_opposition = n.disposition_for_status("ADVISORY", n.LOYAL_OPPOSITION_ROLE)
+
+    assert prime.actionable is True
+    assert prime.dispatchable is False
+    assert prime.owner_visible is True
+    assert prime.reason_code == "prime_advisory_disposition"
+    assert loyal_opposition.actionable is False
+    assert loyal_opposition.reason_code == "wrong_role_prime_advisory"
+
+
+def test_shared_disposition_matrix_wrong_role_reason_codes() -> None:
+    n = _notify()
+
+    assert n.disposition_for_status("NEW", n.PRIME_BUILDER_ROLE).reason_code == "wrong_role_lo_review"
+    assert n.disposition_for_status("GO", n.LOYAL_OPPOSITION_ROLE).reason_code == "wrong_role_prime_continuation"
+
+
+def test_notify_actionable_status_sets_follow_shared_disposition_matrix() -> None:
+    n = _notify()
+
+    assert n.ACTIONABLE_STATUSES_FOR_PRIME == n.PRIME_ACTIONABLE_STATUSES
+    assert n.ACTIONABLE_STATUSES_FOR_CODEX == n.LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 
 
 def test_compute_pending_routes_new_revised_to_codex(tmp_path: Path) -> None:

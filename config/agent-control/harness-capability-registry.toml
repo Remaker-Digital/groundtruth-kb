@@ -452,7 +452,7 @@ status = "native"
 surface = ".codex/skills/kb-session-wrap/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-session-wrap/SKILL.md"
-source_sha256 = "923283300faa3f1d42b6096cf1455e3393a1dadf03e7831e20fd8817a5dddfff"
+source_sha256 = "a53004274f049998ded8c8d61edb9f54f43101df5a0af311449fa2dd91af8465"
 
 [capabilities.antigravity]
 surface = ".agent/skills/kb-session-wrap/SKILL.md"
@@ -857,7 +857,7 @@ status = "native"
 surface = ".codex/skills/verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/verify/SKILL.md"
-source_sha256 = "2512d318c380fa04acb722913ddc54f5aac1c751eab0fa46d1957ca8f30ceb2f"
+source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/verify/SKILL.md"

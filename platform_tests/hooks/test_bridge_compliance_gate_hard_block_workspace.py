@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -34,6 +35,16 @@ AUTHOR_METADATA = (
     "author_model_version: 5.5\n"
     "author_model_configuration: Extra High\n"
 )
+WORK_INTENT_SESSION_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -48,14 +59,18 @@ def _run_hook(payload: str) -> subprocess.CompletedProcess:
     bridge_id = _bridge_id_from_payload(payload_data)
     if bridge_id is not None:
         _claim_bridge_thread(bridge_id, session_id)
+    run_env = os.environ.copy()
+    for env_var in WORK_INTENT_SESSION_ENV_VARS:
+        run_env[env_var] = session_id
     try:
         return subprocess.run(
             [sys.executable, str(ACTIVE_HOOK)],
             input=payload,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
             cwd=str(REPO_ROOT),
+            env=run_env,
         )
     finally:
         if bridge_id is not None:
@@ -163,13 +178,13 @@ def test_proposal_lacking_spec_links_blocked_with_deny() -> None:
             "hook_event_name": "PreToolUse",
             "tool_name": "Write",
             "tool_input": {
-                # Non-versioned bridge path (no -NNN): exempts the
-                # GTKB-GOV-PROPOSAL-STANDARDS Slice 1 body-status-token rule
-                # (versioned-only) so this fixture isolates the Specification
-                # Links clause under test. Versioned-heading-first BLOCK behavior
-                # is covered by test_bridge_compliance_gate_body_status_token.py.
-                "file_path": "bridge/test-fake-proposal-no-spec-links.md",
-                "content": "# Implementation Proposal\n\nDo a thing without citing any specs.",
+                "file_path": "bridge/test-fake-proposal-no-spec-links-001.md",
+                "content": (
+                    "NEW\n" + AUTHOR_METADATA + "\n"
+                    "bridge_kind: governance_advisory\n\n"
+                    "# Implementation Proposal\n\n"
+                    "Do a thing without citing any specs."
+                ),
             },
             "session_id": "test",
             "cwd": str(REPO_ROOT),
@@ -532,13 +547,12 @@ def test_compliant_proposal_passes() -> None:
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
-            "tool_name": "Write",
+            "tool_name": "Edit",
             "tool_input": {
-                # Non-versioned bridge path (see body-status-token note above):
-                # isolates the Specification Links clause from the versioned-only
-                # Slice 1 rule.
-                "file_path": "bridge/test-fake-compliant.md",
+                "file_path": "bridge/test-fake-compliant-001.md",
                 "content": (
+                    "NEW\n" + AUTHOR_METADATA + "\n"
+                    "bridge_kind: governance_advisory\n\n"
                     "# Implementation Proposal\n\n"
                     "## Specification Links\n\n"
                     "- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001\n"

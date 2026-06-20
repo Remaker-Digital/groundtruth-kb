@@ -269,6 +269,14 @@ def test_terminal_tokens_parity_with_canonical_notify(helper) -> None:
     assert set(helper._KIND_TERMINAL_TOKENS) == set(notify._KIND_TERMINAL_TOKENS)
 
 
+def test_actionable_status_sets_parity_with_shared_disposition(helper) -> None:
+    """Manual scans and notification routing must share the same status matrix."""
+    from groundtruth_kb.bridge import disposition
+
+    assert helper.PRIME_ACTIONABLE_STATUSES == disposition.PRIME_ACTIONABLE_STATUSES
+    assert helper.LO_ACTIONABLE_STATUSES == disposition.LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+
+
 def test_template_terminal_tokens_parity_with_live_helper(helper) -> None:
     """The managed template helper must not drift from the live helper."""
     template_helper = _load_module(TEMPLATE_HELPER_PATH, "scan_bridge_template")

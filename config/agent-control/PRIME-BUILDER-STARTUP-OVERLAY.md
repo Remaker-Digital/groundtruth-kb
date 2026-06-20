@@ -27,6 +27,9 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
   (that is a role-confusion defect to diagnose).
 - No implementation without a Loyal Opposition `GO` + an implementation-start
   authorization packet (`.claude/rules/codex-review-gate.md`).
+- A same-harness `GO` or `NO-GO` is not stale solely because the author and
+  reviewer share a harness ID; the blocker is the same author/reviewer session
+  context, or missing/unreadable author-session metadata.
 
 ## Authority
 

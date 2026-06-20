@@ -200,6 +200,18 @@ def test_system_prompt_is_only_for_lo_bridge_skills(tmp_path: Path):
     assert oh.build_system_prompt(None, route(root)) is None
 
 
+def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Path):
+    root = make_root(tmp_path)
+    prompt = oh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    assert "--finalize-verified" in prompt
+    assert "--no-prepopulate" in prompt
+    assert "local commit containing the verified path set" in prompt
+    assert "fail closed" in prompt
+    assert "terminal VERIFIED file" in prompt
+
+
 def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     root = make_root(tmp_path)
     urls: list[str] = []

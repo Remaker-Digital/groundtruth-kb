@@ -58,10 +58,9 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
 
 
-RETIRED_BRIDGE_INDEX_REL = "bridge/" + "INDEX" + ".md"
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
-BRIDGE_INDEX_STATUS_TOKENS = (
+BRIDGE_STATUS_TOKENS = (
     "NEW",
     "REVISED",
     "GO",
@@ -73,10 +72,12 @@ BRIDGE_INDEX_STATUS_TOKENS = (
     "ACCEPTED",
     "BLOCKED",
 )
-BRIDGE_INDEX_STATUS_RE = re.compile(
-    r"^(?:" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r"):\s+bridge/[^\s]+\.md$"
+BRIDGE_VERSIONED_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
+LO_VERDICT_BRIDGE_FILE_RE = re.compile(r"^.+\.lo-verdict\.md$", re.IGNORECASE)
+BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(?:" + "|".join(re.escape(status) for status in BRIDGE_STATUS_TOKENS) + r")\b",
+    re.IGNORECASE,
 )
-BRIDGE_INDEX_STATUS_LIKE_RE = re.compile(r"^[A-Z][A-Z-]*:")
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
 # unification-003 GO at -004). Import the canonical bridge work-intent order;
@@ -124,6 +125,11 @@ OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
     r"[\s.`_\-:]*$",
     re.IGNORECASE,
 )
+PRIOR_DELIBERATIONS_HEADING_RE = re.compile(
+    r"^#{1,6}\s*prior\s+deliberations\s*$",
+    re.IGNORECASE,
+)
+NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
     re.IGNORECASE | re.MULTILINE,
@@ -414,87 +420,48 @@ def _canonical_project_root(cwd_path: Path) -> Path:
     return cwd_path
 
 
-def _parse_bridge_index(index_path: Path) -> dict[str, str]:
-    """
-    Returns {document_name: latest_status} from versioned bridge files.
-    The argument is retained for older call sites and may be either the bridge
-    directory or any path inside it.
-    """
-    bridge_dir = index_path if index_path.is_dir() else index_path.parent
-    if not bridge_dir.is_dir():
-        return {}
-    latest: dict[str, tuple[int, str]] = {}
-    status_re = re.compile(
-        r"^[#>*\-\s`]*(" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r")\b",
-        re.IGNORECASE,
-    )
-    for path in bridge_dir.glob("*.md"):
-        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
+def _status_from_versioned_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(0).strip().split()[0].upper() if match else None
+    return None
+
+
+def _versioned_bridge_entries(project_root: Path) -> dict[str, list[tuple[int, str, str, Path]]]:
+    bridge_dir = project_root / "bridge"
+    entries: dict[str, list[tuple[int, str, str, Path]]] = {}
+    try:
+        candidates = list(bridge_dir.glob("*.md"))
+    except OSError:
+        return entries
+    for path in candidates:
+        match = BRIDGE_VERSIONED_FILE_RE.match(path.name)
         if not match:
             continue
+        status = _status_from_versioned_bridge_file(path)
+        if status is None:
+            continue
+        slug = match.group(1)
+        version = int(match.group(2))
         try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        status = ""
-        for line in text.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            status_match = status_re.match(stripped)
-            status = status_match.group(1).upper() if status_match else ""
-            break
-        version = int(match.group("version"))
-        doc = match.group("doc")
-        if status and version > latest.get(doc, (-1, ""))[0]:
-            latest[doc] = (version, status)
-    return {doc: status for doc, (_, status) in latest.items()}
+            rel_path = path.resolve().relative_to(project_root.resolve()).as_posix()
+        except (OSError, ValueError):
+            rel_path = path.as_posix()
+        entries.setdefault(slug, []).append((version, status, rel_path, path))
+    for values in entries.values():
+        values.sort(key=lambda row: row[0], reverse=True)
+    return entries
 
 
-def _bridge_index_well_formedness_error(content: str) -> str | None:
-    """Return a hard-block reason for malformed retired bridge-state content."""
-    if "\\n" in content:
-        return "retired bridge-index content contains literal escaped newline text (\\n)."
-
-    seen_documents: set[str] = set()
-    current_doc: str | None = None
-    current_doc_status_seen = False
-    for lineno, raw_line in enumerate(content.splitlines(), start=1):
-        line = raw_line.strip()
-        if line.startswith("Document:"):
-            if current_doc is not None and not current_doc_status_seen:
-                return f"Document {current_doc!r} has no status line before line {lineno}."
-            document = line.removeprefix("Document:").strip()
-            if not document:
-                return f"line {lineno}: Document line is missing a bridge document id."
-            if document in seen_documents:
-                return f"line {lineno}: duplicate Document entry {document!r}."
-            seen_documents.add(document)
-            current_doc = document
-            current_doc_status_seen = False
-            continue
-
-        if current_doc is None:
-            continue
-
-        if not line:
-            if not current_doc_status_seen:
-                return f"Document {current_doc!r} has a blank line before its first status line."
-            current_doc = None
-            current_doc_status_seen = False
-            continue
-
-        if BRIDGE_INDEX_STATUS_RE.match(line):
-            current_doc_status_seen = True
-            continue
-
-        if BRIDGE_INDEX_STATUS_LIKE_RE.match(line):
-            return f"line {lineno}: malformed bridge status line {line!r}."
-        return f"line {lineno}: unexpected non-status content inside Document {current_doc!r}: {line!r}."
-
-    if current_doc is not None and not current_doc_status_seen:
-        return f"Document {current_doc!r} has no status line."
-    return None
+def _latest_bridge_statuses(project_root: Path) -> dict[str, str]:
+    return {slug: values[0][1] for slug, values in _versioned_bridge_entries(project_root).items() if values}
 
 
 def _first_nonblank_line(content: str) -> str:
@@ -505,11 +472,27 @@ def _first_nonblank_line(content: str) -> str:
     return ""
 
 
+_RETIRED_BRIDGE_AGGREGATE_NAME = "INDEX.md"
+
+
+def _is_retired_bridge_aggregate_file(file_path: str) -> bool:
+    path = Path(file_path.replace("\\", "/"))
+    parts = tuple(path.parts)
+    return len(parts) >= 2 and parts[-2].lower() == "bridge" and parts[-1] == _RETIRED_BRIDGE_AGGREGATE_NAME
+
+
 def _is_bridge_markdown_file(file_path: str) -> bool:
     normalized = file_path.replace("\\", "/")
     if not normalized.endswith(".md"):
         return False
-    return "/bridge/" in f"/{normalized}" and not normalized.endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
+    return "/bridge/" in f"/{normalized}" and bool(BRIDGE_VERSIONED_FILE_RE.match(Path(normalized).name))
+
+
+def _is_lo_verdict_bridge_file(file_path: str) -> bool:
+    normalized = file_path.replace("\\", "/")
+    if not normalized.endswith(".md"):
+        return False
+    return "/bridge/" in f"/{normalized}" and bool(LO_VERDICT_BRIDGE_FILE_RE.match(Path(normalized).name))
 
 
 def _extract_bridge_id_from_path(file_path: str) -> str | None:
@@ -632,8 +615,7 @@ def _body_status_token_violation(file_path: str, content: str) -> bool:
     New files (and overwrites of files that currently have a canonical first
     line) must keep a canonical first line. Files that already exist on disk
     with a non-canonical first line are grandfathered. Non-versioned bridge
-    markdown (no ``-NNN`` suffix, e.g. retired bridge-index artifacts are already excluded by
-    ``_is_bridge_markdown_file``) is not subject to the rule.
+    markdown (no ``-NNN`` suffix) is not subject to the rule.
     """
     if _extract_bridge_id_from_path(file_path) is None:
         return False
@@ -831,6 +813,20 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _prior_deliberations_has_unedited_placeholder(content: str) -> bool:
+    """True when ## Prior Deliberations still has the helper placeholder."""
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if PRIOR_DELIBERATIONS_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+    section = _collect_section_lines(lines, start)
+    return any(line.strip() == NO_PRIOR_DELIBS_PLACEHOLDER for line in section)
 
 
 def _owner_decisions_section_text(content: str) -> str:
@@ -1136,25 +1132,17 @@ def _run_pending_applicability_preflight(
     return True, ""
 
 
-def _read_proposal_target_paths(bridge_dir: Path, doc_name: str) -> list[str]:
-    """Read target_paths from the latest proposal file's frontmatter."""
-    latest_path: Path | None = None
-    latest_version = -1
-    pattern = re.compile(rf"^{re.escape(doc_name)}-(\d{{3}})\.md$")
-    for path in bridge_dir.glob(f"{doc_name}-*.md"):
-        match = pattern.match(path.name)
-        if not match:
-            continue
-        version = int(match.group(1))
-        if version > latest_version:
-            latest_path = path
-            latest_version = version
-
-    if latest_path is None:
+def _read_proposal_target_paths(project_root: Path, doc_name: str) -> list[str]:
+    """Read target_paths from the latest Prime-authored proposal file."""
+    proposal_path: Path | None = None
+    for _version, status, _rel_path, path in _versioned_bridge_entries(project_root).get(doc_name, []):
+        if status in {"NEW", "REVISED"}:
+            proposal_path = path
+            break
+    if proposal_path is None:
         return []
-
     try:
-        content = latest_path.read_text(encoding="utf-8")
+        content = proposal_path.read_text(encoding="utf-8")
     except OSError:
         return []
 
@@ -1180,21 +1168,15 @@ def _read_proposal_target_paths(bridge_dir: Path, doc_name: str) -> list[str]:
     return paths
 
 
-def _is_bridge_index_file(file_path: str) -> bool:
-    """True when file_path points at the retired bridge-index artifact."""
-    normalized = file_path.replace("\\", "/")
-    return f"/{normalized}".endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
-
-
-def _pending_proposal_ask_reason(bridge_dir: Path, file_path: str) -> str | None:
+def _pending_proposal_ask_reason(project_root: Path, file_path: str) -> str | None:
     """Return an ask-checkpoint reason when file_path matches a pending
     proposal's target_paths, or None."""
-    doc_statuses = _parse_bridge_index(bridge_dir)
+    doc_statuses = _latest_bridge_statuses(project_root)
     file_path_normalized = file_path.replace("\\", "/")
     for doc_name, status in doc_statuses.items():
         if status not in ("NEW", "REVISED", "NO-GO"):
             continue
-        for tp in _read_proposal_target_paths(bridge_dir, doc_name):
+        for tp in _read_proposal_target_paths(project_root, doc_name):
             tp_norm = tp.replace("\\", "/")
             if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
                 if status == "NO-GO":
@@ -1242,8 +1224,17 @@ def _deny_reason_for_content(
     content: str,
     run_pending_preflight: bool = True,
 ) -> str | None:
-    if _is_bridge_index_file(file_path) and content:
-        return "[Governance] Retired bridge-index artifacts must not be written or recreated."
+    if _is_retired_bridge_aggregate_file(file_path):
+        return (
+            "[Governance] Retired bridge aggregate files are not live or writable bridge surfaces. "
+            "Use dispatcher/TAFE state plus status-bearing versioned bridge files."
+        )
+    if _is_lo_verdict_bridge_file(file_path):
+        return (
+            "[Governance] Noncanonical bridge verdict files are not writable authority. "
+            "Write the next numbered bridge/<slug>-NNN.md file through the governed bridge path "
+            "instead of bridge/*.lo-verdict.md."
+        )
 
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
@@ -1316,6 +1307,20 @@ def _deny_reason_for_content(
                 "AskUserQuestion answers that authorize the work. "
                 "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
                 "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
+            )
+        if (
+            first_line in PENDING_PREFLIGHT_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _prior_deliberations_has_unedited_placeholder(content)
+        ):
+            return (
+                "[Governance] Implementation proposals must replace the helper-inserted "
+                "Prior Deliberations placeholder before bridge submission. The exact "
+                f"unedited line `{NO_PRIOR_DELIBS_PLACEHOLDER}` is still present in "
+                "## Prior Deliberations. Add relevant DELIB citations or replace it "
+                "with a substantive no-prior-deliberations reason. "
+                "(Hard-block per the Prior Deliberations section requirement in "
+                ".claude/rules/codex-review-gate.md.)"
             )
         if first_line in PROJECT_METADATA_STATUSES and not _bridge_kind_is_metadata_exempt(content):
             metadata_gaps = _project_metadata_gaps(content)
@@ -1607,12 +1612,9 @@ def main() -> None:
         emit_ask("PreToolUse", heading_ask_reason)
         sys.exit(0)
 
-    bridge_dir = _canonical_project_root(cwd_path) / "bridge"
-    if not bridge_dir.is_dir():
-        emit_pass()
-        sys.exit(0)
-
-    ask_reason = _pending_proposal_ask_reason(bridge_dir, file_path)
+    ask_reason = None
+    if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
+        ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
     if ask_reason:
         emit_ask("PreToolUse", ask_reason)
         sys.exit(0)

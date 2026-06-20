@@ -45,6 +45,33 @@ managed, scaffolded, upgraded, or governed by GT-KB.
   `E:\GT-KB\applications\<application-name>\`; new application files must not be
   added outside `E:\GT-KB\applications\`.
 
+## Harness-Local Scratchpad Non-Authority Boundary
+
+Harness-local scratchpads are non-authoritative. This includes Antigravity planning/brain files,
+Codex automation memory, Claude Code auto-memory, and the
+`MEMORY.md` hierarchy, including `memory/MEMORY.md`, scaffolded root
+`MEMORY.md`, and harness-created mirrors or cache files.
+
+Formal GT-KB artifacts, implementation reports, verification verdicts, tests,
+doctor checks, bridge evidence, governed decisions, release evidence, and
+dependency closure must not read from or depend on harness-local scratchpads as
+authority. Project-relevant information originating in a scratchpad must be
+promoted into governed in-root artifacts such as MemBase, the Deliberation
+Archive, specifications, ADR/DCL/GOV records, bridge files, source, tests, or
+approved reports before it is cited, verified, or used as a dependency.
+
+This boundary does not forbid harness scratchpads from existing as runtime
+byproducts or operational notes. It forbids treating them as GT-KB authority.
+The External Harness Executable Resolution Exception remains executable-only:
+it authorizes invoking registry-enumerated harness executables, not reading, writing,
+verifying, or requiring harness-local files, memory, planning documents, or
+evidence outside `E:\GT-KB`.
+
+The deterministic doctor check `_check_harness_local_scratchpad_boundary`
+enforces this declaration by verifying the required rule surfaces carry the
+non-authority language and by failing when those surfaces regress to granting
+positive authority to harness-local scratchpads.
+
 ## Sandbox Output Exception
 
 GT-KB rehearsal-class operations may emit runtime output to a path outside `E:\GT-KB` when ALL of the following hold:

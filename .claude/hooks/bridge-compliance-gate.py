@@ -125,6 +125,11 @@ OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
     r"[\s.`_\-:]*$",
     re.IGNORECASE,
 )
+PRIOR_DELIBERATIONS_HEADING_RE = re.compile(
+    r"^#{1,6}\s*prior\s+deliberations\s*$",
+    re.IGNORECASE,
+)
+NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
     re.IGNORECASE | re.MULTILINE,
@@ -810,6 +815,20 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
 
 
+def _prior_deliberations_has_unedited_placeholder(content: str) -> bool:
+    """True when ## Prior Deliberations still has the helper placeholder."""
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if PRIOR_DELIBERATIONS_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+    section = _collect_section_lines(lines, start)
+    return any(line.strip() == NO_PRIOR_DELIBS_PLACEHOLDER for line in section)
+
+
 def _owner_decisions_section_text(content: str) -> str:
     lines = content.splitlines()
     start: int | None = None
@@ -1288,6 +1307,20 @@ def _deny_reason_for_content(
                 "AskUserQuestion answers that authorize the work. "
                 "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
                 "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
+            )
+        if (
+            first_line in PENDING_PREFLIGHT_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _prior_deliberations_has_unedited_placeholder(content)
+        ):
+            return (
+                "[Governance] Implementation proposals must replace the helper-inserted "
+                "Prior Deliberations placeholder before bridge submission. The exact "
+                f"unedited line `{NO_PRIOR_DELIBS_PLACEHOLDER}` is still present in "
+                "## Prior Deliberations. Add relevant DELIB citations or replace it "
+                "with a substantive no-prior-deliberations reason. "
+                "(Hard-block per the Prior Deliberations section requirement in "
+                ".claude/rules/codex-review-gate.md.)"
             )
         if first_line in PROJECT_METADATA_STATUSES and not _bridge_kind_is_metadata_exempt(content):
             metadata_gaps = _project_metadata_gaps(content)

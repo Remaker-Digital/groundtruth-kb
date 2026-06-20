@@ -664,15 +664,16 @@ commands: `work subject GT-KB`, `application mode`, `agent red mode`.
 
 ### session-stated role
 
-**Definition:** An ephemeral, session-scoped role declared by the owner via the
-canonical init keyword `::init gtkb (pb|lo)` on an interactive owner prompt. It
-overrides the durable operating role for in-session surfaces — SessionStart
-disclosure rendering, the AXIS 2 Claude-native surface filter, the
-workstream-focus menu shape, MemBase `changed_by` attribution, and AUQ-keyed
-routing — for the rest of the session. It is held in the ephemeral marker
-`.claude/session/active-session-role.json` and is invalidated at the next
-SessionStart; it carries no durable record and does not survive compaction or
-resume.
+**Definition:** A transcript-defined role established by explicit owner
+direction in an interactive session, including the canonical init keyword
+`::init gtkb (pb|lo)`. It overrides the durable operating role for in-session
+surfaces — SessionStart disclosure rendering, the AXIS 2 Claude-native surface
+filter, the workstream-focus menu shape, MemBase `changed_by` attribution, and
+AUQ-keyed routing — within the same interactive context. It persists across
+compaction, resume, and contiguous SessionStart-like boundaries until the owner
+explicitly changes it. Runtime marker files such as
+`.claude/session/active-session-role.json` may cache the resolved role but do
+not carry durable role authority.
 
 **Canonical alias:** interactive session role; session-scoped role.
 
@@ -685,8 +686,11 @@ an orthogonal axis).
 
 **Source:** `GOV-SESSION-ROLE-AUTHORITY-001` (authority split),
 `DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution table),
-`ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives);
-`DELIB-2507` (S371 originating owner directive); `DCL-CONCEPT-ON-CONTACT-001`
+`ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives),
+`ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001` (persistence decision),
+`DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001` (persistence constraints);
+`DELIB-2507` (S371 originating owner directive); `DELIB-20265226` (S447
+interactive transcript persistence directive); `DCL-CONCEPT-ON-CONTACT-001`
 (authority for first-contact glossary addition).
 
 **Implementation pointer:** `.claude/session/active-session-role.json` (runtime

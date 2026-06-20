@@ -34,7 +34,7 @@ versions of an existing thread, verdict files, or advisory entries.
 - `work_item` — the governing WI id (`WI-NNNN` / `GTKB-*`).
 - `project` — the `PROJECT-*` id grouping the work.
 - `pauth` — the active `PAUTH-*` authorization id covering the work item.
-- optional `slice` number, `bridge_kind` (default `implementation_proposal`),
+- optional `slice` number, `bridge_kind` (default `prime_proposal`),
   and one or more `target_path` globs the implementation will touch.
 
 ## Procedure

@@ -35,6 +35,21 @@ When the active harness is assigned Loyal Opposition, apply only governance,
 permissions, and restrictions that pertain to Loyal Opposition. Do not import
 Prime Builder implementation authority into Loyal Opposition operation.
 
+## Bridge Review Independence
+
+Loyal Opposition may review or verify a bridge artifact only from an unrelated
+session context. If the current reviewer session context matches the artifact's
+`author_session_context_id`, or if that author session metadata is missing or
+unreadable under dispatcher rules, the review must fail closed instead of
+issuing `GO` or `VERIFIED`.
+
+Same harness ID is not, by itself, a self-review blocker. A harness may review
+a bridge artifact authored by the same harness only when the author and
+reviewer session contexts are different and the reviewer is operating under a
+valid Loyal Opposition role or dispatch context. Interactive sessions remain
+bound to the owner-declared resolved role and must not switch roles merely to
+create review eligibility.
+
 ## Loyal Opposition File Safety Rule
 
 When operating as Loyal Opposition, do not delete or modify files you have not
@@ -116,6 +131,22 @@ files inspected, commands run, CLI queries made, MemBase/database reads used,
 and other inspection steps at a level sufficient for a later reviewer to
 reproduce or exceed the review depth.
 
+## VERIFIED Commit Finalization
+
+For post-implementation verification, `VERIFIED` is valid only when Loyal
+Opposition uses the verification finalization helper to create the local commit
+that contains the verified work and the new `VERIFIED` verdict artifact:
+
+```text
+python .claude/skills/verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
+```
+
+If the helper cannot create the commit, Loyal Opposition must fail closed and
+must not leave a terminal `VERIFIED` file in the bridge chain. The verdict may
+record intended commit subject and staged path evidence before the commit; the
+final commit SHA is reported by the helper after success and is not embedded in
+the committed verdict file.
+
 ## Required Focus Areas
 
 - system prompt and instruction behavior
@@ -173,4 +204,3 @@ The §"Loyal Opposition File Safety Rule" above restricts non-self-created file 
 Without all four, the LO file-safety rule applies and the operation requires explicit owner approval through the chat interface before the write occurs.
 
 This pathway exists for owner-directed governance work that the owner has chosen to route through Loyal Opposition. It does NOT authorize discretionary LO-initiated KB writes.
-

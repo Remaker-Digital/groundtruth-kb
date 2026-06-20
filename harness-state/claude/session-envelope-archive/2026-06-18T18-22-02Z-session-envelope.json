@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-18T18:22:02Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-18T18:22:01Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-18T18-22-01Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/settings.json\n M .claude/skills/bridge-propose/helpers/write_bridge.py\n M .claude/skills/bridge/SKILL.md\n M .claude/skills/proposal-review/SKILL.md\n M .claude/skills/verify/SKILL.md\n M .codex/skills/MANIFEST.json\n M .codex/skills/bridge/SKILL.md\n M .codex/skills/proposal-review/SKILL.md\n M .codex/skills/verify/SKILL.md\n M config/agent-control/harness-capability-registry.toml\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py\n M groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/_delib_common.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/assertion-check.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/bridge-compliance-gate.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/code-quality-baseline-proposal-check.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/credential-scan.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/delib-search-gate.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/delib-search-tracker.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/destructive-gate.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/gov09-capture.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/intake-classifier.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/kb-not-markdown.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/owner-decision-capture.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/scanner-safe-writer.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/scheduler.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/session-health.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/session-start-governance.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/spec-before-code.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/spec-classifier.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/bridge-essential.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/canonical-terminology.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/canonical-terminology.toml\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/deliberation-protocol.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/file-bridge-protocol.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/loyal-opposition.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/prime-bridge-collaboration-protocol.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/prime-builder.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/report-depth.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/settings.json\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/settings.local.json\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge-propose/SKILL.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge-propose/helpers/write_bridge.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/SKILL.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/impl_report_bridge.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/revise_bridge.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/scan_bridge.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/show_thread_bridge.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/decision-capture/SKILL.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/decision-capture/helpers/record_decision.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/spec-intake/SKILL.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/spec-intake/helpers/spec_intake.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.codex/hooks.json\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.editorconfig\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.gitignore\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.pre-commit-config.yaml\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/AGENTS.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/BRIDGE-INVENTORY.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/CLAUDE.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/MEMORY.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/Makefile\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/README.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/bridge-os-poller-setup-prompt.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/groundtruth.toml\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/independent-progress-assessments/LOYAL-OPPOSITION-LOG.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/memory/release-readiness.md\n M groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/pyproject-sections.toml\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/assertion-check.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/bridge-compliance-gate.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/credential-scan.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/delib-search-gate.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/delib-search-tracker.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/destructive-gate.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/intake-classifier.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/kb-not-markdown.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/scanner-safe-writer.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/scheduler.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/session-health.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/session-start-governance.py\n M groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/spec-before-code.py",
+        "short_line_count": 137,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

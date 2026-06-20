@@ -97,6 +97,36 @@ def _make_project_root(tmp_path: Path, session_id: str | None = None) -> Path:
     return root
 
 
+def _stage_multi_harness_root(
+    tmp_path: Path,
+    identities: dict[str, Any],
+    envelopes: dict[str, list[dict[str, Any]]],
+) -> Path:
+    root = tmp_path / "multi-harness-root"
+    root.mkdir(parents=True)
+    (root / "harness-state").mkdir()
+    (root / "harness-state" / "harness-identities.json").write_text(
+        json.dumps(identities, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    for harness_name, harness_envelopes in envelopes.items():
+        archive = root / "harness-state" / harness_name / "session-envelope-archive"
+        archive.mkdir(parents=True)
+        for index, envelope in enumerate(harness_envelopes, start=1):
+            body = dict(_FIXED_ENVELOPE)
+            body.update(envelope)
+            closed_at = str(body.get("closed_at") or f"2026-06-05T0{index}-00-00Z")
+            body["closed_at"] = closed_at
+            (archive / f"{closed_at}-session-envelope.json").write_text(
+                json.dumps(body, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+    (root / "bridge").mkdir()
+    (root / "bridge" / "INDEX.md").write_text(_FIXED_BRIDGE_INDEX, encoding="utf-8")
+    (root / ".claude").mkdir()
+    return root
+
+
 def _make_db(tmp_path: Path) -> KnowledgeDB:
     db_path = tmp_path / "test.db"
     return KnowledgeDB(db_path=db_path)
@@ -126,6 +156,7 @@ def test_cli_session_handoff_generate_subcommand_registered() -> None:
     result = runner.invoke(gt_cli, ["session", "handoff", "generate", "--help"])
     assert result.exit_code == 0, result.output
     assert "--session-id" in result.output
+    assert "--harness-name" in result.output
 
 
 def test_cli_session_handoff_get_subcommand_registered() -> None:
@@ -459,6 +490,237 @@ def test_resolve_active_harness_errors_on_ambiguous_multiple_archives(
         generate(project_root=root, db=db)
     msg = str(excinfo.value)
     assert "multiple" in msg.lower() or "ambiguous" in msg.lower() or "supply" in msg.lower()
+
+
+def test_default_path_resolves_session_id_across_archives(tmp_path: Path) -> None:
+    identities = {
+        "harnesses": {
+            "claude": {"id": "B"},
+            "antigravity": {"id": "C", "status": "active"},
+            "openrouter": {"id": "F", "status": "active"},
+            "codex": {"id": "A"},
+        }
+    }
+    root = _stage_multi_harness_root(
+        tmp_path,
+        identities,
+        {
+            "claude": [
+                {
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "session_id": "B-CROSS-ARCHIVE",
+                }
+            ],
+        },
+    )
+    db = _make_db(tmp_path)
+
+    result = generate(session_id="B-CROSS-ARCHIVE", project_root=root, db=db)
+
+    body = result["prompt_markdown"]
+    assert "- harness_name: claude" in body
+    assert result["session_id"] == "B-CROSS-ARCHIVE"
+
+
+def test_default_path_raises_when_session_id_matches_multiple_archives(tmp_path: Path) -> None:
+    identities = {
+        "harnesses": {
+            "claude": {"id": "B"},
+            "codex": {"id": "A"},
+        }
+    }
+    root = _stage_multi_harness_root(
+        tmp_path,
+        identities,
+        {
+            "claude": [
+                {
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "session_id": "S-DUPLICATE",
+                    "closed_at": "2026-06-05T01-00-00Z",
+                }
+            ],
+            "codex": [
+                {
+                    "harness_id": "A",
+                    "harness_name": "codex",
+                    "session_id": "S-DUPLICATE",
+                    "closed_at": "2026-06-05T02-00-00Z",
+                }
+            ],
+        },
+    )
+    db = _make_db(tmp_path)
+
+    with pytest.raises(HandoffError) as excinfo:
+        generate(session_id="S-DUPLICATE", project_root=root, db=db)
+
+    msg = str(excinfo.value).lower()
+    assert "ambiguous" in msg
+    assert "claude" in msg
+    assert "codex" in msg
+
+
+def test_default_path_raises_when_session_id_matches_no_archive(tmp_path: Path) -> None:
+    identities = {
+        "harnesses": {
+            "claude": {"id": "B"},
+            "codex": {"id": "A"},
+        }
+    }
+    root = _stage_multi_harness_root(
+        tmp_path,
+        identities,
+        {
+            "claude": [{"harness_id": "B", "harness_name": "claude", "session_id": "S-CLAUDE"}],
+            "codex": [{"harness_id": "A", "harness_name": "codex", "session_id": "S-CODEX"}],
+        },
+    )
+    db = _make_db(tmp_path)
+
+    with pytest.raises(HandoffError) as excinfo:
+        generate(session_id="S-MISSING", project_root=root, db=db)
+
+    msg = str(excinfo.value).lower()
+    assert "no archived envelope matches" in msg
+    assert "claude" in msg
+    assert "codex" in msg
+
+
+def test_default_path_resolves_active_harness_when_session_id_omitted(tmp_path: Path) -> None:
+    identities = {
+        "harnesses": {
+            "claude": {"id": "B"},
+            "antigravity": {"id": "C", "status": "active"},
+            "openrouter": {"id": "F", "status": "active"},
+        }
+    }
+    root = _stage_multi_harness_root(
+        tmp_path,
+        identities,
+        {
+            "claude": [
+                {
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "session_id": "S-OMITTED",
+                }
+            ],
+        },
+    )
+    db = _make_db(tmp_path)
+
+    result = generate(project_root=root, db=db)
+
+    assert "- harness_name: claude" in result["prompt_markdown"]
+    assert result["session_id"] == "B-2026-06-05T01-00-00Z"
+
+
+def test_explicit_harness_name_override_resolves_within_registered_archive(tmp_path: Path) -> None:
+    identities = {
+        "harnesses": {
+            "claude": {"id": "B"},
+            "codex": {"id": "A"},
+        }
+    }
+    root = _stage_multi_harness_root(
+        tmp_path,
+        identities,
+        {
+            "claude": [
+                {
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "session_id": "S-OVERRIDE",
+                    "closed_at": "2026-06-05T01-00-00Z",
+                }
+            ],
+            "codex": [
+                {
+                    "harness_id": "A",
+                    "harness_name": "codex",
+                    "session_id": "S-OVERRIDE",
+                    "closed_at": "2026-06-05T02-00-00Z",
+                }
+            ],
+        },
+    )
+    db = _make_db(tmp_path)
+
+    result = generate(session_id="S-OVERRIDE", project_root=root, db=db, harness_name="claude")
+
+    body = result["prompt_markdown"]
+    assert "- harness_name: claude" in body
+    assert "- harness_id: B" in body
+    assert "2026-06-05T01-00-00Z-session-envelope.json" in body
+    assert "- harness_name: codex" not in body
+
+
+def test_explicit_harness_name_override_with_non_matching_session_id_fails(tmp_path: Path) -> None:
+    identities = {
+        "harnesses": {
+            "claude": {"id": "B"},
+            "codex": {"id": "A"},
+        }
+    }
+    root = _stage_multi_harness_root(
+        tmp_path,
+        identities,
+        {
+            "claude": [{"harness_id": "B", "harness_name": "claude", "session_id": "S-CLAUDE"}],
+            "codex": [{"harness_id": "A", "harness_name": "codex", "session_id": "S-CODEX"}],
+        },
+    )
+    db = _make_db(tmp_path)
+
+    with pytest.raises(HandoffError) as excinfo:
+        generate(session_id="S-CODEX", project_root=root, db=db, harness_name="claude")
+
+    msg = str(excinfo.value).lower()
+    assert "no archived envelope matches" in msg
+    assert "claude" in msg
+
+
+def test_explicit_harness_name_override_rejects_unknown_name(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-UNKNOWN")
+    db = _make_db(tmp_path)
+
+    with pytest.raises(HandoffError) as excinfo:
+        generate(session_id="S-UNKNOWN", project_root=root, db=db, harness_name="unregistered")
+
+    assert "not a registered harness" in str(excinfo.value)
+
+
+def test_explicit_harness_name_override_rejects_parent_traversal(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-PARENT")
+    db = _make_db(tmp_path)
+
+    for invalid_name in ("..", "../claude"):
+        with pytest.raises(HandoffError) as excinfo:
+            generate(session_id="S-PARENT", project_root=root, db=db, harness_name=invalid_name)
+        assert "invalid harness name" in str(excinfo.value)
+
+
+def test_explicit_harness_name_override_rejects_path_separators(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-SEPARATOR")
+    db = _make_db(tmp_path)
+
+    for invalid_name in ("claude/extra", "claude\\extra"):
+        with pytest.raises(HandoffError) as excinfo:
+            generate(session_id="S-SEPARATOR", project_root=root, db=db, harness_name=invalid_name)
+        assert "invalid harness name" in str(excinfo.value)
+
+
+def test_explicit_harness_name_override_rejects_absolute_path(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-ABSOLUTE")
+    db = _make_db(tmp_path)
+
+    for invalid_name in ("C:/claude", "/claude"):
+        with pytest.raises(HandoffError) as excinfo:
+            generate(session_id="S-ABSOLUTE", project_root=root, db=db, harness_name=invalid_name)
+        assert "invalid harness name" in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------

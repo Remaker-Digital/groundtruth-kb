@@ -57,6 +57,20 @@ revised requirements are required before implementation. The second state
 authorizes only requirement/specification capture through the governed approval
 path, not source/config/test implementation.
 
+## Review Independence Gate
+
+Loyal Opposition review and verification require an unrelated session context
+from the bridge artifact author's session context. A same-session review is
+self-review and must not receive `GO` or `VERIFIED`; missing or unreadable
+`author_session_context_id` metadata fails closed. The same harness ID alone is
+not a blocker when the author and reviewer session contexts are unrelated and
+the reviewer is operating under a valid Loyal Opposition role or dispatch
+context.
+
+Interactive sessions do not gain permission to self-review by citing durable
+role assignment or headless-dispatch eligibility. The owner-declared resolved
+role for the current interactive session remains the behavior boundary.
+
 ## What Counts as "Implementation"
 
 - Code changes (new files, edits, deletions)
@@ -111,6 +125,11 @@ If Loyal Opposition is verifying an implementation:
    `Clause Applicability` section in any `VERIFIED` verdict.
 7. Issue `NO-GO` instead of `VERIFIED` for any untested linked specification or
    blocking-gap clause unless an explicit owner waiver is documented.
+8. Record `VERIFIED` only through the atomic finalization helper:
+   `python .claude/skills/verify/helpers/write_verdict.py --slug <document-name> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [...]`.
+   The helper must create the local commit containing the verified paths and the
+   verdict artifact. If commit creation fails, Loyal Opposition must fail closed
+   and must not leave the bridge thread terminal.
 
 This applies even when:
 - The change "seems too small to review"

@@ -19,6 +19,7 @@ from groundtruth_kb.bridge.proposal_autoload import (
     auto_target_paths_in_root_evidence,
     get_work_item_or_raise,
 )
+from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.gates import GateRegistry
@@ -57,7 +58,7 @@ _BASE_TEMPLATE = """NEW
 
 # ${title_prefix} - ${wi_title}
 
-bridge_kind: implementation_proposal_draft
+bridge_kind: ${bridge_kind}
 Document: ${slug}
 Version: 001 (DRAFT; non-dispatchable)
 Date: ${date}
@@ -203,6 +204,7 @@ def build_propose_context(
         "project_id": metadata["project_id"],
         "project_name": metadata["project_name"],
         "target_paths_json": target_paths_json,
+        "bridge_kind": BridgeKind.PRIME_PROPOSAL.value,
         "target_paths_bullets": _format_bullets(
             [f"`{path}`" for path in target_paths],
             empty="_No target paths supplied; fill before filing._",

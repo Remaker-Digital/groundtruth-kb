@@ -19,7 +19,7 @@ Authorization: PAUTH-PROJECT-GTKB-GOV-PROPOSAL-STANDARDS-SLICES-1-4.
 Usage:
     python scripts/gtkb_propose_scaffold.py scaffold \
         --slug my-thread --work-item WI-1234 --project PROJECT-X \
-        --pauth PAUTH-X [--slice 2] [--bridge-kind implementation_proposal] \
+        --pauth PAUTH-X [--slice 2] [--bridge-kind prime_proposal] \
         [--target-path scripts/foo.py --target-path tests/test_foo.py]
 """
 
@@ -37,6 +37,7 @@ DRAFTS_DIR = PROJECT_ROOT / ".gtkb-state" / "propose-drafts"
 GROUNDTRUTH_DB = PROJECT_ROOT / "groundtruth.db"
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+DEFAULT_BRIDGE_KIND = "prime_proposal"
 
 # Specs that always govern an implementation-targeting bridge proposal; the
 # scaffold pre-lists them so the mandatory applicability preflight passes.
@@ -155,7 +156,7 @@ def build_scaffold(
     project: str,
     pauth: str,
     target_paths: list[str],
-    bridge_kind: str = "implementation_proposal",
+    bridge_kind: str = DEFAULT_BRIDGE_KIND,
     slice_n: int | None = None,
     prior_deliberations: list[tuple[str, str]] | None = None,
     specification_links: list[str] | None = None,
@@ -285,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--project", required=True)
     sc.add_argument("--pauth", required=True)
     sc.add_argument("--slice", type=int, default=None)
-    sc.add_argument("--bridge-kind", default="implementation_proposal")
+    sc.add_argument("--bridge-kind", default=DEFAULT_BRIDGE_KIND)
     sc.add_argument("--target-path", action="append", default=[], dest="target_paths")
     sc.add_argument("--no-write", action="store_true", help="Print to stdout without writing a draft.")
     args = parser.parse_args(argv)

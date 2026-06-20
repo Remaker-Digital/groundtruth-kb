@@ -63,13 +63,20 @@ PACKAGE_SRC_DIR = PROJECT_ROOT / "groundtruth-kb" / "src"
 if str(PACKAGE_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(PACKAGE_SRC_DIR))
 
-from implementation_authorization import AuthorizationError, create_authorization_packet  # noqa: E402
+from groundtruth_kb.bridge.disposition import (  # noqa: E402, I001
+    BRIDGE_KIND_TERMINAL_TOKENS as MATRIX_BRIDGE_KIND_TERMINAL_TOKENS,
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES as MATRIX_LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    PRIME_ACTIONABLE_STATUSES as MATRIX_PRIME_ACTIONABLE_STATUSES,
+    VERIFIED_CONTEXT_STATUSES as MATRIX_VERIFIED_CONTEXT_STATUSES,
+    disposition_for_status,
+)
+from implementation_authorization import AuthorizationError, create_authorization_packet  # noqa: E402, I001
 
 Role = Literal["prime-builder", "loyal-opposition"]
 
-PRIME_ACTIONABLE_STATUSES = frozenset({"NO-GO", "GO", "ADVISORY"})
-LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
-TERMINAL_STATUSES = frozenset({"VERIFIED"})
+PRIME_ACTIONABLE_STATUSES = MATRIX_PRIME_ACTIONABLE_STATUSES
+LO_ACTIONABLE_STATUSES = MATRIX_LOYAL_OPPOSITION_ACTIONABLE_STATUSES
+TERMINAL_STATUSES = MATRIX_VERIFIED_CONTEXT_STATUSES
 
 # Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
 # operative Prime proposal (latest NEW/REVISED), NOT on the Codex GO verdict.
@@ -82,22 +89,7 @@ _NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
 # ``GO`` is the deliverable, with no Prime implementation follow-up, so it must
 # NOT appear in the Prime actionable list. Kept in sync with the canonical set
 # by a parity test in ``platform_tests/scripts/test_scan_bridge.py``.
-_KIND_TERMINAL_TOKENS = (
-    "scoping",
-    "closure",
-    "parking",
-    "index_reconciliation",
-    "thread_reconciliation",
-    "operational_state_change",
-    "candidate_spec_intake",
-    "governance_review",
-    "spec_intake",
-    "loyal_opposition_advisory",
-    "governance_advisory",
-    "post_implementation",
-    "post_impl",
-    "implementation_report",
-)
+_KIND_TERMINAL_TOKENS = MATRIX_BRIDGE_KIND_TERMINAL_TOKENS
 
 # Header read budget (bytes). ``bridge_kind`` is always in the header section.
 _HEADER_READ_BUDGET_BYTES = 4096
@@ -362,17 +354,14 @@ def _role_filter(
     no Prime implementation follow-up. A latest ``NO-GO`` is never excluded
     (Prime must revise regardless of kind). ``loyal-opposition`` is unaffected.
     """
-    if role == "prime-builder":
-        actionable_statuses = PRIME_ACTIONABLE_STATUSES
-    elif role == "loyal-opposition":
-        actionable_statuses = LO_ACTIONABLE_STATUSES
-    else:
+    if role not in {"prime-builder", "loyal-opposition"}:
         raise ValueError(f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'")
 
     actionable: list[ThreadEntry] = []
     blocked_non_activatable: list[dict[str, Any]] = []
     for t in threads:
-        if t.latest_status not in actionable_statuses:
+        decision = disposition_for_status(t.latest_status, role)
+        if not decision.actionable:
             continue
         if role == "prime-builder" and t.latest_status == "GO":
             if _is_terminal_kind_go(t, project_root):

@@ -11,7 +11,8 @@ Loyal Opposition.
 - **Adopter / demo application:** An application that consumes GT-KB.
   - **Agent Red:** The reference adopter application for GT-KB. Agent Red exercises the platform's application-isolation contract in continuous use through a deliberately lifecycle-independent repository and CI cadence. The application subtree lives at `applications/Agent_Red/`. Its hosted form deploys from a lifecycle-independent repository (`https://github.com/mike-remakerdigital/agent-red`). Agent Red is the isolation validator: portability of Agent Red between GT-KB installations is the operative test of the platform/application isolation contract. Unless Mike explicitly says the session is Agent Red work, assume active work is GroundTruth-KB.
   - **Other demo applications:** GT-KB includes five adopter fixtures in `groundtruth-kb/examples/` for validation and examples. These are distinct from Agent Red (the reference adopter).
-- **MEMORY.md:** The operational notepad tier of ADR-0001. In the GT-KB checkout this lives at `memory/MEMORY.md` (harness-memory profile); in standard scaffolded adopter projects it lives at the project root. The doctor's `harness-memory` profile skips the root-MEMORY.md content check while still enforcing the canonical-term content contract on AGENTS.md and rule files.
+- **MEMORY.md:** The operational notepad tier of ADR-0001. In the GT-KB checkout this lives at `memory/MEMORY.md` (harness-memory profile); in standard scaffolded adopter projects it lives at the project root. The doctor's `harness-memory` profile skips the root-MEMORY.md content check while still enforcing the canonical-term content contract on AGENTS.md and rule files. The `MEMORY.md` hierarchy is non-authoritative; it can coordinate work but cannot make anything true for formal GT-KB change control.
+- **Harness-local scratchpads and auto-memory:** Antigravity planning/brain files, Codex automation memory, Claude Code auto-memory, and the `MEMORY.md` hierarchy are harness-local scratch/notepad surfaces. Harness-local scratchpads are non-authoritative and cannot be formal GT-KB artifacts, implementation reports, verification verdicts, tests, doctor checks, bridge evidence, governed decisions, release evidence, or dependency-closure inputs. Any project-relevant information originating there must be promoted into governed in-root artifacts such as MemBase, the Deliberation Archive, specifications, ADR/DCL/GOV records, bridge files, source, tests, or approved reports before it is cited or used as a dependency.
 
 ## Mandatory Project Root Boundary
 
@@ -22,6 +23,13 @@ required from outside that root. GT-KB demo/application files MUST be within
 `E:\Claude-Playground` is an archive only and must not be used as a live
 GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
 verification, or dependency location.
+Harness-local scratchpads, including Antigravity planning/brain files, Codex
+automation memory, Claude Code auto-memory, and the `MEMORY.md` hierarchy, are
+non-authoritative and are not root-boundary exceptions. Formal GT-KB artifacts,
+implementation reports, verification verdicts, tests, doctor checks, bridge
+evidence, governed decisions, release evidence, and dependency closure must not
+read from or depend on those surfaces as authority; project-relevant information
+originating there must be promoted into governed in-root artifacts before use.
 
 Apply `.claude/rules/project-root-boundary.md` to all GT-KB work, all bridge
 reviews, all implementation proposals, all tests, all dashboard generation,
@@ -88,7 +96,7 @@ Opposition, apply only governance, permissions, and restrictions that pertain to
 Loyal Opposition. If startup finds no recorded Prime Builder in the role map,
 the starting harness self-assigns Prime Builder and records that correction.
 
-Interactive sessions MAY override the durable role for in-session surfaces — SessionStart disclosure, the workstream-focus menu, MemBase `changed_by` attribution, AUQ routing, and the Claude-native AXIS 2 surface — when the owner declares a role via the canonical init keyword `::init gtkb (pb|lo)` on a prompt. The override is held in the ephemeral `.claude/session/active-session-role.json` marker for the rest of the session and is invalidated by the next SessionStart. This does not change the durable assignment map — the marker is ephemeral runtime state, not a role record — and headless dispatch routing remains keyed to the durable role per `GOV-SESSION-ROLE-AUTHORITY-001` and `DCL-SESSION-ROLE-RESOLUTION-001`.
+Interactive sessions MAY override the durable role for in-session surfaces — SessionStart disclosure, the workstream-focus menu, MemBase `changed_by` attribution, AUQ routing, and the Claude-native AXIS 2 surface — when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. The transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. This does not change the durable assignment map — runtime marker files such as `.claude/session/active-session-role.json` are cache/state only, not durable role records — and headless dispatch routing remains keyed to the durable role per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
 
 ## Prime Builder File Authority
 
@@ -224,6 +232,14 @@ The following workspace locations are strictly protected and require a bridge GO
 - If a prompt, instruction, summary, or cached report would have Prime Builder
   process latest `NEW`, `REVISED`, or `VERIFIED` entries, treat that as a
   role-confusion defect and diagnose it immediately before continuing.
+- Bridge review independence is session-context based. Same-session review is
+  self-review and must fail closed; same harness ID alone is not a blocker when
+  the author and reviewer session contexts are unrelated and the reviewer is in
+  a valid Loyal Opposition role or dispatch context.
+- Missing or unreadable bridge `author_session_context_id` metadata fails
+  closed for `GO` and `VERIFIED`. Interactive sessions remain bound to the
+  owner-declared resolved role and must not switch roles merely to create review
+  eligibility.
 - Loyal Opposition responds by writing the next numbered bridge file and adding
   `GO`, `NO-GO`, or `VERIFIED` at the top of that document entry.
 - Do not use or create alternate bridge runtimes or queues.
@@ -232,6 +248,7 @@ The following workspace locations are strictly protected and require a bridge GO
   Opposition may update the bridge and all downstream bridge-dependent
   artifacts needed to keep the bridge functioning and fully utilized; normal
   Loyal Opposition file-safety restrictions do not apply to that bridge scope.
+- **First-Line Role Eligibility Check**: Before writing any status-bearing bridge file (NEW, REVISED, GO, NO-GO, VERIFIED), the active harness must programmatically or manually execute a first-line verification check ensuring that its resolved session role is authorized to write that status (per `GOV-FILE-BRIDGE-AUTHORITY-001`). Prime Builder is strictly prohibited from authoring Loyal Opposition status tokens (GO, NO-GO, VERIFIED). Loyal Opposition is strictly prohibited from authoring Prime Builder status tokens (NEW, REVISED) unless correcting index-drift or other authorized administrative maintenance.
 
 ## Startup Checklist (Every Session)
 
@@ -309,7 +326,7 @@ item, and release blockers or release-target constraints when present.
   all other downstream bridge-dependent artifacts without additional approval
   when the purpose is sustaining the bridge and ensuring it remains properly and
   fully utilized.
-- **Antigravity harness (ID C)**: As of 2026-05-31, the former Antigravity Standing Exception Retraction & Scoped Authority restrictions are obsolete per owner directive. Antigravity follows the same role-based file authority as any other harness: when assigned Prime Builder, Prime Builder file authority applies; when assigned Loyal Opposition, Loyal Opposition file-safety applies. **Startup Optimization Directive**: To minimize startup resource consumption and token cost, Antigravity uses a local, low-overhead startup path. It is explicitly exempt from Phase B steps 9 through 18a (reading non-essential bootstrap, rule, priority, vision, checklist, and log files). Antigravity must only load the essential baseline files (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/canonical-terminology.md`, `.claude/rules/file-bridge-protocol.md`, and `memory/MEMORY.md`). Furthermore, any startup services or hooks must skip non-local reachability checks (such as Grafana queries) and compile/compaction tasks (such as PDF generation) by running with `--fast-hook` and `--skip-bridge-maintenance`.
+- **Antigravity harness (ID C)**: As of 2026-05-31, the former Antigravity Standing Exception Retraction & Scoped Authority restrictions are obsolete per owner directive. Antigravity follows the same role-based file authority as any other harness: when assigned Prime Builder, Prime Builder file authority applies; when assigned Loyal Opposition, Loyal Opposition file-safety applies. **Startup Optimization Directive**: To minimize startup resource consumption and token cost, Antigravity uses a local, low-overhead startup path. It is explicitly exempt from Phase B steps 9 through 18a (reading non-essential bootstrap, rule, priority, vision, checklist, and log files). However, to enforce role boundaries correctly, Antigravity's optimized startup path must still load the active role overlay file (`config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`) appropriate to its resolved role. Antigravity must load the essential baseline files (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/canonical-terminology.md`, `.claude/rules/file-bridge-protocol.md`, and `memory/MEMORY.md`). Furthermore, any startup services or hooks must skip non-local reachability checks (such as Grafana queries) and compile/compaction tasks (such as PDF generation) by running with `--fast-hook` and `--skip-bridge-maintenance`.
 - New files should be created under:
   - `independent-progress-assessments/`
   - `.claude/rules/`

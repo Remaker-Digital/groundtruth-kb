@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-19T19:55:22Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-19T19:55:22Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-19T19-55-22Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/hooks/bridge-compliance-gate.py\n M .claude/rules/canonical-terminology.md\n M .claude/rules/codex-review-gate.md\n M .claude/rules/file-bridge-protocol.md\n M .claude/rules/loyal-opposition.md\n M .claude/rules/operating-role.md\n M .claude/rules/prime-builder-role.md\n M .claude/skills/bridge/helpers/scan_bridge.py\n M AGENTS.md\n M CLAUDE.md\n M applications/Agent_Red/.gtkb-app-isolation.json\nA  bridge/gtkb-dispatch-runtime-health-readiness-repair-002.md\nA  bridge/gtkb-dispatch-runtime-health-readiness-repair-003.md\n M config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md\n M config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md\n M config/agent-control/SESSION-STARTUP-INDEX.md\n M config/dispatcher/rules.toml\n M groundtruth-kb/docs/reference/canonical-terminology-detail.md\n M groundtruth-kb/pyproject.toml\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py\n M groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py\n M groundtruth-kb/src/groundtruth_kb/db.py\n M groundtruth-kb/src/groundtruth_kb/project/doctor.py\n M groundtruth-kb/src/groundtruth_kb/session/handoff.py\n M groundtruth-kb/templates/hooks/bridge-compliance-gate.py\n M groundtruth-kb/tests/test_doctor_legacy_root.py\n M groundtruth-kb/tests/test_governance_hooks.py\n M groundtruth-kb/uv.lock\n M harness-state/harness-registry.json\n M independent-progress-assessments/LOYAL-OPPOSITION-LOG.md\nM  memory/MEMORY.md\nA  memory/SESSION-HANDOFF-2026-06-19-production-readiness-roadmap.md\n M memory/pending-owner-decisions.md\n M platform_tests/hooks/test_bridge_compliance_gate_hard_block_workspace.py\n M platform_tests/scripts/test_bridge_dispatch_config.py\n M platform_tests/scripts/test_cross_harness_bridge_trigger.py\n M platform_tests/scripts/test_ollama_dispatch_prompt_restructure.py\n M platform_tests/scripts/test_ollama_harness.py\n M platform_tests/scripts/test_openrouter_harness.py\n M platform_tests/scripts/test_session_handoff_service.py\n M scripts/cross_harness_bridge_trigger.py\n M scripts/ollama_harness.py\n M scripts/openrouter_harness.py\n M scripts/session_self_initialization.py\n?? .claude/skills/bridge/helpers/draft-4676-verdict.md\n?? .claude/skills/bridge/helpers/draft-4678-verdict.md\n?? .claude/skills/verify/helpers/draft-004-body.md\n?? .claude/skills/verify/helpers/draft-gtkb-wi4678-finalization-git-write-retry-002.md\n?? .claude/skills/verify/helpers/draft-gtkb-wi4678-git-write-finalization-002.md\n?? .claude/skills/verify/helpers/draft-wi4678-verdict-body.md\n?? .gtkb-tmp/\n?? bridge/draft-verdict-gtkb-wi4678-pytest-timeout-addopts-dependency-004.txt\n?? bridge/gtkb-app-boundary-mechanism-audit-006.md\n?? bridge/gtkb-dispatch-runtime-health-readiness-repair-001.md\n?? bridge/gtkb-dispatch-runtime-health-readiness-repair-004.md\n?? bridge/gtkb-dispatch-runtime-health-readiness-repair-005.md\n?? bridge/gtkb-ollama-cloud-routing-sot-drift-advisory-001.md\n?? bridge/gtkb-project-authorization-completion-keep-open-003.md\n?? bridge/gtkb-project-authorization-completion-keep-open-006.md\n?? bridge/gtkb-propose-scaffold-invalid-bridge-kind-002.md\n?? bridge/gtkb-propose-scaffold-invalid-bridge-kind-003.md\n?? bridge/gtkb-propose-scaffold-invalid-bridge-kind-004.md\n?? bridge/gtkb-propose-scaffold-invalid-bridge-kind-005.md\n?? bridge/gtkb-propose-scaffold-invalid-bridge-kind-006.md\n?? bridge/gtkb-s373-triage-umbrella-004.md\n?? bridge/gtkb-show-thread-bridge-windows-unicode-001.md\n?? bridge/gtkb-show-thread-bridge-windows-unicode-002.md\n?? bridge/gtkb-show-thread-bridge-windows-unicode-004.md\n?? bridge/gtkb-stale-git-worktree-autogc-diagnosis-002.md\n?? bridge/gtkb-stale-git-worktree-autogc-diagnosis-003.md\n?? bridge/gtkb-startup-relay-cache-ttl-self-heal-006.md\n?? bridge/gtkb-wi4676-verified-finalization-004-draft.txt\n?? bridge/gtkb-wi4677-backlog-json-option-validation-004-draft.txt\n?? bridge/gtkb-wi4678-git-write-finalization-004-draft.txt\n?? bridge/gtkb-wi4678-pytest-timeout-addopts-dependency-002-draft.txt\n?? bridge/gtkb-work-intent-registry-failsoft-status-parse-001.md\n?? bridge/gtkb-work-intent-registry-failsoft-status-parse-002.md\n?? bridge/gtkb-work-intent-registry-failsoft-status-parse-003.md\n?? bridge/gtkb-work-intent-registry-failsoft-status-parse-004.md\n?? bridge/gtkb-wrapup-clear-impl-start-packet-at-verified-003.md",
+        "short_line_count": 98,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

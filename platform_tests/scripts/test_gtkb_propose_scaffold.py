@@ -15,9 +15,16 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+GTKB_SRC = REPO_ROOT / "groundtruth-kb" / "src"
+if str(GTKB_SRC) not in sys.path:
+    sys.path.insert(0, str(GTKB_SRC))
+
+from groundtruth_kb.bridge.taxonomy import BridgeKind  # noqa: E402
+
 HELPER = REPO_ROOT / "scripts" / "gtkb_propose_scaffold.py"
 
 
@@ -53,16 +60,14 @@ def test_slug_validation():
         assert _h.validate_slug(bad) is not None, bad
 
 
-def test_slug_collision_against_index(tmp_path):
-    index = tmp_path / "INDEX.md"
-    index.write_text(
-        "# Bridge Index\n\nDocument: existing-thread\nNEW: bridge/existing-thread-001.md\n",
-        encoding="utf-8",
-    )
-    assert _h.slug_collision("existing-thread", index) is not None
-    assert _h.slug_collision("brand-new-thread", index) is None
-    # Missing INDEX degrades to no collision.
-    assert _h.slug_collision("anything", tmp_path / "absent.md") is None
+def test_slug_collision_against_bridge_dir(tmp_path):
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "existing-thread-001.md").write_text("NEW\n", encoding="utf-8")
+    assert _h.slug_collision("existing-thread", bridge_dir) is not None
+    assert _h.slug_collision("brand-new-thread", bridge_dir) is None
+    # Missing bridge dir degrades to no collision.
+    assert _h.slug_collision("anything", tmp_path / "absent") is None
 
 
 # --- scaffold structure ------------------------------------------------------
@@ -100,6 +105,17 @@ def test_scaffold_target_paths_inline_json():
     assert m, "target_paths inline-JSON line not found"
     parsed = json.loads(m.group(1))
     assert parsed == ["scripts/a.py", "b/c.py"]
+
+
+def test_scaffold_bridge_kind_default_matches_taxonomy():
+    body = _scaffold()
+    m = re.search(r"^bridge_kind:\s*(\S+)\s*$", body, re.MULTILINE)
+    assert m, "bridge_kind line not found"
+    default_kind = m.group(1)
+    allowed_kinds = {kind.value for kind in BridgeKind}
+    assert default_kind == BridgeKind.PRIME_PROPOSAL.value
+    assert default_kind in allowed_kinds
+    assert "bridge_kind: implementation_proposal" not in body
 
 
 def test_scaffold_verification_heading_token():
@@ -155,3 +171,14 @@ def test_always_applicable_specs_seeded_by_default():
     body = _scaffold()
     for sid in _h.ALWAYS_APPLICABLE_SPECS:
         assert f"`{sid}`" in body, sid
+
+
+def test_gtkb_propose_guidance_surfaces_document_taxonomy_valid_default():
+    for relative in (
+        ".claude/skills/gtkb-propose/SKILL.md",
+        ".codex/skills/gtkb-propose/SKILL.md",
+        ".agent/skills/gtkb-propose/SKILL.md",
+    ):
+        text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert "bridge_kind` (default `prime_proposal`)" in text, relative
+        assert "bridge_kind` (default `implementation_proposal`)" not in text, relative

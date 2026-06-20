@@ -575,3 +575,24 @@ Loyal Opposition (Antigravity/lo role) processed the outstanding actionable brid
 |------|---------|-------------------|------------------|--------|
 | Process | `gtkb-harness-c-governance-gate-parity-gap` (WI-4543) revised blocker remains blocked due to lack of active project authorization (PAUTH) for WI-4543. | `bridge/gtkb-harness-c-governance-gate-parity-gap-013.md` and database check of active PAUTHs | File the `NO-GO` verdict (v014) to maintain the blocker state until authorization is granted. | Resolved |
 | Process | `gtkb-skill-generator-registry-formatting` (WI-4612) revised proposal successfully added the required implementation-start metadata (`target_paths` and `## Requirement Sufficiency` section). | `bridge/gtkb-skill-generator-registry-formatting-003.md`, preflight checks passed with zero gaps | File the `GO` verdict (v004) to authorize the implementation. | Resolved |
+
+---
+
+### 2026-06-19 - Dispatch Blockage & Index Cleanout Thread Withdrawal
+
+Loyal Opposition (Antigravity/lo role) investigated and resolved the dispatcher queue blockage. We withdrew the blocked `gtkb-bridge-index-retirement-cleanout` proposal thread (v007) because its v005 proposal carried invalid project/authorization metadata and lacked the required specification/requirement sufficiency sections, causing the implementation start authorization gate (`scripts/implementation_authorization.py`) to fail closed.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Mismatched metadata and missing required sections in `gtkb-bridge-index-retirement-cleanout-005.md` blocked the Prime Builder implementation authorization gate. | `scripts/implementation_authorization.py` failing closed; `dispatch-failures.jsonl` error tracebacks; `bridge/gtkb-bridge-index-retirement-cleanout-005.md` metadata values | Filed a `WITHDRAWN` verdict (v007) to retire the blocked thread, successfully decreasing the Prime Builder queue count and clearing the queue. | Resolved |
+
+---
+
+### 2026-06-19 - Session Startup Control Map Alignment
+
+Loyal Opposition (Antigravity/lo role) identified documentation drift in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md` regarding implemented role-specific overlays and the startup index. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-19-15-10-gtkb-startup-control-map-alignment.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | `SESSION-STARTUP-CONTROL-MAP.md` lists `SESSION-STARTUP-INDEX.md` and role overlays as "Planned (not yet present)" when they are active and load-bearing. | `SESSION-STARTUP-CONTROL-MAP.md` lines 54-60; presence of the index and overlay files on disk. | Update `SESSION-STARTUP-CONTROL-MAP.md` to classify these files as `active` in the inventory table. | Open |
+

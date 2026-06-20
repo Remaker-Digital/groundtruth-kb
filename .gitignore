@@ -591,3 +591,33 @@ archive/worktrees/
 # target). These must never be tracked.
 /C:Users*
 /print(*
+# GT-KB session/runtime scratch (WI-4702 sweep): these are non-canonical
+# byproducts of AI sessions that were never gitignored, so a naive `git add -A`
+# would sweep ~2,000 throwaway files into history. Canonical state lives in
+# MemBase, the Deliberation Archive, bridge/<slug>-NNN.md audit files, and
+# tracked source. Owner-approved sweep exclusion, 2026-06-20.
+/.gtkb-tmp/
+/pytest_temp/
+/.harness-d-tmp/
+/$null
+/bridge_scan.md
+/adr_dcl_lo.json
+/test_localsystem.txt
+/tmp_verify_stdout.txt
+/por_*.txt
+/tmp_verdict_*.md
+/tmp_lo_verdict_*.md
+/tmp-gtkb-*-verdict-draft.md
+/.tmp-verdict-*.md
+/.temp_draft_*.md
+/gtkb-wi*-draft.*
+# Bridge verdict draft scratch (canonical bridge files are <slug>-NNN.md, never
+# matched by these). Draft .txt / *-draft.* bodies are pre-write scratch only.
+bridge/*-draft.txt
+bridge/.draft-*.txt
+bridge/draft-verdict-*.txt
+# Skill-helper verdict/body drafts (scratch produced while authoring verdicts).
+.claude/skills/bridge/helpers/draft-*.md
+.claude/skills/verify/helpers/draft-*
+.claude/skills/verify/helpers/_temp_verdict_*
+.claude/skills/verify/helpers/*-draft-body.md

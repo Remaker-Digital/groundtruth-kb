@@ -100,6 +100,18 @@ def test_bridge_review_prompt_seeds_prior_deliberations_before_verdict_write(tmp
     assert "silently omitting Prior Deliberations" in prompt
 
 
+def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Path):
+    root = make_root(tmp_path)
+    prompt = orh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    assert "--finalize-verified" in prompt
+    assert "--no-prepopulate" in prompt
+    assert "local commit containing the verified path set" in prompt
+    assert "fail closed" in prompt
+    assert "terminal VERIFIED file" in prompt
+
+
 def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):
     root = make_root(tmp_path)
     records: list[tuple[str, dict, dict]] = []
