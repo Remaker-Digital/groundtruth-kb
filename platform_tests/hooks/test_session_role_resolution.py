@@ -169,3 +169,59 @@ def test_durable_lookup_reads_seeded_role(tmp_path: Path) -> None:
     )
     assert resolved == srr.ROLE_LO
     assert source == "durable_marker_absent"
+
+
+def _write_envelope(root: Path, harness_name: str, status: str, role_resolved: str | None) -> Path:
+    env_dir = root / "harness-state" / harness_name
+    env_dir.mkdir(parents=True, exist_ok=True)
+    envelope = {
+        "status": status,
+        "role_resolved": role_resolved,
+    }
+    p = env_dir / "session-envelope.json"
+    p.write_text(json.dumps(envelope), encoding="utf-8")
+    return p
+
+
+def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # durable is prime-builder, but active open envelope is loyal-opposition
+    monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
+    _write_envelope(tmp_path, "claude", "open", srr.ROLE_LO)
+
+    # marker is absent -> fallback to envelope role (loyal-opposition)
+    resolved, source = srr.resolve_interactive_session_role(
+        tmp_path, current_session_id="sess-1", harness_name="claude"
+    )
+    assert resolved == srr.ROLE_LO
+    assert source == "durable_marker_absent"
+
+    # marker is stale -> fallback to envelope role (loyal-opposition)
+    _write_marker(tmp_path, srr.ROLE_PRIME, "old-sess")
+    resolved, source = srr.resolve_interactive_session_role(
+        tmp_path, current_session_id="new-sess", harness_name="claude"
+    )
+    assert resolved == srr.ROLE_LO
+    assert source == "durable_marker_stale_session"
+
+
+def test_resolver_envelope_closed_or_missing_falls_back_to_durable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # durable is prime-builder
+    monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_PRIME)
+
+    # 1. envelope is closed
+    _write_envelope(tmp_path, "claude", "closed", srr.ROLE_LO)
+    resolved, source = srr.resolve_interactive_session_role(
+        tmp_path, current_session_id="sess-1", harness_name="claude"
+    )
+    assert resolved == srr.ROLE_PRIME
+    assert source == "durable_marker_absent"
+
+    # 2. envelope is open but role_resolved is invalid/None
+    _write_envelope(tmp_path, "claude", "open", "bogus")
+    resolved, source = srr.resolve_interactive_session_role(
+        tmp_path, current_session_id="sess-1", harness_name="claude"
+    )
+    assert resolved == srr.ROLE_PRIME
+    assert source == "durable_marker_absent"

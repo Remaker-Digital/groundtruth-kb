@@ -152,6 +152,22 @@ def resolve_interactive_session_role(
     """
     durable = _durable_role(project_root, harness_name)
 
+    # WI-4663: Load per-harness session envelope and prefer its role_resolved
+    # over the registry durable role if the envelope is status="open".
+    envelope_path = project_root / "harness-state" / harness_name / "session-envelope.json"
+    envelope_role = None
+    if envelope_path.is_file():
+        try:
+            envelope_data = json.loads(envelope_path.read_text(encoding="utf-8"))
+            if isinstance(envelope_data, dict) and envelope_data.get("status") == "open":
+                role_resolved = envelope_data.get("role_resolved")
+                if role_resolved in _VALID_ROLES:
+                    envelope_role = role_resolved
+        except Exception:
+            pass
+
+    fallback = envelope_role if envelope_role is not None else durable
+
     # WI-4540 (bridge -004, R-B1 + additive transition): the per-session marker
     # is the authority. When a current_session_id is available, prefer the
     # per-session marker keyed under it; it survives a SessionStart that carries
@@ -163,24 +179,24 @@ def resolve_interactive_session_role(
         if per_session is not None:
             role = per_session.get("role")
             if role not in _VALID_ROLES:  # assertion 7
-                return durable, "durable_marker_invalid_role"
+                return fallback, "durable_marker_invalid_role"
             marker_session_id = per_session.get("session_id")
             if not (isinstance(marker_session_id, str) and marker_session_id == current_session_id):
-                return durable, "durable_marker_stale_session"  # assertion 6
+                return fallback, "durable_marker_stale_session"  # assertion 6
             return role, "marker"
 
     body = _read_marker(project_root)
     if body is None:
-        return durable, "durable_marker_absent"
+        return fallback, "durable_marker_absent"
 
     role = body.get("role")
     if role not in _VALID_ROLES:  # assertion 7
-        return durable, "durable_marker_invalid_role"
+        return fallback, "durable_marker_invalid_role"
 
     if current_session_id is not None:
         marker_session_id = body.get("session_id")
         if not (isinstance(marker_session_id, str) and marker_session_id == current_session_id):
-            return durable, "durable_marker_stale_session"  # assertion 6
+            return fallback, "durable_marker_stale_session"  # assertion 6
         return role, "marker"
 
     # current_session_id unavailable: accept the marker. Slice 3 deletes the
