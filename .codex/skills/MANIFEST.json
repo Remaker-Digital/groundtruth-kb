@@ -47,7 +47,7 @@
       "canonical_name": "gtkb-propose",
       "capability_id": "skill.gtkb-propose",
       "source_relative_path": ".claude/skills/gtkb-propose/SKILL.md",
-      "source_sha256": "c0f526b45d59eab1f8ad6b59dd4bb067054b27e53a4d754885e7f353dbc59590"
+      "source_sha256": "7eb0ff541b66aad979a2a21db5dd7307f148fd9146bcf38f38f094c0e21a8b56"
     },
     {
       "adapter_relative_path": ".codex/skills/check-deliberations/SKILL.md",
