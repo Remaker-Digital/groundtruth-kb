@@ -2,9 +2,15 @@
 
 Covers SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001 acceptance criterion #2:
 validation against authoritative role, bridge, and session-state artifacts
-before writing durable state. Includes the live-INDEX compatibility
-regression cases Codex required at bridge -011 F1 (WITHDRAWN rows accepted;
-missing referenced files tolerated).
+before writing durable state.
+
+The bridge-axis cases exercise the numbered-bridge-file model (``*-NNN.md``):
+the validator's fatal floor is structural coherence (directory present, at
+least one numbered file, all readable), while a non-canonical leading status
+token in an existing numbered file is grandfathered legacy observability per
+the file-bridge-protocol Body Status-Token Rule (WI-4696; GO -002). The earlier
+``bridge/INDEX.md``-based cases were retired with WI-4696 because the validator
+no longer reads ``bridge/INDEX.md``.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights reserved.
 """
@@ -61,52 +67,74 @@ def test_validate_role_artifact_unknown_token_fails(project_root: Path) -> None:
 
 
 def test_validate_bridge_artifact_missing_fails(project_root: Path) -> None:
+    """Fatal floor (GO -002 condition 1): no ``bridge/`` directory fails."""
     result = validate_bridge_artifact(project_root)
     assert not result.is_valid
     assert result.axis == "bridge"
 
 
-def test_validate_bridge_artifact_unknown_status_token_fails(project_root: Path) -> None:
-    _write(
-        project_root / "bridge" / "INDEX.md",
-        "Document: foo\nFROBNICATED: bridge/foo-001.md\n",
-    )
-    result = validate_bridge_artifact(project_root)
-    assert not result.is_valid
+def test_validate_bridge_artifact_no_numbered_files_fails(project_root: Path) -> None:
+    """Fatal floor (condition 1): a ``bridge/`` dir with no numbered files fails.
 
-
-def test_validate_bridge_artifact_accepts_withdrawn_status_rows(project_root: Path) -> None:
-    """REVISED-3 regression: WITHDRAWN is part of the canonical vocabulary."""
-    _write(
-        project_root / "bridge" / "INDEX.md",
-        "Document: foo\nWITHDRAWN: bridge/foo-002.md\nNEW: bridge/foo-001.md\n",
-    )
-    result = validate_bridge_artifact(project_root)
-    assert result.is_valid
-
-
-def test_validate_bridge_artifact_tolerates_missing_referenced_bridge_files(
-    project_root: Path,
-) -> None:
-    """REVISED-3 regression: historical INDEX entries may reference removed files.
-
-    The validator MUST NOT make file-existence of referenced bridge files
-    a precondition for mode-switch safety.
+    Only ``*-NNN.md`` files are bridge-axis input; a bare ``INDEX.md`` (or any
+    non-numbered file) is not a numbered bridge file, so the corpus is empty.
     """
-    _write(
-        project_root / "bridge" / "INDEX.md",
-        "Document: ghost\nNEW: bridge/ghost-thread-001.md\n",
-    )
-    # The referenced file is intentionally not on disk.
-    assert not (project_root / "bridge" / "ghost-thread-001.md").exists()
-    result = validate_bridge_artifact(project_root)
-    assert result.is_valid
-
-
-def test_validate_bridge_artifact_no_document_entry_fails(project_root: Path) -> None:
     _write(project_root / "bridge" / "INDEX.md", "# Bridge Index\n\n<!-- empty -->\n")
     result = validate_bridge_artifact(project_root)
     assert not result.is_valid
+
+
+def test_validate_bridge_artifact_ignores_non_numbered_files(project_root: Path) -> None:
+    """Non-numbered files (e.g. ``INDEX.md``) are ignored; numbered files drive validity."""
+    _write(project_root / "bridge" / "INDEX.md", "Document: foo\nFROBNICATED: x\n")
+    _write(project_root / "bridge" / "foo-001.md", "NEW\n\n# proposal\n")
+    result = validate_bridge_artifact(project_root)
+    assert result.is_valid
+
+
+def test_validate_bridge_artifact_grandfathers_unknown_token_in_numbered_file(
+    project_root: Path,
+) -> None:
+    """GO -002 condition 2: a numbered file with a non-canonical first line is
+    grandfathered legacy, not a fatal blocker."""
+    _write(project_root / "bridge" / "legacy-001.md", "Document: foo\nbody\n")
+    result = validate_bridge_artifact(project_root)
+    assert result.is_valid
+
+
+def test_validate_bridge_artifact_accepts_canonical_withdrawn(project_root: Path) -> None:
+    """WITHDRAWN is part of the canonical vocabulary; canonical numbered files validate."""
+    _write(project_root / "bridge" / "foo-001.md", "NEW\n")
+    _write(project_root / "bridge" / "foo-002.md", "WITHDRAWN\n")
+    result = validate_bridge_artifact(project_root)
+    assert result.is_valid
+
+
+def test_validate_bridge_artifact_grandfathers_legacy_with_canonical(
+    project_root: Path,
+) -> None:
+    """GO -002 condition 5: a mixed corpus of a legacy (non-canonical first line)
+    numbered file plus a canonical numbered file is accepted, and the legacy file
+    is surfaced as non-fatal observability (condition 3)."""
+    _write(project_root / "bridge" / "legacy-001.md", "Document: legacy\nbody\n")
+    _write(project_root / "bridge" / "fresh-001.md", "NEW\n\n# fresh proposal\n")
+    result = validate_bridge_artifact(project_root)
+    assert result.is_valid
+    assert any("grandfathered legacy" in note for note in result.notes)
+
+
+def test_validate_bridge_artifact_accepted_blocked_are_legacy_not_canonical(
+    project_root: Path,
+) -> None:
+    """GO -002 condition 3: ``ACCEPTED`` / ``BLOCKED`` are NOT canonical tokens;
+    historical files using them are grandfathered legacy observability, never fatal."""
+    _write(project_root / "bridge" / "hist-001.md", "ACCEPTED\n")
+    _write(project_root / "bridge" / "hist-002.md", "BLOCKED\n")
+    _write(project_root / "bridge" / "hist-003.md", "NEW\n")
+    result = validate_bridge_artifact(project_root)
+    assert result.is_valid
+    # 2 of the 3 numbered files use non-canonical legacy tokens.
+    assert any("2 grandfathered legacy/unknown" in note for note in result.notes)
 
 
 def test_validate_session_state_artifact_missing_is_ok(project_root: Path) -> None:

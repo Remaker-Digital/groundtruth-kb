@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-16T19:24:40Z",
+  "generated_at": "2026-06-20T07:53:58Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -70,7 +70,7 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "prime-builder"
+          "loyal-opposition"
         ],
         "status": "verified"
       },
@@ -131,10 +131,8 @@
       "local command output with path detail"
     ],
     "public_output_policy": "public inventory contains only counts/classes for sensitive local values",
-    "sensitive_environment_categories": [
-      "key_name"
-    ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_categories": [],
+    "sensitive_environment_entry_count": 0,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -414,7 +412,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -568,7 +566,7 @@
     },
     {
       "assignment": {
-        "current_role": "['prime-builder']",
+        "current_role": "['loyal-opposition']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
@@ -655,7 +653,7 @@
   "schema_version": 1,
   "shell": {
     "classification": "public_safe",
-    "current_shell_family": "PowerShell-compatible",
+    "current_shell_family": "powershell.exe",
     "path_detail": "local_only",
     "terminal": "redacted"
   },

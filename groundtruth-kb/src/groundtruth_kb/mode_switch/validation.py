@@ -18,9 +18,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-BRIDGE_STATUS_TOKENS = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "WITHDRAWN", "ADVISORY", "DEFERRED", "ACCEPTED", "BLOCKED"}
-)
+# Canonical bridge status vocabulary per ``.claude/rules/file-bridge-protocol.md``
+# § "Body Status-Token Rule". A non-canonical leading token in an existing
+# numbered bridge file — including the legacy/non-canonical ``ACCEPTED`` /
+# ``BLOCKED`` — is grandfathered legacy observability, NOT a newly-accepted
+# canonical token (WI-4696 GO -002 condition 3).
+BRIDGE_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"})
 
 _BRIDGE_FILE_RE = re.compile(r"^.+-\d{3}\.md$")
 _BRIDGE_STATUS_TOKEN_RE = re.compile(r"^[#>*\-\s`]*([A-Z][A-Z\-]*)\b")
@@ -33,6 +36,7 @@ class ValidationResult:
     is_valid: bool
     axis: str
     errors: tuple[str, ...] = ()
+    notes: tuple[str, ...] = ()
 
 
 def _ok(axis: str) -> ValidationResult:
@@ -99,15 +103,30 @@ def validate_role_artifact(project_root: Path) -> ValidationResult:
 
 
 def validate_bridge_artifact(project_root: Path) -> ValidationResult:
-    """Validate the status-bearing numbered bridge-file chain."""
+    """Validate the status-bearing numbered bridge-file chain for mode-switch safety.
+
+    Per ``.claude/rules/file-bridge-protocol.md`` § "Body Status-Token Rule", the
+    Write-time ``bridge-compliance-gate`` is the canonical enforcement point for
+    the leading status token and it GRANDFATHERS bridge files that already exist
+    on disk with a non-canonical first line ("the rule never retroactively breaks
+    historical bridge files"). Hundreds of the live numbered bridge files predate
+    the rule (WI-4696: ~706 of ~7,383 legacy/unknown). This mode-switch preflight
+    therefore treats a non-canonical first line in an existing numbered file as
+    grandfathered legacy -- counted for non-fatal observability, never a
+    transaction blocker (WI-4696 GO -002 conditions 2-3).
+
+    The retained fatal floor is structural bridge-corpus coherence (condition 1):
+    the ``bridge/`` directory exists, contains numbered bridge files, and they are
+    readable. The status-token presence/validity scan is non-fatal observability.
+    """
     axis = "bridge"
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
         return _fail(axis, f"bridge directory missing: {bridge_dir}")
     checked_files = 0
-    bad_status_tokens: list[str] = []
+    canonical = 0
+    legacy_or_unknown = 0
     unreadable: list[str] = []
-    missing_status: list[str] = []
     for path in sorted(bridge_dir.glob("*.md")):
         if not _BRIDGE_FILE_RE.match(path.name):
             continue
@@ -125,23 +144,25 @@ def validate_bridge_artifact(project_root: Path) -> ValidationResult:
             match = _BRIDGE_STATUS_TOKEN_RE.match(stripped)
             token = match.group(1) if match else None
             break
-        if token is None:
-            missing_status.append(path.name)
-        elif token not in BRIDGE_STATUS_TOKENS:
-            bad_status_tokens.append(token)
+        # A leading token outside the canonical set (the legacy ACCEPTED/BLOCKED,
+        # or no recognizable token at all) is a grandfathered legacy first line:
+        # counted for observability, never fatal.
+        if token is not None and token in BRIDGE_STATUS_TOKENS:
+            canonical += 1
+        else:
+            legacy_or_unknown += 1
     if checked_files == 0:
         return _fail(axis, "bridge directory contains no numbered bridge files")
     if unreadable:
         return _fail(axis, f"bridge files unreadable: {sorted(unreadable)}")
-    if missing_status:
-        return _fail(axis, f"bridge files missing status tokens: {sorted(missing_status)}")
-    if bad_status_tokens:
-        unique_bad = sorted(set(bad_status_tokens))
-        return _fail(
-            axis,
-            f"bridge files contain unknown status tokens: {unique_bad}",
-        )
-    return _ok(axis)
+    return ValidationResult(
+        is_valid=True,
+        axis=axis,
+        notes=(
+            f"bridge corpus: {checked_files} numbered files "
+            f"({canonical} canonical, {legacy_or_unknown} grandfathered legacy/unknown)",
+        ),
+    )
 
 
 def validate_session_state_artifact(project_root: Path) -> ValidationResult:
