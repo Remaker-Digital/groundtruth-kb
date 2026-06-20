@@ -98,6 +98,7 @@ def _worker_pythonpath(inherited: str | None) -> str:
     return os.pathsep.join([_PACKAGE_SRC, *[part for part in inherited_parts if part != _PACKAGE_SRC]])
 
 
+from _env import load_env_local  # noqa: E402, I001
 from bridge_lease_registry import is_lease_held  # noqa: E402, I001
 from bridge_work_intent_registry import (  # noqa: E402, I001
     MalformedBridgeStatusError,
@@ -189,6 +190,14 @@ IMPLEMENTATION_AUTH_ENV_VARS = (
     "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS",
     "GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID",
     "GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES",
+)
+# WI-4707: allowlist of harness auth env keys that may be loaded from
+# .env.local into the headless-worker spawn env. Only these keys are ever
+# injected; unrelated .env.local secrets are never forwarded to workers.
+DISPATCH_AUTH_ENV_KEYS: tuple[str, ...] = (
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
 )
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
@@ -2793,6 +2802,19 @@ def _spawn_harness(
     stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
 
     env = dict(os.environ)
+    # WI-4707: inject .env.local auth credentials into the spawn env so
+    # headless workers can authenticate even when the parent session token has
+    # expired. Only allowlisted keys are injected; setdefault semantics never
+    # override an explicit os.environ value; a missing/unreadable .env.local is
+    # a safe no-op. Credential VALUES are never logged — only key names/presence.
+    try:
+        _env_local_values = load_env_local(check_only=True)
+        for _auth_key in DISPATCH_AUTH_ENV_KEYS:
+            _val = _env_local_values.get(_auth_key, "")
+            if _val and not env.get(_auth_key):
+                env[_auth_key] = _val
+    except Exception:  # noqa: BLE001 - loader errors must never block a spawn
+        pass
     env["GTKB_PROJECT_ROOT"] = str(project_root)
     env["PYTHONPATH"] = _worker_pythonpath(env.get("PYTHONPATH"))
     # Per Slice 4 D9b (Codex F1 on -006): the SessionStart hooks at
