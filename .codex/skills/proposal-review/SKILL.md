@@ -56,7 +56,7 @@ Prefer:
 ## Bridge Verdicts
 
 When this review produces a bridge `GO`/`NO-GO` verdict, run
-`python .claude/skills/verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
+`python .codex/skills/verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
 before filing so the draft's `## Prior Deliberations` section is seeded. Review
 and prune the helper-suggested candidates; if you opt out, keep an explicit
 `_No prior deliberations: <reason>._` line in the verdict.

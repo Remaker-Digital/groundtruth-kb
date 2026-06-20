@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +39,15 @@ def _write_reference(project_root: Path, directory: str, relative_path: str, con
         reference_path.write_bytes(content)
     else:
         reference_path.write_text(content, encoding="utf-8")
+
+
+def _write_helper(project_root: Path, directory: str, relative_path: str, content: bytes | str) -> None:
+    helper_path = project_root / ".claude" / "skills" / directory / "helpers" / relative_path
+    helper_path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(content, bytes):
+        helper_path.write_bytes(content)
+    else:
+        helper_path.write_text(content, encoding="utf-8")
 
 
 def _write_registry(project_root: Path) -> None:
@@ -123,6 +133,50 @@ def test_generate_mirrors_canonical_references(tmp_path: Path) -> None:
     assert (tmp_path / ".codex" / "skills" / "review" / "references" / "data.bin").read_bytes() == b"\x00\x01reference"
 
 
+def test_generate_mirrors_canonical_helpers(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_helper(tmp_path, "review", "nested/tool.py", "print('helper')\n")
+    _write_helper(tmp_path, "review", "data.bin", b"\x00\x01helper")
+    _write_helper(tmp_path, "review", "__pycache__/tool.pyc", b"cache")
+    _write_registry(tmp_path)
+
+    changed, _adapters = module.generate(tmp_path)
+
+    assert ".codex/skills/review/helpers/nested/tool.py" in changed
+    assert ".codex/skills/review/helpers/data.bin" in changed
+    assert ".codex/skills/review/helpers/__pycache__/tool.pyc" not in changed
+    assert (tmp_path / ".codex" / "skills" / "review" / "helpers" / "nested" / "tool.py").read_text(
+        encoding="utf-8"
+    ) == "print('helper')\n"
+    assert (tmp_path / ".codex" / "skills" / "review" / "helpers" / "data.bin").read_bytes() == b"\x00\x01helper"
+    assert not (tmp_path / ".codex" / "skills" / "review" / "helpers" / "__pycache__" / "tool.pyc").exists()
+
+
+def test_generate_rewrites_canonical_helper_paths_to_codex_adapter_paths(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    skill_path = tmp_path / ".claude" / "skills" / "review" / "SKILL.md"
+    skill_path.write_text(
+        skill_path.read_text(encoding="utf-8")
+        + "\nUse `.claude/skills/review/helpers/tool.py` and `.claude\\skills\\review\\helpers\\win.py`.\n",
+        encoding="utf-8",
+    )
+    _write_helper(tmp_path, "review", "tool.py", "print('slash')\n")
+    _write_helper(tmp_path, "review", "win.py", "print('backslash')\n")
+    _write_registry(tmp_path)
+
+    module.generate(tmp_path)
+
+    adapter_text = (tmp_path / ".codex" / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8")
+    assert ".claude/skills/review/helpers/tool.py" not in adapter_text
+    assert ".claude\\skills\\review\\helpers\\win.py" not in adapter_text
+    assert ".codex/skills/review/helpers/tool.py" in adapter_text
+    assert ".codex\\skills\\review\\helpers\\win.py" in adapter_text
+    assert (tmp_path / ".codex" / "skills" / "review" / "helpers" / "tool.py").is_file()
+    assert (tmp_path / ".codex" / "skills" / "review" / "helpers" / "win.py").is_file()
+
+
 def test_check_reports_missing_reference_as_drift(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review")
@@ -136,6 +190,21 @@ def test_check_reports_missing_reference_as_drift(tmp_path: Path) -> None:
 
     assert ".codex/skills/review/references/taxonomy.md" in changed
     assert not adapter_reference.exists()
+
+
+def test_check_reports_missing_helper_as_drift(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_helper(tmp_path, "review", "tool.py", "print('helper')\n")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    adapter_helper = tmp_path / ".codex" / "skills" / "review" / "helpers" / "tool.py"
+    adapter_helper.unlink()
+
+    changed, _adapters = module.generate(tmp_path, check=True)
+
+    assert ".codex/skills/review/helpers/tool.py" in changed
+    assert not adapter_helper.exists()
 
 
 def test_generate_removes_orphan_reference(tmp_path: Path) -> None:
@@ -153,6 +222,21 @@ def test_generate_removes_orphan_reference(tmp_path: Path) -> None:
     assert not orphan.exists()
 
 
+def test_generate_removes_orphan_helper(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_helper(tmp_path, "review", "tool.py", "print('helper')\n")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    orphan = tmp_path / ".codex" / "skills" / "review" / "helpers" / "stale.py"
+    orphan.write_text("stale\n", encoding="utf-8")
+
+    changed, _adapters = module.generate(tmp_path)
+
+    assert ".codex/skills/review/helpers/stale.py" in changed
+    assert not orphan.exists()
+
+
 def test_generate_materializes_all_drifting_references() -> None:
     module = _load_module()
     for adapter in module.build_adapters(REPO_ROOT):
@@ -166,6 +250,40 @@ def test_generate_materializes_all_drifting_references() -> None:
             adapter_file = adapter_references / relative_reference
             assert adapter_file.is_file(), f"missing Codex reference mirror for {adapter_file.relative_to(REPO_ROOT)}"
             assert adapter_file.read_bytes() == canonical_file.read_bytes()
+
+
+def test_generate_materializes_all_drifting_helpers() -> None:
+    module = _load_module()
+    for adapter in module.build_adapters(REPO_ROOT):
+        canonical_helpers = (REPO_ROOT / adapter.source_relative_path).parent / "helpers"
+        canonical_files = sorted(
+            path
+            for path in canonical_helpers.rglob("*")
+            if path.is_file() and module._should_mirror_resource_file(path)
+        )
+        if not canonical_files:
+            continue
+        adapter_helpers = (REPO_ROOT / adapter.adapter_relative_path).parent / "helpers"
+        for canonical_file in canonical_files:
+            relative_helper = canonical_file.relative_to(canonical_helpers)
+            adapter_file = adapter_helpers / relative_helper
+            assert adapter_file.is_file(), f"missing Codex helper mirror for {adapter_file.relative_to(REPO_ROOT)}"
+            assert adapter_file.read_bytes() == canonical_file.read_bytes()
+
+
+def test_generated_adapters_do_not_name_canonical_helper_paths() -> None:
+    adapters = sorted((REPO_ROOT / ".codex" / "skills").glob("*/SKILL.md"))
+    assert adapters, "no codex skill adapters found"
+    slash_helper_path = re.compile(r"\.claude/skills/[^/\s`\"')]+/helpers/")
+    backslash_helper_path = re.compile(r"\.claude\\skills\\[^\\\s`\"')]+\\helpers\\")
+    offenders: list[str] = []
+    for path in adapters:
+        text = path.read_text(encoding="utf-8")
+        if slash_helper_path.search(text):
+            offenders.append(path.relative_to(REPO_ROOT).as_posix())
+        if backslash_helper_path.search(text):
+            offenders.append(path.relative_to(REPO_ROOT).as_posix())
+    assert not offenders, "generated Codex adapters name canonical helper paths:\n" + "\n".join(sorted(offenders))
 
 
 def _write_skill_with_frontmatter(project_root: Path, directory: str, frontmatter_lines: str) -> None:

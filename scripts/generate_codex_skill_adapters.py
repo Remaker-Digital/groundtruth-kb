@@ -21,6 +21,11 @@ GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-CODEX-SKILL-ADAPTER -->"
 MANIFEST_NAME = "MANIFEST.json"
 FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+RESOURCE_DIRECTORY_NAMES = ("references", "helpers")
+RESOURCE_EXCLUDED_DIRECTORY_NAMES = frozenset({"__pycache__"})
+RESOURCE_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
+SLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude/skills/([^/\s`\"')]+)/helpers/")
+BACKSLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude\\skills\\([^\\\s`\"')]+)\\helpers\\")
 
 
 class SkillFrontmatterError(ValueError):
@@ -96,6 +101,12 @@ def _strip_generated_block(text: str) -> str:
     if end == -1:
         return text
     return text[:start] + text[end + len(GENERATED_END_MARKER) :].lstrip("\r\n")
+
+
+def _rewrite_canonical_helper_paths(text: str) -> str:
+    """Point generated Codex adapters at their packaged helper surface."""
+    text = SLASH_CANONICAL_HELPER_PATH_RE.sub(r".codex/skills/\1/helpers/", text)
+    return BACKSLASH_CANONICAL_HELPER_PATH_RE.sub(r".codex\\skills\\\1\\helpers\\", text)
 
 
 def validate_skill_frontmatter(text: str, path: str) -> dict[str, str]:
@@ -191,7 +202,7 @@ def _assert_strict_yaml_frontmatter(frontmatter_text: str, path: str) -> None:
 
 
 def render_adapter(source_text: str, adapter: SkillAdapter, *, generated_at: str) -> str:
-    source_text = _strip_generated_block(source_text).lstrip("\ufeff").rstrip() + "\n"
+    source_text = _rewrite_canonical_helper_paths(_strip_generated_block(source_text).lstrip("\ufeff")).rstrip() + "\n"
     block = _generated_block(adapter, generated_at)
     lines = source_text.splitlines(keepends=True)
     if lines and lines[0].strip() == "---":
@@ -354,31 +365,39 @@ def _remove_empty_directories(path: Path, stop_at: Path) -> None:
         current = current.parent
 
 
-def _sync_reference_mirror(project_root: Path, adapter: SkillAdapter, *, check: bool) -> list[str]:
+def _should_mirror_resource_file(path: Path) -> bool:
+    if any(part in RESOURCE_EXCLUDED_DIRECTORY_NAMES for part in path.parts):
+        return False
+    return path.suffix not in RESOURCE_EXCLUDED_SUFFIXES
+
+
+def _sync_resource_mirror(project_root: Path, adapter: SkillAdapter, resource_name: str, *, check: bool) -> list[str]:
     source_skill_dir = (project_root / adapter.source_relative_path).parent
-    source_references = source_skill_dir / "references"
+    source_resource_dir = source_skill_dir / resource_name
     adapter_skill_dir = (project_root / adapter.adapter_relative_path).parent
-    adapter_references = adapter_skill_dir / "references"
+    adapter_resource_dir = adapter_skill_dir / resource_name
 
     changed: list[str] = []
-    expected_reference_files: set[Path] = set()
+    expected_resource_files: set[Path] = set()
 
-    if source_references.is_dir():
-        for source_file in sorted(path for path in source_references.rglob("*") if path.is_file()):
-            relative_reference = source_file.relative_to(source_references)
-            adapter_file = adapter_references / relative_reference
-            expected_reference_files.add(adapter_file)
+    if source_resource_dir.is_dir():
+        for source_file in sorted(
+            path for path in source_resource_dir.rglob("*") if path.is_file() and _should_mirror_resource_file(path)
+        ):
+            relative_resource = source_file.relative_to(source_resource_dir)
+            adapter_file = adapter_resource_dir / relative_resource
+            expected_resource_files.add(adapter_file)
             if _write_bytes_if_changed(adapter_file, source_file.read_bytes(), check=check):
                 changed.append(_relative_path(project_root, adapter_file))
 
-    if adapter_references.is_dir():
-        for adapter_file in sorted(path for path in adapter_references.rglob("*") if path.is_file()):
-            if adapter_file in expected_reference_files:
+    if adapter_resource_dir.is_dir():
+        for adapter_file in sorted(path for path in adapter_resource_dir.rglob("*") if path.is_file()):
+            if adapter_file in expected_resource_files:
                 continue
             changed.append(_relative_path(project_root, adapter_file))
             if not check:
                 adapter_file.unlink()
-                _remove_empty_directories(adapter_file.parent, adapter_references.parent)
+                _remove_empty_directories(adapter_file.parent, adapter_resource_dir.parent)
 
     return changed
 
@@ -395,7 +414,8 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
         rendered = render_adapter(source_text, adapter, generated_at=generated_at)
         if _write_if_changed(adapter_path, rendered, check=check):
             changed.append(adapter.adapter_relative_path)
-        changed.extend(_sync_reference_mirror(project_root, adapter, check=check))
+        for resource_name in RESOURCE_DIRECTORY_NAMES:
+            changed.extend(_sync_resource_mirror(project_root, adapter, resource_name, check=check))
 
     manifest_path = project_root / CODEX_SKILLS_RELATIVE_PATH / MANIFEST_NAME
     if _write_if_changed(manifest_path, _manifest_content(adapters), check=check):

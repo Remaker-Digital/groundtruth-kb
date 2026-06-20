@@ -82,12 +82,12 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 
 **Purpose**: identify actionable bridge items for the current harness's role.
 
-**Helper**: `.claude/skills/bridge/helpers/scan_bridge.py`
+**Helper**: `.codex/skills/bridge/helpers/scan_bridge.py`
 
 **Canonical invocation** (deterministic, replaces manual grep+Read+regex):
 
 ```powershell
-python .claude/skills/bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> [--format json|markdown]
+python .codex/skills/bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> [--format json|markdown]
 ```
 
 Current scans must use dispatcher/TAFE state and the status-bearing versioned
@@ -108,7 +108,7 @@ must not be used for live queue authority.
 
 **Purpose**: help Prime Builder respond to a latest `NO-GO` without filing incomplete skeletons as actionable bridge state.
 
-**Helper**: `.claude/skills/bridge/helpers/revise_bridge.py`
+**Helper**: `.codex/skills/bridge/helpers/revise_bridge.py`
 
 **Action**:
 
@@ -135,7 +135,7 @@ The helper creates drafts; it does not author the substantive correction. Prime 
    exits 0 and must not be treated as a blocking gate; the registered clause
    preflight remains authoritative.
 5. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
-6. Before writing the verdict, run `python .claude/skills/verify/helpers/write_verdict.py --slug <topic-slug> --body-file <draft-body-file>` to seed `## Prior Deliberations`, then review and prune the helper-suggested candidates. If you opt out, keep an explicit `_No prior deliberations: <reason>._` line.
+6. Before writing the verdict, run `python .codex/skills/verify/helpers/write_verdict.py --slug <topic-slug> --body-file <draft-body-file>` to seed `## Prior Deliberations`, then review and prune the helper-suggested candidates. If you opt out, keep an explicit `_No prior deliberations: <reason>._` line.
 7. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
 8. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
 9. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
@@ -147,19 +147,19 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 
 **Purpose**: file a post-implementation report after a GO is implemented.
 
-**Helper**: `.claude/skills/bridge/helpers/impl_report_bridge.py`
+**Helper**: `.codex/skills/bridge/helpers/impl_report_bridge.py`
 
 **Action**:
 
 1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
 2. Use the helper's `plan` mode or no-index CLI successor to require latest `GO`, load the approved proposal and GO verdict, compute the next version, carry forward linked specifications, capture dirty files via `git diff --name-only HEAD --`, and show the proposed `NEW` report metadata without mutation:
    ```powershell
-   python .claude/skills/bridge/helpers/impl_report_bridge.py plan <topic-slug>
+   python .codex/skills/bridge/helpers/impl_report_bridge.py plan <topic-slug>
    ```
 3. Use `scaffold` mode when you need a non-dispatchable draft under `.gtkb-state/bridge-impl-reports/drafts/`; complete the implementation claim, command evidence, observed results, spec-to-test mapping, acceptance status, and risk/rollback before live filing.
 4. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, and credential-shaped content. It writes `bridge/<topic-slug>-<next-version>.md` through the governed no-index bridge path:
    ```powershell
-   python .claude/skills/bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
+   python .codex/skills/bridge/helpers/impl_report_bridge.py file <topic-slug> --content-file <completed-report.md>
    ```
 5. The helper does not bypass Loyal Opposition verification. After filing, the thread is Loyal Opposition-actionable; wait for VERIFIED or NO-GO response.
 
@@ -167,12 +167,12 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 
 **Purpose**: write protected narrative-artifact files with an immediate Layer-C universal-floor evidence verdict.
 
-**Helper**: `.claude/skills/bridge/helpers/protected_write.py`
+**Helper**: `.codex/skills/bridge/helpers/protected_write.py`
 
 **Canonical invocation**:
 
 ```powershell
-python .claude/skills/bridge/helpers/protected_write.py --target <path> --content-file <path> --packet <packet-path>
+python .codex/skills/bridge/helpers/protected_write.py --target <path> --content-file <path> --packet <packet-path>
 ```
 
 Use this helper for protected narrative-artifact paths governed by `config/governance/narrative-artifact-approval.toml` when an approval packet already exists. The helper validates the packet against the proposed LF-normalized content, writes the target, stages only that target path, and runs `scripts/check_narrative_artifact_evidence.py --paths <target>` semantics against the staged blob. A clean exit means the same universal-floor evidence checker used by `.githooks/pre-commit` clears the staged file.
@@ -183,12 +183,12 @@ This helper is a deterministic Layer-C universal-floor evidence path. It is not 
 
 **Purpose**: read-only inspection without mutation.
 
-**Helper**: `.claude/skills/bridge/helpers/show_thread_bridge.py`
+**Helper**: `.codex/skills/bridge/helpers/show_thread_bridge.py`
 
 **Canonical invocation** (deterministic, replaces per-version grep+Read):
 
 ```powershell
-python .claude/skills/bridge/helpers/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
+python .codex/skills/bridge/helpers/show_thread_bridge.py <topic-slug> [--format json|markdown] [--preview-lines N]
 ```
 
 The helper resolves all `bridge/<slug>-NNN.md` files, sorts by version, and returns `{slug, versions, found, preview_lines_cap}` plus any legacy compatibility-view diagnostics when available. Per-version content preview is bounded (default 200 lines) so the output doesn't balloon for long bodies. Public Python API: `from show_thread_bridge import show; show("gtkb-foo")`.
