@@ -9,7 +9,9 @@ file chain and leaves deeper reconciliation to the dispatcher/health CLI.
 
 It composes with — and does not replace — the other ``wrap_scan_*`` scanners
 (``wrap_scan_consistency``, ``wrap_scan_cross_artifact_drift``,
-``wrap_scan_hygiene``) and the on-demand ``gt bridge reconcile audit`` CLI.
+``wrap_scan_hygiene``) and the on-demand
+``scripts/bridge_verified_backlog_reconciler.py --dry-run`` reconciler
+(the no-index successor to the retired ``gt bridge reconcile audit`` CLI).
 It is read-only and report-only: it never mutates bridge, MemBase, project, or
 correction-packet state, and it never writes a canonical surface.
 

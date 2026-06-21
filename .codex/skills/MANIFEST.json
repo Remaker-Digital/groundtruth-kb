@@ -43,6 +43,13 @@
       "source_sha256": "cdfe7bb7020fe0b55209bd684c5390ee0b86decd792743cfb2c63498136edf8e"
     },
     {
+      "adapter_relative_path": ".codex/skills/bridge-reconciliation/SKILL.md",
+      "canonical_name": "bridge-reconciliation",
+      "capability_id": "skill.bridge-reconciliation",
+      "source_relative_path": ".claude/skills/bridge-reconciliation/SKILL.md",
+      "source_sha256": "cb755587a8e2b4ff2ea4b53339da606b12728e944cdbce84283de2ce57eabbcd"
+    },
+    {
       "adapter_relative_path": ".codex/skills/gtkb-propose/SKILL.md",
       "canonical_name": "gtkb-propose",
       "capability_id": "skill.gtkb-propose",

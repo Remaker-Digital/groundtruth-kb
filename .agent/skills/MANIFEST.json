@@ -26,7 +26,7 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "dc785dfda73bd4899cec3a827e5e96c76b3f2fa1a4e2bebb419cea4e91a74fdd"
+      "source_sha256": "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
     },
     {
       "adapter_relative_path": ".agent/skills/bridge-config/SKILL.md",
@@ -41,6 +41,13 @@
       "capability_id": "skill.bridge-propose",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
       "source_sha256": "cdfe7bb7020fe0b55209bd684c5390ee0b86decd792743cfb2c63498136edf8e"
+    },
+    {
+      "adapter_relative_path": ".agent/skills/bridge-reconciliation/SKILL.md",
+      "canonical_name": "bridge-reconciliation",
+      "capability_id": "skill.bridge-reconciliation",
+      "source_relative_path": ".claude/skills/bridge-reconciliation/SKILL.md",
+      "source_sha256": "cb755587a8e2b4ff2ea4b53339da606b12728e944cdbce84283de2ce57eabbcd"
     },
     {
       "adapter_relative_path": ".agent/skills/gtkb-propose/SKILL.md",
@@ -131,7 +138,7 @@
       "canonical_name": "kb-session-wrap",
       "capability_id": "skill.kb-session-wrap",
       "source_relative_path": ".claude/skills/kb-session-wrap/SKILL.md",
-      "source_sha256": "923283300faa3f1d42b6096cf1455e3393a1dadf03e7831e20fd8817a5dddfff"
+      "source_sha256": "a53004274f049998ded8c8d61edb9f54f43101df5a0af311449fa2dd91af8465"
     },
     {
       "adapter_relative_path": ".agent/skills/kb-session-wrap-scan/SKILL.md",
@@ -166,7 +173,7 @@
       "canonical_name": "proposal-review",
       "capability_id": "skill.proposal-review",
       "source_relative_path": ".claude/skills/proposal-review/SKILL.md",
-      "source_sha256": "62231bdfb6aaa649c139d5d26e16f385494e877c4861a56da33eea8b12c8a90e"
+      "source_sha256": "2f199c8dc6d75752fe4b058afdcd938432f9cf68732eefb61768d9fecfc1509c"
     },
     {
       "adapter_relative_path": ".agent/skills/release-candidate-gate/SKILL.md",
