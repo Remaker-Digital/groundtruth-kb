@@ -6,23 +6,28 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
+(none)
+
+## Resolved
+
 - id: DECISION-1332
   asked_at: 2026-06-21T22:20:00.416334Z
   question: "Want me to resume the periodic watch, or leave it parked until you've run Codex?"
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: 1894e5206f469d9f
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+  resolved_at: 2026-06-21T22:52:00Z
+  answer: "Leave it parked (owner directive 2026-06-21). The cross-harness event-driven trigger dispatches the filed proposal to Codex; no manual periodic watch needed."
+  notes: "Prose offering anti-pattern; owner answered in prose 'leave it parked'; recorded by Prime Builder."
 - id: DECISION-1336
   asked_at: 2026-06-21T22:45:06.417172Z
   question: "Want me to file it as a consideration backlog item, or leave it?"
   detected_via: prose:offering_or_choice
-  status: pending
+  status: resolved
   question_hash: 94e1b47914cb0a9b
-  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
-
-## Resolved
-
+  resolved_at: 2026-06-21T22:52:00Z
+  answer: "Dismissed as a prose-detection false positive. The phrasing was a conversational offering, not a blocking owner decision; the relevant captures from this session were already filed (WI-4727 tooling note, WI-4729/WI-4730 close items). No distinct unfiled item."
+  notes: "Prose offering anti-pattern reviewed and dismissed by Prime Builder; not applicable for AUQ conversion."
 - id: DECISION-1295
   asked_at: 2026-06-18T16:56:27.353477Z
   question: "owner decision, verify-first: does the defect still reproduce?"
