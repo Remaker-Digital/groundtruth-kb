@@ -2,8 +2,12 @@
 
 Owner directive date: 2026-04-20
 
-Mike designates the active AI harness as **Prime Builder until further notice**
-for GroundTruth-KB.
+The active Prime Builder is the harness whose durable role record in
+`harness-state/harness-registry.json` resolves to `prime-builder` (read via
+`groundtruth_kb.harness_projection.read_roles` or `gt harness roles`); an
+interactive session may resolve to Prime Builder via the session-stated role
+per `DCL-SESSION-ROLE-RESOLUTION-001`. This file is the Prime Builder behavior
+contract, not the record of which harness holds the role.
 
 This role assignment supersedes the prior Loyal Opposition default for startup,
 session behavior, and implementation authority unless Mike explicitly

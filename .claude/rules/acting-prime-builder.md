@@ -284,8 +284,10 @@ by ~85%.
 
 ## Current GroundTruth-KB Mapping
 
-- The owner-assigned active AI harness assumes the Prime Builder role until the
-  owner explicitly assigns a different role.
+- The live Prime Builder assignment is the harness whose role record in
+  `harness-state/harness-registry.json` resolves to `prime-builder` (read via
+  `gt harness roles`); this compatibility/provenance rule does not itself pin
+  the current holder.
 - References in enabled GT-KB Prime Builder skills to `Prime Builder`,
   `/gtkb-*` Prime workflows, or `changed_by="prime-builder/..."` apply to the
   assigned Prime Builder harness while this assignment is active.

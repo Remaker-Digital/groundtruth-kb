@@ -20,10 +20,12 @@ VERIFIED).
 ## Harness Identity
 
 Harness identity is installation-stable and resolved from the persistent
-identity artifact:
+identity artifact `harness-state/harness-identities.json`, which is the
+authority for the live ID-to-harness mapping (read it, e.g. via
+`gt harness roles`, rather than relying on the illustrative values below):
 
-- Codex: harness ID `A`
-- Claude Code: harness ID `B`
+- Codex: harness ID `A` (illustrative; not authoritative)
+- Claude Code: harness ID `B` (illustrative; not authoritative)
 - Future host-local harnesses: assign the next unused ID (`C`, `D`, ...)
 
 Harness identity and operating role are separate concepts. Startup first reads
