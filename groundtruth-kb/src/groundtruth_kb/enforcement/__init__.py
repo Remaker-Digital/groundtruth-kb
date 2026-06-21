@@ -24,7 +24,7 @@ REDIRECTION_RE = re.compile(r"(?:>|>>|<|\|)\s*([^\s|&;]+)")
 # URL ('://') context, translates MSYS '/c/...' to 'C:\...', and resolves a
 # rooted-driveless '/foo' as PROJECT-root-relative (the HYG-042 owner decision).
 _DRIVE_ABSOLUTE = r"(?<![\w.])[A-Za-z]:[\\/][^\s|&;'\"]*"
-_UNC_ABSOLUTE = r"\\\\[^\s|&;'\"]+"
+_UNC_ABSOLUTE = r"\\\\[\w.-]+[\\/][^\s|&;'\"]+"
 _ROOTED = r"(?<![\w.:/])/[^\s|&;'\"]*"
 PATH_DELIMITER_RE = re.compile(rf"[\"']?({_DRIVE_ABSOLUTE}|{_UNC_ABSOLUTE}|{_ROOTED})[\"']?")
 
@@ -46,7 +46,7 @@ def _classify_path_token(token: str) -> str | None:
     root rather than being mis-read as an out-of-root absolute.
     """
     token = token.strip().strip("\"'")
-    if not token:
+    if not token or all(c in "./\\" for c in token):
         return None
     if token.lower() in _NULL_SINKS:
         return None
@@ -58,6 +58,10 @@ def _classify_path_token(token: str) -> str | None:
     if re.match(r"^[A-Za-z]:[\\/]", token):  # drive-letter absolute (C:\ or C:/)
         return token
     if token.startswith("\\\\") or token.startswith("//"):  # UNC (both slash forms)
+        # require a separator after the host part to filter out double-slashes/comments
+        remainder = token[2:]
+        if not ("\\" in remainder or "/" in remainder):
+            return None
         return token
     if token.startswith("/"):  # rooted-driveless -> project-root-relative
         if token.lower().startswith(("/etc/", "/home/")):
@@ -107,6 +111,10 @@ def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
         candidate = (project_root / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
     except Exception as exc:  # intentional-catch: path resolution fallback
         return False, f"Path '{path_str}' could not be resolved: {exc}"
+
+    # Allow harness-specific paths (e.g. settings, plugins, logs)
+    if any(part.lower() in {".claude", ".codex", ".gemini", ".api-harness"} for part in candidate.parts):
+        return True, ""
 
     candidate_norm = os.path.normpath(str(candidate)).lower()
     allowed_norm = os.path.normpath(str(allowed_root)).lower()

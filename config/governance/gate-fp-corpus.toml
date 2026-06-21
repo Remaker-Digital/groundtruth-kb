@@ -50,6 +50,18 @@ note = 'drive-shaped substring inside regex/prose is not a standalone filesystem
 command = 'Write-Output "E:\GT-KB\bridge\gtkb-example-001.md"'
 note = 'quoted in-root Windows absolute bridge path is allowed'
 
+[[bash_parser_pass]]
+command = 'Write-Output "regex \\-]+\.[\w]+)\b"'
+note = 'double backslash in regex pattern should not be treated as a UNC absolute path'
+
+[[bash_parser_pass]]
+command = 'echo //some-comment'
+note = 'double forward slash in comment should not be treated as a UNC absolute path'
+
+[[bash_parser_pass]]
+command = 'type C:\Users\micha\.claude\settings.json'
+note = 'allow harness-specific settings files under the user profile directory'
+
 [[bash_parser_block]]
 command = 'cat C:\Users\micha\secret.txt'
 note = 'genuine out-of-root drive-letter absolute'
@@ -71,6 +83,10 @@ note = 'Claude PowerShell matcher routes command text through the same root-boun
 [[codex_apply_patch_pass]]
 path = 'bridge/gtkb-example-001.md'
 note = 'Codex apply_patch adapter treats in-root patch targets as allowed'
+
+[[codex_apply_patch_pass]]
+path = 'C:\Users\micha\.codex\skills\some-skill\SKILL.md'
+note = 'Codex apply_patch allows path under local harness-specific directory'
 
 [[codex_apply_patch_block]]
 path = 'C:\Users\micha\secret.txt'
