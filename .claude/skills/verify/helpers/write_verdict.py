@@ -32,7 +32,7 @@ from groundtruth_kb.bridge.prior_deliberations import (  # noqa: E402
 )
 
 DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-prepopulation.json")
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
+STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
 VERSIONED_BRIDGE_RE_TEMPLATE = r"^{slug}-(?P<version>\d{{3}})\.md$"
 RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
 

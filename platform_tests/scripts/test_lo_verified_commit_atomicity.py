@@ -185,3 +185,77 @@ def test_verified_body_requires_executed_spec_to_test_mapping(verify_helper, tmp
         )
 
     assert not (repo / "bridge" / "sample-004.md").exists()
+
+
+def test_verified_finalization_tolerates_historical_implemented_status(verify_helper, tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    _git(repo, "config", "commit.gpgsign", "false")
+
+    _write(repo / "bridge" / "sample-001.md", "NEW\n\n# Proposal\n")
+    _write(repo / "bridge" / "sample-002.md", "GO\n\n# GO\n")
+    _write(repo / "bridge" / "sample-003.md", "IMPLEMENTED\n\n# Old implementation report\n")
+    _write(repo / "bridge" / "sample-004.md", "NO-GO\n\n# NO-GO\n")
+
+    _git(
+        repo,
+        "add",
+        "--",
+        "bridge/sample-001.md",
+        "bridge/sample-002.md",
+        "bridge/sample-003.md",
+        "bridge/sample-004.md",
+    )
+    _git(repo, "commit", "-m", "chore: seed bridge thread with historical IMPLEMENTED status")
+
+    _write(repo / "bridge" / "sample-005.md", "REVISED\n\n# Revised implementation report\n")
+    _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
+
+    body = _verified_body().replace("Version: 004", "Version: 006")
+
+    result = verify_helper.finalize_verified_commit(
+        "sample",
+        body,
+        include_paths=["bridge/sample-005.md", "scripts/feature.py"],
+        commit_message="fix(gtkb): finalize verified sample work",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    committed = set(_git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.splitlines())
+    assert committed == {"bridge/sample-005.md", "bridge/sample-006.md", "scripts/feature.py"}
+    assert result.verdict_path == "bridge/sample-006.md"
+
+
+def test_verified_finalization_rejects_latest_implemented_status(verify_helper, tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    _git(repo, "config", "commit.gpgsign", "false")
+
+    _write(repo / "bridge" / "sample-001.md", "NEW\n\n# Proposal\n")
+    _write(repo / "bridge" / "sample-002.md", "GO\n\n# GO\n")
+    _write(repo / "bridge" / "sample-003.md", "IMPLEMENTED\n\n# Old implementation report\n")
+    _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
+
+    _git(
+        repo, "add", "--", "bridge/sample-001.md", "bridge/sample-002.md", "bridge/sample-003.md", "scripts/feature.py"
+    )
+    _git(repo, "commit", "-m", "chore: seed bridge thread")
+
+    body = _verified_body().replace("Version: 004", "Version: 004")
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="latest status of NEW or REVISED"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            body,
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): finalize verified sample work",
+            project_root=repo,
+            pre_populate=False,
+        )
