@@ -449,9 +449,10 @@ class ProjectLifecycleService:
         authorization: dict[str, Any],
         verified_for_project: set[str],
         guarded_project_ids: set[str] | None = None,
+        non_verified_implements_by_project: dict[str, set[str]] | None = None,
     ) -> bool:
         """True when ``authorization`` is active and every gating work item is in
-        ``verified_for_project``.
+        ``verified_for_project`` and every active addressing thread is VERIFIED.
 
         ``verified_for_project`` is the PROJECT-SCOPED verified set for this
         authorization's project (per ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001``
@@ -472,6 +473,8 @@ class ProjectLifecycleService:
         if not project_id:
             return False
         if guarded_project_ids is not None and project_id in guarded_project_ids:
+            return False
+        if non_verified_implements_by_project and non_verified_implements_by_project.get(project_id):
             return False
         included = self._project_membership_work_item_ids(project_id)
         return bool(included) and all(work_item in verified_for_project for work_item in included)
@@ -538,6 +541,38 @@ class ProjectLifecycleService:
             if project_id and slug:
                 by_project.setdefault(str(project_id), set()).add(str(slug))
         return by_project
+
+    @staticmethod
+    def _latest_bridge_thread_statuses(project_root: Path) -> dict[str, str | None]:
+        """Return ``{bridge_thread_slug: latest_status}`` from versioned bridge files."""
+        from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
+        root = Path(project_root)
+        bridge_dir = root / "bridge"
+        if not bridge_dir.is_dir():
+            return {}
+        grouped: dict[str, list[tuple[int, Path]]] = {}
+        bridge_file_re = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+        for path in bridge_dir.glob("*.md"):
+            match = bridge_file_re.match(path.name)
+            if match is None:
+                continue
+            grouped.setdefault(match.group("slug"), []).append((int(match.group("version")), path))
+        return {
+            slug: status_from_bridge_file(max(versioned_files, key=lambda item: item[0])[1])
+            for slug, versioned_files in grouped.items()
+        }
+
+    def _non_verified_implements_threads_by_project(self, project_root: Path) -> dict[str, set[str]]:
+        """Return active ``implements`` bridge threads whose latest status is not VERIFIED."""
+        links_by_project = self._implements_links_by_project()
+        statuses_by_thread = self._latest_bridge_thread_statuses(project_root)
+        blocked_by_project: dict[str, set[str]] = {}
+        for project_id, slugs in links_by_project.items():
+            non_verified = {slug for slug in slugs if statuses_by_thread.get(slug) != "VERIFIED"}
+            if non_verified:
+                blocked_by_project[project_id] = non_verified
+        return blocked_by_project
 
     @staticmethod
     def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
@@ -744,6 +779,14 @@ class ProjectLifecycleService:
                 f"Project {project_id} has no active membership-linked work items; "
                 "completion readiness cannot be established."
             )
+        non_verified_implements = sorted(
+            self._non_verified_implements_threads_by_project(project_root).get(project_id, set())
+        )
+        if non_verified_implements:
+            raise ProjectLifecycleError(
+                f"Project authorization {norm_auth_id} is not completion-ready; active implements "
+                f"bridge thread(s) are not VERIFIED: {', '.join(non_verified_implements)}."
+            )
         # Project-scoped verified set (v4 F1 fix): only THIS project's own
         # implements-linked VERIFIED threads count toward its completion.
         verified = self._verified_work_items_by_project(project_root).get(project_id, set())
@@ -845,6 +888,7 @@ class ProjectLifecycleService:
         """
         # Project-scoped decision map (v4 F1 fix): {project_id: {verified WI}}.
         verified_by_project = self._verified_work_items_by_project(project_root)
+        non_verified_implements_by_project = self._non_verified_implements_threads_by_project(project_root)
         guards_by_project = self._completion_guards_by_project()
         guarded_project_ids = set(guards_by_project)
         # Global v3 baseline (over-broad, project-blind) used ONLY for the
@@ -862,7 +906,12 @@ class ProjectLifecycleService:
             project_verified = verified_by_project.get(project_id, set())
             for authorization in self.db.list_project_authorizations(project_id, status="active"):
                 authorization_id = str(authorization["id"])
-                if self._authorization_completion_ready(authorization, project_verified, guarded_project_ids):
+                if self._authorization_completion_ready(
+                    authorization,
+                    project_verified,
+                    guarded_project_ids,
+                    non_verified_implements_by_project,
+                ):
                     result = self.complete_project_authorization(
                         authorization_id,
                         project_root=project_root,
@@ -889,7 +938,12 @@ class ProjectLifecycleService:
                 # that WOULD have auto-retired under v3 and are now paused for
                 # safety. The v3 baseline is the global verified set; the v4
                 # decision is the project-scoped set.
-                if not self._authorization_completion_ready(authorization, verified_global_v3, guarded_project_ids):
+                if not self._authorization_completion_ready(
+                    authorization,
+                    verified_global_v3,
+                    guarded_project_ids,
+                    non_verified_implements_by_project,
+                ):
                     continue
                 gating = self._project_membership_work_item_ids(project_id)
                 missing_under_v4 = [wi for wi in gating if wi not in project_verified]

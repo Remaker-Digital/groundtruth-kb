@@ -6,6 +6,7 @@ from pathlib import Path
 from click.testing import CliRunner
 from groundtruth_kb.cli import main as cli_main
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project.lifecycle import ProjectLifecycleService
 
 
 def _write_config(tmp_path: Path) -> Path:
@@ -65,14 +66,22 @@ def _seed_project_authorization_inputs(tmp_path: Path) -> None:
         db.close()
 
 
-def _write_verified_bridge(project_root: Path, work_item_id: str) -> None:
+def _write_bridge(project_root: Path, slug: str, status: str, work_item_id: str | None = None) -> None:
     bridge = project_root / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
-    slug = "gtkb-project-authorization-cli-completion"
+    body = f"{status}\n\n# Proposal {slug}\n"
+    if work_item_id:
+        body += f"\nWork Item: {work_item_id}\n"
     (bridge / f"{slug}-001.md").write_text(
-        f"VERIFIED\n\n# Proposal {slug}\n\nWork Item: {work_item_id}\n",
+        body,
         encoding="utf-8",
     )
+
+
+def _write_verified_bridge(project_root: Path, work_item_id: str) -> None:
+    slug = "gtkb-project-authorization-cli-completion"
+    _write_bridge(project_root, slug, "VERIFIED", work_item_id)
+    bridge = project_root / "bridge"
     (bridge / "INDEX.md").write_text(
         "\n".join(["# Bridge Index", "", f"Document: {slug}", f"VERIFIED: bridge/{slug}-001.md", ""]),
         encoding="utf-8",
@@ -132,6 +141,26 @@ def _seed_completion_cli_env(tmp_path: Path, *, project_id: str, authorization_i
         )
     finally:
         db.close()
+
+
+def _add_implements_bridge(
+    db: KnowledgeDB,
+    project_root: Path,
+    *,
+    project_id: str,
+    slug: str,
+    status: str,
+    work_item_id: str | None = None,
+) -> None:
+    _write_bridge(project_root, slug, status, work_item_id)
+    db.add_project_artifact_link(
+        project_id,
+        "bridge_thread",
+        slug,
+        "test",
+        f"seed {status.lower()} implements link",
+        relationship="implements",
+    )
 
 
 def test_project_authorization_cli_is_append_only_and_visible(tmp_path: Path) -> None:
@@ -284,5 +313,96 @@ def test_complete_authorization_cli_default_retires_project(tmp_path: Path) -> N
     try:
         assert db.get_project_authorization("PAUTH-COMPLETE-RETIRE")["status"] == "completed"
         assert db.get_project("PROJECT-COMPLETE-RETIRE")["status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_autocomplete_withheld_when_addressing_thread_not_verified(tmp_path: Path) -> None:
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-AUTOCOMPLETE-WITHHELD",
+        authorization_id="PAUTH-AUTOCOMPLETE-WITHHELD",
+        work_item_id="WI-9003",
+    )
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        _add_implements_bridge(
+            db,
+            tmp_path,
+            project_id="PROJECT-AUTOCOMPLETE-WITHHELD",
+            slug="gtkb-project-authorization-addressing-pending",
+            status="NEW",
+        )
+        service = ProjectLifecycleService(db)
+
+        assert service.auto_complete_ready_authorizations(project_root=tmp_path) == []
+        assert db.get_project_authorization("PAUTH-AUTOCOMPLETE-WITHHELD")["status"] == "active"
+        assert db.get_project("PROJECT-AUTOCOMPLETE-WITHHELD")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_autocomplete_proceeds_when_addressing_thread_verified(tmp_path: Path) -> None:
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-AUTOCOMPLETE-VERIFIED",
+        authorization_id="PAUTH-AUTOCOMPLETE-VERIFIED",
+        work_item_id="WI-9004",
+    )
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        _add_implements_bridge(
+            db,
+            tmp_path,
+            project_id="PROJECT-AUTOCOMPLETE-VERIFIED",
+            slug="gtkb-project-authorization-addressing-verified",
+            status="VERIFIED",
+        )
+        service = ProjectLifecycleService(db)
+
+        records = service.auto_complete_ready_authorizations(project_root=tmp_path)
+
+        assert records == [
+            {
+                "outcome": "completed",
+                "authorization_id": "PAUTH-AUTOCOMPLETE-VERIFIED",
+                "project_id": "PROJECT-AUTOCOMPLETE-VERIFIED",
+                "project_retired": True,
+                "retired_work_items": ["WI-9004"],
+            }
+        ]
+        assert db.get_project_authorization("PAUTH-AUTOCOMPLETE-VERIFIED")["status"] == "completed"
+        assert db.get_project("PROJECT-AUTOCOMPLETE-VERIFIED")["status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_autocomplete_membership_only_project_unaffected(tmp_path: Path) -> None:
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-AUTOCOMPLETE-MEMBERSHIP-ONLY",
+        authorization_id="PAUTH-AUTOCOMPLETE-MEMBERSHIP-ONLY",
+        work_item_id="WI-9005",
+    )
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        service = ProjectLifecycleService(db)
+
+        records = service.auto_complete_ready_authorizations(project_root=tmp_path)
+
+        assert records == [
+            {
+                "outcome": "completed",
+                "authorization_id": "PAUTH-AUTOCOMPLETE-MEMBERSHIP-ONLY",
+                "project_id": "PROJECT-AUTOCOMPLETE-MEMBERSHIP-ONLY",
+                "project_retired": True,
+                "retired_work_items": ["WI-9005"],
+            }
+        ]
+        assert db.get_project_authorization("PAUTH-AUTOCOMPLETE-MEMBERSHIP-ONLY")["status"] == "completed"
+        assert db.get_project("PROJECT-AUTOCOMPLETE-MEMBERSHIP-ONLY")["status"] == "retired"
     finally:
         db.close()
