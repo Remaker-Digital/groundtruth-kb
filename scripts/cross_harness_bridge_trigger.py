@@ -171,6 +171,12 @@ RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence
 # incident peak; env-tunable, fail-safe to the default on invalid/non-positive.
 MAX_LIVE_DISPATCHED_PROCESSES_ENV_VAR = "GTKB_MAX_LIVE_DISPATCHED_PROCESSES"
 DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES = 8
+# CA9165 (SPEC-INTAKE-ca9165): per-role concurrency cap. Bounds how many of the
+# global pool a single role (prime-builder / loyal-opposition) may hold so one
+# role cannot starve the other role's dispatch lane. Default (3) sits inside the
+# global default (8) and is evaluated AFTER the global cap (which keeps precedence).
+MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR = "GTKB_MAX_LIVE_DISPATCHED_PER_ROLE"
+DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE = 3
 
 # Selected-batch cap mirrors the smart-poller's default per
 # ``groundtruth-kb/scripts/bridge_poller_runner.py:670-673``. Bumping this
@@ -602,6 +608,59 @@ def _parse_iso_timestamp(value: Any) -> dt.datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=dt.UTC)
     return parsed.astimezone(dt.UTC)
+
+
+# WI-4662: skip reasons that, when they exhaust the ranked Loyal Opposition
+# candidate list, make the failover state a bounded terminal record rather than
+# an unbounded per-cycle re-log.
+_LO_FAILOVER_EXHAUSTION_SKIP_REASONS: frozenset[str] = frozenset(
+    {"provider_failure_backoff_active", "previous_launch_failed"}
+)
+
+
+def _should_relog_previous_launch_failure(recipient_state: dict[str, Any], *, now: dt.datetime | None = None) -> bool:
+    """Return True when a ``previous_launch_failed`` row may be (re-)appended.
+
+    WI-4662: the dispatch trigger previously re-recorded the same
+    ``previous_launch_failed`` evidence on every reconcile cycle, spamming
+    ``dispatch-failures.jsonl`` with no cooldown (1505 of 5716 rows at the time
+    of the fix). This gate throttles the durable *append* to at most once per
+    cooldown window per recipient, where the window reuses the existing dispatch
+    retry-delay knob (``GTKB_DISPATCH_RETRY_DELAY_SECONDS``). Callers still set
+    the in-memory ``previous_launch_failed`` health annotation every cycle, so
+    ``bridge dispatch status``/``diagnose`` visibility is unchanged; only the
+    durable log append is bounded. Returns True when no prior stamp exists
+    (first failure) or the cooldown has elapsed; False while inside the window.
+    """
+    stamp = _parse_iso_timestamp(recipient_state.get("previous_launch_failed_logged_at"))
+    if stamp is None:
+        return True
+    current = now if now is not None else dt.datetime.now(dt.UTC)
+    return (current - stamp).total_seconds() >= _dispatch_retry_delay_seconds()
+
+
+def _is_lo_failover_exhausted(
+    failure_reason: str | None,
+    recipient: str,
+    fallback_skipped_candidates: list[dict[str, Any]] | None,
+) -> bool:
+    """Return True when the ranked Loyal Opposition list is exhausted (WI-4662).
+
+    The ``no_ready_target_for_role`` sentinel for ``loyal-opposition`` is a
+    bounded terminal ``lo_failover_exhausted`` (rather than an unbounded per-cycle
+    re-log) only when every ranked candidate was skipped AND at least one was
+    skipped specifically for a launch-failure / provider-backoff reason. A
+    not-ready/config skip with no failure evidence stays ``no_ready_target_for_role``.
+    """
+    return (
+        failure_reason == "no_ready_target_for_role"
+        and recipient == "loyal-opposition"
+        and bool(fallback_skipped_candidates)
+        and any(
+            isinstance(skipped, dict) and skipped.get("reason") in _LO_FAILOVER_EXHAUSTION_SKIP_REASONS
+            for skipped in fallback_skipped_candidates
+        )
+    )
 
 
 def _circuit_breaker_half_open_allowed(recipient_state: dict[str, Any], retry_delay_seconds: int) -> bool:
@@ -1352,6 +1411,23 @@ def _max_live_dispatched_processes() -> int:
     return parsed if parsed > 0 else DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES
 
 
+def _max_live_dispatched_per_role() -> int:
+    """Resolve the per-role concurrency cap (CA9165 / SPEC-INTAKE-ca9165).
+
+    Reads ``GTKB_MAX_LIVE_DISPATCHED_PER_ROLE``; fail-safe to
+    ``DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE`` on missing/blank/invalid input and
+    on non-positive values, mirroring :func:`_max_live_dispatched_processes`.
+    """
+    raw = os.environ.get(MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR)
+    if raw is None or raw.strip() == "":
+        return DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+    return parsed if parsed > 0 else DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+
+
 def _safe_unlink(path: Path) -> None:
     """Best-effort sidecar removal; never raises."""
     try:
@@ -1424,6 +1500,47 @@ def _count_live_dispatched_processes(runs_dir: Path) -> int:
     live = 0
     for pid_file in sorted(runs_dir.glob("*.pid")):
         dispatch_id = pid_file.name[: -len(".pid")]
+        try:
+            pid_text = pid_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        try:
+            pid = int(pid_text)
+        except (TypeError, ValueError):
+            _safe_unlink(pid_file)
+            continue
+        status_file = runs_dir / f"{dispatch_id}.exit_code"
+        try:
+            exited = status_file.exists() and status_file.stat().st_size > 0
+        except OSError:
+            exited = False
+        if exited or not _pid_alive(pid):
+            _safe_unlink(pid_file)
+            continue
+        live += 1
+    return live
+
+
+def _count_live_dispatched_processes_for_role(runs_dir: Path, role_label: str) -> int:
+    """Count live dispatched headless processes whose dispatch_id encodes
+    ``role_label`` (CA9165 / SPEC-INTAKE-ca9165).
+
+    Reuses the exact liveness + prune semantics of
+    :func:`_count_live_dispatched_processes`, but counts only sidecars whose
+    ``dispatch_id`` contains the ``-<role_label>-`` token produced by
+    :func:`_new_dispatch_id`. The two role labels (``prime-builder`` /
+    ``loyal-opposition``) are non-overlapping, so the token match is unambiguous.
+    A transient miscount can only UNDER-count (reclaim a dead worker), never
+    over-suppress; the global cap remains the hard blast-radius bound.
+    """
+    if not runs_dir.is_dir():
+        return 0
+    role_token = f"-{role_label}-"
+    live = 0
+    for pid_file in sorted(runs_dir.glob("*.pid")):
+        dispatch_id = pid_file.name[: -len(".pid")]
+        if role_token not in dispatch_id:
+            continue
         try:
             pid_text = pid_file.read_text(encoding="utf-8").strip()
         except OSError:
@@ -2777,6 +2894,29 @@ def _spawn_harness(
         _record_dispatch_failure(state_dir, meta)
         return meta
 
+    # CA9165 (SPEC-INTAKE-ca9165): per-role concurrency cap, evaluated AFTER the
+    # global cap above (which keeps precedence — a global-cap hit returns
+    # "concurrency_cap_reached" before this gate is reached). Bounds how many
+    # live workers a single role may hold so one role cannot monopolize the
+    # global pool and starve the other role's dispatch lane. This does NOT
+    # reintroduce binary same-role active-session suppression: same-role workers
+    # below the cap still spawn (per-document lease + work-intent claim provide
+    # the per-item dedup).
+    per_role_cap = _max_live_dispatched_per_role()
+    per_role_live = _count_live_dispatched_processes_for_role(runs_dir, target.needed_role_label)
+    if per_role_live >= per_role_cap:
+        meta = {
+            "dispatch_id": dispatch_id,
+            "recipient": recipient_key,
+            "launched": False,
+            "reason": "per_role_concurrency_cap_reached",
+            "role": target.needed_role_label,
+            "per_role_live": per_role_live,
+            "per_role_cap": per_role_cap,
+        }
+        _record_dispatch_failure(state_dir, meta)
+        return meta
+
     if _is_spawn_rate_limited(runs_dir):
         meta = {
             "dispatch_id": dispatch_id,
@@ -3219,6 +3359,10 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             recipient_state.pop("circuit_breaker_tripped_at", None)
             recipient_state.pop("circuit_breaker_half_open", None)
             recipient_state.pop("last_failure_reason", None)
+            # WI-4662: a recovered target re-logs immediately if it fails again,
+            # so clear the previous_launch_failed cooldown stamp + annotation.
+            recipient_state.pop("previous_launch_failed_logged_at", None)
+            recipient_state.pop("previous_launch_failed", None)
         else:
             # Failure!
             if launch_signature:
@@ -3338,7 +3482,12 @@ def _provider_failure_backoff_skip(
     if previous_failure is not None:
         failure_class = _failure_class_from_previous(previous_failure)
         if failure_class in NON_RETRYABLE_WORKER_FAILURE_CLASSES or prior.get("non_retryable_failure"):
-            _record_dispatch_failure(state_dir, previous_failure)
+            # WI-4662: throttle the durable previous_launch_failed re-log; stamp
+            # the prior state in place so the cooldown persists across cycles and
+            # through _seed_provider_failure_skip_state (which copies prior).
+            if _should_relog_previous_launch_failure(prior):
+                _record_dispatch_failure(state_dir, previous_failure)
+                prior["previous_launch_failed_logged_at"] = _now_iso()
             return {
                 "reason": "provider_failure_backoff_active",
                 "failure_class": failure_class,
@@ -3350,7 +3499,11 @@ def _provider_failure_backoff_skip(
         return None
 
     if previous_failure is not None:
-        _record_dispatch_failure(state_dir, previous_failure)
+        # WI-4662: throttle the durable previous_launch_failed re-log (cooldown
+        # stamped in place on prior; persists via _seed_provider_failure_skip_state).
+        if _should_relog_previous_launch_failure(prior):
+            _record_dispatch_failure(state_dir, previous_failure)
+            prior["previous_launch_failed_logged_at"] = _now_iso()
         failure_class = _failure_class_from_previous(previous_failure)
     else:
         failure_class = str(prior.get("last_failure_reason") or "provider_failure")
@@ -3615,6 +3768,13 @@ def run_trigger(
             reason = failure_reason or "dispatch_target_resolution_failed"
             prior = recipients_state.get(recipient)
             recipient_state = dict(prior) if isinstance(prior, dict) else {}
+            # WI-4662: when the ranked Loyal Opposition candidate list is exhausted
+            # by launch-failure/back-off skips, record a single bounded
+            # lo_failover_exhausted terminal result (one cooldown-gated row)
+            # instead of re-logging no_ready_target_for_role on every cycle.
+            lo_failover_exhausted = _is_lo_failover_exhausted(failure_reason, recipient, fallback_skipped_candidates)
+            if lo_failover_exhausted:
+                reason = "lo_failover_exhausted"
             recipient_state["last_result"] = reason
             recipient_state["updated_at"] = _now_iso()
             result: dict[str, Any] = {"launched": False, "reason": reason}
@@ -3625,6 +3785,19 @@ def run_trigger(
             if fallback_skipped_candidates:
                 recipient_state["fallback_skipped_candidates"] = fallback_skipped_candidates
                 result["fallback_skipped_candidates"] = fallback_skipped_candidates
+            if lo_failover_exhausted and _should_relog_previous_launch_failure(recipient_state):
+                _record_dispatch_failure(
+                    state_dir,
+                    {
+                        "ts": _now_iso(),
+                        "dispatch_id": _new_dispatch_id(recipient),
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": "lo_failover_exhausted",
+                        "fallback_skipped_candidates": fallback_skipped_candidates,
+                    },
+                )
+                recipient_state["previous_launch_failed_logged_at"] = _now_iso()
             recipients_state[recipient] = recipient_state
             results[recipient] = result
             continue
@@ -3704,6 +3877,11 @@ def run_trigger(
             recipient_state["circuit_breaker_half_open"] = prior.get("circuit_breaker_half_open")
         if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
             recipient_state["last_launch"] = prior["last_launch"]
+        # WI-4662: carry forward the previous_launch_failed re-log cooldown stamp
+        # so the throttle persists across reconcile cycles (recipient_state is a
+        # fresh dict each cycle and does not otherwise inherit prior fields).
+        if isinstance(prior, dict) and prior.get("previous_launch_failed_logged_at"):
+            recipient_state["previous_launch_failed_logged_at"] = prior["previous_launch_failed_logged_at"]
 
         if not selected:
             recipient_state["last_result"] = "no_pending_after_filter" if items else "no_pending"
@@ -3787,7 +3965,12 @@ def run_trigger(
                             signature=dispatched_signature,
                         )
                         if previous_launch_failure is not None:
-                            _record_dispatch_failure(state_dir, previous_launch_failure)
+                            # WI-4662: throttle the durable re-log to one row per
+                            # cooldown window; the in-memory annotation below is
+                            # still set every cycle for status/diagnose visibility.
+                            if _should_relog_previous_launch_failure(recipient_state):
+                                _record_dispatch_failure(state_dir, previous_launch_failure)
+                                recipient_state["previous_launch_failed_logged_at"] = _now_iso()
                             recipient_state["previous_launch_failed"] = previous_launch_failure
 
                     if prior_dispatched == dispatched_signature and previous_launch_failure is None:

@@ -52,6 +52,12 @@ RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
     "previous_launch_failed",
     "subprocess_execution_failed",
 }
+# WI-4718: non-launch outcomes ('launch_failed') whose last_launch.reason indicates
+# benign backpressure rather than a dispatcher failure. The trigger collapses all
+# non-launch spawn results to last_result="launch_failed"; only the reason field
+# distinguishes saturation from failure. concurrency_cap_reached = all worker slots
+# busy; surfaced as WARN (not FAIL) by the health classifier.
+BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached"})
 
 
 @dataclass(frozen=True)
@@ -409,9 +415,26 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
         findings.append(
             f"dispatch runtime failure: {recipient_key} circuit breaker is tripped with pending_count={pending_count}"
         )
-    if (last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith("_dispatch_not_ready")) and has_pending_work:
+    last_result_is_runtime_failure = last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith(
+        "_dispatch_not_ready"
+    )
+    # WI-4718: 'launch_failed' is the generic non-launch token written by the trigger
+    # for ANY non-launch outcome; the specific cause is last_launch.reason. Defer to
+    # it so benign backpressure is not misreported as a runtime failure. A genuine
+    # launch reason (in RUNTIME_FAILURE_LAUNCH_REASONS, e.g. spawn_rate_limited) or
+    # an absent reason still flags via the unchanged paths below.
+    if last_result == "launch_failed" and launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS:
+        last_result_is_runtime_failure = False
+    if last_result_is_runtime_failure and has_pending_work:
         findings.append(
             f"dispatch runtime failure: {recipient_key} last_result={last_result} with pending_count={pending_count}"
+        )
+    if last_result == "launch_failed" and launch_reason == "concurrency_cap_reached" and has_pending_work:
+        live = _int_value(last_launch.get("live_count"), default=0)
+        cap = _int_value(last_launch.get("cap"), default=0)
+        findings.append(
+            f"dispatch runtime warning: {recipient_key} saturated "
+            f"(live_count={live}/cap={cap}) with pending_count={pending_count}"
         )
     if failure_class in RUNTIME_FAILURE_CLASSES and has_pending_work:
         findings.append(

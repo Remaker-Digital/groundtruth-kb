@@ -1165,12 +1165,12 @@ modifies source advisory files, uses `origin='hygiene'` and
 ### ollama
 
 **Definition:** The fourth GT-KB coding harness (identity `D`), adopted in
-Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. Locally hosts open-weight models
-via the Ollama platform CLI/server at `http://localhost:11434`. Integrated
-through `scripts/ollama_harness.py` (a framework-free Python tool-calling shim)
-and `.api-harness/routing.toml` (static routing). Phase-1 state: `registered` with an
-empty role-set (no active Prime Builder or Loyal Opposition role, no bridge
-dispatch routing).
+Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. The upstream Ollama platform
+CLI/server (`http://localhost:11434`) is local-capable, but the GT-KB harness
+currently routes all skills to cloud model ids via `.api-harness/routing.toml`
+(current route: `kimi-k2-7-code-cloud` — cloud-backed, not local inference).
+Integrated through `scripts/ollama_harness.py` (a framework-free Python
+tool-calling shim) and `.api-harness/routing.toml` (static routing).
 
 **Canonical alias:** ollama harness.
 
@@ -1189,10 +1189,12 @@ harnesses).
 ### routing.toml
 
 **Definition:** The static TOML routing config at `.api-harness/routing.toml`. Maps
-Ollama-served local models to dispatch contexts within the single Ollama
-harness's model pool. Schema per `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001`
-(`schema_version`, at least one `[models.<key>]` table, a `[routing]` table with
-`default_model`).
+harness skills to model ids within the Ollama harness's routing configuration.
+The current default route (`kimi-k2-7-code-cloud`) is cloud-backed via cloud
+API, not a locally-served Ollama model; the upstream Ollama platform CLI/server
+remains local-capable but is not the active inference endpoint for GT-KB
+dispatch. Schema per `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001` (`schema_version`,
+at least one `[models.<key>]` table, a `[routing]` table with `default_model`).
 
 **Not to be confused with:** the Ollama server's own model cache; bridge
 dispatch state (`.gtkb-state/bridge-poller/`).

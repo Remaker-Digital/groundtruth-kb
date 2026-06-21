@@ -149,13 +149,67 @@ def parse_related_bridge_threads(value: Any) -> list[str]:
     return slugs
 
 
-def _bridge_thread_files(project_root: Path, slug: str) -> list[Path]:
-    return sorted((project_root / "bridge").glob(f"{slug}-*.md"))
+def _index_bridge_thread_files(project_root: Path) -> dict[str, list[Path]]:
+    """One-pass index of slug -> sorted exact-versioned files (``<slug>-NNN.md``).
+
+    Built with a single ``bridge/*.md`` scan so callers needing files for many
+    slugs (reverse-link construction, per-candidate evidence) avoid an
+    O(slugs x dir) per-slug ``glob`` that does not scale at live bridge volume
+    (~1099 docs; WI-4704 verification F1). Grouping by ``VERSIONED_MD_RE``
+    preserves the exact-version rule (WI-4704 GO Condition 1): a child file such
+    as ``<slug>-child-001.md`` indexes under ``<slug>-child``, never ``<slug>``.
+    """
+
+    index: dict[str, list[Path]] = {}
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return index
+    for path in bridge_dir.glob("*.md"):
+        match = VERSIONED_MD_RE.match(path.name)
+        if match is None:
+            continue
+        index.setdefault(match.group(1), []).append(path)
+    for files in index.values():
+        files.sort()
+    return index
+
+
+def _bridge_thread_files(
+    project_root: Path, slug: str, *, file_index: dict[str, list[Path]] | None = None
+) -> list[Path]:
+    """Return only the exact versioned chain for ``slug`` (``<slug>-NNN.md``).
+
+    Batch callers pass ``file_index`` (from ``_index_bridge_thread_files``) to
+    reuse a single directory scan; without it a one-pass index is built and the
+    slug selected (correct for standalone callers and tests). The exact-version
+    rule (WI-4704 GO Condition 1) is enforced by ``VERSIONED_MD_RE`` grouping, so
+    a child file such as ``<slug>-child-001.md`` never counts as a file of
+    ``<slug>``.
+    """
+
+    if file_index is None:
+        file_index = _index_bridge_thread_files(project_root)
+    return file_index.get(slug, [])
+
+
+def _child_thread_slugs(slug: str, bridge_statuses: dict[str, dict[str, str]]) -> list[str]:
+    """Return indexed thread slugs that are children of ``slug`` (``<slug>-*``).
+
+    Child enumeration is a DISTINCT operation from parent-thread file
+    enumeration (WI-4704 GO Condition 1): a child slug shares the parent slug as
+    a prefix but is its own thread with its own versioned chain. A satisfied
+    umbrella never rewrites the parent thread's own status to ``VERIFIED``.
+    """
+
+    prefix = f"{slug}-"
+    return sorted(candidate for candidate in bridge_statuses if candidate != slug and candidate.startswith(prefix))
 
 
 def build_work_item_bridge_links(
     project_root: Path,
     bridge_statuses: dict[str, dict[str, str]],
+    *,
+    file_index: dict[str, list[Path]] | None = None,
 ) -> dict[str, list[str]]:
     """Derive the reverse work-item -> [bridge slug] index from bridge files.
 
@@ -166,11 +220,17 @@ def build_work_item_bridge_links(
     alone. This builds the inverse map by scanning each indexed slug's files for
     the metadata line only (never prose WI mentions), so the reconciler can
     supplement a WI's links with the slugs that explicitly declare it.
+
+    ``file_index`` (from ``_index_bridge_thread_files``) is reused when provided
+    so the bridge directory is scanned once for the whole batch rather than once
+    per slug (WI-4704 verification F1 scale fix).
     """
 
+    if file_index is None:
+        file_index = _index_bridge_thread_files(project_root)
     index: dict[str, set[str]] = {}
     for slug in bridge_statuses:
-        for path in _bridge_thread_files(project_root, slug):
+        for path in _bridge_thread_files(project_root, slug, file_index=file_index):
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
@@ -186,14 +246,17 @@ def _contains_work_item_id(text: str, work_item_id: str) -> bool:
     return bool(re.search(rf"(?<![A-Za-z0-9_.-]){escaped}(?![A-Za-z0-9_.-])", text))
 
 
-def bridge_thread_has_parent_evidence(project_root: Path, slug: str, work_item_id: str) -> dict[str, Any]:
+def bridge_thread_has_parent_evidence(
+    project_root: Path, slug: str, work_item_id: str, *, file_index: dict[str, list[Path]] | None = None
+) -> dict[str, Any]:
     """Return explicit evidence that a bridge thread covers the work item.
 
     related_bridge_threads is a broad linkage field. For mechanical closure we
     require the bridge thread chain itself to carry the exact work item ID.
+    ``file_index`` is reused when provided to avoid a per-call directory scan.
     """
 
-    files = _bridge_thread_files(project_root, slug)
+    files = _bridge_thread_files(project_root, slug, file_index=file_index)
     matched_files: list[str] = []
     for path in files:
         try:
@@ -209,14 +272,96 @@ def bridge_thread_has_parent_evidence(project_root: Path, slug: str, work_item_i
     }
 
 
-def _completion_evidence(current: dict[str, Any], slugs: list[str]) -> str:
-    evidence = (
-        "Bridge VERIFIED backlog reconciler resolved this work item because "
-        "all recognized parent implementation bridge threads are latest VERIFIED "
-        "and carry explicit work-item evidence: "
-        f"{', '.join(slugs)}. Source: "
-        "DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM."
+def bridge_thread_declares_work_item(
+    project_root: Path, slug: str, work_item_id: str, *, file_index: dict[str, list[Path]] | None = None
+) -> bool:
+    """Return True if the thread's exact versioned chain canonically declares the WI.
+
+    Canonical evidence is the ``Work Item: WI-XXXX`` metadata line only (WI-4704
+    GO Condition 2). A prose mention, a bare ``related_bridge_threads``
+    membership, or a prefix-sibling file never counts. This is the only evidence
+    form the WI-4704 parent-evidence relaxation and umbrella-closure paths accept.
+    ``file_index`` is reused when provided to avoid a per-call directory scan.
+    """
+
+    target = work_item_id.upper()
+    for path in _bridge_thread_files(project_root, slug, file_index=file_index):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        for match in _WORK_ITEM_METADATA_RE.finditer(text):
+            if match.group(1).upper() == target:
+                return True
+    return False
+
+
+def umbrella_satisfaction(
+    project_root: Path,
+    slug: str,
+    work_item_id: str,
+    bridge_statuses: dict[str, dict[str, str]],
+    *,
+    file_index: dict[str, list[Path]] | None = None,
+) -> dict[str, Any]:
+    """Evaluate whether non-VERIFIED ``slug`` is a satisfied umbrella for the WI.
+
+    A non-VERIFIED parent thread is a satisfied umbrella only when it has at
+    least one child thread, EVERY child is latest ``VERIFIED``, and at least one
+    child canonically declares this work item (WI-4704 GO Conditions 1 and 2).
+    The parent thread's own status is never rewritten to ``VERIFIED``; child
+    evidence supports the umbrella resolution path only. An umbrella child set
+    where only unrelated children are VERIFIED, or where no child declares the
+    WI, is not satisfied.
+    """
+
+    children = _child_thread_slugs(slug, bridge_statuses)
+    all_children_verified = bool(children) and all(bridge_statuses[child]["status"] == "VERIFIED" for child in children)
+    declaring_children = (
+        [
+            child
+            for child in children
+            if bridge_thread_declares_work_item(project_root, child, work_item_id, file_index=file_index)
+        ]
+        if all_children_verified
+        else []
     )
+    return {
+        "satisfied": all_children_verified and bool(declaring_children),
+        "children": children,
+        "all_children_verified": all_children_verified,
+        "declaring_children": declaring_children,
+    }
+
+
+def _completion_evidence(current: dict[str, Any], row: dict[str, Any]) -> str:
+    slugs = row["recognized_bridge_threads"]
+    reason = row.get("reason")
+    if reason == "umbrella_children_all_verified":
+        evidence = (
+            "Bridge VERIFIED backlog reconciler resolved this work item because the "
+            "recognized parent bridge threads are all satisfied: any GO umbrella thread "
+            "has every child thread latest VERIFIED with at least one child canonically "
+            "declaring this work item, and any directly-VERIFIED thread carries work-item "
+            f"evidence: {', '.join(slugs)}. Source: "
+            "DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM (WI-4704 umbrella auto-closure)."
+        )
+    elif reason == "parent_evidence_canonical_relaxed":
+        evidence = (
+            "Bridge VERIFIED backlog reconciler resolved this work item because all "
+            "recognized parent bridge threads are latest VERIFIED and at least one "
+            "canonically declares this work item via its Work Item metadata line: "
+            f"{', '.join(slugs)}. Source: "
+            "DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM (WI-4704 parent-evidence relaxation)."
+        )
+    else:
+        evidence = (
+            "Bridge VERIFIED backlog reconciler resolved this work item because "
+            "all recognized parent implementation bridge threads are latest VERIFIED "
+            "and carry explicit work-item evidence: "
+            f"{', '.join(slugs)}. Source: "
+            "DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM."
+        )
     existing = current.get("completion_evidence")
     if isinstance(existing, str) and existing.strip():
         return f"{existing.rstrip()}\n{evidence}"
@@ -230,7 +375,10 @@ def classify_work_item(
     project_root: Path = PROJECT_ROOT,
     ignore_terminal: bool = False,
     derived_links: dict[str, list[str]] | None = None,
+    file_index: dict[str, list[Path]] | None = None,
 ) -> dict[str, Any]:
+    if file_index is None:
+        file_index = _index_bridge_thread_files(project_root)
     raw_links = item.get("related_bridge_threads_parsed", item.get("related_bridge_threads"))
     parsed_links = parse_related_bridge_threads(raw_links)
     if derived_links:
@@ -241,7 +389,7 @@ def classify_work_item(
     missing = [slug for slug in parsed_links if slug not in bridge_statuses]
     statuses = {slug: bridge_statuses[slug]["status"] for slug in recognized}
     parent_evidence = {
-        slug: bridge_thread_has_parent_evidence(project_root, slug, item["id"])
+        slug: bridge_thread_has_parent_evidence(project_root, slug, item["id"], file_index=file_index)
         for slug in recognized
         if statuses.get(slug) == "VERIFIED"
     }
@@ -249,6 +397,30 @@ def classify_work_item(
         slug
         for slug in recognized
         if statuses.get(slug) == "VERIFIED" and not parent_evidence[slug]["has_parent_evidence"]
+    ]
+    # Class 1 (WI-4704): a non-VERIFIED recognized link may still be satisfied
+    # when it is an umbrella whose children are ALL VERIFIED and at least one
+    # child canonically declares this work item. The parent's own status is
+    # never rewritten to VERIFIED.
+    umbrella_evidence = {
+        slug: umbrella_satisfaction(project_root, slug, item["id"], bridge_statuses, file_index=file_index)
+        for slug in recognized
+        if statuses.get(slug) != "VERIFIED"
+    }
+    umbrella_satisfied_slugs = [slug for slug, ev in umbrella_evidence.items() if ev["satisfied"]]
+    unsatisfied_non_verified = [
+        slug for slug in recognized if statuses.get(slug) != "VERIFIED" and slug not in umbrella_satisfied_slugs
+    ]
+    # Class 2 (WI-4704): canonical parent-evidence relaxation. When all links are
+    # otherwise satisfied but some VERIFIED link lacks the broad WI-id evidence,
+    # the work item still resolves if at least one VERIFIED link canonically
+    # declares it via the ``Work Item: WI-XXXX`` metadata line. Prose mentions and
+    # bare related_bridge_threads membership never satisfy this floor.
+    canonical_evidence_threads = [
+        slug
+        for slug in recognized
+        if statuses.get(slug) == "VERIFIED"
+        and bridge_thread_declares_work_item(project_root, slug, item["id"], file_index=file_index)
     ]
 
     if not ignore_terminal and item.get("resolution_status") in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
@@ -263,15 +435,20 @@ def classify_work_item(
     elif not recognized:
         action = "skip"
         reason = "unrecognized_only"
-    elif any(status != "VERIFIED" for status in statuses.values()):
+    elif unsatisfied_non_verified:
         action = "skip"
         reason = "linked_bridge_not_verified"
-    elif missing_parent_evidence:
+    elif missing_parent_evidence and not canonical_evidence_threads:
         action = "skip"
         reason = "missing_parent_evidence"
     else:
         action = "resolve"
-        reason = "all_parent_links_verified"
+        if umbrella_satisfied_slugs:
+            reason = "umbrella_children_all_verified"
+        elif missing_parent_evidence:
+            reason = "parent_evidence_canonical_relaxed"
+        else:
+            reason = "all_parent_links_verified"
 
     return {
         "id": item["id"],
@@ -284,6 +461,9 @@ def classify_work_item(
         "bridge_statuses": statuses,
         "parent_evidence": parent_evidence,
         "missing_parent_evidence": missing_parent_evidence,
+        "umbrella_evidence": umbrella_evidence,
+        "umbrella_satisfied": umbrella_satisfied_slugs,
+        "canonical_evidence_threads": canonical_evidence_threads,
         "action": action,
         "reason": reason,
     }
@@ -295,6 +475,7 @@ def classify_reconciler_resolution(
     *,
     project_root: Path = PROJECT_ROOT,
     derived_links: dict[str, list[str]] | None = None,
+    file_index: dict[str, list[Path]] | None = None,
 ) -> dict[str, Any]:
     strict = classify_work_item(
         item,
@@ -302,6 +483,7 @@ def classify_reconciler_resolution(
         project_root=project_root,
         ignore_terminal=True,
         derived_links=derived_links,
+        file_index=file_index,
     )
     if strict["action"] == "resolve":
         action = "keep_resolved"
@@ -356,7 +538,8 @@ def reconcile(
     database_path = db_path or root / "groundtruth.db"
 
     bridge_statuses = collect_latest_bridge_statuses(root)
-    derived_links = build_work_item_bridge_links(root, bridge_statuses)
+    file_index = _index_bridge_thread_files(root)
+    derived_links = build_work_item_bridge_links(root, bridge_statuses, file_index=file_index)
     db = KnowledgeDB(database_path)
     resolved_ids: list[str] = []
     reopened_ids: list[str] = []
@@ -371,7 +554,9 @@ def reconcile(
             or derived_links.get(item["id"])
         ]
         inventory = [
-            classify_work_item(item, bridge_statuses, project_root=root, derived_links=derived_links)
+            classify_work_item(
+                item, bridge_statuses, project_root=root, derived_links=derived_links, file_index=file_index
+            )
             for item in candidates
         ]
         items_by_id = {item["id"]: item for item in candidates}
@@ -388,7 +573,7 @@ def reconcile(
                         owner_approved=True,
                         resolution_status="resolved",
                         stage="resolved",
-                        completion_evidence=_completion_evidence(current, row["recognized_bridge_threads"]),
+                        completion_evidence=_completion_evidence(current, row),
                     )
                     resolved_ids.append(row["id"])
                 except Exception as exc:  # pragma: no cover - defensive runtime reporting
@@ -400,7 +585,9 @@ def reconcile(
                 if item.get("changed_by") == CHANGED_BY
             ]
             repair_inventory = [
-                classify_reconciler_resolution(item, bridge_statuses, project_root=root, derived_links=derived_links)
+                classify_reconciler_resolution(
+                    item, bridge_statuses, project_root=root, derived_links=derived_links, file_index=file_index
+                )
                 for item in reconciler_resolutions
             ]
             if apply:

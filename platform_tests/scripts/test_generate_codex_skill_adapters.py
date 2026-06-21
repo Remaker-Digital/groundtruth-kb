@@ -385,3 +385,116 @@ def test_update_registry_points_codex_at_generated_adapter(tmp_path: Path) -> No
     assert 'status = "adapter"' in registry_text
     assert 'adapter_source = ".claude/skills/review/SKILL.md"' in registry_text
     assert "source_sha256 =" in registry_text
+
+
+# ---------------------------------------------------------------------------
+# WI-4701: LF-only line-ending tests
+# ---------------------------------------------------------------------------
+
+
+def test_generate_emits_lf_only_line_endings(tmp_path: Path) -> None:
+    """WI-4701: generate must write adapter SKILL.md and MANIFEST.json with LF only."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+
+    module.generate(tmp_path)
+
+    adapter_path = tmp_path / ".codex" / "skills" / "review" / "SKILL.md"
+    manifest_path = tmp_path / ".codex" / "skills" / "MANIFEST.json"
+    assert b"\r" not in adapter_path.read_bytes(), "adapter SKILL.md contains CR"
+    assert b"\r" not in manifest_path.read_bytes(), "MANIFEST.json contains CR"
+    for line in adapter_path.read_text(encoding="utf-8", newline="").splitlines():
+        assert line == line.rstrip(), f"trailing whitespace in adapter line: {line!r}"
+
+
+def test_check_mode_detects_crlf_contaminated_adapter(tmp_path: Path) -> None:
+    """WI-4701: --check must report a CRLF-contaminated adapter as drifted."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    adapter_path = tmp_path / ".codex" / "skills" / "review" / "SKILL.md"
+    # Overwrite the LF adapter with a CRLF version to simulate contamination.
+    adapter_path.write_bytes(adapter_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
+
+    changed, _ = module.generate(tmp_path, check=True)
+
+    assert ".codex/skills/review/SKILL.md" in changed
+
+
+def test_generate_corrects_crlf_contaminated_adapter(tmp_path: Path) -> None:
+    """WI-4701: generate (non-check) must rewrite a CRLF adapter to LF."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    adapter_path = tmp_path / ".codex" / "skills" / "review" / "SKILL.md"
+    adapter_path.write_bytes(adapter_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
+
+    module.generate(tmp_path)
+
+    assert b"\r" not in adapter_path.read_bytes(), "adapter still contains CR after correction"
+
+
+def test_generate_idempotent_after_lf_write(tmp_path: Path) -> None:
+    """WI-4701: second generate in check mode after LF write must report no drift."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+
+    changed, _ = module.generate(tmp_path, check=True)
+
+    assert ".codex/skills/review/SKILL.md" not in changed
+    assert ".codex/skills/MANIFEST.json" not in changed
+
+
+def test_update_registry_emits_lf_only_line_endings(tmp_path: Path) -> None:
+    """WI-4701: update_registry must write the registry with LF-only line endings."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    adapters = module.build_adapters(tmp_path)
+
+    module.update_registry(tmp_path, adapters)
+
+    registry_path = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
+    assert b"\r" not in registry_path.read_bytes(), "registry contains CR after update_registry"
+
+
+def test_update_registry_corrects_crlf_contamination(tmp_path: Path) -> None:
+    """WI-4701: update_registry must correct a CRLF-contaminated registry to LF."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    adapters = module.build_adapters(tmp_path)
+    # First call establishes the correct sha256 state.
+    module.update_registry(tmp_path, adapters)
+    registry_path = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
+    # Contaminate with CRLF.
+    registry_path.write_bytes(registry_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
+    assert b"\r" in registry_path.read_bytes()
+
+    module.update_registry(tmp_path, adapters)
+
+    assert b"\r" not in registry_path.read_bytes(), "registry still contains CR after correction"
+
+
+def test_adapter_source_sha256_stable_after_lf_correction(tmp_path: Path) -> None:
+    """WI-4701: source_sha256 in MANIFEST must not change when CRLF adapters are corrected."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    module.generate(tmp_path)
+    manifest_before = json.loads((tmp_path / ".codex" / "skills" / "MANIFEST.json").read_text(encoding="utf-8"))
+    sha256_before = manifest_before["adapters"][0]["source_sha256"]
+    adapter_path = tmp_path / ".codex" / "skills" / "review" / "SKILL.md"
+    # Contaminate adapter with CRLF.
+    adapter_path.write_bytes(adapter_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
+
+    module.generate(tmp_path)
+
+    manifest_after = json.loads((tmp_path / ".codex" / "skills" / "MANIFEST.json").read_text(encoding="utf-8"))
+    sha256_after = manifest_after["adapters"][0]["source_sha256"]
+    assert sha256_before == sha256_after, "source_sha256 must be stable after CRLF correction"

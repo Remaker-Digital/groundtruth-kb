@@ -13,6 +13,8 @@ sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 SCAN_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 
 from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
+    BENIGN_NONLAUNCH_LAUNCH_REASONS,
+    _runtime_findings_for_recipient,
     collect_bridge_dispatch_status,
     load_bridge_dispatch_config,
     select_dispatch_candidates,
@@ -407,6 +409,120 @@ def test_wi4578_health_fails_for_exit_zero_no_verdict_evidence(tmp_path: Path) -
 
     assert status.health_status == "FAIL"
     assert any("last_launch.exit_failure_reason=no_verdict_produced" in f for f in status.health_findings)
+
+
+# WI-4718 — benign concurrency_cap_reached must not be misclassified as a runtime FAIL.
+# bridge/gtkb-wi4718-dispatch-health-benign-cap-false-fail-001.md (GO at -002).
+#
+# The trigger collapses all non-launch spawn results to last_result="launch_failed";
+# only last_launch.reason distinguishes saturation (benign) from genuine failure.
+# Before this fix the generic last_result check at _runtime_findings_for_recipient
+# emitted a dispatch runtime failure finding for concurrency_cap_reached, causing
+# gt bridge dispatch health to report FAIL for a merely saturated dispatcher.
+
+
+def test_wi4718_saturation_emits_warn_not_fail(tmp_path: Path) -> None:
+    """A concurrency_cap_reached row with pending work emits WARN, never FAIL."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "pending_count": 3,
+                "selected_count": 2,
+                "last_result": "launch_failed",
+                "last_launch": {
+                    "reason": "concurrency_cap_reached",
+                    "live_count": 2,
+                    "cap": 2,
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    failure_findings = [f for f in status.health_findings if "dispatch runtime failure" in f]
+    warn_findings = [f for f in status.health_findings if "saturated" in f]
+    assert failure_findings == [], f"Expected no failure findings, got: {failure_findings}"
+    assert len(warn_findings) == 1
+    assert "loyal-opposition:D" in warn_findings[0]
+    assert "live_count=2/cap=2" in warn_findings[0]
+    assert "pending_count=3" in warn_findings[0]
+    assert status.health_status != "FAIL"
+
+
+def test_wi4718_saturation_with_live_count_cap_in_finding(tmp_path: Path) -> None:
+    """The saturation WARN finding includes live_count and cap from last_launch."""
+    row: dict = {
+        "pending_count": 5,
+        "selected_count": 1,
+        "last_result": "launch_failed",
+        "last_launch": {"reason": "concurrency_cap_reached", "live_count": 4, "cap": 4},
+    }
+
+    findings = _runtime_findings_for_recipient("prime-builder:B", row)
+
+    failure = [f for f in findings if "dispatch runtime failure" in f]
+    warn = [f for f in findings if "saturated" in f]
+    assert failure == []
+    assert len(warn) == 1
+    assert "live_count=4/cap=4" in warn[0]
+
+
+def test_wi4718_no_findings_when_no_pending_work(tmp_path: Path) -> None:
+    """Saturation with no pending work emits no findings at all."""
+    row: dict = {
+        "pending_count": 0,
+        "selected_count": 0,
+        "last_result": "launch_failed",
+        "last_launch": {"reason": "concurrency_cap_reached", "live_count": 2, "cap": 2},
+    }
+
+    findings = _runtime_findings_for_recipient("loyal-opposition:A", row)
+
+    assert findings == []
+
+
+def test_wi4718_genuine_launch_reason_still_fails(tmp_path: Path) -> None:
+    """A genuine failure reason (spawn_rate_limited) still produces a runtime failure."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "pending_count": 2,
+                "selected_count": 1,
+                "last_result": "launch_failed",
+                "last_launch": {"reason": "spawn_rate_limited"},
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "FAIL"
+    assert any("last_result=launch_failed" in f for f in status.health_findings)
+
+
+def test_wi4718_absent_launch_reason_still_fails() -> None:
+    """launch_failed with no reason field is treated as a genuine failure (fail-closed)."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "last_result": "launch_failed",
+        "last_launch": {},
+    }
+
+    findings = _runtime_findings_for_recipient("prime-builder:B", row)
+
+    assert any("dispatch runtime failure" in f and "last_result=launch_failed" in f for f in findings)
+
+
+def test_wi4718_benign_constant_contains_expected_reasons() -> None:
+    """BENIGN_NONLAUNCH_LAUNCH_REASONS contains concurrency_cap_reached and is frozen."""
+    assert "concurrency_cap_reached" in BENIGN_NONLAUNCH_LAUNCH_REASONS
+    assert isinstance(BENIGN_NONLAUNCH_LAUNCH_REASONS, frozenset)
 
 
 def test_wi4578_manual_scan_excludes_acknowledged_archived_nonterminal(tmp_path: Path) -> None:

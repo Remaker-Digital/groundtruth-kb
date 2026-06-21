@@ -392,3 +392,99 @@ def test_template_skill_md_contains_pre_population_section():
         "Phase 0a" in content and "pre-population" in content.lower()
     )
     assert "glossary-source seeding" in content.lower() or "Glossary-source seeding" in content
+
+
+# --------------------------------------------------------------------------
+# WI-4565: semantic search is opt-in (db=None/False skip; db=True opts in) and
+# the default-store open is timeout-bounded so opt-in can never hang.
+# --------------------------------------------------------------------------
+
+
+def _prior_deliberations_module():
+    from groundtruth_kb.bridge import prior_deliberations as pd
+
+    return pd
+
+
+def test_wi4565_db_none_default_skips_open_and_search():
+    """db=None (default) must NOT open the default DB nor run semantic search."""
+    pd = _prior_deliberations_module()
+    orig = pd._try_open_default_db
+
+    def boom():
+        raise AssertionError("_try_open_default_db must not be called when db=None")
+
+    pd._try_open_default_db = boom
+    try:
+        body = "## Prior Deliberations\n\n_placeholder._\n"
+        out = pd.pre_populate_prior_deliberations("wi4565-opt-in-topic", body, db=None, log_path=False)
+    finally:
+        pd._try_open_default_db = orig
+    assert "## Prior Deliberations" in out
+
+
+def test_wi4565_db_false_still_disables_search():
+    """db=False keeps disabling semantic search (unchanged explicit-disable contract)."""
+    pd = _prior_deliberations_module()
+    orig = pd._try_open_default_db
+
+    def boom():
+        raise AssertionError("_try_open_default_db must not be called when db=False")
+
+    pd._try_open_default_db = boom
+    try:
+        body = "## Prior Deliberations\n\n_placeholder._\n"
+        out = pd.pre_populate_prior_deliberations("wi4565-opt-in-topic", body, db=False, log_path=False)
+    finally:
+        pd._try_open_default_db = orig
+    assert "## Prior Deliberations" in out
+
+
+def test_wi4565_db_true_opts_in_to_default_store_search():
+    """db=True opts in to the bounded default-store semantic search."""
+    pd = _prior_deliberations_module()
+
+    class _Fake:
+        def __init__(self):
+            self.calls = 0
+
+        def search_deliberations(self, query, *, limit=5):
+            self.calls += 1
+            return [{"id": "DELIB-WI4565-FAKE", "title": "Fake", "score": 0.9}]
+
+    fake = _Fake()
+    orig = pd._try_open_default_db
+    pd._try_open_default_db = lambda: fake
+    try:
+        body = "## Prior Deliberations\n\n_placeholder._\n"
+        out = pd.pre_populate_prior_deliberations("wi4565-opt-in-topic", body, db=True, log_path=False)
+    finally:
+        pd._try_open_default_db = orig
+    assert fake.calls == 1
+    assert "DELIB-WI4565-FAKE" in out
+
+
+def test_wi4565_open_db_bounded_by_timeout(monkeypatch):
+    """_try_open_default_db is timeout-bounded; a hanging construction degrades to None."""
+    import time
+
+    import groundtruth_kb.db as dbmod
+
+    pd = _prior_deliberations_module()
+    monkeypatch.setattr(pd, "_OPEN_DB_TIMEOUT_SECONDS", 0.2)
+
+    def slow_ctor(_path):
+        time.sleep(3.0)
+        return object()
+
+    monkeypatch.setattr(dbmod, "KnowledgeDB", slow_ctor)
+    assert pd._try_open_default_db() is None
+
+
+def test_wi4565_db_param_docstring_matches_skip_behavior(helper_module):
+    """write_bridge.py propose_bridge db-param docstring states the None-skips
+    contract that the WI-4565 code fix now honors. (The db=True opt-in doc
+    enhancement + .codex adapter regen are deferred to WI-4716 to avoid an
+    out-of-scope generated-adapter rewrite.)"""
+    doc = helper_module.propose_bridge.__doc__ or ""
+    assert "skips semantic search" in doc

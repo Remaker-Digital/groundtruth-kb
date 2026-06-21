@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,6 +18,10 @@ DEFAULT_GLOSSARY_PATH = Path(".claude/rules/canonical-terminology.md")
 DEFAULT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-propose-helper/last-prepopulation.json")
 DEFAULT_PRE_POPULATION_LIMIT = 5
 DEFAULT_DB_PATH = "groundtruth.db"
+# WI-4565: bound the default-store open so an opt-in (db=True) semantic search
+# can never hang on ChromaDB client construction / embedding-model load. Tunable
+# via GTKB_DA_OPEN_TIMEOUT_SECONDS; degrades to glossary-only seeding on timeout.
+_OPEN_DB_TIMEOUT_SECONDS = float(os.environ.get("GTKB_DA_OPEN_TIMEOUT_SECONDS") or "10")
 
 NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
 
@@ -29,11 +34,18 @@ def _discover_project_root() -> Path:
 
 
 def _try_open_default_db() -> Any | None:
-    """Attempt to open the default ``KnowledgeDB`` for semantic search."""
-    try:
-        from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
+    """Attempt to open the default ``KnowledgeDB`` for semantic search.
 
-        return KnowledgeDB(DEFAULT_DB_PATH)
+    WI-4565: the construction is bounded by ``_OPEN_DB_TIMEOUT_SECONDS`` (via the
+    shared daemon-thread timeout) so a stalled ChromaDB client / embedding-model
+    load degrades to glossary-only seeding instead of hanging the bridge-authoring
+    hot path. This is the read-side analogue of the FAB-17/WI-4519 query timeout,
+    which bounded the query but left the store-open default unguarded.
+    """
+    try:
+        from groundtruth_kb.db import KnowledgeDB, _call_with_timeout  # noqa: PLC0415
+
+        return _call_with_timeout(lambda: KnowledgeDB(DEFAULT_DB_PATH), _OPEN_DB_TIMEOUT_SECONDS)
     except Exception:  # noqa: BLE001 - graceful degradation
         return None
 
@@ -173,9 +185,13 @@ def pre_populate_prior_deliberations(
             glossary_content = ""
     seed_ids = _glossary_seed_ids_for_topic(topic_slug, glossary_content)
 
-    if db is False:
+    # WI-4565: semantic search is opt-in. db=None (default) and db=False both
+    # skip the ChromaDB default-store open (glossary-source seeding still runs);
+    # db=True opts in to a timeout-bounded default-store search; any other value
+    # is treated as a live KnowledgeDB instance.
+    if db is False or db is None:
         active_db: Any | None = None
-    elif db is None:
+    elif db is True:
         active_db = _try_open_default_db()
     else:
         active_db = db

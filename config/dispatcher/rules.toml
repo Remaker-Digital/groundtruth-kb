@@ -36,10 +36,10 @@ dispatch_availability = 80
 tags = ["loyal-opposition"]
 
 [harnesses.D]
-description = "Ollama: cheapest Loyal Opposition dispatch target."
+description = "Ollama-shim: cloud-routed LO dispatch target (current route: kimi-k2-7-code-cloud via cloud API)."
 can_receive_dispatch = true
 can_fire_events = false
-dispatch_cost = 5
+dispatch_cost = 20
 dispatch_quality = 62
 dispatch_availability = 95
 max_items = 1

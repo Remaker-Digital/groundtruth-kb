@@ -239,14 +239,25 @@ def build_adapters(project_root: Path) -> list[SkillAdapter]:
     return adapters
 
 
+def _assert_no_trailing_whitespace(content: str, path: str) -> None:
+    """Defense in depth: reject generator output with trailing whitespace on any line."""
+    for lineno, line in enumerate(content.splitlines(), start=1):
+        if line != line.rstrip():
+            raise SkillFrontmatterError(f"{path}:{lineno}: generated content has trailing whitespace: {line!r}")
+
+
 def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
-    existing = path.read_text(encoding="utf-8") if path.is_file() else None
+    # Read bytes rather than text so CR is preserved; text-mode read strips CR on
+    # Windows, making a CRLF file compare equal to the LF content string and
+    # silently skipping the corrective rewrite.
+    existing = path.read_bytes().decode("utf-8") if path.is_file() else None
     if existing == content:
         return False
+    _assert_no_trailing_whitespace(content, path.as_posix())
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content, encoding="utf-8", newline="\n")
     return True
 
 
@@ -323,12 +334,13 @@ def _rewrite_registry_text(text: str, adapters: list[SkillAdapter]) -> str:
 
 def update_registry(project_root: Path, adapters: list[SkillAdapter], *, check: bool = False) -> bool:
     registry_path = project_root / REGISTRY_RELATIVE_PATH
-    current = registry_path.read_text(encoding="utf-8")
+    # Read bytes to detect CRLF contamination; text-mode read strips CR on Windows.
+    current = registry_path.read_bytes().decode("utf-8")
     updated = _rewrite_registry_text(current, adapters)
     if current == updated:
         return False
     if not check:
-        registry_path.write_text(updated, encoding="utf-8")
+        registry_path.write_text(updated, encoding="utf-8", newline="\n")
     return True
 
 

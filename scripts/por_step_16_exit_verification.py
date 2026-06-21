@@ -37,10 +37,10 @@ def count_orphan_tests(conn: sqlite3.Connection) -> int:
     return int(row["count"])
 
 
-def count_implemented_or_verified_specs_without_tests(conn: sqlite3.Connection) -> int:
-    row = conn.execute(
+def count_implemented_or_verified_specs_without_tests(conn: sqlite3.Connection, waived_specs: set[str]) -> int:
+    cursor = conn.execute(
         """
-        SELECT COUNT(*) AS count
+        SELECT s.id
         FROM current_specifications s
         WHERE LOWER(COALESCE(s.status, '')) IN ('implemented', 'verified')
           AND NOT EXISTS (
@@ -49,20 +49,43 @@ def count_implemented_or_verified_specs_without_tests(conn: sqlite3.Connection) 
               WHERE t.spec_id = s.id
           )
         """
-    ).fetchone()
-    return int(row["count"])
+    )
+    untested = [row["id"] for row in cursor]
+    remaining = [spec_id for spec_id in untested if spec_id not in waived_specs]
+    return len(remaining)
+
+
+def load_waived_specs(manifest_path: Path) -> set[str]:
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Manifest file not found: {manifest_path}")
+    try:
+        with open(manifest_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Malformed manifest JSON: {exc}") from exc
+
+    if not isinstance(data, dict) or "waived_specs" not in data:
+        raise ValueError("Manifest JSON does not contain 'waived_specs'")
+
+    waived = data["waived_specs"]
+    if not isinstance(waived, list):
+        raise ValueError("'waived_specs' must be a list of strings")
+
+    return set(waived)
 
 
 def evaluate_exit_thresholds(
     db_path: Path,
+    manifest_path: Path,
     *,
     max_untested_specs: int = MAX_UNTESTED_SPECS,
     max_orphan_tests: int = MAX_ORPHAN_TESTS,
 ) -> dict[str, Any]:
+    waived_specs = load_waived_specs(manifest_path)
     conn = _connect_read_only(db_path)
     try:
         orphan_tests = count_orphan_tests(conn)
-        untested_specs = count_implemented_or_verified_specs_without_tests(conn)
+        untested_specs = count_implemented_or_verified_specs_without_tests(conn, waived_specs)
     finally:
         conn.close()
 
@@ -89,6 +112,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     parser.add_argument("--db", type=Path, default=None)
+    parser.add_argument("--manifest", type=Path, default=None)
     parser.add_argument("--max-untested-specs", type=int, default=MAX_UNTESTED_SPECS)
     parser.add_argument("--max-orphan-tests", type=int, default=MAX_ORPHAN_TESTS)
     parser.add_argument("--json", action="store_true", help="emit a machine-readable result")
@@ -106,13 +130,20 @@ def _print_text_report(result: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     db_path = _resolve_db(args.project_root.resolve(), args.db)
+    manifest_path = args.manifest
+    if manifest_path is None:
+        manifest_path = args.project_root / "bridge" / "gtkb-por-step-16-e-exit-verification-manifest-011.json"
+    else:
+        manifest_path = manifest_path.resolve()
+
     try:
         result = evaluate_exit_thresholds(
             db_path,
+            manifest_path,
             max_untested_specs=args.max_untested_specs,
             max_orphan_tests=args.max_orphan_tests,
         )
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 

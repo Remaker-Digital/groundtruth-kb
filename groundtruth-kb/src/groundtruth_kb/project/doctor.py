@@ -955,6 +955,207 @@ def _check_harness_state_sot_consistency(target: Path) -> ToolCheck:
     )
 
 
+def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
+    """WI-4700: fail when dispatch metadata understates cloud-backed routes."""
+    import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
+    check_name = "harness metadata freshness"
+    routing_path = target / ".api-harness" / "routing.toml"
+    dispatch_path = target / "config" / "dispatcher" / "rules.toml"
+    registry_path = target / "harness-state" / "harness-registry.json"
+    canonical_paths = (
+        target / ".claude" / "rules" / "canonical-terminology.md",
+        target / "groundtruth-kb" / "docs" / "reference" / "canonical-terminology-detail.md",
+        target / ".claude" / "rules" / "operating-model.md",
+    )
+
+    warnings: list[str] = []
+    failures: list[str] = []
+
+    if not routing_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="warning",
+            message=".api-harness/routing.toml missing; harness metadata freshness guard unavailable",
+        )
+    if not dispatch_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="warning",
+            message="config/dispatcher/rules.toml missing; dispatch-cost freshness guard unavailable",
+        )
+
+    try:
+        routing_data = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="warning",
+            message=f".api-harness/routing.toml unreadable: {exc}",
+        )
+    try:
+        dispatch_data = tomllib.loads(dispatch_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="warning",
+            message=f"config/dispatcher/rules.toml unreadable: {exc}",
+        )
+
+    route_to_harness_id: dict[str, str] = {"ollama": "D", "openrouter": "F"}
+    if registry_path.is_file():
+        try:
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            warnings.append(f"harness registry unreadable: {exc}")
+        else:
+            harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
+            if isinstance(harnesses, list):
+                for entry in harnesses:
+                    if not isinstance(entry, dict):
+                        continue
+                    name = entry.get("harness_name")
+                    harness_id = entry.get("id")
+                    if isinstance(name, str) and isinstance(harness_id, str):
+                        route_to_harness_id.setdefault(name, harness_id)
+
+    models = routing_data.get("models")
+    routing = routing_data.get("routing")
+    if not isinstance(models, dict) or not models:
+        warnings.append(".api-harness/routing.toml has no [models.<key>] entries")
+        models = {}
+    if not isinstance(routing, dict) or not routing:
+        warnings.append(".api-harness/routing.toml has no [routing.<harness>] entries")
+        routing = {}
+    dispatch_harnesses = dispatch_data.get("harnesses")
+    if not isinstance(dispatch_harnesses, dict):
+        warnings.append("config/dispatcher/rules.toml has no [harnesses.<id>] entries")
+        dispatch_harnesses = {}
+
+    def _cloud_route(model: dict[str, Any]) -> bool:
+        provider = str(model.get("provider", "")).strip().lower()
+        model_id = str(model.get("model_id", "")).strip().lower()
+        return provider == "openrouter" or ":cloud" in model_id
+
+    def _stale_local_claim(text: str) -> bool:
+        lower = text.lower()
+        stale_markers = (
+            "http://localhost:11434",
+            "locally hosts open-weight",
+            "ollama-served local",
+            "local models",
+            "free local inference",
+        )
+        fresh_markers = (
+            "cloud-backed",
+            "cloud-routed",
+            "kimi-k2-7-code-cloud",
+            "current route",
+            "not serving local",
+            "not currently serving local",
+        )
+        return any(marker in lower for marker in stale_markers) and not any(marker in lower for marker in fresh_markers)
+
+    canonical_texts: dict[str, str] = {}
+    for path in canonical_paths:
+        rel = path.relative_to(target).as_posix()
+        if not path.is_file():
+            warnings.append(f"{rel} missing; narrative freshness not checked")
+            continue
+        try:
+            canonical_texts[rel] = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            warnings.append(f"{rel} unreadable: {exc}")
+
+    for route_name, route_config in routing.items():
+        if not isinstance(route_config, dict):
+            continue
+        model_keys: set[str] = set()
+        default_model = route_config.get("default_model")
+        if isinstance(default_model, str) and default_model:
+            model_keys.add(default_model)
+        skills = route_config.get("skills")
+        if isinstance(skills, dict):
+            model_keys.update(value for value in skills.values() if isinstance(value, str) and value)
+
+        harness_id = route_to_harness_id.get(route_name)
+        dispatch_row = dispatch_harnesses.get(harness_id, {}) if harness_id else {}
+        dispatch_cost = dispatch_row.get("dispatch_cost") if isinstance(dispatch_row, dict) else None
+        dispatch_description = str(dispatch_row.get("description", "")) if isinstance(dispatch_row, dict) else ""
+
+        for model_key in sorted(model_keys):
+            model = models.get(model_key)
+            if not isinstance(model, dict):
+                warnings.append(f"routing.{route_name} references unknown model {model_key!r}")
+                continue
+            if not _cloud_route(model):
+                continue
+
+            model_id = str(model.get("model_id", model_key))
+            provider = str(model.get("provider", route_name))
+            try:
+                cost_value = float(dispatch_cost)
+            except (TypeError, ValueError):
+                warnings.append(f"harness {harness_id or route_name} has no numeric dispatch_cost")
+            else:
+                if cost_value <= 10:
+                    failures.append(
+                        f"harness {harness_id or route_name} routes to cloud model {model_id!r} "
+                        f"via {provider!r} but dispatch_cost={cost_value:g} (<=10)"
+                    )
+
+            if route_name == "ollama" and ":cloud" in model_id.lower():
+                if _stale_local_claim(dispatch_description):
+                    failures.append(
+                        f"harness {harness_id or route_name} dispatcher description still claims local Ollama routing"
+                    )
+                for rel, text in canonical_texts.items():
+                    if _stale_local_claim(text):
+                        failures.append(
+                            f"{rel} still claims Ollama local/localhost routing while route uses {model_id!r}"
+                        )
+
+    if failures:
+        head = failures[0]
+        extra = f" (+{len(failures) - 1} more)" if len(failures) > 1 else ""
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(failures)} freshness failures; first: {head}{extra}",
+        )
+
+    if warnings:
+        head = warnings[0]
+        extra = f" (+{len(warnings) - 1} more)" if len(warnings) > 1 else ""
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="warning",
+            message=f"{len(warnings)} freshness warnings; first: {head}{extra}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="pass",
+        message=(
+            "Harness metadata freshness clean: cloud routes have non-cheap dispatch cost and non-local descriptions"
+        ),
+    )
+
+
 def _check_ollama_harness(target: Path) -> ToolCheck:
     """WI-4323: four-store Ollama harness consistency check (Phase-1 Child 3).
 
@@ -5364,6 +5565,10 @@ def run_doctor(
         # the proposal §Acceptance Criteria #8 — promoted to FAIL after WI-4336
         # (mirror retirement) lands.
         checks.append(_check_harness_state_sot_consistency(target))
+        # WI-4700: harness metadata freshness. Fails when cloud-backed API-harness
+        # routes are still advertised as cheap/local in dispatcher or canonical
+        # narrative surfaces.
+        checks.append(_check_harness_metadata_freshness(target))
         # WI-4323: Ollama harness 4-store consistency. Verifies identities + registry +
         # capability registry + routing TOML agree about ollama→D / status=registered /
         # role=[] / tool_calling models. Authorized by

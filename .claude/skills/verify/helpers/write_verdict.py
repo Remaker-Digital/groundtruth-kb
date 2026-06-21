@@ -173,7 +173,9 @@ def _normalize_repo_path(project_root: Path, path_text: str) -> str:
             return path.resolve().relative_to(project_root.resolve()).as_posix()
         except ValueError as exc:
             raise VerifiedFinalizationError(f"Committed path escapes project root: {path_text}") from exc
-    normalized = raw.replace("\\", "/").lstrip("./")
+    normalized = raw.replace("\\", "/")
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
     if normalized.startswith("../") or normalized == ".." or "/../" in normalized:
         raise VerifiedFinalizationError(f"Committed path escapes project root: {path_text}")
     if normalized.startswith(".git/") or normalized == ".git":
@@ -302,7 +304,7 @@ def finalize_verified_commit(
 
     write_bridge_file(slug, next_version, body_to_write, root)
     try:
-        _run_git(["add", "--", *expected_paths], cwd=root, check=True)
+        _run_git(["add", "-f", "--", *expected_paths], cwd=root, check=True)
         staged_after = _staged_paths(root)
         if set(staged_after) != set(expected_paths):
             missing = sorted(set(expected_paths) - set(staged_after))

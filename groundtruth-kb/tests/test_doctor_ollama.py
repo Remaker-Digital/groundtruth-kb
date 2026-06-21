@@ -33,7 +33,7 @@ from pathlib import Path
 
 import pytest
 
-from groundtruth_kb.project.doctor import _check_ollama_harness
+from groundtruth_kb.project.doctor import _check_harness_metadata_freshness, _check_ollama_harness
 
 
 @pytest.fixture(autouse=True)
@@ -113,6 +113,48 @@ def _write_clean_ollama_fixtures(root: Path) -> None:
         'default_model = "qwen-coder-14b"\n',
         encoding="utf-8",
     )
+
+
+def _write_cloud_routed_api_harness_fixture(root: Path) -> None:
+    """Create the WI-4700 cloud-backed Ollama API-harness freshness fixture."""
+    (root / ".api-harness").mkdir(parents=True, exist_ok=True)
+    (root / ".api-harness" / "routing.toml").write_text(
+        "schema_version = 1\n"
+        "\n"
+        "[models.kimi-k2-7-code-cloud]\n"
+        'model_id = "kimi-k2.7-code:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write"]\n'
+        "\n"
+        "[routing.ollama]\n"
+        'default_model = "kimi-k2-7-code-cloud"\n',
+        encoding="utf-8",
+    )
+    (root / "config" / "dispatcher").mkdir(parents=True, exist_ok=True)
+    (root / "config" / "dispatcher" / "rules.toml").write_text(
+        "schema_version = 1\n"
+        "\n"
+        "[harnesses.D]\n"
+        'description = "Ollama-shim: cloud-routed LO dispatch target '
+        '(current route: kimi-k2-7-code-cloud via cloud API)."\n'
+        "dispatch_cost = 20\n",
+        encoding="utf-8",
+    )
+    (root / "harness-state").mkdir(parents=True, exist_ok=True)
+    (root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": [{"id": "D", "harness_name": "ollama"}]}),
+        encoding="utf-8",
+    )
+    stale = "### ollama\n\n**Definition:** Locally hosts open-weight models via http://localhost:11434.\n"
+    for rel_path in (
+        ".claude/rules/canonical-terminology.md",
+        ".claude/rules/operating-model.md",
+        "groundtruth-kb/docs/reference/canonical-terminology-detail.md",
+    ):
+        path = root / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(stale, encoding="utf-8")
 
 
 def test_clean_4_store_returns_pass(tmp_path: Path) -> None:
@@ -253,6 +295,15 @@ def test_pass_message_mentions_all_four_layers(tmp_path: Path) -> None:
     assert result.status == "pass"
     assert "L1" in result.message and "L2" in result.message
     assert "L3" in result.message and "L4" in result.message
+
+
+def test_cloud_routed_ollama_with_stale_local_narrative_fails(tmp_path: Path) -> None:
+    """WI-4700: cloud-backed Ollama route must not retain localhost/local text."""
+    _write_cloud_routed_api_harness_fixture(tmp_path)
+    result = _check_harness_metadata_freshness(tmp_path)
+    assert result.status == "fail"
+    assert "local/localhost" in result.message
+    assert "kimi-k2.7-code:cloud" in result.message
 
 
 # ── Layer 4b — advertised-model verification (hermetic, GO@-006 Constraint 4) ─
