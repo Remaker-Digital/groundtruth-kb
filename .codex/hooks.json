@@ -13,7 +13,7 @@
             "type": "command",
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
-            "timeout": 60
+            "timeout": 180
           },
           {
             "type": "command",
@@ -37,7 +37,7 @@
             "type": "command",
             "command": "python E:\\GT-KB\\.codex\\gtkb-hooks\\session_wrapup_trigger_dispatch.py",
             "statusMessage": "Checking session lifecycle command",
-            "timeout": 15
+            "timeout": 60
           },
           {
             "type": "command",

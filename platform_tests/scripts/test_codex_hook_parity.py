@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
@@ -11,6 +12,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_codex_hook_parity.py"
 CODEX_SESSION_START_DISPATCHER = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
+CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
+SESSION_START_DISPATCH_CORE = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
 
 
 def _load_module():
@@ -31,6 +34,35 @@ def _load_session_start_dispatcher():
     return module
 
 
+def _load_codex_hooks() -> dict:
+    return json.loads(CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
+
+
+def _hooks_for_event(codex_hooks: dict, event_name: str) -> list[dict]:
+    return [hook for group in codex_hooks["hooks"][event_name] for hook in group["hooks"]]
+
+
+def _hook_with_command_fragment(codex_hooks: dict, event_name: str, command_fragment: str) -> dict:
+    matches = [
+        hook for hook in _hooks_for_event(codex_hooks, event_name) if command_fragment in hook.get("command", "")
+    ]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def _float_constant_from_python_module(path: Path, constant_name: str) -> float:
+    module = ast.parse(path.read_text(encoding="utf-8"))
+    for statement in module.body:
+        if not isinstance(statement, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == constant_name for target in statement.targets):
+            continue
+        value = ast.literal_eval(statement.value)
+        assert isinstance(value, (int, float))
+        return float(value)
+    raise AssertionError(f"Missing constant {constant_name} in {path}")
+
+
 def test_codex_hook_parity_passes_for_repository_configuration(capsys) -> None:
     module = _load_module()
 
@@ -41,13 +73,39 @@ def test_codex_hook_parity_passes_for_repository_configuration(capsys) -> None:
     assert "Windows shell-portable command forms" in output
 
 
+def test_codex_sessionstart_hook_timeout_exceeds_inner_startup_service_timeout() -> None:
+    codex_hooks = _load_codex_hooks()
+    session_start_hook = _hook_with_command_fragment(
+        codex_hooks,
+        "SessionStart",
+        "session_start_dispatch.py",
+    )
+    inner_timeout = _float_constant_from_python_module(
+        SESSION_START_DISPATCH_CORE,
+        "STARTUP_SERVICE_TIMEOUT_SECONDS",
+    )
+
+    assert session_start_hook["timeout"] > inner_timeout
+
+
+def test_codex_userpromptsubmit_wrapup_hook_has_headroom_timeout() -> None:
+    codex_hooks = _load_codex_hooks()
+    wrapup_hook = _hook_with_command_fragment(
+        codex_hooks,
+        "UserPromptSubmit",
+        "session_wrapup_trigger_dispatch.py",
+    )
+
+    assert wrapup_hook["timeout"] >= 60
+
+
 def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     module = _load_module()
 
     errors = module.check_project(REPO_ROOT)
 
     assert not errors
-    codex_hooks = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+    codex_hooks = _load_codex_hooks()
     claude_settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     assert any(
         "gtkb-hooks" in hook["command"] and "session_start_dispatch.py" in hook["command"]
@@ -59,12 +117,9 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["SessionStart"]
         for hook in group["hooks"]
     )
-    assert all(
-        hook.get("timeout", 0) >= 60
-        for group in codex_hooks["hooks"]["SessionStart"]
-        for hook in group["hooks"]
-        if "session_start_dispatch.py" in hook.get("command", "")
-    )
+    session_start_hook = _hook_with_command_fragment(codex_hooks, "SessionStart", "session_start_dispatch.py")
+    inner_timeout = _float_constant_from_python_module(SESSION_START_DISPATCH_CORE, "STARTUP_SERVICE_TIMEOUT_SECONDS")
+    assert session_start_hook["timeout"] > inner_timeout
     assert any(
         "gtkb-hooks" in hook["command"] and "session_wrapup_trigger_dispatch.py" in hook["command"]
         for group in codex_hooks["hooks"]["UserPromptSubmit"]
@@ -235,7 +290,8 @@ def test_codex_session_start_dispatcher_bridge_auto_dispatch_mode(monkeypatch, c
     assert "Programmatic Startup Payload" not in ctx
     assert "discarded owner session-start stimulus" in ctx
     assert "active bridge auto-dispatch task" in ctx
-    assert "bridge/INDEX.md" in ctx
+    assert "TAFE/dispatcher bridge state" in ctx
+    assert "status-bearing numbered bridge files" in ctx
 
 
 def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None:
@@ -295,7 +351,9 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert "GTKB_STARTUP_REQUESTED_AT" in core_text
     assert "subprocess.run" in core_text
     assert "STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0" in core_text
-    assert "timeout=STARTUP_SERVICE_TIMEOUT_SECONDS" in core_text
+    assert "STARTUP_SERVICE_TIMEOUT_ENV" in core_text
+    assert "_startup_service_timeout_seconds" in core_text
+    assert "timeout=_startup_service_timeout_seconds()" in core_text
     assert "Startup First-Response Directive" not in core_text
     assert "_live_bridge_index_context" not in core_text
     assert "Mandatory Direct Live Bridge Index Read" not in core_text

@@ -1533,18 +1533,14 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
     harness_id_ok = meta.get("harness_id") in (None, harness_id)
     role_ok = role_mode is None or meta.get("role_mode") == role_mode
     disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
-    consistent_except_freshness = (
-        harness_ok
-        and harness_id_ok
-        and role_ok
-        and disclosure_ok
-        and meta.get("sha256") == actual_sha
-        and meta.get("byte_length") == len(actual_bytes)
-    )
+    relay_identity_ok = harness_ok and harness_id_ok and role_ok and disclosure_ok
+    content_matches_meta = meta.get("sha256") == actual_sha and meta.get("byte_length") == len(actual_bytes)
+    consistent_except_freshness = relay_identity_ok and content_matches_meta
     freshness_ok = _startup_relay_cache_fresh(meta, root)
     headless_dispatch = bool(os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"))
+    recoverable_content_drift = relay_identity_ok and not content_matches_meta
 
-    if consistent_except_freshness and not freshness_ok and not headless_dispatch:
+    if relay_identity_ok and (not freshness_ok or recoverable_content_drift) and not headless_dispatch:
         try:
             try:
                 from scripts import session_start_dispatch_core as _core
@@ -1562,6 +1558,15 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
                     meta = json.loads(meta_path.read_text(encoding="utf-8"))
                     actual_bytes = body.encode("utf-8")
                     actual_sha = hashlib.sha256(actual_bytes).hexdigest()
+                    harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
+                    harness_id_ok = meta.get("harness_id") in (None, harness_id)
+                    role_ok = role_mode is None or meta.get("role_mode") == role_mode
+                    disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
+                    relay_identity_ok = harness_ok and harness_id_ok and role_ok and disclosure_ok
+                    content_matches_meta = meta.get("sha256") == actual_sha and meta.get("byte_length") == len(
+                        actual_bytes
+                    )
+                    consistent_except_freshness = relay_identity_ok and content_matches_meta
                     freshness_ok = _startup_relay_cache_fresh(meta, root)
         except Exception:
             pass
