@@ -652,15 +652,43 @@ def _is_lo_failover_exhausted(
     skipped specifically for a launch-failure / provider-backoff reason. A
     not-ready/config skip with no failure evidence stays ``no_ready_target_for_role``.
     """
-    return (
-        failure_reason == "no_ready_target_for_role"
-        and recipient == "loyal-opposition"
-        and bool(fallback_skipped_candidates)
-        and any(
-            isinstance(skipped, dict) and skipped.get("reason") in _LO_FAILOVER_EXHAUSTION_SKIP_REASONS
-            for skipped in fallback_skipped_candidates
-        )
-    )
+    if failure_reason != "no_ready_target_for_role" or recipient != "loyal-opposition":
+        return False
+    if not fallback_skipped_candidates:
+        return False
+    return any(_skipped_candidate_is_lo_failover_terminal(skipped) for skipped in fallback_skipped_candidates)
+
+
+def _skipped_candidate_is_lo_failover_terminal(skipped: dict[str, Any]) -> bool:
+    reason = skipped.get("reason")
+    if reason == "previous_launch_failed":
+        return True
+    if reason != "provider_failure_backoff_active":
+        return False
+    # Retry delay is a temporary hold, not failover exhaustion. The terminal
+    # WI-4662 state is reserved for non-retryable previous-launch failures.
+    return skipped.get("backoff_source") == "non_retryable_worker_failure"
+
+
+def _lo_provider_backoff_hold_reason(
+    failure_reason: str | None,
+    recipient: str,
+    fallback_skipped_candidates: list[dict[str, Any]] | None,
+) -> str | None:
+    if failure_reason != "no_ready_target_for_role" or recipient != "loyal-opposition":
+        return None
+    if not fallback_skipped_candidates:
+        return None
+    backoff_sources = {
+        skipped.get("backoff_source")
+        for skipped in fallback_skipped_candidates
+        if isinstance(skipped, dict) and skipped.get("reason") == "provider_failure_backoff_active"
+    }
+    if "retry_delay_enforced" in backoff_sources:
+        return "retry_delay_enforced"
+    if "circuit_breaker_active" in backoff_sources:
+        return "circuit_breaker_active"
+    return None
 
 
 def _circuit_breaker_half_open_allowed(recipient_state: dict[str, Any], retry_delay_seconds: int) -> bool:
@@ -3774,6 +3802,10 @@ def run_trigger(
             lo_failover_exhausted = _is_lo_failover_exhausted(failure_reason, recipient, fallback_skipped_candidates)
             if lo_failover_exhausted:
                 reason = "lo_failover_exhausted"
+            else:
+                reason = (
+                    _lo_provider_backoff_hold_reason(failure_reason, recipient, fallback_skipped_candidates) or reason
+                )
             recipient_state["last_result"] = reason
             recipient_state["updated_at"] = _now_iso()
             result: dict[str, Any] = {"launched": False, "reason": reason}

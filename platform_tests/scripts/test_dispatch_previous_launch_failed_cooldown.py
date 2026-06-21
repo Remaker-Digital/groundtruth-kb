@@ -167,10 +167,13 @@ def test_recovery_clears_previous_launch_failed_stamp(tmp_path: Path) -> None:
 
 def test_lo_failover_exhausted_true_for_lo_with_failure_skip() -> None:
     trigger = _load_trigger()
-    for reason in ("provider_failure_backoff_active", "previous_launch_failed"):
-        skipped = [{"reason": reason, "recipient": "loyal-opposition:D"}]
-        assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", skipped) is True, (
-            reason
+    for skipped in (
+        {"reason": "provider_failure_backoff_active", "backoff_source": "non_retryable_worker_failure"},
+        {"reason": "previous_launch_failed"},
+    ):
+        skipped["recipient"] = "loyal-opposition:D"
+        assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", [skipped]) is True, (
+            skipped
         )
 
 
@@ -184,9 +187,20 @@ def test_lo_failover_exhausted_false_for_non_failure_or_non_lo() -> None:
     # Exhaustion with only a not-ready (non-failure) skip stays no_ready_target_for_role.
     not_ready = [{"reason": "codex_dispatch_not_ready"}]
     assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", not_ready) is False
+    retry_delay = [{"reason": "provider_failure_backoff_active", "backoff_source": "retry_delay_enforced"}]
+    assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", retry_delay) is False
     # No skipped candidates at all.
     assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", []) is False
     assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", None) is False
+
+
+def test_lo_provider_backoff_hold_reason_preserves_retry_delay() -> None:
+    trigger = _load_trigger()
+    skipped = [{"reason": "provider_failure_backoff_active", "backoff_source": "retry_delay_enforced"}]
+    assert (
+        trigger._lo_provider_backoff_hold_reason("no_ready_target_for_role", "loyal-opposition", skipped)
+        == "retry_delay_enforced"
+    )
 
 
 # --- end-to-end run_trigger integration ---------------------------------------
