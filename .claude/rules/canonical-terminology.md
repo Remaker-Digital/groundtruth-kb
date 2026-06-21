@@ -560,6 +560,30 @@ fallback, or lifecycle semantics.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-reader-entrypoint).*
 
+### SoT read discipline
+
+**Definition:** The PreToolUse enforcement layer that blocks reads against registered forbidden-substitute paths with canonical-path guidance, so state claims derive from fresh canonical reads; operationalizes `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2 (read-discipline clauses). Harness-specific two-surface contract: Claude `Read`/`Grep`/`Glob` and Codex `Bash` command verbs.
+
+**Canonical alias:** SoT-read discipline.
+
+**Not to be confused with:** the SoT artifact registry (the data; this is the read-time enforcement) or `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` (the governance principle this enforces).
+
+**Source:** `DCL-SOT-READ-HOOK-CONTRACT-001` v1; `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` v2; narrative authority `.claude/rules/sot-read-discipline.md`; `DELIB-20260673` (parallel-session fragmentation motivation).
+
+**Implementation pointer:** `.claude/hooks/sot-read-discipline.py` (Claude surface) + `.codex/gtkb-hooks/sot-read-discipline-bash-adapter.py` (Codex surface); doctor `_check_sot_read_discipline`; owner-authorized bypass `GTKB_SOT_READ_DISCIPLINE_BYPASS`.
+
+### forbidden substitute
+
+**Definition:** A non-canonical alias path for a source-of-truth artifact that the SoT read discipline blocks reads against, redirecting consumers to the canonical reader/path. Registered in the `forbidden_substitutes` column of the `sot_artifacts` registry.
+
+**Canonical alias:** forbidden-substitute path.
+
+**Not to be confused with:** an archived/historical copy (which may be read for audit via the owner-authorized bypass); a deprecated alias that is not yet registered.
+
+**Source:** `DCL-SOT-REGISTRY-RECORD-SCHEMA-001` v2 (`forbidden_substitutes` metadata); `DCL-SOT-READ-HOOK-CONTRACT-001` v1; `DELIB-20260673`.
+
+**Implementation pointer:** `config/registry/sot-artifacts.toml` (`forbidden_substitutes` entries); enforced by `.claude/hooks/sot-read-discipline.py`.
+
 ### handoff prompt
 
 **Definition:** The deterministic-service OUTPUT generated at session close
