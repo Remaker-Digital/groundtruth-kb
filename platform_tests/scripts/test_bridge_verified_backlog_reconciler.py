@@ -330,10 +330,8 @@ def test_build_work_item_bridge_index_parses_metadata_line_only(tmp_path: Path) 
     path = tmp_path / "bridge" / "thread-a-002.md"
     path.write_text(path.read_text(encoding="utf-8") + "\nSee WI-0200 for related context.\n", encoding="utf-8")
 
-    bridge_statuses = module.parse_latest_bridge_statuses(
-        (tmp_path / "bridge" / "INDEX.md").read_text(encoding="utf-8")
-    )
-    index = module.build_work_item_bridge_index(tmp_path, bridge_statuses)
+    bridge_statuses = module.collect_latest_bridge_statuses(tmp_path)
+    index = module.build_work_item_bridge_links(tmp_path, bridge_statuses)
 
     assert index == {"WI-0100": ["thread-a"]}
     assert "WI-0200" not in index
@@ -443,9 +441,7 @@ def test_classify_work_item_without_derived_links_is_byte_identical(tmp_path: Pa
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
     _write_parent_evidence(tmp_path, "thread-a", "WI-0014")
-    bridge_statuses = module.parse_latest_bridge_statuses(
-        (tmp_path / "bridge" / "INDEX.md").read_text(encoding="utf-8")
-    )
+    bridge_statuses = module.collect_latest_bridge_statuses(tmp_path)
     item = {
         "id": "WI-0014",
         "title": "WI-0014 title",
@@ -473,3 +469,193 @@ def test_claude_and_codex_hooks_register_reconciler_command() -> None:
     assert "bridge_verified_backlog_reconciler.py" in codex_text
     assert "--apply --quiet" in claude_text
     assert "--apply --quiet" in codex_text
+
+
+# --- WI-4704: umbrella auto-closure + parent-evidence relaxation -------------
+
+
+def test_bridge_thread_files_excludes_child_and_prefix_sibling_files(tmp_path: Path) -> None:
+    """WI-4704 GO Condition 1: parent enumeration matches only ``<slug>-NNN.md``."""
+
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    (bridge_dir / "thread-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "thread-002.md").write_text("VERIFIED\n", encoding="utf-8")
+    (bridge_dir / "thread-child-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "thread-extra-suffix.md").write_text("NEW\n", encoding="utf-8")
+
+    files = module._bridge_thread_files(tmp_path, "thread")
+
+    assert sorted(p.name for p in files) == ["thread-001.md", "thread-002.md"]
+
+
+def test_umbrella_parent_go_resolves_when_all_children_verified_and_declare_wi(tmp_path: Path) -> None:
+    """WI-4704 Class 1 positive: GO umbrella with all children VERIFIED + declaring child."""
+
+    module = _load_module()
+    _write_index(
+        tmp_path,
+        {"umbrella": "GO", "umbrella-slice-1": "VERIFIED", "umbrella-slice-2": "VERIFIED"},
+    )
+    _write_work_item_metadata(tmp_path, "umbrella-slice-1", "WI-0101")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0101", ["umbrella"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0101")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert summary["resolved_ids"] == ["WI-0101"]
+        candidate = summary["candidates"][0]
+        assert candidate["reason"] == "umbrella_children_all_verified"
+        # The umbrella parent's own status is NOT rewritten to VERIFIED.
+        assert candidate["bridge_statuses"]["umbrella"] == "GO"
+    finally:
+        db.close()
+
+
+def test_umbrella_not_resolved_when_a_child_is_not_verified(tmp_path: Path) -> None:
+    """WI-4704 Class 1 negative: a non-VERIFIED child blocks umbrella closure."""
+
+    module = _load_module()
+    _write_index(
+        tmp_path,
+        {"umbrella": "GO", "umbrella-slice-1": "VERIFIED", "umbrella-slice-2": "GO"},
+    )
+    _write_work_item_metadata(tmp_path, "umbrella-slice-1", "WI-0102")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0102", ["umbrella"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0102")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "linked_bridge_not_verified"
+    finally:
+        db.close()
+
+
+def test_umbrella_not_resolved_when_no_child_declares_work_item(tmp_path: Path) -> None:
+    """WI-4704 Class 1 negative: all-VERIFIED children that never declare the WI do not satisfy."""
+
+    module = _load_module()
+    _write_index(
+        tmp_path,
+        {"umbrella": "GO", "umbrella-slice-1": "VERIFIED", "umbrella-slice-2": "VERIFIED"},
+    )
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0103", ["umbrella"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0103")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "linked_bridge_not_verified"
+    finally:
+        db.close()
+
+
+def test_parent_evidence_relaxation_resolves_when_one_verified_link_declares_wi(tmp_path: Path) -> None:
+    """WI-4704 Class 2 positive: a canonical declaration on one VERIFIED link resolves."""
+
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED", "thread-b": "VERIFIED"})
+    _write_work_item_metadata(tmp_path, "thread-a", "WI-0104")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0104", ["thread-a", "thread-b"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0104")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert summary["resolved_ids"] == ["WI-0104"]
+        assert summary["candidates"][0]["reason"] == "parent_evidence_canonical_relaxed"
+    finally:
+        db.close()
+
+
+def test_parent_evidence_relaxation_rejects_prose_only_declaration(tmp_path: Path) -> None:
+    """WI-4704 Class 2 negative: a prose WI mention never satisfies the canonical floor."""
+
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED", "thread-b": "VERIFIED"})
+    path_a = tmp_path / "bridge" / "thread-a-002.md"
+    path_a.write_text(
+        path_a.read_text(encoding="utf-8") + "\nThis thread supports WI-0105 broadly.\n",
+        encoding="utf-8",
+    )
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0105", ["thread-a", "thread-b"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0105")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "missing_parent_evidence"
+    finally:
+        db.close()
+
+
+def test_reverse_link_construction_scans_bridge_dir_once_at_scale(tmp_path: Path, monkeypatch) -> None:
+    """WI-4704 F1 scale guard: reverse-link construction must not glob the bridge dir per slug.
+
+    Per-slug ``glob`` made the live dry-run O(slugs x dir) and time out at ~1099
+    bridge docs. The one-pass file index scans the bridge directory a bounded
+    number of times regardless of slug count; this test fails on the old shape.
+    """
+
+    module = _load_module()
+    statuses = {f"thread-{i:03d}": "VERIFIED" for i in range(25)}
+    _write_index(tmp_path, statuses)
+    for i in range(25):
+        _write_work_item_metadata(tmp_path, f"thread-{i:03d}", f"WI-95{i:02d}")
+    bridge_statuses = module.collect_latest_bridge_statuses(tmp_path)
+
+    bridge_dir = tmp_path / "bridge"
+    real_glob = Path.glob
+    scan_count = {"n": 0}
+
+    def counting_glob(self, pattern):  # type: ignore[no-untyped-def]
+        if self == bridge_dir:
+            scan_count["n"] += 1
+        return real_glob(self, pattern)
+
+    monkeypatch.setattr(Path, "glob", counting_glob)
+    derived = module.build_work_item_bridge_links(tmp_path, bridge_statuses)
+
+    assert scan_count["n"] <= 2, f"bridge dir scanned {scan_count['n']}x; expected one-pass (<=2), not per-slug"
+    assert len(derived) == 25

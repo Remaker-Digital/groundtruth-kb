@@ -201,6 +201,8 @@ DISPATCH_AUTH_ENV_KEYS: tuple[str, ...] = (
 )
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
+    ("Invalid authentication credentials", "auth_failure"),
+    ("API Error: 401", "auth_failure"),
     ("Ollama chat request failed", "provider_failure"),
     ("Ollama model inventory request failed", "provider_failure"),
     ("OpenRouter completions request failed", "provider_failure"),
@@ -211,6 +213,16 @@ FATAL_WORKER_OUTPUT_MARKERS = (
     ("individuals tier", "harness_unavailable_tier"),
     ("guard denied Write", "guard_denied_write"),
     ("guard denied", "guard_denial"),
+)
+FAST_TRIP_FAILURE_CLASSES = frozenset(
+    {
+        "auth_failure",
+        "max_turn_exhaustion",
+        "provider_failure",
+        "provider_configuration_failure",
+        "guard_denied_write",
+        "guard_denial",
+    }
 )
 NON_RETRYABLE_WORKER_FAILURE_CLASSES = frozenset({"harness_unavailable_tier"})
 NON_LAUNCHED_FAILURE_REASONS = frozenset(
@@ -3222,7 +3234,8 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             recipient_state["failure_count"] = failure_count
             if failure_reason in NON_RETRYABLE_WORKER_FAILURE_CLASSES:
                 recipient_state["non_retryable_failure"] = True
-            if failure_count >= max_retries:
+            effective_trip_threshold = 1 if failure_reason in FAST_TRIP_FAILURE_CLASSES else max_retries
+            if failure_count >= effective_trip_threshold:
                 recipient_state["circuit_breaker_tripped"] = True
                 recipient_state["circuit_breaker_tripped_at"] = _now_iso()
             reason = failure_reason or "subprocess_execution_failed"
