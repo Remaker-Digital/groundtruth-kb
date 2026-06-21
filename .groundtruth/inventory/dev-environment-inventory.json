@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-21T02:28:38Z",
+  "generated_at": "2026-06-21T22:51:45Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -70,7 +70,7 @@
       "A": {
         "harness_type": "codex",
         "role": [
-          "loyal-opposition"
+          "prime-builder"
         ],
         "status": "verified"
       },
@@ -134,7 +134,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 3,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -415,7 +415,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "prime-builder",
@@ -569,7 +569,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "A",
         "matrix_role": "loyal-opposition",
@@ -662,11 +662,11 @@
   },
   "toolchain": {
     "gh": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "gh --version",
       "evidence": "gh --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "2.83.2"
     },
     "git": {
       "classification": "verified",
@@ -683,11 +683,11 @@
       "version": "24.11.1"
     },
     "npm": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "npm --version",
       "evidence": "npm --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "11.6.2"
     },
     "pip": {
       "classification": "unknown",
@@ -704,11 +704,11 @@
       "version": "unknown"
     },
     "pytest": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -718,11 +718,11 @@
       "version": "3.14.0"
     },
     "ruff": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "0.15.5"
     }
   },
   "verification": {

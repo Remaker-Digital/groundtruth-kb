@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-21T22:18:18Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-21T22:18:18Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-21T22-18-18Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .codex/hooks.json\n M config/dispatcher/rules.toml\n M harness-state/harness-registry.json\n M memory/MEMORY.md\n M memory/pending-owner-decisions.md\n M platform_tests/scripts/test_claude_session_start_dispatcher.py\n M platform_tests/scripts/test_codex_hook_parity.py\n?? bridge/gtkb-codex-sessionstart-userpromptsubmit-hook-failures-003.md\n?? bridge/gtkb-explicit-hint-layer-specification-003.md\n?? bridge/gtkb-flaky-claude-sessionstart-dispatcher-tests-003.md\n?? bridge/gtkb-wi4723-verified-finalize-index-lock-retry-001.md\n?? harness-state/claude/session-envelope-archive/2026-06-21T22-14-57Z-session-envelope.json\n?? harness-state/claude/session-envelope.json",
+        "short_line_count": 13,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

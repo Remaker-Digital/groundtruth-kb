@@ -6,7 +6,20 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
+- id: DECISION-1332
+  asked_at: 2026-06-21T22:20:00.416334Z
+  question: "Want me to resume the periodic watch, or leave it parked until you've run Codex?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 1894e5206f469d9f
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1336
+  asked_at: 2026-06-21T22:45:06.417172Z
+  question: "Want me to file it as a consideration backlog item, or leave it?"
+  detected_via: prose:offering_or_choice
+  status: pending
+  question_hash: 94e1b47914cb0a9b
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## Resolved
 
@@ -7839,6 +7852,86 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   question_hash: 8ab33d2b2dc7c2d7
   resolved_at: 2026-06-21T15:25:29.938177Z
   answer: "Your questions have been answered: \"WI-4570 (P2): 'invert LO reviewer precedence so capable harnesses are preferred.' Investigation found the literal precedence-invert is a no-op (precedence is only a tiebreaker); the real lever is cost-vs-quality ordering, and flipping it REVERSES your owner-prioritized cost-first routing (WI-4484 / DELIB-20260612). Separately, WI-4698 (already filed) adds a min_quality FLOOR that filters out the incapable LOs (q62/q72) WITHOUT touching cost policy. How should WI-4570 be handled?\"=\"Addressed by WI-4698 floor; resolve\", \"WI-3454 (P2): the Requirement-Sufficiency parser lets unrecognized openers escape pre-GO review and fail only at impl-start. Two fixes exist: Path A loosens the parser (relaxes the Requirement-Sufficiency contract = a requirement change needing a spec update); Path B de-duplicates BOTH gates onto the single canonical classifier (closes the escape, no contract change). The validated draft uses Path B. Which path do you want?\"=\"Path B — de-dup, no contract change\", \"Two WIs are already-VERIFIED duplicates with NO remaining work — authoring proposals would re-propose terminal work: WI-4571 (= WI-4623; all 37 hooks already use $CLAUDE_PROJECT_DIR, regression test committed, VERIFIED 2026-06-18) and WI-3492 (= WI-3318; the `gt bridge propose` CLI exists with 18 passing tests, VERIFIED 2026-05-27). How should I dispose of them?\"=\"Resolve both as duplicates\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1329
+  asked_at: 2026-06-21T20:30:20.959960Z
+  question: "`::open deliberation` isn't a registered GT-KB keyword. What do you want this session to do with it?"
+  options:
+    - "Start a new deliberation"
+    - "Search prior deliberations"
+    - "Show open/pending decisions"
+    - "Register it as a keyword"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 84886daa8d27d4c5
+  resolved_at: 2026-06-21T20:30:20.959960Z
+  answer: "Your questions have been answered: \"`::open deliberation` isn't a registered GT-KB keyword. What do you want this session to do with it?\"=\"Start a new deliberation\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1330
+  asked_at: 2026-06-21T21:39:14.578073Z
+  question: "Approve inserting the Deliberation Archive record DELIB-20260621-EXPLICIT-HINT-CONTEXT-LOAD-REFRAME exactly as drafted above?"
+  options:
+    - "Approve as drafted"
+    - "Approve with edits"
+    - "Hold — keep deliberating"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f9a7205b2d825c7
+  resolved_at: 2026-06-21T21:39:14.578073Z
+  answer: "Your questions have been answered: \"Approve inserting the Deliberation Archive record DELIB-20260621-EXPLICIT-HINT-CONTEXT-LOAD-REFRAME exactly as drafted above?\"=\"Approve as drafted\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1331
+  asked_at: 2026-06-21T21:39:14.578073Z
+  question: "The capture phase of this deliberation is complete (DELIB + WI-4684 rescope + -001 withdrawal). What's the next move?"
+  options:
+    - "Reconcile sibling WIs"
+    - "Draft the ADR + DCL"
+    - "Keep deliberating"
+    - "Conclude + wrap"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 31bba5b586f4c5da
+  resolved_at: 2026-06-21T21:39:14.578073Z
+  answer: "Your questions have been answered: \"The capture phase of this deliberation is complete (DELIB + WI-4684 rescope + -001 withdrawal). What's the next move?\"=\"Reconcile sibling WIs\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1333
+  asked_at: 2026-06-21T22:27:31.475301Z
+  question: "I've drafted ADR-ACTIVITY-ENVELOPE-DISPOSITION-001 + DCL-ACTIVITY-DISPOSITION-PROFILE-001 above. File them as a governance_review bridge proposal to Codex for GO (artifacts insert later via your per-artifact packet approval), or adjust the framing first?"
+  options:
+    - "File as drafted to Codex"
+    - "Adjust framing first"
+    - "Hold - don't file yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 483b07807c0bdf01
+  resolved_at: 2026-06-21T22:27:31.475301Z
+  answer: "Your questions have been answered: \"I've drafted ADR-ACTIVITY-ENVELOPE-DISPOSITION-001 + DCL-ACTIVITY-DISPOSITION-PROFILE-001 above. File them as a governance_review bridge proposal to Codex for GO (artifacts insert later via your per-artifact packet approval), or adjust the framing first?\"=\"File as drafted to Codex\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1334
+  asked_at: 2026-06-21T22:44:47.857785Z
+  question: "WI-4723 is filed, authorized, and preflight-clean, but it's blocked on Codex (LO) review, which has gone idle without reaching my thread (~2h, still NEW; the auto-dispatcher reports FAIL). My side is fully ready. How do you want me to handle the wait?"
+  options:
+    - "Park it until you run Codex"
+    - "Resume periodic watch"
+    - "Try to unblock from here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 44d276d2c964f9f6
+  resolved_at: 2026-06-21T22:44:47.857785Z
+  answer: "Your questions have been answered: \"WI-4723 is filed, authorized, and preflight-clean, but it's blocked on Codex (LO) review, which has gone idle without reaching my thread (~2h, still NEW; the auto-dispatcher reports FAIL). My side is fully ready. How do you want me to handle the wait?\"=\"Resume periodic watch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1335
+  asked_at: 2026-06-21T22:45:06.417172Z
+  question: "Your commit+push is blocked by the git-level inventory-drift gate. The credential scan passed; the only blocker is a 6-week-stale inventory baseline drifting on harness-state fields (harnesses / role_by_harness_compatibility) — unrelated to my MEMORY.md change. The canonical deliverables are already persisted in MemBase (groundtruth.db); only the MEMORY.md notepad entry is committable. How should I land it?"
+  options:
+    - "Commit with --no-verify + push"
+    - "Leave MEMORY.md uncommitted"
+    - "Regenerate baseline + commit both"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a7095f3e49752822
+  resolved_at: 2026-06-21T22:45:06.417172Z
+  answer: "Your questions have been answered: \"Your commit+push is blocked by the git-level inventory-drift gate. The credential scan passed; the only blocker is a 6-week-stale inventory baseline drifting on harness-state fields (harnesses / role_by_harness_compatibility) — unrelated to my MEMORY.md change. The canonical deliverables are already persisted in MemBase (groundtruth.db); only the MEMORY.md notepad entry is committable. How should I land it?\"=\"Commit with --no-verify + push\". You can now continue with these answers in mind."
   notes: ""
 
 ## History
