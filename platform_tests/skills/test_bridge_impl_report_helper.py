@@ -291,3 +291,74 @@ def test_files_changed_and_recommended_commit_type_sections_are_present(helper, 
     assert "## Files Changed" in skeleton
     assert "## Recommended Commit Type" in skeleton
     assert "Recommended commit type:" in skeleton
+
+
+# ---------------------------------------------------------------------------
+# WI-4468 acceptance assertions
+# These two tests lock the WI-4522 fix at the impl_report_bridge.file_report
+# boundary, verifying that author metadata provenance is per-harness and
+# fail-closed (GOV-DOCUMENT-AUTHOR-PROVENANCE-001).
+# ---------------------------------------------------------------------------
+
+
+def test_wi4468_codex_env_stamps_loyal_opposition_codex_harness_a(helper, tmp_path, monkeypatch):
+    """WI-4468 acceptance: file_report from Codex env stamps loyal-opposition/codex + harness A.
+
+    Verifies the WI-4522 fix at the impl_report_bridge.file_report boundary.
+    A metadata-less report body stamped from a Codex env envelope must carry
+    the Codex-A identity, not a stale cross-harness Claude/B stamp.
+    """
+    import sys
+
+    bridge_dir = _stage_thread(tmp_path)
+
+    # Remove identity/harness_id env overrides so the durable resolver's
+    # canonical form ("role/harness_name") is not masked by env values.
+    # The four per-session runtime fields (session, model, etc.) remain from
+    # the autouse author_metadata_env fixture so validate_author_metadata passes.
+    monkeypatch.delenv("GTKB_AUTHOR_IDENTITY", raising=False)
+    monkeypatch.delenv("GTKB_AUTHOR_HARNESS_ID", raising=False)
+
+    # Patch the durable resolver to return canonical Codex LO identity.
+    # In tests tmp_path has no harness-state/, so load_harness_identities /
+    # load_role_assignments return {} — the resolver would otherwise return {}.
+    bam = sys.modules["scripts.bridge_author_metadata"]
+    monkeypatch.setattr(
+        bam,
+        "_resolve_durable_identity_fields",
+        lambda root, *, env=None: {"author_identity": "loyal-opposition/codex", "author_harness_id": "A"},
+    )
+
+    live = helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
+
+    written = live.read_text(encoding="utf-8")
+    assert "author_identity: loyal-opposition/codex" in written
+    assert "author_harness_id: A" in written
+    assert "author_harness_id: B" not in written  # no stale cross-harness stamp
+
+
+def test_wi4468_absent_env_raises_before_writing(helper, tmp_path, monkeypatch):
+    """WI-4468 acceptance: file_report fails closed before writing when env envelope is absent.
+
+    Verifies the WI-4522 fix at the file_report boundary: when no env envelope
+    supplies author metadata and the report body carries none, ensure_author_metadata
+    raises BridgeAuthorMetadataError and the bridge file is never written.
+    """
+    import sys
+
+    bridge_dir = _stage_thread(tmp_path)
+
+    # Clear every env var that could supply author metadata, simulating the
+    # absent-env-envelope case. FIELD_ENV_NAMES is the canonical catalog of
+    # all env aliases the loader consults — using it avoids drift from the
+    # production code's actual lookup table.
+    bam = sys.modules["scripts.bridge_author_metadata"]
+    for field_vars in bam.FIELD_ENV_NAMES.values():
+        for var in field_vars:
+            monkeypatch.delenv(var, raising=False)
+
+    with pytest.raises(bam.BridgeAuthorMetadataError):
+        helper.file_report("test-impl-report", content=_completed_report(), bridge_dir=bridge_dir)
+
+    # Bridge file must not have been written before the error was raised.
+    assert not (bridge_dir / "test-impl-report-003.md").exists()
