@@ -18,6 +18,7 @@ ROLE_LOYAL_OPPOSITION = "loyal-opposition"
 DISPATCH_ROLES = (ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION)
 
 DEFAULT_SELECTION_ORDER = ("availability", "cost", "quality", "reviewer_precedence", "harness_id")
+GOVERNANCE_GRADE_LO_MIN_QUALITY = 80.0
 RUNTIME_FAILURE_RESULTS = {
     "all_slugs_quarantined",
     "circuit_breaker_active",
@@ -235,6 +236,7 @@ def select_dispatch_candidates(
 ) -> list[dict[str, Any]]:
     """Return active, dispatchable records admitted by ``context``, ranked."""
     candidates: list[dict[str, Any]] = []
+    order = config.selection_order_for(context)
     for raw in records:
         if not isinstance(raw, dict):
             continue
@@ -250,8 +252,9 @@ def select_dispatch_candidates(
             continue
         if config.rules and not config.matching_rules(context):
             continue
+        if not _passes_governance_grade_lo_quality_floor(record, context, order):
+            continue
         candidates.append(record)
-    order = config.selection_order_for(context)
     return sorted(candidates, key=lambda record: _rank_key(record, order))
 
 
@@ -530,6 +533,23 @@ def _rank_key(record: dict[str, Any], order: tuple[str, ...]) -> tuple[Any, ...]
             values.append(str(record.get(name) or ""))
     values.append(str(record.get("id") or ""))
     return tuple(values)
+
+
+def _passes_governance_grade_lo_quality_floor(
+    record: dict[str, Any],
+    context: DispatchContext,
+    order: tuple[str, ...],
+) -> bool:
+    if context.required_role != ROLE_LOYAL_OPPOSITION:
+        return True
+    if not _selection_order_includes_quality(order):
+        return True
+    quality = _float_value(record.get("dispatch_quality"), default=50.0)
+    return quality >= GOVERNANCE_GRADE_LO_MIN_QUALITY
+
+
+def _selection_order_includes_quality(order: tuple[str, ...]) -> bool:
+    return any(name.strip().lower() in {"quality", "dispatch_quality"} for name in order)
 
 
 def _role_only_match(rule: DispatchRule, role: str) -> bool:
