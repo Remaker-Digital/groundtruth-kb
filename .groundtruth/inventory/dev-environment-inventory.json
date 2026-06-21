@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-20T17:17:30Z",
+  "generated_at": "2026-06-21T02:28:38Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -134,7 +134,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 3,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -294,7 +294,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 35,
+      "count": 36,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -302,6 +302,7 @@
         "bridge",
         "bridge-config",
         "bridge-propose",
+        "bridge-reconciliation",
         "check-deliberations",
         "code-review-audit",
         "codex-report",
@@ -661,11 +662,11 @@
   },
   "toolchain": {
     "gh": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "gh --version",
       "evidence": "gh --version",
-      "status": "verified",
-      "version": "2.83.2"
+      "status": "unknown",
+      "version": "unknown"
     },
     "git": {
       "classification": "verified",
@@ -682,11 +683,11 @@
       "version": "24.11.1"
     },
     "npm": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "npm --version",
       "evidence": "npm --version",
-      "status": "verified",
-      "version": "11.6.2"
+      "status": "unknown",
+      "version": "unknown"
     },
     "pip": {
       "classification": "unknown",
@@ -703,11 +704,11 @@
       "version": "unknown"
     },
     "pytest": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
-      "status": "verified",
-      "version": "9.0.3"
+      "status": "unknown",
+      "version": "unknown"
     },
     "python": {
       "classification": "verified",
@@ -717,11 +718,11 @@
       "version": "3.14.0"
     },
     "ruff": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
-      "status": "verified",
-      "version": "0.15.12"
+      "status": "unknown",
+      "version": "unknown"
     }
   },
   "verification": {
