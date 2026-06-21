@@ -187,3 +187,137 @@ def test_lo_failover_exhausted_false_for_non_failure_or_non_lo() -> None:
     # No skipped candidates at all.
     assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", []) is False
     assert trigger._is_lo_failover_exhausted("no_ready_target_for_role", "loyal-opposition", None) is False
+
+
+# --- end-to-end run_trigger integration ---------------------------------------
+
+_CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
+_CLAUDE_INVOCATION_SURFACES = {
+    "headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]}
+}
+
+
+def _make_failover_project(root: Path) -> Path:
+    """Minimal synthetic GT-KB project for sole-active-LO failover test."""
+    (root / "groundtruth.toml").write_text(
+        '[project]\nproject_name = "TestSynthetic"\nprofile = "dual-agent"\n',
+        encoding="utf-8",
+    )
+    (root / "bridge").mkdir(exist_ok=True)
+    hs = root / "harness-state"
+    hs.mkdir(exist_ok=True)
+    (hs / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}),
+        encoding="utf-8",
+    )
+    (hs / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "B": {"role": "prime-builder", "harness_type": "claude"},
+                    "A": {"role": "loyal-opposition", "harness_type": "codex"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (hs / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["loyal-opposition"],
+                        "invocation_surfaces": _CODEX_INVOCATION_SURFACES,
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["prime-builder"],
+                        "invocation_surfaces": _CLAUDE_INVOCATION_SURFACES,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_sole_active_lo_in_backoff_produces_lo_failover_exhausted_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """run_trigger with sole active LO in non_retryable backoff must emit lo_failover_exhausted.
+
+    Regression for WI-4662: the `if target_index < len(targets) - 1` guard prevented
+    _provider_failure_backoff_skip from running on the sole/last target, so the
+    lo_failover_exhausted path was unreachable with a single active LO target.
+    """
+    trigger = _load_trigger()
+    # Bypass conftest autouse fixture that overrides GTKB_HARNESS_REGISTRY_PATH.
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+    # Ensure loop prevention is off.
+    monkeypatch.delenv(trigger.LOOP_PREVENTION_ENV_VAR, raising=False)
+
+    root = tmp_path / "proj"
+    root.mkdir()
+    _make_failover_project(root)
+
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+
+    # Pre-seed a non-retryable failure for the sole LO target (harness A).
+    (state_dir / trigger.DISPATCH_STATE_FILENAME).write_text(
+        json.dumps(
+            {
+                "recipients": {
+                    "loyal-opposition:A": {
+                        "last_launch": {"launched": True, "exit_code": 1, "dispatch_id": "seed-d1"},
+                        "non_retryable_failure": True,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # Write a NEW (LO-actionable) bridge entry so there is actionable work.
+    bridge_file = root / "bridge" / "failover-test-001.md"
+    bridge_file.write_text(
+        "NEW\n\nauthor_session_context_id: fixture-author-session\n",
+        encoding="utf-8",
+    )
+    (root / "bridge" / "INDEX.md").write_text(
+        "# bridge index\n\nDocument: failover-test\nNEW: bridge/failover-test-001.md\n",
+        encoding="utf-8",
+    )
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert not summary.get("skipped"), f"run_trigger skipped unexpectedly: {summary.get('reason')}"
+
+    recipients = summary.get("dispatch_state", {}).get("recipients", {})
+    lo_state = recipients.get("loyal-opposition", {})
+    assert lo_state.get("last_result") == "lo_failover_exhausted", (
+        f"expected lo_failover_exhausted, got {lo_state.get('last_result')!r}"
+    )
+
+    results = summary.get("results", {})
+    lo_result = results.get("loyal-opposition", {})
+    assert lo_result.get("launched") is False
+    assert lo_result.get("reason") == "lo_failover_exhausted"
+
+    # Exactly one lo_failover_exhausted row in the cooldown window.
+    failures_path = state_dir / trigger.DISPATCH_FAILURES_FILENAME
+    rows = _read_failure_rows(failures_path)
+    lo_exhausted = [r for r in rows if r.get("reason") == "lo_failover_exhausted"]
+    assert len(lo_exhausted) == 1, f"expected 1 lo_failover_exhausted row, got {len(lo_exhausted)}: {rows}"

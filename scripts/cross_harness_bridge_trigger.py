@@ -3722,7 +3722,7 @@ def run_trigger(
 
         skipped_candidates: list[dict[str, Any]] = []
         selected_target: DispatchTarget | None = None
-        for target_index, target in enumerate(targets):
+        for _target_index, target in enumerate(targets):
             h_info = harnesses.get(target.harness_id) or {}
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
             if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
@@ -3733,14 +3733,13 @@ def run_trigger(
                 pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
                 continue
             provider_backoff_skip = None
-            if target_index < len(targets) - 1:
-                _target_selected, target_signature = _target_selected_signature(target, items, max_items)
-                provider_backoff_skip = _provider_failure_backoff_skip(
-                    prior=_prior_state_for_target(recipients_state, target),
-                    recipient=target.dispatch_state_key,
-                    signature=target_signature,
-                    state_dir=state_dir,
-                )
+            _target_selected, target_signature = _target_selected_signature(target, items, max_items)
+            provider_backoff_skip = _provider_failure_backoff_skip(
+                prior=_prior_state_for_target(recipients_state, target),
+                recipient=target.dispatch_state_key,
+                signature=target_signature,
+                state_dir=state_dir,
+            )
             if provider_backoff_skip is not None:
                 skip = _dispatch_target_evidence(target)
                 skip.update(
