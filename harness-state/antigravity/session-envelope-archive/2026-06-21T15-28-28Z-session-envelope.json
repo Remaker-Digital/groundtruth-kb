@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-21T15:28:28Z",
+  "envelope_schema_version": 1,
+  "harness_id": "C",
+  "harness_name": "antigravity",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-21T15:28:28Z",
+  "project_id": null,
+  "role": "loyal-opposition",
+  "role_asserted": null,
+  "role_resolved": "loyal-opposition",
+  "session_id": "C-2026-06-21T15-28-28Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/skills/verify/helpers/write_verdict.py\n M .codex/skills/verify/helpers/write_verdict.py\n M memory/pending-owner-decisions.md\n M platform_tests/scripts/test_dispatch_previous_launch_failed_cooldown.py\n M platform_tests/scripts/test_lo_verified_commit_atomicity.py\n M scripts/cross_harness_bridge_trigger.py\n M scripts/generate_codex_skill_adapters.py\n?? GT-KB.pytest_tmpwi4701-regression/\n?? GT-KB.pytest_tmpwi4701-reverify/\n?? GT-KB.pytest_tmpwi4718-reverify2/\n?? bridge/gtkb-antigravity-lo-hallucination-prevention-003.md\n?? bridge/gtkb-auth-gate-requirement-sufficiency-parser-surfaces-001.md\n?? bridge/gtkb-auto-inject-bridge-author-model-metadata-scaffold-001.md\n?? bridge/gtkb-auto-inject-bridge-author-model-metadata-scaffold-002.md\n?? bridge/gtkb-bridge-compliance-gate-regex-bold-variant-001.md\n?? bridge/gtkb-bridge-compliance-gate-regex-bold-variant-002.md\n?? bridge/gtkb-bridge-gate-detectors-magic-content-phrases-001.md\n?? bridge/gtkb-bridge-gate-detectors-magic-content-phrases-002.md\n?? bridge/gtkb-codex-sessionstart-userpromptsubmit-hook-failures-001.md\n?? bridge/gtkb-codex-sessionstart-userpromptsubmit-hook-failures-002.md\n?? bridge/gtkb-codex-skill-path-prefers-repo-local-adapters-001.md\n?? bridge/gtkb-codex-skill-path-prefers-repo-local-adapters-002.md\n?? bridge/gtkb-consolidate-project-root-resolver-definitions-001.md\n?? bridge/gtkb-consolidate-project-root-resolver-definitions-002.md\n?? bridge/gtkb-cross-harness-trigger-cli-single-instance-lock-001.md\n?? bridge/gtkb-cross-harness-trigger-cli-single-instance-lock-002.md\n?? bridge/gtkb-dashboard-sqlite-generation-startup-001.md\n?? bridge/gtkb-dashboard-sqlite-generation-startup-002.md\n?? bridge/gtkb-dispatch-role-state-keys-shared-module-001.md\n?? bridge/gtkb-dispatch-role-state-keys-shared-module-002.md\n?? bridge/gtkb-fix-stale-assertion-regex-non-go-bridge-test-001.md\n?? bridge/gtkb-fix-stale-assertion-regex-non-go-bridge-test-002.md\n?? bridge/gtkb-flaky-claude-sessionstart-dispatcher-tests-001.md\n?? bridge/gtkb-flaky-claude-sessionstart-dispatcher-tests-002.md\n?? bridge/gtkb-gov-requirements-collection-hook-tag-cleanup-001.md\n?? bridge/gtkb-gov-requirements-collection-hook-tag-cleanup-002.md\n?? bridge/gtkb-gt-backlog-add-attribution-resolution-001.md\n?? bridge/gtkb-gt-backlog-add-attribution-resolution-002.md\n?? bridge/gtkb-gt-backlog-add-changed-by-active-harness-001.md\n?? bridge/gtkb-gt-backlog-add-changed-by-active-harness-002.md\n?? bridge/gtkb-gt-bridge-verify-embedded-evidence-cli-001.md\n?? bridge/gtkb-gt-bridge-verify-embedded-evidence-cli-002.md\n?? bridge/gtkb-gtkb-sweep-commit-skill-respects-verified-gate-001.md\n?? bridge/gtkb-gtkb-sweep-commit-skill-respects-verified-gate-002.md\n?? bridge/gtkb-guard-duplicate-same-role-loops-one-project-001.md\n?? bridge/gtkb-guard-duplicate-same-role-loops-one-project-002.md\n?? bridge/gtkb-harness-roles-test-path-canonicalization-001.md\n?? bridge/gtkb-harness-roles-test-path-canonicalization-002.md\n?? bridge/gtkb-hygiene-sweep-agent-red-inherited-config-drift-001.md\n?? bridge/gtkb-hygiene-sweep-agent-red-inherited-config-drift-002.md\n?? bridge/gtkb-impl-auth-target-paths-parser-annotated-headings-001.md\n?? bridge/gtkb-impl-auth-target-paths-parser-annotated-headings-002.md\n?? bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-001.md\n?? bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-002.md\n?? bridge/gtkb-index-pruning-strands-unimplemented-go-threads-001.md\n?? bridge/gtkb-index-pruning-strands-unimplemented-go-threads-002.md\n?? bridge/gtkb-lo-reviewer-pool-governance-grade-routing-001.md\n?? bridge/gtkb-lo-reviewer-pool-governance-grade-routing-002.md\n?? bridge/gtkb-managed-artifact-drift-scaffold-template-refresh-001.md\n?? bridge/gtkb-managed-artifact-drift-scaffold-template-refresh-002.md\n?? bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-001.md\n?? bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-002.md\n?? bridge/gtkb-owner-decision-tracker-auto-resolve-cross-turn-001.md\n?? bridge/gtkb-owner-decision-tracker-auto-resolve-cross-turn-002.md\n?? bridge/gtkb-pb-startup-disclosure-cache-freshness-contract-001.md\n?? bridge/gtkb-pb-startup-disclosure-cache-freshness-contract-002.md\n?? bridge/gtkb-pending-owner-decisions-surface-cache-resurface-001.md\n?? bridge/gtkb-pending-owner-decisions-surface-cache-resurface-002.md\n?? bridge/gtkb-perrole-concurrency-cap-dispatch-004.md\n?? bridge/gtkb-por-step-16-e-exit-verification-017.md\n?? bridge/gtkb-por-step-16-e-exit-verification-018.md\n?? bridge/gtkb-por-step-16-e-exit-verification-019.md\n?? bridge/gtkb-por-step-16-e-exit-verification-020.md\n?? bridge/gtkb-pre-commit-hook-commit-scope-contamination-001.md\n?? bridge/gtkb-pre-commit-hook-commit-scope-contamination-002.md\n?? bridge/gtkb-project-pauth-autocomplete-verified-gate-001.md\n?? bridge/gtkb-project-pauth-autocomplete-verified-gate-002.md\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-001.md\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-002.md\n?? bridge/gtkb-remove-orphaned-bridge-authority-direction-switch-001.md",
+        "short_line_count": 106,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

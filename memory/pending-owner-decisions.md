@@ -7724,6 +7724,122 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-21T05:05:19.764359Z
   answer: "Your questions have been answered: \"WI-4237's own work is complete + correct (49-green earlier), but its verification is blocked by a CONCURRENT session's uncommitted, incomplete generator-CRLF fix in the shared tree (scripts/generate_codex_skill_adapters.py + new tests in test_generate_codex_skill_adapters.py — codex only, antigravity/api untouched, so it's internally inconsistent). It's outside WI-4237's scope. I already discarded the generate_codex half while clearing drift (it's the generator-CRLF defect I'd flagged). How should I resolve this to get WI-4237 verified?\"=\"Revert concurrent drift, verify WI-4237 now\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1320
+  asked_at: 2026-06-21T06:40:15.464892Z
+  question: "The sweep is governance-clean (all pre-commit hooks pass, 167/168 tests pass), but a prior stream modified generate_codex_skill_adapters.py without regenerating its 36 .codex/skills/ output adapters — so committing it as-is flips the codex-adapter parity test from green to red at the new HEAD. How should I handle it?"
+  options:
+    - "Regenerate + commit all"
+    - "Exclude adapter-generator files"
+    - "Commit everything as-is"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a3a540a4e7b17ffe
+  resolved_at: 2026-06-21T06:40:15.464892Z
+  answer: "Your questions have been answered: \"The sweep is governance-clean (all pre-commit hooks pass, 167/168 tests pass), but a prior stream modified generate_codex_skill_adapters.py without regenerating its 36 .codex/skills/ output adapters — so committing it as-is flips the codex-adapter parity test from green to red at the new HEAD. How should I handle it?\"=\"Regenerate + commit all\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1321
+  asked_at: 2026-06-21T08:17:34.455049Z
+  question: "Approve these three narrative pointer-swap edits (WI-4348 Phase-1: operating-role.md A1, prime-builder-role.md A2, acting-prime-builder.md A3) for their narrative-approval packets? They are prose-only — no role-map mutation; role-resolution authority stays in harness-registry.json/harness-identities.json."
+  options:
+    - "Approve all three as written"
+    - "Approve A1 + A3 only"
+    - "Revise the wording"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bb52bba5f29a551b
+  resolved_at: 2026-06-21T08:17:34.455049Z
+  answer: "Your questions have been answered: \"Approve these three narrative pointer-swap edits (WI-4348 Phase-1: operating-role.md A1, prime-builder-role.md A2, acting-prime-builder.md A3) for their narrative-approval packets? They are prose-only — no role-map mutation; role-resolution authority stays in harness-registry.json/harness-identities.json.\"=\"Approve all three as written\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1322
+  asked_at: 2026-06-21T08:17:34.455049Z
+  question: "Slice 8 (REVISED@-005) and WI-4348 Phase-1 (NEW@-003) are queued for Codex VERIFY. What next?"
+  options:
+    - "Let Codex VERIFY the queue first"
+    - "Continue: file WI-4348 Phase-1b now"
+    - "Pause here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ee6d7b693c64f535
+  resolved_at: 2026-06-21T08:17:34.455049Z
+  answer: "Your questions have been answered: \"Slice 8 (REVISED@-005) and WI-4348 Phase-1 (NEW@-003) are queued for Codex VERIFY. What next?\"=\"Let Codex VERIFY the queue first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1323
+  asked_at: 2026-06-21T09:11:45.679619Z
+  question: "The project is 7/12 resolved with 4 VERIFIED-covered drift WIs to reconcile and WI-4681 as the last blocker. How should I close it out?"
+  options:
+    - "Reconcile 4; assess + drive WI-4681"
+    - "Reconcile 4 only; defer WI-4681"
+    - "Hold — report only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: af96aa088e5e21ae
+  resolved_at: 2026-06-21T09:11:45.679619Z
+  answer: "Your questions have been answered: \"The project is 7/12 resolved with 4 VERIFIED-covered drift WIs to reconcile and WI-4681 as the last blocker. How should I close it out?\"=\"Reconcile 4; assess + drive WI-4681\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1324
+  asked_at: 2026-06-21T09:28:58.052982Z
+  question: "WI-4681's implementation is committed (9759c5cd9) + fully passing, verified by reference, but the bridge protocol requires VERIFIED in the same commit as the impl unless waived. Approve a narrow owner waiver so Codex can finalize WI-4681 VERIFIED by reference?"
+  options:
+    - "Approve WI-4681 waiver"
+    - "No waiver; pursue another closure"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 964c8aca27f1ef0d
+  resolved_at: 2026-06-21T09:28:58.052982Z
+  answer: "Your questions have been answered: \"WI-4681's implementation is committed (9759c5cd9) + fully passing, verified by reference, but the bridge protocol requires VERIFIED in the same commit as the impl unless waived. Approve a narrow owner waiver so Codex can finalize WI-4681 VERIFIED by reference?\"=\"Approve WI-4681 waiver\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1325
+  asked_at: 2026-06-21T15:24:19.623283Z
+  question: "Post-crash, your sweep commit (32d7d61c) is safe and the branch advanced 3 commits. The current dirty tree is 126 pytest-tmp garbage paths + interrupted WIP (a 942-line in-flight generator rewrite, WI-4662 test additions) for threads now at NO-GO. How should I proceed?"
+  options:
+    - "Hold — don't touch WIP"
+    - "Safe ignore-gap cleanup"
+    - "Work the dispatch-health NO-GO"
+    - "Full status report only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8fb27553a97b17ec
+  resolved_at: 2026-06-21T15:24:19.623283Z
+  answer: "Your questions have been answered: \"Post-crash, your sweep commit (32d7d61c) is safe and the branch advanced 3 commits. The current dirty tree is 126 pytest-tmp garbage paths + interrupted WIP (a 942-line in-flight generator rewrite, WI-4662 test additions) for threads now at NO-GO. How should I proceed?\"=\"Hold — don't touch WIP\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1326
+  asked_at: 2026-06-21T15:25:29.938177Z
+  question: "WI-4570 (P2): 'invert LO reviewer precedence so capable harnesses are preferred.' Investigation found the literal precedence-invert is a no-op (precedence is only a tiebreaker); the real lever is cost-vs-quality ordering, and flipping it REVERSES your owner-prioritized cost-first routing (WI-4484 / DELIB-20260612). Separately, WI-4698 (already filed) adds a min_quality FLOOR that filters out the incapable LOs (q62/q72) WITHOUT touching cost policy. How should WI-4570 be handled?"
+  options:
+    - "Addressed by WI-4698 floor; resolve"
+    - "File the full quality-first inversion"
+    - "Defer WI-4570"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 016d455a85d046e7
+  resolved_at: 2026-06-21T15:25:29.938177Z
+  answer: "Your questions have been answered: \"WI-4570 (P2): 'invert LO reviewer precedence so capable harnesses are preferred.' Investigation found the literal precedence-invert is a no-op (precedence is only a tiebreaker); the real lever is cost-vs-quality ordering, and flipping it REVERSES your owner-prioritized cost-first routing (WI-4484 / DELIB-20260612). Separately, WI-4698 (already filed) adds a min_quality FLOOR that filters out the incapable LOs (q62/q72) WITHOUT touching cost policy. How should WI-4570 be handled?\"=\"Addressed by WI-4698 floor; resolve\", \"WI-3454 (P2): the Requirement-Sufficiency parser lets unrecognized openers escape pre-GO review and fail only at impl-start. Two fixes exist: Path A loosens the parser (relaxes the Requirement-Sufficiency contract = a requirement change needing a spec update); Path B de-duplicates BOTH gates onto the single canonical classifier (closes the escape, no contract change). The validated draft uses Path B. Which path do you want?\"=\"Path B — de-dup, no contract change\", \"Two WIs are already-VERIFIED duplicates with NO remaining work — authoring proposals would re-propose terminal work: WI-4571 (= WI-4623; all 37 hooks already use $CLAUDE_PROJECT_DIR, regression test committed, VERIFIED 2026-06-18) and WI-3492 (= WI-3318; the `gt bridge propose` CLI exists with 18 passing tests, VERIFIED 2026-05-27). How should I dispose of them?\"=\"Resolve both as duplicates\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1327
+  asked_at: 2026-06-21T15:25:29.938177Z
+  question: "WI-3454 (P2): the Requirement-Sufficiency parser lets unrecognized openers escape pre-GO review and fail only at impl-start. Two fixes exist: Path A loosens the parser (relaxes the Requirement-Sufficiency contract = a requirement change needing a spec update); Path B de-duplicates BOTH gates onto the single canonical classifier (closes the escape, no contract change). The validated draft uses Path B. Which path do you want?"
+  options:
+    - "Path B — de-dup, no contract change"
+    - "Path A — loosen the parser/contract"
+    - "Defer WI-3454"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8140ff809322416e
+  resolved_at: 2026-06-21T15:25:29.938177Z
+  answer: "Your questions have been answered: \"WI-4570 (P2): 'invert LO reviewer precedence so capable harnesses are preferred.' Investigation found the literal precedence-invert is a no-op (precedence is only a tiebreaker); the real lever is cost-vs-quality ordering, and flipping it REVERSES your owner-prioritized cost-first routing (WI-4484 / DELIB-20260612). Separately, WI-4698 (already filed) adds a min_quality FLOOR that filters out the incapable LOs (q62/q72) WITHOUT touching cost policy. How should WI-4570 be handled?\"=\"Addressed by WI-4698 floor; resolve\", \"WI-3454 (P2): the Requirement-Sufficiency parser lets unrecognized openers escape pre-GO review and fail only at impl-start. Two fixes exist: Path A loosens the parser (relaxes the Requirement-Sufficiency contract = a requirement change needing a spec update); Path B de-duplicates BOTH gates onto the single canonical classifier (closes the escape, no contract change). The validated draft uses Path B. Which path do you want?\"=\"Path B — de-dup, no contract change\", \"Two WIs are already-VERIFIED duplicates with NO remaining work — authoring proposals would re-propose terminal work: WI-4571 (= WI-4623; all 37 hooks already use $CLAUDE_PROJECT_DIR, regression test committed, VERIFIED 2026-06-18) and WI-3492 (= WI-3318; the `gt bridge propose` CLI exists with 18 passing tests, VERIFIED 2026-05-27). How should I dispose of them?\"=\"Resolve both as duplicates\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1328
+  asked_at: 2026-06-21T15:25:29.938177Z
+  question: "Two WIs are already-VERIFIED duplicates with NO remaining work — authoring proposals would re-propose terminal work: WI-4571 (= WI-4623; all 37 hooks already use $CLAUDE_PROJECT_DIR, regression test committed, VERIFIED 2026-06-18) and WI-3492 (= WI-3318; the `gt bridge propose` CLI exists with 18 passing tests, VERIFIED 2026-05-27). How should I dispose of them?"
+  options:
+    - "Resolve both as duplicates"
+    - "Leave both open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8ab33d2b2dc7c2d7
+  resolved_at: 2026-06-21T15:25:29.938177Z
+  answer: "Your questions have been answered: \"WI-4570 (P2): 'invert LO reviewer precedence so capable harnesses are preferred.' Investigation found the literal precedence-invert is a no-op (precedence is only a tiebreaker); the real lever is cost-vs-quality ordering, and flipping it REVERSES your owner-prioritized cost-first routing (WI-4484 / DELIB-20260612). Separately, WI-4698 (already filed) adds a min_quality FLOOR that filters out the incapable LOs (q62/q72) WITHOUT touching cost policy. How should WI-4570 be handled?\"=\"Addressed by WI-4698 floor; resolve\", \"WI-3454 (P2): the Requirement-Sufficiency parser lets unrecognized openers escape pre-GO review and fail only at impl-start. Two fixes exist: Path A loosens the parser (relaxes the Requirement-Sufficiency contract = a requirement change needing a spec update); Path B de-duplicates BOTH gates onto the single canonical classifier (closes the escape, no contract change). The validated draft uses Path B. Which path do you want?\"=\"Path B — de-dup, no contract change\", \"Two WIs are already-VERIFIED duplicates with NO remaining work — authoring proposals would re-propose terminal work: WI-4571 (= WI-4623; all 37 hooks already use $CLAUDE_PROJECT_DIR, regression test committed, VERIFIED 2026-06-18) and WI-3492 (= WI-3318; the `gt bridge propose` CLI exists with 18 passing tests, VERIFIED 2026-05-27). How should I dispose of them?\"=\"Resolve both as duplicates\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

@@ -32,6 +32,9 @@
 ## Recent Sessions
 Per-session detail lives in git history (referenced commits) and `bridge/*-NNN.md`.
 Pre-S398 history: [CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md).
+- **S456** (2026-06-21, Claude B): drove **PROJECT-GTKB-PLATFORM-SOT-CONSOLIDATION → retired** (12/12 WIs VERIFIED). Slice 8 (51 ephemera deleted + MEMORY.md→index, WI-4346/4347), gap-closure (WI-4345 SoT-read clause + WI-4350 glossary), WI-4348 Phase-1 (3 rule-file role-state pointer-swaps), WI-4681 (scratchpad boundary, verify-by-reference under owner waiver `DELIB-20265510`) — all GO→impl→VERIFIED; reconciled 4 VERIFIED-but-open drift WIs (4340/4343/4347/4350); manual `gt projects retire` (WI-4384 auto-engine gap). Recovered 3 finalization-NO-GO classes: staged-foreign-file index contamination, CRLF/packet-hash mismatch (LF-normalize), empty-diff verify-by-reference.
+- **S455** (2026-06-21, Antigravity C): post-crash resume; ran bridge trigger diagnostics, resolved launch block and forced dispatch of Codex LO; verified failover/cooldown logic (8 tests passed).
+- **S454** (2026-06-21, Claude B): PROJECT-GTKB-BRIDGE-RECONCILIATION → all 7 WIs resolved. Resolved WI-4237 (bridge VERIFIED @ `gtkb-bridge-reconciliation-operator-skill-014`); WI-4711/4713 auto-resolved by the WI-4704 reconciler; captured WI-4719 (reconciler should treat WITHDRAWN sibling threads as non-blocking). Post-crash resume; read-only verification this turn.
 - **S453** (2026-06-21, Claude B): drove PROJECT-GTKB-BRIDGE / WI-4468 to VERIFIED; GO/ADVISORY backlog reconciliation analysis.
 - **S452** (2026-06-20/21, Claude B): dispatch repair — headless-Claude 401 churn fixed; WI-4682 / WI-4707 / WI-4703 resolved.
 - **S450** (2026-06-20, Claude B): envelope-disposition + autonomous-dispatch program; bridge-dispatcher fabric deliberation.
