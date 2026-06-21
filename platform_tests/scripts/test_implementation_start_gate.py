@@ -260,19 +260,24 @@ def test_lapsed_claim_blocks_mutation(tmp_path: Path) -> None:
 
 
 def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
-    """WI-4443: under concurrent Prime Builders, a session's valid in-scope
-    mutation is allowed even after a peer's ``begin`` clobbered current.json,
-    while a cross-scope mutation into the peer's bridge stays blocked.
+    """WI-4443 + WI-4471: concurrent Prime Builders with overlapping scope.
 
     bridge-a and bridge-b both authorize ``scripts/shared.py``; bridge-b also
     authorizes ``scripts/b_only.py``. The ambient session claims bridge-a;
     session-B claims bridge-b; bridge-b's ``begin`` clobbers current.json.
-    (a) ambient session mutating ``scripts/shared.py`` -> ALLOWED. Without the
-        session-aware fix, current.json (bridge-b) resolves the packet to
-        bridge-b and the ambient session (which holds no bridge-b claim) is
-        wrongly blocked -- this is the WI-4443 regression guard.
+
+    WI-4443 fix: session-aware packet lookup ensures current.json clobbering
+    does not wrongly route the ambient session to bridge-b's packet.
+
+    WI-4471 change: the cross-claim collision check now BLOCKS the ambient
+    session from mutating ``scripts/shared.py`` when session-B's active
+    claim+packet (bridge-b) also reserves that path.  This is the intentional
+    tightening -- concurrent implementers must not edit the same file.
+
+    (a) ambient session mutating ``scripts/shared.py`` -> BLOCKED (WI-4471:
+        bridge-b / session-B collision).
     (c) ambient session mutating ``scripts/b_only.py`` (bridge-b's exclusive
-        scope) -> BLOCKED by the work-intent claim check (no claim on bridge-b).
+        scope) -> BLOCKED by packet authorization (bridge-a doesn't cover it).
     """
     bridge = tmp_path / "bridge"
     bridge.mkdir()
@@ -304,8 +309,12 @@ def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
     _claim_bridge(tmp_path, "bridge-a")
     _claim_bridge(tmp_path, "bridge-b", "session-B")
 
-    # (a) ambient session's in-scope mutation of the overlapping target is allowed.
-    assert gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/shared.py")) == {}
+    # (a) WI-4471: ambient session's mutation of the overlapping target is now BLOCKED
+    # because session-B's active bridge-b claim+packet also reserves scripts/shared.py.
+    collision = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/shared.py"))
+    assert collision["decision"] == "block"
+    assert "bridge-b" in collision["reason"]
+    assert "session-B" in collision["reason"]
 
     # (c) ambient session mutating bridge-b's exclusive target is blocked (no claim on bridge-b).
     cross = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/b_only.py"))
@@ -998,6 +1007,135 @@ def test_gate_allows_quoted_python_mutation_literals(cmd: str, tmp_path: Path) -
 
     assert gate._is_mutating_command(cmd) is False
     assert gate.gate_decision(payload) == {}
+
+
+# WI-4471: cross-claim path-collision check — gate blocks when a different session's
+# active work-intent claim+packet reserves the same target path.
+
+
+def test_gate_blocks_when_other_session_claim_packet_reserves_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4471: gate blocks when another session's active claim+packet reserves the target."""
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
+    shared_target = "scripts/shared.py"
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "bridge-a-001.md").write_text(
+        _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-001.md").write_text(
+        _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
+        "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
+        encoding="utf-8",
+    )
+    packet_a = auth.create_authorization_packet(tmp_path, "bridge-a")
+    auth.write_packet(tmp_path, packet_a)
+    auth.write_named_packet(tmp_path, packet_a, "bridge-a")
+    packet_b = auth.create_authorization_packet(tmp_path, "bridge-b")
+    auth.write_packet(tmp_path, packet_b)
+    auth.write_named_packet(tmp_path, packet_b, "bridge-b")
+    _claim_bridge(tmp_path, "bridge-a", "session-A")
+    _claim_bridge(tmp_path, "bridge-b", "session-B")
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target=shared_target, session_id="session-A"))
+
+    assert result["decision"] == "block"
+    assert "bridge-b" in result["reason"]
+    assert "session-B" in result["reason"]
+
+
+def test_gate_allows_when_no_other_session_reserves_target(tmp_path: Path) -> None:
+    """WI-4471: no cross-claim collision when no other active named packet overlaps the target."""
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    auth.write_named_packet(tmp_path, packet, "sample-implementation")
+    _claim_bridge(tmp_path)
+
+    assert gate.gate_decision(_apply_patch_payload(tmp_path)) == {}
+
+
+def test_collision_ignores_expired_claim_for_overlapping_packet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4471: expired/lapsed claim does not trigger a cross-claim collision."""
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
+    shared_target = "scripts/shared.py"
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "bridge-a-001.md").write_text(
+        _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-001.md").write_text(
+        _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
+        "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
+        encoding="utf-8",
+    )
+    packet_a = auth.create_authorization_packet(tmp_path, "bridge-a")
+    auth.write_packet(tmp_path, packet_a)
+    auth.write_named_packet(tmp_path, packet_a, "bridge-a")
+    packet_b = auth.create_authorization_packet(tmp_path, "bridge-b")
+    auth.write_packet(tmp_path, packet_b)
+    auth.write_named_packet(tmp_path, packet_b, "bridge-b")
+    _claim_bridge(tmp_path, "bridge-a", "session-A")
+    _claim_bridge(tmp_path, "bridge-b", "session-B")
+    # Expire bridge-b's claim so current_holder returns None.
+    conn = auth.bridge_work_intent_registry._get_conn(tmp_path)
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE work_intent_claims"
+                " SET ttl_expires_at = ?, implementation_grace_expires_at = ?"
+                " WHERE thread_slug = ?",
+                ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "bridge-b"),
+            )
+    finally:
+        conn.close()
+
+    assert gate.gate_decision(_apply_patch_payload(tmp_path, target=shared_target, session_id="session-A")) == {}
+
+
+def test_collision_ignores_same_session_overlapping_claim(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-4471: same-session overlapping claim is not a collision (legitimate multi-thread)."""
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
+    shared_target = "scripts/shared.py"
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "bridge-a-001.md").write_text(
+        _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-001.md").write_text(
+        _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
+        "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
+        encoding="utf-8",
+    )
+    packet_a = auth.create_authorization_packet(tmp_path, "bridge-a")
+    auth.write_packet(tmp_path, packet_a)
+    auth.write_named_packet(tmp_path, packet_a, "bridge-a")
+    packet_b = auth.create_authorization_packet(tmp_path, "bridge-b")
+    auth.write_packet(tmp_path, packet_b)
+    auth.write_named_packet(tmp_path, packet_b, "bridge-b")
+    # Same session holds both claims.
+    _claim_bridge(tmp_path, "bridge-a", "session-A")
+    _claim_bridge(tmp_path, "bridge-b", "session-A")
+
+    assert gate.gate_decision(_apply_patch_payload(tmp_path, target=shared_target, session_id="session-A")) == {}
 
 
 @pytest.mark.parametrize(

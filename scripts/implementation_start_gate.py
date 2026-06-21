@@ -18,6 +18,7 @@ try:
     from scripts.implementation_authorization import (
         AuthorizationError,
         canonical_project_root,
+        cross_claim_path_collision_reason,
         normalize_relative_path,
         resolve_work_intent_session_id,
         validate_targets,
@@ -27,6 +28,7 @@ except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import (
         AuthorizationError,
         canonical_project_root,
+        cross_claim_path_collision_reason,
         normalize_relative_path,
         resolve_work_intent_session_id,
         validate_targets,
@@ -1094,6 +1096,13 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         block_reason = work_intent_claim_block_reason(root, bridge_id, session_id)
         if block_reason:
             raise AuthorizationError(block_reason)
+        # WI-4471: cross-claim path-collision check — block if a different session's
+        # active claim+packet already reserves any of the same target paths.
+        collision_reason = cross_claim_path_collision_reason(
+            root, targets=protected, bridge_id=bridge_id, session_id=session_id
+        )
+        if collision_reason:
+            raise AuthorizationError(collision_reason)
         # WI-4527: the edit is authorized. As a fail-soft side-effect on the
         # already-allowed path, auto-extend an active GO-implementation claim
         # whose deadline is near so a long build does not lose its claim

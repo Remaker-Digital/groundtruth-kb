@@ -1464,6 +1464,63 @@ def work_intent_claim_block_reason(project_root: Path, bridge_id: str, session_i
     return None
 
 
+def cross_claim_path_collision_reason(
+    project_root: Path,
+    *,
+    targets: list[str],
+    bridge_id: str,
+    session_id: str,
+) -> str | None:
+    """Return a collision reason if another session's active claim reserves any of targets.
+
+    WI-4471: the implementation-start gate validates that the current session's OWN
+    packet authorizes the target and that this session holds its OWN bridge claim, but
+    it does not check whether a DIFFERENT active claim — for a different bridge thread —
+    has already reserved the same path via its named packet's target_path_globs.  This
+    helper fills that gap: it scans by-bridge named packets, checks for live claim
+    holders with a different session_id, and reports a collision when one overlaps the
+    requested targets.
+
+    Fail-soft: any registry read error or missing directory yields None (allow) so
+    a lookup failure never converts an authorized edit into a spurious block.
+    """
+    if bridge_id in BOOTSTRAP_BRIDGE_IDS:
+        return None
+    if not session_id.strip():
+        return None
+    by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
+    if not by_bridge_dir.is_dir():
+        return None
+    for path in sorted(by_bridge_dir.glob("*.json")):
+        other_bridge_id = path.stem
+        if other_bridge_id == bridge_id or other_bridge_id in BOOTSTRAP_BRIDGE_IDS:
+            continue
+        try:
+            packet = load_named_packet(project_root, other_bridge_id)
+        except AuthorizationError:
+            continue  # expired, invalid, or missing — skip
+        overlapping = [t for t in targets if path_authorized(packet, t)]
+        if not overlapping:
+            continue
+        try:
+            holder = bridge_work_intent_registry.current_holder(other_bridge_id, project_root=project_root)
+        except Exception:  # noqa: BLE001 - fail soft on registry errors
+            continue
+        if holder is None:
+            continue
+        holder_session = str(holder.get("session_id") or "")
+        if holder_session == session_id:
+            continue  # same session — legitimate multi-thread, no collision
+        return (
+            f"Concurrent path reservation conflict: bridge {other_bridge_id!r} "
+            f"(session {holder_session!r}) has an active work-intent claim whose packet "
+            f"reserves overlapping target(s): {', '.join(overlapping)}. "
+            f"Wait for the other claim to release before mutating these targets. "
+            f"(PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001)"
+        )
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", default=None)
