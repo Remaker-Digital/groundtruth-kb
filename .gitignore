@@ -79,6 +79,7 @@ scripts/lib/**/*.py[cod]
 .pytest-*/
 .pytest_*/
 GT-KB.pytest-*/
+GT-KB.pytest_tmp*/
 .tmp-codex-iso018/pytest-*/
 .test-tmp/
 # Malformed pytest cache dir name observed 2026-06-04 (concatenation glitch
@@ -88,9 +89,11 @@ GT-KB.*pytest-cache/
 # Additional pytest residue observed in GT-KB sessions:
 # - $base/ from low-level temp fixture runs
 # - groundtruth-kb/pytest-kpi-retro-codex/ from targeted retro basetemp runs
+# - platform_tests/pytest-tmp-* basetemp dirs from regression/reverify runs
 /$base/
 /PASS
 groundtruth-kb/pytest-kpi-retro-codex/
+platform_tests/pytest-tmp-*/
 # Session-ephemeral one-off scripts (per-session backfill / migration helpers
 # that get created and used within a single session; not source-of-truth).
 scripts/session-tmp/
