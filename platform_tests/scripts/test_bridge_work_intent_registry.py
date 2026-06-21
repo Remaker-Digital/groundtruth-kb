@@ -56,8 +56,10 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
     bridge.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     for slug, status in statuses.items():
-        version = "002" if status == "GO" else "001"
-        lines.extend([f"Document: {slug}", f"{status}: bridge/{slug}-{version}.md", ""])
+        version_num = 2 if status == "GO" else 1
+        lines.extend([f"Document: {slug}", f"{status}: bridge/{slug}-{version_num:03d}.md", ""])
+        path = bridge / f"{slug}-{version_num:03d}.md"
+        path.write_text(f"{status}\n\n# Body\n", encoding="utf-8")
     (bridge / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -243,3 +245,62 @@ def test_bridge_file_status_skips_leading_blank_lines(tmp_path: Path, env) -> No
     """Pre-existing behavior: blank prefix lines do not trigger malformed-status."""
     path = _write_bridge_file(tmp_path, "blanks", 1, "\n\n   \nGO\n\n# Body\n")
     assert env._bridge_file_status(path) == "GO"
+
+
+def test_acquire_tolerates_legacy_status_shadowed_thread(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_index(tmp_path, {"shadowed-thread": "GO"})
+    session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
+    _write_per_session_marker(tmp_path, "prime-builder", session_id)
+
+    _write_bridge_file(tmp_path, "shadowed-thread", 1, "NEW\n\n# Body\n")
+    _write_bridge_file(tmp_path, "shadowed-thread", 2, "PAUSED\n\n# Legacy\n")
+    _write_bridge_file(tmp_path, "shadowed-thread", 3, "GO\n\n# Latest\n")
+
+    assert env.acquire("shadowed-thread", session_id, project_root=tmp_path) is True
+
+
+def test_latest_status_skips_legacy_token_version(tmp_path: Path, env) -> None:
+    _write_bridge_file(tmp_path, "shadowed-thread", 1, "NEW\n\n# Body\n")
+    _write_bridge_file(tmp_path, "shadowed-thread", 2, "PAUSED\n\n# Legacy\n")
+
+    entries = env._thread_version_entries("shadowed-thread", project_root=tmp_path)
+    assert len(entries) == 1
+    assert entries[0] == (1, "NEW", "bridge/shadowed-thread-001.md")
+    assert env._latest_status("shadowed-thread", project_root=tmp_path) == "NEW"
+
+
+def test_legacy_token_version_skip_emits_warning(tmp_path: Path, env) -> None:
+    _write_bridge_file(tmp_path, "shadowed-thread", 1, "NEW\n\n# Body\n")
+    _write_bridge_file(tmp_path, "shadowed-thread", 2, "PAUSED\n\n# Legacy\n")
+
+    with pytest.warns(UserWarning, match="Skipping malformed or legacy status"):
+        env._thread_version_entries("shadowed-thread", project_root=tmp_path)
+
+
+def test_bridge_file_status_still_raises_on_unrecognized_token_regression(tmp_path: Path, env) -> None:
+    path = _write_bridge_file(tmp_path, "shadowed-thread", 1, "PAUSED\n\n# Body\n")
+    with pytest.raises(env.MalformedBridgeStatusError) as excinfo:
+        env._bridge_file_status(path)
+    assert excinfo.value.offending_line == "PAUSED"
+
+
+def test_unreadable_or_duplicate_version_still_raises(tmp_path: Path, env) -> None:
+    _write_bridge_file(tmp_path, "shadowed-thread", 1, "NEW\n\n# Body\n")
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    dup_path = bridge / "shadowed-thread-0001.md"
+    dup_path.write_text("NEW\n\n# Body\n", encoding="utf-8")
+
+    with pytest.raises(env.WorkIntentRegistryError, match="Duplicate bridge version 001"):
+        env._thread_version_entries("shadowed-thread", project_root=tmp_path)
+
+    dup_path.unlink()
+
+    unreadable_dir = bridge / "shadowed-thread-002.md"
+    unreadable_dir.mkdir()
+
+    with pytest.raises(env.WorkIntentRegistryError, match="Bridge file is unreadable"):
+        env._thread_version_entries("shadowed-thread", project_root=tmp_path)
+
+    unreadable_dir.rmdir()

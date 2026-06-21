@@ -233,7 +233,17 @@ def _thread_version_entries(thread_slug: str, *, project_root: Path | None = Non
         version = _version_from_path(rel_path, thread_slug)
         if version is None:
             continue
-        status = _bridge_file_status(path)
+        try:
+            status = _bridge_file_status(path)
+        except MalformedBridgeStatusError as exc:
+            import warnings
+
+            warnings.warn(
+                f"Skipping malformed or legacy status in bridge file: {exc.path} (offending status line: {exc.offending_line!r})",
+                category=UserWarning,
+                stacklevel=2,
+            )
+            continue
         if version in by_version:
             prior = by_version[version][1]
             raise WorkIntentRegistryError(
