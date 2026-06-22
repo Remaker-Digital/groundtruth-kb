@@ -296,6 +296,7 @@ def test_run_doctor_recipient_keys_match_cross_harness_trigger_canonical_labels(
 
     import cross_harness_bridge_trigger
 
+    from groundtruth_kb.bridge import role_state
     from groundtruth_kb.project.doctor import _BRIDGE_AGENT_TO_RECIPIENT
 
     trigger_keys = set(cross_harness_bridge_trigger.ROLE_STATE_KEYS)
@@ -304,3 +305,15 @@ def test_run_doctor_recipient_keys_match_cross_harness_trigger_canonical_labels(
     assert doctor_keys == trigger_keys, f"Doctor keys {doctor_keys} do not match trigger keys {trigger_keys}"
     assert "prime" not in doctor_keys
     assert "codex" not in doctor_keys
+    assert cross_harness_bridge_trigger.ROLE_STATE_KEYS is role_state.ROLE_STATE_KEYS
+    assert _BRIDGE_AGENT_TO_RECIPIENT is role_state.BRIDGE_AGENT_TO_RECIPIENT
+
+
+def test_no_duplicate_role_state_literals_in_dispatch_sources() -> None:
+    """Role-state ownership stays in ``groundtruth_kb.bridge.role_state``."""
+    repo_root = Path(__file__).resolve().parents[2]
+    trigger_source = (repo_root / "scripts" / "cross_harness_bridge_trigger.py").read_text(encoding="utf-8")
+    doctor_source = (repo_root / "groundtruth-kb/src/groundtruth_kb/project/doctor.py").read_text(encoding="utf-8")
+
+    assert 'ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")' not in trigger_source
+    assert '_BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime-builder", "codex": "loyal-opposition"}' not in doctor_source

@@ -18,6 +18,12 @@ from pathlib import Path
 from typing import Any, Literal
 
 from groundtruth_kb import get_templates_dir
+from groundtruth_kb.bridge.role_state import (
+    BRIDGE_AGENT_TO_RECIPIENT as _BRIDGE_AGENT_TO_RECIPIENT,
+)
+from groundtruth_kb.bridge.role_state import (
+    ROLE_STATE_KEYS,
+)
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -3658,7 +3664,6 @@ def _check_file_bridge_state_parse(target: Path) -> ToolCheck:
 # replacement-mechanism check is _check_cross_harness_trigger below.
 
 _BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
-_BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime-builder", "codex": "loyal-opposition"}
 
 _BRIDGE_FRESH_SECS = 4 * 60  # < 4 min → OK
 _BRIDGE_WARN_SECS = 10 * 60  # 4–10 min → WARN; > 10 min → ALARM
@@ -4462,7 +4467,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
 # to keep the packaged groundtruth_kb doctor's import surface out of the
 # repo-root scripts/ tree (Codex Review Ask 2 confirmed).
 _SESSION_ROLE_MARKER_NAME = "active-session-role.json"
-_SESSION_ROLE_VALID_ROLES = frozenset({"prime-builder", "loyal-opposition"})
+_SESSION_ROLE_VALID_ROLES = frozenset(ROLE_STATE_KEYS)
 # MUST equal scripts.gtkb_session_id.MARKER_CONTINUITY_ORDER -- the single
 # session-id membership authority that scripts.workstream_focus._SESSION_ID_ENV_FALLBACKS
 # also delegates to (WI-4270 shared resolver unification). Kept as a verbatim
@@ -4668,7 +4673,7 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
             message=f"harness-state/harness-registry.json unreadable: {exc}",
         )
 
-    valid_read_tokens = frozenset({"prime-builder", "loyal-opposition", "acting-prime-builder"})
+    valid_read_tokens = frozenset((*ROLE_STATE_KEYS, "acting-prime-builder"))
     harnesses = registry_doc.get("harnesses", []) if isinstance(registry_doc, dict) else []
     issues: list[str] = []
     legacy_scalar_count = 0

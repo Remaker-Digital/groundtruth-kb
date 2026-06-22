@@ -82,6 +82,8 @@ _PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src
 if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
+from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS  # noqa: E402
+
 
 def _repo_venv_command(executable_name: str) -> str:
     """Return the in-root repo venv command path used in worker instructions."""
@@ -393,7 +395,6 @@ LEGACY_TO_NEW_STATE_KEY = {
     "prime": "prime-builder",
     "codex": "loyal-opposition",
 }
-ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")
 
 
 def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:
