@@ -1,0 +1,27 @@
+apiVersion: 1
+
+# Default GT-KB operations-dashboard alert notifier contact point.
+#
+# Owner decision DELIB-20265567 (AskUserQuestion, 2026-06-22): the notifier
+# default is "alert-list only". Firing alerts (failing-ci, release-blockers,
+# stale-data) surface in the Grafana Alerting UI / alert list with NO external
+# delivery. This contact point therefore carries no SMTP credentials, no
+# delivery URL, and no other delivery secret.
+#
+# The receiver is a non-delivering placeholder: GT-KB's local Grafana configures
+# no SMTP server, and the address uses the reserved RFC 6761 .invalid TLD, so no
+# message is ever sent. To enable a real external channel (email / Slack /
+# Teams), supply its configuration via env.local per GOV-ENV-LOCAL-AUTHORITY-001
+# and replace this receiver; never commit a delivery secret to this file.
+#
+# Governed by SPEC-GTKB-DASHBOARD-ALERT-NOTIFIER-001.
+contactPoints:
+  - orgId: 1
+    name: gtkb-default
+    receivers:
+      - uid: gtkb_default_alertlist
+        type: email
+        settings:
+          addresses: alerts@localhost.invalid
+          singleEmail: true
+        disableResolveMessage: false

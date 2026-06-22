@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# Root notification policy for the GT-KB operations dashboard.
+#
+# Routes every firing alert to the default contact point (gtkb-default), which
+# is the alert-list-only receiver per owner decision DELIB-20265567. Because the
+# default receiver performs no external delivery, firing alerts surface in the
+# Grafana Alerting UI / alert list and nowhere else. This file gives the
+# provisioned alert rules (failing-ci, release-blockers, stale-data) a defined
+# route instead of an undefined / unrouted default.
+#
+# Governed by SPEC-GTKB-DASHBOARD-ALERT-NOTIFIER-001.
+policies:
+  - orgId: 1
+    receiver: gtkb-default
+    group_by:
+      - grafana_folder
+      - alertname

@@ -44,6 +44,16 @@ REJECTED_ALIASES = {
     "data_freshness_age_minutes",
 }
 
+# Slice 2.3 notifier wiring (SPEC-GTKB-DASHBOARD-ALERT-NOTIFIER-001;
+# owner decision DELIB-20265567 — alert-list-only default). The Grafana
+# provisioning/alerting/ directory holds BOTH alert-rule docs (keyed by
+# ``groups``) and notifier provisioning docs (contact points / notification
+# policies). The rule-shape tests below skip the non-rule docs via
+# ``_is_alert_rule_doc`` so they don't misparse them.
+CONTACT_POINTS_YAML = ALERTING_DIR / "contact-points.yaml"
+NOTIFICATION_POLICIES_YAML = ALERTING_DIR / "notification-policies.yaml"
+DEFAULT_CONTACT_POINT_NAME = "gtkb-default"
+
 
 def _schema_tables() -> set[str]:
     text = SCHEMA_SQL.read_text(encoding="utf-8")
@@ -65,6 +75,16 @@ def _first_rule(doc: dict) -> dict:
     rules = groups[0]["rules"]
     assert rules, "alert group must declare at least one rule"
     return rules[0]
+
+
+def _is_alert_rule_doc(doc: object) -> bool:
+    """True for alert-rule provisioning docs (keyed by ``groups``).
+
+    Contact-point and notification-policy provisioning docs live in the same
+    directory but are keyed by ``contactPoints`` / ``policies``; the rule-shape
+    tests skip them.
+    """
+    return isinstance(doc, dict) and "groups" in doc
 
 
 def _raw_sql(rule: dict) -> str:
@@ -102,7 +122,10 @@ def test_all_three_alert_yamls_present_and_parse() -> None:
 def test_alert_queries_use_nonzero_relative_time_range() -> None:
     """Grafana rejects alert queries whose relative time range is 0 -> 0."""
     for path in sorted(ALERTING_DIR.glob("*.yaml")):
-        rule = _first_rule(_load_yaml(path))
+        doc = _load_yaml(path)
+        if not _is_alert_rule_doc(doc):
+            continue  # contact points / notification policies are not alert-rule docs
+        rule = _first_rule(doc)
         for idx, data_item in enumerate(rule["data"]):
             time_range = data_item.get("relativeTimeRange")
             assert isinstance(time_range, dict), f"{path.name} data[{idx}] must define relativeTimeRange"
@@ -151,7 +174,10 @@ def test_every_alert_sql_references_only_tables_in_schema() -> None:
         "schema sanity precondition failed; cannot validate alert anchoring"
     )
     for path in sorted(ALERTING_DIR.glob("*.yaml")):
-        rule = _first_rule(_load_yaml(path))
+        doc = _load_yaml(path)
+        if not _is_alert_rule_doc(doc):
+            continue  # contact points / notification policies are not alert-rule docs
+        rule = _first_rule(doc)
         sql = _raw_sql(rule)
         referenced = _tables_referenced_by_sql(sql)
         assert referenced, f"{path.name} SQL references no tables; suspicious"
@@ -218,3 +244,66 @@ def test_refresh_pipeline_actually_emits_the_alert_metric_keys(tmp_path) -> None
         f"refresh pipeline did not emit {EXPECTED_FAILING_CI_METRIC_KEY!r} "
         f"into current_metrics; alert rule would never fire. Emitted keys: {sorted(emitted)}"
     )
+
+
+# ---------- Slice 2.3 notifier wiring (SPEC-GTKB-DASHBOARD-ALERT-NOTIFIER-001) ----------
+#
+# Owner decision DELIB-20265567 selected the alert-list-only default: firing
+# alerts surface in the Grafana alert list with no external delivery. The two
+# provisioning docs below give the alert rules a defined route while committing
+# no delivery secret.
+
+
+def test_notifier_contact_points_present_and_parse() -> None:
+    """Provisioning shape (1): a default contact point is provisioned."""
+    assert CONTACT_POINTS_YAML.exists(), f"missing notifier contact points: {CONTACT_POINTS_YAML}"
+    doc = _load_yaml(CONTACT_POINTS_YAML)
+    assert doc["apiVersion"] == 1
+    points = doc["contactPoints"]
+    assert points, "contact-points.yaml must declare at least one contact point"
+    names = {cp["name"] for cp in points}
+    assert DEFAULT_CONTACT_POINT_NAME in names, (
+        f"contact-points.yaml must define a {DEFAULT_CONTACT_POINT_NAME!r} contact point; got {sorted(names)}"
+    )
+
+
+def test_notifier_policy_root_receiver_matches_contact_point() -> None:
+    """Provisioning shape (2): the root policy routes to the default contact point."""
+    assert NOTIFICATION_POLICIES_YAML.exists(), f"missing notifier policies: {NOTIFICATION_POLICIES_YAML}"
+    doc = _load_yaml(NOTIFICATION_POLICIES_YAML)
+    assert doc["apiVersion"] == 1
+    policies = doc["policies"]
+    assert policies, "notification-policies.yaml must declare at least one policy"
+    receivers = {p["receiver"] for p in policies}
+    assert DEFAULT_CONTACT_POINT_NAME in receivers, (
+        f"a root policy receiver must reference {DEFAULT_CONTACT_POINT_NAME!r}; got {sorted(receivers)}"
+    )
+
+
+def test_notifier_yamls_are_grafana_v1() -> None:
+    """Provisioning shape (3): both docs are Grafana v1 provisioning documents."""
+    contact_points = _load_yaml(CONTACT_POINTS_YAML)
+    policies = _load_yaml(NOTIFICATION_POLICIES_YAML)
+    assert contact_points["apiVersion"] == 1 and "contactPoints" in contact_points
+    assert policies["apiVersion"] == 1 and "policies" in policies
+
+
+def test_notifier_default_has_no_external_delivery_secret() -> None:
+    """'External channels are opt-in': the alert-list-only default commits no
+    delivery URL or credential. Comment lines (which explain the env.local
+    opt-in path) are skipped; only active YAML keys/values are scanned.
+    """
+    secret_key_re = re.compile(r"(?i)\b(password|secret|token|apikey|api_key|bearer)\b")
+    url_re = re.compile(r"https?://")
+    for path in (CONTACT_POINTS_YAML, NOTIFICATION_POLICIES_YAML):
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            assert not url_re.search(stripped), (
+                f"{path.name}: alert-list-only default must not embed a delivery URL ({stripped!r})"
+            )
+            assert not secret_key_re.search(stripped), (
+                f"{path.name}: alert-list-only default must not embed a delivery secret ({stripped!r}); "
+                "external channels are opt-in via env.local per GOV-ENV-LOCAL-AUTHORITY-001"
+            )
