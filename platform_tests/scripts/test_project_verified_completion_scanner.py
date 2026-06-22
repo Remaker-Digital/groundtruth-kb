@@ -62,7 +62,10 @@ def _seed(
         slug = f"gtkb-thread-{index}"
         thread_slugs.append(slug)
         top_status = "VERIFIED" if verified else "GO"
-        (bridge / f"{slug}-001.md").write_text(f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8")
+        (bridge / f"{slug}-001.md").write_text(
+            f"{top_status}\n\n# Proposal {slug}\n\nWork Item: {wi}\n",
+            encoding="utf-8",
+        )
         index_lines += [f"Document: {slug}", f"{top_status}: bridge/{slug}-001.md", ""]
     (bridge / "INDEX.md").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
 
@@ -433,3 +436,166 @@ def test_cross_project_implements_link_does_not_satisfy_other_project(scanner, t
     auth_b = next(r for r in full if r.authorization_id == "PAUTH-B")
     assert auth_b.completion_ready is False
     assert auth_b.unverified_work_item_ids == ["WI-8002"]
+
+
+# --- WI-4737 related_bridge_threads id-agnostic recognition path -------------
+
+
+def test_wi4737_noncanonical_wi_recognized_via_related_bridge_threads(scanner, tmp_path):
+    """WI-4737: a membership WI with a NON-canonical id whose VERIFIED
+    implements-linked thread carries NO regex-parseable ``Work Item:`` line is
+    recognized as verified-for-project via the WI's own ``related_bridge_threads``.
+
+    Derives from GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 (completion
+    detection must recognize work items whose bridge threads reached VERIFIED).
+    Against the un-augmented scanner this WI is unverified (the regex never
+    matches its non-canonical id and the thread carries no parseable line), so
+    the authorization is judged not completion-ready.
+    """
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    # VERIFIED thread with NO regex-parseable Work Item line (prose only) — the
+    # "authored before its WI existed" shape.
+    (bridge / "gtkb-noncanon-thread-001.md").write_text(
+        "VERIFIED\n\n# Verified report\n\nWork Item: new work item to be created later\n",
+        encoding="utf-8",
+    )
+    (bridge / "INDEX.md").write_text(
+        "# Bridge Index\n\nDocument: gtkb-noncanon-thread\nVERIFIED: bridge/gtkb-noncanon-thread-001.md\n\n",
+        encoding="utf-8",
+    )
+    wi = "WI-NONCANON-RECOG-001"
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            "DELIB-SEED",
+            "owner_conversation",
+            "Owner approved",
+            "Owner approved.",
+            "{}",
+            "test",
+            "seed",
+            outcome="owner_decision",
+        )
+        db.insert_project("Scanner Project", "test", "seed", id="PROJECT-X", status="active")
+        db.insert_work_item(
+            wi,
+            f"Work item {wi}",
+            "new",
+            "backlog",
+            "open",
+            "test",
+            "seed",
+            related_bridge_threads='["gtkb-noncanon-thread"]',
+        )
+        db.link_project_work_item("PROJECT-X", wi, "test", "seed")
+        db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
+        db.insert_project_authorization(
+            "PROJECT-X",
+            "Scanner authorization",
+            "DELIB-SEED",
+            "Bounded scope.",
+            "test",
+            "seed",
+            id="PAUTH-X",
+            status="active",
+            included_work_item_ids=[wi],
+            included_spec_ids=["SPEC-SEED"],
+        )
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            "bridge_thread",
+            "gtkb-noncanon-thread",
+            "test",
+            "seed implements link",
+            relationship="implements",
+        )
+    finally:
+        db.close()
+
+    assert wi in scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
+    ready = scanner.completion_ready(tmp_path)
+    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    assert ready[0].verified_work_item_ids == [wi]
+
+
+def test_wi4737_two_sided_guard_rejects_unlinked_and_unverified(scanner, tmp_path):
+    """WI-4737 two-sided guard: the related_bridge_threads path recognizes a WI
+    only when BOTH the project holds an active implements-link to the thread AND
+    the thread is VERIFIED-topped. A WI citing a VERIFIED-but-unlinked thread, or
+    an implements-linked-but-unVERIFIED (GO) thread, is NOT recognized.
+    """
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    # Thread U: VERIFIED but NOT implements-linked to PROJECT-X.
+    (bridge / "gtkb-unlinked-thread-001.md").write_text("VERIFIED\n\n# report\n\n(prose only)\n", encoding="utf-8")
+    # Thread G: implements-linked but NOT VERIFIED (GO).
+    (bridge / "gtkb-unverified-thread-001.md").write_text("GO\n\n# report\n\n(prose only)\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "# Bridge Index\n\n"
+        "Document: gtkb-unlinked-thread\nVERIFIED: bridge/gtkb-unlinked-thread-001.md\n\n"
+        "Document: gtkb-unverified-thread\nGO: bridge/gtkb-unverified-thread-001.md\n\n",
+        encoding="utf-8",
+    )
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            "DELIB-SEED",
+            "owner_conversation",
+            "Owner approved",
+            "Owner approved.",
+            "{}",
+            "test",
+            "seed",
+            outcome="owner_decision",
+        )
+        db.insert_project("Scanner Project", "test", "seed", id="PROJECT-X", status="active")
+        db.insert_work_item(
+            "WI-NONCANON-UNLINKED-001",
+            "unlinked",
+            "new",
+            "backlog",
+            "open",
+            "test",
+            "seed",
+            related_bridge_threads='["gtkb-unlinked-thread"]',
+        )
+        db.insert_work_item(
+            "WI-NONCANON-UNVERIFIED-001",
+            "unverified",
+            "new",
+            "backlog",
+            "open",
+            "test",
+            "seed",
+            related_bridge_threads='["gtkb-unverified-thread"]',
+        )
+        db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNLINKED-001", "test", "seed")
+        db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNVERIFIED-001", "test", "seed")
+        db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
+        db.insert_project_authorization(
+            "PROJECT-X",
+            "Scanner authorization",
+            "DELIB-SEED",
+            "Bounded scope.",
+            "test",
+            "seed",
+            id="PAUTH-X",
+            status="active",
+            included_work_item_ids=["WI-NONCANON-UNLINKED-001", "WI-NONCANON-UNVERIFIED-001"],
+            included_spec_ids=["SPEC-SEED"],
+        )
+        # Only the GO thread is implements-linked; the VERIFIED one deliberately is NOT.
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            "bridge_thread",
+            "gtkb-unverified-thread",
+            "test",
+            "seed implements link",
+            relationship="implements",
+        )
+    finally:
+        db.close()
+
+    verified = scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
+    assert verified == set(), f"two-sided guard breached: {verified}"

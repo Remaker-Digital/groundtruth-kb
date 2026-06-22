@@ -42,6 +42,48 @@ _COMPLETION_GUARD_RELATIONSHIP = "plan_incomplete"
 _COMPLETION_GUARD_ARTIFACT_TYPES = ("completion_guard", "bridge_thread")
 
 
+# WI-4737: id-agnostic recognition helpers. A work item whose VERIFIED bridge
+# thread carries no regex-parseable ``Work Item:`` line (a non-canonical id, or
+# a thread authored before its work item existed) is recognized as
+# verified-for-project via its own ``related_bridge_threads`` field instead.
+# These two helpers normalize that field and are mirrored byte-for-byte in
+# ``groundtruth-kb/src/groundtruth_kb/project/lifecycle.py``.
+def _thread_slug_from_ref(ref: object) -> str:
+    """Normalize a ``related_bridge_threads`` entry to a bare thread slug.
+
+    Accepts either a bare slug (``gtkb-foo``) or a versioned bridge-file path
+    (``bridge/gtkb-foo-003.md``); returns the slug, or ``""`` when empty.
+    """
+    text = str(ref or "").strip()
+    if not text:
+        return ""
+    base = text.replace("\\", "/").rsplit("/", 1)[-1]
+    match = re.match(r"^(?P<slug>.+)-\d{3}\.md$", base)
+    if match:
+        return match.group("slug")
+    if base.endswith(".md"):
+        base = base[:-3]
+    return base
+
+
+def _related_thread_slugs(value: object) -> set[str]:
+    """Parse a work item's ``related_bridge_threads`` field into a set of slugs.
+
+    The field may be a JSON string, a list, or ``None``; unparseable input
+    yields the empty set (defensive — never raises).
+    """
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (ValueError, TypeError):
+            return set()
+    if not isinstance(value, (list, tuple)):
+        return set()
+    return {slug for slug in (_thread_slug_from_ref(item) for item in value) if slug}
+
+
 @dataclass(frozen=True)
 class AuthorizationReadiness:
     """Completion-readiness verdict for one project authorization."""
@@ -187,14 +229,87 @@ def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
     return by_thread
 
 
+def _latest_bridge_thread_statuses(project_root: Path) -> dict[str, str | None]:
+    """Return ``{bridge_thread_slug: latest_status}`` from versioned bridge files.
+
+    Mirrors ``ProjectLifecycleService._latest_bridge_thread_statuses``.
+    """
+    _ensure_groundtruth_importable(project_root)
+    from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return {}
+    grouped: dict[str, list[tuple[int, Path]]] = {}
+    bridge_file_re = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+    for path in bridge_dir.glob("*.md"):
+        match = bridge_file_re.match(path.name)
+        if match is None:
+            continue
+        grouped.setdefault(match.group("slug"), []).append((int(match.group("version")), path))
+    return {
+        slug: status_from_bridge_file(max(versioned_files, key=lambda item: item[0])[1])
+        for slug, versioned_files in grouped.items()
+    }
+
+
+def _augment_verified_with_related_threads(
+    verified_by_project: dict[str, set[str]],
+    links_by_project: dict[str, set[str]],
+    project_root: Path,
+) -> None:
+    """WI-4737 additive recognition path (mirrors lifecycle.py).
+
+    A work item counts as verified-for-project when it is an active member of
+    the project AND its own ``related_bridge_threads`` names a VERIFIED-topped
+    thread that the project holds an active ``implements`` link to. Opens a
+    read-only DB connection only when at least one VERIFIED implements-linked
+    thread exists; closes it before returning.
+    """
+    statuses_by_thread = _latest_bridge_thread_statuses(project_root)
+    verified_slugs_by_project = {
+        project_id: {s for s in slugs if statuses_by_thread.get(s) == "VERIFIED"}
+        for project_id, slugs in links_by_project.items()
+    }
+    if not any(verified_slugs_by_project.values()):
+        return
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return
+    _ensure_groundtruth_importable(project_root)
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(db_path)
+    try:
+        for project_id, verified_implements_slugs in verified_slugs_by_project.items():
+            if not verified_implements_slugs:
+                continue
+            verified = verified_by_project.setdefault(project_id, set())
+            for membership in db.list_project_work_items(project_id):
+                if str(membership.get("membership_status") or "").strip().lower() != "active":
+                    continue
+                work_item_id = str(membership.get("work_item_id") or "")
+                if not work_item_id or work_item_id in verified:
+                    continue
+                work_item = db.get_work_item(work_item_id)
+                if work_item is None:
+                    continue
+                if _related_thread_slugs(work_item.get("related_bridge_threads")) & verified_implements_slugs:
+                    verified.add(work_item_id)
+    finally:
+        db.close()
+
+
 def verified_work_items_by_project(project_root: Path) -> dict[str, set[str]]:
     """Return ``{project_id: {verified work_item_id}}`` (project-scoped; closes F1).
 
     A work item WI-X is VERIFIED *for project P* (per
     ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v4) iff P holds an active
-    ``relationship='implements'`` link to a VERIFIED-topped bridge thread whose
-    version files cite WI-X. Coverage is attributed to the linking project only:
-    a thread implements-linked to PROJECT-A contributes WI metadata to
+    ``relationship='implements'`` link to a VERIFIED-topped bridge thread that
+    either (regex path) cites WI-X in a ``Work Item:`` line, or (WI-4737
+    id-agnostic path) is named in WI-X's own ``related_bridge_threads`` while
+    WI-X is an active member of P. Coverage is attributed to the linking project
+    only: a thread implements-linked to PROJECT-A contributes WI metadata to
     PROJECT-A's verified set and to no other project, even if a different
     project's gating WI is cited in that thread.
 
@@ -211,6 +326,8 @@ def verified_work_items_by_project(project_root: Path) -> dict[str, set[str]]:
         for slug in slugs:
             verified |= wis_by_thread.get(slug, set())
         verified_by_project[project_id] = verified
+    # WI-4737 additive id-agnostic recognition path (mirrors lifecycle.py).
+    _augment_verified_with_related_threads(verified_by_project, links_by_project, project_root)
     return verified_by_project
 
 

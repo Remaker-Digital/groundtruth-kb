@@ -815,3 +815,168 @@ def test_auto_complete_retires_membership_linked_work_items(tmp_path) -> None:
         assert db.get_work_item("WI-8001")["resolution_status"] == "retired"
     finally:
         db.close()
+
+
+# --- WI-4737 related_bridge_threads id-agnostic recognition path -------------
+
+
+def _seed_noncanonical_recognition_env(project_root: Path) -> KnowledgeDB:
+    """Seed PROJECT-X with a non-canonical-id WI whose VERIFIED implements-linked
+    thread carries NO regex-parseable ``Work Item:`` line, but whose
+    ``related_bridge_threads`` names that thread. Returns an open KnowledgeDB.
+    """
+    bridge = project_root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "gtkb-noncanon-thread-001.md").write_text(
+        "VERIFIED\n\n# Verified report\n\nWork Item: new work item to be created later\n",
+        encoding="utf-8",
+    )
+    (bridge / "INDEX.md").write_text(
+        "# Bridge Index\n\nDocument: gtkb-noncanon-thread\nVERIFIED: bridge/gtkb-noncanon-thread-001.md\n\n",
+        encoding="utf-8",
+    )
+    db = KnowledgeDB(db_path=project_root / "groundtruth.db")
+    db.insert_deliberation(
+        "DELIB-SEED",
+        "owner_conversation",
+        "Owner approved",
+        "Owner approved.",
+        "{}",
+        "test",
+        "seed",
+        outcome="owner_decision",
+    )
+    db.insert_project("Lifecycle Project", "test", "seed", id="PROJECT-X", status="active")
+    db.insert_work_item(
+        "WI-NONCANON-RECOG-001",
+        "Work item",
+        "new",
+        "backlog",
+        "open",
+        "test",
+        "seed",
+        related_bridge_threads='["gtkb-noncanon-thread"]',
+    )
+    db.link_project_work_item("PROJECT-X", "WI-NONCANON-RECOG-001", "test", "seed")
+    db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
+    db.insert_project_authorization(
+        "PROJECT-X",
+        "Lifecycle authorization",
+        "DELIB-SEED",
+        "Bounded scope.",
+        "test",
+        "seed",
+        id="PAUTH-X",
+        status="active",
+        included_work_item_ids=["WI-NONCANON-RECOG-001"],
+        included_spec_ids=["SPEC-SEED"],
+    )
+    db.add_project_artifact_link(
+        "PROJECT-X",
+        "bridge_thread",
+        "gtkb-noncanon-thread",
+        "test",
+        "seed implements link",
+        relationship="implements",
+    )
+    return db
+
+
+def test_wi4737_lifecycle_noncanonical_recognized_via_related_bridge_threads(tmp_path) -> None:
+    """WI-4737 lifecycle parity: a non-canonical-id member WI whose VERIFIED
+    implements-linked thread carries no parseable ``Work Item:`` line is
+    recognized via ``related_bridge_threads`` and completes the authorization.
+
+    Derives from GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001. Against the
+    un-augmented service this WI is unverified-for-project and
+    ``complete_project_authorization`` raises ``not completion-ready``.
+    """
+    db = _seed_noncanonical_recognition_env(tmp_path)
+    try:
+        service = ProjectLifecycleService(db)
+        assert "WI-NONCANON-RECOG-001" in service._verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
+        # End-to-end: the governed completion gate now passes and retires.
+        service.complete_project_authorization("PAUTH-X", project_root=tmp_path, change_reason="complete")
+        assert db.get_project("PROJECT-X")["status"] == "retired"
+        assert db.get_work_item("WI-NONCANON-RECOG-001")["resolution_status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_wi4737_lifecycle_two_sided_guard_rejects_unlinked_and_unverified(tmp_path) -> None:
+    """WI-4737 lifecycle two-sided guard: a WI citing a VERIFIED-but-unlinked
+    thread, or an implements-linked-but-unVERIFIED (GO) thread, is NOT
+    recognized; the authorization stays not completion-ready.
+    """
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "gtkb-unlinked-thread-001.md").write_text("VERIFIED\n\n# report\n\n(prose only)\n", encoding="utf-8")
+    (bridge / "gtkb-unverified-thread-001.md").write_text("GO\n\n# report\n\n(prose only)\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "# Bridge Index\n\n"
+        "Document: gtkb-unlinked-thread\nVERIFIED: bridge/gtkb-unlinked-thread-001.md\n\n"
+        "Document: gtkb-unverified-thread\nGO: bridge/gtkb-unverified-thread-001.md\n\n",
+        encoding="utf-8",
+    )
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    try:
+        db.insert_deliberation(
+            "DELIB-SEED",
+            "owner_conversation",
+            "Owner approved",
+            "Owner approved.",
+            "{}",
+            "test",
+            "seed",
+            outcome="owner_decision",
+        )
+        db.insert_project("Lifecycle Project", "test", "seed", id="PROJECT-X", status="active")
+        db.insert_work_item(
+            "WI-NONCANON-UNLINKED-001",
+            "unlinked",
+            "new",
+            "backlog",
+            "open",
+            "test",
+            "seed",
+            related_bridge_threads='["gtkb-unlinked-thread"]',
+        )
+        db.insert_work_item(
+            "WI-NONCANON-UNVERIFIED-001",
+            "unverified",
+            "new",
+            "backlog",
+            "open",
+            "test",
+            "seed",
+            related_bridge_threads='["gtkb-unverified-thread"]',
+        )
+        db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNLINKED-001", "test", "seed")
+        db.link_project_work_item("PROJECT-X", "WI-NONCANON-UNVERIFIED-001", "test", "seed")
+        db.insert_spec(id="SPEC-SEED", title="Seed spec", status="verified", changed_by="test", change_reason="seed")
+        db.insert_project_authorization(
+            "PROJECT-X",
+            "Lifecycle authorization",
+            "DELIB-SEED",
+            "Bounded scope.",
+            "test",
+            "seed",
+            id="PAUTH-X",
+            status="active",
+            included_work_item_ids=["WI-NONCANON-UNLINKED-001", "WI-NONCANON-UNVERIFIED-001"],
+            included_spec_ids=["SPEC-SEED"],
+        )
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            "bridge_thread",
+            "gtkb-unverified-thread",
+            "test",
+            "seed implements link",
+            relationship="implements",
+        )
+        service = ProjectLifecycleService(db)
+        assert service._verified_work_items_by_project(tmp_path).get("PROJECT-X", set()) == set()
+        with pytest.raises(ProjectLifecycleError, match="not completion-ready"):
+            service.complete_project_authorization("PAUTH-X", project_root=tmp_path, change_reason="complete")
+    finally:
+        db.close()
