@@ -271,7 +271,7 @@ def _run_git_with_lock_retry(
         raise VerifiedFinalizationError(f"git {' '.join(args)} did not run.")
     if check:
         raise VerifiedFinalizationError(
-            f"git {' '.join(args)} failed with exit {last.returncode}: {(last.stderr or last.stdout).strip()}"
+            f"git {' '.join(args)} failed (attempt {attempt + 1}/{attempts}) with exit {last.returncode}: {(last.stderr or last.stdout).strip()}"
         )
     return last
 
