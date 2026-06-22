@@ -1210,37 +1210,8 @@ def test_detect_counterpart_state_no_counterpart_files_no_warning(tmp_path, monk
     assert result["counterpart_present"] is False
 
 
-# WI-3342 IP-6 — KNOWN PRODUCTION REGRESSION (reported, not fixed here).
-#
-# The two tests below are written correctly against the migrated registry
-# projection, but they expose a genuine production defect introduced by the
-# WI-3342 IP-3 migration of ``scripts/harness_roles.py::load_role_assignments``:
-#
-#   * Pre-migration, ``load_role_assignments`` returned each harness record as
-#     a FULL dict (``dict(raw_record)``), preserving ``harness_type``.
-#   * Post-migration, it returns a MINIMAL ``{"role": [...]}`` record
-#     (harness_roles.py lines ~248-252) — ``harness_type`` is dropped.
-#   * ``detect_counterpart_state`` (scripts/workstream_focus.py line ~909)
-#     still keys ``per_harness_role_sets`` by ``record.get("harness_type")``,
-#     which is now always ``None`` -> the map is keyed by harness ID (A/B).
-#   * ``counterpart_present`` (line ~912-914) tests membership against
-#     ``DEFAULT_HARNESS_IDS`` KEYS (harness names ``codex``/``claude``), which
-#     never match the ID-keyed map -> ``counterpart_present`` is always False
-#     and ``same_role_slot`` never fires.
-#
-# Net effect: counterpart role-collision warnings silently never fire. This is
-# a production fix (workstream_focus.py should resolve harness names from the
-# registry projection, e.g. via load_harness_projection / harness_name, rather
-# than relying on the now-stripped harness_type), out of scope for this
-# test-only WI-3342 IP-6 work item. xfail keeps the correct test in place and
-# will xpass — flagging the marker for removal — once production is fixed.
-_COUNTERPART_HARNESS_TYPE_REGRESSION = (
-    "WI-3342 IP-3 production regression: load_role_assignments no longer "
-    "returns harness_type, so detect_counterpart_state keys per_harness_role_sets "
-    "by harness ID and counterpart_present (compared vs harness names) is always "
-    "False. Production fix required in scripts/workstream_focus.py; out of scope "
-    "for the test-only WI-3342 IP-6 work item."
-)
+# WI-3342 IP-3 counterpart-role matching is resolved; the tests below remain
+# live regression coverage for registry-projection role matching.
 
 
 def test_detect_counterpart_state_same_role_warns(tmp_path, monkeypatch) -> None:
