@@ -293,6 +293,8 @@ ADVISORY_REPORT_SECTIONS = (
     "Classification Slot",
 )
 AUDIT_OUTPUT_RELATIVE_PATH = Path(".codex") / "gtkb-hooks" / "last-bridge-audit.json"
+PENDING_TARGET_CACHE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-compliance" / "pending-proposal-targets.json"
+PENDING_TARGET_CACHE_SCHEMA_VERSION = 1
 
 
 def _record_gate_denial(pattern_id: str, subject: str, reason: str, *, root: Path | None = None) -> None:
@@ -422,41 +424,55 @@ def _canonical_project_root(cwd_path: Path) -> Path:
 
 def _status_from_versioned_bridge_file(path: Path) -> str | None:
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        handle = path.open("r", encoding="utf-8-sig", errors="replace")
     except OSError:
         return None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        match = BRIDGE_FILE_STATUS_RE.match(stripped)
-        return match.group(0).strip().split()[0].upper() if match else None
+    with handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = BRIDGE_FILE_STATUS_RE.match(stripped)
+            return match.group(0).strip().split()[0].upper() if match else None
     return None
 
 
-def _versioned_bridge_entries(project_root: Path) -> dict[str, list[tuple[int, str, str, Path]]]:
-    bridge_dir = project_root / "bridge"
-    entries: dict[str, list[tuple[int, str, str, Path]]] = {}
+def _project_relative_path(path: Path, project_root: Path) -> str:
     try:
-        candidates = list(bridge_dir.glob("*.md"))
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except (OSError, ValueError):
+        return path.as_posix()
+
+
+def _versioned_bridge_file_groups(project_root: Path) -> dict[str, list[tuple[int, Path]]]:
+    bridge_dir = project_root / "bridge"
+    groups: dict[str, list[tuple[int, Path]]] = {}
+    try:
+        candidates = list(bridge_dir.iterdir())
     except OSError:
-        return entries
+        return groups
     for path in candidates:
+        if not path.is_file():
+            continue
         match = BRIDGE_VERSIONED_FILE_RE.match(path.name)
         if not match:
             continue
+        groups.setdefault(match.group(1), []).append((int(match.group(2)), path))
+    for values in groups.values():
+        values.sort(key=lambda row: row[0], reverse=True)
+    return groups
+
+
+def _versioned_bridge_entries(project_root: Path) -> dict[str, list[tuple[int, str, str, Path]]]:
+    entries: dict[str, list[tuple[int, str, str, Path]]] = {}
+    for slug, values in _versioned_bridge_file_groups(project_root).items():
+        if not values:
+            continue
+        version, path = values[0]
         status = _status_from_versioned_bridge_file(path)
         if status is None:
             continue
-        slug = match.group(1)
-        version = int(match.group(2))
-        try:
-            rel_path = path.resolve().relative_to(project_root.resolve()).as_posix()
-        except (OSError, ValueError):
-            rel_path = path.as_posix()
-        entries.setdefault(slug, []).append((version, status, rel_path, path))
-    for values in entries.values():
-        values.sort(key=lambda row: row[0], reverse=True)
+        entries[slug] = [(version, status, _project_relative_path(path, project_root), path)]
     return entries
 
 
@@ -1132,10 +1148,16 @@ def _run_pending_applicability_preflight(
     return True, ""
 
 
-def _read_proposal_target_paths(project_root: Path, doc_name: str) -> list[str]:
+def _read_proposal_target_paths(
+    project_root: Path,
+    doc_name: str,
+    file_groups: dict[str, list[tuple[int, Path]]] | None = None,
+) -> list[str]:
     """Read target_paths from the latest Prime-authored proposal file."""
     proposal_path: Path | None = None
-    for _version, status, _rel_path, path in _versioned_bridge_entries(project_root).get(doc_name, []):
+    groups = file_groups if file_groups is not None else _versioned_bridge_file_groups(project_root)
+    for _version, path in groups.get(doc_name, []):
+        status = _status_from_versioned_bridge_file(path)
         if status in {"NEW", "REVISED"}:
             proposal_path = path
             break
@@ -1168,15 +1190,112 @@ def _read_proposal_target_paths(project_root: Path, doc_name: str) -> list[str]:
     return paths
 
 
+def _pending_target_cache_path(project_root: Path) -> Path:
+    return project_root / PENDING_TARGET_CACHE_RELATIVE_PATH
+
+
+def _bridge_dir_signature(project_root: Path) -> dict[str, int]:
+    bridge_dir = project_root / "bridge"
+    signature = {"file_count": 0, "max_mtime_ns": 0}
+    try:
+        with os.scandir(bridge_dir) as entries:
+            for entry in entries:
+                if not entry.is_file():
+                    continue
+                if not BRIDGE_VERSIONED_FILE_RE.match(entry.name):
+                    continue
+                signature["file_count"] += 1
+                try:
+                    stat_result = entry.stat()
+                except OSError:
+                    continue
+                mtime_ns = getattr(stat_result, "st_mtime_ns", int(stat_result.st_mtime * 1_000_000_000))
+                signature["max_mtime_ns"] = max(signature["max_mtime_ns"], int(mtime_ns))
+    except OSError:
+        pass
+    return signature
+
+
+def _read_pending_target_cache(project_root: Path, signature: dict[str, int]) -> list[dict[str, object]] | None:
+    try:
+        payload = json.loads(_pending_target_cache_path(project_root).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if payload.get("schema_version") != PENDING_TARGET_CACHE_SCHEMA_VERSION:
+        return None
+    if payload.get("bridge_signature") != signature:
+        return None
+    records = payload.get("records")
+    if not isinstance(records, list):
+        return None
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _write_pending_target_cache(
+    project_root: Path,
+    signature: dict[str, int],
+    records: list[dict[str, object]],
+) -> None:
+    cache_path = _pending_target_cache_path(project_root)
+    payload = {
+        "schema_version": PENDING_TARGET_CACHE_SCHEMA_VERSION,
+        "bridge_signature": signature,
+        "records": records,
+    }
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = cache_path.with_name(f"{cache_path.name}.{uuid4().hex}.tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp_path.replace(cache_path)
+    except OSError:
+        pass
+
+
+def _build_pending_proposal_targets(project_root: Path) -> list[dict[str, object]]:
+    file_groups = _versioned_bridge_file_groups(project_root)
+    records: list[dict[str, object]] = []
+    for doc_name, files in file_groups.items():
+        if not files:
+            continue
+        _version, latest_path = files[0]
+        status = _status_from_versioned_bridge_file(latest_path)
+        if status not in ("NEW", "REVISED", "NO-GO"):
+            continue
+        records.append(
+            {
+                "document": doc_name,
+                "status": status,
+                "target_paths": _read_proposal_target_paths(project_root, doc_name, file_groups),
+            }
+        )
+    return records
+
+
+def _pending_proposal_target_records(project_root: Path) -> list[dict[str, object]]:
+    signature = _bridge_dir_signature(project_root)
+    cached = _read_pending_target_cache(project_root, signature)
+    if cached is not None:
+        return cached
+    records = _build_pending_proposal_targets(project_root)
+    _write_pending_target_cache(project_root, signature, records)
+    return records
+
+
 def _pending_proposal_ask_reason(project_root: Path, file_path: str) -> str | None:
     """Return an ask-checkpoint reason when file_path matches a pending
     proposal's target_paths, or None."""
-    doc_statuses = _latest_bridge_statuses(project_root)
     file_path_normalized = file_path.replace("\\", "/")
-    for doc_name, status in doc_statuses.items():
+    for record in _pending_proposal_target_records(project_root):
+        doc_name = str(record.get("document") or "")
+        status = str(record.get("status") or "")
         if status not in ("NEW", "REVISED", "NO-GO"):
             continue
-        for tp in _read_proposal_target_paths(project_root, doc_name):
+        target_paths = record.get("target_paths")
+        if not isinstance(target_paths, list):
+            continue
+        for tp in target_paths:
+            if not isinstance(tp, str):
+                continue
             tp_norm = tp.replace("\\", "/")
             if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
                 if status == "NO-GO":
