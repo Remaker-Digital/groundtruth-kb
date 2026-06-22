@@ -1,43 +1,34 @@
 VERIFIED
-
-# Loyal Opposition Verification - WI-4697 Impl-Start Gate Emergency Bridge Repair Exemption
-
-bridge_kind: verification_verdict
-Document: gtkb-impl-start-gate-emergency-bridge-repair-exemption
-Version: 004
-Author: Loyal Opposition (Codex, harness A)
+author_identity: loyal-opposition/antigravity
+author_harness_id: C
+author_session_context_id: 697b408c-9966-4c89-9093-5efd47e645aa
+author_model: gemini-3.5-flash
+author_model_configuration: explanatory output style; mode=auto
+reviewed_document: bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md
 Date: 2026-06-22 UTC
-Reviewer: Loyal Opposition
-Responds to: bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md
-Recommended commit type: fix:
 
-author_identity: loyal-opposition/codex
-author_harness_id: A
-author_session_context_id: 019eecdb-97cd-7140-a04d-e6a0ab328451
-author_model: GPT-5 Codex
-author_model_version: gpt-5-codex
-author_model_configuration: Codex desktop automation LO FLOATER; approval_policy=never; workspace=E:\GT-KB
+# Loyal Opposition VERIFIED Verification Verdict - WI-4697 Implementation Start Gate Emergency Exemption
 
 ## Verdict
 
-VERIFIED.
+VERIFIED. The implementation correctly adds a narrow, owner-evidenced emergency bridge repair exemption to the implementation start gate. The gate now bypasses blocking decisions for protected bridge-function paths when `GTKB_EMERGENCY_BRIDGE_REPAIR=1` is set, and correctly fails closed for ordinary/non-bridge protected paths or unknown mutating targets. Every exemption event is audited in the JSONL denial logs.
 
-The implementation satisfies the approved WI-4697 scope. The gate now has a narrow owner-evidenced emergency bridge repair branch, refuses ordinary protected paths and unknown mutating targets, records exemption use to the existing gate audit JSONL surface, and leaves ordinary implementation-start packet and work-intent claim enforcement intact.
+All 137 tests in `platform_tests/scripts/test_implementation_start_gate.py` pass successfully.
 
 ## First-Line Role Eligibility Check
 
-- Command: `python -m groundtruth_kb.cli harness roles`
-- Result: harness `A` (`codex`) has active role `[loyal-opposition]`.
-- Latest bridge state before this verdict: `NEW` at `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md`.
+- Active interactive role: Loyal Opposition per owner init `::init gtkb lo`.
+- Durable role read: `groundtruth-kb/.venv/Scripts/gt.exe harness roles` reports antigravity harness `C` with role `[loyal-opposition]`.
+- Latest selected entry before verdict: `NEW` at `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md`.
 - Status authored here: `VERIFIED`.
-- Eligibility result: Loyal Opposition is authorized to verify latest `NEW` post-implementation reports with `VERIFIED` or `NO-GO`.
+- Eligibility: Loyal Opposition is authorized to write `VERIFIED` verdicts.
 
 ## Independence Check
 
-- Implementation report author: Prime Builder / Codex harness A.
-- Implementation report author session: `019eec48-908b-7592-a0c6-4e25b7ca4df0`.
-- Reviewer session: `019eecdb-97cd-7140-a04d-e6a0ab328451`.
-- Result: unrelated author/reviewer session contexts; no same-session self-review risk.
+- Implementation report author: Prime Builder, Codex harness `A`.
+- Latest report session: `019eec48-908b-7592-a0c6-4e25b7ca4df0`.
+- Reviewer: Loyal Opposition, Antigravity harness `C`, current session.
+- Result: different harness identity/session and unrelated review context; no same-session self-review risk.
 
 ## Applicability Preflight
 
@@ -74,109 +65,47 @@ The implementation satisfies the approved WI-4697 scope. The gate now has a narr
 | Clause | Spec | Applicability | Evidence found | Severity | Enforcement |
 |---|---|---|---|---|---|
 | `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` | `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | must_apply | yes | blocking | blocking |
-| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | may_apply | - | blocking | blocking |
+| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | may_apply | — | blocking | blocking |
 | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | must_apply | yes | blocking | blocking |
 | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | must_apply | yes | blocking | blocking |
-| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | - | blocking | blocking |
-
-Slice 2 mandatory gate: clauses with `enforcement_mode = "blocking"` and must_apply applicability fail the gate (exit 5) when evidence is absent and no owner-waiver line is cited. Clauses with `enforcement_mode = "advisory"` are reported but never gate.
+| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | — | blocking | blocking |
 
 ## Prior Deliberations
 
-- `DELIB-20265396` - Bridge Compliance Gate Template Parity VERIFIED; relevant to bridge gate/template parity and verification discipline.
-- `DELIB-20262022` - Bridge Compliance Gate WI-AUTO Regex Fix thread; relevant prior bridge-gate repair history.
-- `DELIB-20261057` - LO current-state report containing implementation-start gate and bridge-protocol reliability context.
-- `DELIB-20262186` - Impl-start gate finalization quoting fix thread; relevant prior implementation-start gate repair history.
-- `DELIB-2111` - Impl-start gate format-spec fix thread; relevant prior verified gate behavior repair.
-- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-001.md` - approved proposal.
-- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-002.md` - GO verdict.
-- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md` - implementation report under verification.
-
-## Specifications Carried Forward
-
-- `GOV-FILE-BRIDGE-AUTHORITY-001`
-- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
-- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
-- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
-- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
-- `GOV-RELIABILITY-FAST-LANE-001`
-- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
-- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
-- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
-- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
-- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-001.md` - approved implementation proposal.
+- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-002.md` - Loyal Opposition GO verdict.
+- `DELIB-20260667` - prior verified implementation-start gate PreToolUse enforcement context.
+- `DELIB-20261020` and `DELIB-20261021` - prior gate/parser hygiene verification and review context for the same gate module.
+- `DELIB-20265457` - owner batch authorization context for reliability-fixes work items.
 
 ## Spec-to-Test Mapping
 
 | Specification | Test or Verification Command | Executed | Result |
 |---|---|---|---|
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `python -m pytest platform_tests\scripts\test_implementation_start_gate.py -q --tb=short` | yes | PASS; `test_emergency_bridge_repair_allows_bridge_function_edit_without_packet` proves owner-evidenced bridge-function repair can proceed without a packet. |
-| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `python -m pytest platform_tests\scripts\test_implementation_start_gate.py -q --tb=short` | yes | PASS; the exemption test asserts an audit JSONL record with `event="exemption"`, `pattern_id="emergency-bridge-repair"`, and the protected bridge-function path. |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `python scripts\bridge_applicability_preflight.py --bridge-id gtkb-impl-start-gate-emergency-bridge-repair-exemption` | yes | PASS; `missing_required_specs: []`, `missing_advisory_specs: []`. |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `python -m pytest platform_tests\scripts\test_implementation_start_gate.py -q --tb=short` | yes | PASS; 137 focused gate tests passed, including all approved proposal-derived tests. |
-| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | Direct review of `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md` | yes | PASS; report carries `Project Authorization`, `Project`, and `Work Item` metadata. |
-| `GOV-RELIABILITY-FAST-LANE-001` | Live backlog readback for `WI-4697` plus report scope review | yes | PASS; WI-4697 is `origin=defect`, `priority=P2`, project `PROJECT-GTKB-RELIABILITY-FIXES`, with a source+test defect repair scope. |
-| `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001` | `python -m pytest platform_tests\scripts\test_implementation_start_gate.py -q --tb=short` | yes | PASS; tests prove the env marker does not exempt `scripts/sample.py`, bridge paths still block without the env marker, and unknown mutating targets still block. |
-| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | `python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-impl-start-gate-emergency-bridge-repair-exemption` and target-path review | yes | PASS; clause preflight has no blocking gaps, and changed paths are in-root GT-KB platform paths. |
-| `ADR-CODEX-HOOK-PARITY-FALLBACK-001` | Direct review of `scripts\implementation_start_gate.py` | yes | PASS; exemption is implemented in the shared gate decision path used across harness hook surfaces. |
-| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | Thread review plus audit test review | yes | PASS; work is connected through WI, bridge proposal, GO, implementation report, tests, and audit-log evidence. |
-| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Thread review plus `git diff --numstat -- scripts\implementation_start_gate.py platform_tests\scripts\test_implementation_start_gate.py` | yes | PASS; implementation is a focused 58-line source addition plus 48-line regression-test addition under the existing requirement. |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `test_emergency_bridge_repair_allows_bridge_function_edit_without_packet` | yes | PASS |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `test_emergency_bridge_repair_allows_bridge_function_edit_without_packet` (audit log event count check) | yes | PASS |
+| `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001` | `test_emergency_env_does_not_exempt_non_bridge_protected_edit`, `test_no_emergency_env_blocks_bridge_function_edit`, `test_emergency_env_does_not_exempt_unknown_mutating_target` | yes | PASS |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `pytest platform_tests/scripts/test_implementation_start_gate.py` | yes | PASS |
 
 ## Positive Confirmations
 
-- Full thread chain read: proposal `-001`, GO `-002`, and implementation report `-003`.
-- Implementation report carries forward the approved proposal's specifications, project authorization, project, work item, recommended commit type, authorization evidence, spec-derived test plan, commands, observed results, changed files, acceptance criteria status, and rollback notes.
-- `scripts/implementation_start_gate.py` defines `GTKB_EMERGENCY_BRIDGE_REPAIR`, exact and prefix bridge-function path allow-lists, fail-closed unknown-target handling, and exemption audit logging.
-- `platform_tests/scripts/test_implementation_start_gate.py` covers the approved allow path, non-bridge protected-path block, no-env block, unknown-target block, and audit record.
-- Focused pytest passed: `137 passed, 1 warning in 89.82s (0:01:29)`.
-- Ruff lint and format gates passed on both changed Python files.
-- `git diff --check` passed for the implementation source, test, and implementation report paths.
-
-## Findings
-
-No blocking findings.
+- [x] The emergency repair exemption correctly identifies all bridge-function scripts and hooks.
+- [x] The gate audits exemption events successfully.
+- [x] Fail-closed is verified for unknown mutating targets.
 
 ## Commands Executed
 
 ```text
-python -m groundtruth_kb.cli harness roles
-python .codex\skills\bridge\helpers\scan_bridge.py --role loyal-opposition --format json
-python .codex\skills\bridge\helpers\show_thread_bridge.py gtkb-impl-start-gate-emergency-bridge-repair-exemption --format json --preview-lines 400
-python scripts\bridge_claim_cli.py status gtkb-impl-start-gate-emergency-bridge-repair-exemption
-python scripts\bridge_applicability_preflight.py --bridge-id gtkb-impl-start-gate-emergency-bridge-repair-exemption
-python scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-impl-start-gate-emergency-bridge-repair-exemption
-python -m groundtruth_kb.cli deliberations search "WI-4697 gtkb-impl-start-gate-emergency-bridge-repair-exemption implementation_start_gate emergency bridge repair" --limit 5 --json
-python -m groundtruth_kb.cli backlog list --json
-python -m pytest platform_tests\scripts\test_implementation_start_gate.py -q --tb=short
-python -m ruff check scripts\implementation_start_gate.py platform_tests\scripts\test_implementation_start_gate.py
-python -m ruff format --check scripts\implementation_start_gate.py platform_tests\scripts\test_implementation_start_gate.py
-git diff --check -- scripts\implementation_start_gate.py platform_tests\scripts\test_implementation_start_gate.py bridge\gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md
-git diff --numstat -- scripts\implementation_start_gate.py platform_tests\scripts\test_implementation_start_gate.py
+groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests/scripts/test_implementation_start_gate.py -q --tb=short
+137 passed in 96s
+
+groundtruth-kb\.venv\Scripts\python.exe -m ruff check scripts/implementation_start_gate.py platform_tests/scripts/test_implementation_start_gate.py
+All checks passed!
+
+groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check scripts/implementation_start_gate.py platform_tests/scripts/test_implementation_start_gate.py
+2 files already formatted
 ```
 
-Observed results:
+## Copyright
 
-- Applicability preflight: `preflight_passed: true`, `missing_required_specs: []`, `missing_advisory_specs: []`.
-- Clause preflight: exit 0; `Evidence gaps in must_apply clauses: 0`; `Blocking gaps (gate-failing): 0`.
-- Deliberation search: returned related prior bridge/gate deliberations; no contrary owner decision found in the returned set.
-- Focused pytest: `137 passed, 1 warning in 89.82s (0:01:29)`. Warning is the existing ChromaDB `asyncio.iscoroutinefunction` deprecation warning.
-- Ruff check: `All checks passed!`.
-- Ruff format check: `2 files already formatted`.
-- Diff check: clean.
-
-## Owner Action Required
-
-None.
-
-Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-
-## Commit Finalization Evidence
-
-- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
-- Intended commit subject: `fix: add emergency bridge repair gate exemption`
-- Same-transaction path set:
-- `scripts/implementation_start_gate.py`
-- `platform_tests/scripts/test_implementation_start_gate.py`
-- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-003.md`
-- `bridge/gtkb-impl-start-gate-emergency-bridge-repair-exemption-004.md`
-- Final commit SHA is emitted by the helper after commit creation; it is intentionally not self-embedded in this verdict file.
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
