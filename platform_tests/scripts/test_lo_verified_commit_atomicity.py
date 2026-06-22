@@ -11,6 +11,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFY_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
+CODEX_VERIFY_HELPER_PATH = REPO_ROOT / ".codex" / "skills" / "verify" / "helpers" / "write_verdict.py"
 
 
 def _load_verify_helper():
@@ -43,6 +44,15 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _index_lock_failure(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+        ["git", *args],
+        1,
+        "",
+        "fatal: Unable to create 'E:/GT-KB/.git/index.lock': Permission denied",
+    )
 
 
 def _init_verified_repo(tmp_path: Path) -> Path:
@@ -152,12 +162,125 @@ def test_commit_failure_removes_verified_verdict_and_unstages_helper_paths(
     assert "bridge/sample-003.md" in _git(repo, "status", "--short").stdout
 
 
-def test_unrelated_staged_path_fails_before_verified_verdict_is_written(verify_helper, tmp_path: Path) -> None:
+def test_unrelated_staged_path_is_tolerated_and_excluded_from_commit(verify_helper, tmp_path: Path) -> None:
     repo = _init_verified_repo(tmp_path)
+    # Another session left an unrelated file staged in the shared index.
     _write(repo / "scripts" / "unrelated.py", "VALUE = 99\n")
     _git(repo, "add", "--", "scripts/unrelated.py")
 
-    with pytest.raises(verify_helper.VerifiedFinalizationError, match="clean staging area"):
+    result = verify_helper.finalize_verified_commit(
+        "sample",
+        _verified_body(),
+        include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+        commit_message="fix(gtkb): finalize verified sample work",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    # The VERIFIED commit contains ONLY the verified path set + verdict; the
+    # unrelated staged file is excluded via the explicit-pathspec commit.
+    committed = set(_git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.splitlines())
+    assert committed == {"bridge/sample-003.md", "bridge/sample-004.md", "scripts/feature.py"}
+    assert "scripts/unrelated.py" not in committed
+    assert result.verdict_path == "bridge/sample-004.md"
+    # The unrelated session's staged work is left untouched (still staged).
+    staged = set(_git(repo, "diff", "--name-only", "--cached", "--").stdout.splitlines())
+    assert "scripts/unrelated.py" in staged
+
+
+def test_verified_finalization_retries_transient_index_lock_on_add(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    real_run_git = verify_helper._run_git
+    add_attempts = 0
+    sleeps: list[float] = []
+
+    def transient_add_lock(args: list[str], *, cwd: Path, check: bool = False):
+        nonlocal add_attempts
+        if args and args[0] == "add":
+            add_attempts += 1
+            if add_attempts == 1:
+                return _index_lock_failure(args)
+        return real_run_git(args, cwd=cwd, check=check)
+
+    monkeypatch.setattr(verify_helper, "_run_git", transient_add_lock)
+    monkeypatch.setattr(verify_helper.time, "sleep", sleeps.append)
+
+    result = verify_helper.finalize_verified_commit(
+        "sample",
+        _verified_body(),
+        include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+        commit_message="fix(gtkb): finalize verified sample work",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    committed = set(_git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.splitlines())
+    assert committed == {"bridge/sample-003.md", "bridge/sample-004.md", "scripts/feature.py"}
+    assert result.verdict_path == "bridge/sample-004.md"
+    assert add_attempts == 2
+    assert sleeps == [0.5]
+    assert _git(repo, "diff", "--name-only", "--cached", "--").stdout.strip() == ""
+
+
+def test_verified_finalization_retries_transient_index_lock_on_commit(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    real_run_git = verify_helper._run_git
+    commit_attempts = 0
+    sleeps: list[float] = []
+
+    def transient_commit_lock(args: list[str], *, cwd: Path, check: bool = False):
+        nonlocal commit_attempts
+        if args and args[0] == "commit":
+            commit_attempts += 1
+            if commit_attempts == 1:
+                return _index_lock_failure(args)
+        return real_run_git(args, cwd=cwd, check=check)
+
+    monkeypatch.setattr(verify_helper, "_run_git", transient_commit_lock)
+    monkeypatch.setattr(verify_helper.time, "sleep", sleeps.append)
+
+    result = verify_helper.finalize_verified_commit(
+        "sample",
+        _verified_body(),
+        include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+        commit_message="fix(gtkb): finalize verified sample work",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    assert result.commit_sha == _git(repo, "rev-parse", "HEAD").stdout.strip()
+    assert commit_attempts == 2
+    assert sleeps == [0.5]
+    assert _git(repo, "diff", "--name-only", "--cached", "--").stdout.strip() == ""
+
+
+def test_verified_finalization_does_not_retry_non_lock_git_failure(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    real_run_git = verify_helper._run_git
+    add_attempts = 0
+
+    def fail_add_without_lock(args: list[str], *, cwd: Path, check: bool = False):
+        nonlocal add_attempts
+        if args and args[0] == "add":
+            add_attempts += 1
+            return subprocess.CompletedProcess(["git", *args], 1, "", "pathspec error")
+        return real_run_git(args, cwd=cwd, check=check)
+
+    monkeypatch.setattr(verify_helper, "_run_git", fail_add_without_lock)
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="pathspec error"):
         verify_helper.finalize_verified_commit(
             "sample",
             _verified_body(),
@@ -167,7 +290,56 @@ def test_unrelated_staged_path_fails_before_verified_verdict_is_written(verify_h
             pre_populate=False,
         )
 
+    assert add_attempts == 1
     assert not (repo / "bridge" / "sample-004.md").exists()
+    assert _git(repo, "diff", "--name-only", "--cached", "--").stdout.strip() == ""
+
+
+def test_verified_finalization_exhausts_lock_retries(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    real_run_git = verify_helper._run_git
+    add_attempts = 0
+    sleeps: list[float] = []
+
+    def always_lock_add(args: list[str], *, cwd: Path, check: bool = False):
+        nonlocal add_attempts
+        if args and args[0] == "add":
+            add_attempts += 1
+            return _index_lock_failure(args)
+        return real_run_git(args, cwd=cwd, check=check)
+
+    monkeypatch.setattr(verify_helper, "_run_git", always_lock_add)
+    monkeypatch.setattr(verify_helper.time, "sleep", sleeps.append)
+    monkeypatch.setenv("GTKB_VERIFIED_COMMIT_LOCK_RETRIES", "3")
+    monkeypatch.setenv("GTKB_VERIFIED_COMMIT_LOCK_BASE_DELAY", "0.25")
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="index.lock"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): finalize verified sample work",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert add_attempts == 3
+    assert sleeps == [0.25, 0.5]
+    assert not (repo / "bridge" / "sample-004.md").exists()
+    assert _git(repo, "diff", "--name-only", "--cached", "--").stdout.strip() == ""
+
+
+def test_verify_helper_codex_twin_matches_claude_and_has_retry() -> None:
+    claude_bytes = VERIFY_HELPER_PATH.read_bytes()
+    codex_bytes = CODEX_VERIFY_HELPER_PATH.read_bytes()
+
+    assert codex_bytes == claude_bytes
+    assert b"def _run_git_with_lock_retry" in claude_bytes
+    assert b"def _run_git_with_lock_retry" in codex_bytes
 
 
 def test_verified_body_requires_executed_spec_to_test_mapping(verify_helper, tmp_path: Path) -> None:

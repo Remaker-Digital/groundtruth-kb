@@ -324,10 +324,12 @@ def finalize_verified_commit(
 ) -> VerifiedFinalizationResult:
     """Write a VERIFIED verdict and create the final local commit as one transaction.
 
-    The helper writes the next versioned bridge verdict, stages exactly the
-    verified path set plus that verdict, and creates a local `git commit`. If
-    any step after the verdict write fails, the verdict file is removed and the
-    staged paths added by this helper are unstaged.
+    The helper writes the next versioned bridge verdict, stages the verified
+    path set plus that verdict, and commits ONLY that path set via an explicit
+    pathspec. Unrelated paths already staged in the shared index by other
+    sessions are tolerated and left untouched (never folded into this commit).
+    If any step after the verdict write fails, the verdict file is removed and
+    the staged paths added by this helper are unstaged.
     """
     root = _project_root_from_arg(project_root)
     if not include_paths:
@@ -343,12 +345,12 @@ def finalize_verified_commit(
     if len(expected_paths) != len(include_paths) + 1:
         raise VerifiedFinalizationError("VERIFIED finalization include paths must not duplicate the verdict path.")
 
-    staged_before = _staged_paths(root)
-    if staged_before:
-        raise VerifiedFinalizationError(
-            "VERIFIED finalization requires a clean staging area before it stages the verified path set. "
-            f"Currently staged: {', '.join(staged_before)}"
-        )
+    # Pre-existing staged paths from other sessions in the shared index are
+    # tolerated: the final commit below uses an explicit pathspec, so only the
+    # verified path set is committed regardless of unrelated staged work. We
+    # capture them to scope the post-`git add` staged-set assertion to this
+    # helper's own paths; unrelated staged entries are left untouched.
+    staged_before = set(_staged_paths(root))
 
     body_to_write = seed_prior_deliberations(
         slug,
@@ -380,15 +382,23 @@ def finalize_verified_commit(
     write_bridge_file(slug, next_version, body_to_write, root)
     try:
         _run_git_with_lock_retry(["add", "-f", "--", *expected_paths], cwd=root)
-        staged_after = _staged_paths(root)
-        if set(staged_after) != set(dirty_expected_paths):
-            missing = sorted(set(dirty_expected_paths) - set(staged_after))
-            extra = sorted(set(staged_after) - set(dirty_expected_paths))
+        staged_after = set(_staged_paths(root))
+        missing = set(dirty_expected_paths) - staged_after
+        # Anything staged beyond the helper's own expected paths must be a
+        # pre-existing unrelated entry (tolerated); the helper must never have
+        # introduced new staging of its own beyond `dirty_expected_paths`.
+        unexpected_new = (staged_after - set(dirty_expected_paths)) - staged_before
+        if missing or unexpected_new:
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
-                f"missing={missing}; extra={extra}; expected_dirty={list(dirty_expected_paths)}"
+                f"missing={sorted(missing)}; unexpected_new={sorted(unexpected_new)}; "
+                f"expected_dirty={list(dirty_expected_paths)}; pre_existing_staged={sorted(staged_before)}"
             )
-        commit = _run_git_with_lock_retry(["commit", "-m", commit_message], cwd=root, check=False)
+        # Commit ONLY the verified path set via explicit pathspec so unrelated
+        # pre-existing staged files are never folded into this VERIFIED commit.
+        commit = _run_git_with_lock_retry(
+            ["commit", "-m", commit_message, "--", *expected_paths], cwd=root, check=False
+        )
         if commit.returncode != 0:
             raise VerifiedFinalizationError(
                 f"git commit failed with exit {commit.returncode}: {(commit.stderr or commit.stdout).strip()}"
