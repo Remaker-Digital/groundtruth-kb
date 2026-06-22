@@ -314,6 +314,33 @@ def test_run_trigger_target_active_records_suppressed_not_dispatched(trigger_mod
     assert prime_state.get("signature") in (None,), f"expected None or unchanged, got {prime_state.get('signature')!r}"
 
 
+def test_run_trigger_active_session_lock_suppresses_ahead_of_leases(trigger_module, tmp_path: Path) -> None:
+    """WI-4753: a fresh target active-session LOCK suppresses dispatch via the
+    pre-spawn check_target_active guard, AHEAD of per-document lease filtering.
+
+    No document lease is planted, so any suppression here is attributable to the
+    pre-spawn active-session guard (the headless-dispatch storm backpressure),
+    not to lease filtering. The suppressed (not dispatched) signature must be
+    recorded so the work stays retryable once the target exits.
+    """
+    project_root = _make_minimal_index(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    # Fresh active-session lock for the selected prime-builder target (B=claude).
+    _write_lock(state_dir, "claude")
+
+    result = _run_trigger_dry(trigger_module, project_root, state_dir)
+
+    prime_state = result["dispatch_state"]["recipients"]["prime-builder"]
+    assert prime_state["last_result"] == "target_active_session_present"
+    assert prime_state["last_suppressed_signature"] is not None
+    # Active-session suppression must NOT record a dispatched signature
+    # (keeps the work retryable once the target exits).
+    assert prime_state.get("last_dispatched_signature") in (None,), (
+        f"expected None, got {prime_state.get('last_dispatched_signature')!r}"
+    )
+
+
 def test_run_trigger_retry_after_target_exits(trigger_module, tmp_path: Path) -> None:
     """T-SUPPRESS-retry-after-counterpart-exits (F1 fix critical).
 
