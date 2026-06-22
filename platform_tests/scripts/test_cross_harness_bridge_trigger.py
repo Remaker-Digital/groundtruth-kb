@@ -1986,6 +1986,121 @@ def test_diagnose_migrates_legacy_recipient_keys_before_liveness(
     assert "DEGRADED" not in output
 
 
+def test_reset_recipient_survives_concurrent_full_state_write(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A stale full-state writer must not restore a recipient reset."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    original = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "failure_count": 4,
+                "circuit_breaker_tripped": True,
+                "circuit_breaker_tripped_at": "2026-06-21T00:00:00+00:00",
+                "updated_at": "2026-06-21T00:00:00+00:00",
+            }
+        },
+        "schema_version": 1,
+        "updated_at": "2026-06-21T00:00:00+00:00",
+    }
+    trigger._write_dispatch_state(state_dir, original)
+    stale_snapshot = trigger._load_dispatch_state(state_dir, root)
+
+    assert (
+        trigger.main(
+            ["--project-root", str(root), "--state-dir", str(state_dir), "--reset-recipient", "loyal-opposition"]
+        )
+        == 0
+    )
+    assert "Reset circuit breaker and failure count" in capsys.readouterr().out
+
+    trigger._write_dispatch_state(state_dir, stale_snapshot)
+    final = trigger._load_dispatch_state(state_dir, root)
+    recipient = final["recipients"]["loyal-opposition:A"]
+    assert recipient["failure_count"] == 0
+    assert recipient["circuit_breaker_tripped"] is False
+    assert "circuit_breaker_tripped_at" not in recipient
+
+
+def test_reset_recipient_fails_fast_when_guard_held(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A fresh reset guard returns immediately instead of blocking."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "failure_count": 2,
+                "circuit_breaker_tripped": True,
+                "updated_at": "2026-06-21T00:00:00+00:00",
+            }
+        },
+        "schema_version": 1,
+    }
+    trigger._write_dispatch_state(state_dir, state)
+    trigger._reset_guard_path(state_dir).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "token": "peer",
+                "pid": 12345,
+                "acquired_at": trigger._now_iso(),
+                "ttl_seconds": 30,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        trigger.main(
+            ["--project-root", str(root), "--state-dir", str(state_dir), "--reset-recipient", "loyal-opposition"]
+        )
+        == 0
+    )
+    assert "Another trigger instance is mutating dispatch-state; retry the reset." in capsys.readouterr().out
+    recipient = trigger._load_dispatch_state(state_dir, root)["recipients"]["loyal-opposition:A"]
+    assert recipient["failure_count"] == 2
+    assert recipient["circuit_breaker_tripped"] is True
+
+
+def test_diagnose_is_read_only_and_lock_free(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Diagnose must not create the reset guard or mutate dispatch-state."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "last_result": "launch_failed",
+                "failure_count": 1,
+                "circuit_breaker_tripped": False,
+                "updated_at": "2026-06-21T00:00:00+00:00",
+            }
+        },
+        "schema_version": 1,
+    }
+    trigger._write_dispatch_state(state_dir, state)
+    state_path = state_dir / "dispatch-state.json"
+    before = state_path.read_text(encoding="utf-8")
+
+    assert trigger.main(["--project-root", str(root), "--state-dir", str(state_dir), "--diagnose"]) == 0
+    assert "Cross-harness trigger diagnose" in capsys.readouterr().out
+    assert trigger._reset_guard_path(state_dir).exists() is False
+    assert state_path.read_text(encoding="utf-8") == before
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # WI-3265 — dispatch-state-lag diagnostic instrumentation (IP-2)
 # Per bridge/gtkb-cross-harness-trigger-dispatch-state-lag-003.md (Codex GO -004).

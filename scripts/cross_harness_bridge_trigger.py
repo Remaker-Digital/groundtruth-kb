@@ -144,6 +144,7 @@ LOOP_PREVENTION_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 DEFAULT_STATE_SUBDIR = (".gtkb-state", "cross-harness-trigger")
 BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 DISPATCH_STATE_FILENAME = "dispatch-state.json"
+DISPATCH_STATE_RESET_GUARD_FILENAME = "dispatch-state-reset.lock"
 QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
@@ -163,6 +164,7 @@ EXPECTED_SUPPRESSION_REASONS = frozenset({"work_intent_already_held", "headless_
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
 DEFAULT_DISPATCH_RUNS_MAX_BYTES = 200 * 1024 * 1024
 DEFAULT_GTKB_STATE_GC_AGE_DAYS = 14
+DISPATCH_STATE_RESET_GUARD_TTL_SECONDS = 30.0
 RUNTIME_RETENTION_CONFIG_REL = Path("config") / "governance" / "runtime-evidence-retention.toml"
 # WI-4472: hard global concurrency cap on live dispatched headless harness
 # processes. The 2026-06-11 dispatch storm accumulated ~300 hung codex
@@ -521,6 +523,7 @@ def _write_dispatch_state(state_dir: Path, payload: dict[str, Any]) -> None:
     exception propagates.
     """
     state_dir.mkdir(parents=True, exist_ok=True)
+    payload = _preserve_newer_recipient_resets(state_dir, payload)
     target = state_dir / DISPATCH_STATE_FILENAME
     unique = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
     tmp = target.with_suffix(target.suffix + f".{unique}.tmp")
@@ -533,6 +536,157 @@ def _write_dispatch_state(state_dir: Path, payload: dict[str, Any]) -> None:
                 tmp.unlink()
         except OSError:
             pass
+
+
+def _parse_updated_at(value: Any) -> dt.datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt.UTC)
+    return parsed.astimezone(dt.UTC)
+
+
+def _preserve_newer_recipient_resets(state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    """Preserve a newer manual reset when a stale full-state writer follows it."""
+    target = state_dir / DISPATCH_STATE_FILENAME
+    try:
+        current = json.loads(target.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return payload
+    if not isinstance(current, dict):
+        return payload
+    current_recipients = current.get("recipients")
+    incoming_recipients = payload.get("recipients")
+    if not isinstance(current_recipients, dict) or not isinstance(incoming_recipients, dict):
+        return payload
+
+    for key, current_state in current_recipients.items():
+        incoming_state = incoming_recipients.get(key)
+        if not isinstance(current_state, dict) or not isinstance(incoming_state, dict):
+            continue
+        current_updated = _parse_updated_at(current_state.get("updated_at"))
+        incoming_updated = _parse_updated_at(incoming_state.get("updated_at"))
+        if current_updated is None or incoming_updated is None or current_updated <= incoming_updated:
+            continue
+        if current_state.get("failure_count") != 0 or current_state.get("circuit_breaker_tripped"):
+            continue
+        incoming_state["failure_count"] = 0
+        incoming_state["circuit_breaker_tripped"] = False
+        incoming_state["updated_at"] = current_state.get("updated_at")
+        incoming_state.pop("circuit_breaker_tripped_at", None)
+        incoming_state.pop("circuit_breaker_half_open", None)
+    return payload
+
+
+def _reset_guard_path(state_dir: Path) -> Path:
+    return state_dir / DISPATCH_STATE_RESET_GUARD_FILENAME
+
+
+def _read_reset_guard(path: Path) -> dict[str, Any] | None:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _reset_guard_is_stale(record: dict[str, Any] | None) -> bool:
+    if record is None:
+        return True
+    acquired = _parse_updated_at(record.get("acquired_at"))
+    if acquired is None:
+        return True
+    ttl = record.get("ttl_seconds", DISPATCH_STATE_RESET_GUARD_TTL_SECONDS)
+    if not isinstance(ttl, (int, float)) or isinstance(ttl, bool) or ttl <= 0:
+        ttl = DISPATCH_STATE_RESET_GUARD_TTL_SECONDS
+    return (dt.datetime.now(dt.UTC) - acquired).total_seconds() > float(ttl)
+
+
+def _try_acquire_reset_guard(state_dir: Path) -> str | None:
+    state_dir.mkdir(parents=True, exist_ok=True)
+    path = _reset_guard_path(state_dir)
+    token = uuid.uuid4().hex
+    record = {
+        "schema_version": 1,
+        "token": token,
+        "pid": os.getpid(),
+        "acquired_at": _now_iso(),
+        "ttl_seconds": DISPATCH_STATE_RESET_GUARD_TTL_SECONDS,
+    }
+    for attempt in range(2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            if attempt == 0 and _reset_guard_is_stale(_read_reset_guard(path)):
+                try:
+                    path.unlink()
+                except OSError:
+                    return None
+                continue
+            return None
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(record, f, indent=2, sort_keys=True)
+                f.write("\n")
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                path.unlink()
+            except OSError:
+                pass
+            raise
+        return token
+    return None
+
+
+def _release_reset_guard(state_dir: Path, token: str) -> None:
+    path = _reset_guard_path(state_dir)
+    record = _read_reset_guard(path)
+    if not isinstance(record, dict) or record.get("token") != token:
+        return
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def _reset_recipient_state(
+    state_dir: Path,
+    project_root: Path,
+    target_recipient: str,
+) -> tuple[str, int]:
+    token = _try_acquire_reset_guard(state_dir)
+    if token is None:
+        return ("contended", 0)
+    try:
+        state = _load_dispatch_state(state_dir, project_root)
+        recipients_state = state.get("recipients") if isinstance(state, dict) else {}
+        if not isinstance(recipients_state, dict):
+            recipients_state = {}
+        reset_count = 0
+        for key in list(recipients_state.keys()):
+            if key == target_recipient or key.startswith(target_recipient + ":"):
+                if isinstance(recipients_state[key], dict):
+                    recipients_state[key]["failure_count"] = 0
+                    recipients_state[key]["circuit_breaker_tripped"] = False
+                    recipients_state[key]["updated_at"] = _now_iso()
+                    recipients_state[key].pop("circuit_breaker_tripped_at", None)
+                    recipients_state[key].pop("circuit_breaker_half_open", None)
+                    reset_count += 1
+        if reset_count > 0:
+            state["recipients"] = recipients_state
+            _write_dispatch_state(state_dir, state)
+            return ("reset", reset_count)
+        return ("not_found", 0)
+    finally:
+        _release_reset_guard(state_dir, token)
 
 
 def _write_quiesce_state(state_dir: Path, payload: dict[str, Any]) -> None:
@@ -4762,22 +4916,12 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.reset_recipient:
-            state = _load_dispatch_state(state_dir, project_root)
-            recipients_state = state.get("recipients") if isinstance(state, dict) else {}
-            if not isinstance(recipients_state, dict):
-                recipients_state = {}
             target_recipient = args.reset_recipient.strip()
-            reset_count = 0
-            for key in list(recipients_state.keys()):
-                if key == target_recipient or key.startswith(target_recipient + ":"):
-                    if isinstance(recipients_state[key], dict):
-                        recipients_state[key]["failure_count"] = 0
-                        recipients_state[key]["circuit_breaker_tripped"] = False
-                        recipients_state[key]["updated_at"] = _now_iso()
-                        reset_count += 1
-            if reset_count > 0:
-                state["recipients"] = recipients_state
-                _write_dispatch_state(state_dir, state)
+            reset_result, reset_count = _reset_recipient_state(state_dir, project_root, target_recipient)
+            if reset_result == "contended":
+                if args.verbose or not args.stop_hook:
+                    print("Another trigger instance is mutating dispatch-state; retry the reset.")
+            elif reset_result == "reset":
                 if args.verbose or not args.stop_hook:
                     print(
                         f"Reset circuit breaker and failure count for recipient '{target_recipient}' (updated {reset_count} entries)."
