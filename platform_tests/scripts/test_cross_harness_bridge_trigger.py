@@ -3197,6 +3197,98 @@ def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(
     assert "loyal-opposition:F" not in summary["results"]
 
 
+def test_lo_quality_first_spillover_dispatches_distinct_batches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4691: ready quality-qualified LO targets receive spillover, not broadcast."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    (root / "config" / "dispatcher").mkdir(parents=True)
+    (root / "config" / "dispatcher" / "rules.toml").write_text(
+        """
+schema_version = 1
+selection_order = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+
+[harnesses.A]
+dispatch_quality = 90
+dispatch_cost = 60
+dispatch_availability = 90
+
+[harnesses.D]
+dispatch_quality = 80
+dispatch_cost = 30
+dispatch_availability = 95
+
+[harnesses.F]
+dispatch_quality = 80
+dispatch_cost = 20
+dispatch_availability = 90
+
+[[rules]]
+id = "bridge-loyal-opposition-quality-first"
+required_roles = ["loyal-opposition"]
+statuses = ["NEW", "REVISED"]
+prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+    _write_registry(
+        root,
+        [
+            _rec(
+                "A",
+                "codex",
+                ["loyal-opposition"],
+                "active",
+                {
+                    "headless": {
+                        "argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"],
+                        "max_items": 1,
+                    }
+                },
+                can_receive_dispatch=True,
+                reviewer_precedence=20,
+            ),
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"], "max_items": 1}},
+                can_receive_dispatch=True,
+                reviewer_precedence=10,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"], "max_items": 1}},
+                can_receive_dispatch=True,
+                reviewer_precedence=30,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_three_new(root))
+    trigger = _load_trigger()
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    assert "results" in summary, summary
+    assert summary["results"]["loyal-opposition"].get("selected_candidate"), summary["results"]
+    assert summary["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "A"
+    state = summary["dispatch_state"]["recipients"]
+    expected_keys = ["loyal-opposition:A", "loyal-opposition:F", "loyal-opposition:D"]
+    assert [state[key]["selected_candidate"]["harness_id"] for key in expected_keys] == ["A", "F", "D"]
+    assert [state[key]["selected_count"] for key in expected_keys] == [1, 1, 1]
+    signatures = [state[key]["last_dispatched_signature"] for key in expected_keys]
+    assert len(set(signatures)) == 3
+
+
 def test_lo_ordered_fallback_skips_not_ready_preferred_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
