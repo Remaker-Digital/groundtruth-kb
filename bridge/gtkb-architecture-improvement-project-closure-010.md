@@ -117,6 +117,11 @@ Clauses with `enforcement_mode = "advisory"` are reported but never gate._
 - `bridge/gtkb-architecture-improvement-project-closure-006.md` - GO containment conditions for this closure.
 - `bridge/gtkb-implementation-authorization-retired-project-reconciliation-006.md` - prerequisite repair now terminal VERIFIED.
 
+
+### Helper-suggested candidates
+
+_No prior deliberations: <fill in reason before filing>._
+
 ## Specifications Carried Forward
 
 - `GOV-FILE-BRIDGE-AUTHORITY-001`
