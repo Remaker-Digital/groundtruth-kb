@@ -62,6 +62,7 @@ bridge_kind: ${bridge_kind}
 Document: ${slug}
 Version: 001 (DRAFT; non-dispatchable)
 Date: ${date}
+${author_metadata_block}
 
 Project Authorization: ${project_authorization_id}
 Project: ${project_id}
@@ -174,6 +175,34 @@ def _validate_slug(slug: str) -> None:
         raise click.ClickException("Slug must be lowercase kebab-case using only a-z, 0-9, and hyphens.")
 
 
+def _placeholder_author_metadata_block() -> str:
+    fields = (
+        "author_identity",
+        "author_harness_id",
+        "author_session_context_id",
+        "author_model",
+        "author_model_version",
+        "author_model_configuration",
+    )
+    return "\n".join(f"{field}: TODO: <fill {field}>" for field in fields) + "\n"
+
+
+def _author_metadata_block(project_root: Path) -> str:
+    try:
+        from scripts.bridge_author_metadata import (
+            BridgeAuthorMetadataError,
+            load_author_metadata,
+            render_author_metadata_lines,
+        )
+    except Exception:
+        return _placeholder_author_metadata_block()
+
+    try:
+        return "".join(render_author_metadata_lines(load_author_metadata(project_root)))
+    except BridgeAuthorMetadataError:
+        return _placeholder_author_metadata_block()
+
+
 def build_propose_context(
     db: KnowledgeDB,
     project_root: Path,
@@ -197,6 +226,7 @@ def build_propose_context(
         "slug": slug,
         "kind": kind,
         "date": f"{datetime.now(UTC).date().isoformat()} UTC",
+        "author_metadata_block": _author_metadata_block(project_root),
         "wi_id": wi_id,
         "wi_title": str(work_item.get("title") or wi_id),
         "wi_description": str(work_item.get("description") or ""),

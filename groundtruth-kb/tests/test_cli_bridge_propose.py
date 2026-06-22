@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from scripts.bridge_author_metadata import FIELD_ENV_NAMES, REQUIRED_AUTHOR_METADATA_FIELDS
 
 from groundtruth_kb.bridge.proposal_autoload import (
     auto_prior_delibs,
@@ -96,6 +97,70 @@ def _context(project_dir: Path, kind: str = "implementation") -> dict:
         )
     finally:
         db.close()
+
+
+def _clear_author_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for names in FIELD_ENV_NAMES.values():
+        for name in names:
+            monkeypatch.delenv(name, raising=False)
+
+
+def test_scaffold_emits_six_author_metadata_field_labels(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_author_env(monkeypatch)
+    _seed_project(project_dir)
+    rendered = render_proposal_draft("implementation", _context(project_dir))
+
+    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
+        assert f"{field}:" in rendered
+
+
+def test_scaffold_author_block_after_date_before_project_auth(
+    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_author_env(monkeypatch)
+    _seed_project(project_dir)
+    rendered = render_proposal_draft("implementation", _context(project_dir))
+
+    assert rendered.index("Date: ") < rendered.index("author_identity:")
+    assert rendered.index("author_model_configuration:") < rendered.index("Project Authorization:")
+
+
+def test_scaffold_author_block_populates_resolvable_fields_from_env(
+    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_author_env(monkeypatch)
+    values = {
+        "GTKB_AUTHOR_IDENTITY": "prime-builder/test-harness",
+        "GTKB_AUTHOR_HARNESS_ID": "T",
+        "GTKB_AUTHOR_SESSION_CONTEXT_ID": "test-session-123",
+        "GTKB_AUTHOR_MODEL": "test-model",
+        "GTKB_AUTHOR_MODEL_VERSION": "test-model-version",
+        "GTKB_AUTHOR_MODEL_CONFIGURATION": "test-config",
+    }
+    for name, value in values.items():
+        monkeypatch.setenv(name, value)
+
+    _seed_project(project_dir)
+    rendered = render_proposal_draft("implementation", _context(project_dir))
+
+    assert "author_identity: prime-builder/test-harness" in rendered
+    assert "author_harness_id: T" in rendered
+    assert "author_session_context_id: test-session-123" in rendered
+    assert "author_model: test-model" in rendered
+    assert "author_model_version: test-model-version" in rendered
+    assert "author_model_configuration: test-config" in rendered
+    assert "TODO: <fill" not in rendered
+
+
+def test_scaffold_author_block_degrades_to_placeholder_when_unresolvable(
+    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_author_env(monkeypatch)
+    _seed_project(project_dir)
+    rendered = render_proposal_draft("implementation", _context(project_dir))
+
+    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
+        assert f"{field}: TODO: <fill {field}>" in rendered
 
 
 def test_auto_project_metadata_active_auth(project_dir: Path) -> None:
@@ -341,6 +406,7 @@ def test_cli_bridge_propose_no_optional_deps(project_dir: Path) -> None:
         "--dry-run",
     )
     assert dry_run_result.exit_code == 0, dry_run_result.output
+    assert "author_identity:" in dry_run_result.output
 
 
 def test_cli_bridge_propose_help_resolves() -> None:
