@@ -1,0 +1,266 @@
+schema_version = 1
+# Activity disposition profiles per DCL-ACTIVITY-DISPOSITION-PROFILE-001.
+# headless_eligibility values per DELIB-20265287 D4:
+#   spec/build/test = "headless_eligible"
+#   deliberation/project = "interactive_only"
+#   ops = "interactive_primary"
+# Substantive per-activity content refinement is deferred to WI-4730 (owner-driven AUQ).
+
+[activities.ops]
+version = 1
+headless_eligibility = "interactive_primary"
+skills = [
+    "open-items",
+    "codex-report",
+    "gtkb-hygiene-investigation",
+    "kb-assert",
+]
+terminology = [
+    "deployed application",
+    "hosted application",
+    "release",
+    "incident",
+    "rollback",
+    "platform",
+    "doctor",
+    "dashboard",
+]
+
+[activities.ops.history_state]
+sources = [
+    "recent operational incidents",
+    "bridge queue health",
+    "doctor check results",
+    "release blockers",
+    "active deployment artifacts",
+]
+
+[activities.ops.direction]
+stance = "triage-and-stabilize"
+guardrails = [
+    "no unreviewed implementations",
+    "surface blockers to owner via AUQ before acting on release-gating items",
+    "prefer read-only investigation in headless mode",
+]
+manipulates = [
+    "bridge state",
+    "operational artifacts",
+    "doctor reports",
+    "release evidence",
+]
+
+[activities.deliberation]
+version = 1
+headless_eligibility = "interactive_only"
+skills = [
+    "grill-me-for-clarification",
+    "decision-capture",
+    "spec-intake",
+    "kb-spec",
+]
+terminology = [
+    "requirement",
+    "specification",
+    "deliberation",
+    "Deliberation Archive",
+    "owner decision",
+    "AskUserQuestion",
+    "specification language",
+]
+
+[activities.deliberation.history_state]
+sources = [
+    "prior deliberations on the topic",
+    "pending owner decisions",
+    "related specifications",
+    "open AUQ items",
+]
+
+[activities.deliberation.direction]
+stance = "capture-and-clarify"
+guardrails = [
+    "do not implement during a deliberation session",
+    "every owner decision must go through AskUserQuestion",
+    "surface candidate specifications before proposing bridge work",
+]
+manipulates = [
+    "Deliberation Archive records",
+    "candidate specifications",
+    "pending owner decisions log",
+]
+
+[activities.build]
+version = 1
+headless_eligibility = "headless_eligible"
+skills = [
+    "bridge",
+    "bridge-propose",
+    "verify",
+    "kb-work-item",
+    "kb-spec",
+]
+terminology = [
+    "implementation proposal",
+    "implementation report",
+    "work item",
+    "bridge",
+    "GO",
+    "NO-GO",
+    "VERIFIED",
+    "target_paths",
+    "PAUTH",
+]
+
+[activities.build.history_state]
+sources = [
+    "GO'd bridge proposals",
+    "active PAUTH authorizations",
+    "recent implementation commits",
+    "backlog priority order",
+    "open NO-GO items",
+]
+
+[activities.build.direction]
+stance = "implement-within-scope"
+guardrails = [
+    "no implementation without a GO'd bridge proposal",
+    "stay within target_paths declared in the proposal",
+    "run ruff check and ruff format --check before filing an implementation report",
+    "acquire work-intent claim before drafting",
+]
+manipulates = [
+    "source files",
+    "test files",
+    "configuration files",
+    "bridge implementation reports",
+    "MemBase work items",
+]
+
+[activities.test]
+version = 1
+headless_eligibility = "headless_eligible"
+skills = [
+    "verify",
+    "kb-assert",
+    "gtkb-benchmarks",
+    "assertion-triage",
+]
+terminology = [
+    "test",
+    "assertion",
+    "VERIFIED",
+    "verification",
+    "spec-to-test mapping",
+    "assertion run",
+    "assertion category",
+    "genuine_drift",
+]
+
+[activities.test.history_state]
+sources = [
+    "failing assertions",
+    "recent assertion runs",
+    "test coverage gaps",
+    "chronic_noise and genuine_drift categories",
+    "implementation reports awaiting verification",
+]
+
+[activities.test.direction]
+stance = "verify-evidence-first"
+guardrails = [
+    "do not modify source during a test activity",
+    "a VERIFIED verdict requires executed tests derived from linked specifications",
+    "no self-review: reviewer session must differ from author session",
+]
+manipulates = [
+    "test artifacts",
+    "assertion run records",
+    "VERIFIED bridge verdicts",
+    "coverage evidence",
+]
+
+[activities.spec]
+version = 1
+headless_eligibility = "headless_eligible"
+skills = [
+    "spec-intake",
+    "kb-spec",
+    "decision-capture",
+    "kb-work-item",
+]
+terminology = [
+    "specification",
+    "requirement",
+    "GOV",
+    "ADR",
+    "DCL",
+    "protected behavior",
+    "MemBase",
+    "Deliberation Archive",
+    "specify-on-contact",
+]
+
+[activities.spec.history_state]
+sources = [
+    "recent specification changes",
+    "open work items without linked specifications",
+    "candidate requirements from prior sessions",
+    "specification-to-test coverage gaps",
+]
+
+[activities.spec.direction]
+stance = "capture-before-implement"
+guardrails = [
+    "no implementation before specifications are recorded and linked",
+    "apply interrogative default to owner factual claims",
+    "formal artifact approval required before canonical insertion",
+]
+manipulates = [
+    "MemBase specification rows",
+    "Deliberation Archive records",
+    "work item backlog",
+    "approval packets",
+]
+
+[activities.project]
+version = 1
+headless_eligibility = "interactive_only"
+skills = [
+    "projects",
+    "open-items",
+    "kb-session-wrap-scan",
+    "codex-report",
+]
+terminology = [
+    "project",
+    "sub-project",
+    "backlog",
+    "work item",
+    "project authorization",
+    "PAUTH",
+    "project completion",
+    "retired project",
+]
+
+[activities.project.history_state]
+sources = [
+    "active project status",
+    "backlog priority order",
+    "blocked work items",
+    "project authorization expiry",
+    "recent project completions",
+]
+
+[activities.project.direction]
+stance = "overview-and-prioritize"
+guardrails = [
+    "do not implement during a project activity",
+    "prioritization changes must be surfaced via AUQ",
+    "project retirement requires VERIFIED-driven completion per GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001",
+]
+manipulates = [
+    "project records",
+    "backlog ordering",
+    "project authorization packets",
+    "session focus decisions",
+]
