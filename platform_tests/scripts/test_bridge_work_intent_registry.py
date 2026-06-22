@@ -20,8 +20,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sqlite3
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -61,6 +62,25 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
         path = bridge / f"{slug}-{version_num:03d}.md"
         path.write_text(f"{status}\n\n# Body\n", encoding="utf-8")
     (bridge / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_project_thread(root: Path, slug: str, status: str, project_id: str = "PROJECT-X") -> None:
+    bridge = root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    proposal = "\n".join(
+        [
+            "NEW",
+            "",
+            f"# Fixture proposal {slug}",
+            "",
+            f"Project: {project_id}",
+            "Work Item: WI-0000",
+            "",
+        ]
+    )
+    (bridge / f"{slug}-001.md").write_text(proposal, encoding="utf-8")
+    if status == "GO":
+        (bridge / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
 
 
 def _write_registry(root: Path, roles: dict[str, str]) -> None:
@@ -189,6 +209,115 @@ def test_legacy_fallback_when_no_per_session_marker(tmp_path: Path, env) -> None
     holder = env.current_holder("go-thread", project_root=tmp_path)
     assert holder is not None
     assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    conn.execute(
+        """
+        CREATE TABLE work_intent_claims (
+            rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_slug TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            acquired_at TEXT NOT NULL,
+            ttl_expires_at TEXT NOT NULL,
+            UNIQUE(thread_slug)
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    assert env.acquire(
+        "thread-a",
+        "2026-06-22T00-00-00Z-prime-builder-B-abc123",
+        project_root=tmp_path,
+    )
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["acting_role"] == "prime-builder"
+    assert holder["project_id"] == "PROJECT-X"
+    assert env.project_id_for_thread("thread-a", project_root=tmp_path) == "PROJECT-X"
+
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()}
+    conn.close()
+    assert {"acting_role", "project_id"} <= columns
+
+
+def test_same_role_project_holder_detects_conflicting_same_role_claim(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+
+    assert env.acquire("thread-a", holder_session, project_root=tmp_path)
+
+    holder = env.same_role_project_holder("prime-builder", "PROJECT-X", "other-session", project_root=tmp_path)
+    assert holder is not None
+    assert holder["thread_slug"] == "thread-a"
+    assert holder["session_id"] == holder_session
+    assert env.same_role_project_holder("prime-builder", "PROJECT-X", holder_session, project_root=tmp_path) is None
+
+
+def test_same_role_project_guard_does_not_alter_acquire_verdict(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    _write_project_thread(tmp_path, "thread-b", "GO", project_id="PROJECT-X")
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    other_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+
+    assert env.acquire("thread-a", holder_session, project_root=tmp_path)
+    assert env.same_role_project_holder("prime-builder", "PROJECT-X", other_session, project_root=tmp_path)
+    assert env.acquire("thread-b", other_session, project_root=tmp_path) is True
+
+
+def test_same_role_project_holder_ignores_expired_or_lapsed_claim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, env
+) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+
+    assert env.acquire("thread-a", holder_session, project_root=tmp_path)
+    monkeypatch.setattr(
+        env,
+        "now_utc",
+        lambda: (
+            datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
+            + timedelta(seconds=env.GO_IMPLEMENTATION_DEADLINE_SECONDS + env.GO_IMPLEMENTATION_GRACE_SECONDS + 1)
+        ),
+    )
+
+    assert env.same_role_project_holder("prime-builder", "PROJECT-X", "other-session", project_root=tmp_path) is None
+
+
+def test_same_role_project_holder_ignores_different_role(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_project_thread(tmp_path, "thread-a", "NEW", project_id="PROJECT-X")
+
+    assert env.acquire(
+        "thread-a",
+        "2026-06-22T00-00-00Z-loyal-opposition-D-def456",
+        project_root=tmp_path,
+    )
+
+    assert env.same_role_project_holder("prime-builder", "PROJECT-X", "other-session", project_root=tmp_path) is None
+
+
+def test_same_role_project_holder_returns_none_on_null_project_or_role(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+
+    assert env.acquire(
+        "thread-a",
+        "2026-06-22T00-00-00Z-prime-builder-B-abc123",
+        project_root=tmp_path,
+    )
+
+    assert env.same_role_project_holder(None, "PROJECT-X", "other-session", project_root=tmp_path) is None
+    assert env.same_role_project_holder("prime-builder", None, "other-session", project_root=tmp_path) is None
 
 
 # WI-4658 — MalformedBridgeStatusError tests.

@@ -17,6 +17,7 @@ SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$"
 )
+BRIDGE_PROJECT_RE: Final[re.Pattern[str]] = re.compile(r"^Project:\s*(\S+)\s*$", re.MULTILINE)
 
 DEFAULT_DRAFT_TTL_SECONDS: Final[int] = int(os.environ.get("GTKB_WORK_INTENT_TTL_SECONDS") or "600")
 GO_IMPLEMENTATION_DEADLINE_SECONDS: Final[int] = 30 * 60
@@ -151,12 +152,17 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         "extensions_used": "INTEGER DEFAULT 0",
         "extension_cap_seconds": "INTEGER",
         "extension_capped": "INTEGER DEFAULT 0",
+        "acting_role": "TEXT",
+        "project_id": "TEXT",
     }
     for name, column_type in additive_columns.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE work_intent_claims ADD COLUMN {name} {column_type}")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_slug ON work_intent_claims(thread_slug);")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_work_intent_claims_kind ON work_intent_claims(claim_kind);")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_work_intent_claims_role_project ON work_intent_claims(acting_role, project_id);"
+    )
     conn.commit()
 
 
@@ -258,6 +264,28 @@ def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str
     return entries[0][1] if entries else None
 
 
+def project_id_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+    """Return the bridge proposal ``Project:`` metadata for ``thread_slug``.
+
+    The project-level guard is advisory and fail-open. Missing or unreadable
+    metadata therefore returns ``None`` instead of blocking a claim.
+    """
+    slug = _validate_slug(thread_slug)
+    root = _root(project_root)
+    entries = _thread_version_entries(slug, project_root=root)
+    proposal_entries = [entry for entry in entries if entry[1] in {"NEW", "REVISED"}]
+    for _version, _status, rel_path in proposal_entries or entries:
+        try:
+            text = (root / rel_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        match = BRIDGE_PROJECT_RE.search(text)
+        if match:
+            project_id = match.group(1).strip()
+            return project_id or None
+    return None
+
+
 def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
     """Return the unexpired holder record for ``thread_slug``, if present."""
     slug = _validate_slug(thread_slug)
@@ -341,6 +369,32 @@ def claim_status(thread_slug: str, *, project_root: Path | None = None) -> dict[
         conn.close()
 
 
+def _normalize_claim_role(role: str | None) -> str | None:
+    normalized = (role or "").strip().lower()
+    if normalized in {"prime-builder", "acting-prime-builder"}:
+        return "prime-builder"
+    if normalized == "loyal-opposition":
+        return "loyal-opposition"
+    return normalized or None
+
+
+def _resolve_acting_role(session_id: str, *, project_root: Path | None) -> str | None:
+    """Resolve the canonical role label to persist with a work-intent claim."""
+    harness_id = _dispatch_harness_id(session_id)
+    if harness_id is not None:
+        try:
+            reader = _harness_projection_reader()
+            document = reader.load_harness_projection(_root(project_root))
+            role_set = reader.role_set_for_id(document, harness_id)
+        except Exception:
+            return None
+        for role in ("prime-builder", "acting-prime-builder", "loyal-opposition"):
+            if role in role_set:
+                return _normalize_claim_role(role)
+        return _normalize_claim_role(sorted(role_set)[0]) if role_set else None
+    return _normalize_claim_role(_interactive_marker_role(project_root, session_id))
+
+
 def _claim_values(
     slug: str,
     session_id: str,
@@ -351,6 +405,8 @@ def _claim_values(
 ) -> dict[str, Any]:
     latest_status = _latest_status(slug, project_root=project_root)
     acquired_at = now
+    acting_role = _resolve_acting_role(session_id, project_root=project_root)
+    project_id = project_id_for_thread(slug, project_root=project_root)
     if latest_status == "GO":
         deadline = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_DEADLINE_SECONDS)
         grace_expires = deadline + timedelta(seconds=GO_IMPLEMENTATION_GRACE_SECONDS)
@@ -360,6 +416,8 @@ def _claim_values(
             "acquired_at": _iso(acquired_at),
             "ttl_expires_at": _iso(grace_expires),
             "claim_kind": CLAIM_KIND_GO_IMPLEMENTATION,
+            "acting_role": acting_role,
+            "project_id": project_id,
             "implementation_deadline": _iso(deadline),
             "implementation_grace_expires_at": _iso(grace_expires),
             "extensions_used": 0,
@@ -373,6 +431,8 @@ def _claim_values(
         "acquired_at": _iso(acquired_at),
         "ttl_expires_at": _iso(ttl_expires_at),
         "claim_kind": CLAIM_KIND_DRAFT,
+        "acting_role": acting_role,
+        "project_id": project_id,
         "implementation_deadline": None,
         "implementation_grace_expires_at": None,
         "extensions_used": 0,
@@ -529,10 +589,12 @@ def acquire(
                 """
                 INSERT OR REPLACE INTO work_intent_claims
                 (thread_slug, session_id, acquired_at, ttl_expires_at, claim_kind,
+                 acting_role, project_id,
                  implementation_deadline, implementation_grace_expires_at,
                  extensions_used, extension_cap_seconds, extension_capped)
                 VALUES
                 (:thread_slug, :session_id, :acquired_at, :ttl_expires_at, :claim_kind,
+                 :acting_role, :project_id,
                  :implementation_deadline, :implementation_grace_expires_at,
                  :extensions_used, :extension_cap_seconds, :extension_capped)
                 """,
@@ -726,6 +788,46 @@ def lapsed_go_implementation_claims(*, project_root: Path | None = None) -> list
         conn.close()
 
 
+def same_role_project_holder(
+    role: str | None,
+    project_id: str | None,
+    session_id: str,
+    *,
+    project_root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Return an active different-session holder for the same role/project.
+
+    Missing role or project metadata fails open by returning ``None``. The guard
+    is advisory only; per-thread ``acquire`` remains the correctness boundary.
+    """
+    canonical_role = _normalize_claim_role(role)
+    normalized_project = (project_id or "").strip()
+    if not canonical_role or not normalized_project or not session_id:
+        return None
+    conn = _get_conn(project_root)
+    try:
+        rows = conn.execute(
+            """
+            SELECT * FROM work_intent_claims
+            WHERE acting_role = ? AND project_id = ? AND session_id != ?
+            ORDER BY acquired_at DESC
+            """,
+            (canonical_role, normalized_project, session_id),
+        ).fetchall()
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Database error during same_role_project_holder: {exc}") from exc
+    finally:
+        conn.close()
+
+    now = now_utc()
+    for row in rows:
+        record = _row_to_record(row)
+        if _is_expired(record, now=now) or _is_lapsed_go_implementation(record, now=now):
+            continue
+        return record
+    return None
+
+
 def revalidate_thread_version(thread_slug: str, project_root: Path) -> dict[str, int | str | bool]:
     """Read live bridge state and report the next version target."""
     slug = _validate_slug(thread_slug)
@@ -759,6 +861,8 @@ __all__ = [
     "extend",
     "lapsed_go_implementation_claims",
     "maybe_auto_extend",
+    "project_id_for_thread",
     "revalidate_thread_version",
     "release",
+    "same_role_project_holder",
 ]

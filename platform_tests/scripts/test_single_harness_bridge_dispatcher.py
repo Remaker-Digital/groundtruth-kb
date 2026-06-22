@@ -144,7 +144,12 @@ def _write_bridge_file(root: Path, name: str) -> None:
     (root / "bridge" / name).write_text("bridge_kind: implementation_proposal\n", encoding="utf-8")
 
 
-def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | None = None) -> str:
+def _write_authorized_go_thread(
+    root: Path,
+    doc: str,
+    target_paths: list[str] | None = None,
+    project_id: str | None = None,
+) -> str:
     if target_paths is None:
         target_paths = ["scripts/single_harness_bridge_dispatcher.py"]
     proposal = "\n".join(
@@ -155,6 +160,7 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
             "",
             f"target_paths: {json.dumps(target_paths)}",
             "",
+            *(["Project: " + project_id, ""] if project_id else []),
             "## Specification Links",
             "",
             "- GOV-FILE-BRIDGE-AUTHORITY-001 - bridge authority.",
@@ -176,7 +182,10 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
 
 
 def _index_with_one_new(root: Path) -> str:
-    _write_bridge_file(root, "example-thread-001.md")
+    (root / "bridge" / "example-thread-001.md").write_text(
+        "NEW\n\nauthor_session_context_id: fixture-author-session\n",
+        encoding="utf-8",
+    )
     return "# bridge index\n\nDocument: example-thread\nNEW: bridge/example-thread-001.md\n"
 
 
@@ -195,6 +204,32 @@ def test_dispatcher_runs_in_multi_harness_topology(tmp_path: Path) -> None:
     summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary["skipped"] is False
     assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+
+def test_single_harness_dispatcher_honors_prime_work_intent_filter_project_guard(tmp_path: Path) -> None:
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    dispatcher = _load_dispatcher()
+    dispatcher._load_trigger_module()
+    registry = sys.modules["bridge_work_intent_registry"]
+    state_dir = tmp_path / "state"
+    project_id = "PROJECT-GUARD"
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+
+    _write_authorized_go_thread(root, "held-thread", project_id=project_id)
+    _write_index(root, _write_authorized_go_thread(root, "selected-thread", project_id=project_id))
+    assert registry.acquire("held-thread", holder_session, project_root=root)
+
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["skipped"] is False
+    assert summary["results"]["prime-builder"]["reason"] == "work_intent_already_held"
+    suppressions_path = state_dir / "dispatch-suppressions.jsonl"
+    records = [json.loads(line) for line in suppressions_path.read_text(encoding="utf-8").splitlines() if line]
+    project_guard_records = [record for record in records if record["reason"] == "same_role_project_claim_active"]
+    assert len(project_guard_records) == 1
+    assert project_guard_records[0]["document_name"] == "selected-thread"
+    assert project_guard_records[0]["project_id"] == project_id
+    assert project_guard_records[0]["holder_thread_slug"] == "held-thread"
 
 
 # ──────────────────────────────────────────────────────────────────────────

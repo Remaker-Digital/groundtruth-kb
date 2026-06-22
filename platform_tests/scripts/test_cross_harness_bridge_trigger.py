@@ -312,6 +312,62 @@ def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_pa
     assert _failure_records(state_dir) == []
 
 
+def test_filter_prime_selected_stands_down_on_same_role_project_holder(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    registry = sys.modules["bridge_work_intent_registry"]
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    project_id = "PROJECT-GUARD"
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    dispatch_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+
+    for doc in ("held-thread", "selected-thread"):
+        _write_bridge_file(
+            root,
+            f"{doc}-001.md",
+            "\n".join(
+                [
+                    "NEW",
+                    "",
+                    f"# Fixture proposal {doc}",
+                    "",
+                    f"Project: {project_id}",
+                    "Work Item: WI-0000",
+                    "",
+                ]
+            ),
+        )
+        _write_bridge_file(root, f"{doc}-002.md", "GO\n\nFixture GO.\n")
+
+    assert registry.acquire("held-thread", holder_session, project_root=root)
+    selected = [
+        SimpleNamespace(
+            document_name="selected-thread",
+            top_status="GO",
+            top_file="bridge/selected-thread-002.md",
+        )
+    ]
+
+    result = trigger._filter_prime_selected_by_work_intent(
+        selected,
+        project_root=root,
+        state_dir=state_dir,
+        recipient="prime-builder:B",
+        dispatch_id="dispatch-2",
+        session_id=dispatch_session,
+    )
+
+    assert result == {"ok": True, "reason": None, "selected": [], "held_count": 1}
+    records = _suppression_records(state_dir)
+    assert len(records) == 1
+    assert records[0]["reason"] == "same_role_project_claim_active"
+    assert records[0]["document_name"] == "selected-thread"
+    assert records[0]["project_id"] == project_id
+    assert records[0]["holder_thread_slug"] == "held-thread"
+    assert records[0]["holder_session_id"] == holder_session
+    assert _failure_records(state_dir) == []
+
+
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:
     """T-2-signature-computation: signature deterministic per recipient
     given identical INDEX state.

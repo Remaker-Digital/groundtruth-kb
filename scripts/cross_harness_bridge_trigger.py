@@ -107,7 +107,9 @@ from bridge_work_intent_registry import (  # noqa: E402, I001
     WorkIntentRegistryError,
     acquire as acquire_work_intent,
     current_holder as current_work_intent_holder,
+    project_id_for_thread,
     release as release_work_intent,
+    same_role_project_holder,
 )
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
@@ -162,7 +164,9 @@ DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 # dispatch failures, so the shared writer routes them to
 # dispatch-suppressions.jsonl instead of polluting dispatch-failures.jsonl and
 # burying real, actionable failures in the `diagnose` "Recent failures" view.
-EXPECTED_SUPPRESSION_REASONS = frozenset({"work_intent_already_held", "headless_takeover_cooldown"})
+EXPECTED_SUPPRESSION_REASONS = frozenset(
+    {"work_intent_already_held", "headless_takeover_cooldown", "same_role_project_claim_active"}
+)
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
 DEFAULT_DISPATCH_RUNS_MAX_BYTES = 200 * 1024 * 1024
 DEFAULT_GTKB_STATE_GC_AGE_DAYS = 14
@@ -1084,6 +1088,41 @@ def _record_prime_work_intent_held(
     )
 
 
+def _record_prime_same_role_project_held(
+    *,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    item: Any,
+    project_id: str,
+    holder: dict[str, Any],
+) -> None:
+    holder_session_id = str(holder.get("session_id") or "")
+    if not _mark_work_intent_held_recorded(
+        state_dir,
+        document_name=item.document_name,
+        holder_session_id=holder_session_id,
+    ):
+        return
+    _record_dispatch_suppression(
+        state_dir,
+        {
+            "ts": _now_iso(),
+            "dispatch_id": dispatch_id,
+            "recipient": recipient,
+            "launched": False,
+            "reason": "same_role_project_claim_active",
+            "document_name": item.document_name,
+            "top_status": item.top_status,
+            "top_file": item.top_file,
+            "project_id": project_id,
+            "holder_thread_slug": holder.get("thread_slug"),
+            "holder_session_id": holder_session_id,
+            "holder_ttl_expires_at": holder.get("ttl_expires_at"),
+        },
+    )
+
+
 def _filter_prime_selected_by_work_intent(
     selected: list[Any],
     *,
@@ -1127,6 +1166,42 @@ def _filter_prime_selected_by_work_intent(
                 dispatch_id=dispatch_id,
                 item=item,
                 holder=holder,
+            )
+            continue
+
+        try:
+            project_id = project_id_for_thread(item.document_name, project_root=project_root)
+            project_holder = same_role_project_holder(
+                "prime-builder",
+                project_id,
+                session_id,
+                project_root=project_root,
+            )
+        except WorkIntentRegistryError as exc:
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "ts": _now_iso(),
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": "work_intent_registry_error",
+                    "document_name": item.document_name,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            )
+            project_holder = None
+            project_id = None
+        if project_holder is not None and project_id:
+            held_count += 1
+            _record_prime_same_role_project_held(
+                state_dir=state_dir,
+                recipient=recipient,
+                dispatch_id=dispatch_id,
+                item=item,
+                project_id=project_id,
+                holder=project_holder,
             )
             continue
 
