@@ -1217,6 +1217,41 @@ def _bridge_kind_validation_error(content: str) -> str | None:
     return None
 
 
+def _verdict_evidence_anchor_deny_reason(content: str, project_root: Path) -> str | None:
+    """Deny reason when a NO-GO/VERIFIED verdict cites fabricated evidence anchors.
+
+    WI-4520: an Antigravity (gemini) NO-GO cited a non-existent "Draft Template
+    Placeholder" at line 86 of a proposal whose line 86 was '## Implementation
+    Plan'. This gate validates that a gated verdict's cited line numbers and
+    quoted strings actually exist in the operative file(s) it references.
+
+    Fails OPEN: any import or runtime error returns None so this gate can never
+    block a verdict for an infrastructure reason (the bridge is top priority).
+    """
+    try:
+        from scripts.verdict_evidence_anchor_preflight import (
+            validate_verdict_evidence_anchors,
+            violation_summary,
+        )
+    except Exception:  # pragma: no cover - fail open on partial install
+        return None
+    try:
+        violations = validate_verdict_evidence_anchors(content, project_root=project_root)
+    except Exception:  # pragma: no cover - fail open on parser error
+        return None
+    if not violations:
+        return None
+    return (
+        "[Governance] This NO-GO/VERIFIED verdict cites evidence anchors that do not "
+        "exist in the operative file(s): "
+        + violation_summary(violations)
+        + ". Point the citation at real line numbers / quoted text, or mark the finding "
+        "[inference] / [no exact anchor] / [absent] if it is intentionally not an "
+        "exact-text claim. (Hard-block per WI-4520 verdict-evidence-anchor preflight; "
+        "see scripts/verdict_evidence_anchor_preflight.py.)"
+    )
+
+
 def _deny_reason_for_content(
     *,
     cwd_path: Path,
@@ -1284,6 +1319,10 @@ def _deny_reason_for_content(
                 "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
             )
+        if first_line in {"NO-GO", "VERIFIED"}:
+            anchor_reason = _verdict_evidence_anchor_deny_reason(content, cwd_path)
+            if anchor_reason:
+                return anchor_reason
         if (
             first_line not in {"ADVISORY", "DEFERRED"}
             and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))

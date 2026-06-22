@@ -11,6 +11,10 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from scripts.bridge_author_metadata import ensure_author_metadata
+from scripts.verdict_evidence_anchor_preflight import (
+    validate_verdict_evidence_anchors,
+    violation_summary,
+)
 
 VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
@@ -30,6 +34,15 @@ class BridgeConflictError(BridgeError):
 
 class BridgeTransitionError(BridgeError):
     """Proposed status transition is illegal for the calling workflow."""
+
+
+class BridgeEvidenceAnchorError(BridgeError):
+    """A gated verdict (NO-GO/VERIFIED) cites evidence anchors that do not exist.
+
+    Raised by ``write_bridge_file`` per WI-4520 so the helper-routed verdict
+    chokepoint (post-implementation VERIFIED finalize, impl-report, revise)
+    cannot persist a verdict whose cited line/string anchors are fabricated.
+    """
 
 
 def _bridge_dir(project_root: Path) -> Path:
@@ -57,6 +70,13 @@ def write_bridge_file(
     target = _bridge_dir(project_root) / f"{document_name}-{version:03d}.md"
     if target.exists():
         raise BridgeConflictError(f"{target} already exists; refusing to overwrite")
+    anchor_violations = validate_verdict_evidence_anchors(content, project_root=project_root)
+    if anchor_violations:
+        raise BridgeEvidenceAnchorError(
+            "refusing to write verdict with fabricated evidence anchors (WI-4520): "
+            + violation_summary(anchor_violations)
+            + ". Fix the citation, or mark the finding [inference] / [no exact anchor] / [absent]."
+        )
     content_to_write = (
         ensure_author_metadata(content, project_root=project_root, explicit=author_metadata)
         if require_author_metadata
