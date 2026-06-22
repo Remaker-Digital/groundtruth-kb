@@ -283,6 +283,10 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
     assert model["skills"]["count"] > 0
     assert "harness-registry.json" in model["role"]["role_mapping_source"]
+    assert model["role"]["interactive_resolved_role"] == "Prime Builder"
+    assert "interactive surfaces only" in model["role"]["interactive_role_source"]
+    assert model["role"]["durable_registry_role"]
+    assert "non-overriding" in model["role"]["durable_registry_authority"]
     assert "formal-artifact-approval-gate.py" in model["directives"]["hook_files"]
     assert model["workstream_focus"]["default_label"] == "GT-KB Infrastructure Focus"
     assert model["workstream_focus"]["current_label"] == "GT-KB Infrastructure Focus"
@@ -396,6 +400,27 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         "dev environment inventory",
         "tokens consumed before user input",
     } <= subsystems
+
+
+def test_role_metadata_discloses_interactive_role_and_non_overriding_durable_role(monkeypatch) -> None:
+    """Startup role metadata separates transcript-selected role from durable registry role."""
+    module = _load_module()
+    monkeypatch.setattr(module, "discover_role_profile", lambda *a, **k: "loyal-opposition")
+
+    metadata = module._role_metadata(
+        "prime-builder",
+        REPO_ROOT,
+        harness_name="codex",
+        harness_id="A",
+        role_profile_explicit=True,
+    )
+
+    assert metadata["interactive_resolved_role"] == "Prime Builder"
+    assert metadata["interactive_role_profile"] == "prime-builder"
+    assert "overrides durable registry" in metadata["interactive_role_source"]
+    assert metadata["durable_registry_role"] == "Loyal Opposition"
+    assert metadata["durable_registry_role_profile"] == "loyal-opposition"
+    assert "headless dispatch routing" in metadata["durable_registry_authority"]
 
 
 def _scoped_client_payload() -> dict:
@@ -768,7 +793,9 @@ def test_harness_role_assignment_map_is_startup_source_of_truth(tmp_path, capsys
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
-    assert "Role being assumed: Prime Builder" in context
+    assert "Interactive resolved role: Loyal Opposition" in context
+    assert "Interactive role source: durable registry fallback" in context
+    assert "Durable registry role: Loyal Opposition" in context
     assert f"Role mapping source: {role_path}" in context
     assert "Harness self-identification: A" in context
     assert "Harness identity source: harness-state/harness-identities.json" in context
@@ -1978,7 +2005,9 @@ def test_emit_report_ignores_forced_role_profile_and_uses_durable_toggle(tmp_pat
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     context = payload["additionalContext"]
-    assert "Role being assumed: Prime Builder" in context
+    assert "Interactive resolved role: Prime Builder" in context
+    assert "Interactive role source: durable registry fallback" in context
+    assert "Durable registry role: Prime Builder" in context
     assert "## Session Startup" in context
     assert "## Loyal Opposition Startup Task" not in context
 

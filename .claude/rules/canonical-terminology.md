@@ -801,15 +801,18 @@ by owner commands at session start.
 
 ### session-stated role
 
-**Definition:** An ephemeral, session-scoped role declared by the owner via the
+**Definition:** A transcript-defined role declared by the owner via the
 canonical init keyword `::init gtkb (pb|lo)` on an interactive owner prompt. It
 overrides the durable operating role for in-session surfaces — SessionStart
 disclosure rendering, the AXIS 2 Claude-native surface filter, the
 workstream-focus menu shape, MemBase `changed_by` attribution, and AUQ-keyed
-routing — for the rest of the session. It is held in the ephemeral marker
-`.claude/session/active-session-role.json` and is invalidated at the next
-SessionStart; it carries no durable record and does not survive compaction or
-resume.
+routing — for the rest of the contiguous interactive context. It persists
+across compaction, resume, and contiguous SessionStart-like boundaries until
+the owner explicitly changes it. Runtime marker files such as
+`.claude/session/active-session-role.json` and per-session `role-*.json` files
+are cache/state only and carry no durable role authority; the legacy single-file
+marker may be invalidated at SessionStart, but the transcript-defined
+interactive role persists through the per-session marker/envelope authority.
 
 **Canonical alias:** interactive session role; session-scoped role.
 

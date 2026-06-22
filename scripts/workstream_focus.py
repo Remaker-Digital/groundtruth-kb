@@ -1120,8 +1120,10 @@ def _explicit_role_hint_mode_from_prompt(prompt: str) -> str | None:
 # Codex GO at -004). Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 4
 # and DCL-SESSION-ROLE-RESOLUTION-001 assertions 2/6/7: when the owner declares
 # a session role via ``::init gtkb (pb|lo)`` in an interactive context, write
-# an ephemeral marker carrying the role and a non-null session id. The marker
-# is invalidated by SessionStart in Slice 3 and read by Slices 4-6.
+# marker state carrying the role and a non-null session id. The legacy
+# single-file marker may be invalidated by SessionStart, but the WI-4540
+# per-session marker/envelope authority persists across compaction/resume and is
+# read by the shared resolver.
 _MODE_TO_ROLE_PROFILE = {
     "pb": "prime-builder",
     "lo": "loyal-opposition",

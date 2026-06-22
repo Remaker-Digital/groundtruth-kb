@@ -47,13 +47,24 @@ def heartbeat_module():
 
 def test_heartbeat_session_start_creates_lock(heartbeat_module, tmp_path: Path) -> None:
     """T-HB-session-start-creates-lock: --mode session-start writes the lock file with current timestamp."""
-    heartbeat_module._handle_session_start(tmp_path, "claude")
+    heartbeat_module._handle_session_start(
+        tmp_path,
+        "claude",
+        interactive_role="prime-builder",
+        interactive_role_source="init_keyword",
+        durable_registry_role="loyal-opposition",
+    )
     lock = tmp_path / "active-claude-session.lock"
     assert lock.is_file()
     payload = json.loads(lock.read_text(encoding="utf-8"))
     assert "opened_at" in payload
     assert "last_refreshed" in payload
     assert payload["opened_at"] == payload["last_refreshed"]
+    assert payload["harness_name"] == "claude"
+    assert payload["role_authority"]["interactive_resolved_role"] == "prime-builder"
+    assert payload["role_authority"]["interactive_role_source"] == "init_keyword"
+    assert payload["role_authority"]["durable_registry_role"] == "loyal-opposition"
+    assert payload["role_authority"]["authority_mode"] == "interactive_transcript"
 
 
 def test_heartbeat_tool_use_refreshes_existing_lock(heartbeat_module, tmp_path: Path) -> None:
@@ -70,6 +81,7 @@ def test_heartbeat_tool_use_refreshes_existing_lock(heartbeat_module, tmp_path: 
     refreshed = json.loads(lock.read_text(encoding="utf-8"))
     assert refreshed["opened_at"] == initial_opened_at, "opened_at must persist across tool-use"
     assert refreshed["last_refreshed"] != initial_opened_at, "last_refreshed must update"
+    assert refreshed["role_authority"]["harness_name"] == "codex"
 
 
 def test_heartbeat_tool_use_creates_when_absent(heartbeat_module, tmp_path: Path) -> None:
@@ -155,6 +167,55 @@ def test_heartbeat_main_respects_state_dir(heartbeat_module, tmp_path: Path) -> 
     )
     assert rc == 0
     assert (custom_dir / "active-codex-session.lock").is_file()
+
+
+def test_heartbeat_main_requires_source_when_interactive_and_durable_roles_differ(
+    heartbeat_module, tmp_path: Path
+) -> None:
+    """T-HB-role-authority-fail-closed: differing interactive/durable roles require an explicit source."""
+    with pytest.raises(SystemExit) as exc_info:
+        heartbeat_module.main(
+            [
+                "--mode",
+                "session-start",
+                "--role",
+                "codex",
+                "--state-dir",
+                str(tmp_path),
+                "--interactive-role",
+                "pb",
+                "--durable-role",
+                "lo",
+            ]
+        )
+    assert exc_info.value.code != 0
+    assert not (tmp_path / "active-codex-session.lock").exists()
+
+
+def test_heartbeat_main_records_split_role_authority(heartbeat_module, tmp_path: Path) -> None:
+    """T-HB-role-authority-payload: lock discloses interactive role/source and durable role separately."""
+    rc = heartbeat_module.main(
+        [
+            "--mode",
+            "session-start",
+            "--role",
+            "codex",
+            "--state-dir",
+            str(tmp_path),
+            "--interactive-role",
+            "pb",
+            "--interactive-role-source",
+            "init_keyword",
+            "--durable-role",
+            "lo",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads((tmp_path / "active-codex-session.lock").read_text(encoding="utf-8"))
+    assert payload["role_authority"]["interactive_resolved_role"] == "prime-builder"
+    assert payload["role_authority"]["interactive_role_source"] == "init_keyword"
+    assert payload["role_authority"]["durable_registry_role"] == "loyal-opposition"
+    assert "non-overriding" in payload["role_authority"]["durable_registry_authority"]
 
 
 def test_heartbeat_fire_and_forget_on_error(heartbeat_module, tmp_path: Path) -> None:

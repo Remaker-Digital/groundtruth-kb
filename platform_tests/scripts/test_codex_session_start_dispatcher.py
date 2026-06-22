@@ -136,6 +136,26 @@ def test_dispatch_authorized_when_env_and_matching_keyword(tmp_path: Path, monke
     assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
 
+def test_headless_dispatch_ignores_interactive_session_role_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Durable/dispatch env routing remains authoritative for headless dispatch."""
+    _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
+    marker_dir = tmp_path / ".claude" / "session"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    (marker_dir / "active-session-role.json").write_text(
+        json.dumps({"role": "prime-builder", "session_id": "interactive-pb", "source": "init_keyword"}) + "\n",
+        encoding="utf-8",
+    )
+    hook = _load_codex_hook("dispatch_ignores_interactive_marker")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-codex-marker-ignored")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
+
+    decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
+
+
 def test_dispatch_authorized_when_role_record_is_multi_role_set(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -293,6 +313,30 @@ def test_startup_relay_cache_written_with_consistent_metadata(tmp_path: Path, mo
     assert meta["sha256"] == hashlib.sha256(encoded).hexdigest()
     assert meta["byte_length"] == len(encoded)
     assert meta["harness_name"] == "codex"
+    assert "role_authority" in meta
+    assert meta["role_authority"]["interactive_resolved_role"] is None
+    assert "headless dispatch routing" in meta["role_authority"]["durable_registry_authority"]
+
+
+def test_startup_relay_cache_metadata_separates_cache_role_from_durable_role(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Relay metadata labels the cached role as pending init-keyword selection, not durable authority."""
+    module = _load_codex_hook("relay_cache_role_authority")
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "A")
+    monkeypatch.setattr(module, "_resolve_own_role_set", lambda *a, **k: frozenset({"lo"}))
+
+    body = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\n- Role being assumed: Prime Builder\n"
+    module._write_startup_relay_cache(body)
+
+    meta = json.loads((tmp_path / "last-user-visible-startup.meta.json").read_text(encoding="utf-8"))
+    assert meta["role_mode"] == "pb"
+    assert meta["role_profile"] == "prime-builder"
+    assert meta["role_authority"]["interactive_resolved_role"] == "prime-builder"
+    assert "init-keyword" in meta["role_authority"]["interactive_role_source"]
+    assert meta["role_authority"]["durable_registry_roles"] == ["loyal-opposition"]
+    assert meta["role_authority"]["authority_mode"] == "cache_only_pending_init_keyword"
 
 
 def test_normal_startup_relay_cache_uses_startup_disclosure_field(

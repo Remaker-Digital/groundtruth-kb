@@ -139,12 +139,11 @@ def _purge_previous_diagnostics(*paths: Path) -> None:
             pass
 
 
-# Slice 3 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: the ephemeral
-# session-state role marker is written by the UserPromptSubmit init-keyword
-# path (scripts/workstream_focus.py, Slice 2). Per
-# DCL-SESSION-ROLE-RESOLUTION-001 assertion 5, SessionStart must invalidate it
-# so the interactive override does not survive a SessionStart event (new
-# session, compaction, resume). The constant is duplicated from
+# Slice 3/WI-4540 split: the legacy single-file session role marker is written
+# by the UserPromptSubmit init-keyword path and may be invalidated at
+# SessionStart. The transcript-defined interactive role itself persists across
+# compaction/resume in the per-session marker/envelope surfaces; only the legacy
+# shared cache file is deleted here. The constant is duplicated from
 # scripts.workstream_focus._SESSION_ROLE_MARKER_NAME rather than imported, to
 # keep the SessionStart hot path stdlib-light; the parity test asserts the two
 # paths stay equal.
@@ -537,15 +536,51 @@ def _startup_body_role_mode(body: str) -> str | None:
     return None
 
 
+def _durable_registry_role_profiles() -> list[str]:
+    try:
+        modes = sorted(_resolve_own_role_set())
+    except Exception:
+        return []
+    return [_MODE_TO_ROLE_PROFILE[mode] for mode in modes if mode in _MODE_TO_ROLE_PROFILE]
+
+
+def _startup_relay_role_authority(role_mode: str | None) -> dict:
+    interactive_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
+    durable_profiles = _durable_registry_role_profiles()
+    return {
+        "interactive_resolved_role": interactive_profile,
+        "interactive_role_source": (
+            f"startup disclosure cache role mode {role_mode}; authoritative only when selected by "
+            "the owner transcript/init-keyword path"
+            if interactive_profile
+            else None
+        ),
+        "durable_registry_roles": durable_profiles,
+        "durable_registry_authority": (
+            "headless dispatch routing and interactive fallback only; non-overriding when a "
+            "transcript-defined interactive role is present"
+        ),
+        "authority_mode": "cache_only_pending_init_keyword" if interactive_profile else "unknown",
+    }
+
+
 def _render_role_startup_report(role_profile: str) -> str | None:
     try:
         from scripts import session_self_initialization as startup  # noqa: PLC0415
 
+        role_mode = (
+            "pb" if role_profile == "prime-builder" else "lo" if role_profile == "loyal-opposition" else role_profile
+        )
         model = startup.build_startup_model(
             PROJECT_ROOT,
             role_profile=role_profile,
             harness_name=HARNESS_NAME,
             harness_id=_persistent_harness_id(),
+            role_profile_explicit=False,
+            interactive_role_source=(
+                f"startup disclosure cache role mode {role_mode}; authoritative only when selected by "
+                "the owner transcript/init-keyword path"
+            ),
             fast_hook=True,
         )
         return startup.render_report(
@@ -580,6 +615,7 @@ def _write_startup_relay_cache(additional_context: str, *, role_mode: str | None
         "harness_id": _persistent_harness_id(),
         "role_mode": effective_role_mode,
         "role_profile": _MODE_TO_ROLE_PROFILE.get(effective_role_mode or ""),
+        "role_authority": _startup_relay_role_authority(effective_role_mode),
         "generated_at": _now_iso(),
         "byte_length": len(encoded),
         "sha256": hashlib.sha256(encoded).hexdigest(),
@@ -622,12 +658,11 @@ def main() -> int:
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
     _purge_previous_diagnostics(stdout_path, stderr_path)
-    # Slice 3 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: invalidate any
-    # pre-existing session-state role marker before the dispatch fork and before
-    # any role rendering, so the ephemeral interactive override does not survive
-    # this SessionStart event (DCL-SESSION-ROLE-RESOLUTION-001 assertion 5). This
-    # runs on every SessionStart path (normal or bridge auto-dispatch)
-    # and does not disturb the mode-switch-drain -> dispatch ordering below.
+    # Invalidate only the legacy shared session-role marker before the dispatch
+    # fork and before role rendering. Per-session markers and the session
+    # envelope carry the transcript-defined interactive role across contiguous
+    # SessionStart-like boundaries; the sweep below handles stale per-session
+    # cleanup without clobbering the current context.
     _invalidate_session_role_marker()
     # WI-4540: sweep stale per-session role markers (role-*.json) without
     # touching the current context's marker. current_session_id is resolved

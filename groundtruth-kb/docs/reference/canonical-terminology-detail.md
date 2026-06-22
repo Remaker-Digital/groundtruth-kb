@@ -693,11 +693,14 @@ an orthogonal axis).
 interactive transcript persistence directive); `DCL-CONCEPT-ON-CONTACT-001`
 (authority for first-contact glossary addition).
 
-**Implementation pointer:** `.claude/session/active-session-role.json` (runtime
-marker); written by `scripts/workstream_focus.py` on init-keyword match;
-invalidated by both `.claude/hooks/session_start_dispatch.py` and
-`.codex/gtkb-hooks/session_start_dispatch.py` at SessionStart; resolution rules
-in `scripts/session_role_resolution.py`.
+**Implementation pointer:** `.claude/session/active-session-role.json` is the
+legacy runtime marker written by `scripts/workstream_focus.py` on init-keyword
+match and may be invalidated by both `.claude/hooks/session_start_dispatch.py`
+and `.codex/gtkb-hooks/session_start_dispatch.py` at SessionStart. The current
+interactive authority is the transcript/session envelope plus per-session
+`role-*.json` marker state; that authority persists across compaction, resume,
+and contiguous SessionStart-like boundaries until explicit owner change.
+Resolution rules live in `scripts/session_role_resolution.py`.
 
 ### smart poller
 

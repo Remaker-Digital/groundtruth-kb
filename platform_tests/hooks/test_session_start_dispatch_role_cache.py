@@ -148,6 +148,10 @@ def test_metadata_role_mode_fields_match_cache(
     assert pb_meta["role_profile"] == "prime-builder"
     assert lo_meta["role_mode"] == "lo"
     assert lo_meta["role_profile"] == "loyal-opposition"
+    assert pb_meta["role_authority"]["interactive_resolved_role"] == "prime-builder"
+    assert pb_meta["role_authority"]["authority_mode"] == "cache_only_pending_init_keyword"
+    assert "non-overriding" in pb_meta["role_authority"]["durable_registry_authority"]
+    assert lo_meta["role_authority"]["interactive_resolved_role"] == "loyal-opposition"
 
     # Sidecar integrity: byte_length + sha256 describe the on-disk cache body.
     import hashlib

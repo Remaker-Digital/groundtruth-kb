@@ -322,6 +322,8 @@ def _role_metadata(
     harness_name: str | None = None,
     harness_id: str | None = None,
     role_record_path: Path | None = None,
+    role_profile_explicit: bool = False,
+    interactive_role_source: str | None = None,
 ) -> dict[str, str]:
     metadata = dict(ROLE_PROFILES[role_profile])
     resolved_name = _resolved_harness_name(harness_name)
@@ -341,6 +343,26 @@ def _role_metadata(
         metadata["role_assignment"] = (
             f"active AI harness assigned by owner through single role map entry for harness `{resolved_id}`"
         )
+    durable_profile = discover_role_profile(
+        project_root,
+        harness_name=harness_name,
+        harness_id=harness_id,
+        role_record_path=role_record_path,
+    )
+    durable_label = ROLE_PROFILES.get(durable_profile, {}).get("assumed_role", durable_profile)
+    metadata["interactive_role_profile"] = role_profile
+    metadata["interactive_resolved_role"] = metadata["assumed_role"]
+    metadata["interactive_role_source"] = interactive_role_source or (
+        "explicit transcript/startup role profile; overrides durable registry for interactive surfaces only"
+        if role_profile_explicit
+        else "durable registry fallback; no transcript-defined interactive role was provided to startup"
+    )
+    metadata["durable_registry_role_profile"] = durable_profile
+    metadata["durable_registry_role"] = durable_label
+    metadata["durable_registry_authority"] = (
+        "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined "
+        "interactive role is present"
+    )
     return metadata
 
 
@@ -3416,6 +3438,8 @@ def build_startup_model(
     harness_name: str | None = None,
     harness_id: str | None = None,
     role_record_path: Path | None = None,
+    role_profile_explicit: bool | None = None,
+    interactive_role_source: str | None = None,
     fast_hook: bool = False,
 ) -> dict[str, Any]:
     """Collect the complete startup disclosure model without writing files."""
@@ -3426,6 +3450,9 @@ def build_startup_model(
         harness_name=harness_name,
         harness_id=harness_id,
         role_record_path=role_record_path,
+    )
+    resolved_role_profile_explicit = (
+        role_profile is not None if role_profile_explicit is None else role_profile_explicit
     )
     generated_at = _now_iso()
     database = _database_metrics(project_root)
@@ -3510,6 +3537,8 @@ def build_startup_model(
             harness_name=harness_name,
             harness_id=harness_id,
             role_record_path=role_record_path,
+            role_profile_explicit=resolved_role_profile_explicit,
+            interactive_role_source=interactive_role_source,
         ),
         "role_profile": resolved_role_profile,
         "dashboard_opening": _dashboard_opening_state(),
@@ -5039,6 +5068,10 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             "### Role And Governance Stance",
             "",
             f"- Role being assumed: {role['assumed_role']}",
+            f"- Interactive resolved role: {role.get('interactive_resolved_role', role['assumed_role'])}",
+            f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}",
+            f"- Durable registry role: {role.get('durable_registry_role', 'unidentified')}",
+            f"- Durable registry role authority: {role.get('durable_registry_authority', 'unidentified')}",
             f"- Role assignment: {role['role_assignment']}",
             f"- Bridge: {role['bridge']}",
             f"- Bridge dispatch: {role['bridge_dispatch']}",
@@ -6438,6 +6471,8 @@ def write_dashboard_and_report(
     harness_name: str | None = None,
     harness_id: str | None = None,
     role_record_path: Path | None = None,
+    role_profile_explicit: bool | None = None,
+    interactive_role_source: str | None = None,
     fast_hook: bool = False,
 ) -> dict[str, Any]:
     model = build_startup_model(
@@ -6446,6 +6481,8 @@ def write_dashboard_and_report(
         harness_name=harness_name,
         harness_id=harness_id,
         role_record_path=role_record_path,
+        role_profile_explicit=role_profile_explicit,
+        interactive_role_source=interactive_role_source,
         fast_hook=fast_hook,
     )
     if startup_bridge_maintenance is not None:
@@ -6847,6 +6884,10 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             "## Compact Startup Routing Facts",
             "",
             f"- Role being assumed: {role.get('assumed_role', 'unidentified')}",
+            f"- Interactive resolved role: {role.get('interactive_resolved_role', role.get('assumed_role', 'unidentified'))}.",
+            f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}.",
+            f"- Durable registry role: {role.get('durable_registry_role', 'unidentified')}.",
+            f"- Durable registry role authority: {role.get('durable_registry_authority', 'unidentified')}.",
             f"- Role mapping source: {role.get('role_mapping_source', 'unidentified')}.",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
@@ -7291,7 +7332,7 @@ def main(argv: list[str] | None = None) -> int:
         else (args.role_record_path.resolve() if args.role_record_path is not None else None)
     )
     override_role = None
-    if args.role_profile:
+    if args.role_profile and not startup_emit_requested:
         override_role = args.role_profile
     else:
         keyword = (os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD") or "").strip()
@@ -7302,6 +7343,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if override_role:
         role_profile = override_role
+        role_profile_explicit = True
     else:
         role_profile = discover_role_profile(
             project_root,
@@ -7309,6 +7351,7 @@ def main(argv: list[str] | None = None) -> int:
             harness_id=args.harness_id,
             role_record_path=role_record_path,
         )
+        role_profile_explicit = False
 
     # Persist interactive role overrides (marker files) per WI-4673
     if override_role and args.harness_name:
@@ -7403,6 +7446,7 @@ def main(argv: list[str] | None = None) -> int:
         harness_name=args.harness_name,
         harness_id=args.harness_id,
         role_record_path=role_record_path,
+        role_profile_explicit=role_profile_explicit,
         fast_hook=args.fast_hook,
     )
     if startup_emit_requested:

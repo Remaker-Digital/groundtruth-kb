@@ -175,8 +175,11 @@ def _base_envelope(
     active_work_item_id: str | None = None,
 ) -> dict[str, Any]:
     opened_at = utc_now_iso()
-    resolved_role = role or _resolve_role(project_root, harness_id)
+    durable_role = _resolve_role(project_root, harness_id)
+    resolved_role = role or durable_role
     resolved_subject = subject or os.environ.get("GTKB_WORK_SUBJECT") or "gtkb_infrastructure"
+    interactive_role_source = "transcript_init_keyword" if role else None
+    authority_mode = "interactive_transcript" if role else "durable_registry_fallback"
     return {
         "envelope_schema_version": ENVELOPE_SCHEMA_VERSION,
         "session_id": _session_id(harness_id, opened_at),
@@ -194,6 +197,16 @@ def _base_envelope(
         "role_asserted": role,
         "role_resolved": resolved_role,
         "role": resolved_role,
+        "role_resolution": {
+            "interactive_resolved_role": resolved_role,
+            "interactive_role_source": interactive_role_source,
+            "durable_registry_role": durable_role,
+            "durable_registry_authority": (
+                "headless dispatch routing and interactive fallback only; non-overriding when "
+                "a transcript-defined interactive role is present"
+            ),
+            "authority_mode": authority_mode,
+        },
         "application_id": None,
         "opened_at": opened_at,
         "closed_at": None,

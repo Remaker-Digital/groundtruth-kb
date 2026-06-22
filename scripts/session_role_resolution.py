@@ -14,9 +14,11 @@ MemBase attribution, and the doctor checks all resolve "what role is this
 interactive session operating as" through ``resolve_interactive_session_role``
 so the resolution table lives in exactly one place.
 
-Resolution (marker > durable), per the DCL interactive rows:
+Resolution (per-session marker/envelope > legacy marker > durable), per the
+DCL interactive rows and the interactive-persistence correction:
 
-- marker absent / unreadable / malformed -> (durable, "durable_marker_absent")
+- marker absent / unreadable / malformed -> (envelope_role, "session_envelope")
+  when an open envelope carries a valid role, else (durable, "durable_marker_absent")
 - marker role not in {prime-builder, loyal-opposition}
                                          -> (durable, "durable_marker_invalid_role")  # assertion 7
 - current_session_id given and marker session_id mismatches
@@ -25,10 +27,12 @@ Resolution (marker > durable), per the DCL interactive rows:
 - current_session_id is None (unavailable)
                                          -> (marker_role, "marker_session_id_unverified")
 
-The ``marker_session_id_unverified`` branch accepts the marker because Slice 3
-deletes the marker at every SessionStart in both dispatchers, so a marker
-present mid-session belongs to the current session. The session-id check is
-defense-in-depth for the case where SessionStart invalidation silently failed.
+The ``marker_session_id_unverified`` branch is a legacy transition fallback.
+Callers that have an interactive session id should pass it so the resolver can
+prefer the per-session marker and validate the stored raw id. The session
+envelope/per-session marker authority survives compaction, resume, and
+contiguous SessionStart-like boundaries; headless dispatch remains outside this
+interactive resolver and continues to use durable registry routing.
 
 The resolver is strictly READ-ONLY: it never writes the marker and never
 mutates the durable role map. The durable fallback is composed from the
@@ -45,6 +49,13 @@ from typing import Any
 ROLE_PRIME = "prime-builder"
 ROLE_LO = "loyal-opposition"
 _VALID_ROLES = frozenset({ROLE_PRIME, ROLE_LO})
+_DURABLE_FALLBACK_SOURCES = frozenset(
+    {
+        "durable_marker_absent",
+        "durable_marker_invalid_role",
+        "durable_marker_stale_session",
+    }
+)
 
 # MUST equal scripts.workstream_focus._SESSION_ROLE_MARKER_NAME (Slice 2) and
 # the SessionStart dispatchers' _SESSION_ROLE_MARKER_NAME (Slice 3). A parity
@@ -167,6 +178,13 @@ def resolve_interactive_session_role(
             pass
 
     fallback = envelope_role if envelope_role is not None else durable
+    fallback_absent_source = "session_envelope" if envelope_role is not None else "durable_marker_absent"
+    fallback_invalid_source = (
+        "session_envelope_marker_invalid_role" if envelope_role is not None else "durable_marker_invalid_role"
+    )
+    fallback_stale_source = (
+        "session_envelope_marker_stale_session" if envelope_role is not None else "durable_marker_stale_session"
+    )
 
     # WI-4540 (bridge -004, R-B1 + additive transition): the per-session marker
     # is the authority. When a current_session_id is available, prefer the
@@ -179,26 +197,54 @@ def resolve_interactive_session_role(
         if per_session is not None:
             role = per_session.get("role")
             if role not in _VALID_ROLES:  # assertion 7
-                return fallback, "durable_marker_invalid_role"
+                return fallback, fallback_invalid_source
             marker_session_id = per_session.get("session_id")
             if not (isinstance(marker_session_id, str) and marker_session_id == current_session_id):
-                return fallback, "durable_marker_stale_session"  # assertion 6
+                return fallback, fallback_stale_source  # assertion 6
             return role, "marker"
 
     body = _read_marker(project_root)
     if body is None:
-        return fallback, "durable_marker_absent"
+        return fallback, fallback_absent_source
 
     role = body.get("role")
     if role not in _VALID_ROLES:  # assertion 7
-        return fallback, "durable_marker_invalid_role"
+        return fallback, fallback_invalid_source
 
     if current_session_id is not None:
         marker_session_id = body.get("session_id")
         if not (isinstance(marker_session_id, str) and marker_session_id == current_session_id):
-            return fallback, "durable_marker_stale_session"  # assertion 6
+            return fallback, fallback_stale_source  # assertion 6
         return role, "marker"
 
-    # current_session_id unavailable: accept the marker. Slice 3 deletes the
-    # marker at every SessionStart, so a present marker belongs to this session.
+    # current_session_id unavailable: accept the legacy marker as a transition
+    # fallback only. Interactive callers should pass a session id so the
+    # per-session marker/envelope authority can prove its source.
     return role, "marker_session_id_unverified"
+
+
+def resolve_interactive_session_role_details(
+    project_root: Path,
+    *,
+    current_session_id: str | None = None,
+    harness_name: str = "claude",
+) -> dict[str, str | None]:
+    """Return role resolution metadata with durable and interactive authority split."""
+
+    role, source = resolve_interactive_session_role(
+        project_root,
+        current_session_id=current_session_id,
+        harness_name=harness_name,
+    )
+    durable = _durable_role(project_root, harness_name)
+    authority_mode = "durable_registry_fallback" if source in _DURABLE_FALLBACK_SOURCES else "interactive_transcript"
+    return {
+        "interactive_resolved_role": role,
+        "interactive_role_source": source,
+        "durable_registry_role": durable,
+        "durable_registry_authority": (
+            "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined "
+            "interactive role is present"
+        ),
+        "authority_mode": authority_mode,
+    }

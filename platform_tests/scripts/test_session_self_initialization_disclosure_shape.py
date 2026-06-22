@@ -78,6 +78,10 @@ def test_open_disclosure_includes_role_declaration() -> None:
     report = _render_prime_open_report(module)
     assert "### Role And Governance Stance" in report
     assert "Role being assumed: Prime Builder" in report
+    assert "Interactive resolved role: Prime Builder" in report
+    assert "Interactive role source:" in report
+    assert "Durable registry role:" in report
+    assert "Durable registry role authority:" in report
 
 
 def test_open_disclosure_includes_bridge_actionable_summary() -> None:

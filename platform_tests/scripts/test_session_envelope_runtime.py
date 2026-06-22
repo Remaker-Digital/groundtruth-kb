@@ -47,7 +47,8 @@ def test_open_session_writes_current_per_harness_envelope(tmp_path: Path) -> Non
     envelope = open_session(
         tmp_path,
         harness_name="codex",
-        init_keyword="::init gtkb lo",
+        init_keyword="::init gtkb pb",
+        role="prime-builder",
         active_work_item_id="WI-4301",
     )
 
@@ -56,8 +57,25 @@ def test_open_session_writes_current_per_harness_envelope(tmp_path: Path) -> Non
     saved = json.loads(current.read_text(encoding="utf-8"))
     assert saved["session_id"] == envelope["session_id"]
     assert saved["harness_id"] == "A"
-    assert saved["role_resolved"] == "loyal-opposition"
+    assert saved["role_resolved"] == "prime-builder"
+    assert saved["role_resolution"]["interactive_resolved_role"] == "prime-builder"
+    assert saved["role_resolution"]["interactive_role_source"] == "transcript_init_keyword"
+    assert saved["role_resolution"]["durable_registry_role"] == "loyal-opposition"
+    assert saved["role_resolution"]["authority_mode"] == "interactive_transcript"
+    assert "non-overriding" in saved["role_resolution"]["durable_registry_authority"]
     assert saved["active_work_item_id"] == "WI-4301"
+
+
+def test_open_session_without_role_uses_durable_registry_fallback(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+
+    open_session(tmp_path, harness_name="codex")
+
+    saved = json.loads(current_envelope_path(tmp_path, "codex").read_text(encoding="utf-8"))
+    assert saved["role_resolved"] == "loyal-opposition"
+    assert saved["role_resolution"]["interactive_role_source"] is None
+    assert saved["role_resolution"]["durable_registry_role"] == "loyal-opposition"
+    assert saved["role_resolution"]["authority_mode"] == "durable_registry_fallback"
 
 
 def test_topic_open_close_is_strict_and_one_per_type(tmp_path: Path) -> None:

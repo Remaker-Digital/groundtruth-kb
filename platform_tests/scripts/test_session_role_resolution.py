@@ -67,6 +67,25 @@ def _write_legacy(root: Path, role: str, session_id: str | None) -> Path:
     return marker
 
 
+def _write_envelope(root: Path, harness_name: str, role: str) -> Path:
+    envelope = root / "harness-state" / harness_name / "session-envelope.json"
+    envelope.parent.mkdir(parents=True, exist_ok=True)
+    envelope.write_text(
+        json.dumps(
+            {
+                "status": "open",
+                "role_resolved": role,
+                "role_asserted": role,
+                "init_keyword": "::init gtkb pb" if role == srr.ROLE_PRIME else "::init gtkb lo",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return envelope
+
+
 @pytest.mark.parametrize(("role", "expected"), [("pb", srr.ROLE_PRIME), ("lo", srr.ROLE_LO)])
 def test_per_session_marker_beats_durable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, role: str, expected: str
@@ -97,6 +116,12 @@ def test_per_session_invalid_role_falls_back_to_durable(tmp_path: Path, monkeypa
     assert resolved == srr.ROLE_PRIME
     assert source == "durable_marker_invalid_role"
 
+    details = srr.resolve_interactive_session_role_details(tmp_path, current_session_id="sess-1")
+    assert details["interactive_resolved_role"] == srr.ROLE_PRIME
+    assert details["interactive_role_source"] == "durable_marker_invalid_role"
+    assert details["durable_registry_role"] == srr.ROLE_PRIME
+    assert details["authority_mode"] == "durable_registry_fallback"
+
 
 def test_per_session_stored_id_mismatch_falls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A per-session marker whose stored raw session_id differs from the querying
@@ -106,6 +131,12 @@ def test_per_session_stored_id_mismatch_falls_back(tmp_path: Path, monkeypatch: 
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
     assert resolved == srr.ROLE_PRIME
     assert source == "durable_marker_stale_session"
+
+    details = srr.resolve_interactive_session_role_details(tmp_path, current_session_id="sess-1")
+    assert details["interactive_resolved_role"] == srr.ROLE_PRIME
+    assert details["interactive_role_source"] == "durable_marker_stale_session"
+    assert details["durable_registry_role"] == srr.ROLE_PRIME
+    assert details["authority_mode"] == "durable_registry_fallback"
 
 
 def test_no_per_session_marker_falls_back_to_legacy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,6 +154,32 @@ def test_no_marker_at_all_uses_durable(tmp_path: Path, monkeypatch: pytest.Monke
     resolved, source = srr.resolve_interactive_session_role(tmp_path, current_session_id="sess-1")
     assert resolved == srr.ROLE_LO
     assert source == "durable_marker_absent"
+
+
+def test_open_envelope_role_beats_durable_and_reports_envelope_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Durable Codex LO + transcript PB envelope resolves PB and does not label the source as durable."""
+    monkeypatch.setattr(srr, "_durable_role", lambda *a, **k: srr.ROLE_LO)
+    _write_envelope(tmp_path, "codex", srr.ROLE_PRIME)
+
+    resolved, source = srr.resolve_interactive_session_role(
+        tmp_path,
+        current_session_id="sess-1",
+        harness_name="codex",
+    )
+    assert resolved == srr.ROLE_PRIME
+    assert source == "session_envelope"
+
+    details = srr.resolve_interactive_session_role_details(
+        tmp_path,
+        current_session_id="sess-1",
+        harness_name="codex",
+    )
+    assert details["interactive_resolved_role"] == srr.ROLE_PRIME
+    assert details["interactive_role_source"] == "session_envelope"
+    assert details["durable_registry_role"] == srr.ROLE_LO
+    assert details["authority_mode"] == "interactive_transcript"
 
 
 def test_per_session_resolver_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
