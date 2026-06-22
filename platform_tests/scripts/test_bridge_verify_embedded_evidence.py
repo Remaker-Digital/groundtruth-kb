@@ -49,6 +49,43 @@ def _bridge_content(
     )
 
 
+def _write_bridge_chain(
+    root: Path,
+    *,
+    bridge_id: str = "chain-thread",
+    appendix_body: str = "print('ok')\n",
+) -> None:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    (bridge_dir / f"{bridge_id}-001.md").write_text(
+        (
+            "NEW\n\n"
+            f"Document: {bridge_id}\n\n"
+            'target_paths: ["scripts/example.py"]\n\n'
+            "## Proposal\n\n"
+            "Approved implementation scope.\n"
+        ),
+        encoding="utf-8",
+    )
+    (bridge_dir / f"{bridge_id}-002.md").write_text(
+        f"GO\n\nDocument: {bridge_id}\n\n## Verdict\n\nGO.\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / f"{bridge_id}-003.md").write_text(
+        (
+            "NEW\n"
+            "bridge_kind: implementation_report\n\n"
+            f"Document: {bridge_id}\n\n"
+            "## Implementation Evidence\n\n"
+            "### Appendix A1 - example.py\n\n"
+            "```python\n"
+            f"{appendix_body}"
+            "```\n"
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_pass_when_appendix_matches_source(tmp_path: Path) -> None:
     _write_source(tmp_path, "scripts/example.py", "print('ok')\n")
     pending = tmp_path / "pending.md"
@@ -64,6 +101,41 @@ def test_pass_when_appendix_matches_source(tmp_path: Path) -> None:
     assert report["passed"] is True
     assert report["summary"]["appendix_failures"] == 0
     assert report["appendices"][0]["status"] == "match"
+
+
+def test_bridge_id_mode_resolves_report_appendix_against_proposal_targets(tmp_path: Path) -> None:
+    _write_source(tmp_path, "scripts/example.py", "print('ok')\n")
+    _write_bridge_chain(tmp_path)
+
+    report = verify.build_report(
+        bridge_id="chain-thread",
+        bridge_dir=tmp_path / "bridge",
+        clauses_config=CLAUSES_CONFIG,
+    )
+
+    assert report["passed"] is True
+    assert report["operative_version"]["path"] == "bridge/chain-thread-003.md"
+    assert report["target_path_source"] == {
+        "mode": "approved_proposal",
+        "path": "bridge/chain-thread-001.md",
+    }
+    assert report["target_paths"] == ["scripts/example.py"]
+    assert report["appendices"][0]["status"] == "match"
+
+
+def test_bridge_id_mode_fails_chain_resolved_appendix_hash_mismatch(tmp_path: Path) -> None:
+    _write_source(tmp_path, "scripts/example.py", "print('source')\n")
+    _write_bridge_chain(tmp_path, appendix_body="print('embedded')\n")
+
+    report = verify.build_report(
+        bridge_id="chain-thread",
+        bridge_dir=tmp_path / "bridge",
+        clauses_config=CLAUSES_CONFIG,
+    )
+
+    assert report["passed"] is False
+    assert report["target_paths"] == ["scripts/example.py"]
+    assert report["appendices"][0]["status"] == "mismatch"
 
 
 def test_fail_on_appendix_hash_mismatch(tmp_path: Path) -> None:

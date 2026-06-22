@@ -372,12 +372,13 @@ def _load_content(
     bridge_id: str,
     bridge_dir: Path,
     content_file: Path | None,
-) -> tuple[str, dict[str, Any], BridgeVersion | None]:
+) -> tuple[str, dict[str, Any], BridgeVersion | None, list[BridgeVersion]]:
     if content_file is not None:
         return (
             content_file.read_text(encoding="utf-8"),
             {"mode": "pending_content", "path": _display_path(content_file)},
             None,
+            [],
         )
     versions = parse_versioned_files_for_document(bridge_dir, bridge_id)
     operative = choose_operative_version(versions)
@@ -391,7 +392,25 @@ def _load_content(
         operative.abs_path.read_text(encoding="utf-8"),
         {"mode": "bridge_file_operative", "path": operative.rel_path},
         operative,
+        versions,
     )
+
+
+def _is_implementation_report(content: str) -> bool:
+    return bool(re.search(r"(?im)^\s*bridge_kind:\s*implementation_report\s*$", content))
+
+
+def _approved_proposal_target_paths(versions: list[BridgeVersion]) -> tuple[set[str], dict[str, Any] | None]:
+    for version in sorted(versions, key=lambda item: item.version_number, reverse=True):
+        if version.status not in {"NEW", "REVISED"} or not version.abs_path.is_file():
+            continue
+        content = version.abs_path.read_text(encoding="utf-8")
+        if _is_implementation_report(content):
+            continue
+        target_paths = extract_declared_target_paths(content)
+        if target_paths:
+            return target_paths, {"mode": "approved_proposal", "path": version.rel_path}
+    return set(), None
 
 
 def build_report(
@@ -401,12 +420,18 @@ def build_report(
     clauses_config: Path = DEFAULT_CLAUSES_CONFIG,
     content_file: Path | None = None,
 ) -> dict[str, Any]:
-    content, content_source, operative = _load_content(
+    content, content_source, operative, versions = _load_content(
         bridge_id=bridge_id,
         bridge_dir=bridge_dir,
         content_file=content_file,
     )
     target_paths = extract_declared_target_paths(content)
+    target_path_source: dict[str, Any] = dict(content_source)
+    if not target_paths and content_file is None:
+        proposal_paths, proposal_source = _approved_proposal_target_paths(versions)
+        if proposal_paths and proposal_source is not None:
+            target_paths = proposal_paths
+            target_path_source = proposal_source
     project_root = _infer_project_root(content_file, bridge_dir, target_paths)
     appendix_checks = check_appendices(
         blocks=extract_appendix_blocks(content),
@@ -432,6 +457,7 @@ def build_report(
         ),
         "project_root": _display_path(project_root, project_root),
         "target_paths": sorted(target_paths),
+        "target_path_source": target_path_source,
         "appendices": [asdict(check) for check in appendix_checks],
         "root_boundary": root_boundary,
         "summary": {
