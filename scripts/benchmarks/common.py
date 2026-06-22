@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -53,7 +54,22 @@ def new_run_id() -> str:
 
 def _resolve_project_root(project_root: Path | str | None) -> Path:
     if project_root is None:
-        return Path(__file__).resolve().parents[2]
+        env_root = os.environ.get("GTKB_PROJECT_ROOT")
+        if env_root:
+            return Path(env_root).resolve()
+        try:
+            from groundtruth_kb.bridge.paths import resolve_project_root
+
+            return resolve_project_root()
+        except Exception:
+            here = Path(__file__).resolve().parent
+            for candidate in [here, *here.parents]:
+                parts = candidate.parts
+                if ".claude" in parts and "worktrees" in parts:
+                    continue
+                if (candidate / "groundtruth.toml").is_file():
+                    return candidate
+            raise RuntimeError("Could not resolve GT-KB project root.")
     return Path(project_root).resolve()
 
 

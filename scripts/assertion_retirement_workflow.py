@@ -32,8 +32,19 @@ def _resolve_project_root(explicit: str | None) -> Path:
     env_root = os.environ.get("GTKB_PROJECT_ROOT")
     if env_root:
         return Path(env_root).resolve()
+
+    try:
+        from groundtruth_kb.bridge.paths import resolve_project_root
+
+        return resolve_project_root()
+    except Exception:
+        pass
+
     here = Path(__file__).resolve().parent
     for candidate in [here, *here.parents]:
+        parts = candidate.parts
+        if ".claude" in parts and "worktrees" in parts:
+            continue
         if (candidate / "groundtruth.toml").is_file():
             return candidate
     raise SystemExit("Could not resolve GT-KB project root.")

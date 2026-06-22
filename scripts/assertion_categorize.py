@@ -62,15 +62,27 @@ def _resolve_project_root(explicit: str | None) -> Path:
     Order:
       1. Explicit ``--project-root`` argument.
       2. ``GTKB_PROJECT_ROOT`` env var.
-      3. Walk up from this script's location looking for ``groundtruth.toml``.
+      3. Shared bridge root resolver.
+      4. Worktree-aware fallback walk from this script's location.
     """
     if explicit:
         return Path(explicit).resolve()
     env_root = os.environ.get("GTKB_PROJECT_ROOT")
     if env_root:
         return Path(env_root).resolve()
+
+    try:
+        from groundtruth_kb.bridge.paths import resolve_project_root
+
+        return resolve_project_root()
+    except Exception:
+        pass
+
     here = Path(__file__).resolve().parent
     for candidate in [here, *here.parents]:
+        parts = candidate.parts
+        if ".claude" in parts and "worktrees" in parts:
+            continue
         if (candidate / "groundtruth.toml").is_file():
             return candidate
     raise SystemExit("Could not resolve GT-KB project root. Pass --project-root or set GTKB_PROJECT_ROOT.")
