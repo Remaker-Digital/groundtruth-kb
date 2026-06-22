@@ -3,10 +3,10 @@
 
 Compares assertion counts in staged test files against the committed baseline.
 If any file's assertion count DECREASED, the commit is rejected.
-If any file's assertion count INCREASED, the baseline is auto-updated.
+If any file's assertion count INCREASED, the baseline is updated on disk.
 
 Exit codes:
-  0 = pass (baseline may have been auto-updated)
+  0 = pass (baseline may have been updated on disk)
   1 = fail (assertion count decreased in one or more files)
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -19,9 +19,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Reuse the counting logic from the generator
+# Reuse the counting logic from the generator.
+# isort: off
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from generate_assertion_baseline import count_assertions, PROJECT_ROOT
+# isort: on
 
 BASELINE_PATH = Path(__file__).resolve().parent / "assertion-baseline.json"
 
@@ -50,7 +52,7 @@ def main() -> int:
         print("Skipping assertion ratchet check.")
         return 0
 
-    with open(BASELINE_PATH, "r", encoding="utf-8") as f:
+    with open(BASELINE_PATH, encoding="utf-8") as f:
         data = json.load(f)
 
     baselines: dict[str, int] = data.get("baselines", {})
@@ -91,7 +93,7 @@ def main() -> int:
         print("=" * 70)
         return 1
 
-    # Auto-update baseline for increased counts
+    # Update the baseline for increased counts without mutating the git index.
     if updates:
         for path, new_count in updates.items():
             baselines[path] = new_count
@@ -101,12 +103,11 @@ def main() -> int:
         with open(BASELINE_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, sort_keys=True)
             f.write("\n")
-        # Stage the updated baseline
-        subprocess.run(
-            ["git", "add", str(BASELINE_PATH)],
-            cwd=PROJECT_ROOT,
+        print(
+            f"Assertion ratchet: {len(updates)} file(s) increased -- baseline updated on disk but NOT staged. "
+            f"Stage {BASELINE_PATH.relative_to(PROJECT_ROOT).as_posix()} deliberately if this commit should "
+            "include it."
         )
-        print(f"Assertion ratchet: {len(updates)} file(s) increased -- baseline auto-updated.")
 
     return 0
 
