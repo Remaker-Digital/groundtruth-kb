@@ -900,6 +900,7 @@ def test_default_invocation_does_not_scan_home_directory_for_skills_or_plugins(m
     monkeypatch.setattr(module.Path, "home", _raise_if_called)
 
     skill_files = module._discover_skill_files(REPO_ROOT)
+    codex_skill_fallbacks = module._codex_skill_fallbacks(REPO_ROOT)
     plugin_list = module._plugin_inventory()
 
     # Default behavior: skill discovery includes only project-root skills.
@@ -911,6 +912,7 @@ def test_default_invocation_does_not_scan_home_directory_for_skills_or_plugins(m
         )
 
     # Default behavior: plugin inventory is empty (home-dir plugin cache not scanned).
+    assert codex_skill_fallbacks == []
     assert plugin_list == [], f"Default plugin inventory must be empty (no home-dir scan); got {plugin_list}"
 
 
@@ -941,6 +943,42 @@ def test_opt_in_invocation_scans_home_directory_for_skills_and_plugins(monkeypat
     assert found_synthetic_skill, f"Opt-in must scan home-dir skills; got {[str(p) for p in skill_files]}"
 
     assert "synthetic-plugin" in plugin_list, f"Opt-in must scan home-dir plugin cache; got {plugin_list}"
+
+
+def test_codex_skill_discovery_prefers_in_root_adapter_over_home(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    project_root = tmp_path / "project"
+    home_root = tmp_path / "home"
+    repo_skill = project_root / ".codex" / "skills" / "bridge" / "SKILL.md"
+    home_skill = home_root / ".codex" / "skills" / "bridge" / "SKILL.md"
+    repo_skill.parent.mkdir(parents=True)
+    home_skill.parent.mkdir(parents=True)
+    repo_skill.write_text("# repo bridge", encoding="utf-8")
+    home_skill.write_text("# home bridge", encoding="utf-8")
+
+    monkeypatch.setenv("GTKB_DISCOVER_USER_EXTENSIONS", "1")
+    monkeypatch.setattr(module.Path, "home", lambda: home_root)
+
+    skill_files = module._discover_skill_files(project_root)
+
+    assert repo_skill in skill_files
+    assert home_skill not in skill_files
+    assert module._codex_skill_fallbacks(project_root) == []
+
+
+def test_codex_skill_home_only_resolution_reported_as_fallback(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    home_root = tmp_path / "home"
+    home_skill = home_root / ".codex" / "skills" / "home-only-codex-skill" / "SKILL.md"
+    home_skill.parent.mkdir(parents=True)
+    home_skill.write_text("# home-only", encoding="utf-8")
+
+    monkeypatch.setenv("GTKB_DISCOVER_USER_EXTENSIONS", "1")
+    monkeypatch.setattr(module.Path, "home", lambda: home_root)
+
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder")
+
+    assert "home-only-codex-skill" in model["codex_skill_fallbacks"]
 
 
 def test_startup_payload_marks_user_extension_discovery_state(monkeypatch) -> None:

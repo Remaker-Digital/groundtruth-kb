@@ -1685,25 +1685,45 @@ def _user_extension_discovery_opt_in() -> bool:
     return os.environ.get("GTKB_DISCOVER_USER_EXTENSIONS") == "1"
 
 
-def _discover_skill_files(project_root: Path) -> list[Path]:
-    roots = [project_root / ".claude" / "skills"]
-    if _user_extension_discovery_opt_in():
-        roots.extend(
-            [
-                Path.home() / ".codex" / "skills",
-                Path.home() / ".agents" / "skills",
-            ]
-        )
+def _skill_files_under(root: Path) -> list[Path]:
+    if not root.is_dir():
+        return []
     skill_files: list[Path] = []
-    for root in roots:
-        if not root.is_dir():
+    for path in root.rglob("SKILL.md"):
+        try:
+            path.relative_to(root)
+        except ValueError:
             continue
-        for path in root.rglob("SKILL.md"):
-            try:
-                path.relative_to(root)
-            except ValueError:
-                continue
-            skill_files.append(path)
+        skill_files.append(path)
+    return skill_files
+
+
+def _resolved_codex_skill_files(project_root: Path) -> dict[str, tuple[Path, str]]:
+    """Return Codex skill adapter files, preferring in-root adapters over home copies."""
+    if not _user_extension_discovery_opt_in():
+        return {}
+
+    resolved: dict[str, tuple[Path, str]] = {}
+    for root, source in (
+        (project_root / ".codex" / "skills", "repo"),
+        (Path.home() / ".codex" / "skills", "home"),
+    ):
+        for path in _skill_files_under(root):
+            resolved.setdefault(_skill_name(path), (path, source))
+    return resolved
+
+
+def _codex_skill_fallbacks(project_root: Path) -> list[str]:
+    return sorted(
+        name for name, (_path, source) in _resolved_codex_skill_files(project_root).items() if source == "home"
+    )
+
+
+def _discover_skill_files(project_root: Path) -> list[Path]:
+    skill_files = _skill_files_under(project_root / ".claude" / "skills")
+    if _user_extension_discovery_opt_in():
+        skill_files.extend(path for path, _source in _resolved_codex_skill_files(project_root).values())
+        skill_files.extend(_skill_files_under(Path.home() / ".agents" / "skills"))
     return sorted(set(skill_files), key=lambda path: str(path).lower())
 
 
@@ -3570,6 +3590,7 @@ def build_startup_model(
         "user_extension_discovery": (
             "opt_in_active" if _user_extension_discovery_opt_in() else "default_root_contained"
         ),
+        "codex_skill_fallbacks": _codex_skill_fallbacks(project_root),
         "directives": {
             "rule_files": [path.name for path in rule_files],
             "hook_files": [path.name for path in hook_files],
