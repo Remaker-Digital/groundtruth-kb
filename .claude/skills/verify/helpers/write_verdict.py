@@ -371,7 +371,7 @@ def finalize_verified_commit(
     for path in expected_paths:
         if path == verdict_rel_path:
             continue
-        res = _run_git(["status", "--porcelain", "--", path], cwd=root)
+        res = _run_git(["status", "--porcelain", "--ignored", "--", path], cwd=root)
         if res.stdout.strip():
             dirty_expected_paths.append(path)
 
