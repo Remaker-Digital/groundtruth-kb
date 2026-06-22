@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,15 @@ def test_bridge_probe_counts_latest_role_actionable_statuses(project_dir: Path) 
     for name in ("first-001", "first-002", "second-001", "third-001", "third-002"):
         (bridge_dir / f"{name}.md").write_text("bridge_kind: implementation_proposal\n", encoding="utf-8")
 
+    for name, status in {
+        "first-001": "NEW",
+        "first-002": "GO",
+        "second-001": "NEW",
+        "third-001": "NEW",
+        "third-002": "VERIFIED",
+    }.items():
+        (bridge_dir / f"{name}.md").write_text(f"{status}\n", encoding="utf-8")
+
     state = collect_operating_state(project_dir, config=_config(project_dir), components=("bridge",))
     bridge = state.components[0]
 
@@ -80,6 +90,44 @@ def test_missing_chromadb_is_unknown_not_crash(project_dir: Path, monkeypatch: p
 
     assert state.components[0].status == "UNKNOWN"
     assert "not installed" in state.components[0].detail
+
+
+def test_absent_dashboard_cache_is_unknown_with_regeneration_guidance(project_dir: Path) -> None:
+    dashboard_db = project_dir / ".groundtruth" / "dashboard" / "gtkb-dashboard.sqlite"
+    assert not dashboard_db.exists()
+
+    state = collect_operating_state(project_dir, config=_config(project_dir), components=("dashboard",))
+    dashboard = state.components[0]
+
+    assert dashboard.status == "UNKNOWN"
+    assert "regenerated" in dashboard.detail
+    assert "gt dashboard refresh" in dashboard.detail
+    assert dashboard.detail != "dashboard SQLite database not generated"
+
+
+def test_absent_dashboard_cache_does_not_crash_and_keeps_source_path(project_dir: Path) -> None:
+    dashboard_db = project_dir / ".groundtruth" / "dashboard" / "gtkb-dashboard.sqlite"
+
+    state = collect_operating_state(project_dir, config=_config(project_dir), components=("dashboard",))
+    dashboard = state.components[0]
+
+    assert dashboard.status == "UNKNOWN"
+    assert dashboard.source == str(dashboard_db)
+    assert dashboard.evidence == {}
+
+
+def test_present_dashboard_cache_reports_pass_with_table_count(project_dir: Path) -> None:
+    dashboard_db = project_dir / ".groundtruth" / "dashboard" / "gtkb-dashboard.sqlite"
+    dashboard_db.parent.mkdir(parents=True)
+    with sqlite3.connect(dashboard_db) as conn:
+        conn.execute("CREATE TABLE sample_metric (id INTEGER PRIMARY KEY)")
+
+    state = collect_operating_state(project_dir, config=_config(project_dir), components=("dashboard",))
+    dashboard = state.components[0]
+
+    assert dashboard.status == "PASS"
+    assert dashboard.detail == "dashboard SQLite database readable"
+    assert dashboard.evidence["tables"] == 1
 
 
 def test_resource_registry_probe_reports_compact_health(project_dir: Path) -> None:
@@ -162,7 +210,7 @@ def test_system_interface_map_probe_reports_compact_health(project_dir: Path) ->
                 'canonical_name = "backlog"',
                 'accepted_aliases = ["backlog"]',
                 'authoritative_source = "MemBase table: current_work_items"',
-                'read_method = "current_work_items, work_items, bridge/INDEX.md"',
+                'read_method = "current_work_items, work_items, versioned bridge files"',
                 'harness_caveats = "dashboard summaries are non-authoritative"',
                 "",
                 "[[systems]]",

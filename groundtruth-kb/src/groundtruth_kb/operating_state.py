@@ -292,7 +292,12 @@ def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
 def _probe_dashboard(root: Path) -> tuple[str, str, str, dict[str, Any]]:
     dashboard_db = root / ".groundtruth" / "dashboard" / "gtkb-dashboard.sqlite"
     if not dashboard_db.exists():
-        return "UNKNOWN", "dashboard SQLite database not generated", str(dashboard_db), {}
+        return (
+            "UNKNOWN",
+            "dashboard SQLite cache is absent and can be regenerated via 'gt dashboard refresh'",
+            str(dashboard_db),
+            {},
+        )
     try:
         with sqlite3.connect(f"file:{dashboard_db}?mode=ro", uri=True, timeout=2.0) as conn:
             table_count = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
