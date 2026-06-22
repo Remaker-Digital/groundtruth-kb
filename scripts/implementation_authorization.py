@@ -83,6 +83,7 @@ TARGET_PATHS_RE = re.compile(
 PROJECT_AUTHORIZATION_KEYS = frozenset({"project authorization", "project authorization id"})
 PROJECT_KEYS = frozenset({"project", "project id"})
 WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
+PROJECT_RETIREMENT_RECONCILIATION_CLASS = "project_retirement_reconciliation"
 
 # HYG-046 (FAB-14): single canonical repo-path-token matcher. Previously duplicated
 # (and drifted — one copy carried 'memory/', the other did not) across
@@ -764,13 +765,17 @@ def packet_spec_links(packet: dict[str, Any]) -> list[str]:
     return spec_links
 
 
-def _project_is_active(project_root: Path, project_id: str) -> bool:
+def _project_status(project_root: Path, project_id: str) -> str | None:
     conn = sqlite3.connect(groundtruth_db_path(project_root))
     try:
         row = conn.execute("SELECT status FROM current_projects WHERE id = ?", (project_id,)).fetchone()
     finally:
         conn.close()
-    return bool(row and row[0] == "active")
+    return str(row[0]) if row and row[0] is not None else None
+
+
+def _project_is_active(project_root: Path, project_id: str) -> bool:
+    return _project_status(project_root, project_id) == "active"
 
 
 def _work_item_in_project(project_root: Path, project_id: str, work_item_id: str) -> bool:
@@ -808,7 +813,11 @@ def validate_project_authorization_row(
         raise AuthorizationError(
             f"Project authorization {authorization_id} is for {project_id}, not proposal project {proposal_project_id}"
         )
-    if not _project_is_active(project_root, project_id):
+    project_status = _project_status(project_root, project_id)
+    allowed_mutation_classes = set(_json_list(row, "allowed_mutation_classes"))
+    if project_status != "active" and not (
+        project_status == "retired" and PROJECT_RETIREMENT_RECONCILIATION_CLASS in allowed_mutation_classes
+    ):
         raise AuthorizationError(f"Project authorization {authorization_id} is not attached to an active project")
 
     included_items = set(_json_list(row, "included_work_item_ids"))

@@ -274,6 +274,86 @@ def _seed_owner_sufficiency_deliberation(
     return deliberation_id
 
 
+def _seed_project_authorization(
+    tmp_path: Path,
+    *,
+    project_status: str = "active",
+    allowed_mutation_classes: list[str] | None = None,
+    auth_id: str = "PAUTH-FIXTURE",
+    project_id: str = "PROJECT-FIXTURE",
+) -> str:
+    """Seed the minimal project-authorization surface used by the gate."""
+    _make_groundtruth_toml(tmp_path)
+    db_path = tmp_path / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """CREATE TABLE current_projects (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE current_project_authorizations (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                authorization_name TEXT,
+                owner_decision_deliberation_id TEXT,
+                scope_summary TEXT,
+                expires_at TEXT,
+                allowed_mutation_classes TEXT,
+                forbidden_operations TEXT,
+                included_work_item_ids TEXT,
+                excluded_work_item_ids TEXT,
+                included_spec_ids TEXT,
+                excluded_spec_ids TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO current_projects (id, status) VALUES (?, ?)",
+            (project_id, project_status),
+        )
+        conn.execute(
+            """INSERT INTO current_project_authorizations
+               (id, project_id, status, authorization_name, owner_decision_deliberation_id,
+                scope_summary, expires_at, allowed_mutation_classes, forbidden_operations,
+                included_work_item_ids, excluded_work_item_ids, included_spec_ids, excluded_spec_ids)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                auth_id,
+                project_id,
+                "active",
+                "Fixture PAUTH",
+                "DELIB-FIXTURE",
+                "Fixture implementation authority.",
+                None,
+                json.dumps(allowed_mutation_classes or []),
+                json.dumps([]),
+                json.dumps([]),
+                json.dumps([]),
+                json.dumps([]),
+                json.dumps([]),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return auth_id
+
+
+def _add_project_authorization_metadata(
+    proposal_path: Path,
+    *,
+    auth_id: str = "PAUTH-FIXTURE",
+    project_id: str = "PROJECT-FIXTURE",
+) -> None:
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8") + f"\nProject Authorization: {auth_id}\nProject: {project_id}\n",
+        encoding="utf-8",
+    )
+
+
 def _begin_packet(auth_module, tmp_path: Path, slug: str) -> dict[str, Any]:
     """Wrapper: create + write both current.json and named packet."""
     packet = auth_module.create_authorization_packet(tmp_path, slug)
@@ -382,6 +462,50 @@ def test_begin_cli_succeeds_when_work_intent_claim_held(auth_module, tmp_path, c
     packet = json.loads(capsys.readouterr().out)
     assert packet["bridge_id"] == slug
     assert not auth_module.packet_path(tmp_path).exists()
+
+
+def test_project_authorization_accepts_active_project_without_retirement_class(auth_module, tmp_path):
+    """Baseline: ordinary active-project PAUTH validation remains unchanged."""
+    slug = "project-auth-active"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, project_status="active", allowed_mutation_classes=["source"])
+
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+
+    assert packet["project_authorization"]["id"] == "PAUTH-FIXTURE"
+    assert packet["project_authorization"]["project_id"] == "PROJECT-FIXTURE"
+
+
+def test_project_authorization_accepts_retired_project_for_retirement_reconciliation(auth_module, tmp_path):
+    """Retired-project reconciliation PAUTHs can mint implementation packets."""
+    slug = "project-auth-retired-reconciliation"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(
+        tmp_path,
+        project_status="retired",
+        allowed_mutation_classes=["project_retirement_reconciliation"],
+    )
+
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+
+    assert packet["project_authorization"]["id"] == "PAUTH-FIXTURE"
+    assert packet["project_authorization"]["project_id"] == "PROJECT-FIXTURE"
+
+
+def test_project_authorization_rejects_retired_project_without_retirement_reconciliation(auth_module, tmp_path):
+    """Retired projects still fail closed unless the PAUTH explicitly allows reconciliation."""
+    slug = "project-auth-retired-denied"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, project_status="retired", allowed_mutation_classes=["source"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="not attached to an active project"):
+        auth_module.create_authorization_packet(tmp_path, slug)
 
 
 def test_activate_restores_named_packet_to_current_json(auth_module, tmp_path):
