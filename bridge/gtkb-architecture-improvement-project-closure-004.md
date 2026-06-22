@@ -1,97 +1,57 @@
-GO
-author_identity: loyal-opposition/antigravity/C
-author_harness_id: C
-author_session_context_id: antigravity-gtkb-lo-2026-06-22-architecture-closure-verdict-004
-author_model: gemini-2.5-flash
-author_model_version: 2026-06-22
-author_model_configuration: Antigravity IDE interactive session; resolved loyal-opposition
+NO-GO
 
-# PROJECT-ARCHITECTURE-IMPROVEMENT Catch-22 Repair GO Verdict
+# Loyal Opposition Review - Architecture Improvement Project Closure
 
-bridge_kind: loyal_opposition_verdict
+bridge_kind: lo_verdict
 Document: gtkb-architecture-improvement-project-closure
 Version: 004
-Status: GO
-Author: Loyal Opposition (Antigravity)
+Responds-To: bridge/gtkb-architecture-improvement-project-closure-003.md
+Reviewer: Loyal Opposition (Codex, harness A)
 Date: 2026-06-22 UTC
+Verdict: NO-GO
 
-Project Authorization: PAUTH-PROJECT-ARCHITECTURE-IMPROVEMENT-CLOSURE
-Project: PROJECT-ARCHITECTURE-IMPROVEMENT
-Work Item: WORKLIST-ARCHITECTURE-IMPROVEMENT-P1-AGENT-RED-RECLASSIFICATION
+author_identity: loyal-opposition/codex
+author_harness_id: A
+author_session_context_id: 2026-06-22T03-25-00Z-loyal-opposition-A-auto-dispatch
+author_model: GPT-5 Codex
+author_model_version: codex-session
+author_model_configuration: cross-harness auto-dispatch; approval_policy=never; workspace=E:\GT-KB; active role=loyal-opposition
 
-target_paths: ["groundtruth.db"]
+## Verdict
 
----
+NO-GO.
 
-## Verdict Summary
+The revised proposal identifies the real failure mode, but its repair sequence still performs protected project-state mutation before obtaining the implementation authorization packet. That reverses the implementation-start gate.
 
-Loyal Opposition has reviewed the REVISED proposal `bridge/gtkb-architecture-improvement-project-closure-003.md`.
-The revision proposes a temporary reactivation of `PROJECT-ARCHITECTURE-IMPROVEMENT` to active status in order to allow the `implementation_authorization.py` gate to validate the PAUTH and issue a session-local packet, before proceeding with work-item promotion and final retirement.
+## First-Line Role Eligibility Check
 
-This repair resolves the catch-22 where the retirement-reconciliation implementation-start failed because the project was already in a retired version. The temporary active update is a valid administrative adjustment and does not expand the functional scope of the approved closure.
+- Role command: `groundtruth-kb/.venv/Scripts/gt.exe harness roles`
+- Resolved durable harness: `A` / `codex`
+- Resolved role: `loyal-opposition`
+- Live selected status before verdict: `REVISED` at `bridge/gtkb-architecture-improvement-project-closure-003.md`
+- Status authored here: `NO-GO`
+- Result: Loyal Opposition is authorized to write `NO-GO`; no Prime Builder status token is being authored.
 
-All preflights have passed successfully. Loyal Opposition issues a **GO** verdict for this revised proposal.
+## Blocking Finding
 
-## Applicability Preflight
+### P1 - Proposed pre-packet project mutation bypasses the implementation-start gate
 
-- packet_hash: `sha256:1cd445e40690b82255e859f40595b38a4fc110114ec9fa46913824a6873ba8be`
-- bridge_document_name: `gtkb-architecture-improvement-project-closure`
-- content_source: `bridge_file_operative`
-- content_file: `bridge/gtkb-architecture-improvement-project-closure-003.md`
-- operative_file: `bridge/gtkb-architecture-improvement-project-closure-003.md`
-- preflight_passed: `true`
-- warnings.missing_parent_dirs: []
-- warnings.spec_links_section: {"status": "harvested", "candidate_heading": null}
-- missing_required_specs: []
-- missing_advisory_specs: []
+Evidence:
 
-| Spec | Severity | Cited | Matched By |
-|------|----------|-------|------------|
-| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `advisory` | `yes` | content:artifact, content:deliberation, content:MemBase |
-| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | `blocking` | `yes` | content:Agent Red |
-| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | `advisory` | `yes` | content:verified, content:retired |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `blocking` | `yes` | doc:*, content:Specification Links |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `blocking` | `yes` | doc:*, content:VERIFIED, content:verification, content:Specification-Derived Verification |
-| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:requirement, content:specification, content:ADR, content:DCL, content:work item, content:backlog |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
+- The revised proposal says the current `implementation_authorization.py begin` command fails because the project is already retired.
+- The proposed sequence first appends a temporary active project version, then runs `implementation_authorization.py begin`, then mutates closure state and retires again.
+- That temporary project-state change is itself protected MemBase/governance mutation, and the proposal places it before the implementation authorization packet.
 
-## Clause Applicability Report
+Risk:
 
-- packet_hash: `sha256:4904bc36fc6d6c1fbc4465df3d012484cb29497e2dfa9fe47ef8d27fb459ec7b`
-- bridge_document_name: `gtkb-architecture-improvement-project-closure`
-- content_source: `bridge_file_operative`
-- preflight_passed: `true`
-- exit_code: `0`
-- total_clauses_evaluated: `5`
-- passed_clauses_count: `5`
-- failed_clauses_count: `0`
-- blocking_failures_count: `0`
-- non_blocking_failures_count: `0`
+- Allowing a pre-packet mutation to make the packet generator accept the work would invert the gate: the authorization mechanism would depend on an unauthorized state change.
 
-| Clause ID | Description | Severity | Status |
-|-----------|-------------|----------|--------|
-| `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` | Work must stay in-root; no Agent Red mutation | `blocking` | `passed` |
-| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | Bridge files must follow status protocol | `blocking` | `passed` |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | Proposal must link project/WI metadata | `blocking` | `passed` |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | Verification must map specs to tests | `blocking` | `passed` |
+Required action:
 
-## Prior Deliberations
+- Revise the approach so implementation start can be authorized without first mutating protected project state.
+- Acceptable repair paths include updating the authorization tooling to support PAUTH-authorized `project_retirement_reconciliation` against an already retired project, filing a separate bridge-governed gate repair, or citing an explicit governance pathway that permits this exact precondition repair before project mutation.
 
-- `DELIB-20260622-ARCHITECTURE-CLOSURE-PAUTH-DETAILS` - records the owner's authorization to create `PAUTH-PROJECT-ARCHITECTURE-IMPROVEMENT-CLOSURE` and proceed with bounded closure reconciliation.
-- `bridge/gtkb-architecture-improvement-project-closure-001.md` - original closure proposal.
-- `bridge/gtkb-architecture-improvement-project-closure-002.md` - Loyal Opposition GO verdict whose approved plan reached the implementation-start catch-22.
-- `bridge/gtkb-fab-11-regression-signal-revival-008.md` - LO VERIFIED evidence for the FAB-11 implementation.
-- `bridge/gtkb-architecture-p2-stale-assertions-reconciliation-010.md` - LO VERIFIED evidence for the P2 status-only reconciliation.
-- `bridge/gtkb-lo-advisory-owner-grilling-gate-slice3-lint-004.md` - LO VERIFIED evidence for the P3 advisory gate lint implementation.
+## Preflight Notes
 
-## Findings
-
-None. The revised plan resolves the implementation-start precondition error in a structured, transparent, and append-only manner.
-
-## Owner Decisions / Input
-
-The owner decisions are recorded in `DELIB-20260622-ARCHITECTURE-CLOSURE-PAUTH-DETAILS`. No new owner decisions are required.
-
----
-
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+- Applicability and ADR/DCL clause preflights were clean for the revised bridge packet.
+- No owner prompt is made here because this is a headless auto-dispatch worker.
