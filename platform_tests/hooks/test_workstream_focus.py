@@ -1251,13 +1251,12 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     monkeypatch.setenv("GTKB_HARNESS_ID", "B")
-    role_map = _write_role_map(
-        tmp_path / "role-assignments.json",
+    _write_registry_projection(
+        tmp_path,
         {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
     )
-    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
-    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
-    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard = tmp_path / "harness-state" / "codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / "harness-state" / "claude" / "session-lifecycle-guard.json"
     codex_guard.parent.mkdir(parents=True, exist_ok=True)
     claude_guard.parent.mkdir(parents=True, exist_ok=True)
     codex_guard.write_text(
@@ -1268,14 +1267,9 @@ def test_detect_counterpart_state_subject_mismatch_warns(tmp_path, monkeypatch) 
         json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(
-        module,
-        "HARNESS_LIFECYCLE_GUARDS",
-        {"codex": codex_guard, "claude": claude_guard},
-    )
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = module.detect_counterpart_state()
+    result = module.detect_counterpart_state(tmp_path)
     assert result["subject_mismatch"] is True
     assert any(
         module.FOCUS_GTKB_INFRASTRUCTURE in msg and module.FOCUS_APPLICATION in msg for msg in result["warnings"]
@@ -1299,13 +1293,12 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(tmp
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
     monkeypatch.setenv("GTKB_HARNESS_ID", "A")
-    role_map = _write_role_map(
-        tmp_path / "role-assignments.json",
+    _write_registry_projection(
+        tmp_path,
         {"A": ("codex", "prime-builder"), "B": ("claude", "loyal-opposition")},
     )
-    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
-    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
-    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard = tmp_path / "harness-state" / "codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / "harness-state" / "claude" / "session-lifecycle-guard.json"
     codex_guard.parent.mkdir(parents=True, exist_ok=True)
     claude_guard.parent.mkdir(parents=True, exist_ok=True)
     # Codex harness's own guard says gtkb_infrastructure.
@@ -1318,17 +1311,12 @@ def test_detect_counterpart_state_subject_mismatch_symmetric_from_codex_side(tmp
         json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(
-        module,
-        "HARNESS_LIFECYCLE_GUARDS",
-        {"codex": codex_guard, "claude": claude_guard},
-    )
     # Shared canonical is application (what Claude last wrote). If the old
     # implementation read our_subject from this file, it would compare
     # application (ours) against application (claude's guard) and miss.
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = module.detect_counterpart_state()
+    result = module.detect_counterpart_state(tmp_path)
     assert result["subject_mismatch"] is True, (
         "Codex-side must detect subject divergence against Claude's guard; "
         "pre-fix behavior silently missed this because our_subject came from "
@@ -1344,13 +1332,12 @@ def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch
     canonical, _ = _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     monkeypatch.setenv("GTKB_HARNESS_ID", "B")
-    role_map = _write_role_map(
-        tmp_path / "role-assignments.json",
+    _write_registry_projection(
+        tmp_path,
         {"A": ("codex", "loyal-opposition"), "B": ("claude", "prime-builder")},
     )
-    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
-    codex_guard = tmp_path / ".codex" / "session-lifecycle-guard.json"
-    claude_guard = tmp_path / ".claude" / "session-lifecycle-guard.json"
+    codex_guard = tmp_path / "harness-state" / "codex" / "session-lifecycle-guard.json"
+    claude_guard = tmp_path / "harness-state" / "claude" / "session-lifecycle-guard.json"
     codex_guard.parent.mkdir(parents=True, exist_ok=True)
     claude_guard.parent.mkdir(parents=True, exist_ok=True)
     for guard in (codex_guard, claude_guard):
@@ -1358,14 +1345,9 @@ def test_detect_counterpart_state_subject_match_no_warning(tmp_path, monkeypatch
             json.dumps({"current_subject": module.FOCUS_APPLICATION}) + "\n",
             encoding="utf-8",
         )
-    monkeypatch.setattr(
-        module,
-        "HARNESS_LIFECYCLE_GUARDS",
-        {"codex": codex_guard, "claude": claude_guard},
-    )
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT, updated_by="owner_prompt")
 
-    result = module.detect_counterpart_state()
+    result = module.detect_counterpart_state(tmp_path)
     assert result["subject_mismatch"] is False
     assert not any("work subject" in msg for msg in result["warnings"])
 
@@ -1387,14 +1369,13 @@ def test_render_active_work_subject_combines_focus_overlay_and_counterpart(tmp_p
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
-    role_map = _write_role_map(
-        tmp_path / "role-assignments.json",
+    _write_registry_projection(
+        tmp_path,
         {"B": ("claude", "prime-builder")},
     )
-    monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_map))
 
     rendered = module.render_active_work_subject(
-        REPO_ROOT,
+        tmp_path,
         overlay_status={"overlay_present": False},
     )
     assert "Active Work Subject" not in rendered  # heading is rendered by caller
