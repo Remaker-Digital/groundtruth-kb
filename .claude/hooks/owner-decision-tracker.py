@@ -1571,6 +1571,17 @@ _RESOLVE_RE = re.compile(r"^\s*resolve\s+(DECISION-\d+)\s*:\s*(.+?)\s*$", re.IGN
 _CLEAR_RE = re.compile(r"^\s*clear pending\b", re.IGNORECASE)
 
 
+def _pending_freshness_marker(pending_path: Path, pending: list[DecisionEntry]) -> str:
+    """Return a compact live-state signature for the durable pending queue."""
+    try:
+        mtime = datetime.fromtimestamp(pending_path.stat().st_mtime, UTC).isoformat().replace("+00:00", "Z")
+    except OSError:
+        mtime = "unknown"
+    pending_ids = "\n".join(sorted(entry.id.upper() for entry in pending))
+    pending_hash = hashlib.sha256(pending_ids.encode("utf-8")).hexdigest()[:12]
+    return f"live as of {mtime}; pending-set {pending_hash}"
+
+
 def _user_prompt_handler(stdin_text: str) -> str:
     """UserPromptSubmit mode entry point.
 
@@ -1585,6 +1596,8 @@ def _user_prompt_handler(stdin_text: str) -> str:
     prompt = str(payload.get("prompt") or "")
 
     pending_path = PROJECT_ROOT / PENDING_FILE_REL
+    if not pending_path.exists():
+        return ""
     _ensure_pending_file(pending_path)
     sections = _read_pending_file(pending_path)
 
@@ -1634,11 +1647,15 @@ def _user_prompt_handler(stdin_text: str) -> str:
         return f"[owner-decision-tracker] acknowledged {len(sections['pending'])} pending decision(s); they remain in the queue."
 
     # No shortcut; emit nudge if pending exist and prompt doesn't reference them.
+    marker = _pending_freshness_marker(pending_path, sections["pending"])
     if not sections["pending"]:
-        return ""
+        return (
+            "[owner-decision-tracker] live pending owner-decision set is empty "
+            f'({marker}); disregard any earlier cached "Pending Owner Decisions" banner.'
+        )
     if _prompt_references_pending(prompt, sections["pending"]):
         return ""
-    return _format_nudge(sections["pending"])
+    return _format_nudge(sections["pending"], marker)
 
 
 def _prompt_references_pending(prompt: str, pending: list[DecisionEntry]) -> bool:
@@ -1663,7 +1680,7 @@ def _prompt_references_pending(prompt: str, pending: list[DecisionEntry]) -> boo
     return False
 
 
-def _format_nudge(pending: list[DecisionEntry]) -> str:
+def _format_nudge(pending: list[DecisionEntry], freshness_marker: str | None = None) -> str:
     """Render the UserPromptSubmit nudge.
 
     Markdown-formatted; the Claude Code hook contract injects this as
@@ -1693,6 +1710,8 @@ def _format_nudge(pending: list[DecisionEntry]) -> str:
         lines.append(f"- **{entry.id}**: {entry.question}{opts_blurb}")
     if n > 3:
         lines.append(f"- ... and {n - 3} older pending decision(s) in `{PENDING_FILE_REL}`.")
+    if freshness_marker:
+        lines.extend(["", f"_Live owner-decision queue: {freshness_marker}._"])
     return "\n".join(lines)
 
 

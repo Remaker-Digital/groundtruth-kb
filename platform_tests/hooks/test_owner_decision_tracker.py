@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -380,6 +381,69 @@ def _seed_one_pending(project: Path, decision_id: str = "DECISION-0001", questio
     (project / "memory" / "pending-owner-decisions.md").write_text(body, encoding="utf-8")
 
 
+def _decision_entry(decision_id: str, question: str, status: str) -> str:
+    resolved_bits = ""
+    if status == "resolved":
+        resolved_bits = """\
+  resolved_at: 2026-06-03T21:01:34Z
+  answer: "Dismiss as stale or false-positive"
+"""
+    return f"""\
+- id: {decision_id}
+  asked_at: 2026-06-03T20:55:00Z
+  question: {json.dumps(question)}
+  options:
+    - "Keep"
+    - "Dismiss"
+  detected_via: ask_user_question
+  status: {status}
+  question_hash: hash-{decision_id.lower()}
+{resolved_bits}  notes: ""
+"""
+
+
+def _seed_pending_and_resolved(
+    project: Path,
+    pending_ids: list[str],
+    resolved_ids: list[str] | None = None,
+    blank_resolved_questions: bool = False,
+) -> None:
+    resolved_ids = resolved_ids or []
+    pending_body = "\n".join(
+        _decision_entry(decision_id, f"Question for {decision_id}?", "pending") for decision_id in pending_ids
+    )
+    resolved_body = "\n".join(
+        _decision_entry(
+            decision_id,
+            "" if blank_resolved_questions else f"Question for {decision_id}?",
+            "resolved",
+        )
+        for decision_id in resolved_ids
+    )
+    body = f"""\
+# Pending Owner Decisions
+---
+## Pending
+
+{pending_body if pending_body else "(none)"}
+
+## Resolved
+
+{resolved_body if resolved_body else "(none)"}
+
+## History
+
+(none)
+"""
+    (project / "memory" / "pending-owner-decisions.md").write_text(body, encoding="utf-8")
+
+
+def _pending_set_hash(stdout: str) -> str:
+    match = re.search(r"pending-set ([0-9a-f]{12})", stdout)
+    assert match, f"missing pending-set marker in: {stdout!r}"
+    return match.group(1)
+
+
 def test_t7_ups_emits_nudge_when_pending_and_prompt_unrelated(tmp_path: Path) -> None:
     """T7: pending exists + prompt doesn't reference -> nudge emitted."""
     project = _setup_project(tmp_path)
@@ -388,6 +452,57 @@ def test_t7_ups_emits_nudge_when_pending_and_prompt_unrelated(tmp_path: Path) ->
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert "Pending Owner Decisions" in result.stdout
     assert "DECISION-0001" in result.stdout
+
+
+def test_wi4282_ups_nudge_includes_live_freshness_marker_when_pending(tmp_path: Path) -> None:
+    """WI-4282: live non-empty nudges carry a durable-file freshness marker."""
+    project = _setup_project(tmp_path)
+    _seed_one_pending(project)
+    result = _run_hook("user-prompt-submit", project, _ups_payload("Continue with the next backlog item."))
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "Pending Owner Decisions" in result.stdout
+    assert "Live owner-decision queue: live as of " in result.stdout
+    assert re.search(r"pending-set [0-9a-f]{12}", result.stdout)
+
+
+def test_wi4282_ups_emits_empty_marker_after_pending_resolved(tmp_path: Path) -> None:
+    """WI-4282: an empty live queue supersedes a stale SessionStart banner."""
+    project = _setup_project(tmp_path)
+    decision_ids = ["DECISION-0925", "DECISION-0931", "DECISION-0936"]
+    _seed_pending_and_resolved(project, [], decision_ids, blank_resolved_questions=True)
+    result = _run_hook("user-prompt-submit", project, _ups_payload("Continue with the next backlog item."))
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "live pending owner-decision set is empty" in result.stdout
+    assert 'disregard any earlier cached "Pending Owner Decisions" banner' in result.stdout
+    assert "DECISION-0925" not in result.stdout
+    assert re.search(r"pending-set [0-9a-f]{12}", result.stdout)
+
+
+def test_wi4282_ups_freshness_hash_changes_when_pending_set_changes(tmp_path: Path) -> None:
+    """WI-4282: the marker is keyed by the current sorted pending DECISION IDs."""
+    project = _setup_project(tmp_path)
+    decision_ids = ["DECISION-0925", "DECISION-0931", "DECISION-0936"]
+    _seed_pending_and_resolved(project, decision_ids)
+    pending_result = _run_hook("user-prompt-submit", project, _ups_payload("Continue with the next backlog item."))
+
+    _seed_pending_and_resolved(project, [], decision_ids, blank_resolved_questions=True)
+    empty_result = _run_hook("user-prompt-submit", project, _ups_payload("Continue with the next backlog item."))
+
+    assert pending_result.returncode == 0, f"stderr: {pending_result.stderr}"
+    assert empty_result.returncode == 0, f"stderr: {empty_result.stderr}"
+    assert _pending_set_hash(pending_result.stdout) != _pending_set_hash(empty_result.stdout)
+
+
+def test_wi4282_ups_emits_nothing_when_durable_file_absent(tmp_path: Path) -> None:
+    """WI-4282: absent durable state preserves graceful UserPromptSubmit silence."""
+    project = _setup_project(tmp_path)
+    (project / "memory" / "pending-owner-decisions.md").unlink()
+    result = _run_hook("user-prompt-submit", project, _ups_payload("Continue with the next backlog item."))
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout == ""
 
 
 def test_t8_ups_silent_when_prompt_references_pending(tmp_path: Path) -> None:
@@ -520,7 +635,10 @@ def test_t14_prose_false_positive_guard_suppresses_abstract_discussion(tmp_path:
                     "content": [
                         {
                             "type": "text",
-                            "text": "Decisions are hard. In general, decisions involve weighing tradeoffs. Should I describe the framework or give an example?",
+                            "text": (
+                                "Decisions are hard. In general, decisions involve weighing tradeoffs. "
+                                "Should I describe the framework or give an example?"
+                            ),
                         }
                     ],
                 },
