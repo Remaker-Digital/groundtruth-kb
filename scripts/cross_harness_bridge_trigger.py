@@ -1965,6 +1965,32 @@ def _selected_oldest_first(items: list[Any], max_items: int) -> list[Any]:
     return list(reversed(items))[:max_items]
 
 
+def _dispatch_item_identity(item: Any) -> tuple[str, str, str]:
+    return (
+        str(getattr(item, "document_name", "")),
+        str(getattr(item, "top_status", "")),
+        str(getattr(item, "top_file", "")),
+    )
+
+
+def _without_selected_dispatch_items(items: list[Any], selected: list[Any]) -> list[Any]:
+    """Remove one occurrence of each selected bridge item while preserving queue order."""
+    selected_counts: dict[tuple[str, str, str], int] = {}
+    for item in selected:
+        identity = _dispatch_item_identity(item)
+        selected_counts[identity] = selected_counts.get(identity, 0) + 1
+
+    remaining: list[Any] = []
+    for item in items:
+        identity = _dispatch_item_identity(item)
+        count = selected_counts.get(identity, 0)
+        if count:
+            selected_counts[identity] = count - 1
+            continue
+        remaining.append(item)
+    return remaining
+
+
 def _effective_max_items_for_target(target: DispatchTarget, max_items: int) -> int:
     if max_items <= 0:
         return 0
@@ -3749,7 +3775,8 @@ def run_trigger(
             continue
 
         skipped_candidates: list[dict[str, Any]] = []
-        selected_target: DispatchTarget | None = None
+        selected_any_target = False
+        remaining_items = list(items)
         for _target_index, target in enumerate(targets):
             h_info = harnesses.get(target.harness_id) or {}
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
@@ -3758,10 +3785,10 @@ def run_trigger(
                 skip = _dispatch_target_evidence(target)
                 skip["reason"] = reason
                 skipped_candidates.append(skip)
-                pending_by_target.append((target, items, target.dispatch_state_key, reason, None))
+                pending_by_target.append((target, remaining_items, target.dispatch_state_key, reason, None))
                 continue
             provider_backoff_skip = None
-            _target_selected, target_signature = _target_selected_signature(target, items, max_items)
+            target_selected, target_signature = _target_selected_signature(target, remaining_items, max_items)
             provider_backoff_skip = _provider_failure_backoff_skip(
                 prior=_prior_state_for_target(recipients_state, target),
                 recipient=target.dispatch_state_key,
@@ -3775,15 +3802,26 @@ def run_trigger(
                 )
                 skipped_candidates.append(skip)
                 _seed_provider_failure_skip_state(recipients_state, target, provider_backoff_skip)
-                pending_by_target.append((target, items, target.dispatch_state_key, skip["reason"], None))
+                pending_by_target.append((target, remaining_items, target.dispatch_state_key, skip["reason"], None))
                 continue
-            selected_target = target
-            break
-        if selected_target is None:
-            pending_by_target.append((None, items, needed_role_label, "no_ready_target_for_role", skipped_candidates))
-        else:
+            selected_any_target = True
             pending_by_target.append(
-                (selected_target, items, selected_target.dispatch_state_key, None, skipped_candidates)
+                (
+                    target,
+                    remaining_items,
+                    target.dispatch_state_key,
+                    None,
+                    list(skipped_candidates) if skipped_candidates else None,
+                )
+            )
+            if not target_selected:
+                break
+            remaining_items = _without_selected_dispatch_items(remaining_items, target_selected)
+            if not any(getattr(item, "dispatchable", True) for item in remaining_items):
+                break
+        if not selected_any_target:
+            pending_by_target.append(
+                (None, remaining_items, needed_role_label, "no_ready_target_for_role", skipped_candidates)
             )
 
     results: dict[str, Any] = {}
@@ -4197,8 +4235,9 @@ def run_trigger(
             results[recipient]["selected_candidate"] = selected_candidate
             if fallback_skipped_candidates:
                 results[recipient]["fallback_skipped_candidates"] = fallback_skipped_candidates
-            results[target.needed_role_label] = results[recipient]
-            recipients_state[target.needed_role_label] = recipient_state
+            if target.needed_role_label not in results:
+                results[target.needed_role_label] = results[recipient]
+                recipients_state[target.needed_role_label] = recipient_state
 
         recipients_state[recipient] = recipient_state
 

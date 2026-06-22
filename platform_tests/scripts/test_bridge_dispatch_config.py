@@ -213,6 +213,67 @@ prefer = ["harness_id"]
     assert non_matching == []
 
 
+def test_quality_first_selection_breaks_ties_by_cost_then_availability(tmp_path: Path) -> None:
+    _write_project(
+        tmp_path,
+        rules="""
+schema_version = 1
+selection_order = ["quality", "cost", "availability", "harness_id"]
+rules = []
+""".lstrip(),
+    )
+    records = [
+        {
+            "id": "A",
+            "harness_name": "codex",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 90,
+            "dispatch_cost": 20,
+            "dispatch_availability": 99,
+        },
+        {
+            "id": "B",
+            "harness_name": "claude",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 95,
+            "dispatch_cost": 70,
+            "dispatch_availability": 75,
+        },
+        {
+            "id": "C",
+            "harness_name": "antigravity",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 95,
+            "dispatch_cost": 60,
+            "dispatch_availability": 80,
+        },
+        {
+            "id": "D",
+            "harness_name": "ollama",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 95,
+            "dispatch_cost": 60,
+            "dispatch_availability": 95,
+        },
+    ]
+
+    selected = select_dispatch_candidates(
+        records,
+        load_bridge_dispatch_config(tmp_path),
+        DispatchContext(required_role="prime-builder"),
+    )
+
+    assert [row["id"] for row in selected] == ["D", "C", "B", "A"]
+
+
 # WI-4658 — collect_bridge_dispatch_status quarantined-thread health-finding tests.
 # bridge/gtkb-dispatch-malformed-status-token-quarantine-001.md (GO at -002).
 #

@@ -17,7 +17,7 @@ ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
 DISPATCH_ROLES = (ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION)
 
-DEFAULT_SELECTION_ORDER = ("availability", "cost", "quality", "reviewer_precedence", "harness_id")
+DEFAULT_SELECTION_ORDER = ("quality", "cost", "availability", "reviewer_precedence", "harness_id")
 GOVERNANCE_GRADE_LO_MIN_QUALITY = 80.0
 RUNTIME_FAILURE_RESULTS = {
     "all_slugs_quarantined",
