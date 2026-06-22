@@ -57,18 +57,12 @@ def status_from_bridge_file(path: Path) -> str | None:
 
 def _classify_candidate(latest_file_text: str) -> str:
     lines = latest_file_text.splitlines()
-    first_token: str | None = None
     for raw in lines:
         if raw.strip():
             first_token = _line_status_token(raw)
-            break
-    if first_token in _TERMINAL_STATUS_TOKENS:
-        return "archived"
-    if first_token in _NON_TERMINAL_STATUS_TOKENS:
-        return "lost"
-    for raw in lines:
-        if _line_status_token(raw) in _TERMINAL_STATUS_TOKENS:
-            return "archived"
+            if first_token in _TERMINAL_STATUS_TOKENS:
+                return "archived"
+            return "lost"
     return "lost"
 
 
