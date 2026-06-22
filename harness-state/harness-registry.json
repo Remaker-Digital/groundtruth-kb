@@ -1,14 +1,14 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-21T22:02:19Z",
+  "generated_at": "2026-06-22T00:12:11Z",
   "harnesses": [
     {
       "can_fire_events": true,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
-      "dispatch_cost": 35.0,
-      "dispatch_quality": 88.0,
+      "dispatch_cost": 60.0,
+      "dispatch_quality": 90.0,
       "dispatch_tags": [
         "prime-builder",
         "event-source"
@@ -32,17 +32,17 @@
       },
       "reviewer_precedence": 20,
       "role": [
-        "prime-builder"
+        "loyal-opposition"
       ],
       "status": "active",
-      "version": 40
+      "version": 41
     },
     {
       "can_fire_events": true,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
       "dispatch_availability": 75.0,
-      "dispatch_cost": 70.0,
+      "dispatch_cost": 60.0,
       "dispatch_quality": 95.0,
       "dispatch_tags": [
         "prime-builder",
@@ -77,8 +77,8 @@
       "can_receive_dispatch": true,
       "capabilities_ref": null,
       "dispatch_availability": 80.0,
-      "dispatch_cost": 35.0,
-      "dispatch_quality": 78.0,
+      "dispatch_cost": 30.0,
+      "dispatch_quality": 80.0,
       "dispatch_tags": [
         "loyal-opposition"
       ],
@@ -115,9 +115,9 @@
       "can_receive_dispatch": true,
       "capabilities_ref": null,
       "dispatch_availability": 95.0,
-      "dispatch_cost": 20.0,
+      "dispatch_cost": 30.0,
       "dispatch_max_items": 1,
-      "dispatch_quality": 62.0,
+      "dispatch_quality": 80.0,
       "dispatch_tags": [
         "loyal-opposition",
         "low-cost"
@@ -152,7 +152,7 @@
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,
-      "dispatch_quality": 72.0,
+      "dispatch_quality": 80.0,
       "dispatch_tags": [
         "loyal-opposition",
         "low-cost"

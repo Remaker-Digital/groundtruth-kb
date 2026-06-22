@@ -6,7 +6,7 @@
 # and how eligible candidates are ranked.
 
 schema_version = 1
-selection_order = ["availability", "cost", "quality", "reviewer_precedence", "harness_id"]
+selection_order = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
 
 [harnesses.A]
 description = "Codex: active Prime Builder and dispatchable PB target."
@@ -58,10 +58,10 @@ tags = ["loyal-opposition", "low-cost"]
 id = "bridge-prime-builder-default"
 required_roles = ["prime-builder"]
 statuses = ["GO", "NO-GO"]
-prefer = ["availability", "quality", "cost", "reviewer_precedence", "harness_id"]
+prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
 
 [[rules]]
 id = "bridge-loyal-opposition-cheap-fast-default"
 required_roles = ["loyal-opposition"]
 statuses = ["NEW", "REVISED"]
-prefer = ["cost", "availability", "quality", "reviewer_precedence", "harness_id"]
+prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
