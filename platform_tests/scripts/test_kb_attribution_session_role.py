@@ -16,6 +16,7 @@ Covers:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -29,6 +30,14 @@ import scripts._kb_attribution as kb  # noqa: E402
 
 _LO = "loyal-opposition"
 _PB = "prime-builder"
+_ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
+_VENDOR_ENV_VARS = (
+    "CLAUDECODE",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_PROJECT_DIR",
+    "CODEX_HOME",
+    "CODEX_THREAD_ID",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -149,3 +158,90 @@ def test_headless_attribution_keeps_durable(monkeypatch: pytest.MonkeyPatch, stu
     # suppresses it, so attribution stays durable PB.
     monkeypatch.setattr(srr, "resolve_interactive_session_role", lambda *a, **k: (_LO, "marker"))
     assert kb.resolve_changed_by(harness_name="claude") == "prime-builder/claude"
+
+
+# ---------------------------------------------------------------------------
+# _resolve_harness_name envelope source: interactive harness name precedes
+# vendor signals and durable Prime fallback.
+# ---------------------------------------------------------------------------
+
+
+def _write_session_envelope(project_root: Path, harness_name: str, *, status: str = "open") -> None:
+    envelope_path = project_root / "harness-state" / harness_name / "session-envelope.json"
+    envelope_path.parent.mkdir(parents=True, exist_ok=True)
+    envelope_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": status,
+                "harness_name": harness_name,
+                "role_resolved": _PB,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.fixture
+def envelope_harness_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(kb, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(kb, "_active_prime_builder_harness_name", lambda: "codex")
+    monkeypatch.setattr(kb, "_harness_id_for_name", lambda name: {"claude": "B", "codex": "A"}.get(name))
+    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _LO, "B": _LO}.get(hid))
+    monkeypatch.setattr(kb, "_session_role_override", lambda name: _PB if name == "claude" else None)
+    monkeypatch.delenv(_ENV_VAR_HARNESS_NAME, raising=False)
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    for env_var in _VENDOR_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
+    return tmp_path
+
+
+def test_attribution_uses_open_envelope_harness_over_durable_prime(
+    envelope_harness_state: Path,
+) -> None:
+    _write_session_envelope(envelope_harness_state, "claude")
+    assert kb.resolve_changed_by() == "prime-builder/claude"
+
+
+def test_attribution_env_var_overrides_open_envelope(
+    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_session_envelope(envelope_harness_state, "claude")
+    monkeypatch.setenv(_ENV_VAR_HARNESS_NAME, "codex")
+    assert kb.resolve_changed_by() == "loyal-opposition/codex"
+
+
+def test_attribution_open_envelope_precedes_vendor_signal(
+    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_session_envelope(envelope_harness_state, "claude")
+    monkeypatch.setenv("CODEX_HOME", "C:/Users/example/.codex")
+    assert kb.resolve_changed_by() == "prime-builder/claude"
+
+
+def test_attribution_falls_back_to_durable_prime_when_no_open_envelope(
+    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _PB, "B": _LO}.get(hid))
+    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)
+    assert kb.resolve_changed_by() == "prime-builder/codex"
+
+
+def test_attribution_envelope_source_skipped_under_headless_dispatch(
+    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_session_envelope(envelope_harness_state, "claude")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "run-123")
+    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _PB, "B": _LO}.get(hid))
+    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)
+    assert kb.resolve_changed_by() == "prime-builder/codex"
+
+
+def test_attribution_multiple_open_envelopes_defer_to_fallback(
+    envelope_harness_state: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_session_envelope(envelope_harness_state, "claude")
+    _write_session_envelope(envelope_harness_state, "codex")
+    monkeypatch.setattr(kb, "_role_for_harness_id", lambda hid: {"A": _PB, "B": _LO}.get(hid))
+    monkeypatch.setattr(kb, "_session_role_override", lambda name: None)
+    assert kb.resolve_changed_by() == "prime-builder/codex"

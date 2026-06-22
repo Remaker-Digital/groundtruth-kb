@@ -30,6 +30,14 @@ from scripts._kb_attribution import (  # noqa: E402
     resolve_changed_by_or_none,
 )
 
+_VENDOR_ENV_VARS = (
+    "CLAUDECODE",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_PROJECT_DIR",
+    "CODEX_HOME",
+    "CODEX_THREAD_ID",
+)
+
 
 @pytest.fixture(autouse=True)
 def mock_harness_state(tmp_path, monkeypatch):
@@ -80,10 +88,16 @@ def mock_harness_state(tmp_path, monkeypatch):
 
     monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry_file))
     monkeypatch.setenv("GTKB_HARNESS_IDENTITIES_PATH", str(identities_file))
+    for env_var in _VENDOR_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
     # Baseline tests assert durable registry behavior; marker tests cover overrides.
     monkeypatch.setattr(
         "scripts._kb_attribution._session_role_override",
         lambda _harness_name: None,
+    )
+    monkeypatch.setattr(
+        "scripts._kb_attribution._open_session_envelope_harness_name",
+        lambda: None,
     )
 
 
@@ -109,6 +123,40 @@ def test_kwarg_precedes_env_var() -> None:
     """Priority 1 beats priority 2: explicit kwarg overrides env var."""
     with mock.patch.dict("os.environ", {ENV_VAR_HARNESS_NAME: "codex"}):
         assert resolve_changed_by(harness_name="claude") == "prime-builder/claude"
+
+
+def test_kwarg_and_env_precede_runtime_env_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Higher-confidence sources beat conflicting vendor-runtime signals."""
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert resolve_changed_by(harness_name="codex") == "loyal-opposition/codex"
+
+    monkeypatch.setenv(ENV_VAR_HARNESS_NAME, "codex")
+    assert resolve_changed_by() == "loyal-opposition/codex"
+
+
+def test_runtime_env_detects_codex_over_prime_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Codex runtime signals identify Codex before the durable Prime fallback."""
+    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
+    monkeypatch.setenv("CODEX_HOME", "C:/Users/example/.codex")
+    assert resolve_changed_by() == "loyal-opposition/codex"
+
+
+def test_runtime_env_detects_claude(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Claude runtime signals identify Claude without relying on the fallback."""
+    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
+    monkeypatch.setenv("CLAUDECODE", "1")
+    assert resolve_changed_by() == "prime-builder/claude"
+
+
+def test_runtime_env_unknown_harness_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Vendor detection is only a candidate source; identities still validate."""
+    monkeypatch.setattr("scripts._kb_attribution._harness_id_for_name", lambda _name: None)
+    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", "thread-123")
+    with pytest.raises(RuntimeError, match="has no entry"):
+        resolve_changed_by()
 
 
 def test_single_prime_fallback_resolves_to_claude() -> None:

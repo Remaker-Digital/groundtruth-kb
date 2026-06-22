@@ -7,22 +7,24 @@ prior pattern where helper scripts hardcoded `prime-builder/claude-code`,
 which caused 39 specs + 20 deliberation inserts to be mis-attributed to
 Claude during the 2026-05-03 -> 2026-05-05 Codex-as-Prime period.
 
-Three-source priority order for resolution:
+Harness-name priority order for resolution:
 
 1. Explicit kwarg `harness_name` (recommended for new helpers).
 2. Environment variable `GTKB_HARNESS_NAME` (set by harness wrappers at
    session start; current default for ad-hoc CLI use under a configured
    harness session).
-3. The active Prime Builder fallback harness. When multiple active harnesses
+3. A single unambiguous open session envelope under `harness-state/*/`.
+4. Deterministic vendor runtime signals for the current process.
+5. The active Prime Builder fallback harness. When multiple active harnesses
    hold `prime-builder`, priority-3 fallback resolves only if exactly one is
    dispatchable; otherwise the mutating resolver fails closed and the caller
    must provide an explicit harness name. The active-status filter is applied
    upstream by `load_role_assignments`, which returns only `status == "active"`
    harnesses.
 
-The resolver does NOT attempt to "infer" the harness from a process ID,
-parent-shell name, or any other derived signal. The above three sources
-are the only authoritative inputs.
+Envelope and vendor runtime sources are candidate harness-name selectors only.
+The selected name is still validated through the harness identity and role
+sources of truth before a mutating caller receives attribution.
 
 For mutating callers, `resolve_changed_by()` raises `RuntimeError` rather
 than returning a fallback when no source resolves a harness or when the
@@ -35,6 +37,7 @@ where the mutating variant raises. Mutating callers MUST NOT use the
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -43,6 +46,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ROLE_ASSIGNMENTS_PATH = PROJECT_ROOT / "harness-state" / "harness-registry.json"
 HARNESS_IDENTITIES_PATH = PROJECT_ROOT / "harness-state" / "harness-identities.json"
 ENV_VAR_HARNESS_NAME = "GTKB_HARNESS_NAME"
+
+_CLAUDE_RUNTIME_ENV_VARS = ("CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PROJECT_DIR")
+_CODEX_RUNTIME_ENV_VARS = ("CODEX_HOME", "CODEX_THREAD_ID")
 
 
 def _load_role_assignments() -> dict[str, dict[str, str]]:
@@ -169,13 +175,63 @@ def _active_prime_builder_harness_name() -> str | None:
     return _name_for_harness_id(dispatchable_prime_ids[0])
 
 
+def _open_session_envelope_harness_name() -> str | None:
+    """Return the single open interactive session envelope harness, if any.
+
+    This is a candidate harness-name source only. It is skipped for headless
+    dispatch and ignored when zero or multiple open envelopes exist.
+    """
+    if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
+        return None
+    harness_state_dir = PROJECT_ROOT / "harness-state"
+    try:
+        envelope_paths = sorted(harness_state_dir.glob("*/session-envelope.json"))
+    except OSError:
+        return None
+    open_harness_names: list[str] = []
+    try:
+        from scripts.harness_identity import normalize_harness_name  # local: avoid top-level cycle
+    except Exception:
+        return None
+
+    for envelope_path in envelope_paths:
+        try:
+            envelope_data = json.loads(envelope_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if not isinstance(envelope_data, dict) or envelope_data.get("status") != "open":
+            continue
+        raw_name = envelope_data.get("harness_name") or envelope_path.parent.name
+        harness_name = normalize_harness_name(str(raw_name))
+        if harness_name:
+            open_harness_names.append(harness_name)
+    if len(open_harness_names) != 1:
+        return None
+    return open_harness_names[0]
+
+
+def _harness_name_from_runtime_env() -> str | None:
+    """Return a candidate harness name from deterministic vendor env signals."""
+    if any(os.environ.get(name) for name in _CLAUDE_RUNTIME_ENV_VARS):
+        return "claude"
+    if any(os.environ.get(name) for name in _CODEX_RUNTIME_ENV_VARS):
+        return "codex"
+    return None
+
+
 def _resolve_harness_name(harness_name: str | None) -> str | None:
-    """Three-source priority resolution; returns name or None if unresolved."""
+    """Priority-order harness-name resolution; returns name or None."""
     if harness_name:
         return harness_name
     env_value = os.environ.get(ENV_VAR_HARNESS_NAME, "").strip()
     if env_value:
         return env_value
+    envelope_value = _open_session_envelope_harness_name()
+    if envelope_value:
+        return envelope_value
+    runtime_value = _harness_name_from_runtime_env()
+    if runtime_value:
+        return runtime_value
     return _active_prime_builder_harness_name()
 
 
@@ -233,7 +289,10 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
     Priority:
         1. Explicit kwarg `harness_name`.
         2. `GTKB_HARNESS_NAME` env var.
-        3. The active Prime Builder fallback harness. If multiple active Prime
+        3. A single open session envelope harness name, skipped under
+           headless dispatch.
+        4. Deterministic vendor runtime signals.
+        5. The active Prime Builder fallback harness. If multiple active Prime
            Builders exist, fallback resolves only when exactly one is
            dispatchable.
 
