@@ -4060,7 +4060,7 @@ def run_trigger(
                 pass
 
         prior = recipients_state.get(recipient) if isinstance(recipients_state.get(recipient), dict) else {}
-        # Active-session suppression state model:
+        # Lease/contention suppression state model:
         # - last_dispatched_signature: dedup field. Slice 2 invariant —
         #   current_signature == last_dispatched_signature → "unchanged".
         # - last_suppressed_signature: retry-pending marker. Set when
@@ -4115,32 +4115,16 @@ def run_trigger(
             recipient_state["signature"] = signature
             results[recipient] = {"launched": False, "reason": recipient_state["last_result"]}
         else:
-            # WI-4753: target-active-session pre-spawn suppression. If the
-            # selected target harness already holds a fresh foreground
-            # active-session lock, suppress spawning entirely (incident
-            # backpressure against the headless-dispatch process storm),
-            # AHEAD of per-document lease filtering. Record the suppressed
-            # signature so the work stays retryable once the target exits; do
-            # NOT update the dispatched/legacy signature. Per-document leases
-            # remain the governing path when no target foreground session is
-            # active.
-            if check_target_active(target, state_dir):
-                recipient_state["last_suppressed_signature"] = signature
-                recipient_state["last_result"] = TARGET_ACTIVE_SESSION_RESULT
-                results[recipient] = {
-                    "launched": False,
-                    "reason": TARGET_ACTIVE_SESSION_RESULT,
-                }
-                recipients_state[recipient] = recipient_state
-                continue
             leased_items = [it for it in selected if is_lease_held(it.document_name, state_dir=state_dir)]
 
             if len(leased_items) == len(selected):
-                # Target-active suppression: all selected documents are
-                # already leased by active target-side work. Record the
-                # signature in the suppressed field (NOT the dispatched field)
-                # so it remains retryable when the target exits. Do NOT update
-                # legacy `signature`.
+                # Lease/contention suppression: all selected documents are
+                # already leased by active target-side work. Keep the legacy
+                # target-active result token for compatibility with existing
+                # diagnostics, but do not consult harness active-session locks.
+                # Record the signature in the suppressed field (NOT the
+                # dispatched field) so it remains retryable when the lease is
+                # released. Do NOT update legacy `signature`.
                 recipient_state["last_suppressed_signature"] = signature
                 recipient_state["last_result"] = TARGET_ACTIVE_SESSION_RESULT
                 results[recipient] = {

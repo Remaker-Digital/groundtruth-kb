@@ -1,14 +1,17 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Active-session suppression tests for scripts/cross_harness_bridge_trigger.py.
+"""Dispatch retry/suppression tests for scripts/cross_harness_bridge_trigger.py.
 
 Per ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-005.md``
-GO at ``-006`` (REVISED-2):
+GO at ``-006`` (REVISED-2), later narrowed by
+``bridge/gtkb-disable-active-session-dispatch-suppression-002.md``:
 
-These tests cover the suppression gate added to the trigger:
+These tests cover the diagnostic active-session helper and lease-driven
+suppression state:
 - ``check_target_active(recipient, state_dir)``: returns True when the
-  target harness lock file is present and within sanity TTL.
+  target harness lock file is present and within sanity TTL. This is now
+  diagnostic only and does not suppress dispatch.
 - ``run_trigger()`` three-way state-machine:
-  - counterpart_active → record ``last_suppressed_signature``; do NOT dispatch.
+  - all selected documents leased → record ``last_suppressed_signature``; do NOT dispatch.
   - prior_dispatched == current → ``unchanged``; do NOT dispatch.
   - else → dispatch; record ``last_dispatched_signature``; clear suppressed.
 
@@ -314,14 +317,12 @@ def test_run_trigger_target_active_records_suppressed_not_dispatched(trigger_mod
     assert prime_state.get("signature") in (None,), f"expected None or unchanged, got {prime_state.get('signature')!r}"
 
 
-def test_run_trigger_active_session_lock_suppresses_ahead_of_leases(trigger_module, tmp_path: Path) -> None:
-    """WI-4753: a fresh target active-session LOCK suppresses dispatch via the
-    pre-spawn check_target_active guard, AHEAD of per-document lease filtering.
+def test_run_trigger_active_session_lock_does_not_suppress_dispatch(trigger_module, tmp_path: Path) -> None:
+    """A fresh target active-session lock is diagnostic only.
 
-    No document lease is planted, so any suppression here is attributable to the
-    pre-spawn active-session guard (the headless-dispatch storm backpressure),
-    not to lease filtering. The suppressed (not dispatched) signature must be
-    recorded so the work stays retryable once the target exits.
+    No document lease is planted. Dispatch should proceed despite the fresh
+    active-session heartbeat; real contention is handled by per-document leases,
+    work-intent claims, and process caps.
     """
     project_root = _make_minimal_index(tmp_path)
     state_dir = tmp_path / "state"
@@ -332,13 +333,11 @@ def test_run_trigger_active_session_lock_suppresses_ahead_of_leases(trigger_modu
     result = _run_trigger_dry(trigger_module, project_root, state_dir)
 
     prime_state = result["dispatch_state"]["recipients"]["prime-builder"]
-    assert prime_state["last_result"] == "target_active_session_present"
-    assert prime_state["last_suppressed_signature"] is not None
-    # Active-session suppression must NOT record a dispatched signature
-    # (keeps the work retryable once the target exits).
-    assert prime_state.get("last_dispatched_signature") in (None,), (
-        f"expected None, got {prime_state.get('last_dispatched_signature')!r}"
-    )
+    assert result["results"]["prime-builder"]["reason"] == "dry_run"
+    assert prime_state["last_result"] == "launch_failed"
+    assert prime_state["last_suppressed_signature"] is None
+    assert prime_state["last_dispatched_signature"] is not None
+    assert prime_state["signature"] == prime_state["last_dispatched_signature"]
 
 
 def test_run_trigger_retry_after_target_exits(trigger_module, tmp_path: Path) -> None:
