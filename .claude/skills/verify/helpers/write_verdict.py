@@ -365,18 +365,28 @@ def finalize_verified_commit(
         paths=expected_paths,
     )
 
+    # Determine which expected paths are actually dirty/modified/untracked
+    # so we only expect those to be staged after `git add`.
+    dirty_expected_paths = [verdict_rel_path]
+    for path in expected_paths:
+        if path == verdict_rel_path:
+            continue
+        res = _run_git(["status", "--porcelain", "--", path], cwd=root)
+        if res.stdout.strip():
+            dirty_expected_paths.append(path)
+
     from scripts.gtkb_bridge_writer import write_bridge_file
 
     write_bridge_file(slug, next_version, body_to_write, root)
     try:
         _run_git_with_lock_retry(["add", "-f", "--", *expected_paths], cwd=root)
         staged_after = _staged_paths(root)
-        if set(staged_after) != set(expected_paths):
-            missing = sorted(set(expected_paths) - set(staged_after))
-            extra = sorted(set(staged_after) - set(expected_paths))
+        if set(staged_after) != set(dirty_expected_paths):
+            missing = sorted(set(dirty_expected_paths) - set(staged_after))
+            extra = sorted(set(staged_after) - set(dirty_expected_paths))
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
-                f"missing={missing}; extra={extra}; expected={list(expected_paths)}"
+                f"missing={missing}; extra={extra}; expected_dirty={list(dirty_expected_paths)}"
             )
         commit = _run_git_with_lock_retry(["commit", "-m", commit_message], cwd=root, check=False)
         if commit.returncode != 0:

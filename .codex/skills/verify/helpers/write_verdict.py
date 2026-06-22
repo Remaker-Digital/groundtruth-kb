@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -211,6 +213,69 @@ def _run_git(args: list[str], *, cwd: Path, check: bool = False) -> subprocess.C
     return result
 
 
+_INDEX_LOCK_SIGNATURES = (
+    "index.lock",
+    "unable to create",
+    "permission denied",
+    "another git process",
+)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, ""))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        value = float(os.environ.get(name, ""))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def _is_index_lock_failure(result: subprocess.CompletedProcess[str]) -> bool:
+    blob = f"{result.stderr or ''}\n{result.stdout or ''}".lower()
+    return "index.lock" in blob or (
+        "another git process" in blob and any(signature in blob for signature in _INDEX_LOCK_SIGNATURES)
+    )
+
+
+def _run_git_with_lock_retry(
+    args: list[str],
+    *,
+    cwd: Path,
+    attempts: int | None = None,
+    base_delay: float | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    attempts = attempts if attempts is not None else _env_int("GTKB_VERIFIED_COMMIT_LOCK_RETRIES", 5)
+    base_delay = base_delay if base_delay is not None else _env_float("GTKB_VERIFIED_COMMIT_LOCK_BASE_DELAY", 0.5)
+    attempts = max(1, attempts)
+    base_delay = max(0.0, base_delay)
+    last: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(attempts):
+        result = _run_git(args, cwd=cwd, check=False)
+        if result.returncode == 0:
+            return result
+        last = result
+        if not _is_index_lock_failure(result):
+            break
+        if attempt < attempts - 1:
+            time.sleep(base_delay * (2**attempt))
+
+    if last is None:
+        raise VerifiedFinalizationError(f"git {' '.join(args)} did not run.")
+    if check:
+        raise VerifiedFinalizationError(
+            f"git {' '.join(args)} failed with exit {last.returncode}: {(last.stderr or last.stdout).strip()}"
+        )
+    return last
+
+
 def _git_lines(args: list[str], *, cwd: Path) -> tuple[str, ...]:
     result = _run_git(args, cwd=cwd, check=True)
     return tuple(line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip())
@@ -300,20 +365,30 @@ def finalize_verified_commit(
         paths=expected_paths,
     )
 
+    # Determine which expected paths are actually dirty/modified/untracked
+    # so we only expect those to be staged after `git add`.
+    dirty_expected_paths = [verdict_rel_path]
+    for path in expected_paths:
+        if path == verdict_rel_path:
+            continue
+        res = _run_git(["status", "--porcelain", "--", path], cwd=root)
+        if res.stdout.strip():
+            dirty_expected_paths.append(path)
+
     from scripts.gtkb_bridge_writer import write_bridge_file
 
     write_bridge_file(slug, next_version, body_to_write, root)
     try:
-        _run_git(["add", "-f", "--", *expected_paths], cwd=root, check=True)
+        _run_git_with_lock_retry(["add", "-f", "--", *expected_paths], cwd=root)
         staged_after = _staged_paths(root)
-        if set(staged_after) != set(expected_paths):
-            missing = sorted(set(expected_paths) - set(staged_after))
-            extra = sorted(set(staged_after) - set(expected_paths))
+        if set(staged_after) != set(dirty_expected_paths):
+            missing = sorted(set(dirty_expected_paths) - set(staged_after))
+            extra = sorted(set(staged_after) - set(dirty_expected_paths))
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
-                f"missing={missing}; extra={extra}; expected={list(expected_paths)}"
+                f"missing={missing}; extra={extra}; expected_dirty={list(dirty_expected_paths)}"
             )
-        commit = _run_git(["commit", "-m", commit_message], cwd=root)
+        commit = _run_git_with_lock_retry(["commit", "-m", commit_message], cwd=root, check=False)
         if commit.returncode != 0:
             raise VerifiedFinalizationError(
                 f"git commit failed with exit {commit.returncode}: {(commit.stderr or commit.stdout).strip()}"
