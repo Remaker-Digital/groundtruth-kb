@@ -458,7 +458,7 @@ def test_emergency_env_does_not_exempt_unknown_mutating_target(tmp_path: Path, m
 def test_non_go_bridge_entry_cannot_create_authorization(tmp_path: Path) -> None:
     _write_thread(tmp_path, latest_status="REVISED")
 
-    with pytest.raises(auth.AuthorizationError, match="latest GO"):
+    with pytest.raises(auth.AuthorizationError, match="requires a GO in the bridge chain"):
         auth.create_authorization_packet(tmp_path, "sample-implementation")
 
 

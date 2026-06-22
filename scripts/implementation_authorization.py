@@ -387,6 +387,7 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
         None,
     )
     if go_index is None:
+        # Stable test-tracked anchor for non-GO authorization failures.
         raise AuthorizationError(
             "Implementation authorization requires a GO in the bridge chain; "
             "latest GO or resumable post-GO NO-GO is required; "
