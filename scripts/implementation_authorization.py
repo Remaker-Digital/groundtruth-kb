@@ -47,6 +47,7 @@ _SPEC_ID_RE = re.compile(r"\b[A-Z][A-Z0-9]*-[A-Z0-9][A-Z0-9-]*\b")
 # (or any h3-headed section) is not silently invisible to the section scan.
 SECTION_RE = re.compile(r"^#{2,3}\s+(.+?)\s*$", re.MULTILINE)
 SECTION_LEVEL_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*$", re.MULTILINE)
+MARKDOWN_HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 # Heading substrings that mark a section as a spec-derived verification plan.
 # Substring match (not equality) so a heading like "Test Plan (spec-to-test
 # mapping)" is accepted, matching what the bridge clause-preflight already
@@ -447,6 +448,27 @@ def section_body(markdown: str, heading: str) -> str:
     return ""
 
 
+def _matches_target_paths_heading(heading: str) -> bool:
+    normalized = heading.strip().rstrip("#").strip().lower()
+    if normalized == "target_paths":
+        return True
+    if not normalized.startswith("target_paths"):
+        return False
+    suffix = normalized[len("target_paths") :]
+    return bool(suffix) and (suffix[0].isspace() or suffix[0] in "(:")
+
+
+def _target_paths_heading_body(markdown: str) -> str:
+    matches = list(MARKDOWN_HEADING_RE.finditer(markdown))
+    for index, match in enumerate(matches):
+        if not _matches_target_paths_heading(match.group(1)):
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
+        return markdown[start:end].strip()
+    return ""
+
+
 def _phrase_re(phrase: str) -> re.Pattern[str]:
     """Compile a bounded phrase matcher with whitespace tolerance."""
     pattern = r"\b" + r"\s+".join(re.escape(part) for part in phrase.split()) + r"\b"
@@ -594,7 +616,7 @@ def extract_target_paths(markdown: str) -> list[str]:
     # spans, so only the first span per bullet is the path. The asymmetry
     # with `## Files Expected To Change` (all spans) is deliberate: each
     # section name keeps the extraction matched to its observed convention.
-    heading_body = section_body(markdown, "target_paths")
+    heading_body = _target_paths_heading_body(markdown)
     if heading_body:
         heading_targets: list[str] = []
         for line in heading_body.splitlines():

@@ -1285,6 +1285,40 @@ def test_extract_target_paths_target_paths_heading_first_span_only(auth_module):
     assert auth_module.extract_target_paths(md) == ["scripts/a.py", "tests/b.py"]
 
 
+def test_extract_target_paths_accepts_annotated_target_paths_heading(auth_module):
+    """WI-3499 -- bounded annotations after target_paths are accepted."""
+    md = "# Proposal\n\n## target_paths (live re-probe; per S376)\n\n- `scripts/a.py`\n- `tests/b.py`\n"
+    assert auth_module.extract_target_paths(md) == ["scripts/a.py", "tests/b.py"]
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "## target_paths",
+        "## target_paths (live re-probe; per S376)",
+    ],
+)
+def test_extract_target_paths_heading_body_stops_before_nested_subsection(auth_module, heading):
+    """WI-3499 -- nested markdown subsection bullets are not target paths."""
+    md = f"{heading}\n\n- `scripts/a.py`\n\n### Intentionally preserved\n\n- `bridge/**`\n- `archive/**`\n"
+    assert auth_module.extract_target_paths(md) == ["scripts/a.py"]
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "## target_paths_notes",
+        "## targeting",
+        "## retarget_paths",
+    ],
+)
+def test_extract_target_paths_rejects_lookalike_target_paths_heading(auth_module, heading):
+    """WI-3499 -- lookalike headings do not authorize path extraction."""
+    md = f"# Proposal\n\n{heading}\n\n- `scripts/a.py`\n"
+    with pytest.raises(auth_module.AuthorizationError, match="missing concrete target_paths"):
+        auth_module.extract_target_paths(md)
+
+
 def test_extract_target_paths_inline_json_unchanged(auth_module):
     """T3 -- the inline `target_paths:` JSON metadata line is unchanged."""
     md = 'target_paths: ["scripts/a.py", "tests/b.py"]\n\n## Summary\n\nx\n'
