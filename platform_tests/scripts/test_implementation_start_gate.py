@@ -407,6 +407,54 @@ def test_no_auth_blocks_protected_source_edit(tmp_path: Path) -> None:
     assert "authorization packet" in result["reason"]
 
 
+def test_emergency_bridge_repair_allows_bridge_function_edit_without_packet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    audit_path = tmp_path / "gate-events.jsonl"
+    monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
+    monkeypatch.setenv("GTKB_GATE_DENIALS_PATH", str(audit_path))
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/cross_harness_bridge_trigger.py"))
+
+    assert result == {}
+    [record] = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert record["event"] == "exemption"
+    assert record["pattern_id"] == "emergency-bridge-repair"
+    assert record["paths"] == ["scripts/cross_harness_bridge_trigger.py"]
+
+
+def test_emergency_env_does_not_exempt_non_bridge_protected_edit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/sample.py"))
+
+    assert result["decision"] == "block"
+    assert "authorization packet" in result["reason"]
+
+
+def test_no_emergency_env_blocks_bridge_function_edit(tmp_path: Path) -> None:
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/cross_harness_bridge_trigger.py"))
+
+    assert result["decision"] == "block"
+    assert "authorization packet" in result["reason"]
+
+
+def test_emergency_env_does_not_exempt_unknown_mutating_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "Bash",
+        "tool_input": {"command": "python -c \"open('scripts/cross_harness_bridge_trigger.py', 'w').write('x')\""},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert "<unknown-mutating-target>" in result["reason"]
+
+
 def test_non_go_bridge_entry_cannot_create_authorization(tmp_path: Path) -> None:
     _write_thread(tmp_path, latest_status="REVISED")
 

@@ -59,6 +59,28 @@ def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
         pass
 
 
+def _record_gate_exemption(pattern_id: str, subject: str, reason: str, paths: list[str]) -> None:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "gate": "implementation-start-gate",
+        "event": "exemption",
+        "pattern_id": pattern_id,
+        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
+        "paths": sorted(paths),
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 PROTECTED_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
@@ -87,6 +109,21 @@ ALLOWED_WRITE_PREFIXES = (
 DIAGNOSTIC_WRITE_PREFIXES = (
     ".groundtruth/session/snapshots/",
     ".gtkb-state/",
+)
+EMERGENCY_BRIDGE_REPAIR_ENV_VAR = "GTKB_EMERGENCY_BRIDGE_REPAIR"
+BRIDGE_FUNCTION_EXACT = {
+    ".claude/settings.json",
+    ".codex/hooks.json",
+    "scripts/bridge_claim_cli.py",
+    "scripts/cross_harness_bridge_trigger.py",
+    "scripts/implementation_authorization.py",
+    "scripts/implementation_start_gate.py",
+    "scripts/single_harness_bridge_dispatcher.py",
+}
+BRIDGE_FUNCTION_PREFIXES = (
+    ".claude/hooks/",
+    ".codex/gtkb-hooks/",
+    "groundtruth-kb/src/groundtruth_kb/bridge/",
 )
 SAFE_COMMAND_PREFIXES = (
     "rg ",
@@ -244,6 +281,19 @@ def _protected_path_classification(relative_path: str) -> str:
         if rel.startswith(prefix):
             return prefix
     return rel
+
+
+def _is_bridge_function_path(relative_path: str) -> bool:
+    rel = _preserve_dot_prefixed_relative_path(relative_path)
+    return rel in BRIDGE_FUNCTION_EXACT or any(rel.startswith(prefix) for prefix in BRIDGE_FUNCTION_PREFIXES)
+
+
+def _emergency_bridge_repair_applies(protected_paths: list[str]) -> bool:
+    if os.environ.get(EMERGENCY_BRIDGE_REPAIR_ENV_VAR) != "1":
+        return False
+    if not protected_paths or "<unknown-mutating-target>" in protected_paths:
+        return False
+    return all(_is_bridge_function_path(path) for path in protected_paths)
 
 
 def _paths_from_apply_patch(root: Path, text: str) -> list[str]:
@@ -1082,6 +1132,14 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         protected = [path for path in paths if is_protected_path(path)]
     if not protected:
+        return {}
+    if _emergency_bridge_repair_applies(protected):
+        _record_gate_exemption(
+            "emergency-bridge-repair",
+            json.dumps(payload, sort_keys=True),
+            "owner-authorized emergency bridge repair exemption",
+            protected,
+        )
         return {}
     try:
         # WI-4443: resolve the work-intent session BEFORE packet resolution so
