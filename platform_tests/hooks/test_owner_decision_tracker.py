@@ -93,15 +93,79 @@ def _read_pending_file(project_root: Path) -> str:
 
 def _stop_payload(transcript_fixture: str) -> str:
     """Build a Stop hook payload pointing transcript_path at the fixture."""
+    return _stop_payload_for_path(FIXTURES / transcript_fixture)
+
+
+def _stop_payload_for_path(transcript_path: Path) -> str:
+    """Build a Stop hook payload pointing transcript_path at an explicit file."""
     return json.dumps(
         {
             "session_id": "test-session",
-            "transcript_path": str(FIXTURES / transcript_fixture),
+            "transcript_path": str(transcript_path),
             "cwd": str(REPO_ROOT),
             "hook_event_name": "Stop",
             "stop_hook_active": True,
             "last_assistant_message": "",
         }
+    )
+
+
+def _write_jsonl(path: Path, events: list[dict]) -> None:
+    """Write a small transcript fixture local to the test's tmp_path."""
+    path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
+
+
+def _write_answered_auq_transcript(path: Path, question: str, options: list[str], answer: str) -> None:
+    """Write a transcript containing one answered AskUserQuestion call."""
+    option_rows = [{"label": option, "description": option} for option in options]
+    _write_jsonl(
+        path,
+        [
+            {
+                "type": "user",
+                "uuid": "u-1",
+                "parentUuid": None,
+                "timestamp": "2026-06-22T12:00:00Z",
+                "message": {"role": "user", "content": "Please formalize the decision."},
+            },
+            {
+                "type": "assistant",
+                "uuid": "a-1",
+                "parentUuid": "u-1",
+                "timestamp": "2026-06-22T12:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "Formalizing the decision."},
+                        {
+                            "type": "tool_use",
+                            "id": "tu-cross-turn",
+                            "name": "AskUserQuestion",
+                            "input": {
+                                "questions": [
+                                    {
+                                        "question": question,
+                                        "header": "Decision",
+                                        "options": option_rows,
+                                        "multiSelect": False,
+                                    }
+                                ]
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                "type": "user",
+                "uuid": "u-2",
+                "parentUuid": "a-1",
+                "timestamp": "2026-06-22T12:00:30Z",
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "tool_result", "tool_use_id": "tu-cross-turn", "content": answer}],
+                },
+            },
+        ],
     )
 
 
@@ -844,6 +908,85 @@ def test_correlated_two_signal_resolves_prose_entry_substring_path(tmp_path: Pat
     # And NOT in Pending.
     pending = body.split("## Pending", 1)[1].split("##", 1)[0]
     assert "detected_via: prose:" not in pending, "correlated prose match must auto-resolve, not stay pending"
+
+
+def test_cross_turn_pending_prose_resolves_on_later_correlated_auq(tmp_path: Path) -> None:
+    """A pending prose ask resolves when a later answered AUQ matches the same decision."""
+    project = _setup_project(tmp_path)
+    first = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    assert first.returncode == 0, f"stderr: {first.stderr}"
+    pending_after_first = _read_pending_file(project).split("## Pending", 1)[1].split("##", 1)[0]
+    assert "detected_via: prose:" in pending_after_first
+
+    transcript = tmp_path / "cross_turn_answered.jsonl"
+    question = "Should I file the proposal as Slice 1 first or jump straight into the implementation?"
+    _write_answered_auq_transcript(
+        transcript,
+        question,
+        ["File proposal first", "Jump to implementation"],
+        "File proposal first",
+    )
+
+    second = _run_hook("stop", project, _stop_payload_for_path(transcript))
+    assert second.returncode == 0, f"stderr: {second.stderr}"
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    resolved = body.split("## Resolved", 1)[1].split("##", 1)[0]
+    assert "detected_via: prose:" not in pending
+    assert "resolved_via: cross_turn_auq_formalization" in resolved
+    assert 'answer: "File proposal first"' in resolved
+
+
+def test_cross_turn_uncorrelated_auq_leaves_prose_pending(tmp_path: Path) -> None:
+    """A later answered AUQ on an unrelated topic must not resolve prior prose pending state."""
+    project = _setup_project(tmp_path)
+    first = _run_hook("stop", project, _stop_payload("turn_with_prose_decision.jsonl"))
+    assert first.returncode == 0, f"stderr: {first.stderr}"
+
+    transcript = tmp_path / "cross_turn_unrelated.jsonl"
+    _write_answered_auq_transcript(
+        transcript,
+        "Should I deploy the dashboard now or hold?",
+        ["Deploy", "Hold"],
+        "Deploy",
+    )
+
+    second = _run_hook("stop", project, _stop_payload_for_path(transcript))
+    assert second.returncode == 0, f"stderr: {second.stderr}"
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    assert "detected_via: prose:" in pending
+    assert "resolved_via: cross_turn_auq_formalization" not in body
+
+
+def test_same_turn_correlation_still_resolves_after_cross_turn_change(tmp_path: Path) -> None:
+    """The cross-turn pass does not disturb existing same-turn AUQ correlation."""
+    project = _setup_project(tmp_path)
+    result = _run_hook("stop", project, _stop_payload("turn_prose_auq_correlated_substring.jsonl"))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    assert "resolved_via: same_turn_auq_formalization" in body
+    assert "resolved_via: cross_turn_auq_formalization" not in body
+    assert "detected_via: prose:" not in pending
+
+
+def test_cross_turn_resolution_noops_without_pending_prose(tmp_path: Path) -> None:
+    """Scan A2 is a no-op when the turn has an answered AUQ but no pending prose entry."""
+    project = _setup_project(tmp_path)
+    transcript = tmp_path / "cross_turn_no_pending.jsonl"
+    _write_answered_auq_transcript(
+        transcript,
+        "Should I file the proposal as Slice 1 first or jump straight into the implementation?",
+        ["File proposal first", "Jump to implementation"],
+        "File proposal first",
+    )
+    result = _run_hook("stop", project, _stop_payload_for_path(transcript))
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    body = _read_pending_file(project)
+    pending = body.split("## Pending", 1)[1].split("##", 1)[0]
+    assert "(none)" in pending
+    assert "resolved_via: cross_turn_auq_formalization" not in body
 
 
 def test_uncorrelated_boilerplate_overlap_keeps_prose_pending(tmp_path: Path) -> None:

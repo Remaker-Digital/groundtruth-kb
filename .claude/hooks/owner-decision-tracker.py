@@ -1346,11 +1346,13 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     # prose matches per DCL-OWNER-DECISION-TRACKER-SAME-TURN-AUQ-RESOLUTION-001.
     askuserquestion_count = 0
     auq_questions_this_turn: list[tuple[str, list[str]]] = []
+    answered_auq_this_turn: list[tuple[str, list[str], str]] = []
     for pair in _scan_askuserquestion(turn_events):
         askuserquestion_count += 1
         tu = pair["tool_use"]
         tu_input = tu.get("input") or {}
         questions = tu_input.get("questions") or []
+        tr = pair["tool_result"]
         for q in questions:
             if not isinstance(q, dict):
                 continue
@@ -1359,6 +1361,9 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
             if not question_text:
                 continue
             auq_questions_this_turn.append((question_text, options))
+            answer_text = _extract_answer_text(tr) if tr is not None else ""
+            if tr is not None:
+                answered_auq_this_turn.append((question_text, options, answer_text))
             qhash = _question_hash(question_text, options)
             if qhash in existing_hashes:
                 continue
@@ -1374,17 +1379,49 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
                 status="pending",
                 question_hash=qhash,
             )
-            tr = pair["tool_result"]
             if tr is not None:
                 entry.status = "resolved"
                 entry.resolved_at = asked_at
                 entry.resolved_in_session = session_hint
-                entry.answer = _extract_answer_text(tr)
+                entry.answer = answer_text
                 sections["resolved"].append(entry)
                 _auto_archive_if_enabled(entry, session_hint=session_hint)
             else:
                 sections["pending"].append(entry)
             mutated = True
+
+    # Scan A2 -- cross-turn pending-prose resolution. When a prior turn left a
+    # prose-detected ask pending, a later answered AUQ can formalize it using
+    # the same fail-closed two-signal correlator as the same-turn path.
+    if answered_auq_this_turn:
+        for pending_entry in list(sections["pending"]):
+            if not pending_entry.detected_via.startswith("prose:"):
+                continue
+            for auq_question, auq_options, auq_answer in answered_auq_this_turn:
+                correlated, signal_name = _correlate_prose_to_auq(
+                    pending_entry.question,
+                    auq_question,
+                    auq_options,
+                )
+                if not correlated:
+                    continue
+                sections["pending"].remove(pending_entry)
+                pending_entry.status = "resolved"
+                pending_entry.resolved_at = asked_at
+                pending_entry.resolved_in_session = session_hint
+                pending_entry.resolved_via = "cross_turn_auq_formalization"
+                pending_entry.answer = auq_answer
+                note = (
+                    "Cross-turn pending prose entry correlated with answered "
+                    f"AskUserQuestion (signals: A=true, B={signal_name}); "
+                    "auto-resolved per DCL-OWNER-DECISION-TRACKER-SAME-TURN-"
+                    "AUQ-RESOLUTION-001."
+                )
+                pending_entry.notes = f"{pending_entry.notes} {note}".strip()
+                sections["resolved"].append(pending_entry)
+                _auto_archive_if_enabled(pending_entry, session_hint=session_hint)
+                mutated = True
+                break
 
     # Scan B -- prose anti-patterns. ``prose_matches_this_turn`` is the raw
     # scan result feeding the durable-file append/correlation path (which uses
