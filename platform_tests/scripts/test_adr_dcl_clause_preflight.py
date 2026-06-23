@@ -171,6 +171,22 @@ def test_evidence_detection_true_negative_with_gap_summary(preflight):
     assert gap is not None and len(gap) > 0, f"expected non-empty gap_summary; got {gap}"
 
 
+def test_evidence_gap_summary_includes_satisfying_pattern(preflight):
+    """Missing-evidence diagnostics should name the token surface that clears the gate."""
+    content = (
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- GOV-FILE-BRIDGE-AUTHORITY-001 - dispatcher state governs this artifact.\n\n"
+        "This proposal discusses dispatcher state but omits the satisfying bridge-file phrasing.\n"
+    )
+    clauses = preflight.load_clauses(CLAUSES_CONFIG)
+    numbered_chain_clause = next(c for c in clauses if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id)
+    found, _reasons, gap = preflight.evaluate_evidence(numbered_chain_clause, content)
+    assert found is False
+    assert gap is not None
+    assert numbered_chain_clause.evidence_pattern in gap
+
+
 # Slice 2 added tests below: the retired Slice-1 advisory-mode test
 # (``test_cli_advisory_mode_always_exits_zero``) was deleted because it
 # encoded the contract that this slice intentionally retires. Replacement
@@ -276,6 +292,47 @@ def test_blocking_evidence_gap_exits_nonzero(preflight, tmp_path):
     )
     report = out.read_text(encoding="utf-8")
     assert "Blocking Gaps" in report, "Slice 2 report must include the Blocking Gaps subsection on gate failure"
+    in_root_clause = next(
+        c
+        for c in preflight.load_clauses(CLAUSES_CONFIG)
+        if c.clause_id == "ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT"
+    )
+    assert in_root_clause.failure_pattern in report
+
+
+def test_blocking_gap_report_surfaces_satisfying_evidence_pattern(preflight, tmp_path):
+    """Rendered Blocking Gaps should include the literal pattern that satisfies missing evidence."""
+    bridge_id = "test-blocking-pattern-guidance"
+    content = (
+        "# Test bridge\n\n"
+        "## Specification Links\n\n"
+        "- GOV-FILE-BRIDGE-AUTHORITY-001 - dispatcher state governs this proposal.\n"
+        "- ADR-ISOLATION-APPLICATION-PLACEMENT-001 - all outputs stay in E:/GT-KB.\n\n"
+        "The proposal references dispatcher state but omits the required bridge-file wording.\n"
+    )
+    _bridge_file, index, bridge_dir = _stage_bridge(tmp_path, bridge_id, content)
+    out = tmp_path / "pattern-guidance-report.md"
+    rc = preflight.main(
+        [
+            "--bridge-id",
+            bridge_id,
+            "--clauses-config",
+            str(CLAUSES_CONFIG),
+            "--bridge-dir",
+            str(bridge_dir),
+            "--index",
+            str(index),
+            "--out",
+            str(out),
+        ]
+    )
+    assert rc == preflight.EXIT_BLOCKING_GAP
+    report = out.read_text(encoding="utf-8")
+    numbered_chain_clause = next(
+        c for c in preflight.load_clauses(CLAUSES_CONFIG) if "CLAUSE-NUMBERED-FILE-CHAIN" in c.clause_id
+    )
+    assert "Evidence pattern:" in report
+    assert numbered_chain_clause.evidence_pattern in report
 
 
 def test_blocking_evidence_present_exits_zero(preflight, tmp_path):

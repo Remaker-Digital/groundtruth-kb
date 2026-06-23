@@ -1218,6 +1218,60 @@ def _run_pending_applicability_preflight(
     return True, ""
 
 
+def _trim_preflight_output(output: str, *, limit: int = 2400) -> str:
+    text = re.sub(r"\s+\n", "\n", output).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + " ... <truncated>"
+
+
+def _run_pending_clause_preflight(
+    *,
+    cwd: Path,
+    file_path: str,
+    bridge_id: str,
+    content: str,
+) -> tuple[bool, str]:
+    scratch_path: Path | None = None
+    try:
+        scratch_path = _root_contained_scratch_path(cwd, bridge_id)
+        scratch_path.write_text(content, encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/adr_dcl_clause_preflight.py",
+                "--bridge-id",
+                bridge_id,
+                "--content-file",
+                str(scratch_path),
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        print(f"[Governance] ADR/DCL clause preflight warning for {file_path}: {exc}", file=sys.stderr)
+        return True, ""
+    finally:
+        if scratch_path is not None:
+            try:
+                scratch_path.unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"[Governance] Could not remove bridge clause preflight scratch file: {exc}", file=sys.stderr)
+
+    combined_output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+    if result.returncode == 0:
+        return True, ""
+    if result.returncode == 5:
+        return False, _trim_preflight_output(combined_output)
+    print(f"[Governance] ADR/DCL clause preflight warning for {file_path}: {combined_output}", file=sys.stderr)
+    return True, ""
+
+
 def _read_proposal_target_paths(
     project_root: Path,
     doc_name: str,
@@ -1623,6 +1677,19 @@ def _deny_reason_for_content(
                         "for full output. (Hard-block per "
                         "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
                         "mechanical enforcement.)"
+                    )
+                clause_preflight_ok, clause_error_msg = _run_pending_clause_preflight(
+                    cwd=cwd_path,
+                    file_path=file_path,
+                    bridge_id=bridge_id,
+                    content=content,
+                )
+                if not clause_preflight_ok:
+                    return (
+                        "[Governance] ADR/DCL clause preflight failed for pending bridge write: "
+                        f"file_path={file_path}. {clause_error_msg} Run "
+                        f"python scripts/adr_dcl_clause_preflight.py --bridge-id {bridge_id} "
+                        "for full output. (Hard-block per the mandatory ADR/DCL clause-test preflight gate.)"
                     )
         if first_line in BRIDGE_AUTHOR_METADATA_STATUSES:
             author_metadata_gaps = author_metadata_gaps_for_content(content)

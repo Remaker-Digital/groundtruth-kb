@@ -264,7 +264,12 @@ def evaluate_evidence(clause: Clause, content: str) -> tuple[bool, list[str], st
             scan_content = _failure_pattern_scan_content(clause, content)
             if re.search(clause.failure_pattern, scan_content):
                 reasons.append(f"failure pattern `{clause.failure_pattern}` matched (refutes evidence)")
-                return (False, reasons, f"Failure marker present: {clause.failure_condition}")
+                return (
+                    False,
+                    reasons,
+                    f"Failure marker present: {clause.failure_condition}; "
+                    f"remove or rephrase text matching failure pattern: {clause.failure_pattern}",
+                )
         except re.error as e:
             reasons.append(f"(failure pattern invalid: {e})")
     if not clause.evidence_pattern:
@@ -281,7 +286,11 @@ def evaluate_evidence(clause: Clause, content: str) -> tuple[bool, list[str], st
         reasons.append(f"(evidence pattern invalid: {e})")
         return (False, reasons, "Evidence pattern invalid; manual review required.")
     reasons.append(f"evidence pattern `{clause.evidence_pattern}` did not match")
-    return (False, reasons, f"Evidence missing: {clause.evidence_required}")
+    return (
+        False,
+        reasons,
+        f"Evidence missing: {clause.evidence_required}; add text matching evidence pattern: {clause.evidence_pattern}",
+    )
 
 
 def evaluate_clauses(clauses: list[Clause], content: str, doc_name: str, paths: list[str]) -> list[ClauseResult]:
@@ -391,6 +400,10 @@ def render_markdown(
             lines.append(f"- **`{r.clause.clause_id}`** ({r.clause.severity}, {r.clause.enforcement_mode})")
             lines.append(f"  - Gap: {r.gap_summary}")
             lines.append(f"  - Evidence required: {r.clause.evidence_required}")
+            if r.clause.evidence_pattern:
+                lines.append(f"  - Evidence pattern: `{r.clause.evidence_pattern}`")
+            if r.clause.failure_pattern:
+                lines.append(f"  - Failure pattern: `{r.clause.failure_pattern}`")
             for reason in r.evidence_reasons:
                 lines.append(f"  - Detector note: {reason}")
     if gaps and not blocking_gaps:
@@ -398,6 +411,11 @@ def render_markdown(
         for r in gaps:
             lines.append(f"- **`{r.clause.clause_id}`** ({r.clause.severity}, {r.clause.enforcement_mode})")
             lines.append(f"  - Gap: {r.gap_summary}")
+            lines.append(f"  - Evidence required: {r.clause.evidence_required}")
+            if r.clause.evidence_pattern:
+                lines.append(f"  - Evidence pattern: `{r.clause.evidence_pattern}`")
+            if r.clause.failure_pattern:
+                lines.append(f"  - Failure pattern: `{r.clause.failure_pattern}`")
     lines += [
         "",
         '_Slice 2 mandatory gate: clauses with `enforcement_mode = "blocking"` and',
