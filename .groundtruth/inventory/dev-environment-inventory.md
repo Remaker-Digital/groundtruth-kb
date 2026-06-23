@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-06-22T00:35:13Z
+Generated: 2026-06-23T06:28:44Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0)
 
 ## Project
@@ -13,7 +13,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:8212ae6b1de0eca07cb3f425165
 ## Redaction
 
 - Status: pass
-- Sensitive local environment entries detected: 3
+- Sensitive local environment entries detected: 1
 - Public output excludes raw credential values, local-only key names, and absolute local paths.
 
 ## Toolchain

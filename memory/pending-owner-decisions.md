@@ -8126,6 +8126,33 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-22T22:34:58.663633Z
   answer: "owner cleared without specific answer"
   notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1353
+  asked_at: 2026-06-23T05:48:49.103976Z
+  question: "Set the dispatch concurrency env vars now to start scaling?"
+  options:
+    - "Set per_role=8, global=14 (Recommended)"
+    - "Set per_role=6, global=10 (Conservative)"
+    - "Set higher: per_role=12, global=20"
+    - "Analysis only, don't change yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e5bff49d48dc7f63
+  resolved_at: 2026-06-23T05:48:49.103976Z
+  answer: "Your questions have been answered: \"Set the dispatch concurrency env vars now to start scaling?\"=\"Set per_role=8, global=14 (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1354
+  asked_at: 2026-06-23T06:12:12.744082Z
+  question: "10 stale Codex-A LO workers (63-138 min old, from before the A→PB role switch) are consuming LO cap slots, blocking all new LO dispatch. Kill workers older than 30 minutes?"
+  options:
+    - "Kill all >30 min (Recommended)"
+    - "Kill all >60 min only"
+    - "Leave them alone"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6d57e63c320b24d7
+  resolved_at: 2026-06-23T06:12:12.744082Z
+  answer: "Your questions have been answered: \"10 stale Codex-A LO workers (63-138 min old, from before the A→PB role switch) are consuming LO cap slots, blocking all new LO dispatch. Kill workers older than 30 minutes?\"=\"Kill all >30 min (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
