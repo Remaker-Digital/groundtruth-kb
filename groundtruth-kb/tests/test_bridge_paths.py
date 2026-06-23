@@ -231,9 +231,12 @@ def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     worktree carries its own committed groundtruth.toml. Requires git.
     """
     ident = [
-        "-c", "user.email=test@example.com",
-        "-c", "user.name=test",
-        "-c", "commit.gpgsign=false",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=test",
+        "-c",
+        "commit.gpgsign=false",
     ]
     canonical = tmp_path / "canonical"
     canonical.mkdir()
@@ -252,9 +255,7 @@ def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     return canonical, worktree
 
 
-def test_resolve_project_root_worktree_returns_canonical(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_project_root_worktree_returns_canonical(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """WI-3353 IP-1: resolve_project_root() from inside a linked worktree returns
     the canonical main-worktree root, not the worktree itself.
 
@@ -270,9 +271,7 @@ def test_resolve_project_root_worktree_returns_canonical(
     assert p.resolve_project_root().resolve() == canonical.resolve()
 
 
-def test_resolve_project_root_env_override_and_parent_walk(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_project_root_env_override_and_parent_walk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """WI-3353 IP-1: the GTKB_PROJECT_ROOT override still wins from a worktree
     cwd, and the no-git parent walk skips a .claude/worktrees/ segment to reach
     the canonical root rather than stopping on the worktree's marker copy.

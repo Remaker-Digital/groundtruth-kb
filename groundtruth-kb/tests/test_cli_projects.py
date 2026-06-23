@@ -48,11 +48,17 @@ def _invoke_authorize_without_specs(tmp_path: Path, monkeypatch):
     return CliRunner().invoke(
         main,
         [
-            "projects", "authorize", PROJECT_ID,
-            "--owner-decision", DELIB_ID,
-            "--name", "CLI Auth Test Authorization",
-            "--scope", "bounded test authorization scope",
-            "--change-reason", "test authorization",
+            "projects",
+            "authorize",
+            PROJECT_ID,
+            "--owner-decision",
+            DELIB_ID,
+            "--name",
+            "CLI Auth Test Authorization",
+            "--scope",
+            "bounded test authorization scope",
+            "--change-reason",
+            "test authorization",
         ],
     )
 

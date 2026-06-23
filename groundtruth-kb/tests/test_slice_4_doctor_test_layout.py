@@ -33,8 +33,7 @@ def test_legacy_bridge_poller_test_path_absent() -> None:
     """(a) Old ``test_doctor_bridge_poller.py`` no longer exists."""
     legacy = _TESTS_DIR / "test_doctor_bridge_poller.py"
     assert not legacy.exists(), (
-        f"Legacy test path {legacy} still exists — Slice 4 D4 renamed it to "
-        f"test_doctor_bridge_dispatch_liveness.py."
+        f"Legacy test path {legacy} still exists — Slice 4 D4 renamed it to test_doctor_bridge_dispatch_liveness.py."
     )
 
 
@@ -51,8 +50,7 @@ def test_legacy_smart_poller_doctor_test_path_absent() -> None:
     """(c) Old ``test_doctor_smart_poller.py`` no longer exists at its live tests/ path."""
     legacy = _TESTS_DIR / "test_doctor_smart_poller.py"
     assert not legacy.exists(), (
-        f"Legacy test path {legacy} still exists at its live location — Slice 4 D4 "
-        f"archived it to {_ARCHIVE_DIR}."
+        f"Legacy test path {legacy} still exists at its live location — Slice 4 D4 archived it to {_ARCHIVE_DIR}."
     )
 
 

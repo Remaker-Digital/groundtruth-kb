@@ -242,11 +242,28 @@ def test_run_doctor_fresh_scaffold_zero_error(tmp_path: Path, profile: str) -> N
 # the GT-KB self-install (`.claude/rules/canonical-terminology.{md,toml}`); it does NOT
 # appear in adopter scaffolds.
 _TEMPLATE_REQUIRED_21_TERMS = [
-    "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
-    "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
-    "adopter", "project", "work item", "backlog", "specification",
-    "requirement", "implementation proposal", "implementation report", "verification",
-    "dashboard", "bridge",
+    "MemBase",
+    "Deliberation Archive",
+    "MEMORY.md",
+    "Prime Builder",
+    "Loyal Opposition",
+    "GT-KB",
+    "GroundTruth-KB",
+    "GTKB",
+    "platform",
+    "application",
+    "hosted application",
+    "adopter",
+    "project",
+    "work item",
+    "backlog",
+    "specification",
+    "requirement",
+    "implementation proposal",
+    "implementation report",
+    "verification",
+    "dashboard",
+    "bridge",
 ]
 
 
@@ -272,8 +289,7 @@ def test_required_primer_terms_cover_21_template_minimum(tmp_path: Path, profile
     )
     # Inverse check: "Agent Red" must NOT be in the adopter template.
     assert "Agent Red" not in primer_terms, (
-        f"profile {profile}: 'Agent Red' must not appear in adopter template "
-        "(GT-KB-self-install only)"
+        f"profile {profile}: 'Agent Red' must not appear in adopter template (GT-KB-self-install only)"
     )
 
 
@@ -305,9 +321,7 @@ def test_doctor_fails_when_primer_missing_a_required_term(tmp_path: Path) -> Non
     primer.write_text(text.replace("GTKB", "REDACTED"), encoding="utf-8")
     check = _check_canonical_terminology(target, "dual-agent")
     assert check.status == "fail", f"expected fail, got {check.status}: {check.message}"
-    assert "GTKB" in check.message, (
-        f"failure message should cite the missing primer term; got: {check.message}"
-    )
+    assert "GTKB" in check.message, f"failure message should cite the missing primer term; got: {check.message}"
     assert "primer term" in check.message, (
         f"failure message should distinguish primer-term failures from startup-term failures; got: {check.message}"
     )
@@ -324,10 +338,23 @@ def test_doctor_does_not_force_22_terms_into_startup_files(tmp_path: Path) -> No
     text = claude_md.read_text(encoding="utf-8")
     # Strip primer-only terms (NOT in dual-agent required_startup_terms).
     primer_only = [
-        "GT-KB", "GroundTruth-KB", "GTKB", "platform", "application", "hosted application",
-        "adopter", "project", "work item", "backlog", "specification",
-        "requirement", "implementation proposal", "implementation report", "verification",
-        "dashboard", "bridge",
+        "GT-KB",
+        "GroundTruth-KB",
+        "GTKB",
+        "platform",
+        "application",
+        "hosted application",
+        "adopter",
+        "project",
+        "work item",
+        "backlog",
+        "specification",
+        "requirement",
+        "implementation proposal",
+        "implementation report",
+        "verification",
+        "dashboard",
+        "bridge",
     ]
     for term in primer_only:
         text = text.replace(term, "REDACTED")
@@ -404,12 +431,8 @@ def test_primer_severity_independent_of_startup_severity(tmp_path: Path) -> None
         r"(\[config\.profiles\.dual-agent\].*?)\bmissing_severity\s*=\s*\"ERROR\"",
         _re.DOTALL,
     )
-    new_text, sub_count = pattern.subn(
-        r'\1missing_severity = "WARN"', text, count=1
-    )
-    assert sub_count == 1, (
-        "differential-severity setup must override exactly one dual-agent missing_severity"
-    )
+    new_text, sub_count = pattern.subn(r'\1missing_severity = "WARN"', text, count=1)
+    assert sub_count == 1, "differential-severity setup must override exactly one dual-agent missing_severity"
     toml_path.write_text(new_text, encoding="utf-8")
 
     # Remove a primer-only term from the primer file. "GTKB" is in primer_terms

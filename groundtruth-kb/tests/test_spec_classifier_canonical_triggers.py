@@ -28,16 +28,21 @@ CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
 
 def _run_hook(prompt: str) -> dict:
     """Invoke the hook via subprocess with the given prompt; return parsed stdout."""
-    payload = json.dumps({
-        "session_id": "test-spec-classifier-canonical",
-        "transcript_path": "/tmp/transcript.jsonl",
-        "cwd": str(REPO_ROOT),
-        "hook_event_name": "UserPromptSubmit",
-        "prompt": prompt,
-    })
+    payload = json.dumps(
+        {
+            "session_id": "test-spec-classifier-canonical",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "cwd": str(REPO_ROOT),
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        }
+    )
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH)],
-        input=payload, capture_output=True, text=True, timeout=10,
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     assert result.returncode == 0, f"Hook exit {result.returncode}; stderr: {result.stderr[-500:]}"
     out = result.stdout.strip()
@@ -61,17 +66,13 @@ def test_canonical_trigger_track_as_requirement_fires():
 
 def test_canonical_trigger_this_is_a_protected_behavior_fires():
     """`This is a protected behavior` matches the declarative-classification pattern."""
-    response = _run_hook(
-        "This is a protected behavior of the system that must never be removed."
-    )
+    response = _run_hook("This is a protected behavior of the system that must never be removed.")
     assert "systemMessage" in response, f"Expected systemMessage; got {response}"
 
 
 def test_canonical_trigger_imperative_modal_fires():
     """`The system must include X` matches the imperative-modal pattern."""
-    response = _run_hook(
-        "The system must include retry-after handling for all 429 responses."
-    )
+    response = _run_hook("The system must include retry-after handling for all 429 responses.")
     assert "systemMessage" in response, f"Expected systemMessage; got {response}"
 
 
@@ -111,9 +112,7 @@ def test_reminder_text_contains_auq_invariant():
     Per GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2: the reminder must direct
     the AI agent to use AskUserQuestion before any artifact creation.
     """
-    response = _run_hook(
-        "Create a specification for the new authentication flow with these constraints."
-    )
+    response = _run_hook("Create a specification for the new authentication flow with these constraints.")
     assert "systemMessage" in response
     msg = response["systemMessage"]
     assert "AskUserQuestion" in msg, f"Reminder missing 'AskUserQuestion': {msg[:200]}"
@@ -125,14 +124,19 @@ def test_reminder_text_contains_auq_invariant():
 
 def test_hook_subprocess_smoke_emits_systemMessage_on_match():
     """End-to-end subprocess invocation with a canonical trigger produces stdout JSON."""
-    payload = json.dumps({
-        "session_id": "test-e2e-match",
-        "hook_event_name": "UserPromptSubmit",
-        "prompt": "Create a specification for the cache invalidation policy described above.",
-    })
+    payload = json.dumps(
+        {
+            "session_id": "test-e2e-match",
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "Create a specification for the cache invalidation policy described above.",
+        }
+    )
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH)],
-        input=payload, capture_output=True, text=True, timeout=10,
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     assert result.returncode == 0
     parsed = json.loads(result.stdout.strip())
@@ -142,14 +146,19 @@ def test_hook_subprocess_smoke_emits_systemMessage_on_match():
 
 def test_hook_subprocess_smoke_emits_empty_on_no_match():
     """End-to-end subprocess invocation with a non-trigger message produces empty JSON."""
-    payload = json.dumps({
-        "session_id": "test-e2e-nomatch",
-        "hook_event_name": "UserPromptSubmit",
-        "prompt": "show me the bridge index please",  # short + anti-pattern
-    })
+    payload = json.dumps(
+        {
+            "session_id": "test-e2e-nomatch",
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "show me the bridge index please",  # short + anti-pattern
+        }
+    )
     result = subprocess.run(
         [sys.executable, str(HOOK_PATH)],
-        input=payload, capture_output=True, text=True, timeout=10,
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     assert result.returncode == 0
     parsed = json.loads(result.stdout.strip())
@@ -197,6 +206,5 @@ def test_hook_registered_in_codex_hooks_json():
                 found = True
                 break
     assert found, (
-        f"spec-classifier.py not registered under UserPromptSubmit in "
-        f"{CODEX_HOOKS_PATH}. Settings: {user_prompt_hooks}"
+        f"spec-classifier.py not registered under UserPromptSubmit in {CODEX_HOOKS_PATH}. Settings: {user_prompt_hooks}"
     )

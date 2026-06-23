@@ -5,7 +5,6 @@ circuit breakers, retry delays, and dry-run safety in cross-harness bridge trigg
 
 import datetime as dt
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path

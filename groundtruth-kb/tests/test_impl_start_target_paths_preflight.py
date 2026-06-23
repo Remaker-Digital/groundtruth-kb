@@ -612,3 +612,33 @@ def test_verdict_labels_stable() -> None:
     assert preflight.VERDICT_NO_GO_FILE == "no_go_file"
     assert preflight.VERDICT_MISSING_TARGETS == "missing_target_paths"
     assert preflight.VERDICT_SCOPE_DRIFT == "out_of_scope_drift"
+
+
+def test_design_only_empty_target_paths_returns_exit_ok(fixture_project: Path) -> None:
+    files = _write_bridge_thread(
+        fixture_project,
+        "gtkb-fixture-thread",
+        target_paths=[],
+    )
+    proposal_path = files["new-001"]
+    content = proposal_path.read_text(encoding="utf-8")
+    content = content.replace("target_paths: []", "target_paths: []\nimplementation_scope: design-only\n")
+    proposal_path.write_text(content, encoding="utf-8")
+
+    result, exit_code = preflight.run_preflight(
+        fixture_project,
+        "gtkb-fixture-thread",
+        explicit_candidates=[],
+        use_git_diff=False,
+    )
+    assert exit_code == preflight.EXIT_OK
+    assert result[preflight.KEY_VERDICT] == preflight.VERDICT_OK
+
+    result2, exit_code2 = preflight.run_preflight(
+        fixture_project,
+        "gtkb-fixture-thread",
+        explicit_candidates=["scripts/foo.py"],
+        use_git_diff=False,
+    )
+    assert exit_code2 == preflight.EXIT_SCOPE_DRIFT
+    assert result2[preflight.KEY_VERDICT] == preflight.VERDICT_SCOPE_DRIFT

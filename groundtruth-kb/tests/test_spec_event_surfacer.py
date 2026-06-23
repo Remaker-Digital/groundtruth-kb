@@ -389,17 +389,14 @@ def test_concurrent_invocations_do_not_double_emit(tmp_path: Path) -> None:
     )
 
     assert len(emit_count_per_spec) == NUM_SPECS, (
-        f"Expected {NUM_SPECS} unique emits across the union of process outputs; "
-        f"got {len(emit_count_per_spec)}"
+        f"Expected {NUM_SPECS} unique emits across the union of process outputs; got {len(emit_count_per_spec)}"
     )
 
     ledger_path = tmp_path / ".claude" / "session" / "spec-events-seen.jsonl"
     assert ledger_path.exists(), "ledger file was not created"
     with ledger_path.open(encoding="utf-8") as fh:
         ledger_lines = [line for line in fh if line.strip()]
-    assert len(ledger_lines) == NUM_SPECS, (
-        f"Expected {NUM_SPECS} ledger entries; got {len(ledger_lines)}"
-    )
+    assert len(ledger_lines) == NUM_SPECS, f"Expected {NUM_SPECS} ledger entries; got {len(ledger_lines)}"
 
     seen_keys: set[tuple[str, int]] = set()
     for line in ledger_lines:
@@ -415,9 +412,7 @@ def test_concurrent_invocations_do_not_double_emit(tmp_path: Path) -> None:
         timeout=10,
     )
     final_out = result.stdout.decode("utf-8").strip()
-    assert final_out == "{}", (
-        f"Expected silent emit on sequential invocation after concurrent run; got: {final_out!r}"
-    )
+    assert final_out == "{}", f"Expected silent emit on sequential invocation after concurrent run; got: {final_out!r}"
 
 
 def test_surfacer_runtime_under_200ms_for_typical_turn_transcript(tmp_path: Path) -> None:

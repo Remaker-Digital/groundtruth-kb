@@ -23,12 +23,28 @@ _MANAGED_ARTIFACTS_PATH = _REPO_ROOT / "templates" / "managed-artifacts.toml"
 # 21 generic owner-required terms (template; "Agent Red" added in GT-KB self-install
 # post-render per primer Slice 1 pattern).
 _TEMPLATE_REQUIRED_21_TERMS = [
-    "MemBase", "Deliberation Archive", "MEMORY.md", "Prime Builder", "Loyal Opposition",
-    "GT-KB", "GroundTruth-KB", "GTKB",
-    "platform", "application", "hosted application", "adopter", "project",
-    "work item", "backlog", "specification", "requirement",
-    "implementation proposal", "implementation report", "verification",
-    "dashboard", "bridge",
+    "MemBase",
+    "Deliberation Archive",
+    "MEMORY.md",
+    "Prime Builder",
+    "Loyal Opposition",
+    "GT-KB",
+    "GroundTruth-KB",
+    "GTKB",
+    "platform",
+    "application",
+    "hosted application",
+    "adopter",
+    "project",
+    "work item",
+    "backlog",
+    "specification",
+    "requirement",
+    "implementation proposal",
+    "implementation report",
+    "verification",
+    "dashboard",
+    "bridge",
 ]
 
 _PINNED_DEFAULTS_KEYS = [
@@ -44,9 +60,7 @@ _PINNED_DEFAULTS_KEYS = [
 
 def test_canonical_terminology_policy_toml_exists() -> None:
     """Policy file is present at the expected template path."""
-    assert _POLICY_PATH.exists(), (
-        f"canonical-terminology-policy.toml must exist at {_POLICY_PATH}"
-    )
+    assert _POLICY_PATH.exists(), f"canonical-terminology-policy.toml must exist at {_POLICY_PATH}"
 
 
 def test_policy_registered_in_managed_artifacts() -> None:
@@ -56,8 +70,7 @@ def test_policy_registered_in_managed_artifacts() -> None:
     """
     text = _MANAGED_ARTIFACTS_PATH.read_text(encoding="utf-8")
     assert 'id = "rule.canonical-terminology-policy"' in text, (
-        "managed-artifacts.toml must register the policy file as "
-        "'rule.canonical-terminology-policy'"
+        "managed-artifacts.toml must register the policy file as 'rule.canonical-terminology-policy'"
     )
     assert 'template_path = "rules/canonical-terminology-policy.toml"' in text
     assert 'target_path = ".claude/rules/canonical-terminology-policy.toml"' in text
@@ -88,15 +101,10 @@ def test_policy_covers_21_generic_owner_required_terms() -> None:
     config = tomllib.loads(_POLICY_PATH.read_text(encoding="utf-8"))
     terms = config.get("term", {})
     missing = [t for t in _TEMPLATE_REQUIRED_21_TERMS if t not in terms]
-    assert not missing, (
-        f"[term.*] missing {len(missing)} owner-required term(s): {missing}"
-    )
+    assert not missing, f"[term.*] missing {len(missing)} owner-required term(s): {missing}"
     # Inverse: Agent Red must NOT be in the adopter template
     # (smoke-test no-leakage rule per primer Slice 1 lesson).
-    assert "Agent Red" not in terms, (
-        "'Agent Red' must not appear in the adopter template "
-        "(GT-KB-self-install only)"
-    )
+    assert "Agent Red" not in terms, "'Agent Red' must not appear in the adopter template (GT-KB-self-install only)"
 
 
 def test_policy_term_entries_have_disambiguation_tier() -> None:
@@ -105,9 +113,7 @@ def test_policy_term_entries_have_disambiguation_tier() -> None:
     terms = config.get("term", {})
     for term_name, entry in terms.items():
         tier = entry.get("disambiguation_tier")
-        assert tier in ("A", "B", "C"), (
-            f"term {term_name!r}: disambiguation_tier must be A/B/C, got {tier!r}"
-        )
+        assert tier in ("A", "B", "C"), f"term {term_name!r}: disambiguation_tier must be A/B/C, got {tier!r}"
 
 
 def test_policy_config_load_parses_without_error() -> None:
@@ -144,7 +150,9 @@ def test_evaluate_content_honors_file_level_disable_marker(tmp_path: Path) -> No
     content = "<!-- term-disambiguation: off -->\nbacklog without qualification."
     fake_file.write_text(content, encoding="utf-8")
     violations = evaluate_content(
-        content, file_path=fake_file, policy=policy,
+        content,
+        file_path=fake_file,
+        policy=policy,
     )
     assert violations == []
 

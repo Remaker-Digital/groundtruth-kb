@@ -54,9 +54,7 @@ def _scaffold_minimal_dual_agent(target: Path) -> None:
         encoding="utf-8",
     )
     (target / "bridge").mkdir(parents=True, exist_ok=True)
-    (target / "bridge" / "INDEX.md").write_text(
-        "# bridge index\n", encoding="utf-8"
-    )
+    (target / "bridge" / "INDEX.md").write_text("# bridge index\n", encoding="utf-8")
     (target / ".gtkb-state" / "bridge-poller").mkdir(parents=True, exist_ok=True)
 
 
@@ -71,15 +69,12 @@ def test_doctor_cli_emits_no_current_use_smart_poller_guidance(tmp_path: Path) -
 
     # Doctor exits with 0 on PASS or 1 on findings; either is acceptable for
     # this wording assertion. The test cares about output content, not verdict.
-    assert result.exit_code in (0, 1), (
-        f"unexpected exit code {result.exit_code}; output:\n{result.output}"
-    )
+    assert result.exit_code in (0, 1), f"unexpected exit code {result.exit_code}; output:\n{result.output}"
 
     output = result.output
     for pattern in _FORBIDDEN_CURRENT_USE_PATTERNS:
         assert pattern not in output, (
-            f"forbidden current-use smart-poller wording found: {pattern!r}\n"
-            f"full doctor output:\n{output}"
+            f"forbidden current-use smart-poller wording found: {pattern!r}\nfull doctor output:\n{output}"
         )
 
 
@@ -91,9 +86,7 @@ def test_doctor_cli_emits_cross_harness_or_dispatch_wording(tmp_path: Path) -> N
         main,
         ["project", "doctor", "--dir", str(tmp_path)],
     )
-    assert result.exit_code in (0, 1), (
-        f"unexpected exit code {result.exit_code}; output:\n{result.output}"
-    )
+    assert result.exit_code in (0, 1), f"unexpected exit code {result.exit_code}; output:\n{result.output}"
 
     output = result.output.lower()
     assert any(needle in output for needle in _REQUIRED_DISPATCH_WORDING), (
@@ -110,9 +103,7 @@ def test_doctor_cli_runs_cross_harness_trigger_check(tmp_path: Path) -> None:
         main,
         ["project", "doctor", "--dir", str(tmp_path)],
     )
-    assert result.exit_code in (0, 1), (
-        f"unexpected exit code {result.exit_code}; output:\n{result.output}"
-    )
+    assert result.exit_code in (0, 1), f"unexpected exit code {result.exit_code}; output:\n{result.output}"
 
     # The check name "Cross-harness trigger" or similar must appear; the
     # status (PASS/WARN/FAIL) is mechanism-dependent and not asserted.
