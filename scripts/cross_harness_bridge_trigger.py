@@ -2233,7 +2233,47 @@ def _effective_max_items_for_target(target: DispatchTarget, max_items: int) -> i
     return max_items
 
 
-def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -> str:
+def _load_antigravity_rules(project_root: Path, mode: str) -> str:
+    """Load and aggregate baseline rules and overlays for the Antigravity harness."""
+    parts = []
+    files = [
+        ("CLAUDE.md", Path("CLAUDE.md")),
+        ("AGENTS.md", Path("AGENTS.md")),
+        ("canonical-terminology.md", Path(".claude") / "rules" / "canonical-terminology.md"),
+        ("file-bridge-protocol.md", Path(".claude") / "rules" / "file-bridge-protocol.md"),
+        ("project-root-boundary.md", Path(".claude") / "rules" / "project-root-boundary.md"),
+        ("memory.md", Path("memory") / "MEMORY.md"),
+    ]
+    if mode == "pb":
+        files.append(("active-role-overlay.md", Path("config") / "agent-control" / "PRIME-BUILDER-STARTUP-OVERLAY.md"))
+    elif mode == "lo":
+        files.append(
+            ("active-role-overlay.md", Path("config") / "agent-control" / "LOYAL-OPPOSITION-STARTUP-OVERLAY.md")
+        )
+
+    parts.append("### BASELINE RULES AND DIRECTIVES (Antigravity Parity Layer)")
+    parts.append("The following baseline rules, directives, and overlays are loaded directly into your context:")
+    parts.append("")
+
+    for label, rel_path in files:
+        full_path = project_root / rel_path
+        if full_path.is_file():
+            try:
+                content = full_path.read_text(encoding="utf-8")
+            except Exception as e:
+                content = f"Error reading rules file {rel_path}: {e}"
+        else:
+            content = f"Rules file {rel_path} does not exist."
+
+        parts.append(f"<RULE[{label}]>")
+        parts.append(content)
+        parts.append(f"</RULE[{label}]>")
+        parts.append("")
+
+    return "\n".join(parts)
+
+
+def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, project_root: Path | None = None) -> str:
     """Build the dispatch prompt mirroring the smart-poller phrasing.
 
     Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md
@@ -2282,7 +2322,8 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
         "then include the clean Applicability Preflight section in the verdict artifact."
     )
     canonical_keyword = f"::init gtkb {target.canonical_mode}"
-    return "\n".join(
+
+    prompt = "\n".join(
         [
             canonical_keyword,
             "",
@@ -2304,6 +2345,13 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int) -
             selected_text,
         ]
     )
+
+    if target.command_handle == "antigravity" or target.harness_id == "C":
+        resolved_root = project_root if project_root is not None else _resolve_project_root(None)
+        rules_block = _load_antigravity_rules(resolved_root, target.canonical_mode)
+        prompt = prompt + "\n\n" + rules_block
+
+    return prompt
 
 
 def _normalize_argv_head(head: str, project_root: Path) -> str:
@@ -3134,7 +3182,7 @@ def _spawn_harness(
     ``dispatch-failures.jsonl`` and reported in the return meta. The caller
     treats failure as non-fatal per the fire-and-forget contract.
     """
-    prompt = _dispatch_prompt(target, items, max_items)
+    prompt = _dispatch_prompt(target, items, max_items, project_root)
     command = _harness_command(target, prompt, project_root)
     recipient_key = target.dispatch_state_key
     dispatch_id = dispatch_id or _new_dispatch_id(recipient_key)

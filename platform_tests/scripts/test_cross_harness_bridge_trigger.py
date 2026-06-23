@@ -2652,6 +2652,52 @@ def test_dispatch_prompt_pins_role_and_preflight_commands_to_repo_venv() -> None
     assert "`python scripts/adr_dcl_clause_preflight.py" not in prompt
 
 
+def test_antigravity_dispatch_prompt_injects_rules_and_overlays(tmp_path: Path) -> None:
+    """The dispatch prompt for Antigravity must inject baseline rules and overlays."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="C",
+        command_handle="antigravity",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["gemini", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-antigravity-rules-injection",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-antigravity-rules-injection-001.md",
+        },
+    )()
+
+    # Write mock files under tmp_path
+    tmp_path.joinpath("CLAUDE.md").write_text("Mock CLAUDE", encoding="utf-8")
+    tmp_path.joinpath("AGENTS.md").write_text("Mock AGENTS", encoding="utf-8")
+    tmp_path.joinpath("memory").mkdir()
+    tmp_path.joinpath("memory", "MEMORY.md").write_text("Mock MEMORY", encoding="utf-8")
+    tmp_path.joinpath(".claude", "rules").mkdir(parents=True)
+    tmp_path.joinpath(".claude", "rules", "canonical-terminology.md").write_text("Mock TERMS", encoding="utf-8")
+    tmp_path.joinpath(".claude", "rules", "file-bridge-protocol.md").write_text("Mock BRIDGE", encoding="utf-8")
+    tmp_path.joinpath(".claude", "rules", "project-root-boundary.md").write_text("Mock BOUNDARY", encoding="utf-8")
+    tmp_path.joinpath("config", "agent-control").mkdir(parents=True)
+    tmp_path.joinpath("config", "agent-control", "LOYAL-OPPOSITION-STARTUP-OVERLAY.md").write_text(
+        "Mock LO OVERLAY", encoding="utf-8"
+    )
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1, project_root=tmp_path)
+
+    assert "### BASELINE RULES AND DIRECTIVES (Antigravity Parity Layer)" in prompt
+    assert "<RULE[CLAUDE.md]>\nMock CLAUDE\n</RULE[CLAUDE.md]>" in prompt
+    assert "<RULE[AGENTS.md]>\nMock AGENTS\n</RULE[AGENTS.md]>" in prompt
+    assert "<RULE[memory.md]>\nMock MEMORY\n</RULE[memory.md]>" in prompt
+    assert "<RULE[canonical-terminology.md]>\nMock TERMS\n</RULE[canonical-terminology.md]>" in prompt
+    assert "<RULE[file-bridge-protocol.md]>\nMock BRIDGE\n</RULE[file-bridge-protocol.md]>" in prompt
+    assert "<RULE[project-root-boundary.md]>\nMock BOUNDARY\n</RULE[project-root-boundary.md]>" in prompt
+    assert "<RULE[active-role-overlay.md]>\nMock LO OVERLAY\n</RULE[active-role-overlay.md]>" in prompt
+
+
 def test_harness_command_preserves_dispatch_prompt_as_single_argv_element(tmp_path: Path) -> None:
     """The canonical init keyword must remain the first line of the argv prompt."""
     trigger = _load_trigger()
