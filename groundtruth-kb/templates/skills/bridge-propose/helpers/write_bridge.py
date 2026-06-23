@@ -444,8 +444,8 @@ def propose_bridge(
 ) -> Path:
     """Create ``bridge/<topic_slug>-001.md`` through the no-index bridge path.
 
-    Phase 0 — Prior Deliberations pre-population (default-on; Phase 2 of
-    GTKB-DA-READ-SURFACE-CORRECTION): when
+    Phase 0 — Prior Deliberations pre-population (glossary seeding plus
+    semantic-search opt-in; Phase 2 of GTKB-DA-READ-SURFACE-CORRECTION): when
     ``pre_populate_prior_deliberations=True`` (default), call
     :func:`pre_populate_prior_deliberations` on ``body`` before scanning.
     Glossary-source seeding from ``.claude/rules/canonical-terminology.md``
@@ -498,7 +498,7 @@ def propose_bridge(
     project_root = bridge_root.parent.resolve()
     bridge_file = bridge_root / f"{topic_slug}-001.md"
 
-    # Phase 0: Prior Deliberations pre-population (default-on).
+    # Phase 0: Prior Deliberations pre-population with semantic search opt-in.
     if pre_populate_prior_deliberations:
         body = globals()["pre_populate_prior_deliberations"](
             topic_slug,

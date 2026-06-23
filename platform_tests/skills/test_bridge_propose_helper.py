@@ -258,7 +258,7 @@ def test_audit_log_schema(helper_module, tmp_path):
 
 
 # --------------------------------------------------------------------------
-# Tests 7-9 — Default-db semantic search behavior (F1 of -006 fix)
+# Tests 7-9 — Explicit semantic-search opt-in behavior (F1 of -006 fix)
 # --------------------------------------------------------------------------
 
 
@@ -274,9 +274,9 @@ class _FakeKnowledgeDB:
         return self._results
 
 
-def test_default_db_path_invokes_semantic_search(helper_module, tmp_path):
-    """When ``db=None`` (default), the helper opens a default DB and calls
-    ``search_deliberations``. This is the F1 acceptance test."""
+def test_explicit_db_instance_invokes_semantic_search(helper_module, tmp_path):
+    """An explicit DB instance opts into semantic search and calls
+    ``search_deliberations``."""
     fake_results = [
         {"id": "DELIB-FAKE-100", "source_type": "owner_conversation", "title": "Fake match A"},
         {"id": "DELIB-FAKE-101", "source_type": "owner_conversation", "title": "Fake match B"},
@@ -392,6 +392,12 @@ def test_template_skill_md_contains_pre_population_section():
         "Phase 0a" in content and "pre-population" in content.lower()
     )
     assert "glossary-source seeding" in content.lower() or "Glossary-source seeding" in content
+    assert "default-on" not in content
+    assert "automatically and queries" not in content
+    assert "``db=False`` to disable semantic search entirely" not in content
+    assert "``db=None`` skips" in content
+    assert "``db=True``" in content
+    assert "explicit DB instance" in content
 
 
 # --------------------------------------------------------------------------

@@ -286,6 +286,29 @@ def test_generated_adapters_do_not_name_canonical_helper_paths() -> None:
     assert not offenders, "generated Codex adapters name canonical helper paths:\n" + "\n".join(sorted(offenders))
 
 
+def test_bridge_propose_skill_surfaces_document_semantic_search_opt_in() -> None:
+    """WI-4716: committed bridge-propose skill surfaces must match the
+    db=None/db=False skip and db=True/explicit-DB opt-in contract.
+    """
+    paths = [
+        REPO_ROOT / ".claude/skills/bridge-propose/SKILL.md",
+        REPO_ROOT / ".codex/skills/bridge-propose/SKILL.md",
+        REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/SKILL.md",
+    ]
+    stale_patterns = [
+        "default-on",
+        "automatically and queries",
+        "``db=False`` to disable semantic search entirely",
+    ]
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        for stale in stale_patterns:
+            assert stale not in text, f"{path.relative_to(REPO_ROOT)} still contains stale phrase {stale!r}"
+        assert "``db=None`` skips" in text, f"{path.relative_to(REPO_ROOT)} missing db=None skip wording"
+        assert "``db=True``" in text, f"{path.relative_to(REPO_ROOT)} missing db=True opt-in wording"
+        assert "explicit DB instance" in text, f"{path.relative_to(REPO_ROOT)} missing explicit DB wording"
+
+
 def _write_skill_with_frontmatter(project_root: Path, directory: str, frontmatter_lines: str) -> None:
     skill_dir = project_root / ".claude" / "skills" / directory
     skill_dir.mkdir(parents=True, exist_ok=True)

@@ -40,7 +40,7 @@
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
-      "source_sha256": "cdfe7bb7020fe0b55209bd684c5390ee0b86decd792743cfb2c63498136edf8e"
+      "source_sha256": "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
     },
     {
       "adapter_relative_path": ".codex/skills/bridge-reconciliation/SKILL.md",

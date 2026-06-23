@@ -116,12 +116,13 @@ the retired bridge-index file.
 Invokes ``helpers/write_bridge.py``'s ``propose_bridge()`` with the
 caller-supplied ``topic_slug``, ``body``, and optional metadata.
 
-### Phase 0 — Prior Deliberations pre-population (default-on)
+### Phase 0 — Prior Deliberations pre-population
 
 Per Phase 2 of the GTKB-DA-READ-SURFACE-CORRECTION program
 (``ADR-DA-READ-SURFACE-PLACEMENT-001`` Path D), the helper pre-populates
 the proposal's ``## Prior Deliberations`` section before the credential
-scan. Two-stage retrieval:
+scan. Retrieval has a deterministic baseline plus an explicit semantic-search
+opt-in:
 
 1. **Glossary-source seeding (deterministic).** The helper reads
    ``.claude/rules/canonical-terminology.md`` and looks for a
@@ -129,13 +130,14 @@ scan. Two-stage retrieval:
    case-insensitive). If matched, the heading's ``**Source:**`` block is
    parsed and ``DELIB-*`` / MemBase spec IDs are extracted as deterministic
    seed candidates.
-2. **Semantic search (broad coverage; default-on).** The helper opens a
-   default ``KnowledgeDB("groundtruth.db")`` automatically and queries
-   ``search_deliberations(query, limit=...)``. Results are added on top
-   of the seeds, deduplicated. Pass ``db=`` to override with an explicit
-   instance, or ``db=False`` to disable semantic search entirely. If the
-   default DB cannot be opened (missing file, import error), the helper
-   silently falls back to glossary-only seeding.
+2. **Semantic search (explicit opt-in).** By default, ``db=None`` skips
+   semantic search and uses glossary-only seeding. ``db=False`` is the
+   explicit-disable form and also skips semantic search. Pass ``db=True``
+   to opt into the bounded default ``KnowledgeDB("groundtruth.db")`` search
+   path, or pass an explicit DB instance to use that connection. Results are
+   added on top of the seeds and deduplicated. If an opted-in default DB
+   cannot be opened (missing file, import error, timeout), the helper silently
+   falls back to glossary-only seeding.
 
 When the topic is genuinely novel (no glossary entry, no DA matches), the
 helper inserts an ``_No prior deliberations: <fill in reason before
