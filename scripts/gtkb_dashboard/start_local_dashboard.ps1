@@ -3,7 +3,8 @@ param(
     [string]$GrafanaHome = "",
     [int]$GrafanaPort = 3000,
     [int]$RefreshPort = 8766,
-    [int]$RefreshIntervalMinutes = 60
+    [int]$RefreshIntervalMinutes = 60,
+    [switch]$Headless
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,9 +57,49 @@ function Join-ProcessArguments {
     return ($quoted -join " ")
 }
 
+function Test-HeadlessLaunch {
+    param([bool]$Requested)
+    if ($Requested) {
+        return $true
+    }
+    if ($env:GTKB_DASHBOARD_HEADLESS -match "^(1|true|yes)$") {
+        return $true
+    }
+    return -not [Environment]::UserInteractive
+}
+
+function Start-DashboardProcess {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [string]$WorkingDirectory,
+        [string]$StandardOutputPath,
+        [string]$StandardErrorPath,
+        [bool]$UseHeadlessLaunch
+    )
+    $argumentString = Join-ProcessArguments $ArgumentList
+    if ($UseHeadlessLaunch) {
+        return Start-Process -FilePath $FilePath `
+            -ArgumentList $argumentString `
+            -WorkingDirectory $WorkingDirectory `
+            -RedirectStandardOutput $StandardOutputPath `
+            -RedirectStandardError $StandardErrorPath `
+            -NoNewWindow `
+            -PassThru
+    }
+    return Start-Process -FilePath $FilePath `
+        -ArgumentList $argumentString `
+        -WorkingDirectory $WorkingDirectory `
+        -RedirectStandardOutput $StandardOutputPath `
+        -RedirectStandardError $StandardErrorPath `
+        -WindowStyle Hidden `
+        -PassThru
+}
+
 $ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
 Set-Location $ProjectRoot
 Import-EnvFile -Path (Join-Path $ProjectRoot ".env.local")
+$UseHeadlessLaunch = Test-HeadlessLaunch -Requested $Headless.IsPresent
 
 $RuntimeRoot = Join-Path $ProjectRoot "memory\grafana"
 $DataDir = Join-Path $RuntimeRoot "data"
@@ -78,6 +119,7 @@ $env:GTKB_DASHBOARD_DASHBOARDS_PATH = $DashboardsDir
 $env:GTKB_DASHBOARD_PROJECT_ROOT = $ProjectRoot
 $env:GTKB_DASHBOARD_REFRESH_PORT = [string]$RefreshPort
 $env:GTKB_DASHBOARD_REFRESH_INTERVAL_MINUTES = [string]$RefreshIntervalMinutes
+$env:GTKB_DASHBOARD_HEADLESS = if ($UseHeadlessLaunch) { "true" } else { "false" }
 $env:GF_PATHS_DATA = $DataDir
 $env:GF_PATHS_LOGS = $LogsDir
 $env:GF_PATHS_PLUGINS = $PluginsDir
@@ -123,24 +165,24 @@ python (Join-Path $ProjectRoot "scripts\gtkb_dashboard\refresh_dashboard_db.py")
 
 $refreshLog = Join-Path $LogsDir "refresh-service.log"
 $refreshErr = Join-Path $LogsDir "refresh-service.err.log"
-$refreshProcess = Start-Process -FilePath "python" `
-    -ArgumentList (Join-ProcessArguments @((Join-Path $ProjectRoot "scripts\gtkb_dashboard\refresh_service.py"))) `
+$refreshProcess = Start-DashboardProcess `
+    -FilePath "python" `
+    -ArgumentList @((Join-Path $ProjectRoot "scripts\gtkb_dashboard\refresh_service.py")) `
     -WorkingDirectory $ProjectRoot `
-    -RedirectStandardOutput $refreshLog `
-    -RedirectStandardError $refreshErr `
-    -WindowStyle Hidden `
-    -PassThru
+    -StandardOutputPath $refreshLog `
+    -StandardErrorPath $refreshErr `
+    -UseHeadlessLaunch $UseHeadlessLaunch
 Set-Content -LiteralPath (Join-Path $PidDir "refresh-service.pid") -Value $refreshProcess.Id -Encoding UTF8
 
 $grafanaLog = Join-Path $LogsDir "grafana.log"
 $grafanaErr = Join-Path $LogsDir "grafana.err.log"
-$grafanaProcess = Start-Process -FilePath $grafanaFile `
-    -ArgumentList (Join-ProcessArguments $grafanaArgs) `
+$grafanaProcess = Start-DashboardProcess `
+    -FilePath $grafanaFile `
+    -ArgumentList $grafanaArgs `
     -WorkingDirectory $GrafanaHome `
-    -RedirectStandardOutput $grafanaLog `
-    -RedirectStandardError $grafanaErr `
-    -WindowStyle Hidden `
-    -PassThru
+    -StandardOutputPath $grafanaLog `
+    -StandardErrorPath $grafanaErr `
+    -UseHeadlessLaunch $UseHeadlessLaunch
 Set-Content -LiteralPath (Join-Path $PidDir "grafana.pid") -Value $grafanaProcess.Id -Encoding UTF8
 
 Write-Host "Grafana dashboard: http://127.0.0.1:$GrafanaPort/"
