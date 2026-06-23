@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import UTC
 from pathlib import Path
 
@@ -1570,6 +1571,63 @@ def test_startup_gate_self_heals_rederivable_content_drift(tmp_path, monkeypatch
     assert healed_meta["sha256"] == hashlib.sha256(healed_body.encode("utf-8")).hexdigest()
     assert healed_meta["byte_length"] == len(healed_body.encode("utf-8"))
     assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_startup_gate_refresh_timeout_fails_visibly_without_late_cache_write(tmp_path, monkeypatch) -> None:
+    """Verifies DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001: slow relay-cache refresh fails visibly.
+
+    The UserPromptSubmit init-keyword path must not hang on synchronous startup
+    model/dashboard-summary regeneration. A timed-out refresh returns the
+    existing relay-failure diagnostic and does not rewrite the cache later.
+    """
+
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", "0.05")
+    _write_startup_gate_guard(tmp_path)
+
+    body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
+    stale_time_str = "2026-06-19T00:00:00Z"
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body_text, encoding="utf-8", newline="\n")
+
+    encoded = body_text.encode("utf-8")
+    meta = {
+        "harness_name": "codex",
+        "harness_id": "A",
+        "generated_at": stale_time_str,
+        "byte_length": len(encoded),
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+    meta_file.write_text(json.dumps(meta), encoding="utf-8", newline="\n")
+
+    called = False
+
+    def _slow_render(role_profile):
+        nonlocal called
+        called = True
+        time.sleep(0.2)
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nLate body"
+
+    _mock_dispatch_core(monkeypatch, module, _slow_render)
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    started = time.monotonic()
+    response = module.handle_hook_payload(
+        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        tmp_path,
+    )
+    elapsed = time.monotonic() - started
+
+    assert called
+    assert elapsed < 0.5
+    assert "STARTUP RELAY FAILURE" in response["hookSpecificOutput"]["additionalContext"]
+    time.sleep(0.25)
+    assert cache_file.read_text(encoding="utf-8").strip() == body_text
 
 
 def test_startup_gate_no_self_heal_on_non_recoverable_inconsistency(tmp_path, monkeypatch) -> None:

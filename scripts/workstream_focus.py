@@ -15,7 +15,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import queue
 import re
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -99,6 +101,7 @@ DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "sessio
 STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
 STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
 STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
+STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 2.0
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
@@ -1463,6 +1466,60 @@ def _startup_relay_cache_fresh(meta: dict[str, Any], project_root: Path) -> bool
     return -age_seconds <= STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS
 
 
+def _startup_relay_refresh_timeout_seconds() -> float:
+    raw_value = os.environ.get("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS")
+    if raw_value is None:
+        return STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS
+    try:
+        value = float(raw_value)
+    except ValueError:
+        return STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS
+    return max(0.01, min(value, STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS))
+
+
+def _refresh_startup_relay_cache_bounded(root: Path, *, role_mode: str | None, meta: dict[str, Any]) -> bool:
+    """Best-effort stale relay-cache refresh, bounded for UserPromptSubmit hooks."""
+
+    result_queue: queue.Queue[bool] = queue.Queue(maxsize=1)
+    cancel = threading.Event()
+
+    def _refresh() -> None:
+        try:
+            try:
+                from scripts import session_start_dispatch_core as _core
+            except ImportError:
+                import session_start_dispatch_core as _core
+            _core.HARNESS_NAME = _resolved_harness_name() or "codex"
+            _core.OUT_DIR = _startup_diagnostic_dir(root)
+            role_mode_to_use = role_mode or meta.get("role_mode") or "pb"
+            role_profile = _core._MODE_TO_ROLE_PROFILE.get(role_mode_to_use)
+            if not role_profile:
+                result_queue.put(False)
+                return
+            report = _core._render_role_startup_report(role_profile)
+            if not report or cancel.is_set():
+                result_queue.put(False)
+                return
+            _core._write_startup_relay_cache(report, role_mode=role_mode)
+            result_queue.put(True)
+        except Exception:
+            try:
+                result_queue.put(False)
+            except queue.Full:
+                pass
+
+    worker = threading.Thread(target=_refresh, name="gtkb-startup-relay-refresh", daemon=True)
+    worker.start()
+    worker.join(_startup_relay_refresh_timeout_seconds())
+    if worker.is_alive():
+        cancel.set()
+        return False
+    try:
+        return result_queue.get_nowait()
+    except queue.Empty:
+        return False
+
+
 def _allowed_startup_relay_cache_reads(root: Path) -> set[Path]:
     allowed: set[Path] = set()
     for role_mode in (None, "pb", "lo"):
@@ -1543,35 +1600,23 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
     recoverable_content_drift = relay_identity_ok and not content_matches_meta
 
     if relay_identity_ok and (not freshness_ok or recoverable_content_drift) and not headless_dispatch:
-        try:
+        refreshed = _refresh_startup_relay_cache_bounded(root, role_mode=role_mode, meta=meta)
+        if refreshed:
             try:
-                from scripts import session_start_dispatch_core as _core
-            except ImportError:
-                import session_start_dispatch_core as _core
-            _core.HARNESS_NAME = _resolved_harness_name() or "codex"
-            _core.OUT_DIR = _startup_diagnostic_dir(root)
-            role_mode_to_use = role_mode or meta.get("role_mode") or "pb"
-            role_profile = _core._MODE_TO_ROLE_PROFILE.get(role_mode_to_use)
-            if role_profile:
-                report = _core._render_role_startup_report(role_profile)
-                if report:
-                    _core._write_startup_relay_cache(report, role_mode=role_mode)
-                    body = cache_path.read_text(encoding="utf-8")
-                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                    actual_bytes = body.encode("utf-8")
-                    actual_sha = hashlib.sha256(actual_bytes).hexdigest()
-                    harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
-                    harness_id_ok = meta.get("harness_id") in (None, harness_id)
-                    role_ok = role_mode is None or meta.get("role_mode") == role_mode
-                    disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
-                    relay_identity_ok = harness_ok and harness_id_ok and role_ok and disclosure_ok
-                    content_matches_meta = meta.get("sha256") == actual_sha and meta.get("byte_length") == len(
-                        actual_bytes
-                    )
-                    consistent_except_freshness = relay_identity_ok and content_matches_meta
-                    freshness_ok = _startup_relay_cache_fresh(meta, root)
-        except Exception:
-            pass
+                body = cache_path.read_text(encoding="utf-8")
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                actual_bytes = body.encode("utf-8")
+                actual_sha = hashlib.sha256(actual_bytes).hexdigest()
+                harness_ok = meta.get("harness_name") in (None, _resolved_harness_name())
+                harness_id_ok = meta.get("harness_id") in (None, harness_id)
+                role_ok = role_mode is None or meta.get("role_mode") == role_mode
+                disclosure_ok = "# GroundTruth-KB Fresh Session Startup" in body and "## Startup Disclosure" in body
+                relay_identity_ok = harness_ok and harness_id_ok and role_ok and disclosure_ok
+                content_matches_meta = meta.get("sha256") == actual_sha and meta.get("byte_length") == len(actual_bytes)
+                consistent_except_freshness = relay_identity_ok and content_matches_meta
+                freshness_ok = _startup_relay_cache_fresh(meta, root)
+            except (OSError, json.JSONDecodeError):
+                pass
 
     consistent = consistent_except_freshness and freshness_ok
     try:
