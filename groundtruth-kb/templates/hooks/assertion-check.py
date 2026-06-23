@@ -15,6 +15,7 @@ Exit:   Always 0
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
+import contextlib
 import json
 import os
 import sys
@@ -260,7 +261,9 @@ def _quality_dashboard(db) -> list[str]:
             # Exclude governance artifact types (GOV-20): they have different test expectations
             row = conn.execute(
                 """SELECT COUNT(*) AS total,
-                          SUM(CASE WHEN assertions IS NOT NULL AND assertions != 'null' THEN 1 ELSE 0 END) AS with_assertions
+                          SUM(
+                              CASE WHEN assertions IS NOT NULL AND assertions != 'null' THEN 1 ELSE 0 END
+                          ) AS with_assertions
                    FROM current_specifications
                    WHERE status IN ('implemented', 'verified')
                      AND COALESCE(type, 'requirement') NOT IN
@@ -586,17 +589,16 @@ def _check_assertion_triage_advisory() -> list[str]:
         lines.append("  ^ genuine_drift entries are highest-priority for review.")
     if counts.get("chronic_noise", 0) > 0:
         lines.append(
-            "  ^ review chronic_noise candidates via `python scripts/assertion_retirement_workflow.py review-candidates`"
+            "  ^ review chronic_noise candidates via "
+            "`python scripts/assertion_retirement_workflow.py review-candidates`"
         )
     return lines
 
 
 def main():
     # Consume stdin (required by hook protocol)
-    try:
+    with contextlib.suppress(json.JSONDecodeError, EOFError):
         json.loads(sys.stdin.read())
-    except (json.JSONDecodeError, EOFError):
-        pass
 
     # Check if knowledge database exists
     db_path = PROJECT_DIR / "groundtruth.db"

@@ -74,9 +74,13 @@ def validate_rules(data: dict[str, Any]) -> list[DispatchRule]:
         if not isinstance(raw, dict):
             raise DispatchRuleError(f"Rule {index} must be a table/object")
         # Skip bridge rules (which are handled separately by bridge_dispatch_config)
-        if "trigger" not in raw and "target" not in raw and "activity_gate" not in raw:
-            if "required_roles" in raw or "statuses" in raw or "prefer" in raw:
-                continue
+        if (
+            "trigger" not in raw
+            and "target" not in raw
+            and "activity_gate" not in raw
+            and ("required_roles" in raw or "statuses" in raw or "prefer" in raw)
+        ):
+            continue
         rule = _validate_rule(raw, index)
         if rule.id in seen_ids:
             raise DispatchRuleError(f"Rule {index} duplicates id {rule.id!r}")
