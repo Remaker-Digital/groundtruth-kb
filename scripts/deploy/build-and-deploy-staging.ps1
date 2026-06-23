@@ -123,12 +123,12 @@ function New-BuildContext {
     }
 
     # Docs site (API gateway Dockerfile serves /docs from built Docusaurus output)
-    if (Test-Path "$PROJECT_ROOT\docs-site\docs") {
-        New-Item -ItemType Directory -Path "$ContextDir\docs-site" -Force | Out-Null
-        Copy-Item -Recurse "$PROJECT_ROOT\docs-site\docs" "$ContextDir\docs-site\docs"
-        Log "INFO" "  + docs-site/docs"
+    if (Test-Path "$PROJECT_ROOT\applications\Agent_Red\docs-site\docs") {
+        New-Item -ItemType Directory -Path "$ContextDir\applications\Agent_Red\docs-site" -Force | Out-Null
+        Copy-Item -Recurse "$PROJECT_ROOT\applications\Agent_Red\docs-site\docs" "$ContextDir\applications\Agent_Red\docs-site\docs"
+        Log "INFO" "  + applications/Agent_Red/docs-site/docs"
     } else {
-        Log "WARN" "  - docs-site/docs MISSING (will break API gateway build)"
+        Log "WARN" "  - applications/Agent_Red/docs-site/docs MISSING (will break API gateway build)"
     }
 
     $size = [math]::Round(

@@ -504,7 +504,8 @@ def test_standing_backlog_is_formalized_as_governed_artifact() -> None:
                 # PB/ADR/DCL specs hold machine-checkable assertions and DO
                 # require these fields populated.
                 assert spec["testability"] in ("structural", None), (
-                    f"{spec_id} testability must be 'structural' or absent for governance specs; got {spec['testability']!r}"
+                    f"{spec_id} testability must be 'structural' or absent for governance specs; "
+                    f"got {spec['testability']!r}"
                 )
             else:
                 assert spec["testability"] == "structural", (

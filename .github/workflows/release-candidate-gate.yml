@@ -87,6 +87,9 @@ jobs:
       - name: Seed CI MemBase records
         run: python scripts/membase_ci_seed.py seed
 
+      - name: Configure git hooks path
+        run: git config core.hooksPath .githooks
+
       - name: Run release-candidate gate
         run: python scripts/release_candidate_gate.py --require-python 3.12 --skip-frontend
 
@@ -128,6 +131,10 @@ jobs:
           AGENT_RED_GITHUB_REPO=Remaker-Digital/agent-red-customer-engagement
           GROUND_TRUTH_GITHUB_REPO=Remaker-Digital/groundtruth-kb
           "@ | Set-Content -Path .env.local -Encoding UTF8 -NoNewline
+
+      - name: Configure git hooks path
+        shell: pwsh
+        run: git config core.hooksPath .githooks
 
       - name: Run frontend release-candidate gate
         shell: pwsh

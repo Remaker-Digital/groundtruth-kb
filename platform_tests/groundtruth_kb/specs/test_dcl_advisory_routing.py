@@ -67,7 +67,9 @@ def test_constraints_enforcement_mode_advisory(dcl_spec: dict) -> None:
 
 
 def test_constraint_text_references_axis_2_surface(dcl_spec: dict) -> None:
-    """T3 (constraint text): description references Axis-2, non-dispatchable, actionable-signature, and the AXIS 2 surface (UserPromptSubmit hook)."""
+    """T3 (constraint text): description references Axis-2, non-dispatchable,
+    actionable-signature, and the AXIS 2 surface (UserPromptSubmit hook).
+    """
     desc = dcl_spec.get("description") or ""
     for needle in ("Axis-2", "non-dispatchable", "actionable-signature"):
         assert needle in desc, f"description must reference {needle!r}"

@@ -77,7 +77,8 @@ def test_required_body_sections_enumerated(spec: dict) -> None:
 
 
 def test_classification_vocabulary_closed(spec: dict) -> None:
-    """T4 (vocabulary enumeration): description enumerates exactly the 5-state classification vocabulary; no superset, no subset.
+    """T4 (vocabulary enumeration): description enumerates exactly the 5-state classification vocabulary;
+    no superset, no subset.
 
     Source-of-truth: ``.claude/rules/peer-solution-advisory-loop.md`` Classification
     Vocabulary. The closed enumeration phrase asserted here anchors the

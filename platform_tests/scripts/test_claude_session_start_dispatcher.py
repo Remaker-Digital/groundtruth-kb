@@ -343,7 +343,8 @@ def _dispatcher_success_context(
             "",
             "- Role being assumed: Prime Builder",
             "- Role mapping source: harness-state/harness-registry.json",
-            "- Token measurement status: not_exposed_by_current_harness; reducing startup token consumption now uses compact additionalContext plus demand-loaded expansion paths.",
+            "- Token measurement status: not_exposed_by_current_harness; reducing startup token "
+            "consumption now uses compact additionalContext plus demand-loaded expansion paths.",
         ]
     )
     service_payload = {

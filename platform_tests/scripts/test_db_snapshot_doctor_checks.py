@@ -181,7 +181,10 @@ def test_install_script_syntax() -> None:
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            f"$null = [System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$errs); $errs.Count",
+            (
+                f"$null = [System.Management.Automation.Language.Parser]::ParseFile('{script}', "
+                "[ref]$null, [ref]$errs); $errs.Count"
+            ),
         ],
         capture_output=True,
         text=True,

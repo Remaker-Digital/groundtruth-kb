@@ -8,7 +8,8 @@ Coverage matches the test plan in
 2.  Multi-term match (cap respected) — 7+ terms → ≤ MAX_GLOSSARY_MATCHES.
 3.  Concept-shaped non-match → DA candidate (fake DB).
 4.  Semantic-search cap — many concept-shaped phrases → ≤ MAX_SEMANTIC_CANDIDATES calls.
-5.  Distance-threshold filter (F1 of -004 fix) — low-distance accepted, high-distance rejected, text-match fallback handled.
+5.  Distance-threshold filter (F1 of -004 fix) — low-distance accepted,
+        high-distance rejected, text-match fallback handled.
 6.  Token-budget cap — output ≤ TOKEN_BUDGET_BYTES.
 7.  Output contract — JSON parses to {} or {"systemMessage": ...}.
 8.  No-match — stop-word-only prompt → {}.
