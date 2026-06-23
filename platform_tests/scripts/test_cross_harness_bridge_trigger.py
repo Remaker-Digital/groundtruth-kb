@@ -167,6 +167,22 @@ def _write_index(root: Path, body: str) -> None:
     (root / "bridge" / "INDEX.md").write_text(body, encoding="utf-8")
 
 
+def _write_work_subject(root: Path, subject: str) -> None:
+    state_path = root / ".claude" / "session" / "work-subject.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "current_subject": subject,
+                "source": "test fixture",
+                "updated_by": "pytest",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_bridge_file(root: Path, name: str, body: str = "# placeholder\n") -> None:
     """Create a referenced bridge file so ``compute_actionable_pending`` keeps it."""
     stripped = body.lstrip()
@@ -310,6 +326,68 @@ def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_pa
     )
     assert len(_suppression_records(state_dir)) == 2
     assert _failure_records(state_dir) == []
+
+
+def test_application_subject_suppresses_prime_dispatch_before_acquire_or_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _write_authorized_go_thread(root, "selected-thread"))
+    _write_work_subject(root, "application")
+
+    trigger = _load_trigger()
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+
+    def _forbidden_acquire(*_args: object, **_kwargs: object) -> dict[str, object]:
+        pytest.fail("application subject must suppress before prime work-intent acquisition")
+
+    def _forbidden_spawn(**_kwargs: object) -> dict[str, object]:
+        pytest.fail("application subject must suppress before worker spawn")
+
+    def _forbidden_release(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("application subject must not release in-flight prime work intent")
+
+    monkeypatch.setattr(trigger, "_acquire_prime_work_intent_batch", _forbidden_acquire)
+    monkeypatch.setattr(trigger, "_release_prime_work_intents", _forbidden_release)
+    monkeypatch.setattr(trigger, "_spawn_harness", _forbidden_spawn)
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=False)
+
+    result = summary["results"]["prime-builder"]
+    assert result["reason"] == trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+    assert result["current_subject"] == "application"
+
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder:B"]
+    assert recipient_state["last_result"] == trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+    assert recipient_state["last_suppressed_signature"]
+    assert recipient_state["last_dispatched_signature"] is None
+    assert recipient_state["signature"] is None
+
+    records = _suppression_records(state_dir)
+    assert [record["reason"] for record in records] == [trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON]
+    assert records[0]["document_names"] == ["selected-thread"]
+    assert _failure_records(state_dir) == []
+
+
+def test_gtkb_subject_allows_cross_harness_dispatch_negative_control(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    _write_work_subject(root, "gtkb_infrastructure")
+
+    trigger = _load_trigger()
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
+    recipient_state = summary["dispatch_state"]["recipients"]["loyal-opposition:A"]
+    assert recipient_state["last_result"] == "launch_failed"
+    assert recipient_state["last_dispatched_signature"] == recipient_state["signature"]
+    assert recipient_state.get("last_suppressed_signature") is None
+    assert _suppression_records(state_dir) == []
 
 
 def test_filter_prime_selected_stands_down_on_same_role_project_holder(tmp_path: Path) -> None:

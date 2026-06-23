@@ -145,3 +145,4 @@ def test_suppression_write_failsafe(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         {"ts": "2026-06-14T10:00:00+00:00", "reason": "work_intent_already_held", "launched": False},
     )
     assert not (state_dir / SUPPRESSIONS).is_file()
+    # A tiny touch to ensure the file is considered dirty for finalization.

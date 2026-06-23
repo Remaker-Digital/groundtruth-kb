@@ -100,6 +100,30 @@ def _worker_pythonpath(inherited: str | None) -> str:
     return os.pathsep.join([_PACKAGE_SRC, *[part for part in inherited_parts if part != _PACKAGE_SRC]])
 
 
+def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, Any] | None:
+    """Return work-subject suppression metadata when application subject is active.
+
+    Missing, malformed, or unreadable state must preserve the GT-KB default, so
+    this helper fails open and only suppresses on an explicit application token.
+    """
+    try:
+        from workstream_focus import SUBJECT_APPLICATION, load_state  # noqa: PLC0415
+
+        state = load_state(project_root)
+    except Exception:  # noqa: BLE001 - dispatch subject guard must fail open
+        return None
+
+    current_subject = str(state.get("current_subject") or state.get("current_focus") or "").strip()
+    if current_subject != SUBJECT_APPLICATION:
+        return None
+    return {
+        "current_subject": current_subject,
+        "state_source": state.get("source"),
+        "updated_at": state.get("updated_at"),
+        "updated_by": state.get("updated_by"),
+    }
+
+
 from _env import load_env_local  # noqa: E402, I001
 from bridge_lease_registry import is_lease_held  # noqa: E402, I001
 from bridge_work_intent_registry import (  # noqa: E402, I001
@@ -153,19 +177,27 @@ QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
+STORM_WATCHDOG_HEARTBEAT_SUBPATH = (".gtkb-state", "ops", "storm-watchdog-heartbeat.txt")
+_HEARTBEAT_STALE_SECONDS = 300
 DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
 DISPATCH_SUPPRESSIONS_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_SUPPRESSIONS_MAX_BYTES"
 DEFAULT_JSONL_MAX_BYTES = 10 * 1024 * 1024
 DEFAULT_JSONL_ROLLOVERS = 5
 DEFAULT_DISPATCH_FAILURES_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
+WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"
 # WI-4396: expected, non-actionable lease/contention suppression reasons. These
 # are normal concurrency outcomes (launched: false with a holder), NOT actionable
 # dispatch failures, so the shared writer routes them to
 # dispatch-suppressions.jsonl instead of polluting dispatch-failures.jsonl and
 # burying real, actionable failures in the `diagnose` "Recent failures" view.
 EXPECTED_SUPPRESSION_REASONS = frozenset(
-    {"work_intent_already_held", "headless_takeover_cooldown", "same_role_project_claim_active"}
+    {
+        "work_intent_already_held",
+        "headless_takeover_cooldown",
+        "same_role_project_claim_active",
+        WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+    }
 )
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
 DEFAULT_DISPATCH_RUNS_MAX_BYTES = 200 * 1024 * 1024
@@ -4331,6 +4363,39 @@ def run_trigger(
                         recipient_state["last_result"] = "unchanged"
                         results[recipient] = {"launched": False, "reason": "unchanged"}
                     else:
+                        subject_suppression = _application_subject_dispatch_suppression(project_root)
+                        if subject_suppression is not None:
+                            if dispatch_id is None:
+                                dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                            recipient_state["last_suppressed_signature"] = dispatched_signature
+                            recipient_state["last_result"] = WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+                            recipient_state["work_subject"] = subject_suppression
+                            result = {
+                                "launched": False,
+                                "reason": WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+                                "dispatch_id": dispatch_id,
+                                "current_subject": subject_suppression["current_subject"],
+                            }
+                            _record_dispatch_suppression(
+                                state_dir,
+                                {
+                                    "ts": _now_iso(),
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": recipient,
+                                    "launched": False,
+                                    "reason": WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+                                    "signature": dispatched_signature,
+                                    "selected_count": len(dispatched_selected),
+                                    "pending_count": len(dispatched_filtered),
+                                    "raw_pending_count": len(items),
+                                    "document_names": [it.document_name for it in dispatched_selected],
+                                    "work_subject": subject_suppression,
+                                },
+                            )
+                            results[recipient] = result
+                            recipients_state[recipient] = recipient_state
+                            continue
+
                         # Dispatch path. Covers:
                         #   - first dispatch ever
                         #   - signature changed since last dispatch
@@ -4670,6 +4735,121 @@ def _read_dispatch_suppression_records(state_dir: Path, *, include_rotated: bool
     return records
 
 
+def _parse_storm_watchdog_heartbeat(project_root: Path) -> dict[str, Any]:
+    """Parse the storm-watchdog process-family heartbeat.
+
+    The heartbeat is diagnostic evidence only. Missing, empty, or malformed
+    content degrades the liveness section without changing dispatch behavior.
+    """
+    path = project_root.joinpath(*STORM_WATCHDOG_HEARTBEAT_SUBPATH)
+    result: dict[str, Any] = {
+        "timestamp": None,
+        "codex": None,
+        "family": None,
+        "noncodex": None,
+        "threshold": None,
+        "noncodex_threshold": None,
+        "age_seconds": None,
+        "stale": False,
+        "absent": False,
+        "parse_error": None,
+    }
+    if not path.is_file():
+        result["absent"] = True
+        return result
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        result["parse_error"] = str(exc)
+        return result
+    if not text:
+        result["parse_error"] = "empty file"
+        return result
+
+    parts = text.split()
+    result["timestamp"] = parts[0]
+    try:
+        timestamp = dt.datetime.fromisoformat(parts[0])
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=dt.UTC)
+        age_seconds = (dt.datetime.now(dt.UTC) - timestamp.astimezone(dt.UTC)).total_seconds()
+        result["age_seconds"] = age_seconds
+        result["stale"] = age_seconds > _HEARTBEAT_STALE_SECONDS
+    except ValueError:
+        result["parse_error"] = f"unparsable timestamp: {parts[0]!r}"
+
+    key_map = {
+        "codex": "codex",
+        "family": "family",
+        "noncodex": "noncodex",
+        "threshold": "threshold",
+        "noncodexthreshold": "noncodex_threshold",
+    }
+    token_re = re.compile(r"^([A-Za-z]+)=(\d+)$")
+    for token in parts[1:]:
+        match = token_re.match(token)
+        if not match:
+            continue
+        mapped = key_map.get(match.group(1).lower())
+        if mapped is not None:
+            result[mapped] = int(match.group(2))
+    return result
+
+
+def _dispatch_state_appears_idle(recipients: dict[str, Any]) -> bool:
+    """Return True when recorded recipient states show no active dispatch branch."""
+    if not recipients:
+        return False
+    idle_results = {
+        "",
+        "no_pending",
+        "no_pending_after_filter",
+        "no_actionable_change",
+        "unchanged",
+        "single_harness_topology_not_applicable",
+    }
+    for record in recipients.values():
+        if not isinstance(record, dict):
+            return False
+        last_result = str(record.get("last_result") or "")
+        if last_result not in idle_results:
+            return False
+    return True
+
+
+def _append_worker_process_liveness_section(
+    lines: list[str],
+    *,
+    recipients: dict[str, Any],
+    project_root: Path | None,
+) -> None:
+    """Append process-family liveness derived from the watchdog heartbeat."""
+    lines.append("== Worker process-family liveness ==")
+    if project_root is None:
+        lines.append("- Heartbeat UNKNOWN (project root could not be resolved).")
+        lines.append("")
+        return
+
+    heartbeat = _parse_storm_watchdog_heartbeat(project_root)
+    if heartbeat["absent"]:
+        lines.append("- Heartbeat ABSENT (storm-watchdog not running or never started).")
+    elif heartbeat["parse_error"]:
+        lines.append(f"- Heartbeat PARSE ERROR: {heartbeat['parse_error']}")
+    else:
+        age = heartbeat["age_seconds"]
+        age_text = f"{age:.0f}s ago" if isinstance(age, (int, float)) else "age unknown"
+        stale_tag = " [STALE]" if heartbeat["stale"] else ""
+        lines.append(f"- Timestamp: {heartbeat['timestamp']} ({age_text}){stale_tag}")
+        lines.append(f"  codex={heartbeat['codex']} family={heartbeat['family']} threshold={heartbeat['threshold']}")
+        if heartbeat["noncodex"] is not None:
+            lines.append(f"  noncodex={heartbeat['noncodex']} noncodexThreshold={heartbeat['noncodex_threshold']}")
+        if _dispatch_state_appears_idle(recipients) and (
+            (heartbeat["codex"] or 0) > 0 or (heartbeat["family"] or 0) > 1 or (heartbeat["noncodex"] or 0) > 0
+        ):
+            lines.append("  WARNING: dispatch state appears idle but worker process families are active.")
+    lines.append("")
+
+
 def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = False) -> str:
     """Render a structured liveness summary; read-only.
 
@@ -4846,6 +5026,12 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
             lines.append(f"- {name}: state={last_result or '?'} (no liveness rule matched).{annotation}")
             overall_healthy = False
     lines.append("")
+
+    _append_worker_process_liveness_section(
+        lines,
+        recipients=recipients,
+        project_root=project_root,
+    )
 
     # Overall
     lines.append("== Overall ==")

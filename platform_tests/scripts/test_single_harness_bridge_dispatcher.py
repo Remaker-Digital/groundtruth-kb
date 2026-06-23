@@ -14,6 +14,7 @@ Specs:
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import json
 import sys
@@ -138,6 +139,29 @@ def _make_synthetic_project(root: Path, single_harness: bool = False) -> Path:
 
 def _write_index(root: Path, body: str) -> None:
     (root / "bridge" / "INDEX.md").write_text(body, encoding="utf-8")
+
+
+def _write_work_subject(root: Path, subject: str) -> None:
+    state_path = root / ".claude" / "session" / "work-subject.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "current_subject": subject,
+                "source": "test fixture",
+                "updated_by": "pytest",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _suppression_records(state_dir: Path) -> list[dict]:
+    path = state_dir / "dispatch-suppressions.jsonl"
+    if not path.is_file():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def _write_bridge_file(root: Path, name: str) -> None:
@@ -379,6 +403,68 @@ def test_dispatcher_suppresses_on_document_lease(tmp_path: Path) -> None:
     release_lease(lease)
 
 
+def test_application_subject_suppresses_single_harness_prime_dispatch_before_acquire_or_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    state_dir = tmp_path / "state"
+    _write_index(root, _write_authorized_go_thread(root, "selected-thread"))
+    _write_work_subject(root, "application")
+
+    dispatcher = _load_dispatcher()
+    trigger = dispatcher._load_trigger_module()
+
+    def _forbidden_filter(*_args: object, **_kwargs: object) -> dict[str, object]:
+        pytest.fail("application subject must suppress before prime work-intent filtering")
+
+    def _forbidden_acquire(*_args: object, **_kwargs: object) -> dict[str, object]:
+        pytest.fail("application subject must suppress before prime work-intent acquisition")
+
+    def _forbidden_spawn(**_kwargs: object) -> dict[str, object]:
+        pytest.fail("application subject must suppress before worker spawn")
+
+    def _forbidden_release(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("application subject must not release in-flight prime work intent")
+
+    monkeypatch.setattr(trigger, "_filter_prime_selected_by_work_intent", _forbidden_filter)
+    monkeypatch.setattr(trigger, "_acquire_prime_work_intent_batch", _forbidden_acquire)
+    monkeypatch.setattr(trigger, "_release_prime_work_intents", _forbidden_release)
+    monkeypatch.setattr(dispatcher, "_spawn_worker", _forbidden_spawn)
+
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=False)
+
+    result = summary["results"]["prime-builder"]
+    assert result["reason"] == trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+    assert result["current_subject"] == "application"
+
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert recipient_state["last_result"] == trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+    assert recipient_state["last_suppressed_signature"]
+    assert recipient_state["last_dispatched_signature"] is None
+    assert recipient_state["signature"] is None
+
+    records = _suppression_records(state_dir)
+    assert [record["reason"] for record in records] == [trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON]
+    assert records[0]["document_names"] == ["selected-thread"]
+
+
+def test_gtkb_subject_allows_single_harness_prime_dispatch_negative_control(tmp_path: Path) -> None:
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    state_dir = tmp_path / "state"
+    _write_index(root, _write_authorized_go_thread(root, "selected-thread"))
+    _write_work_subject(root, "gtkb_infrastructure")
+
+    dispatcher = _load_dispatcher()
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["results"]["prime-builder"]["reason"] == "dry_run"
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert recipient_state["last_result"] == "launch_failed"
+    assert recipient_state["last_dispatched_signature"] == recipient_state["signature"]
+    assert recipient_state.get("last_suppressed_signature") is None
+    assert _suppression_records(state_dir) == []
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-SHD-S2-signature-dedup-loop-prevention
 # ──────────────────────────────────────────────────────────────────────────
@@ -576,3 +662,165 @@ def test_dispatcher_respects_manual_disable_env_var(tmp_path: Path, monkeypatch:
     summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary == {"skipped": True, "reason": "loop_prevention_env_var"}
     assert not (state_dir / "dispatch-state.json").exists()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# T-SHD-heartbeat — _parse_storm_watchdog_heartbeat
+# Authority: bridge/gtkb-wi4742-autonomous-dispatch-loop-health-002.md GO
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _write_heartbeat(project_root: Path, content: str) -> Path:
+    """Write a heartbeat file to the storm-watchdog path under project_root."""
+    hb_path = project_root / ".gtkb-state" / "ops" / "storm-watchdog-heartbeat.txt"
+    hb_path.parent.mkdir(parents=True, exist_ok=True)
+    hb_path.write_text(content, encoding="utf-8")
+    return hb_path
+
+
+def _write_dispatch_state(
+    state_dir: Path, pb_result: str = "no_actionable_change", lo_result: str = "no_actionable_change"
+) -> None:
+    """Write a minimal dispatch-state.json so _emit_diagnose_summary takes the rich path."""
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "updated_at": "2026-06-23T00:00:00+00:00",
+        "recipients": {
+            "prime-builder": {
+                "last_result": pb_result,
+                "pending_count": 0,
+                "selected_count": 0,
+                "signature": "a" * 64,
+                "last_dispatched_signature": None,
+            },
+            "loyal-opposition": {
+                "last_result": lo_result,
+                "pending_count": 0,
+                "selected_count": 0,
+                "signature": "b" * 64,
+                "last_dispatched_signature": None,
+            },
+        },
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
+
+
+def test_parse_heartbeat_absent(tmp_path: Path) -> None:
+    """Heartbeat file not present → absent=True, no error."""
+    dispatcher = _load_dispatcher()
+    result = dispatcher._parse_storm_watchdog_heartbeat(tmp_path)
+    assert result["absent"] is True
+    assert result["parse_error"] is None
+    assert result["timestamp"] is None
+
+
+def test_parse_heartbeat_modern_format(tmp_path: Path) -> None:
+    """Modern format with noncodex field."""
+    fresh_ts = dt.datetime.now(dt.UTC).isoformat()
+    _write_heartbeat(tmp_path, f"{fresh_ts} codex=3 family=7 threshold=15 noncodex=4 noncodexThreshold=10\n")
+    dispatcher = _load_dispatcher()
+    result = dispatcher._parse_storm_watchdog_heartbeat(tmp_path)
+    assert result["absent"] is False
+    assert result["parse_error"] is None
+    assert result["codex"] == 3
+    assert result["family"] == 7
+    assert result["threshold"] == 15
+    assert result["noncodex"] == 4
+    assert result["noncodex_threshold"] == 10
+    assert result["age_seconds"] is not None
+    assert result["stale"] is False  # fresh timestamp
+
+
+def test_parse_heartbeat_older_format_without_noncodex(tmp_path: Path) -> None:
+    """Older format without noncodex."""
+    _write_heartbeat(tmp_path, "2026-06-23T00:00:00+00:00 codex=10 family=22 threshold=15\n")
+    dispatcher = _load_dispatcher()
+    result = dispatcher._parse_storm_watchdog_heartbeat(tmp_path)
+    assert result["codex"] == 10
+    assert result["family"] == 22
+    assert result["noncodex"] is None
+    assert result["noncodex_threshold"] is None
+
+
+def test_parse_heartbeat_stale(tmp_path: Path) -> None:
+    """Timestamp more than _HEARTBEAT_STALE_SECONDS old → stale=True."""
+    # Use a timestamp well in the past (year 2000).
+    _write_heartbeat(tmp_path, "2000-01-01T00:00:00+00:00 codex=1 family=2 threshold=15\n")
+    dispatcher = _load_dispatcher()
+    result = dispatcher._parse_storm_watchdog_heartbeat(tmp_path)
+    assert result["stale"] is True
+    assert result["age_seconds"] is not None and result["age_seconds"] > 300
+
+
+def test_parse_heartbeat_empty_file(tmp_path: Path) -> None:
+    """Empty heartbeat file → parse_error set."""
+    _write_heartbeat(tmp_path, "")
+    dispatcher = _load_dispatcher()
+    result = dispatcher._parse_storm_watchdog_heartbeat(tmp_path)
+    assert result["absent"] is False
+    assert result["parse_error"] is not None
+
+
+def test_parse_heartbeat_unparsable_timestamp(tmp_path: Path) -> None:
+    """Unparsable timestamp → parse_error mentions the bad timestamp."""
+    _write_heartbeat(tmp_path, "NOT-A-DATE codex=5 family=10 threshold=15\n")
+    dispatcher = _load_dispatcher()
+    result = dispatcher._parse_storm_watchdog_heartbeat(tmp_path)
+    assert result["parse_error"] is not None
+    assert "NOT-A-DATE" in result["parse_error"]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# T-SHD-heartbeat — _emit_diagnose_summary liveness section
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_diagnose_summary_liveness_section_when_absent(tmp_path: Path) -> None:
+    """When heartbeat file is absent, diagnose reports ABSENT."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_dispatch_state(state_dir)
+    dispatcher = _load_dispatcher()
+    output = dispatcher._emit_diagnose_summary(state_dir, root)
+    assert "Worker process-family liveness" in output
+    assert "ABSENT" in output
+
+
+def test_diagnose_summary_liveness_section_shows_counters(tmp_path: Path) -> None:
+    """When heartbeat present, diagnose shows codex/family/threshold counters."""
+    root = _make_synthetic_project(tmp_path)
+    _write_heartbeat(root, "2026-06-23T00:00:00+00:00 codex=3 family=7 threshold=15\n")
+    state_dir = tmp_path / "state"
+    _write_dispatch_state(state_dir)
+    dispatcher = _load_dispatcher()
+    output = dispatcher._emit_diagnose_summary(state_dir, root)
+    assert "Worker process-family liveness" in output
+    assert "codex=3" in output
+    assert "family=7" in output
+    assert "threshold=15" in output
+
+
+def test_diagnose_summary_false_idle_warning_emitted(tmp_path: Path) -> None:
+    """WARNING emitted when dispatch shows no change but family>1 (processes active)."""
+    root = _make_synthetic_project(tmp_path)
+    # family=5 means worker processes are running despite idle dispatch state
+    _write_heartbeat(root, "2026-06-23T00:00:00+00:00 codex=0 family=5 threshold=15\n")
+    state_dir = tmp_path / "state"
+    _write_dispatch_state(state_dir, pb_result="no_actionable_change", lo_result="no_actionable_change")
+    dispatcher = _load_dispatcher()
+    output = dispatcher._emit_diagnose_summary(state_dir, root)
+    assert "WARNING" in output
+    assert "processes appear active" in output
+
+
+def test_diagnose_summary_no_false_idle_warning_when_truly_idle(tmp_path: Path) -> None:
+    """No WARNING when processes are idle (family<=1, codex=0)."""
+    root = _make_synthetic_project(tmp_path)
+    _write_heartbeat(root, "2026-06-23T00:00:00+00:00 codex=0 family=1 threshold=15\n")
+    state_dir = tmp_path / "state"
+    _write_dispatch_state(state_dir, pb_result="no_actionable_change", lo_result="no_actionable_change")
+    dispatcher = _load_dispatcher()
+    output = dispatcher._emit_diagnose_summary(state_dir, root)
+    # Section present but no warning
+    assert "Worker process-family liveness" in output
+    assert "WARNING" not in output

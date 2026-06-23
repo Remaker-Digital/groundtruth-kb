@@ -826,6 +826,7 @@ def run_dispatcher(
                 if isinstance(prior, dict) and prior.get("last_dispatched_signature") is not None
                 else prior_legacy_signature
             )
+            prior_suppressed = prior.get("last_suppressed_signature") if isinstance(prior, dict) else None
 
             recipient_state = {
                 "signature_scope": "selected_dispatch_batch",
@@ -834,6 +835,7 @@ def run_dispatcher(
                 "raw_pending_count": len(items),
                 "updated_at": _now_iso(),
                 "last_dispatched_signature": prior_dispatched,
+                "last_suppressed_signature": prior_suppressed,
                 "signature": prior_legacy_signature,
             }
             if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
@@ -854,96 +856,126 @@ def run_dispatcher(
                     "reason": "unchanged",
                 }
             else:
-                # Spawn workers for all resolved active targets
-                launches = []
-                for target in targets:
-                    dispatch_id = trigger._new_dispatch_id(target.dispatch_state_key)
-                    work_intent_session_id = trigger._work_intent_session_id(dispatch_id)
-                    spawn_items = non_leased
+                subject_suppression = trigger._application_subject_dispatch_suppression(project_root)
+                if subject_suppression is not None:
+                    dispatch_id = trigger._new_dispatch_id(needed_role_label)
+                    recipient_state["last_suppressed_signature"] = signature
+                    recipient_state["last_result"] = trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
+                    recipient_state["work_subject"] = subject_suppression
+                    result = {
+                        "launched": False,
+                        "reason": trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+                        "dispatch_id": dispatch_id,
+                        "current_subject": subject_suppression["current_subject"],
+                    }
+                    trigger._record_dispatch_suppression(
+                        state_dir,
+                        {
+                            "ts": _now_iso(),
+                            "dispatch_id": dispatch_id,
+                            "recipient": needed_role_label,
+                            "launched": False,
+                            "reason": trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+                            "signature": signature,
+                            "selected_count": len(selected),
+                            "pending_count": len(non_leased),
+                            "raw_pending_count": len(items),
+                            "document_names": [it.document_name for it in selected],
+                            "work_subject": subject_suppression,
+                        },
+                    )
+                    results[needed_role_label] = result
+                else:
+                    # Spawn workers for all resolved active targets
+                    launches = []
+                    for target in targets:
+                        dispatch_id = trigger._new_dispatch_id(target.dispatch_state_key)
+                        work_intent_session_id = trigger._work_intent_session_id(dispatch_id)
+                        spawn_items = non_leased
 
-                    if needed_role_label == "prime-builder" and selected:
-                        work_intent_filter = trigger._filter_prime_selected_by_work_intent(
-                            selected,
-                            project_root=project_root,
-                            state_dir=state_dir,
-                            recipient=needed_role_label,
-                            dispatch_id=dispatch_id,
-                            session_id=work_intent_session_id,
-                        )
-                        if not work_intent_filter["ok"]:
-                            launches.append(
-                                {
-                                    "dispatch_id": dispatch_id,
-                                    "recipient": target.dispatch_state_key,
-                                    "launched": False,
-                                    "reason": work_intent_filter["reason"],
-                                }
-                            )
-                            continue
-
-                        dispatched_selected = list(work_intent_filter["selected"])
-                        if not dispatched_selected:
-                            launches.append(
-                                {
-                                    "dispatch_id": dispatch_id,
-                                    "recipient": target.dispatch_state_key,
-                                    "launched": False,
-                                    "reason": "work_intent_already_held",
-                                }
-                            )
-                            continue
-
-                        if not dry_run:
-                            acquire_result = trigger._acquire_prime_work_intent_batch(
-                                dispatched_selected,
+                        if needed_role_label == "prime-builder" and selected:
+                            work_intent_filter = trigger._filter_prime_selected_by_work_intent(
+                                selected,
                                 project_root=project_root,
                                 state_dir=state_dir,
                                 recipient=needed_role_label,
                                 dispatch_id=dispatch_id,
                                 session_id=work_intent_session_id,
                             )
-                            if not acquire_result["ok"]:
+                            if not work_intent_filter["ok"]:
                                 launches.append(
                                     {
                                         "dispatch_id": dispatch_id,
                                         "recipient": target.dispatch_state_key,
                                         "launched": False,
-                                        "reason": acquire_result["reason"],
+                                        "reason": work_intent_filter["reason"],
                                     }
                                 )
                                 continue
-                        spawn_items = dispatched_selected
 
-                    launch = _spawn_worker(
-                        target=target,
-                        items=spawn_items,
-                        project_root=project_root,
-                        state_dir=state_dir,
-                        max_items=max_items,
-                        dry_run=dry_run,
-                        trigger=trigger,
-                        dispatch_id=dispatch_id,
-                    )
-                    if launch.get("launched") and not dry_run:
-                        first_bridge_id = spawn_items[0].document_name if spawn_items else ""
-                        import time
+                            dispatched_selected = list(work_intent_filter["selected"])
+                            if not dispatched_selected:
+                                launches.append(
+                                    {
+                                        "dispatch_id": dispatch_id,
+                                        "recipient": target.dispatch_state_key,
+                                        "launched": False,
+                                        "reason": "work_intent_already_held",
+                                    }
+                                )
+                                continue
 
-                        trigger._post_dispatch_poll(
-                            dispatch_id=dispatch_id,
-                            bridge_id=first_bridge_id,
-                            dispatch_ts=time.time(),
+                            if not dry_run:
+                                acquire_result = trigger._acquire_prime_work_intent_batch(
+                                    dispatched_selected,
+                                    project_root=project_root,
+                                    state_dir=state_dir,
+                                    recipient=needed_role_label,
+                                    dispatch_id=dispatch_id,
+                                    session_id=work_intent_session_id,
+                                )
+                                if not acquire_result["ok"]:
+                                    launches.append(
+                                        {
+                                            "dispatch_id": dispatch_id,
+                                            "recipient": target.dispatch_state_key,
+                                            "launched": False,
+                                            "reason": acquire_result["reason"],
+                                        }
+                                    )
+                                    continue
+                            spawn_items = dispatched_selected
+
+                        launch = _spawn_worker(
+                            target=target,
+                            items=spawn_items,
                             project_root=project_root,
                             state_dir=state_dir,
+                            max_items=max_items,
+                            dry_run=dry_run,
+                            trigger=trigger,
+                            dispatch_id=dispatch_id,
                         )
-                    launches.append(launch)
+                        if launch.get("launched") and not dry_run:
+                            first_bridge_id = spawn_items[0].document_name if spawn_items else ""
+                            import time
 
-                # Aggregate results
-                any_launched = any(ln.get("launched") for ln in launches)
-                recipient_state["last_result"] = "launched" if any_launched else "launch_failed"
-                recipient_state["last_launch"] = launches[0] if len(launches) == 1 else {"launches": launches}
-                recipient_state["last_dispatched_signature"] = signature
-                recipient_state["signature"] = signature
-                results[needed_role_label] = launches[0] if len(launches) == 1 else {"launches": launches}
+                            trigger._post_dispatch_poll(
+                                dispatch_id=dispatch_id,
+                                bridge_id=first_bridge_id,
+                                dispatch_ts=time.time(),
+                                project_root=project_root,
+                                state_dir=state_dir,
+                            )
+                        launches.append(launch)
+
+                    # Aggregate results
+                    any_launched = any(ln.get("launched") for ln in launches)
+                    recipient_state["last_result"] = "launched" if any_launched else "launch_failed"
+                    recipient_state["last_launch"] = launches[0] if len(launches) == 1 else {"launches": launches}
+                    recipient_state["last_dispatched_signature"] = signature
+                    recipient_state["signature"] = signature
+                    results[needed_role_label] = launches[0] if len(launches) == 1 else {"launches": launches}
 
             recipients_state[needed_role_label] = recipient_state
 
@@ -1119,6 +1151,28 @@ def _emit_diagnose_summary(state_dir: Path, project_root: Path) -> str:
             class_counts[cls] = class_counts.get(cls, 0) + 1
         for cls, count in sorted(class_counts.items(), key=lambda kv: -kv[1]):
             lines.append(f"  - {cls}: {count}")
+    lines.append("")
+
+    lines.append("== Worker process-family liveness ==")
+    hb = _parse_storm_watchdog_heartbeat(project_root)
+    if hb["absent"]:
+        lines.append("- Heartbeat ABSENT (storm-watchdog not running or never started).")
+    elif hb["parse_error"]:
+        lines.append(f"- Heartbeat PARSE ERROR: {hb['parse_error']}")
+    else:
+        age_str = f"{hb['age_seconds']:.0f}s ago" if hb["age_seconds"] is not None else "age unknown"
+        stale_tag = " [STALE]" if hb["stale"] else ""
+        lines.append(f"- Timestamp : {hb['timestamp']} ({age_str}){stale_tag}")
+        lines.append(f"  codex={hb['codex']} family={hb['family']} threshold={hb['threshold']}")
+        if hb["noncodex"] is not None:
+            lines.append(f"  noncodex={hb['noncodex']} noncodexThreshold={hb['noncodex_threshold']}")
+        # False-idle warning: dispatch state shows no actionable change but processes are running
+        all_idle = all(
+            (recipients.get(role) or {}).get("last_result") in (None, "no_actionable_change")
+            for role in ("prime-builder", "loyal-opposition")
+        )
+        if all_idle and ((hb["family"] or 0) > 1 or (hb["codex"] or 0) > 0):
+            lines.append("  WARNING: dispatch state shows no actionable change but worker processes appear active.")
     lines.append("")
 
     lines.append("== Overall ==")
