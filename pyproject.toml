@@ -42,11 +42,11 @@ filterwarnings = [
 # ---------------------------------------------------------------------------
 
 [tool.coverage.run]
-source = ["applications/Agent_Red/src"]
+source = ["groundtruth-kb/src", "scripts"]
 branch = true
 omit = [
-    "applications/Agent_Red/src/__init__.py",
-    "applications/Agent_Red/src/*/__init__.py",
+    "groundtruth-kb/src/**/__init__.py",
+    "scripts/**/__init__.py",
 ]
 
 [tool.coverage.report]

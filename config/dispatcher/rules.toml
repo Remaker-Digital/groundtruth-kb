@@ -42,7 +42,7 @@ can_fire_events = false
 dispatch_cost = 30
 dispatch_quality = 80
 dispatch_availability = 95
-max_items = 1
+max_items = 2
 tags = ["loyal-opposition", "low-cost"]
 
 [harnesses.F]
