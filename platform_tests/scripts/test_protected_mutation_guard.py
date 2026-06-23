@@ -150,6 +150,15 @@ def test_forbidden_operation_bridge_index_denied(root: Path) -> None:
     assert "bridge/INDEX.md" in res.details
 
 
+def test_dispatcher_rules_toml_direct_target_denied_with_stable_reason(root: Path) -> None:
+    res = evaluate_mutation(root, ["config/dispatcher/rules.toml"], harness_id="A", session_id="session-1")
+
+    assert res.allowed is False
+    assert res.reason_code == "dispatcher_config_cli_only"
+    assert "DCL-DISPATCHER-CONFIG-CLI-ONLY-001" in res.details
+    assert "gt bridge dispatch config" in res.details
+
+
 def test_forbidden_operation_command_denied(root: Path) -> None:
     res = evaluate_mutation(
         root, ["scripts/dummy.py"], harness_id="A", session_id="session-1", command="git push origin main --force"

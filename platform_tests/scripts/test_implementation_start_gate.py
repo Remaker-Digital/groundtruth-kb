@@ -214,6 +214,50 @@ def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> 
     assert gate.gate_decision(_apply_patch_payload(tmp_path)) == {}
 
 
+def test_dispatcher_rules_toml_direct_apply_patch_blocked_even_with_go(tmp_path: Path) -> None:
+    target = "config/dispatcher/rules.toml"
+    _write_thread(tmp_path, proposal=_proposal(target_paths=[target]))
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target=target))
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "dispatcher_config_cli_only"
+    assert "DCL-DISPATCHER-CONFIG-CLI-ONLY-001" in result["reason"]
+    assert "gt bridge dispatch config" in result["reason"]
+
+
+def test_dispatcher_rules_toml_direct_shell_write_blocked(tmp_path: Path) -> None:
+    payload = {
+        "cwd": str(tmp_path),
+        "session_id": "session-1",
+        "tool_name": "Bash",
+        "tool_input": {"command": "Set-Content -Path config/dispatcher/rules.toml -Value 'schema_version = 1'"},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "dispatcher_config_cli_only"
+
+
+def test_dispatcher_config_cli_command_not_treated_as_direct_file_edit(tmp_path: Path) -> None:
+    payload = {
+        "cwd": str(tmp_path),
+        "session_id": "session-1",
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": (
+                "python -m groundtruth_kb.cli bridge dispatch config set-eligibility F --no-can-receive-dispatch"
+            )
+        },
+    }
+
+    assert gate.gate_decision(payload) == {}
+
+
 def test_valid_packet_blocks_when_work_intent_claim_missing(tmp_path: Path) -> None:
     _write_thread(tmp_path)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")

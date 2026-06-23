@@ -13,6 +13,7 @@ from groundtruth_kb.project.doctor import (
     ToolCheck,
     _check_bridge_dispatch_liveness,
     _check_db_schema,
+    _check_dispatcher_config_cli_only_guard,
     _check_git,
     _check_groundtruth_toml,
     _check_harness_metadata_freshness,
@@ -103,6 +104,44 @@ def _write_harness_metadata_freshness_fixture(
     (detail / "canonical-terminology-detail.md").write_text(canonical_text, encoding="utf-8")
 
 
+def _write_dispatcher_config_cli_only_guard_fixture(root: Path, *, omit_guard_marker: bool = False) -> None:
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "scripts" / "implementation_start_gate.py").write_text(
+        "GTKB-DISPATCHER-CONFIG-CLI-ONLY\nconfig/dispatcher/rules.toml\n",
+        encoding="utf-8",
+    )
+    protected_guard_text = "config/dispatcher/rules.toml\n"
+    if not omit_guard_marker:
+        protected_guard_text += "dispatcher_config_cli_only\n"
+    (root / "scripts" / "protected_mutation_guard.py").write_text(protected_guard_text, encoding="utf-8")
+
+    transactions = root / "groundtruth-kb" / "src" / "groundtruth_kb"
+    transactions.mkdir(parents=True, exist_ok=True)
+    (transactions / "bridge_dispatch_transactions.py").write_text(
+        "\n".join(
+            [
+                "def set_eligibility(): pass",
+                "def set_weights(): pass",
+                "def set_caps(): pass",
+                "def add_harness(): pass",
+                "def remove_harness(): pass",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    (root / ".codex").mkdir(parents=True, exist_ok=True)
+    (root / ".codex" / "hooks.json").write_text(
+        json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "implementation-start-gate"}]}]}}),
+        encoding="utf-8",
+    )
+    (root / ".claude").mkdir(parents=True, exist_ok=True)
+    (root / ".claude" / "settings.json").write_text(
+        json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "implementation-start-gate.py"}]}]}}),
+        encoding="utf-8",
+    )
+
+
 # ---------------------------------------------------------------------------
 # _check_python
 # ---------------------------------------------------------------------------
@@ -146,6 +185,24 @@ def test_harness_metadata_freshness_missing_routing_warns(tmp_path: Path) -> Non
     result = _check_harness_metadata_freshness(tmp_path)
     assert result.status == "warning"
     assert ".api-harness/routing.toml missing" in result.message
+
+
+def test_dispatcher_config_cli_only_guard_passes_with_markers_and_cli_surface(tmp_path: Path) -> None:
+    _write_dispatcher_config_cli_only_guard_fixture(tmp_path)
+
+    result = _check_dispatcher_config_cli_only_guard(tmp_path)
+
+    assert result.status == "pass"
+    assert "CLI-only guard active" in result.message
+
+
+def test_dispatcher_config_cli_only_guard_fails_without_stable_guard_reason(tmp_path: Path) -> None:
+    _write_dispatcher_config_cli_only_guard_fixture(tmp_path, omit_guard_marker=True)
+
+    result = _check_dispatcher_config_cli_only_guard(tmp_path)
+
+    assert result.status == "fail"
+    assert "protected mutation guard lacks stable dispatcher_config_cli_only reason" in result.message
 
 
 # ---------------------------------------------------------------------------

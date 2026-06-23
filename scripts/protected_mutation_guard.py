@@ -51,6 +51,7 @@ PROTECTED_PREFIXES = (
     "config/",
     ".github/",
 )
+DISPATCHER_CONFIG_PATH = "config/dispatcher/rules.toml"
 
 ALLOWED_WRITE_PREFIXES = (
     "bridge/",
@@ -90,6 +91,10 @@ def is_protected_path(relative_path: str) -> bool:
     return any(rel.startswith(prefix) for prefix in PROTECTED_PREFIXES)
 
 
+def _dispatcher_config_direct_edit_targets(paths: Iterable[str]) -> list[str]:
+    return [path for path in paths if _preserve_dot_prefixed_relative_path(path) == DISPATCHER_CONFIG_PATH]
+
+
 def evaluate_mutation(
     project_root: str | Path,
     targets: Iterable[str | Path],
@@ -124,6 +129,18 @@ def evaluate_mutation(
                 reason_code="forbidden_operation",
                 details="Recreating or modifying bridge/INDEX.md is forbidden",
             )
+
+    dispatcher_config_targets = _dispatcher_config_direct_edit_targets(normalized_targets)
+    if dispatcher_config_targets:
+        return GuardResult(
+            allowed=False,
+            reason_code="dispatcher_config_cli_only",
+            details=(
+                "Direct file mutation of config/dispatcher/rules.toml is prohibited by "
+                "DCL-DISPATCHER-CONFIG-CLI-ONLY-001; use `gt bridge dispatch config ...` "
+                "or `python -m groundtruth_kb.cli bridge dispatch config ...`."
+            ),
+        )
 
     forbidden_kws = ("deploy", "credential", "key_vault", "bypass", "force")
     if command and any(kw in command.lower() for kw in forbidden_kws):

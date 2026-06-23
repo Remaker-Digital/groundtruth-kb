@@ -102,6 +102,8 @@ PROTECTED_PREFIXES = (
     "config/",
     ".github/",
 )
+DISPATCHER_CONFIG_PATH = "config/dispatcher/rules.toml"
+DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"
 ALLOWED_WRITE_PREFIXES = (
     "bridge/",
     "independent-progress-assessments/",
@@ -294,6 +296,25 @@ def _emergency_bridge_repair_applies(protected_paths: list[str]) -> bool:
     if not protected_paths or "<unknown-mutating-target>" in protected_paths:
         return False
     return all(_is_bridge_function_path(path) for path in protected_paths)
+
+
+def _dispatcher_config_direct_edit_targets(paths: list[str]) -> list[str]:
+    return [path for path in paths if _preserve_dot_prefixed_relative_path(path) == DISPATCHER_CONFIG_PATH]
+
+
+def _dispatcher_config_cli_only_block(targets: list[str]) -> dict[str, Any]:
+    rendered = ", ".join(sorted(targets))
+    return {
+        "decision": "block",
+        "reason_code": "dispatcher_config_cli_only",
+        "reason": (
+            f"BLOCKED ({DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID}): DCL-DISPATCHER-CONFIG-CLI-ONLY-001\n"
+            f"Reason: direct file mutation of {rendered} is prohibited, even with a bridge GO packet. "
+            "Use the governed dispatcher transaction CLI instead: "
+            "`python -m groundtruth_kb.cli bridge dispatch config ...` "
+            "or `gt bridge dispatch config ...`."
+        ),
+    }
 
 
 def _paths_from_apply_patch(root: Path, text: str) -> list[str]:
@@ -1133,6 +1154,9 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         protected = [path for path in paths if is_protected_path(path)]
     if not protected:
         return {}
+    dispatcher_config_targets = _dispatcher_config_direct_edit_targets(protected)
+    if dispatcher_config_targets:
+        return _dispatcher_config_cli_only_block(dispatcher_config_targets)
     if _emergency_bridge_repair_applies(protected):
         _record_gate_exemption(
             "emergency-bridge-repair",
