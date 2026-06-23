@@ -624,6 +624,20 @@ def _ondisk_first_nonblank_line(file_path: str) -> str | None:
         return None
 
 
+def _versioned_bridge_file_exists_on_disk(file_path: str) -> bool:
+    """Return True when a versioned bridge file already exists on disk.
+
+    Fail-open: returns False on any OS error so a filesystem issue cannot
+    create a spurious hard-block.
+    """
+    if _extract_bridge_id_from_path(file_path) is None:
+        return False
+    try:
+        return Path(file_path).is_file()
+    except OSError:
+        return False
+
+
 def _body_status_token_violation(file_path: str, content: str) -> bool:
     """True when a versioned bridge file's first non-blank line is not a
     recognized status token AND the file is not grandfathered.
@@ -1388,6 +1402,18 @@ def _deny_reason_for_content(
             "[Governance] Noncanonical bridge verdict files are not writable authority. "
             "Write the next numbered bridge/<slug>-NNN.md file through the governed bridge path "
             "instead of bridge/*.lo-verdict.md."
+        )
+
+    if _is_bridge_markdown_file(file_path) and _versioned_bridge_file_exists_on_disk(file_path):
+        bridge_id = _extract_bridge_id_from_path(file_path) or Path(file_path).name
+        return (
+            "[Governance] Bridge append-only boundary violation: "
+            f"{Path(file_path).name} already exists on disk. "
+            "Bridge thread state advances by writing the next numbered version, "
+            "never by rewriting an existing numbered file in place. "
+            f"Write bridge/{bridge_id}-NNN.md where NNN is the next version number. "
+            "(Hard-block per GOV-FILE-BRIDGE-AUTHORITY-001 append-only boundary guard; "
+            "WI-4740.)"
         )
 
     if _is_bridge_markdown_file(file_path) and content:

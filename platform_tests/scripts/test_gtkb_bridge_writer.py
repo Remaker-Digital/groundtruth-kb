@@ -6,6 +6,7 @@ state and helper-level latest-status validation live above this module.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -59,3 +60,53 @@ def test_write_bridge_file_can_skip_author_metadata_for_test_fixtures(tmp_path: 
     path = write_bridge_file("fixture", 2, "GO\n\nfixture body\n", tmp_path, require_author_metadata=False)
 
     assert path.read_text(encoding="utf-8") == "GO\n\nfixture body\n"
+
+
+def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> None:
+    """write_bridge_file raises BridgeConflictError when the target version exists in
+    git history but is absent from disk (deleted-then-recreate attempt, WI-4740)."""
+    try:
+        subprocess.run(
+            ["git", "init", "--quiet", str(tmp_path)],
+            check=True,
+            capture_output=True,
+            timeout=10,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=str(tmp_path),
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test Runner"],
+            cwd=str(tmp_path),
+            check=True,
+            capture_output=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pytest.skip("git not available in test environment")
+
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    committed = bridge_dir / "gtkb-history-guard-001.md"
+    committed.write_text("GO\n\n# Original verdict\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(tmp_path), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "initial bridge file"],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+
+    # Delete from disk — now committed in history but absent on disk.
+    committed.unlink()
+
+    with pytest.raises(BridgeConflictError, match="git history"):
+        write_bridge_file(
+            "gtkb-history-guard",
+            1,
+            "NEW\n\n# Recreate attempt - should fail\n",
+            project_root=tmp_path,
+            require_author_metadata=False,
+        )

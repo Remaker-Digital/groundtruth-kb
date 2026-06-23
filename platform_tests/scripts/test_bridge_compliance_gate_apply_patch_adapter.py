@@ -117,3 +117,48 @@ def test_extract_bridge_writes_includes_lo_verdict_file(tmp_path: Path) -> None:
     assert len(writes) == 1
     assert writes[0].file_path == "bridge/sample-003.lo-verdict.md"
     assert writes[0].content == "GO\n\n# Loyal Opposition Verdict\n"
+
+
+def test_apply_patch_adapter_blocks_overwrite_of_existing_versioned_bridge_file(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """Adapter propagates the canonical gate denial when apply_patch targets an existing
+    versioned bridge file — the overwrite guard fires for the apply_patch path (WI-4740)."""
+    adapter = _load_adapter()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    existing = bridge_dir / "gtkb-demo-001.md"
+    existing.write_text("NEW\n\n# Original proposal\n", encoding="utf-8")
+
+    patch = """*** Begin Patch
+*** Update File: bridge/gtkb-demo-001.md
+@@
+ NEW
+
+-# Original proposal
++# Overwritten proposal - should fail
+*** End Patch
+"""
+    payload = {"cwd": str(tmp_path), "tool_input": {"patch": patch}}
+    calls: list = []
+
+    def fake_run_canonical(payload_arg, write):
+        calls.append(write)
+        return (
+            2,
+            '{"decision": "deny", "reason": "Bridge append-only boundary violation: '
+            'gtkb-demo-001.md already exists on disk."}',
+            "",
+        )
+
+    monkeypatch.setattr(adapter, "_run_canonical", fake_run_canonical)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+
+    result = adapter.main()
+
+    assert result == 2
+    assert len(calls) >= 1
+    captured = capsys.readouterr()
+    assert "Bridge append-only boundary violation" in captured.out

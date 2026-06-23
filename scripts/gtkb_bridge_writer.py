@@ -7,6 +7,7 @@ after caller-side validation has passed; it never mutates aggregate queue state.
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -15,6 +16,31 @@ from scripts.verdict_evidence_anchor_preflight import (
     validate_verdict_evidence_anchors,
     violation_summary,
 )
+
+
+def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
+    """Return True when *target* appears in git history, even if absent on disk.
+
+    Prevents recreating a numbered bridge file at the same version as a
+    previously committed but now-deleted file.  Fail-open: returns False on
+    any subprocess / git error so a missing git installation or repository
+    does not create a spurious hard-block.
+    """
+    try:
+        rel = target.relative_to(project_root).as_posix()
+    except ValueError:
+        return False
+    try:
+        result = subprocess.run(
+            ["git", "log", "--oneline", "-1", "--", rel],
+            cwd=str(project_root),
+            capture_output=True,
+            timeout=5,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return False
+
 
 VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
@@ -70,6 +96,11 @@ def write_bridge_file(
     target = _bridge_dir(project_root) / f"{document_name}-{version:03d}.md"
     if target.exists():
         raise BridgeConflictError(f"{target} already exists; refusing to overwrite")
+    if _bridge_file_committed_in_git(target, project_root):
+        raise BridgeConflictError(
+            f"{target} exists in git history; refusing to recreate at the same version. "
+            "Use the next version number to append a new bridge entry."
+        )
     anchor_violations = validate_verdict_evidence_anchors(content, project_root=project_root)
     if anchor_violations:
         raise BridgeEvidenceAnchorError(
