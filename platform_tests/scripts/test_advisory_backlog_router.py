@@ -217,6 +217,24 @@ def test_router_compact_mode_reports_staged_count(router, fake_project: Path, db
     assert compact_json["skipped_expired_count"] == 0
 
 
+def test_router_compact_mode_suppresses_skipped_existing_items(router, fake_project: Path, db_factory) -> None:
+    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    _write_insights(dropbox, "INSIGHTS-2026-05-10-13-26-COMPACT-SKIPPED.md", _basic_advisory())
+
+    router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
+    result = router.run(project_root=fake_project, source="dropbox", since=None, dry_run=False, db_factory=db_factory)
+
+    normal_json = json.loads(result.as_json(compact=False))
+    assert "skipped_existing" in normal_json
+    assert len(normal_json["skipped_existing"]) == 1
+    assert "skipped_existing_count" not in normal_json
+
+    compact_json = json.loads(result.as_json(compact=True))
+    assert "skipped_existing" not in compact_json
+    assert compact_json["skipped_existing_count"] == 1
+    assert compact_json["staged_count"] == 0
+
+
 def test_router_retention_policy_skips_expired_advisories(router, fake_project: Path, db_factory) -> None:
     dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
     _write_insights(dropbox, "INSIGHTS-2026-03-01-13-26-OLD.md", _basic_advisory(date_str="2026-03-01"))
