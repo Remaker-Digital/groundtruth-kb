@@ -83,6 +83,13 @@ flowchart TB
 
     ROOT --> CF
     ROOT --> AO
+
+    classDef generalIntent fill:#E0F2FE,color:#111827,stroke:#38BDF8
+    classDef orderIntent fill:#FEF3C7,color:#111827,stroke:#F59E0B
+    classDef adminIntent fill:#F3E8FF,color:#111827,stroke:#A855F7
+    class C1,C2,C8,C9,C10,C11,C12,C13,C14,C15,C16,C17 generalIntent
+    class C3,C4,C5,C6,C7 orderIntent
+    class A1 adminIntent
 ```
 
 **3. Escalation Detection runs in parallel.** While the main pipeline processes the message, the escalation agent independently evaluates whether the conversation requires a human. It assesses customer sentiment, issue complexity, account value, and conversation history. If escalation triggers, the system routes the conversation to a human agent in your help desk (Zendesk, or another connected platform) and notifies the customer that a person is taking over.

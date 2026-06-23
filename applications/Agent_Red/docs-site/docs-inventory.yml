@@ -67,7 +67,7 @@ features:
     explanation:
       status: complete
       path: docs/getting-started/how-it-works.md
-      notes: "Covered in how-it-works: 17 intents, GPT-4o-mini, 98% accuracy, mindmap diagram"
+      notes: "Covered in how-it-works: 17 customer-facing intents plus admin_assistance, GPT-4o-mini, styled flowchart diagram"
 
   - name: Knowledge Retrieval
     category: agents
