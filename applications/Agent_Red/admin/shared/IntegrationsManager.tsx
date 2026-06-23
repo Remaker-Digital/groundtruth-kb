@@ -13,7 +13,13 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import type { BaseComponentProps, IntegrationSummary, SyncEvent, ActionConfigItem, ConnectionLogEntry } from './types/index';
+import type {
+  ActionConfigItem,
+  BaseComponentProps,
+  ConnectionLogEntry,
+  IntegrationSummary,
+  SyncEvent,
+} from './types/index';
 import {
   useIntegrations,
   useActivateIntegration,
@@ -120,12 +126,16 @@ const IntegrationIcons: Record<string, React.FC> = {
 
 interface IntegrationCardProps {
   integration: IntegrationSummary;
-  onActivate: (type: string) => void;
-  onDeactivate: (type: string) => void;
-  onDisconnect: (type: string) => void;
+  onActivate: IntegrationTypeHandler;
+  onDeactivate: IntegrationTypeHandler;
+  onDisconnect: IntegrationTypeHandler;
   activating: boolean;
   deactivating: boolean;
 }
+
+type IntegrationTypeHandler = (type: string) => void; // eslint-disable-line no-unused-vars
+type AdminApiFetch = (url: string, options?: globalThis.RequestInit) => Promise<Response>; // eslint-disable-line no-unused-vars
+type AdminNotify = (message: string, severity: 'success' | 'error' | 'info') => void; // eslint-disable-line no-unused-vars
 
 const cardStyle: React.CSSProperties = {
   background: tokens.surface,
@@ -205,9 +215,9 @@ const HoverButton: React.FC<{
 const IntegrationCard: React.FC<IntegrationCardProps & {
   isDark?: boolean;
   basePath?: string;
-  apiFetch?: (url: string, options?: RequestInit) => Promise<Response>;
+  apiFetch?: AdminApiFetch;
   tenantId?: string;
-  onNotify?: (message: string, severity: 'success' | 'error' | 'info') => void;
+  onNotify?: AdminNotify;
   onRefetch?: () => void;
 }> = ({
   integration,
@@ -399,9 +409,9 @@ const IntegrationCard: React.FC<IntegrationCardProps & {
 
 interface IntegrationDetailPanelProps {
   integration: IntegrationSummary;
-  apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  apiFetch: AdminApiFetch;
   onClose: () => void;
-  onNotify: (message: string, severity: 'success' | 'error' | 'info') => void;
+  onNotify: AdminNotify;
   onRefetch: () => void;
 }
 
@@ -426,6 +436,39 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 
 type DetailTab = 'config' | 'sync' | 'actions' | 'logs';
 
+type IntegrationDetailSummary = IntegrationSummary & {
+  syncHistory?: SyncEvent[];
+  actionConfig?: ActionConfigItem[];
+  connectionLogs?: ConnectionLogEntry[];
+};
+
+const detailSectionStyle: React.CSSProperties = {
+  marginTop: 12,
+  padding: 12,
+  background: tokens.page,
+  border: `1px solid ${tokens.border}`,
+  borderRadius: 6,
+};
+
+const detailRowStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 12,
+  padding: '8px 0',
+  borderTop: `1px solid ${tokens.border}`,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  marginTop: 4,
+  padding: '6px 8px',
+  borderRadius: 4,
+  border: `1px solid ${tokens.border}`,
+  background: tokens.surface,
+  color: tokens.textPrimary,
+};
+
 const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
   integration,
   apiFetch,
@@ -435,6 +478,12 @@ const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('config');
   const [syncing, setSyncing] = useState(false);
+  const detailIntegration = integration as IntegrationDetailSummary;
+  const syncHistory: SyncEvent[] = detailIntegration.syncHistory ?? [];
+  const actionConfig: ActionConfigItem[] = detailIntegration.actionConfig ?? [];
+  const connectionLogs: ConnectionLogEntry[] = detailIntegration.connectionLogs ?? [];
+  const supportsKnowledgeSourceSelection =
+    detailIntegration.category === 'knowledge' || detailIntegration.type === 'google_docs';
 
   const handleSyncNow = useCallback(async () => {
     setSyncing(true);
@@ -499,6 +548,37 @@ const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
           <div style={{ marginBottom: 8 }}>
             <strong>Tier Gate:</strong> {integration.tierGate || 'All tiers'}
           </div>
+          {supportsKnowledgeSourceSelection && (
+            <div style={detailSectionStyle}>
+              <div style={{ fontWeight: 600, color: tokens.textPrimary, marginBottom: 8 }}>
+                Knowledge Source Selection
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+                <label>
+                  Folder browser
+                  <select aria-label="Folder browser" defaultValue="all_folders" style={inputStyle}>
+                    <option value="all_folders">All folders</option>
+                    <option value="selected_folder">Selected folder</option>
+                    <option value="recently_changed">Recently changed folders</option>
+                  </select>
+                </label>
+                <label>
+                  Page browser
+                  <select aria-label="Page browser" defaultValue="published_pages" style={inputStyle}>
+                    <option value="published_pages">Published pages</option>
+                    <option value="recent_pages">Recently updated pages</option>
+                    <option value="draft_pages">Draft pages</option>
+                  </select>
+                </label>
+              </div>
+              <HoverButton
+                variant="outline"
+                onClick={() => onNotify('Source selection preview loaded', 'info')}
+              >
+                Browse Sources
+              </HoverButton>
+            </div>
+          )}
         </div>
       )}
 
@@ -542,6 +622,37 @@ const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
               </div>
             )}
           </div>
+          <div style={detailSectionStyle}>
+            <div style={{ fontWeight: 600, color: tokens.textPrimary, marginBottom: 8 }}>
+              Sync History
+            </div>
+            {syncHistory.length > 0 ? (
+              syncHistory.map((event) => (
+                <div key={`${event.timestamp}-${event.status}`} style={detailRowStyle}>
+                  <div>
+                    <div style={{ color: tokens.textPrimary }}>{new Date(event.timestamp).toLocaleString()}</div>
+                    {event.errorMessage && (
+                      <div style={{ color: tokens.danger, fontSize: 12 }}>
+                        Error details: {event.errorMessage}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: event.status === 'error' ? tokens.danger : tokens.success }}>
+                      {event.status}
+                    </div>
+                    <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+                      {event.itemsSynced.toLocaleString()} items synced
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+                No sync-history events recorded yet.
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -550,9 +661,37 @@ const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
           <p style={{ marginBottom: 8 }}>
             Configure HITL (Human-in-the-Loop) policies for each action type.
           </p>
-          <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+          <div style={{ fontSize: 12, color: tokens.textTertiary, marginBottom: 8 }}>
             Action configuration is loaded from the integration&apos;s backend settings.
             Toggle HITL policies to control which actions require human approval.
+          </div>
+          <div style={detailSectionStyle}>
+            {actionConfig.length > 0 ? (
+              actionConfig.map((action) => (
+                <div key={action.actionType} style={detailRowStyle}>
+                  <div>
+                    <div style={{ color: tokens.textPrimary }}>{action.label}</div>
+                    <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+                      Action type: {action.actionType}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <label>
+                      <input type="checkbox" checked={action.enabled} readOnly />
+                      Enabled
+                    </label>
+                    <label>
+                      <input type="checkbox" checked={action.hitlPolicy !== 'never'} readOnly />
+                      HITL policy: {action.hitlPolicy}
+                    </label>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+                No action configuration rows returned by the integration backend.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -572,6 +711,32 @@ const IntegrationDetailPanel: React.FC<IntegrationDetailPanelProps> = ({
           }}>
             Logs are loaded from the integration events container.
             Use the API at /api/admin/integrations/{integration.type}/events for programmatic access.
+          </div>
+          <div style={detailSectionStyle}>
+            {connectionLogs.length > 0 ? (
+              connectionLogs.map((entry) => (
+                <div key={`${entry.timestamp}-${entry.level}-${entry.message}`} style={detailRowStyle}>
+                  <div>
+                    <div style={{ color: tokens.textPrimary }}>{entry.message}</div>
+                    {entry.details && (
+                      <div style={{ color: tokens.danger, fontSize: 12 }}>
+                        Error details: {entry.details}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div>{new Date(entry.timestamp).toLocaleString()}</div>
+                    <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+                      Severity: {entry.level}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: tokens.textTertiary }}>
+                No connection-log entries recorded yet.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -663,7 +828,7 @@ export const IntegrationsManager: React.FC<BaseComponentProps & { isDark?: boole
   const items = integrations ?? [];
 
   const detailIntegration = detailType
-    ? items.find((i) => i.type === detailType) ?? null
+    ? (items.find((i) => i.type === detailType) as IntegrationDetailSummary | undefined) ?? null
     : null;
 
   return (
