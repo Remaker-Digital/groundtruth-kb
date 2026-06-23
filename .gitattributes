@@ -1,0 +1,12 @@
+/.gitattributes text eol=lf
+
+*.json text eol=lf
+*.toml text eol=lf
+
+.codex/skills/** text eol=lf
+.agent/skills/** text eol=lf
+.api-harness/skills/** text eol=lf
+.claude/skills/** text eol=lf
+config/agent-control/** text eol=lf
+groundtruth-kb/templates/hooks/** text eol=lf
+groundtruth-kb/templates/skills/** text eol=lf
