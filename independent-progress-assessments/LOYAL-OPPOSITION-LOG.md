@@ -596,3 +596,35 @@ Loyal Opposition (Antigravity/lo role) identified documentation drift in `config
 |------|---------|-------------------|------------------|--------|
 | Process | `SESSION-STARTUP-CONTROL-MAP.md` lists `SESSION-STARTUP-INDEX.md` and role overlays as "Planned (not yet present)" when they are active and load-bearing. | `SESSION-STARTUP-CONTROL-MAP.md` lines 54-60; presence of the index and overlay files on disk. | Update `SESSION-STARTUP-CONTROL-MAP.md` to classify these files as `active` in the inventory table. | Open |
 
+---
+
+### 2026-06-23 - Dispatch Saturation Revalidation
+
+Loyal Opposition (Codex automation, harness A) performed a read-only fallback investigation of bridge dispatch saturation and launch failures. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-23-14-18-dispatch-saturation-revalidation.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Bridge dispatch | Headless LO dispatch remained failed throughout the run. The 14:18 UTC check showed eight live wrapper processes and `per_role_concurrency_cap_reached`; the post-wait 14:34 UTC check still failed with LO `launch_failed` / `unchanged` states. The failure classes are already covered by `WI-4670`, so no duplicate hygiene WI was added. | `gt bridge dispatch health --json` FAIL; `.gtkb-state/bridge-poller/dispatch-failures.jsonl` tail; live process census; `scripts/run_with_status.py` bare `p.wait()`. | Execute `WI-4670` with worker-lifetime timeout, process-tree termination, structured timeout classification, and focused regression coverage. | Open |
+
+---
+
+### 2026-06-23 - WI-4770 Bridge Verdict & Session Startup
+
+Loyal Opposition (Antigravity/lo role) verified and filed the `GO` verdict for the Per-Item Authorization Quarantine proposal (WI-4770, version 005) to address head-of-line blocking in both dispatch substrates. Verified that all preflights (applicability and clause preflight) pass with zero gaps.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `gtkb-dispatch-per-item-auth-quarantine` revised proposal revision 005 has resolved all previous finding-blockers (P1 and P2). | `bridge/gtkb-dispatch-per-item-auth-quarantine-005.md` proposal; zero gaps in clause/applicability preflights. | File the `GO` verdict (`bridge/gtkb-dispatch-per-item-auth-quarantine-006.md`) so Prime Builder can implement. | Resolved |
+
+---
+
+### 2026-06-23 - WI-3464 Orphan-WI Backfill Verification
+
+Loyal Opposition (Antigravity/lo role) verified and filed the `VERIFIED` verdict for the Orphan-WI Backfill per-WI retire/exclude execution (WI-3464, version 007). All spec-derived tests pass cleanly, and the implementation is successfully committed.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `gtkb-orphan-wi-backfill-per-wi-retire-exclude-service` implementation passes all 14 project CLI tests and matches isolation guidelines. | `bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-007.md`, successful preflight, zero gaps | File the `VERIFIED` verdict (`bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-008.md`) and commit the implementation files. | Resolved |
+
+
+
