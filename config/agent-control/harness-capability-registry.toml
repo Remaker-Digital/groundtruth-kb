@@ -124,6 +124,30 @@ status = "adapter"
 adapter_source = ".claude/skills/bridge-config/SKILL.md"
 source_sha256 = "9c674fade46e95b76bf877f059253ddac687aba75d54eb3c054399b6f83d58a3"
 [[capabilities]]
+id = "skill.dispatcher-control"
+kind = "skill"
+canonical_name = "dispatcher-control"
+canonical_purpose = "Operate the governed GT-KB bridge dispatcher reporting and configuration control surface."
+canonical_source = ".claude/skills/dispatcher-control/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/dispatcher-control/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/dispatcher-control/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/dispatcher-control/SKILL.md"
+source_sha256 = "2dc26c0578410bdc1a028dc360503b11d18d96a24c739917906873d0b21b0ed5"
+
+[capabilities.antigravity]
+surface = ".agent/skills/dispatcher-control/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/dispatcher-control/SKILL.md"
+source_sha256 = "2dc26c0578410bdc1a028dc360503b11d18d96a24c739917906873d0b21b0ed5"
+[[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
 canonical_name = "gtkb-bridge-propose"
@@ -146,7 +170,7 @@ source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b
 surface = ".agent/skills/bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-propose/SKILL.md"
-source_sha256 = "cdfe7bb7020fe0b55209bd684c5390ee0b86decd792743cfb2c63498136edf8e"
+source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 [[capabilities]]
 id = "skill.bridge-reconciliation"
 kind = "skill"

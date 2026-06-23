@@ -1,0 +1,78 @@
+---
+name: dispatcher-control
+description: Use the governed GT-KB bridge dispatcher control surface for reporting and configuration. Trigger when Codex needs to inspect dispatcher health, status, report data, selected targets, live workers, dispatch history, or change dispatcher eligibility, ranking weights, caps, rules, or harness overlays through gt bridge dispatch commands instead of editing config/dispatcher/rules.toml or runtime JSON.
+allowed-tools: Bash, Read
+license: "Proprietary - Remaker Digital"
+metadata:
+  project: groundtruth-kb
+  category: bridge-dispatch
+---
+
+# Dispatcher Control
+
+Use this skill when you need to inspect or change GT-KB bridge dispatcher behavior.
+Use the governed `gt bridge dispatch` CLI surfaces; do not read or edit
+`config/dispatcher/rules.toml`, dispatch-state JSON, or other runtime files as
+the operator control path.
+
+## Reporting
+
+Use read-only commands for observation:
+
+```powershell
+gt bridge dispatch report --json
+gt bridge dispatch status --json
+gt bridge dispatch health --json
+gt bridge dispatch config --json
+```
+
+Use `report --json` for the full operations view: configuration, topology,
+eligibility, performance, reliability, live workers, pending counts, and recent
+history. Use `status --json` for selected candidates and eligibility. Use
+`health --json` for pass/warn/fail health findings.
+
+## Configuration Transactions
+
+Use governed transaction commands for mutation:
+
+```powershell
+gt bridge dispatch config set-eligibility
+gt bridge dispatch config set-weights
+gt bridge dispatch config set-caps
+gt bridge dispatch config set-rule
+gt bridge dispatch config add-harness
+gt bridge dispatch config remove-harness
+```
+
+Each transaction must validate inputs, preserve the dispatcher partition, and
+write an audit record. Prefer `--dry-run` first when the subcommand supports it.
+Use the command help for exact required options before mutating:
+
+```powershell
+gt bridge dispatch config set-eligibility --help
+```
+
+## Prohibitions
+
+- Do not directly edit `config/dispatcher/rules.toml`.
+- Do not mutate dispatcher runtime JSON by hand.
+- Do not use `gt harness suspend` as a substitute for dispatcher eligibility
+  transactions.
+- Do not treat raw config files or generated summaries as current bridge queue
+  authority; use dispatcher/TAFE state and status-bearing bridge files.
+
+## Verification
+
+After a dispatcher-control change, verify through the CLI:
+
+```powershell
+gt bridge dispatch config --json
+gt bridge dispatch status --json
+gt bridge dispatch health --json
+gt bridge dispatch report --json
+```
+
+For skill or adapter changes, run the focused skill test and adapter parity
+checks named by the governing bridge proposal.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
