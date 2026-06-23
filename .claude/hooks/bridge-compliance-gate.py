@@ -297,7 +297,9 @@ REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES = (
     REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
     REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
 )
-BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset({"prime_proposal", "implementation_proposal"})
+BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset(
+    {"prime_proposal", "implementation_proposal", "prime_implementation_proposal"}
+)
 
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
 # CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
@@ -333,6 +335,26 @@ KB_MUTATION_NEGATION_RE = re.compile(
     r"[^.\n]{0,100}\b(?:MemBase|KB|groundtruth\.db)\b[^.\n]{0,80}\b(?:mutation|write|insert|change|edit)s?\b",
     re.IGNORECASE,
 )
+APPROVAL_EVIDENCE_DECLARATION_RE = re.compile(
+    r"\b(?:"
+    r"formal[-\s]+artifact[-\s]+approval(?:[-\s]+evidence|[-\s]+packet)?|"
+    r"formal[-\s]+approval[-\s]+packet|"
+    r"narrative[-\s]+artifact[-\s]+approval(?:[-\s]+evidence|[-\s]+packet)?|"
+    r"narrative[-\s]+approval[-\s]+packet|"
+    r"artifact[-\s]+approval[-\s]+packet|"
+    r"approval[-\s]+packet"
+    r")\b"
+    r"|\.groundtruth[\\/]+formal-artifact-approvals(?:[\\/][^\s`),]+)?",
+    re.IGNORECASE,
+)
+APPROVAL_EVIDENCE_NEGATION_RE = re.compile(
+    r"\b(?:"
+    r"no|not|without|does\s+not|do\s+not|performs?\s+no|creates?\s+no|writes?\s+no|updates?\s+no|"
+    r"requires?\s+no|omits?|excludes?"
+    r")\b",
+    re.IGNORECASE,
+)
+APPROVAL_EVIDENCE_TARGET_DIR = ".groundtruth/formal-artifact-approvals"
 
 ADVISORY_REPORT_HEADER_FIELDS = ("bridge_kind", "Document", "Version", "Author", "Date")
 ADVISORY_REPORT_SECTIONS = (
@@ -797,6 +819,9 @@ def _ask_reason_for_content(file_path: str, content: str) -> str | None:
         kb_mutation_reason = _kb_mutation_target_paths_ask_reason(content)
         if kb_mutation_reason:
             return kb_mutation_reason
+        approval_evidence_reason = _approval_evidence_target_paths_ask_reason(content)
+        if approval_evidence_reason:
+            return approval_evidence_reason
     if _has_concrete_spec_links(content):
         return None
     if not _specification_links_heading_misdetected(content):
@@ -830,6 +855,17 @@ def _target_paths_from_content(content: str) -> list[str]:
     return paths
 
 
+def _normalise_target_path(path: str) -> str:
+    norm = path.replace("\\", "/").strip().strip("\"'`")
+    while norm.startswith("./"):
+        norm = norm[2:]
+    return norm.rstrip("/")
+
+
+def _target_path_set_from_content(content: str) -> set[str]:
+    return {_normalise_target_path(path) for path in _target_paths_from_content(content)}
+
+
 def _declares_kb_mutation(content: str) -> bool:
     """Return True when proposal text declares its own KB/MemBase mutation."""
     if KB_MUTATION_NEGATION_RE.search(content):
@@ -846,7 +882,7 @@ def _kb_mutation_target_paths_ask_reason(content: str) -> str | None:
         return None
     if not _declares_kb_mutation(content):
         return None
-    target_paths = {path.replace("\\", "/").lstrip("./") for path in _target_paths_from_content(content)}
+    target_paths = _target_path_set_from_content(content)
     if "groundtruth.db" in target_paths:
         return None
     return (
@@ -854,6 +890,52 @@ def _kb_mutation_target_paths_ask_reason(content: str) -> str | None:
         "but target_paths does not include `groundtruth.db`. Add `groundtruth.db` to "
         "target_paths, or confirm the proposal performs no KB mutation. "
         "(Ask checkpoint per bridge target_paths KB-mutation completeness check.)"
+    )
+
+
+def _declares_approval_evidence_scope(content: str) -> bool:
+    """Return True when proposal text declares approval-packet evidence work."""
+    for segment in re.split(r"(?<=[.!?])\s+|\n+", content):
+        if not segment.strip():
+            continue
+        if not APPROVAL_EVIDENCE_DECLARATION_RE.search(segment):
+            continue
+        if APPROVAL_EVIDENCE_NEGATION_RE.search(segment):
+            continue
+        return True
+    return False
+
+
+def _target_paths_include_approval_evidence_packet(target_paths: set[str]) -> bool:
+    for path in target_paths:
+        if path == APPROVAL_EVIDENCE_TARGET_DIR:
+            return True
+        if path.startswith(f"{APPROVAL_EVIDENCE_TARGET_DIR}/"):
+            return True
+    return False
+
+
+def _approval_evidence_target_paths_ask_reason(content: str) -> str | None:
+    """Checkpoint approval-evidence work that omits its packet path envelope."""
+    first_line = _first_nonblank_line(content)
+    if first_line not in PENDING_PREFLIGHT_STATUSES:
+        return None
+    if _bridge_kind_is_metadata_exempt(content):
+        return None
+    if BRIDGE_KIND_LINE_RE.search(content) and not _bridge_kind_is_implementation_proposal(content):
+        return None
+    if not _declares_approval_evidence_scope(content):
+        return None
+    target_paths = _target_path_set_from_content(content)
+    if _target_paths_include_approval_evidence_packet(target_paths):
+        return None
+    return (
+        "[Governance] This bridge proposal appears to declare formal/narrative artifact "
+        "approval evidence or approval-packet work, but target_paths does not include "
+        "a concrete `.groundtruth/formal-artifact-approvals/<packet>.json` path or the "
+        "`.groundtruth/formal-artifact-approvals/**` envelope. Add the approval-packet "
+        "path to target_paths, or confirm the proposal performs no approval-evidence work. "
+        "(Ask checkpoint per bridge target_paths approval-evidence completeness check.)"
     )
 
 

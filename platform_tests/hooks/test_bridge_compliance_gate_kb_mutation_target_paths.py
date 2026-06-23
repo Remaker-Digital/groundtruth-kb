@@ -1,4 +1,4 @@
-"""Focused coverage for the KB-mutation target_paths bridge checkpoint."""
+"""Focused coverage for target_paths bridge proposal checkpoints."""
 
 from __future__ import annotations
 
@@ -99,3 +99,78 @@ def test_metadata_exempt_bridge_kind_not_flagged(gate: ModuleType) -> None:
     )
 
     assert gate._ask_reason_for_content("bridge/test-kb-mutation-target-paths-001.md", content) is None
+
+
+def test_formal_artifact_approval_evidence_without_packet_path_asks(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths='[".claude/hooks/bridge-compliance-gate.py"]',
+        body="This implementation writes formal artifact approval evidence for a new GOV version.",
+    )
+
+    reason = gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-001.md", content)
+
+    assert reason is not None
+    assert ".groundtruth/formal-artifact-approvals" in reason
+    assert "approval-packet" in reason
+
+
+def test_narrative_artifact_approval_packet_without_packet_path_asks(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths='[".claude/hooks/bridge-compliance-gate.py"]',
+        body="This implementation writes a narrative-artifact approval-packet for AGENTS.md.",
+    )
+
+    reason = gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-001.md", content)
+
+    assert reason is not None
+    assert "formal/narrative artifact approval evidence" in reason
+
+
+def test_approval_evidence_with_concrete_packet_path_passes(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths=(
+            '[".claude/hooks/bridge-compliance-gate.py", '
+            '".groundtruth/formal-artifact-approvals/2026-06-23-gov-update.json"]'
+        ),
+        body="This implementation writes formal artifact approval evidence for a new GOV version.",
+    )
+
+    assert gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-001.md", content) is None
+
+
+def test_approval_evidence_with_directory_glob_passes(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths=('[".claude/hooks/bridge-compliance-gate.py", ".groundtruth/formal-artifact-approvals/**"]'),
+        body="This implementation writes an approval packet for a narrative artifact.",
+    )
+
+    assert gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-001.md", content) is None
+
+
+def test_approval_packet_mention_only_not_flagged(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths='[".claude/hooks/bridge-compliance-gate.py"]',
+        body="This proposal explains prior approval packet defects but performs no approval packet work.",
+    )
+
+    assert gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-001.md", content) is None
+
+
+def test_approval_evidence_metadata_exempt_bridge_kind_not_flagged(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths='[".claude/hooks/bridge-compliance-gate.py"]',
+        body="This spec intake writes a formal artifact approval packet.",
+        bridge_kind="spec_intake",
+    )
+
+    assert gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-001.md", content) is None
+
+
+def test_approval_evidence_implementation_report_not_flagged(gate: ModuleType) -> None:
+    content = _proposal(
+        target_paths='[".claude/hooks/bridge-compliance-gate.py"]',
+        body="This implementation report carries forward formal artifact approval evidence spec links.",
+        bridge_kind="implementation_report",
+    )
+
+    assert gate._ask_reason_for_content("bridge/test-approval-evidence-target-paths-003.md", content) is None
