@@ -1,0 +1,70 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-22T10:07:12Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-22T10:07:12Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolution": {
+    "authority_mode": "durable_registry_fallback",
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "durable_registry_role": "prime-builder",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": null
+  },
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-22T10-07-12Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/hooks/bridge-axis-2-surface.py\nA  bridge/gtkb-auto-retire-on-verified-actuation-slice-1-004.md\n M bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-002.md\n M bridge/gtkb-dashboard-industry-alignment-slice2c-integration-002.md\nA  docs/gtkb-dashboard/grafana/provisioning/alerting/contact-points.yaml\nA  docs/gtkb-dashboard/grafana/provisioning/alerting/notification-policies.yaml\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py\n M groundtruth-kb/src/groundtruth_kb/dispatcher/rules_loader.py\n M groundtruth-kb/src/groundtruth_kb/project/lifecycle.py\n M groundtruth-kb/templates/hooks/_delib_common.py\n M groundtruth-kb/templates/hooks/gov09-capture.py\n M groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py\n M groundtruth-kb/tests/test_impl_start_target_paths_preflight.py\n M groundtruth-kb/tests/test_project_artifacts.py\n M memory/MEMORY.md\n M memory/pending-owner-decisions.md\n M platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate.py\n M platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate_pending.py\n M platform_tests/groundtruth_kb/test_mode_switch_pending.py\n M platform_tests/groundtruth_kb/test_mode_switch_transaction.py\n M platform_tests/hooks/test_bridge_axis_2_surface_governance_review_terminal.py\n M platform_tests/hooks/test_project_completion_surface.py\n M platform_tests/scripts/test_dispatcher_envelope_runtime.py\n M platform_tests/scripts/test_go_impl_claim_timebox.py\nM  platform_tests/scripts/test_gtkb_dashboard_alerting.py\n M platform_tests/scripts/test_project_verified_completion_scanner.py\n M platform_tests/scripts/test_sweep_commit_helpers.py\n M platform_tests/scripts/test_work_intent_role_eligibility.py\n M scripts/impl_start_target_paths_preflight.py\n M scripts/ollama_harness.py\n M scripts/openrouter_harness.py\n M scripts/project_verified_completion_scanner.py\n M scripts/sweep_commit_helpers.py\n?? .codex-pytest-tmp/\n?? .codex-test-tmp-runtime/\n?? .codex-test-tmp-self-init/\n?? .codex_pytest_tmp/\n?? bridge/gtkb-antigravity-lo-hallucination-prevention-005.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-003.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-005.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-001.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-002.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-003.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-004.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-001.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-auth-repair-001.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-auth-repair-002.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-001.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-003.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-004.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-005.md\n?? bridge/gtkb-enforcer-false-positive-crashes-004.md\n?? bridge/gtkb-enforcer-false-positive-crashes-005.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-001.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-002.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-003.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-004.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-005.md\n?? bridge/gtkb-storm-watchdog-detect-noncodex-process-families-003.md\n?? bridge/gtkb-sweep-commit-automation-respects-verified-gate-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-005.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-006.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-007.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-008.md\n?? bridge/gtkb-verified-finalize-tolerate-unrelated-staged-001.md\n?? bridge/gtkb-verified-finalize-tolerate-unrelated-staged-002.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-001.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-002.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-003.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-004.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-005.md\n?? bridge/gtkb-wi4466-gt-cli-availability-doctor-check-001.md\n?? bridge/gtkb-wi4684-disposition-profiles-slice1-001.md\n?? bridge/gtkb-wi4684-disposition-profiles-slice1-002.md\n?? bridge/gtkb-wi4684-disposition-profiles-slice1-003.md\n?? bridge/gtkb-wi4684-disposition-profiles-slice1-004.md\n?? bridge/gtkb-wi4728-duplicate-project-record-merge-001.md\n?? bridge/gtkb-wi4728-duplicate-project-record-merge-003.md\n?? bridge/gtkb-wi4728-duplicate-project-record-merge-004.md",
+        "short_line_count": 101,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

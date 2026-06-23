@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-22T00:49:02Z",
+  "envelope_schema_version": 1,
+  "harness_id": "A",
+  "harness_name": "codex",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-22T00:49:01Z",
+  "project_id": null,
+  "role": "loyal-opposition",
+  "role_asserted": null,
+  "role_resolved": "loyal-opposition",
+  "session_id": "A-2026-06-22T00-49-01Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "canonical_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py\n M groundtruth-kb/templates/hooks/_delib_common.py\n M groundtruth-kb/templates/hooks/gov09-capture.py\n M groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py\n M harness-state/harness-registry.json\n M memory/MEMORY.md\n M memory/pending-owner-decisions.md\n M platform_tests/hooks/test_workstream_focus.py\n M platform_tests/scripts/test_lo_verified_commit_atomicity.py\n M platform_tests/scripts/test_sweep_commit_helpers.py\n M scripts/sweep_commit_helpers.py\n?? bridge/gtkb-lo-harness-turn-budget-fix-001.md\n?? bridge/gtkb-storm-watchdog-detect-noncodex-process-families-003.md\n?? bridge/gtkb-sweep-commit-automation-respects-verified-gate-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-003.md\n?? bridge/gtkb-wi4534-membase-closure-reconciliation-003.md\n?? bridge/gtkb-wi4565-prior-deliberations-semantic-search-opt-in-009.md\n?? bridge/gtkb-wi4662-dispatch-previous-launch-failed-cooldown-failover-005.md\n?? bridge/gtkb-wi4691-quality-first-spillover-dispatch-002.md\n?? bridge/gtkb-wi4723-verified-finalize-index-lock-retry-005.md\n?? bridge/gtkb-wi4728-duplicate-project-record-merge-001.md\n?? harness-state/codex/session-envelope.json\n?? platform_tests/scripts/test_harness_storm_watchdog.py\n?? scripts/ops/harness_storm_watchdog.ps1\n?? temp-wi4471-draft-verdict.md\n?? temp-wi4723-draft-verdict.md",
+        "short_line_count": 26,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

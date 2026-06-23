@@ -1,0 +1,63 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-22T03:14:41Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-22T03:14:41Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-22T03-14-41Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/hooks/bridge-compliance-gate.py\n M bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-002.md\nA  bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-006.md\n M bridge/gtkb-wi4728-duplicate-project-record-merge-002.md\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py\n M groundtruth-kb/templates/hooks/_delib_common.py\n M groundtruth-kb/templates/hooks/bridge-compliance-gate.py\n M groundtruth-kb/templates/hooks/gov09-capture.py\n M groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py\n M memory/MEMORY.md\n M memory/pending-owner-decisions.md\n M platform_tests/scripts/test_go_impl_claim_timebox.py\n M platform_tests/scripts/test_lo_verified_commit_atomicity.py\n M platform_tests/scripts/test_sweep_commit_helpers.py\n M platform_tests/scripts/test_work_intent_role_eligibility.py\n M scripts/gtkb_bridge_writer.py\n M scripts/ollama_harness.py\n M scripts/openrouter_harness.py\n M scripts/sweep_commit_helpers.py\n?? bridge/gtkb-antigravity-lo-hallucination-prevention-005.md\n?? bridge/gtkb-architecture-improvement-project-closure-001.md\n?? bridge/gtkb-architecture-improvement-project-closure-002.md\n?? bridge/gtkb-architecture-improvement-project-closure-003.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-001.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-auth-repair-001.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-auth-repair-002.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-001.md\n?? bridge/gtkb-enforcer-false-positive-crashes-004.md\n?? bridge/gtkb-enforcer-false-positive-crashes-005.md\n?? bridge/gtkb-invisible-interactive-role-switch-hardening-001.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-001.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-002.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-003.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-004.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-005.md\n?? bridge/gtkb-stale-active-project-retirement-batch-003.md\n?? bridge/gtkb-storm-watchdog-detect-noncodex-process-families-003.md\n?? bridge/gtkb-sweep-commit-automation-respects-verified-gate-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-005.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-001.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-002.md\n?? bridge/gtkb-wi4395-uv-cache-command-surface-003.md\n?? bridge/gtkb-wi4474-membase-closure-reconciliation-001.md\n?? bridge/gtkb-wi4534-membase-closure-reconciliation-003.md\n?? bridge/gtkb-wi4534-membase-closure-reconciliation-005.md\n?? bridge/gtkb-wi4534-membase-closure-reconciliation-006.md\n?? bridge/gtkb-wi4534-membase-closure-reconciliation-007.md\n?? bridge/gtkb-wi4661-membase-closure-reconciliation-005.md\n?? bridge/gtkb-wi4684-disposition-profiles-slice1-001.md\n?? bridge/gtkb-wi4723-verified-finalize-index-lock-retry-005.md\n?? bridge/gtkb-wi4723-verified-finalize-index-lock-retry-007.md\n?? bridge/gtkb-wi4723-verified-finalize-index-lock-retry-008.md\n?? bridge/gtkb-wi4723-verified-finalize-index-lock-retry-009.md\n?? bridge/gtkb-wi4728-duplicate-project-record-merge-001.md\n?? harness-state/claude/session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T00-49-02Z-session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T01-11-58Z-session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T01-31-12Z-session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T01-32-13Z-session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T01-32-41Z-session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T02-51-55Z-session-envelope.json\n?? harness-state/codex/session-envelope-archive/2026-06-22T02-52-07Z-session-envelope.json\n?? platform_tests/scripts/test_harness_storm_watchdog.py\n?? platform_tests/scripts/test_lo_harness_turn_budget.py\n?? platform_tests/scripts/test_verdict_evidence_anchor_preflight.py\n?? scripts/ops/harness_storm_watchdog.ps1\n?? scripts/verdict_evidence_anchor_preflight.py\n?? temp-wi4471-draft-verdict.md\n?? temp-wi4723-draft-verdict.md\n?? temp-wi4723-report-007.md\n?? tmp-verdict-body-005.txt",
+        "short_line_count": 72,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

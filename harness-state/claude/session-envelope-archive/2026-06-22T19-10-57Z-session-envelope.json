@@ -1,0 +1,70 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-22T19:10:57Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-22T19:10:57Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolution": {
+    "authority_mode": "durable_registry_fallback",
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "durable_registry_role": "prime-builder",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": null
+  },
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-22T19-10-57Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .claude/hooks/bridge-axis-2-surface.py\n M .claude/hooks/owner-decision-tracker.py\nA  bridge/gtkb-auto-retire-on-verified-actuation-slice-1-009.md\n M bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-002.md\n M bridge/gtkb-dashboard-industry-alignment-slice2c-integration-002.md\nA  bridge/gtkb-wi3326-sessionstart-phantom-spec-citation-repoint-002.md\nA  bridge/gtkb-wi3326-sessionstart-phantom-spec-citation-repoint-004.md\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py\n M groundtruth-kb/src/groundtruth_kb/dispatcher/rules_loader.py\n M groundtruth-kb/templates/hooks/_delib_common.py\n M groundtruth-kb/templates/hooks/gov09-capture.py\n M groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py\n M groundtruth-kb/tests/test_impl_start_target_paths_preflight.py\n M memory/MEMORY.md\n M memory/pending-owner-decisions.md\n M platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate.py\n M platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate_pending.py\n M platform_tests/groundtruth_kb/test_mode_switch_pending.py\n M platform_tests/groundtruth_kb/test_mode_switch_transaction.py\n M platform_tests/hooks/test_bridge_axis_2_surface_governance_review_terminal.py\n M platform_tests/hooks/test_owner_decision_tracker.py\n M platform_tests/hooks/test_project_completion_surface.py\n M platform_tests/scripts/test_dispatcher_envelope_runtime.py\n M platform_tests/scripts/test_fab12_agent_red_residue_sweep.py\n M platform_tests/scripts/test_go_impl_claim_timebox.py\n M platform_tests/scripts/test_sweep_commit_helpers.py\n M platform_tests/scripts/test_work_intent_role_eligibility.py\n M pyproject.toml\n M scripts/impl_start_target_paths_preflight.py\n M scripts/ollama_harness.py\n M scripts/openrouter_harness.py\n M scripts/sweep_commit_helpers.py\n?? bridge/gtkb-antigravity-lo-hallucination-prevention-005.md\n?? bridge/gtkb-auto-inject-bridge-author-model-metadata-scaffold-003.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-003.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-004.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-005.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-006.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-007.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-008.md\n?? bridge/gtkb-auto-retire-on-verified-actuation-slice-1-010.md\n?? bridge/gtkb-bridge-compliance-gate-regex-bold-variant-003.md\n?? bridge/gtkb-bridge-compliance-gate-test-hygiene-pending-scan-hang-fix-003.md\n?? bridge/gtkb-bridge-gate-detectors-magic-content-phrases-003.md\n?? bridge/gtkb-codex-skill-path-prefers-repo-local-adapters-003.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-001.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-002.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-003.md\n?? bridge/gtkb-completion-gate-noncanonical-wi-recognition-004.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-001.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-auth-repair-001.md\n?? bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-auth-repair-002.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-001.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-003.md\n?? bridge/gtkb-dashboard-industry-alignment-slice2c-integration-004.md\n?? bridge/gtkb-dashboard-sqlite-generation-startup-003.md\n?? bridge/gtkb-enforcer-false-positive-crashes-004.md\n?? bridge/gtkb-enforcer-false-positive-crashes-005.md\n?? bridge/gtkb-fix-stale-assertion-regex-non-go-bridge-test-003.md\n?? bridge/gtkb-gov-requirements-collection-hook-tag-cleanup-003.md\n?? bridge/gtkb-guard-duplicate-same-role-loops-one-project-003.md\n?? bridge/gtkb-harness-roles-test-path-canonicalization-003.md\n?? bridge/gtkb-impl-auth-target-paths-parser-annotated-headings-003.md\n?? bridge/gtkb-index-pruning-strands-unimplemented-go-threads-003.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-001.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-002.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-003.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-004.md\n?? bridge/gtkb-lo-harness-turn-budget-fix-005.md\n?? bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-003.md\n?? bridge/gtkb-owner-decision-tracker-auto-resolve-cross-turn-003.md\n?? bridge/gtkb-remove-orphaned-bridge-authority-direction-switch-003.md\n?? bridge/gtkb-storm-watchdog-detect-noncodex-process-families-003.md\n?? bridge/gtkb-sweep-commit-automation-respects-verified-gate-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-003.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-005.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-006.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-007.md\n?? bridge/gtkb-test-workstream-focus-stale-relay-cache-fixtures-008.md\n?? bridge/gtkb-verified-finalize-tolerate-unrelated-staged-001.md",
+        "short_line_count": 129,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}
