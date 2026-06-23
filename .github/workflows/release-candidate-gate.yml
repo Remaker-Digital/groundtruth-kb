@@ -1,4 +1,5 @@
 name: Release Candidate Gate
+# WI-4761: restore CI/CD testing integration health (scoped revision)
 
 on:
   pull_request:

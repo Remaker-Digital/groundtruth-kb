@@ -124,6 +124,7 @@ def _load_scan_bridge_helper() -> Any:
     if spec is None or spec.loader is None:
         raise RuntimeError(f"scan helper could not be loaded from {helper_path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules["_gtkb_axis2_scan_bridge"] = module
     spec.loader.exec_module(module)
     return module
 
