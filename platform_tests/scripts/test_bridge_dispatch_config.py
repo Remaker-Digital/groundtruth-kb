@@ -19,6 +19,7 @@ from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     load_bridge_dispatch_config,
     select_dispatch_candidates,
 )
+from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report  # noqa: E402
 from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text  # noqa: E402
 from groundtruth_kb.harness_projection import read_roles  # noqa: E402
 
@@ -584,6 +585,34 @@ def test_wi4718_benign_constant_contains_expected_reasons() -> None:
     """BENIGN_NONLAUNCH_LAUNCH_REASONS contains concurrency_cap_reached and is frozen."""
     assert "concurrency_cap_reached" in BENIGN_NONLAUNCH_LAUNCH_REASONS
     assert isinstance(BENIGN_NONLAUNCH_LAUNCH_REASONS, frozenset)
+
+
+def test_wi4765_report_builder_preserves_dispatch_runtime_failure_causes(tmp_path: Path) -> None:
+    """The read-only report exposes distinct runtime cause fields for operators."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_result": "launch_failed",
+                "failure_class": "provider_failure",
+                "last_launch": {
+                    "reason": "spawn_rate_limited",
+                    "exit_failure_reason": "no_verdict_produced",
+                },
+            }
+        },
+    )
+
+    report = build_bridge_dispatch_report(tmp_path)
+    taxonomy = report["reliability"]["failure_taxonomy"]
+
+    assert taxonomy["last_result"]["launch_failed"] == 1
+    assert taxonomy["failure_class"]["provider_failure"] == 1
+    assert taxonomy["last_launch.reason"]["spawn_rate_limited"] == 1
+    assert taxonomy["last_launch.exit_failure_reason"]["no_verdict_produced"] == 1
 
 
 def test_wi4578_manual_scan_excludes_acknowledged_archived_nonterminal(tmp_path: Path) -> None:
