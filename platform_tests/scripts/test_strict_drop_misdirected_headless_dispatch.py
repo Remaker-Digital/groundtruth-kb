@@ -377,8 +377,7 @@ def test_claude_dispatch_authorized_when_keyword_mode_matches_role_set(
     # written on the role-mismatch branch. The ordinary authorized path is
     # the happy-path of receiver-side dispatch and intentionally silent.
     assert not failures_path.exists() or failures_path.read_text(encoding="utf-8").strip() == "", (
-        f"authorized path must not write to dispatch-failures.jsonl; "
-        f"found: {failures_path.read_text(encoding='utf-8')!r}"
+        f"authorized path must not write to dispatch-failures.jsonl; found: {failures_path.read_text(encoding='utf-8')!r}"
     )
 
 
@@ -405,6 +404,5 @@ def test_codex_dispatch_authorized_when_keyword_mode_matches_role_set(
         f"Codex expected DISPATCH_AUTHORIZED for matching keyword mode 'lo'; got {decision!r} ({reason})"
     )
     assert not failures_path.exists() or failures_path.read_text(encoding="utf-8").strip() == "", (
-        f"authorized path must not write to dispatch-failures.jsonl; "
-        f"found: {failures_path.read_text(encoding='utf-8')!r}"
+        f"authorized path must not write to dispatch-failures.jsonl; found: {failures_path.read_text(encoding='utf-8')!r}"
     )

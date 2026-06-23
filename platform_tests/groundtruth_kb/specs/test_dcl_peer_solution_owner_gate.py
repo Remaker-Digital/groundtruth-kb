@@ -67,9 +67,7 @@ def test_constraints_enforcement_mode_advisory(dcl_spec: dict) -> None:
 
 
 def test_description_references_auq_and_in_scope_classes(dcl_spec: dict) -> None:
-    """T3 (constraint text): description references AskUserQuestion (or AUQ)
-    and the in-scope decision classes (adopt / adapt / reject / defer).
-    """
+    """T3 (constraint text): description references AskUserQuestion (or AUQ) and the in-scope decision classes (adopt / adapt / reject / defer)."""
     desc = dcl_spec.get("description") or ""
     # AUQ reference (either canonical name or the abbreviation)
     assert ("AskUserQuestion" in desc) or ("AUQ" in desc), "description must reference 'AskUserQuestion' or 'AUQ'"
@@ -79,8 +77,7 @@ def test_description_references_auq_and_in_scope_classes(dcl_spec: dict) -> None
 
 
 def test_assertions_reference_in_scope_classes_predicate(dcl_spec: dict) -> None:
-    """T4 (assertions predicate): assertions field contains a machine-checkable predicate
-    referencing the in-scope decision classes.
+    """T4 (assertions predicate): assertions field contains a machine-checkable predicate referencing the in-scope decision classes.
 
     Predicate form per proposal IP-1:
 

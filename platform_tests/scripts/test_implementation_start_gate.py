@@ -1010,10 +1010,7 @@ def test_gate_allows_python_sqlite_select_read() -> None:
 
 
 def test_gate_allows_python_sqlite_with_read() -> None:
-    cmd = (
-        'python -c "import sqlite3; '
-        "sqlite3.connect('a.db').execute('WITH cte AS (SELECT id FROM t) SELECT * FROM cte')\""
-    )
+    cmd = "python -c \"import sqlite3; sqlite3.connect('a.db').execute('WITH cte AS (SELECT id FROM t) SELECT * FROM cte')\""
     assert gate._is_mutating_command(cmd) is False
 
 

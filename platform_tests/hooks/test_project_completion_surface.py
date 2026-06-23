@@ -51,9 +51,7 @@ def _seed(
     for index, (wi, verified) in enumerate(sorted(wi_verified.items())):
         slug = f"gtkb-thread-{index}"
         top_status = "VERIFIED" if verified else "GO"
-        (bridge / f"{slug}-001.md").write_text(
-            f"{top_status}\n\n# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8"
-        )
+        (bridge / f"{slug}-001.md").write_text(f"# Proposal {slug}\n\nWork Item: {wi}\n", encoding="utf-8")
         index_lines += [f"Document: {slug}", f"{top_status}: bridge/{slug}-001.md", ""]
     (bridge / "INDEX.md").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
 

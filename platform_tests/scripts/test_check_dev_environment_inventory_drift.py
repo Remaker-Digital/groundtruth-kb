@@ -32,10 +32,7 @@ def _write_registry(root: Path) -> Path:
                 "",
                 "[[protected_artifacts]]",
                 'id = "inventory"',
-                (
-                    'patterns = [".groundtruth/inventory/dev-environment-inventory.json", '
-                    '"scripts/check_dev_environment_inventory_drift.py"]'
-                ),
+                'patterns = [".groundtruth/inventory/dev-environment-inventory.json", "scripts/check_dev_environment_inventory_drift.py"]',
                 'severity = "accepted_baseline_update"',
                 'route = "accepted_baseline_update"',
                 "accept_with_inventory_baseline_update = true",
@@ -259,10 +256,7 @@ def _write_toolchain_availability_volatile_registry(root: Path) -> Path:
         "\n".join(
             [
                 "schema_version = 1",
-                (
-                    'volatile_inventory_paths = ["generated_at", "toolchain.*.version", '
-                    '"toolchain.*.status", "toolchain.*.classification"]'
-                ),
+                'volatile_inventory_paths = ["generated_at", "toolchain.*.version", "toolchain.*.status", "toolchain.*.classification"]',
                 "",
                 "[[protected_artifacts]]",
                 'id = "inventory"',

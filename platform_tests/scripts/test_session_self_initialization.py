@@ -74,10 +74,7 @@ def _load_module(*, live_dashboard_probes: bool = False):
         elif "log" in cmd_str:
             return {
                 "ok": True,
-                "stdout": (
-                    "1234567890abcdef1234567890abcdef12345678\x1f12345678\x1f"
-                    "2026-06-11T12:00:00-07:00\x1fAuthor Name\x1fCommit message\n"
-                ),
+                "stdout": "1234567890abcdef1234567890abcdef12345678\x1f12345678\x1f2026-06-11T12:00:00-07:00\x1fAuthor Name\x1fCommit message\n",
                 "stderr": "",
                 "returncode": 0,
             }
@@ -1027,11 +1024,11 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "hookSpecificOutput.startupDisclosure" in prime_context
     assert "role records may be list-valued role sets" in prime_context
     assert (
-        "read TAFE/dispatcher bridge state and status-bearing versioned files under "
-        "`bridge/` before bridge queue claims" in prime_context
+        "read TAFE/dispatcher bridge state and status-bearing versioned files under `bridge/` before bridge queue claims"
+        in prime_context
     )
     assert "routes the first owner message through the init-keyword matcher" in prime_context
-    assert "DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001" in prime_context
+    assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in prime_context
     assert "on no-match, process the prompt as normal task content" in prime_context
     assert "wait for Mike's next message before choosing or mapping session work" in prime_context
     assert "render the startup disclosure and wait for the next message" in prime_context
@@ -1058,7 +1055,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "## Session Startup Instructions" in loyal_context
     assert "### Fresh-Session Input Semantics" in loyal_context
     assert "routes the first owner message through the init-keyword matcher" in loyal_context
-    assert "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001" in loyal_context
+    assert "DCL-SESSION-START-INIT-KEYWORD-MATCHING-001" in loyal_context
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
     assert "process actionable `NEW` / `REVISED` entries oldest-to-newest by default" in loyal_context
     assert "ask Mike whether to switch to auto-process before writing verdict files" in loyal_context
@@ -1177,8 +1174,8 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         not in report
     )
     assert (
-        "startup reports, dashboard JSON, cached documents, copied excerpts, "
-        "summary counts, or hook-generated summaries" not in report
+        "startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries"
+        not in report
     )
     assert "do not display this checklist as a substitute for performing the verification" not in report
     assert "Bridge dispatch startup rule: rely on the cross-harness event-driven trigger" not in report
@@ -1193,8 +1190,8 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "Do not relay this section to Mike as user-visible startup content." in context
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." in context
     assert (
-        "Mandatory direct-read rule: before reporting the live bridge scan count, "
-        "read current TAFE/dispatcher bridge state and versioned bridge files directly" in context
+        "Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly"
+        in context
     )
     assert "Project-state startup rule: include a compact current-state report" in context
     assert "## User-Visible Startup Message" not in context
@@ -1432,9 +1429,9 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
     assert contention["source_read_mode"] == "versioned_bridge_file_chain"
     assert contention["derived_artifacts_authoritative"] is False
     assert contention["live_bridge_directory_available"] is True
-    assert module._render_file_bridge_scan({"metrics": {"contention": contention}}) == (
-        "- Generated-time file bridge scan, non-authoritative after report generation: "
-        "1 latest NEW/REVISED entry identified."
+    assert (
+        module._render_file_bridge_scan({"metrics": {"contention": contention}})
+        == "- Generated-time file bridge scan, non-authoritative after report generation: 1 latest NEW/REVISED entry identified."
     )
 
 
@@ -1460,10 +1457,7 @@ def test_bridge_metrics_ignore_cached_startup_report_counts(tmp_path) -> None:
     (bridge_dir / "cached-report-must-not-win-001.md").write_text("NEW\n\nProposal.", encoding="utf-8")
     (bridge_dir / "cached-report-must-not-win-002.md").write_text("GO\n\nApproved.", encoding="utf-8")
     (dashboard_dir / "session-startup-report.md").write_text(
-        (
-            "- Generated-time file bridge scan, non-authoritative after report generation: "
-            "99 latest NEW/REVISED entries identified.\n"
-        ),
+        "- Generated-time file bridge scan, non-authoritative after report generation: 99 latest NEW/REVISED entries identified.\n",
         encoding="utf-8",
     )
     (dashboard_dir / "dashboard-data.json").write_text(
@@ -1583,8 +1577,8 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     )
     assert "Role being assumed: Prime Builder" in report_text
     assert (
-        "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
-        "files and checked at session startup" in report_text
+        "Bridge: always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
+        in report_text
     )
     assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in report_text
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in report_text
@@ -1842,8 +1836,8 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "relay the generated startup message verbatim as the first durable assistant answer" not in context
     assert "Do not summarize, paraphrase, shorten, reorder, or omit cached startup-disclosure content" in context
     assert (
-        "Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, "
-        "`Expected work`, and compact full-list label" in context
+        "Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label"
+        in context
     )
     assert "the A/B/C recommendations and D full focus list must remain present" in context
     assert "routes the first owner message through the init-keyword matcher" in context
@@ -2104,8 +2098,8 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
     context = payload["additionalContext"]
     assert f"Role being assumed: {module.ROLE_PROFILES[discovered_role]['assumed_role']}" in context
     assert (
-        "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
-        "files and checked at session startup" in context
+        "Bridge: always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
+        in context
     )
     assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in context
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in context
@@ -3116,9 +3110,7 @@ def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, mo
         {
             "id": "GTKB-VERIFIED-WITH-RESIDUAL-001",
             "title": "Verified but residual work",
-            "body": (
-                "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\nBody explaining the residual work."
-            ),
+            "body": "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\nBody explaining the residual work.",
             "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",

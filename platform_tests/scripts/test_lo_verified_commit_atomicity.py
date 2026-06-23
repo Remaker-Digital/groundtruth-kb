@@ -98,8 +98,7 @@ _No prior deliberations: atomicity fixture._
 
 | Specification | Test or Verification Command | Executed | Result |
 | --- | --- | --- | --- |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `pytest platform_tests/scripts/\
-test_lo_verified_commit_atomicity.py` | yes | PASS |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `pytest platform_tests/scripts/test_lo_verified_commit_atomicity.py` | yes | PASS |
 
 ## Positive Confirmations
 

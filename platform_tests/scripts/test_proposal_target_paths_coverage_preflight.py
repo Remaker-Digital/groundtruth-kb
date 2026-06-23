@@ -182,10 +182,7 @@ def test_bridge_id_resolution_skips_post_go_new_report(module, tmp_path) -> None
         tmp_path,
         slug,
         3,
-        (
-            "NEW\n\nbridge_kind: implementation_report\n\n## Commands Run\n\n"
-            "pytest platform_tests/scripts/test_report.py\n"
-        ),
+        "NEW\n\nbridge_kind: implementation_report\n\n## Commands Run\n\npytest platform_tests/scripts/test_report.py\n",
     )
 
     result, exit_code = module.run_preflight(tmp_path, bridge_id=slug, strict=True)
@@ -224,10 +221,7 @@ def test_bridge_id_resolution_uses_revised_proposal_under_go(module, tmp_path) -
         tmp_path,
         slug,
         5,
-        (
-            "NEW\n\nbridge_kind: implementation_report\n\n## Commands Run\n\n"
-            "pytest platform_tests/scripts/test_report.py\n"
-        ),
+        "NEW\n\nbridge_kind: implementation_report\n\n## Commands Run\n\npytest platform_tests/scripts/test_report.py\n",
     )
 
     result, exit_code = module.run_preflight(tmp_path, bridge_id=slug, strict=True)

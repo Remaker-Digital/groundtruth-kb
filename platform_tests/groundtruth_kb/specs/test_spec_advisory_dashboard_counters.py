@@ -84,9 +84,7 @@ def test_actionable_count_for_prime_excludes_verified(spec_row: dict) -> None:
 
 
 def test_advisory_disposition_count_separate(spec_row: dict) -> None:
-    """T5 (F1+F3 closure): description identifies advisory_disposition_count as a
-    separate Prime-disposition metric, distinct from actionable_count_for_prime.
-    """
+    """T5 (F1+F3 closure): description identifies advisory_disposition_count as a separate Prime-disposition metric, distinct from actionable_count_for_prime."""
     desc = spec_row.get("description") or ""
     assert "advisory_disposition_count" in desc, "description must reference 'advisory_disposition_count'"
     # The "separate" / "disposition surface" framing must be explicit

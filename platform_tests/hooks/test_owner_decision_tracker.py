@@ -84,7 +84,7 @@ def _run_hook(mode: str, project_root: Path, stdin_text: str = "") -> subprocess
         capture_output=True,
         env=env,
         check=False,
-        timeout=30,
+        timeout=10,
     )
 
 

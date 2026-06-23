@@ -68,9 +68,7 @@ def test_heartbeat_session_start_creates_lock(heartbeat_module, tmp_path: Path) 
 
 
 def test_heartbeat_tool_use_refreshes_existing_lock(heartbeat_module, tmp_path: Path) -> None:
-    """T-HB-tool-use-refreshes-mtime: when a lock exists, --mode tool-use updates last_refreshed
-    but preserves opened_at.
-    """
+    """T-HB-tool-use-refreshes-mtime: when a lock exists, --mode tool-use updates last_refreshed but preserves opened_at."""
     heartbeat_module._handle_session_start(tmp_path, "codex")
     lock = tmp_path / "active-codex-session.lock"
     initial = json.loads(lock.read_text(encoding="utf-8"))

@@ -37,13 +37,13 @@ if (Test-Path "$PROJECT_ROOT\widget\dist") {
     Write-Host "  Copied widget/dist"
 }
 
-# Docs site (Dockerfile COPY applications/Agent_Red/docs-site/docs/)
-if (Test-Path "$PROJECT_ROOT\applications\Agent_Red\docs-site\docs") {
-    New-Item -ItemType Directory -Path "$ctx\applications\Agent_Red\docs-site" -Force | Out-Null
-    Copy-Item -Recurse "$PROJECT_ROOT\applications\Agent_Red\docs-site\docs" "$ctx\applications\Agent_Red\docs-site\docs"
-    Write-Host "  Copied applications/Agent_Red/docs-site/docs"
+# Docs site (Dockerfile COPY docs-site/docs/)
+if (Test-Path "$PROJECT_ROOT\docs-site\docs") {
+    New-Item -ItemType Directory -Path "$ctx\docs-site" -Force | Out-Null
+    Copy-Item -Recurse "$PROJECT_ROOT\docs-site\docs" "$ctx\docs-site\docs"
+    Write-Host "  Copied docs-site/docs"
 } else {
-    Write-Warning "applications/Agent_Red/docs-site/docs missing — build will fail"
+    Write-Warning "docs-site/docs missing — build will fail"
 }
 
 # Verify critical files

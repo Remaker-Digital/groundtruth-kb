@@ -78,10 +78,7 @@ def _write_valid_secret_gate_files(root: Path) -> None:
         encoding="utf-8",
     )
     (hooks_dir / "pre-push").write_text(
-        (
-            'python -m groundtruth_kb secrets scan --range "$remote_sha..$local_sha" '
-            "--redacted --fail-on verified-provider\n"
-        ),
+        'python -m groundtruth_kb secrets scan --range "$remote_sha..$local_sha" --redacted --fail-on verified-provider\n',
         encoding="utf-8",
     )
     (hooks_dir / "setup-hooks.sh").write_text(
@@ -103,10 +100,7 @@ def _write_valid_secret_workflow(root: Path) -> None:
                 "jobs:",
                 "  secrets-scan:",
                 "    steps:",
-                (
-                    "      - run: python -m groundtruth_kb secrets scan --tracked --redacted "
-                    "--report-json .quality/gtkb-secrets.json --fail-on verified-provider"
-                ),
+                "      - run: python -m groundtruth_kb secrets scan --tracked --redacted --report-json .quality/gtkb-secrets.json --fail-on verified-provider",
                 "      - uses: actions/upload-artifact@v4",
             ]
         ),

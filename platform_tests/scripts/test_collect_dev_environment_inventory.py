@@ -201,10 +201,7 @@ def test_extract_version_path_safe_fallback_for_unstructured_output() -> None:
     module = _load_module()
 
     # Windows-style path inside gh failure stderr.
-    gh_failure = (
-        "failed to create root command: failed to read configuration: "
-        "open C:\\Users\\micha\\AppData\\Roaming\\gh\\config.yml"
-    )
+    gh_failure = "failed to create root command: failed to read configuration: open C:\\Users\\micha\\AppData\\Roaming\\gh\\config.yml"
     assert module._extract_version(gh_failure) == "unknown"
 
     # POSIX-style path that the validator also rejects.
