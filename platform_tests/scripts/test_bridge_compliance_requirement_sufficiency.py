@@ -39,6 +39,8 @@ from types import ModuleType
 
 import pytest
 
+from scripts.implementation_authorization import requirement_sufficiency_state
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
@@ -68,6 +70,14 @@ _DUAL_STATE = (
     "## Requirement Sufficiency\n\n"
     "Existing requirements sufficient.\n"
     "New or revised requirement required before implementation.\n"
+)
+
+_BOUNDED_SUFFICIENCY_STATES = (
+    "Existing requirements are sufficient for this scoped governance correction.",
+    "Requirements remain sufficient.",
+    "Requirements are sufficient for this scope.",
+    "Existing owner direction and WI-4213 are sufficient.",
+    "Existing requirements sufficient. A new or revised requirement may be needed later for a separate child slice.",
 )
 
 
@@ -146,6 +156,17 @@ def test_requirement_sufficiency_without_operative_state_denied(gate: ModuleType
     assert reason is not None and _MARKER in reason
 
 
+def test_write_gate_denies_unrecognized_opener_caught_by_impl_start(gate: ModuleType, tmp_path: Path) -> None:
+    requirement_sufficiency = "## Requirement Sufficiency\n\nThe requirements were considered carefully.\n"
+    assert requirement_sufficiency_state(requirement_sufficiency) == "unrecognized"
+
+    reason = _deny(gate, _proposal(requirement_sufficiency=requirement_sufficiency), tmp_path)
+
+    assert reason is not None
+    assert _MARKER in reason
+    assert "Requirement Sufficiency" in reason
+
+
 # --- Acceptance criteria: allow cases -------------------------------------------
 
 
@@ -159,6 +180,21 @@ def test_second_operative_state_allowed(gate: ModuleType, tmp_path: Path) -> Non
     # must remain write-allowed.
     content = _proposal(requirement_sufficiency=_GAP_STATE)
     assert _deny(gate, content, tmp_path) is None
+
+
+@pytest.mark.parametrize("state_text", _BOUNDED_SUFFICIENCY_STATES)
+def test_write_gate_agrees_with_impl_start_on_bounded_sufficiency(
+    gate: ModuleType, tmp_path: Path, state_text: str
+) -> None:
+    requirement_sufficiency = f"## Requirement Sufficiency\n\n{state_text} Rationale prose here.\n"
+    assert requirement_sufficiency_state(requirement_sufficiency) == "sufficient"
+
+    assert _deny(gate, _proposal(requirement_sufficiency=requirement_sufficiency), tmp_path) is None
+
+
+def test_write_gate_accepts_gap_state_unchanged(gate: ModuleType, tmp_path: Path) -> None:
+    assert requirement_sufficiency_state(_GAP_STATE) == "gap"
+    assert _deny(gate, _proposal(requirement_sufficiency=_GAP_STATE), tmp_path) is None
 
 
 def test_dual_state_requirement_sufficiency_denied(gate: ModuleType, tmp_path: Path) -> None:

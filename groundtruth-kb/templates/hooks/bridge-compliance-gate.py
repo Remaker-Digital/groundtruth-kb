@@ -225,24 +225,66 @@ REQUIREMENT_SUFFICIENCY_HEADING_RE = re.compile(
     r"^#{1,6}\s*requirement\s+sufficiency\s*$",
     re.IGNORECASE,
 )
-REQUIREMENT_SUFFICIENCY_OPERATIVE_RE = re.compile(
-    r"existing\s+requirements?\s+(?:are\s+)?sufficient"
-    r"|new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
-    re.IGNORECASE,
-)
+# The implementation-start authorization parser owns the bounded Requirement
+# Sufficiency vocabulary. The Write-time hook imports that classifier when the
+# full project checkout is available, and falls back to the same bounded regexes
+# when installed in a partial hook/template context.
+try:
+    from scripts.implementation_authorization import (
+        REQUIREMENT_GAP_RE as REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
+    )
+    from scripts.implementation_authorization import (
+        REQUIREMENT_SUFFICIENCY_RE as REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
+    )
+    from scripts.implementation_authorization import (
+        requirement_sufficiency_state as _implementation_requirement_sufficiency_state,
+    )
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE = re.compile(
+        r"(?i)(?<!\bno\s)\bnew\s+or\s+revised\s+requirements?\b[^.]{0,60}?\b(?:required|needed)\b"
+    )
+    REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE = re.compile(
+        r"(?i)\b(?:existing\s+)?(?:requirements?|owner\s+direction)\b(?:(?!\bnot\b)[^.]){0,80}?\bsufficient\b"
+    )
+    _FALLBACK_FUTURE_SCOPED_GAP_CONTEXT_RE = re.compile(
+        r"(?i)\b(?:would|could|might|may)\b[^.]{0,80}?\b(?:only|later|future|follow-?on|separate|child)\b"
+    )
+
+    def _implementation_requirement_sufficiency_state(markdown: str) -> str:
+        lines = markdown.splitlines()
+        start: int | None = None
+        for idx, line in enumerate(lines):
+            if REQUIREMENT_SUFFICIENCY_HEADING_RE.match(line.strip()):
+                start = idx + 1
+                break
+        if start is None:
+            return "missing"
+        body_lines = _collect_section_lines(lines, start)
+        body = "\n".join(body_lines).strip()
+        if not body:
+            return "missing"
+        gap_match = REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE.search(body)
+        sufficiency_match = REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE.search(body)
+        if gap_match and sufficiency_match:
+            if gap_match.start() < sufficiency_match.start():
+                return "gap"
+            gap_sentence_end = body.find(".", gap_match.start())
+            if gap_sentence_end == -1:
+                gap_sentence_end = len(body)
+            gap_sentence = body[gap_match.start() : gap_sentence_end + 1]
+            if _FALLBACK_FUTURE_SCOPED_GAP_CONTEXT_RE.search(gap_sentence):
+                return "sufficient"
+            return "gap"
+        if gap_match:
+            return "gap"
+        if sufficiency_match:
+            return "sufficient"
+        return "unrecognized"
+
+
 # The two mutually exclusive operative states. The file-bridge-protocol requires
-# EXACTLY ONE; the gap helper counts distinct states present and rejects zero or
-# more than one (per WI-3439 verification NO-GO -008: the combined RE above only
-# proved presence-of-either, so a section asserting BOTH states was wrongly
-# accepted).
-REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE = re.compile(
-    r"existing\s+requirements?\s+(?:are\s+)?sufficient",
-    re.IGNORECASE,
-)
-REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE = re.compile(
-    r"new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
-    re.IGNORECASE,
-)
+# EXACTLY ONE; the gap helper counts distinct canonical states present and
+# rejects zero or more than one (per WI-3439 verification NO-GO -008).
 REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES = (
     REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
     REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
@@ -946,16 +988,22 @@ def _requirement_sufficiency_section_gap(content: str) -> str | None:
         return "section placeholder-only"
     joined = "\n".join(section)
     states_present = sum(1 for state_re in REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES if state_re.search(joined))
-    if states_present == 0:
+    state = _implementation_requirement_sufficiency_state(content)
+    if state == "unrecognized" or states_present == 0:
         return (
             "no operative state ('Existing requirements sufficient' or "
             "'New or revised requirement required before implementation')"
         )
-    if states_present > 1:
+    if states_present > 1 and state != "sufficient":
         return (
             "multiple operative states (exactly one required: 'Existing "
             "requirements sufficient' XOR 'New or revised requirement required "
             "before implementation')"
+        )
+    if state not in {"sufficient", "gap"}:
+        return (
+            "no operative state ('Existing requirements sufficient' or "
+            "'New or revised requirement required before implementation')"
         )
     return None
 
