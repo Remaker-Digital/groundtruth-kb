@@ -34,6 +34,10 @@ def project_root(tmp_path: Path) -> Path:
         "Document: foo\nNEW: bridge/foo-001.md\n",
     )
     _write(
+        tmp_path / "bridge" / "foo-001.md",
+        "NEW\n",
+    )
+    _write(
         tmp_path / "groundtruth.toml",
         '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
     )
@@ -264,3 +268,39 @@ def test_substrate_inert_path_when_disagrees_with_durable_selection(
     res = run_trigger(project_root=project_root, state_dir=state_dir)
     assert res["skipped"] is True
     assert res["reason"] == "substrate_mismatch_inert"
+
+
+@pytest.mark.parametrize(
+    ("substrate", "expected"),
+    [
+        ("cross_harness_trigger", True),
+        ("none", False),
+        ("single_harness_dispatcher", False),
+    ],
+)
+def test_active_substrate_predicate_matches_configured_domain(
+    project_root: Path, substrate: str, expected: bool
+) -> None:
+    from scripts.cross_harness_bridge_trigger import _is_cross_harness_trigger_active_substrate
+
+    _write(
+        project_root / "harness-state" / "bridge-substrate.json",
+        json.dumps({"substrate": substrate}),
+    )
+
+    assert _is_cross_harness_trigger_active_substrate(project_root) is expected
+
+
+def test_active_substrate_predicate_fail_open_when_missing_config(project_root: Path) -> None:
+    from scripts.cross_harness_bridge_trigger import _is_cross_harness_trigger_active_substrate
+
+    assert _is_cross_harness_trigger_active_substrate(project_root) is True
+
+
+@pytest.mark.parametrize("content", ["not-json", "[]"])
+def test_active_substrate_predicate_fail_open_when_invalid_or_non_dict(project_root: Path, content: str) -> None:
+    from scripts.cross_harness_bridge_trigger import _is_cross_harness_trigger_active_substrate
+
+    _write(project_root / "harness-state" / "bridge-substrate.json", content)
+
+    assert _is_cross_harness_trigger_active_substrate(project_root) is True

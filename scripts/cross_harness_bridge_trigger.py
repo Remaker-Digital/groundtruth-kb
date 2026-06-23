@@ -3374,11 +3374,13 @@ def _spawn_harness(
 
 
 def _is_cross_harness_trigger_active_substrate(project_root: Path) -> bool:
-    """Return True if cross_harness_trigger is the active substrate.
+    """Return True when the cross-harness trigger should dispatch.
 
     Reads harness-state/bridge-substrate.json when present.
-    If substrate is registered but not 'cross_harness_trigger', returns False.
-    If file is missing or invalid, default to True (fail open for backwards compatibility).
+    The configured ``cross_harness_trigger`` substrate is active.
+    ``none`` and ``single_harness_dispatcher`` are mismatch-inert and return
+    False. Missing, invalid, or non-dict config fails open to True for
+    backward compatibility.
     """
     path = project_root / "harness-state" / "bridge-substrate.json"
     if path.is_file():
