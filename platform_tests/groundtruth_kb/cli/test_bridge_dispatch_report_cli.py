@@ -138,6 +138,8 @@ def test_bridge_dispatch_report_json_exposes_required_sections_and_cause_taxonom
         "summary",
         "topology",
     }
+    assert "consistency_findings" in payload["reliability"]
+    assert "runtime_classifications" in payload["reliability"]
     assert payload["topology"]["effective_per_cycle_ceiling"] == {
         "loyal-opposition": 2,
         "prime-builder": 3,

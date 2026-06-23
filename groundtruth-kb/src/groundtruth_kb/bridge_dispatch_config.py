@@ -53,12 +53,11 @@ RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
     "previous_launch_failed",
     "subprocess_execution_failed",
 }
-# WI-4718: non-launch outcomes ('launch_failed') whose last_launch.reason indicates
-# benign backpressure rather than a dispatcher failure. The trigger collapses all
-# non-launch spawn results to last_result="launch_failed"; only the reason field
-# distinguishes saturation from failure. concurrency_cap_reached = all worker slots
-# busy; surfaced as WARN (not FAIL) by the health classifier.
-BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached"})
+# WI-4718/WI-4768: non-launch outcomes ('launch_failed') whose last_launch.reason
+# indicates benign backpressure rather than a dispatcher failure. The trigger
+# collapses all non-launch spawn results to last_result="launch_failed"; only the
+# reason field distinguishes saturation from failure.
+BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached", "per_role_concurrency_cap_reached"})
 
 
 @dataclass(frozen=True)
@@ -150,6 +149,8 @@ class BridgeDispatchStatus:
     selected_by_role: dict[str, list[dict[str, Any]]]
     health_status: str
     health_findings: tuple[str, ...]
+    consistency_findings: tuple[str, ...] = ()
+    runtime_classifications: tuple[dict[str, Any], ...] = ()
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
@@ -158,6 +159,8 @@ class BridgeDispatchStatus:
             "selected_by_role": self.selected_by_role,
             "health_status": self.health_status,
             "health_findings": list(self.health_findings),
+            "consistency_findings": list(self.consistency_findings),
+            "runtime_classifications": list(self.runtime_classifications),
         }
 
 
@@ -267,9 +270,11 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     records = tuple(apply_dispatch_config_to_record(dict(record), config) for record in raw_records)
     selected_by_role: dict[str, list[dict[str, Any]]] = {}
     findings: list[str] = []
+    consistency_findings = _dispatch_config_consistency_findings(raw_records, config)
 
     if config.errors:
         findings.extend(f"config error: {error}" for error in config.errors)
+    findings.extend(consistency_findings)
 
     active_event_sources = [
         record for record in records if _record_status(record) == "active" and record.get("can_fire_events") is True
@@ -289,7 +294,8 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         if not selected:
             findings.append(f"no active dispatchable harness is eligible for role {role!r}")
 
-    findings.extend(_runtime_dispatch_findings(root, selected_by_role))
+    runtime_findings, runtime_classifications = _runtime_dispatch_evaluation(root, selected_by_role)
+    findings.extend(runtime_findings)
 
     health = (
         "FAIL"
@@ -309,6 +315,8 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         selected_by_role=selected_by_role,
         health_status=health,
         health_findings=tuple(findings),
+        consistency_findings=tuple(consistency_findings),
+        runtime_classifications=tuple(runtime_classifications),
     )
 
 
@@ -365,11 +373,20 @@ def _load_projection(root: Path) -> dict[str, Any]:
 
 
 def _runtime_dispatch_findings(root: Path, selected_by_role: dict[str, list[dict[str, Any]]]) -> list[str]:
+    findings, _classifications = _runtime_dispatch_evaluation(root, selected_by_role)
+    return findings
+
+
+def _runtime_dispatch_evaluation(
+    root: Path,
+    selected_by_role: dict[str, list[dict[str, Any]]],
+) -> tuple[list[str], list[dict[str, Any]]]:
     state, errors = _load_dispatch_runtime_state(root)
     findings = list(errors)
+    classifications: list[dict[str, Any]] = []
     recipients = state.get("recipients")
     if not isinstance(recipients, dict):
-        return findings
+        return findings, classifications
 
     selected_keys: set[str] = set(DISPATCH_ROLES)
     for role, rows in selected_by_role.items():
@@ -383,11 +400,13 @@ def _runtime_dispatch_findings(root: Path, selected_by_role: dict[str, list[dict
         row = recipients.get(recipient_key)
         if not isinstance(row, dict):
             continue
-        for finding in _runtime_findings_for_recipient(recipient_key, row):
+        classification = _runtime_classification_for_recipient(recipient_key, row)
+        classifications.append(classification)
+        for finding in classification["findings"]:
             if finding not in seen:
                 findings.append(finding)
                 seen.add(finding)
-    return findings
+    return findings, classifications
 
 
 def _load_dispatch_runtime_state(root: Path) -> tuple[dict[str, Any], tuple[str, ...]]:
@@ -404,6 +423,10 @@ def _load_dispatch_runtime_state(root: Path) -> tuple[dict[str, Any], tuple[str,
 
 
 def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> list[str]:
+    return list(_runtime_classification_for_recipient(recipient_key, row)["findings"])
+
+
+def _runtime_classification_for_recipient(recipient_key: str, row: dict[str, Any]) -> dict[str, Any]:
     findings: list[str] = []
     pending_count = _int_value(row.get("pending_count"), default=0)
     selected_count = _int_value(row.get("selected_count"), default=0)
@@ -413,8 +436,26 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
     last_launch = row.get("last_launch") if isinstance(row.get("last_launch"), dict) else {}
     launch_reason = str(last_launch.get("reason") or "").strip()
     launch_exit_failure = str(last_launch.get("exit_failure_reason") or "").strip()
+    stale_failure_reason = _stale_failure_evidence_reason(recipient_key, row, last_launch)
+    failure_evidence_present = any(
+        (
+            failure_class in RUNTIME_FAILURE_CLASSES,
+            last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith("_dispatch_not_ready"),
+            launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS,
+            launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES,
+            row.get("circuit_breaker_tripped") is True,
+        )
+    )
+    ignore_failure_fields = bool(stale_failure_reason and has_pending_work and failure_evidence_present)
 
-    if row.get("circuit_breaker_tripped") is True and has_pending_work:
+    if ignore_failure_fields:
+        findings.append(
+            "dispatch runtime warning: "
+            f"{recipient_key} stale failure evidence ignored ({stale_failure_reason}) "
+            f"with pending_count={pending_count}"
+        )
+
+    if row.get("circuit_breaker_tripped") is True and has_pending_work and not ignore_failure_fields:
         findings.append(
             f"dispatch runtime failure: {recipient_key} circuit breaker is tripped with pending_count={pending_count}"
         )
@@ -428,34 +469,38 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
     # an absent reason still flags via the unchanged paths below.
     if last_result == "launch_failed" and launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS:
         last_result_is_runtime_failure = False
-    if last_result_is_runtime_failure and has_pending_work:
+    if last_result_is_runtime_failure and has_pending_work and not ignore_failure_fields:
         findings.append(
             f"dispatch runtime failure: {recipient_key} last_result={last_result} with pending_count={pending_count}"
         )
-    if last_result == "launch_failed" and launch_reason == "concurrency_cap_reached" and has_pending_work:
-        live = _int_value(last_launch.get("live_count"), default=0)
-        cap = _int_value(last_launch.get("cap"), default=0)
+    if last_result == "launch_failed" and launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS and has_pending_work:
+        live = _int_value(last_launch.get("live_count", last_launch.get("per_role_live")), default=0)
+        cap = _int_value(last_launch.get("cap", last_launch.get("per_role_cap")), default=0)
         findings.append(
             f"dispatch runtime warning: {recipient_key} saturated "
-            f"(live_count={live}/cap={cap}) with pending_count={pending_count}"
+            f"(live_count={live}/cap={cap}, reason={launch_reason}) with pending_count={pending_count}"
         )
-    if failure_class in RUNTIME_FAILURE_CLASSES and has_pending_work:
+    if failure_class in RUNTIME_FAILURE_CLASSES and has_pending_work and not ignore_failure_fields:
         findings.append(
             "dispatch runtime failure: "
             f"{recipient_key} failure_class={failure_class} with pending_count={pending_count}"
         )
-    if launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS and has_pending_work:
+    if launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS and has_pending_work and not ignore_failure_fields:
         findings.append(
             "dispatch runtime failure: "
             f"{recipient_key} last_launch.reason={launch_reason} with pending_count={pending_count}"
         )
-    if launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES and has_pending_work:
+    if (
+        launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES
+        and has_pending_work
+        and not ignore_failure_fields
+    ):
         findings.append(
             "dispatch runtime failure: "
             f"{recipient_key} last_launch.exit_failure_reason={launch_exit_failure} "
             f"with pending_count={pending_count}"
         )
-    if launch_reason == "work_intent_acquire_failed" and has_pending_work:
+    if launch_reason == "work_intent_acquire_failed" and has_pending_work and not ignore_failure_fields:
         findings.append(
             "dispatch runtime failure: "
             f"{recipient_key} work intent acquisition failed with pending_count={pending_count}"
@@ -494,6 +539,98 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
                 f"{len(unique_slugs)} bridge thread(s) quarantined for malformed status token: "
                 f"{unique_slugs}"
             )
+    severity = "PASS"
+    if any(finding.startswith("dispatch runtime failure") for finding in findings):
+        severity = "FAIL"
+    elif findings:
+        severity = "WARN"
+    return {
+        "recipient": recipient_key,
+        "severity": severity,
+        "pending_count": pending_count,
+        "selected_count": selected_count,
+        "last_result": last_result or None,
+        "failure_class": failure_class or None,
+        "last_launch_reason": launch_reason or None,
+        "last_launch_exit_failure_reason": launch_exit_failure or None,
+        "stale_failure_evidence": bool(stale_failure_reason),
+        "stale_failure_reason": stale_failure_reason,
+        "findings": tuple(findings),
+    }
+
+
+def _stale_failure_evidence_reason(
+    recipient_key: str,
+    row: dict[str, Any],
+    last_launch: dict[str, Any],
+) -> str | None:
+    if ":" not in recipient_key:
+        return None
+    expected = recipient_key.strip()
+    evidence_recipients = _recipient_evidence_values(row, last_launch)
+    if not evidence_recipients or expected in evidence_recipients:
+        return None
+    return "recipient evidence points to " + ", ".join(sorted(evidence_recipients))
+
+
+def _recipient_evidence_values(row: dict[str, Any], last_launch: dict[str, Any]) -> set[str]:
+    values: set[str] = set()
+    _add_recipient_evidence(values, last_launch.get("recipient"))
+    selected_candidate = last_launch.get("selected_candidate")
+    if isinstance(selected_candidate, dict):
+        _add_recipient_evidence(values, selected_candidate.get("recipient"))
+    row_candidate = row.get("selected_candidate")
+    if isinstance(row_candidate, dict):
+        _add_recipient_evidence(values, row_candidate.get("recipient"))
+    return values
+
+
+def _add_recipient_evidence(values: set[str], value: Any) -> None:
+    if isinstance(value, str) and value.strip():
+        values.add(value.strip())
+
+
+def _dispatch_config_consistency_findings(
+    raw_records: list[dict[str, Any]],
+    config: BridgeDispatchConfig,
+) -> list[str]:
+    findings: list[str] = []
+    for raw in raw_records:
+        harness_id = str(raw.get("id") or "").strip()
+        if not harness_id:
+            continue
+        overlay = config.overlay_for(harness_id)
+        if overlay is None:
+            continue
+        if overlay.can_receive_dispatch is not None:
+            raw_receive = _optional_bool(raw.get("can_receive_dispatch"))
+            if raw_receive is not None and raw_receive != overlay.can_receive_dispatch:
+                findings.append(
+                    "dispatch config drift warning: "
+                    f"harness {harness_id} can_receive_dispatch "
+                    f"rules.toml={overlay.can_receive_dispatch} harness-registry={raw_receive}"
+                )
+            if overlay.can_receive_dispatch is True and _record_status(raw) != "active":
+                findings.append(
+                    "dispatch config drift warning: "
+                    f"harness {harness_id} can_receive_dispatch rules.toml=True "
+                    f"but harness-registry status={_record_status(raw) or '(missing)'}"
+                )
+        if overlay.can_fire_events is not None:
+            raw_fire = _optional_bool(raw.get("can_fire_events"))
+            if raw_fire is not None and raw_fire != overlay.can_fire_events:
+                findings.append(
+                    "dispatch config drift warning: "
+                    f"harness {harness_id} can_fire_events "
+                    f"rules.toml={overlay.can_fire_events} harness-registry={raw_fire}"
+                )
+            raw_hooks = _optional_bool(raw.get("event_driven_hooks"))
+            if raw_hooks is not None and raw_hooks != overlay.can_fire_events:
+                findings.append(
+                    "dispatch config drift warning: "
+                    f"harness {harness_id} event_driven_hooks "
+                    f"rules.toml={overlay.can_fire_events} harness-registry={raw_hooks}"
+                )
     return findings
 
 

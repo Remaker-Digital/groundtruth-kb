@@ -89,6 +89,8 @@ def build_bridge_dispatch_report(
         "reliability": {
             "health_status": status.health_status,
             "findings": list(status.health_findings),
+            "consistency_findings": list(status.consistency_findings),
+            "runtime_classifications": list(status.runtime_classifications),
             "failure_taxonomy": failure_taxonomy,
             "circuit_breakers": circuit_breakers,
             "dispatch_failures_tail": dispatch_failures,

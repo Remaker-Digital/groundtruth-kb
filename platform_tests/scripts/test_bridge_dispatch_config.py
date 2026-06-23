@@ -133,7 +133,7 @@ def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Pa
     assert registry_path.read_bytes() == before
 
 
-def test_wi4661_live_harness_b_is_headless_dispatchable() -> None:
+def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
     rules = tomllib.loads((REPO_ROOT / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
     harness_b_rules = rules["harnesses"]["B"]
 
@@ -142,14 +142,19 @@ def test_wi4661_live_harness_b_is_headless_dispatchable() -> None:
 
     projection = read_roles(REPO_ROOT)
     harness_b = next(row for row in projection["harnesses"] if row["id"] == "B")
-    assert harness_b["role"] == ["prime-builder"]
-    assert harness_b["status"] == "active"
 
     status_payload = collect_bridge_dispatch_status(REPO_ROOT).to_json_dict()
     harness_b_status = next(row for row in status_payload["harnesses"] if row["id"] == "B")
     assert harness_b_status["can_receive_dispatch"] is True
-    prime_candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
-    assert "B" in prime_candidate_ids
+    assert harness_b_status["status"] == harness_b["status"]
+    if harness_b["status"] == "active":
+        candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
+        assert "B" in candidate_ids
+    else:
+        assert any(
+            "harness B can_receive_dispatch" in finding and f"status={harness_b['status']}" in finding
+            for finding in status_payload["consistency_findings"]
+        )
 
 
 def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
@@ -590,7 +595,99 @@ def test_wi4718_absent_launch_reason_still_fails() -> None:
 def test_wi4718_benign_constant_contains_expected_reasons() -> None:
     """BENIGN_NONLAUNCH_LAUNCH_REASONS contains concurrency_cap_reached and is frozen."""
     assert "concurrency_cap_reached" in BENIGN_NONLAUNCH_LAUNCH_REASONS
+    assert "per_role_concurrency_cap_reached" in BENIGN_NONLAUNCH_LAUNCH_REASONS
     assert isinstance(BENIGN_NONLAUNCH_LAUNCH_REASONS, frozenset)
+
+
+def test_wi4768_per_role_saturation_emits_warn_not_fail(tmp_path: Path) -> None:
+    """Per-role worker saturation is live backpressure, not dispatcher failure."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "pending_count": 3,
+                "selected_count": 1,
+                "last_result": "launch_failed",
+                "last_launch": {
+                    "reason": "per_role_concurrency_cap_reached",
+                    "per_role_live": 8,
+                    "per_role_cap": 8,
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    failure_findings = [f for f in status.health_findings if "dispatch runtime failure" in f]
+    warn_findings = [f for f in status.health_findings if "per_role_concurrency_cap_reached" in f]
+    assert failure_findings == []
+    assert len(warn_findings) == 1
+    assert "live_count=8/cap=8" in warn_findings[0]
+    assert status.health_status == "WARN"
+
+
+def test_wi4768_orphaned_failure_evidence_warns_not_fails(tmp_path: Path) -> None:
+    """A recipient row whose failure evidence points at another recipient is stale."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "pending_count": 2,
+                "selected_count": 1,
+                "last_result": "subprocess_execution_failed",
+                "failure_class": "subprocess_execution_failed",
+                "selected_candidate": {"recipient": "loyal-opposition:D"},
+                "last_launch": {
+                    "recipient": "loyal-opposition:D",
+                    "selected_candidate": {"recipient": "loyal-opposition:D"},
+                    "exit_failure_reason": "subprocess_execution_failed",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime failure: loyal-opposition:F" not in findings
+    assert "loyal-opposition:F stale failure evidence ignored" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["severity"] == "WARN"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == "recipient evidence points to loyal-opposition:D"
+
+
+def test_wi4768_status_surfaces_config_projection_drift(tmp_path: Path) -> None:
+    """Status keeps overlay behavior visible by reporting raw projection drift."""
+    harnesses = _default_harnesses()
+    for harness in harnesses:
+        if harness["id"] == "F":
+            harness["can_receive_dispatch"] = False
+    _write_project(
+        tmp_path,
+        harnesses=harnesses,
+        rules="""
+schema_version = 1
+
+[harnesses.F]
+can_receive_dispatch = true
+dispatch_quality = 80
+
+rules = []
+""".lstrip(),
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    assert any(
+        "harness F can_receive_dispatch rules.toml=True harness-registry=False" in finding
+        for finding in status.consistency_findings
+    )
+    assert any(row["id"] == "F" for row in status.selected_by_role["loyal-opposition"])
 
 
 def test_wi4765_report_builder_preserves_dispatch_runtime_failure_causes(tmp_path: Path) -> None:
