@@ -232,6 +232,50 @@ def test_dry_run_reports_candidates_without_mutating_database(tmp_path: Path) ->
         db.close()
 
 
+def test_apply_revalidates_latest_bridge_status_before_resolution(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    _write_parent_evidence(tmp_path, "thread-a", "WI-0015")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0015", ["thread-a"])
+    finally:
+        db.close()
+
+    original_classify_work_item = module.classify_work_item
+    classify_calls = {"count": 0}
+
+    def classify_and_drift(*args, **kwargs):  # type: ignore[no-untyped-def]
+        result = original_classify_work_item(*args, **kwargs)
+        classify_calls["count"] += 1
+        if classify_calls["count"] == 1:
+            (tmp_path / "bridge" / "thread-a-003.md").write_text(
+                "DEFERRED\n\n# thread-a\n\nOwner parked the thread after prior VERIFIED evidence.\n",
+                encoding="utf-8",
+            )
+        return result
+
+    monkeypatch.setattr(module, "classify_work_item", classify_and_drift)
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0015")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert row["stage"] == "backlogged"
+        assert classify_calls["count"] >= 2
+        assert summary["resolved_ids"] == []
+        assert summary["would_resolve_ids"] == []
+        candidate = summary["candidates"][0]
+        assert candidate["action"] == "skip"
+        assert candidate["reason"] == "linked_bridge_not_verified"
+        assert candidate["bridge_statuses"] == {"thread-a": "DEFERRED"}
+    finally:
+        db.close()
+
+
 def test_contextual_verified_bridge_reference_without_parent_evidence_is_skipped(tmp_path: Path) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})

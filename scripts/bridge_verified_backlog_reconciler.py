@@ -23,7 +23,7 @@ from groundtruth_kb.db import (  # noqa: E402
     WORK_ITEM_TERMINAL_RESOLUTION_STATUSES,
 )
 
-BRIDGE_FILE_STATUS_RE = re.compile(r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|WITHDRAWN)\b")
+BRIDGE_FILE_STATUS_RE = re.compile(r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b")
 BRIDGE_PATH_RE = re.compile(r"(?:^|\b)bridge/([A-Za-z0-9_.-]+?)-\d{3}\.md(?:\b|$)")
 VERSIONED_MD_RE = re.compile(r"^([A-Za-z0-9_.-]+?)-\d{3}\.md$")
 TOKEN_SPLIT_RE = re.compile(r"[,;\r\n]+")
@@ -527,6 +527,23 @@ def _previous_nonterminal_version(db: KnowledgeDB, item_id: str) -> dict[str, An
     return None
 
 
+def _revalidate_work_item_for_resolution(project_root: Path, item: dict[str, Any]) -> dict[str, Any]:
+    fresh_bridge_statuses = collect_latest_bridge_statuses(project_root)
+    fresh_file_index = _index_bridge_thread_files(project_root)
+    fresh_derived_links = build_work_item_bridge_links(
+        project_root,
+        fresh_bridge_statuses,
+        file_index=fresh_file_index,
+    )
+    return classify_work_item(
+        item,
+        fresh_bridge_statuses,
+        project_root=project_root,
+        derived_links=fresh_derived_links,
+        file_index=fresh_file_index,
+    )
+
+
 def reconcile(
     *,
     project_root: Path = PROJECT_ROOT,
@@ -561,11 +578,15 @@ def reconcile(
         ]
         items_by_id = {item["id"]: item for item in candidates}
         if apply:
-            for row in inventory:
+            for index, row in enumerate(inventory):
                 if row["action"] != "resolve":
                     continue
-                current = items_by_id[row["id"]]
                 try:
+                    current = db.get_work_item(row["id"]) or items_by_id[row["id"]]
+                    row = _revalidate_work_item_for_resolution(root, current)
+                    inventory[index] = row
+                    if row["action"] != "resolve":
+                        continue
                     db.update_work_item(
                         row["id"],
                         CHANGED_BY,
