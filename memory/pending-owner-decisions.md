@@ -7938,6 +7938,194 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-21T22:45:06.417172Z
   answer: "Your questions have been answered: \"Your commit+push is blocked by the git-level inventory-drift gate. The credential scan passed; the only blocker is a 6-week-stale inventory baseline drifting on harness-state fields (harnesses / role_by_harness_compatibility) — unrelated to my MEMORY.md change. The canonical deliverables are already persisted in MemBase (groundtruth.db); only the MEMORY.md notepad entry is committable. How should I land it?\"=\"Commit with --no-verify + push\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1337
+  asked_at: 2026-06-21T23:57:32.414057Z
+  question: "What do you want `::open deliberation` to do?"
+  options:
+    - "Open a new deliberation"
+    - "List open/pending deliberations"
+    - "Search the archive"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5c63e68d0a228232
+  resolved_at: 2026-06-21T23:57:32.414057Z
+  answer: "Your questions have been answered: \"What do you want `::open deliberation` to do?\"=\"Open a new deliberation\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1339
+  asked_at: 2026-06-22T03:26:54.357769Z
+  question: "WI-4723's content is LO-verified-correct three times, but VERIFIED finalization keeps NO-GO'ing purely on the shared-index environment (the index re-dirties faster than it can be cleaned during the LO's dispatch window — -010 is the 4th such NO-GO, and I just watched the LO's verification race my de-stage and lose). How do you want to get WI-4723 to closure?"
+  options:
+    - "Quiesce + verify"
+    - "Pragmatic-accept + close"
+    - "Keep retrying"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b9453af916628600
+  resolved_at: 2026-06-22T03:26:54.357769Z
+  answer: "Your questions have been answered: \"WI-4723's content is LO-verified-correct three times, but VERIFIED finalization keeps NO-GO'ing purely on the shared-index environment (the index re-dirties faster than it can be cleaned during the LO's dispatch window — -010 is the 4th such NO-GO, and I just watched the LO's verification race my de-stage and lose). How do you want to get WI-4723 to closure?\"=\"Quiesce + verify\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1340
+  asked_at: 2026-06-22T04:09:35.935781Z
+  question: "LO verification of the WI-4520 report (-007) is blocked: headless LO dispatch is saturated by hung worker processes (2 openrouter LO workers stuck 44 min holding the per-role concurrency cap of 3). It won't self-resolve. How should I unblock it?"
+  options:
+    - "Clear hung LO workers (recommended)"
+    - "You run an interactive LO session"
+    - "Keep waiting / monitoring"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bb2cc3c5f59ff534
+  resolved_at: 2026-06-22T04:09:35.935781Z
+  answer: "Your questions have been answered: \"LO verification of the WI-4520 report (-007) is blocked: headless LO dispatch is saturated by hung worker processes (2 openrouter LO workers stuck 44 min holding the per-role concurrency cap of 3). It won't self-resolve. How should I unblock it?\"=\"Clear hung LO workers (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1341
+  asked_at: 2026-06-22T04:23:10.089604Z
+  question: "Both your asks are complete (62 projects retired with the -003 report awaiting autonomous LO VERIFIED; turn-budget fix VERIFIED; WI-4741/4742 captured). What should I do next?"
+  options:
+    - "Leave it to the dispatcher"
+    - "Build the auto-retire automation now"
+    - "Wrap up the session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 53282829b6cc96ee
+  resolved_at: 2026-06-22T04:23:10.089604Z
+  answer: "Your questions have been answered: \"Both your asks are complete (62 projects retired with the -003 report awaiting autonomous LO VERIFIED; turn-budget fix VERIFIED; WI-4741/4742 captured). What should I do next?\"=\"Build the auto-retire automation now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1344
+  asked_at: 2026-06-22T07:13:16.846553Z
+  question: "WI-4741's 'detector archival-blindness' is not the real gap (the scanner already reads 562 VERIFIED threads). The real gaps: it only scans authorized projects (33/64 active have none), and its completion test requires implements-linked VERIFIED-thread coverage (only 32 projects have it) rather than your 'all member WIs terminal' criterion. How should I re-scope the detector/criterion work?"
+  options:
+    - "Reconcile to member-WI criterion"
+    - "Broaden scope only, keep strict criterion"
+    - "Pause Slice 2; re-spec WI-4741"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c97fe4b721bd9e0c
+  resolved_at: 2026-06-22T07:13:16.846553Z
+  answer: "Your questions have been answered: \"WI-4741's 'detector archival-blindness' is not the real gap (the scanner already reads 562 VERIFIED threads). The real gaps: it only scans authorized projects (33/64 active have none), and its completion test requires implements-linked VERIFIED-thread coverage (only 32 projects have it) rather than your 'all member WIs terminal' criterion. How should I re-scope the detector/criterion work?\"=\"Reconcile to member-WI criterion\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1345
+  asked_at: 2026-06-22T08:44:48.975671Z
+  question: "The WI-4753 dispatch-storm hotfix is GO'd, but the GO is a same-session self-review (Codex authored both the -001 proposal and the -002 GO from session codex-wi4753-hotfix-20260622), which the independence rule fails closed. How should I proceed?"
+  options:
+    - "Independent review, then I implement"
+    - "Authorize emergency direct implement"
+    - "Leave it to the dispatcher"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ee583211dc32718f
+  resolved_at: 2026-06-22T08:44:48.975671Z
+  answer: "Your questions have been answered: \"The WI-4753 dispatch-storm hotfix is GO'd, but the GO is a same-session self-review (Codex authored both the -001 proposal and the -002 GO from session codex-wi4753-hotfix-20260622), which the independence rule fails closed. How should I proceed?\"=\"Independent review, then I implement\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1338
+  asked_at: 2026-06-22T03:23:05.876040Z
+  question: "Want me to do anything else, or leave the rest to the autonomous dispatcher?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 2267a7562a4a8613
+  resolved_at: 2026-06-22T10:17:34.838470Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1342
+  asked_at: 2026-06-22T05:11:46.694186Z
+  question: "want me to look into that, or is it already in hand?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 33787134fb565d6b
+  resolved_at: 2026-06-22T10:17:34.838491Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1343
+  asked_at: 2026-06-22T05:11:46.694186Z
+  question: "should I keep working the broader bridge queue, or leave it to the dispatcher?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: 3d3cb8ac55718e67
+  resolved_at: 2026-06-22T10:17:34.838497Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1346
+  asked_at: 2026-06-22T10:16:32.492585Z
+  question: "Want me to confirm whether `PROJECT-GTKB-RELIABILITY-FIXES` has any remaining open items (and whether it auto-retires..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: f2615ce0a7de8c80
+  resolved_at: 2026-06-22T10:17:34.838501Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1347
+  asked_at: 2026-06-22T13:47:12.418922Z
+  question: "WI-4723 is fully closed (VERIFIED at -022, resolved in MemBase v4, memory updated). What would you like next?"
+  options:
+    - "Check project status"
+    - "Stop here"
+    - "Clear stale decisions + stop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3f4d0fc11beca6a5
+  resolved_at: 2026-06-22T13:47:12.418922Z
+  answer: "Your questions have been answered: \"WI-4723 is fully closed (VERIFIED at -022, resolved in MemBase v4, memory updated). What would you like next?\"=\"Check project status\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1348
+  asked_at: 2026-06-22T13:58:26.895635Z
+  question: "WI-4683 (re-admit `ops`) hit NO-GO twice — Codex correctly requires it be done as a sequenced, owner-ratified FORMAL AMENDMENT of two governance specs (SPEC-TOPIC-ENVELOPE-ROUTER-001 + DCL-TOPIC-ENVELOPE-ROUTING-001, 5→6) BEFORE any code; the routing DCL itself mandates owner-AUQ to add a type. The 6-member vocabulary is already your decision (DEC-4), and WI-4684 Slice 2 does NOT depend on this. How should I proceed?"
+  options:
+    - "Defer WI-4683; drive Slice 2"
+    - "Proceed: formal amendment now"
+    - "Different approach"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 54d743aa7d982516
+  resolved_at: 2026-06-22T13:58:26.895635Z
+  answer: "Your questions have been answered: \"WI-4683 (re-admit `ops`) hit NO-GO twice — Codex correctly requires it be done as a sequenced, owner-ratified FORMAL AMENDMENT of two governance specs (SPEC-TOPIC-ENVELOPE-ROUTER-001 + DCL-TOPIC-ENVELOPE-ROUTING-001, 5→6) BEFORE any code; the routing DCL itself mandates owner-AUQ to add a type. The 6-member vocabulary is already your decision (DEC-4), and WI-4684 Slice 2 does NOT depend on this. How should I proceed?\"=\"Proceed: formal amendment now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1349
+  asked_at: 2026-06-22T16:19:16.360046Z
+  question: "The WI-4737+WI-4751 bundle was already sweep-committed in 47a298abe (during the WI-4723 finalization window) with no bridge thread; WI-4737 is already resolved in MemBase sans-VERIFIED stamp, WI-4751 is still backlogged. All 7 WI-4751 target tests pass at HEAD. The previous 'land the whole bundle' answer assumed an uncommitted bundle to propose; current reality changes the choice. How do you want to close WI-4751?"
+  options:
+    - "Match WI-4737: pragmatic resolve"
+    - "Formal waiver + VERIFIED"
+    - "Stop — leave WI-4751 open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a83388fd4ae93cb6
+  resolved_at: 2026-06-22T16:19:16.360046Z
+  answer: "Your questions have been answered: \"The WI-4737+WI-4751 bundle was already sweep-committed in 47a298abe (during the WI-4723 finalization window) with no bridge thread; WI-4737 is already resolved in MemBase sans-VERIFIED stamp, WI-4751 is still backlogged. All 7 WI-4751 target tests pass at HEAD. The previous 'land the whole bundle' answer assumed an uncommitted bundle to propose; current reality changes the choice. How do you want to close WI-4751?\"=\"Match WI-4737: pragmatic resolve\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1350
+  asked_at: 2026-06-22T16:32:01.547682Z
+  question: "Formal artifact approval: insert GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v6 with the member-WI terminal-resolution criterion as shown above (replacing the v4/v5 implements-link gating, preserving keep-open election + AUQ boundary + safeguards)?"
+  options:
+    - "Approve v6 as drafted"
+    - "Modify before approving"
+    - "Don't insert a spec; reconsider"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6142b13a39c6ab72
+  resolved_at: 2026-06-22T16:32:01.547682Z
+  answer: "Your questions have been answered: \"Formal artifact approval: insert GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v6 with the member-WI terminal-resolution criterion as shown above (replacing the v4/v5 implements-link gating, preserving keep-open election + AUQ boundary + safeguards)?\"=\"Approve v6 as drafted\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1351
+  asked_at: 2026-06-22T18:36:35.426325Z
+  question: "The LO queue isn't being dispatched because GTKB_NO_CROSS_HARNESS_TRIGGER=1 is set at User scope (persistent), disabling the cross-harness trigger entirely (9h-stale state, no LO workers, ~19 items incl. your WI-4746 unreviewed). No deliberation records it as intentional. Clear the kill-switch to re-enable dispatch?"
+  options:
+    - "Clear it — re-enable dispatch"
+    - "Leave it set"
+    - "Investigate further first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 32ca7f7ef8fd7a05
+  resolved_at: 2026-06-22T18:36:35.426325Z
+  answer: "Your questions have been answered: \"The LO queue isn't being dispatched because GTKB_NO_CROSS_HARNESS_TRIGGER=1 is set at User scope (persistent), disabling the cross-harness trigger entirely (9h-stale state, no LO workers, ~19 items incl. your WI-4746 unreviewed). No deliberation records it as intentional. Clear the kill-switch to re-enable dispatch?\"=\"Clear it — re-enable dispatch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1352
+  asked_at: 2026-06-22T20:06:30.350846Z
+  question: "should I file the proposal as Slice 1 first or jump straight into the implementation?"
+  detected_via: prose:should_i_or
+  status: resolved
+  question_hash: ebe0839fe231c5ec
+  resolved_at: 2026-06-22T22:34:58.663633Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
 
 ## History
 
