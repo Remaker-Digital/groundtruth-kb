@@ -56,6 +56,7 @@ def test_claude_md_narrative_approval_packet_matches_current_file() -> None:
 def test_root_pyproject_and_ci_paths_are_platform_scoped_and_extant() -> None:
     pyproject = _read_toml("pyproject.toml")
     pytest_options = pyproject["tool"]["pytest"]["ini_options"]
+    coverage_options = pyproject["tool"]["coverage"]["run"]
 
     assert "tool" not in pyproject or "mutmut" not in pyproject["tool"]
     assert "tests/**" not in pyproject["tool"]["ruff"]["lint"]["per-file-ignores"]
@@ -68,6 +69,20 @@ def test_root_pyproject_and_ci_paths_are_platform_scoped_and_extant() -> None:
     ignore_paths = re.findall(r"--ignore=([^ ]+)", pytest_options["addopts"])
     for relative_path in ignore_paths:
         assert (ROOT / relative_path).exists(), relative_path
+
+    assert coverage_options["source"] == ["groundtruth-kb/src", "scripts"]
+    assert all("applications/Agent_Red" not in relative_path for relative_path in coverage_options["source"])
+    for relative_path in coverage_options["source"]:
+        assert (ROOT / relative_path).exists(), relative_path
+
+    assert coverage_options["omit"] == [
+        "groundtruth-kb/src/**/__init__.py",
+        "scripts/**/__init__.py",
+    ]
+    assert all("applications/Agent_Red" not in relative_path for relative_path in coverage_options["omit"])
+    for relative_glob in coverage_options["omit"]:
+        root_path = relative_glob.split("/**/", maxsplit=1)[0]
+        assert (ROOT / root_path).exists(), relative_glob
 
     groundtruth_workflow = _read_text(".github/workflows/groundtruth-kb-tests.yml")
     assert "python -m pytest tests/" in groundtruth_workflow

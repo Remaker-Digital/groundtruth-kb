@@ -4,9 +4,9 @@
 Authority: bridge `gtkb-loyal-opposition-startup-symmetry-001` GO at -008,
 IP-1 (init-keyword regex + matching helper).
 
-Specs: ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 (NEW),
-DCL-SESSION-START-INIT-KEYWORD-MATCHING-001 (NEW),
-DCL-SESSION-START-APP-SCOPE-BINDING-001 (NEW).
+Specs: DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001,
+SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001,
+DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
 """
 
 from __future__ import annotations
@@ -124,7 +124,7 @@ def test_whitespace_punctuation_case_tolerance(prompt: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# DCL-SESSION-START-APP-SCOPE-BINDING-001: app-scope normalization
+# DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001: app-scope normalization
 # ---------------------------------------------------------------------------
 
 

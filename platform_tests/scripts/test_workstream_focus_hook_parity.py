@@ -5,7 +5,7 @@ Authority: bridge `gtkb-loyal-opposition-startup-symmetry-001` GO at -008,
 IP-12 (`.claude/settings.json` UserPromptSubmit registration; first-position
 ordering).
 
-Specs: ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 (NEW); init-keyword
+Specs: DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001; init-keyword
 matching MUST run before owner-decision-tracker so the tracker doesn't see
 init-keyword prompts as prose decision-asks.
 """

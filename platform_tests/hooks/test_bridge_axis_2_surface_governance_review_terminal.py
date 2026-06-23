@@ -34,12 +34,20 @@ if str(REPO_ROOT) not in sys.path:
 _PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
 if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
+_SCRIPTS = REPO_ROOT / "scripts"
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
 
 _HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "bridge-axis-2-surface.py"
 
 
 def _load_hook(project_root: Path) -> ModuleType:
     """Import the hook module fresh and rebind its PROJECT_ROOT to a tmp dir."""
+    src_helper = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+    dst_helper = project_root / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+    dst_helper.parent.mkdir(parents=True, exist_ok=True)
+    dst_helper.write_bytes(src_helper.read_bytes())
+
     spec = importlib.util.spec_from_file_location("_test_axis2_dispatchable_filter", _HOOK_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

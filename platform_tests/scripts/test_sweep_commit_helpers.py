@@ -3,6 +3,8 @@
 Per ``bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-001.md``
 (NEW) and ``-002`` (Codex GO). Covers the eight acceptance criteria in the
 proposal's Verification Plan, including the 2026-06-13 incident regression.
+WI-4709 extends the same planner with a non-terminal bridge-thread hold so
+protected paths cannot be committed ahead of VERIFIED.
 
 The fixture bridge filenames used below (``bridge/wi4528-fixture-*.md``) are
 synthetic test fixtures created on disk inside ``tmp_path``; they are NOT
@@ -86,7 +88,7 @@ def test_protected_hook_with_bridge_evidence_grouped(tmp_path: Path) -> None:
     bridge_rel = "bridge/wi4528-fixture-hooks-001.md"
     root = _make_project(
         tmp_path,
-        bridge_files={bridge_rel: "NEW\n\nThis proposal registers a Stop hook in .codex/hooks.json.\n"},
+        bridge_files={bridge_rel: "VERIFIED\n\nThis report registers a Stop hook in .codex/hooks.json.\n"},
     )
     staged = [".codex/hooks.json", bridge_rel]
 
@@ -119,18 +121,21 @@ def test_missing_evidence_diagnostic(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC3: bridge/INDEX.md co-stage is the universal gate-satisfier.
+# AC3: non-numbered bridge files are not review evidence for the gate.
 # ---------------------------------------------------------------------------
-def test_index_md_is_universal_evidence(tmp_path: Path) -> None:
+def test_index_md_is_not_review_evidence(tmp_path: Path) -> None:
     root = _make_project(tmp_path)
     staged = [".codex/hooks.json", "bridge/INDEX.md"]
 
     batches = helper.plan_commit_batches(staged, root)
 
-    pwe = _batch_of_kind(batches, "protected-with-evidence")
-    assert len(pwe) == 1
-    assert set(pwe[0].paths) == {".codex/hooks.json", "bridge/INDEX.md"}
-    assert "bridge/INDEX.md" in pwe[0].evidence
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
+    missing = _batch_of_kind(batches, "protected-missing-evidence")
+    assert len(missing) == 1
+    assert missing[0].paths == [".codex/hooks.json"]
+    unconstrained = _batch_of_kind(batches, "unconstrained")
+    assert len(unconstrained) == 1
+    assert unconstrained[0].paths == ["bridge/INDEX.md"]
 
 
 # ---------------------------------------------------------------------------
@@ -166,8 +171,8 @@ def test_multiple_protected_paths_each_get_evidence(tmp_path: Path) -> None:
     root = _make_project(
         tmp_path,
         bridge_files={
-            bridge_a: "NEW\n\nRegisters .codex/hooks.json Stop hook.\n",
-            bridge_b: "NEW\n\nAdds .claude/hooks/foo.py PreToolUse gate.\n",
+            bridge_a: "VERIFIED\n\nRegisters .codex/hooks.json Stop hook.\n",
+            bridge_b: "VERIFIED\n\nAdds .claude/hooks/foo.py PreToolUse gate.\n",
         },
     )
     staged = [".codex/hooks.json", ".claude/hooks/foo.py", bridge_a, bridge_b]
@@ -243,12 +248,12 @@ def test_fail_soft_when_toml_malformed(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # AC8: real-world replay of the 2026-06-13 incident staged set.
 # ---------------------------------------------------------------------------
-def test_real_world_2026_06_13_incident_replay(tmp_path: Path) -> None:
+def test_real_world_2026_06_13_incident_replay_active_go_is_held(tmp_path: Path) -> None:
     """The 2026-06-13 split: the .codex/hooks.json change had no co-staged bridge.
 
-    When the dependent bridge evidence IS co-staged, the plan groups the hooks
-    file with that evidence into a single accept-able batch (the fix); the
-    settings.json + lint-script + tests land in their own unconstrained batch.
+    With WI-4709, a GO thread that still cites the hooks file is active and
+    non-terminal, so the hooks file is held rather than committed with evidence.
+    The settings.json + lint-script + tests still land unconstrained.
     """
     bridge_rel = "bridge/wi4528-fixture-grilling-gate-001.md"
     root = _make_project(
@@ -267,10 +272,14 @@ def test_real_world_2026_06_13_incident_replay(tmp_path: Path) -> None:
 
     batches = helper.plan_commit_batches(staged, root)
 
-    pwe = _batch_of_kind(batches, "protected-with-evidence")
-    assert len(pwe) == 1
-    assert ".codex/hooks.json" in pwe[0].paths
-    assert bridge_rel in pwe[0].paths
+    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    assert len(held) == 1
+    assert held[0].paths == [".codex/hooks.json"]
+    assert "wi4528-fixture-grilling-gate@GO" in held[0].rationale
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
+    bridge_only = _batch_of_kind(batches, "bridge-only")
+    assert len(bridge_only) == 1
+    assert bridge_only[0].paths == [bridge_rel]
     # .claude/settings.json is NOT in the protected registry (only .claude/hooks/**),
     # so it lands unconstrained, not blocked.
     unconstrained = _batch_of_kind(batches, "unconstrained")
@@ -280,8 +289,126 @@ def test_real_world_2026_06_13_incident_replay(tmp_path: Path) -> None:
         "scripts/check_lo_advisory_grilling_gate.py",
         "platform_tests/scripts/test_advisory_grilling_gate_lint.py",
     }
-    # No missing-evidence: the hooks file is paired with its bridge evidence.
+    # No missing-evidence: the hooks file is held by active bridge state instead.
     assert _batch_of_kind(batches, "protected-missing-evidence") == []
+
+
+# ---------------------------------------------------------------------------
+# WI-4709: active non-terminal bridge threads hold protected paths until VERIFIED.
+# ---------------------------------------------------------------------------
+def test_protected_path_in_nonterminal_thread_is_held(tmp_path: Path) -> None:
+    bridge_rel = "bridge/wi4709-active-001.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={bridge_rel: "REVISED\n\nUpdates .claude/hooks/foo.py for the active thread.\n"},
+    )
+    staged = [".claude/hooks/foo.py", bridge_rel]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    assert len(held) == 1
+    assert held[0].paths == [".claude/hooks/foo.py"]
+    assert "wi4709-active@REVISED" in held[0].rationale
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
+    bridge_only = _batch_of_kind(batches, "bridge-only")
+    assert len(bridge_only) == 1
+    assert bridge_only[0].paths == [bridge_rel]
+
+
+def test_protected_path_with_only_verified_thread_commits(tmp_path: Path) -> None:
+    bridge_001 = "bridge/wi4709-verified-001.md"
+    bridge_002 = "bridge/wi4709-verified-002.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={
+            bridge_001: "NEW\n\nInitial proposal for .codex/hooks.json.\n",
+            bridge_002: "VERIFIED\n\nVerified implementation for .codex/hooks.json.\n",
+        },
+    )
+    staged = [".codex/hooks.json", bridge_002]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    assert _batch_of_kind(batches, "protected-active-thread-nonterminal") == []
+    pwe = _batch_of_kind(batches, "protected-with-evidence")
+    assert len(pwe) == 1
+    assert set(pwe[0].paths) == {".codex/hooks.json", bridge_002}
+
+
+def test_latest_version_status_decides_not_earlier_version(tmp_path: Path) -> None:
+    terminal_bridge = "bridge/wi4709-terminal-002.md"
+    active_bridge = "bridge/wi4709-active-latest-002.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={
+            "bridge/wi4709-terminal-001.md": "NEW\n\nInitial .codex/hooks.json proposal.\n",
+            terminal_bridge: "VERIFIED\n\nVerified .codex/hooks.json implementation.\n",
+            "bridge/wi4709-active-latest-001.md": "GO\n\nApproved .claude/hooks/foo.py change.\n",
+            active_bridge: "REVISED\n\nStill active .claude/hooks/foo.py revision.\n",
+        },
+    )
+    staged = [".codex/hooks.json", terminal_bridge, ".claude/hooks/foo.py", active_bridge]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    assert len(held) == 1
+    assert held[0].paths == [".claude/hooks/foo.py"]
+    assert "wi4709-active-latest@REVISED" in held[0].rationale
+    pwe = _batch_of_kind(batches, "protected-with-evidence")
+    assert len(pwe) == 1
+    assert set(pwe[0].paths) == {".codex/hooks.json", terminal_bridge}
+
+
+def test_protected_path_with_no_citing_thread_unaffected(tmp_path: Path) -> None:
+    evidence_bridge = "bridge/wi4709-evidence-002.md"
+    active_unrelated = "bridge/wi4709-unrelated-001.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={
+            evidence_bridge: "VERIFIED\n\nVerified .codex/hooks.json implementation.\n",
+            active_unrelated: "REVISED\n\nThis active thread cites no protected hook path.\n",
+        },
+    )
+    staged = [".codex/hooks.json", evidence_bridge]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    assert _batch_of_kind(batches, "protected-active-thread-nonterminal") == []
+    pwe = _batch_of_kind(batches, "protected-with-evidence")
+    assert len(pwe) == 1
+    assert set(pwe[0].paths) == {".codex/hooks.json", evidence_bridge}
+
+
+def test_nonterminal_gate_fail_soft_when_bridge_dir_absent(tmp_path: Path) -> None:
+    root = _make_project(tmp_path)
+    staged = [".codex/hooks.json"]
+
+    assert helper.active_nonterminal_bridge_threads_citing(staged, root) == {".codex/hooks.json": []}
+
+    batches = helper.plan_commit_batches(staged, root)
+    assert _batch_of_kind(batches, "protected-active-thread-nonterminal") == []
+    missing = _batch_of_kind(batches, "protected-missing-evidence")
+    assert len(missing) == 1
+    assert missing[0].paths == [".codex/hooks.json"]
+
+
+def test_codex_hooks_json_in_nonterminal_thread_is_held(tmp_path: Path) -> None:
+    bridge_rel = "bridge/wi4709-codex-hooks-001.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={bridge_rel: "NEW\n\nRegisters the Codex hook file at .codex/hooks.json.\n"},
+    )
+    staged = [".codex/hooks.json", bridge_rel]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    assert len(held) == 1
+    assert held[0].paths == [".codex/hooks.json"]
+    assert "wi4709-codex-hooks@NEW" in held[0].rationale
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
 
 
 # ---------------------------------------------------------------------------
@@ -295,12 +422,12 @@ def test_partition_staged_buckets(tmp_path: Path) -> None:
         globs,
     )
     assert parts["protected"] == [".codex/hooks.json"]
-    assert set(parts["bridge"]) == {"bridge/INDEX.md", "bridge/x-001.md"}
-    assert parts["other"] == ["scripts/y.py"]
+    assert parts["bridge"] == ["bridge/x-001.md"]
+    assert parts["other"] == ["bridge/INDEX.md", "scripts/y.py"]
 
 
 def test_is_bridge_evidence_path() -> None:
-    assert helper.is_bridge_evidence_path("bridge/INDEX.md") is True
+    assert helper.is_bridge_evidence_path("bridge/INDEX.md") is False
     assert helper.is_bridge_evidence_path("bridge/anything-001.md") is True
     assert helper.is_bridge_evidence_path("scripts/x.py") is False
 

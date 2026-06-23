@@ -38,6 +38,10 @@ def project_root(tmp_path: Path) -> Path:
         "Document: foo\nNEW: bridge/foo-001.md\n",
     )
     _write(
+        tmp_path / "bridge" / "foo-001.md",
+        "NEW\n",
+    )
+    _write(
         tmp_path / "groundtruth.toml",
         '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
     )

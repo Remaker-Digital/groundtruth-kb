@@ -42,7 +42,22 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
     bridge.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     for slug, status in statuses.items():
-        version = "002" if status == "GO" else "001"
+        existing = sorted(
+            (
+                int(path.stem.rsplit("-", 1)[1])
+                for path in bridge.glob(f"{slug}-*.md")
+                if path.stem.rsplit("-", 1)[-1].isdigit()
+            ),
+            reverse=True,
+        )
+        if existing:
+            version_number = existing[0] + 1
+        else:
+            version_number = 2 if status == "GO" else 1
+            if status == "GO":
+                (bridge / f"{slug}-001.md").write_text("NEW\n", encoding="utf-8")
+        version = f"{version_number:03d}"
+        (bridge / f"{slug}-{version}.md").write_text(f"{status}\n", encoding="utf-8")
         lines.extend([f"Document: {slug}", f"{status}: bridge/{slug}-{version}.md", ""])
     (bridge / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 

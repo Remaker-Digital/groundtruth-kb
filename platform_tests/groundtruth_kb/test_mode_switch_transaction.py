@@ -88,6 +88,7 @@ def _seed_workspace(
         )
     generate_harness_projection(db, root)
     _write(root / "bridge" / "INDEX.md", index_text)
+    _write(root / "bridge" / "foo-001.md", "NEW\n")
 
 
 def _read_role_map(root: Path) -> dict[str, Any]:

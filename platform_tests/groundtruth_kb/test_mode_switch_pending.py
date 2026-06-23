@@ -72,6 +72,10 @@ def _seed_workspace(root: Path) -> None:
         root / "bridge" / "INDEX.md",
         "Document: foo\nVERIFIED: bridge/foo-001.md\n",
     )
+    _write(
+        root / "bridge" / "foo-001.md",
+        "VERIFIED\n",
+    )
 
 
 def _read_role_map(root: Path) -> dict[str, Any]:
