@@ -12,7 +12,7 @@ import ThemedImage from '@theme/ThemedImage';
     alt="Agent Red"
     sources={{
       light: '/img/primary-logo-no-wordmark_black_text.svg',
-      dark: '/img/agent-red-logo.svg',
+      dark: '/img/primary-logo-no-wordmark_white_text.svg',
     }}
     style={{maxHeight: '240px', marginTop: '100px', marginBottom: '80px'}}
   />
