@@ -42,6 +42,40 @@ def test_marked_disclosure_mention_not_refuted():
     assert gap is None
 
 
+def test_harness_local_observed_result_path_not_refuted():
+    preflight = _load_module()
+    clause = _in_root_clause(preflight)
+    content = (
+        'target_paths: ["scripts/adr_dcl_clause_preflight.py"]\n\n'
+        "Implementation artifacts remain in-root under E:\\GT-KB.\n"
+        "## Observed Results\n\n"
+        "- Initial no-`--basetemp` pytest run failed during fixture setup because "
+        "Windows denied access to `C:\\Users\\micha\\AppData\\Local\\Temp\\pytest-of-micha`; "
+        "rerunning with repo-local `--basetemp` passed.\n"
+    )
+
+    found, reasons, gap = preflight.evaluate_evidence(clause, content)
+
+    assert found is True, f"harness-local observed-result path should not refute; reasons={reasons}; gap={gap}"
+    assert gap is None
+
+
+def test_harness_local_diagnostic_disclosure_line_not_refuted():
+    preflight = _load_module()
+    clause = _in_root_clause(preflight)
+    content = (
+        'target_paths: ["scripts/adr_dcl_clause_preflight.py"]\n\n'
+        "Implementation artifacts remain in-root under E:\\GT-KB.\n"
+        "Diagnostic disclosure: stderr included local harness path "
+        "`C:\\Users\\micha\\AppData\\Local\\Temp\\pytest-of-micha` from the test environment.\n"
+    )
+
+    found, reasons, gap = preflight.evaluate_evidence(clause, content)
+
+    assert found is True, f"harness-local diagnostic disclosure should not refute; reasons={reasons}; gap={gap}"
+    assert gap is None
+
+
 def test_out_of_root_target_paths_still_refutes():
     preflight = _load_module()
     clause = _in_root_clause(preflight)
@@ -62,18 +96,34 @@ def test_out_of_root_target_paths_still_refutes():
         assert gap is not None
 
 
-def test_unmarked_mention_still_refutes():
+def test_unmarked_artifact_claim_still_refutes():
     preflight = _load_module()
     clause = _in_root_clause(preflight)
     content = (
         'target_paths: ["scripts/adr_dcl_clause_preflight.py"]\n\n'
         "Implementation artifacts remain in-root under E:\\GT-KB.\n"
-        "The proposal also mentions C:\\Users\\micha\\scratch outside any disclosure marker.\n"
+        "The implementation will write output to C:\\Users\\micha\\scratch outside the project root.\n"
     )
 
     found, reasons, gap = preflight.evaluate_evidence(clause, content)
 
-    assert found is False, f"unmarked out-of-root mention must still refute; reasons={reasons}"
+    assert found is False, f"unmarked out-of-root artifact claim must still refute; reasons={reasons}"
+    assert gap is not None
+
+
+def test_files_changed_user_profile_path_still_refutes():
+    preflight = _load_module()
+    clause = _in_root_clause(preflight)
+    content = (
+        'target_paths: ["scripts/adr_dcl_clause_preflight.py"]\n\n'
+        "Implementation artifacts remain in-root under E:\\GT-KB.\n"
+        "## Files Changed\n\n"
+        "- C:\\Users\\micha\\scratch\\out.md (new)\n"
+    )
+
+    found, reasons, gap = preflight.evaluate_evidence(clause, content)
+
+    assert found is False, f"out-of-root file-list entry must still refute; reasons={reasons}"
     assert gap is not None
 
 

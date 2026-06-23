@@ -62,6 +62,30 @@ TARGET_PATHS_DECLARATION_RE = re.compile(
     re.IGNORECASE,
 )
 DOCUMENT_DECLARATION_RE = re.compile(r"(?im)^\s*Document:\s*([A-Za-z0-9_.-]+)\s*$")
+MARKDOWN_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*$")
+DISCLOSURE_CONTEXT_HEADING_RE = re.compile(
+    r"(?i)\b(?:observed results?|command(?:s executed| output)|test output|diagnostics?|stderr|stdout|"
+    r"environment|notes?|context|findings)\b"
+)
+ARTIFACT_DECLARATION_HEADING_RE = re.compile(
+    r"(?i)\b(?:files?\s+(?:changed|modified|created|deleted)|changed files?|target paths?|paths changed|"
+    r"generated (?:artifacts?|files?)|outputs?|output paths?|artifacts?)\b"
+)
+DISCLOSURE_CONTEXT_LINE_RE = re.compile(
+    r"(?i)\b(?:diagnostic(?:s)?|disclosure|observed|stderr|stdout|log(?:ged)?|traceback|pytest|"
+    r"fixture setup|temp(?:orary)? directory|harness[- ]local|local harness|operator context|"
+    r"test environment|command output|repo[- ]local)\b"
+)
+ARTIFACT_DECLARATION_LINE_RE = re.compile(
+    r"(?ix)"
+    r"\btarget_paths?\b|"
+    r"\bfiles?\s+changed\b|"
+    r"\boutputs?\s+(?:go(?:es)?|went|land(?:s)?|reside|write|writes|written|generated|created|stored|saved|under|to)\b|"
+    r"\b(?:write|writes|written|create|creates|created|generate|generates|generated|store|stores|stored|"
+    r"save|saves|saved)\s+(?:to|under|at)\b|"
+    r"\b(?:artifact|output|file)s?\s+(?:path|under|outside|escape|escapes|outside)\b|"
+    r"^\s*[-*]\s+`?(?:[A-Za-z]:\\|/tmp/|C:\\temp\\)"
+)
 
 
 @dataclass(frozen=True)
@@ -185,10 +209,48 @@ def _failure_pattern_scan_content(clause: Clause, content: str) -> str:
         return content
 
     stripped = IN_ROOT_DISCLOSURE_BLOCK_RE.sub("", content)
+    stripped = _strip_report_safe_disclosure_lines(clause, stripped)
     target_path_lines = [line for line in content.splitlines() if TARGET_PATHS_DECLARATION_RE.match(line)]
     if not target_path_lines:
         return stripped
     return "\n".join([stripped, *target_path_lines])
+
+
+def _strip_report_safe_disclosure_lines(clause: Clause, content: str) -> str:
+    """Remove diagnostic-only path disclosures from CLAUSE-IN-ROOT failure scans.
+
+    Raw target-path declarations are appended back by ``_failure_pattern_scan_content``.
+    Artifact/output declarations and file-list sections remain in the scanned
+    text, so genuine out-of-root implementation claims still refute evidence.
+    """
+    if not clause.failure_pattern:
+        return content
+
+    current_heading = ""
+    lines: list[str] = []
+    for line in content.splitlines():
+        heading_match = MARKDOWN_HEADING_RE.match(line)
+        if heading_match:
+            current_heading = heading_match.group(1)
+            lines.append(line)
+            continue
+
+        if _is_report_safe_disclosure_line(clause, line, current_heading):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _is_report_safe_disclosure_line(clause: Clause, line: str, current_heading: str) -> bool:
+    if not clause.failure_pattern or not re.search(clause.failure_pattern, line):
+        return False
+    if TARGET_PATHS_DECLARATION_RE.match(line):
+        return False
+    if ARTIFACT_DECLARATION_HEADING_RE.search(current_heading):
+        return False
+    if ARTIFACT_DECLARATION_LINE_RE.search(line):
+        return False
+    return bool(DISCLOSURE_CONTEXT_HEADING_RE.search(current_heading) or DISCLOSURE_CONTEXT_LINE_RE.search(line))
 
 
 def evaluate_evidence(clause: Clause, content: str) -> tuple[bool, list[str], str | None]:
