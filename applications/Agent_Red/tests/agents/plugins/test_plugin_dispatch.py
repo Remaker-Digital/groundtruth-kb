@@ -19,6 +19,30 @@ from src.agents.plugins.dispatch import PluginDispatcher, PluginDispatchResult
 from src.agents.plugins.registry import PluginAgentRegistry
 
 
+class RecordingResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+class RecordingHttpClient:
+    def __init__(self):
+        self.calls = []
+
+    async def post(self, url, *, json, headers, timeout):
+        self.calls.append(
+            {
+                "url": url,
+                "json": json,
+                "headers": headers,
+                "timeout": timeout,
+            }
+        )
+        return RecordingResponse({"ok": True, "received": json})
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -34,27 +58,29 @@ def _reset():
 @pytest.fixture
 def registry() -> PluginAgentRegistry:
     r = PluginAgentRegistry.get_instance()
-    r.load_from_dict({
-        "test_agent": {
-            "display_name": "Test",
-            "description": "Test agent",
-            "spec_id": "SPEC-TEST",
-            "category": "testing",
-            "endpoint": "http://test:8080",
-            "capabilities": ["test.do_thing"],
-            "status": "available",
-        },
-        "ext_server": {
-            "display_name": "External",
-            "description": "External MCP",
-            "spec_id": "SPEC-1712",
-            "category": "external",
-            "endpoint": "https://mcp.ext.com",
-            "capabilities": ["ext.query"],
-            "status": "available",
-            "is_external": True,
-        },
-    })
+    r.load_from_dict(
+        {
+            "test_agent": {
+                "display_name": "Test",
+                "description": "Test agent",
+                "spec_id": "SPEC-TEST",
+                "category": "testing",
+                "endpoint": "http://test:8080",
+                "capabilities": ["test.do_thing"],
+                "status": "available",
+            },
+            "ext_server": {
+                "display_name": "External",
+                "description": "External MCP",
+                "spec_id": "SPEC-1712",
+                "category": "external",
+                "endpoint": "https://mcp.ext.com",
+                "capabilities": ["ext.query"],
+                "status": "available",
+                "is_external": True,
+            },
+        }
+    )
     return r
 
 
@@ -71,9 +97,7 @@ def dispatcher(registry) -> PluginDispatcher:
 class TestDispatch:
     @pytest.mark.asyncio
     async def test_dispatch_internal(self, dispatcher: PluginDispatcher):
-        result = await dispatcher.dispatch(
-            "test.do_thing", {"query": "hello"}, tenant_id="t-1"
-        )
+        result = await dispatcher.dispatch("test.do_thing", {"query": "hello"}, tenant_id="t-1")
         assert result.success is True
         assert result.agent_id == "test_agent"
         assert result.tool_name == "test.do_thing"
@@ -81,9 +105,7 @@ class TestDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_unknown_tool(self, dispatcher: PluginDispatcher):
-        result = await dispatcher.dispatch(
-            "unknown.tool", {}, tenant_id="t-1"
-        )
+        result = await dispatcher.dispatch("unknown.tool", {}, tenant_id="t-1")
         assert result.success is False
         assert "No agent registered" in result.error
         assert result.agent_id == "unknown"
@@ -101,20 +123,68 @@ class TestDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_result_metadata(self, dispatcher: PluginDispatcher):
-        result = await dispatcher.dispatch(
-            "test.do_thing", {"q": "test"}, tenant_id="t-1"
-        )
+        result = await dispatcher.dispatch("test.do_thing", {"q": "test"}, tenant_id="t-1")
         assert result.metadata.get("agent_id") or result.agent_id == "test_agent"
         assert result.metadata.get("is_external") is False
 
     @pytest.mark.asyncio
     async def test_dispatch_external_mock(self, dispatcher: PluginDispatcher):
-        result = await dispatcher.dispatch(
-            "ext.query", {"q": "test"}, tenant_id="t-1"
-        )
+        result = await dispatcher.dispatch("ext.query", {"q": "test"}, tenant_id="t-1")
         # External dispatch falls back to mock when no AGNTCY SDK
         assert result.success is True
         assert result.agent_id == "ext_server"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_campaigns_tool_through_production_registry(self, monkeypatch):
+        monkeypatch.setenv("AGENT_CAMPAIGNS_URL", "http://campaigns-agent.test:8080")
+        r = PluginAgentRegistry.get_instance()
+        r.load_from_yaml()
+        http_client = RecordingHttpClient()
+        dispatcher = PluginDispatcher(registry=r, http_client=http_client)
+
+        result = await dispatcher.dispatch(
+            "campaigns.list_active",
+            {"status": "active"},
+            tenant_id="tenant-campaigns",
+            conversation_id="conversation-campaigns",
+            timeout_ms=1234,
+        )
+
+        assert result.success is True
+        assert result.agent_id == "campaigns"
+        assert result.tool_name == "campaigns.list_active"
+        assert result.content == {
+            "ok": True,
+            "received": {
+                "tool_name": "campaigns.list_active",
+                "arguments": {"status": "active"},
+                "tenant_id": "tenant-campaigns",
+                "conversation_id": "conversation-campaigns",
+            },
+        }
+        assert result.metadata == {
+            "endpoint": "http://campaigns-agent.test:8080",
+            "is_external": False,
+            "category": "marketing",
+        }
+
+        assert http_client.calls == [
+            {
+                "url": "http://campaigns-agent.test:8080/tools/campaigns.list_active",
+                "json": {
+                    "tool_name": "campaigns.list_active",
+                    "arguments": {"status": "active"},
+                    "tenant_id": "tenant-campaigns",
+                    "conversation_id": "conversation-campaigns",
+                },
+                "headers": {
+                    "Content-Type": "application/json",
+                    "X-Tenant-Id": "tenant-campaigns",
+                    "X-Conversation-Id": "conversation-campaigns",
+                },
+                "timeout": 1.234,
+            }
+        ]
 
 
 class TestHealthCheck:

@@ -16,13 +16,26 @@ Tests cover:
 
 from __future__ import annotations
 
-
 import pytest
 
 from src.agents.plugins.registry import (
     PluginAgentDefinition,
     PluginAgentRegistry,
 )
+
+CAMPAIGNS_CAPABILITIES = (
+    "campaigns.list_active",
+    "campaigns.get_discount_codes",
+    "campaigns.get_talking_points",
+    "campaigns.track_metrics",
+)
+
+CAMPAIGNS_SKILLS = {
+    "campaigns:list-active": ("read", ("campaigns.list_active",)),
+    "campaigns:get-discount-codes": ("read", ("campaigns.get_discount_codes",)),
+    "campaigns:get-talking-points": ("read", ("campaigns.get_talking_points",)),
+    "campaigns:track-metrics": ("mutate", ("campaigns.track_metrics",)),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +229,53 @@ class TestToolCatalog:
         assert registry.resolve_tool_agent("unknown.tool") is None
 
 
+class TestCampaignsAgentSpec1707:
+    def test_campaigns_agent_metadata_from_production_yaml(self, monkeypatch):
+        monkeypatch.setenv("AGENT_CAMPAIGNS_URL", "http://campaigns-agent.test:8080")
+        r = PluginAgentRegistry.get_instance()
+        r.load_from_yaml()
+
+        campaigns = r.get("campaigns")
+        assert campaigns is not None
+        assert campaigns.display_name == "Campaigns Agent"
+        assert campaigns.spec_id == "SPEC-1707"
+        assert campaigns.category == "marketing"
+        assert campaigns.agent_kind == "peer"
+        assert campaigns.auth_type == "internal"
+        assert campaigns.tier_gate == "professional"
+        assert campaigns.health_check == "/health"
+        assert campaigns.status == "available"
+        assert campaigns.endpoint == "${AGENT_CAMPAIGNS_URL:-http://10.0.1.20:8080}"
+        assert campaigns.resolve_endpoint() == "http://campaigns-agent.test:8080"
+        assert campaigns.capabilities == CAMPAIGNS_CAPABILITIES
+
+    def test_campaigns_agent_skills_catalog_and_tool_resolution(self):
+        r = PluginAgentRegistry.get_instance()
+        r.load_from_yaml()
+
+        skills = {skill.skill_id: skill for skill in r.list_skills("campaigns")}
+        assert set(skills) == set(CAMPAIGNS_SKILLS)
+
+        for skill_id, (mode, tool_names) in CAMPAIGNS_SKILLS.items():
+            assert skills[skill_id].mode == mode
+            assert r.resolve_skill_to_tools(skill_id) == tool_names
+
+        for tool_name in CAMPAIGNS_CAPABILITIES:
+            agent = r.resolve_tool_agent(tool_name)
+            assert agent is not None
+            assert agent.agent_id == "campaigns"
+
+        catalog = {
+            tool["function"]["name"]: tool
+            for tool in r.get_tool_catalog(tier="professional")
+            if tool["_agent_id"] == "campaigns"
+        }
+        assert set(catalog) == set(CAMPAIGNS_CAPABILITIES)
+        for tool_name in CAMPAIGNS_CAPABILITIES:
+            assert catalog[tool_name]["_endpoint"] == "${AGENT_CAMPAIGNS_URL:-http://10.0.1.20:8080}"
+            assert catalog[tool_name]["_is_external"] is False
+
+
 # ---------------------------------------------------------------------------
 # Agent definition
 # ---------------------------------------------------------------------------
@@ -224,16 +284,24 @@ class TestToolCatalog:
 class TestAgentDefinition:
     def test_is_frozen(self):
         defn = PluginAgentDefinition(
-            agent_id="test", display_name="Test", description="", spec_id="",
-            category="", endpoint="http://test:8080",
+            agent_id="test",
+            display_name="Test",
+            description="",
+            spec_id="",
+            category="",
+            endpoint="http://test:8080",
         )
         with pytest.raises(AttributeError):
             defn.agent_id = "changed"  # type: ignore
 
     def test_has_capability(self):
         defn = PluginAgentDefinition(
-            agent_id="test", display_name="", description="", spec_id="",
-            category="", endpoint="",
+            agent_id="test",
+            display_name="",
+            description="",
+            spec_id="",
+            category="",
+            endpoint="",
             capabilities=("a.b", "c.d"),
         )
         assert defn.has_capability("a.b") is True
@@ -241,8 +309,12 @@ class TestAgentDefinition:
 
     def test_resolve_endpoint_template(self):
         defn = PluginAgentDefinition(
-            agent_id="test", display_name="", description="", spec_id="",
-            category="", endpoint="https://{shop_domain}/mcp",
+            agent_id="test",
+            display_name="",
+            description="",
+            spec_id="",
+            category="",
+            endpoint="https://{shop_domain}/mcp",
         )
         resolved = defn.resolve_endpoint(shop_domain="test.myshopify.com")
         assert resolved == "https://test.myshopify.com/mcp"
