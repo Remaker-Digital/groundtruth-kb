@@ -4,7 +4,9 @@ Per ``bridge/gtkb-wi4528-sweep-commit-protected-hook-co-stage-helper-001.md``
 (NEW) and ``-002`` (Codex GO). Covers the eight acceptance criteria in the
 proposal's Verification Plan, including the 2026-06-13 incident regression.
 WI-4709 extends the same planner with a non-terminal bridge-thread hold so
-protected paths cannot be committed ahead of VERIFIED.
+protected paths cannot be committed ahead of VERIFIED. WI-4710 adds the
+stricter staged-evidence rule: co-staged bridge evidence only clears a protected
+path when that evidence's thread is latest VERIFIED.
 
 The fixture bridge filenames used below (``bridge/wi4528-fixture-*.md``) are
 synthetic test fixtures created on disk inside ``tmp_path``; they are NOT
@@ -272,10 +274,11 @@ def test_real_world_2026_06_13_incident_replay_active_go_is_held(tmp_path: Path)
 
     batches = helper.plan_commit_batches(staged, root)
 
-    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    held = _batch_of_kind(batches, "protected-unverified-thread")
     assert len(held) == 1
     assert held[0].paths == [".codex/hooks.json"]
     assert "wi4528-fixture-grilling-gate@GO" in held[0].rationale
+    assert "not VERIFIED" in held[0].rationale
     assert _batch_of_kind(batches, "protected-with-evidence") == []
     bridge_only = _batch_of_kind(batches, "bridge-only")
     assert len(bridge_only) == 1
@@ -306,7 +309,7 @@ def test_protected_path_in_nonterminal_thread_is_held(tmp_path: Path) -> None:
 
     batches = helper.plan_commit_batches(staged, root)
 
-    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    held = _batch_of_kind(batches, "protected-unverified-thread")
     assert len(held) == 1
     assert held[0].paths == [".claude/hooks/foo.py"]
     assert "wi4709-active@REVISED" in held[0].rationale
@@ -352,7 +355,7 @@ def test_latest_version_status_decides_not_earlier_version(tmp_path: Path) -> No
 
     batches = helper.plan_commit_batches(staged, root)
 
-    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    held = _batch_of_kind(batches, "protected-unverified-thread")
     assert len(held) == 1
     assert held[0].paths == [".claude/hooks/foo.py"]
     assert "wi4709-active-latest@REVISED" in held[0].rationale
@@ -404,11 +407,118 @@ def test_codex_hooks_json_in_nonterminal_thread_is_held(tmp_path: Path) -> None:
 
     batches = helper.plan_commit_batches(staged, root)
 
-    held = _batch_of_kind(batches, "protected-active-thread-nonterminal")
+    held = _batch_of_kind(batches, "protected-unverified-thread")
     assert len(held) == 1
     assert held[0].paths == [".codex/hooks.json"]
     assert "wi4709-codex-hooks@NEW" in held[0].rationale
     assert _batch_of_kind(batches, "protected-with-evidence") == []
+
+
+# ---------------------------------------------------------------------------
+# WI-4710: co-staged bridge evidence only clears protected paths after VERIFIED.
+# ---------------------------------------------------------------------------
+def test_protected_path_with_unverified_thread_is_withheld(tmp_path: Path) -> None:
+    bridge_rel = "bridge/wi4710-unverified-001.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={bridge_rel: "NEW\n\nUpdates .claude/hooks/foo.py before verification.\n"},
+    )
+    staged = [".claude/hooks/foo.py", bridge_rel]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    held = _batch_of_kind(batches, "protected-unverified-thread")
+    assert len(held) == 1
+    assert held[0].paths == [".claude/hooks/foo.py"]
+    assert held[0].evidence == [bridge_rel]
+    assert "wi4710-unverified@NEW" in held[0].rationale
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
+
+
+def test_unverified_thread_batch_rationale_instructs_exclusion(tmp_path: Path) -> None:
+    bridge_rel = "bridge/wi4710-nogo-002.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={
+            "bridge/wi4710-nogo-001.md": "NEW\n\nInitial .codex/hooks.json proposal.\n",
+            bridge_rel: "NO-GO\n\nStill cites .codex/hooks.json.\n",
+        },
+    )
+    staged = [".codex/hooks.json", bridge_rel]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    held = _batch_of_kind(batches, "protected-unverified-thread")
+    assert len(held) == 1
+    assert "exclude the protected path from sweep" in held[0].rationale
+    assert "until the bridge thread reaches VERIFIED" in held[0].rationale
+
+
+def test_unreadable_thread_status_treated_as_unverified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge_rel = "bridge/wi4710-unreadable-001.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={bridge_rel: "VERIFIED\n\nMentions .codex/hooks.json.\n"},
+    )
+
+    def _raise_oserror(project_root: Path) -> dict[str, object]:
+        raise OSError("simulated scan failure")
+
+    monkeypatch.setattr(helper, "scan_expected_documents", _raise_oserror)
+
+    batches = helper.plan_commit_batches([".codex/hooks.json", bridge_rel], root)
+
+    held = _batch_of_kind(batches, "protected-unverified-thread")
+    assert len(held) == 1
+    assert held[0].paths == [".codex/hooks.json"]
+    assert f"{bridge_rel}@unreadable" in held[0].rationale
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
+
+
+def test_wi4682_incident_replay_withholds_protected_rule_files(tmp_path: Path) -> None:
+    custom_toml = """\
+schema_version = 1
+
+[[protected_artifacts]]
+id = "protected-narrative-rules"
+patterns = [".claude/rules/**"]
+accept_with_inventory_baseline_update = false
+required_evidence = ["bridge report"]
+"""
+    bridge_rel = "bridge/gtkb-wi4682-automation-value-cost-principle-015.md"
+    root = _make_project(
+        tmp_path,
+        toml_text=custom_toml,
+        bridge_files={bridge_rel: "REVISED\n\nImplementation report for .claude/rules/bridge-essential.md.\n"},
+    )
+    staged = [".claude/rules/bridge-essential.md", bridge_rel]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    held = _batch_of_kind(batches, "protected-unverified-thread")
+    assert len(held) == 1
+    assert held[0].paths == [".claude/rules/bridge-essential.md"]
+    assert "gtkb-wi4682-automation-value-cost-principle@REVISED" in held[0].rationale
+    assert _batch_of_kind(batches, "protected-with-evidence") == []
+
+
+def test_non_protected_paths_unaffected_by_thread_gate(tmp_path: Path) -> None:
+    bridge_rel = "bridge/wi4710-source-001.md"
+    root = _make_project(
+        tmp_path,
+        bridge_files={bridge_rel: "NEW\n\nMentions scripts/source.py while active.\n"},
+    )
+    staged = ["scripts/source.py", bridge_rel]
+
+    batches = helper.plan_commit_batches(staged, root)
+
+    assert _batch_of_kind(batches, "protected-unverified-thread") == []
+    bridge_only = _batch_of_kind(batches, "bridge-only")
+    unconstrained = _batch_of_kind(batches, "unconstrained")
+    assert len(bridge_only) == 1
+    assert bridge_only[0].paths == [bridge_rel]
+    assert len(unconstrained) == 1
+    assert unconstrained[0].paths == ["scripts/source.py"]
 
 
 # ---------------------------------------------------------------------------

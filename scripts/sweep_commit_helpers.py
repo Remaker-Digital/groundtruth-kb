@@ -47,6 +47,7 @@ __all__ = [
     "is_bridge_evidence_path",
     "partition_staged",
     "bridge_files_citing",
+    "unverified_bridge_evidence_threads_citing",
     "active_nonterminal_bridge_threads_citing",
     "plan_commit_batches",
 ]
@@ -71,6 +72,9 @@ class CommitBatch:
       - ``"protected-missing-evidence"``: protected path(s) with NO co-stageable
         bridge evidence in the staged set; committing this batch will be blocked
         by the inventory-drift gate. The ``rationale`` flags the diagnostic.
+      - ``"protected-unverified-thread"``: protected path(s) whose co-staged
+        bridge evidence belongs to a thread that is not at ``VERIFIED`` or whose
+        status cannot be read; committing would bypass finalization.
       - ``"protected-active-thread-nonterminal"``: protected path(s) cited by a
         live non-terminal bridge thread; committing before VERIFIED would bypass
         the bridge commit-finalization gate.
@@ -214,6 +218,61 @@ def bridge_files_citing(
     return citing
 
 
+def _bridge_slug_from_evidence_path(path: str) -> str | None:
+    """Return the bridge thread slug for ``bridge/<slug>-NNN.md`` evidence paths."""
+    candidate = _posix(path)
+    if not is_bridge_evidence_path(candidate):
+        return None
+    name = Path(candidate).name
+    stem = name.removesuffix(".md")
+    slug, sep, version = stem.rpartition("-")
+    if sep != "-" or not slug or not version.isdigit():
+        return None
+    return slug
+
+
+def unverified_bridge_evidence_threads_citing(
+    protected_to_evidence: dict[str, list[str]],
+    project_root: Path | str,
+) -> dict[str, list[str]]:
+    """Map protected paths to co-staged evidence threads that are not VERIFIED.
+
+    ``protected-with-evidence`` is commit-safe only when the citing bridge
+    evidence belongs to a thread whose latest status token is ``VERIFIED``. If
+    the thread cannot be resolved or its status cannot be read, the evidence is
+    treated conservatively as unverified so sweep planning withholds the
+    protected path instead of front-running the finalization gate.
+    """
+    root = Path(project_root)
+    result: dict[str, list[str]] = {protected: [] for protected in protected_to_evidence}
+
+    try:
+        expected_documents = scan_expected_documents(root)
+    except OSError:
+        for protected, evidence_files in protected_to_evidence.items():
+            result[protected] = [f"{evidence}@unreadable" for evidence in evidence_files]
+        return result
+
+    for protected, evidence_files in protected_to_evidence.items():
+        for evidence in evidence_files:
+            slug = _bridge_slug_from_evidence_path(evidence)
+            if slug is None:
+                result[protected].append(f"{evidence}@unresolved")
+                continue
+
+            document = expected_documents.get(slug)
+            if document is not None and document.files:
+                latest_path = root / document.files[-1]
+                status = status_from_bridge_file(latest_path)
+            else:
+                status = status_from_bridge_file(root / evidence)
+
+            if status != "VERIFIED":
+                result[protected].append(f"{slug}@{status or 'unreadable'}")
+
+    return result
+
+
 def active_nonterminal_bridge_threads_citing(
     staged_protected: list[str],
     project_root: Path | str,
@@ -270,6 +329,9 @@ def plan_commit_batches(staged: list[str], project_root: Path | str) -> list[Com
       - a protected path with no co-stageable bridge evidence is surfaced in a
         ``protected-missing-evidence`` batch whose rationale flags that the
         commit will be blocked by the gate (the 2026-06-13 incident diagnostic);
+      - a protected path whose co-staged bridge evidence resolves to anything
+        other than latest ``VERIFIED`` is surfaced in a held
+        ``protected-unverified-thread`` batch;
       - a protected path cited by a live non-terminal bridge thread is surfaced
         in a held ``protected-active-thread-nonterminal`` batch before evidence
         co-staging is considered, so sweep automation cannot commit ahead of
@@ -279,8 +341,9 @@ def plan_commit_batches(staged: list[str], project_root: Path | str) -> list[Com
         pattern);
       - other files get an ``unconstrained`` batch.
 
-    Order: active non-terminal holds first, then protected-with-evidence,
-    protected-missing-evidence, bridge-only, and unconstrained.
+    Order: staged unverified-evidence holds first, then active non-terminal
+    holds, protected-with-evidence, protected-missing-evidence, bridge-only, and
+    unconstrained.
 
     Fail-soft: when the inventory-drift TOML is missing/unreadable,
     ``load_protected_path_globs`` returns ``[]`` so no path is treated as
@@ -309,13 +372,33 @@ def plan_commit_batches(staged: list[str], project_root: Path | str) -> list[Com
     other_paths = parts["other"]
 
     citing = bridge_files_citing(protected_paths, bridge_files, project_root)
+    unverified_evidence_threads = unverified_bridge_evidence_threads_citing(citing, project_root)
     active_threads = active_nonterminal_bridge_threads_citing(protected_paths, project_root)
 
     batches: list[CommitBatch] = []
     consumed_bridge: set[str] = set()
 
-    # 1) Protected active-thread holds, protected-with-evidence, and missing-evidence batches.
+    # 1) Protected unverified-thread holds, active-thread holds, protected-with-evidence,
+    # and missing-evidence batches.
     for protected in protected_paths:
+        unverified_threads = unverified_evidence_threads.get(protected, [])
+        if unverified_threads:
+            evidence = citing.get(protected, [])
+            batches.append(
+                CommitBatch(
+                    paths=[protected],
+                    kind="protected-unverified-thread",
+                    rationale=(
+                        f"Protected path {protected!r} has co-staged bridge evidence "
+                        f"{evidence!r}, but citing thread(s) {unverified_threads!r} "
+                        "are not VERIFIED; exclude the protected path from sweep "
+                        "until the bridge thread reaches VERIFIED."
+                    ),
+                    evidence=list(evidence),
+                )
+            )
+            continue
+
         nonterminal_threads = active_threads.get(protected, [])
         if nonterminal_threads:
             batches.append(
