@@ -217,7 +217,7 @@ APPLICATION_PREFIXES = (
     "widget/",
 )
 
-# Current-repo bridge/governance surfaces (allowed under BOTH work subjects).
+# Current-repo bridge/governance surfaces.
 CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES = (
     ".claude/hooks/",
     ".claude/rules/",
@@ -241,6 +241,10 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_FILES = {
     "scripts/session_self_initialization.py",
     "scripts/workstream_focus.py",
 }
+
+VERSIONED_BRIDGE_PATH_RE = re.compile(r"^bridge/[^/]+-\d{3}\.md$")
+ADVISORY_BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*[\w-]*advisory\b", re.IGNORECASE | re.MULTILINE)
+SHELL_TOOL_NAMES = {"Bash", "shell_command", "functions.shell_command"}
 
 # Back-compat aliases (legacy classify_path still consumed by third-party callers).
 GTKB_INFRASTRUCTURE_PREFIXES = CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES
@@ -2013,11 +2017,37 @@ def paths_from_tool_input(tool_name: str, tool_input: dict[str, Any]) -> list[st
         if isinstance(value, str) and value.strip():
             paths.append(value)
 
-    if tool_name == "Bash":
+    if tool_name in SHELL_TOOL_NAMES:
         command = str(tool_input.get("command") or "")
         if _command_looks_mutating(command):
             paths.extend(_path_mentions_from_command(command))
     return paths
+
+
+def _first_non_blank_line(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _application_allows_current_repo_write(
+    *,
+    path_text: str,
+    tool_name: str,
+    tool_input: dict[str, Any],
+    project_root: Path | None = None,
+) -> bool:
+    relative = _normalize_relative_path(path_text, project_root)
+    if not VERSIONED_BRIDGE_PATH_RE.match(relative):
+        return False
+    if tool_name != "Write":
+        return False
+    content = tool_input.get("content")
+    if not isinstance(content, str):
+        return False
+    return _first_non_blank_line(content) == "ADVISORY" and ADVISORY_BRIDGE_KIND_RE.search(content) is not None
 
 
 def guard_tool_use(
@@ -2026,14 +2056,12 @@ def guard_tool_use(
 ) -> dict[str, Any]:
     """Phase 7 root-aware guard.
 
-    Blocks only cross-product writes:
+    Blocks cross-subject writes:
 
     * ``application`` subject blocks ``gtkb_product`` targets.
+    * ``application`` subject blocks current-repo bridge/governance targets
+      except full-content writes of numbered bridge ``ADVISORY`` entries.
     * ``gtkb_infrastructure`` subject blocks ``application_product`` targets.
-
-    Current-repo bridge/governance surfaces (``current_repo_bridge_or_governance``)
-    are NOT blocked in either subject — they are workspace infrastructure, not
-    GT-KB product paths.
     """
 
     if _startup_response_pending(project_root) and not _is_startup_relay_cache_read(payload, project_root):
@@ -2062,6 +2090,23 @@ def guard_tool_use(
                     "BLOCKED (GTKB-WORK-SUBJECT): Current work subject is application. "
                     f"This change targets GT-KB product artifacts (`{path_text}`). "
                     "Switch with standalone `work subject GT-KB` before proceeding."
+                ),
+            }
+        if active_subject == FOCUS_APPLICATION and root_class == ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE:
+            if _application_allows_current_repo_write(
+                path_text=path_text,
+                tool_name=tool_name,
+                tool_input=tool_input,
+                project_root=project_root,
+            ):
+                continue
+            return {
+                "decision": "block",
+                "reason": (
+                    "BLOCKED (GTKB-WORK-SUBJECT): Current work subject is application. "
+                    f"This change targets GT-KB bridge/governance artifacts (`{path_text}`). "
+                    "Application work may only write GT-KB-directed output as a numbered bridge ADVISORY entry; "
+                    "switch with standalone `work subject GT-KB` before ordinary GT-KB artifact changes."
                 ),
             }
         if active_subject == FOCUS_GTKB_INFRASTRUCTURE and root_class == ROOT_APPLICATION_PRODUCT:

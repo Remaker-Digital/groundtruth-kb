@@ -82,6 +82,20 @@ def _basic_advisory(date_str: str = "2026-05-10", severity: str | None = "P1") -
     )
 
 
+def _bridge_advisory(date_str: str = "2026-05-10") -> str:
+    return (
+        "ADVISORY\n\n"
+        "bridge_kind: loyal_opposition_advisory\n"
+        "Document: gtkb-application-boundary-advisory\n"
+        "Version: 001\n"
+        f"Date: {date_str}\n\n"
+        "# Application Boundary Advisory\n\n"
+        "## Claim\n\n"
+        "This bridge advisory should be staged as a candidate for later GT-KB disposition.\n\n"
+        "Severity: P2\n"
+    )
+
+
 def _candidate_events(project_root: Path) -> list[dict]:
     store = project_root / ".gtkb-state" / "advisory-candidates" / "candidates.jsonl"
     if not store.exists():
@@ -108,6 +122,33 @@ def test_router_stages_candidates_creates_no_work_items(router, fake_project: Pa
     assert events[0]["status"] == "staged"
     assert events[0]["source_key"] == "INSIGHTS-2026-05-10-13-26-SAMPLE-A.md"
     assert events[0]["proposed_title"] == "Route LO advisory: INSIGHTS-2026-05-10-13-26-SAMPLE-A.md"
+    assert events[0]["source_spec_id"] == "GOV-STANDING-BACKLOG-001"
+
+
+def test_router_stages_bridge_advisory_candidates_creates_no_work_items(
+    router,
+    fake_project: Path,
+    db_factory,
+) -> None:
+    bridge = fake_project / "bridge"
+    (bridge / "gtkb-application-boundary-advisory-001.md").write_text(_bridge_advisory(), encoding="utf-8")
+    (bridge / "gtkb-old-advisory-001.md").write_text(_bridge_advisory(), encoding="utf-8")
+    (bridge / "gtkb-old-advisory-002.md").write_text(
+        "NEW\n\nDocument: gtkb-old-advisory\nVersion: 002\n",
+        encoding="utf-8",
+    )
+
+    result = router.run(project_root=fake_project, source="bridge", since=None, dry_run=False, db_factory=db_factory)
+
+    assert result.scanned == 1
+    assert len(result.staged) == 1
+    assert result.errors == []
+    assert _work_item_count(db_factory()) == 0
+    events = _candidate_events(fake_project)
+    assert len(events) == 1
+    assert events[0]["source"] == "bridge"
+    assert events[0]["source_key"] == "gtkb-application-boundary-advisory"
+    assert events[0]["proposed_title"] == "Route bridge ADVISORY: gtkb-application-boundary-advisory"
     assert events[0]["source_spec_id"] == "GOV-STANDING-BACKLOG-001"
 
 

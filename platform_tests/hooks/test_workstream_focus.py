@@ -497,6 +497,7 @@ def test_startup_gate_emits_bounded_pointer_not_inlined_disclosure(tmp_path, mon
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
     disclosure = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\n" + (
         "disclosure body line\n" * 400
@@ -523,6 +524,7 @@ def test_startup_gate_message_authorizes_one_read_only_read(tmp_path, monkeypatc
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
     _write_relay_cache(
         tmp_path / ".codex" / "gtkb-hooks", "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nbody"
@@ -619,6 +621,7 @@ def test_startup_gate_does_not_consult_shared_dashboard_report(tmp_path, monkeyp
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
     shared = tmp_path / "docs" / "gtkb-dashboard"
     shared.mkdir(parents=True)
@@ -642,6 +645,7 @@ def test_startup_gate_fails_visibly_on_inconsistent_cache(tmp_path, monkeypatch)
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
     _write_relay_cache(
         tmp_path / ".codex" / "gtkb-hooks",
@@ -957,19 +961,81 @@ def test_application_subject_blocks_gtkb_product_write(tmp_path, monkeypatch) ->
     assert "GT-KB product artifacts" in response["reason"]
 
 
-def test_application_subject_allows_current_repo_bridge_or_governance_write(tmp_path, monkeypatch) -> None:
-    """Phase 7 relaxation: current-repo bridge/governance paths are NOT blocked under application subject."""
-
+@pytest.mark.parametrize(
+    "target",
+    [
+        ".claude/rules/new-rule.md",
+        ".claude/hooks/new-hook.py",
+        ".codex/gtkb-hooks/new-hook.cmd",
+        "groundtruth.db",
+        "bridge/some-proposal-001.md",
+    ],
+)
+def test_application_subject_blocks_current_repo_bridge_or_governance_write(tmp_path, monkeypatch, target) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
 
     response = module.guard_tool_use(
-        {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+        {"tool_name": "Write", "tool_input": {"file_path": target}},
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "Current work subject is application" in response["reason"]
+    assert "GT-KB bridge/governance artifacts" in response["reason"]
+    assert "numbered bridge ADVISORY" in response["reason"]
+
+
+def test_application_subject_allows_bridge_advisory_write(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
+
+    response = module.guard_tool_use(
+        {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/app-cross-scope-platform-concern-001.md",
+                "content": (
+                    "ADVISORY\n\n"
+                    "bridge_kind: loyal_opposition_advisory\n"
+                    "Document: app-cross-scope-platform-concern\n"
+                    "Version: 001\n"
+                ),
+            },
+        },
         REPO_ROOT,
     )
 
     assert response == {}
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "NEW\n\nbridge_kind: prime_proposal\nDocument: app-cross-scope-platform-concern\n",
+        "ADVISORY\n\nDocument: app-cross-scope-platform-concern\n",
+    ],
+)
+def test_application_subject_blocks_non_advisory_bridge_write(tmp_path, monkeypatch, content) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
+
+    response = module.guard_tool_use(
+        {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/app-cross-scope-platform-concern-001.md",
+                "content": content,
+            },
+        },
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "numbered bridge ADVISORY" in response["reason"]
 
 
 def test_application_subject_allows_application_write(tmp_path, monkeypatch) -> None:
@@ -1075,7 +1141,7 @@ def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, 
     assert guard_state["stale_startup_response_pending_cleared"] is True
 
 
-def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeypatch) -> None:
+def test_bash_guard_blocks_mutating_gtkb_and_governance_commands(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
@@ -1091,7 +1157,7 @@ def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeyp
     )
     assert read_response == {}
 
-    # Mutations to bridge/governance are NOT blocked (Phase 7 relaxation).
+    # Mutations to bridge/governance are blocked under application subject.
     governance_write_response = module.guard_tool_use(
         {
             "tool_name": "Bash",
@@ -1099,7 +1165,21 @@ def test_bash_guard_only_blocks_mutating_gtkb_product_commands(tmp_path, monkeyp
         },
         REPO_ROOT,
     )
-    assert governance_write_response == {}
+    assert governance_write_response["decision"] == "block"
+    assert "GT-KB bridge/governance artifacts" in governance_write_response["reason"]
+
+    # Shell writes fail closed because the guard cannot inspect the final full file content.
+    bridge_write_response = module.guard_tool_use(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "Set-Content bridge/app-cross-scope-platform-concern-001.md 'ADVISORY'",
+            },
+        },
+        REPO_ROOT,
+    )
+    assert bridge_write_response["decision"] == "block"
+    assert "numbered bridge ADVISORY" in bridge_write_response["reason"]
 
     # Mutations to GT-KB product paths ARE blocked under application subject.
     gtkb_target = (gtkb_dir / "src" / "groundtruth_kb" / "foo.py").as_posix()
@@ -1491,10 +1571,11 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
 
     body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
-    stale_time_str = "2026-06-19T00:00:00Z"
+    stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
     cache_file = diagnostics / "last-user-visible-startup.md"
@@ -1530,10 +1611,11 @@ def test_startup_gate_self_heals_rederivable_content_drift(tmp_path, monkeypatch
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
 
     body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
-    stale_time_str = "2026-06-19T00:00:00Z"
+    stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
     cache_file = diagnostics / "last-user-visible-startup.md"
@@ -1584,11 +1666,12 @@ def test_startup_gate_refresh_timeout_fails_visibly_without_late_cache_write(tmp
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     monkeypatch.setenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", "0.05")
     _write_startup_gate_guard(tmp_path)
 
     body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
-    stale_time_str = "2026-06-19T00:00:00Z"
+    stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
     cache_file = diagnostics / "last-user-visible-startup.md"
@@ -1634,10 +1717,11 @@ def test_startup_gate_no_self_heal_on_non_recoverable_inconsistency(tmp_path, mo
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
 
     body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
-    stale_time_str = "2026-06-19T00:00:00Z"
+    stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
     cache_file = diagnostics / "last-user-visible-startup.md"
@@ -1682,7 +1766,7 @@ def test_startup_gate_no_self_heal_on_headless_dispatch(tmp_path, monkeypatch) -
     _write_startup_gate_guard(tmp_path)
 
     body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
-    stale_time_str = "2026-06-19T00:00:00Z"
+    stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
     cache_file = diagnostics / "last-user-visible-startup.md"
@@ -1723,6 +1807,7 @@ def test_startup_gate_no_self_heal_on_fresh_consistent_cache(tmp_path, monkeypat
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
 
     body_text = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nSome body"
