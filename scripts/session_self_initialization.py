@@ -6829,9 +6829,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
     dashboard_path = _display_path(project_root, Path(result["dashboard_path"]))
     role = model.get("role") or {}
     tokens = (model.get("metrics") or {}).get("tokens") or {}
-    focus_option_count = len(_session_focus_options(model))
     relay_cache_lines = _startup_relay_cache_lines(project_root, _harness_name_for_payload(result))
-    top_priority_lines = _compact_top_priority_lines(model)
     startup_instruction_context = [
         "",
         "## Session Startup Instructions",
@@ -6876,9 +6874,10 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         ]
     else:
         startup_relay_instruction = (
-            "- SessionStart caches the generated Prime Builder startup disclosure for later init-keyword rendering. "
+            "- SessionStart caches the minimized Prime Builder init disclosure for later init-keyword rendering. "
             "Do not render it directly from this SessionStart payload or wait for a focus selection unless the "
-            "UserPromptSubmit init-keyword matcher returns a match."
+            "UserPromptSubmit init-keyword matcher returns a match; operator-facing activity context loads through "
+            "`::open <activity>`."
         )
     return "\n".join(
         [
@@ -6891,12 +6890,9 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             "- Context mode: compact SessionStart routing summary.",
             "- User-visible startup disclosure is generated in `hookSpecificOutput.startupDisclosure`; it is intentionally not embedded in `additionalContext`.",
             startup_relay_instruction,
-            "- Do not summarize, paraphrase, shorten, reorder, or omit cached startup-disclosure content when an init-keyword path relays it.",
-            "- Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, `Expected work`, and compact full-list label exactly as written in `startupDisclosure`.",
-            (
-                f"- Prime Builder focus-menu preservation rule: when the startup message contains a session-focus menu, "
-                f"the A/B/C recommendations and D full focus list must remain present; the full focus list must include all {focus_option_count} labels in order."
-            ),
+            "- Do not summarize, paraphrase, shorten, reorder, or omit the minimized cached startup-disclosure content when an init-keyword path relays it.",
+            "- Prime Builder init disclosure is intentionally bounded: no focus menu, top-priority list, operator briefing, or activity disposition profile is cached for `::init`.",
+            "- Operator-facing disclosure moved to the strict topic-envelope path: use `::open <activity>` to load the activity disposition profile, compact operator briefing, dashboard pointer, active work subject, and top-priority surface.",
             _render_init_keyword_relay_instruction(model),
             "- Only an init-keyword match relays startup disclosure; a non-matching first owner message is ordinary task input and may be mapped normally.",
             "- When the init-keyword path renders cached startup content, do not replace the startup message with a shorter final answer after rendering it.",
@@ -6921,10 +6917,6 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             f"- Payload profile path: `{profile_rel}`",
             f"- Token measurement status: {tokens.get('measurement_status', 'unknown')}; reducing startup token consumption now uses compact `additionalContext` plus demand-loaded expansion paths.",
             "",
-            "### Top Priority Actions",
-            "",
-            *top_priority_lines,
-            "",
             "### Startup Disclosure Cache Paths",
             "",
             *relay_cache_lines,
@@ -6934,8 +6926,45 @@ def _startup_service_context(result: dict[str, Any]) -> str:
     )
 
 
+def _minimized_startup_disclosure(result: dict[str, Any]) -> str:
+    model = result["model"]
+    project_root = Path(result["project_root"])
+    role = model.get("role") or {}
+    return "\n".join(
+        [
+            "# GroundTruth-KB Fresh Session Startup",
+            "",
+            f"Generated: {model['generated_at']}",
+            f"Dashboard: GroundTruth-KB Project Dashboard: {result['dashboard_url']}",
+            "",
+            "## Startup Disclosure",
+            "",
+            "### Role And Routing",
+            "",
+            f"- Role being assumed: {role.get('assumed_role', 'unidentified')}",
+            f"- Interactive resolved role: {role.get('interactive_resolved_role', role.get('assumed_role', 'unidentified'))}",
+            f"- Interactive role source: {role.get('interactive_role_source', 'unidentified')}",
+            f"- Durable registry role: {role.get('durable_registry_role', 'unidentified')}",
+            f"- Durable registry role authority: {role.get('durable_registry_authority', 'unidentified')}",
+            f"- Role mapping source: {role.get('role_mapping_source', 'unidentified')}",
+            f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
+            "",
+            "### Compact Project State",
+            "",
+            _render_current_project_state(model),
+            "",
+            "### Init Scope",
+            "",
+            "- This `::init` disclosure is minimized for routing, role authority, and compact project state.",
+            "- Operator-facing activity context is loaded with `::open <activity>` after startup.",
+            "- The `::open <activity>` path injects the activity disposition profile, dashboard pointer, active work subject, compact operator briefing, and top-priority surface.",
+            f"- Startup report path: `{_display_path(project_root, Path(result['report_path']))}`",
+        ]
+    )
+
+
 def _startup_disclosure(result: dict[str, Any]) -> str:
-    return str(result["report_text"])
+    return _minimized_startup_disclosure(result)
 
 
 def _display_path(project_root: Path, path: Path) -> str:

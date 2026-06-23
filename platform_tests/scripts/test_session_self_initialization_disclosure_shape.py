@@ -38,6 +38,21 @@ def _render_prime_open_report(module) -> str:
     return module.render_report(model, "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard", REPO_ROOT)
 
 
+def _startup_service_result(module, model: dict, report_text: str) -> dict:
+    dashboard_dir = REPO_ROOT / "docs" / "gtkb-dashboard"
+    return {
+        "project_root": REPO_ROOT,
+        "model": model,
+        "dashboard_path": REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json",
+        "dashboard_url": module.GRAFANA_DASHBOARD_URL,
+        "data_path": dashboard_dir / "dashboard-data.json",
+        "report_path": dashboard_dir / "session-startup-report.md",
+        "report_text": report_text,
+        "wrapup_path": dashboard_dir / "session-wrapup-report.md",
+        "wrapup_text": "",
+    }
+
+
 # ---- Section absence tests (4 dropped sections per SPEC) -------------------
 
 
@@ -108,6 +123,22 @@ def test_open_disclosure_includes_dashboard_link() -> None:
     report = _render_prime_open_report(module)
     assert "GroundTruth-KB Project Dashboard" in report
     assert "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard" in report
+
+
+def test_init_disclosure_is_minimized_for_routing_only() -> None:
+    module = _load_module()
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder", fast_hook=True)
+    report = module.render_report(model, module.GRAFANA_DASHBOARD_URL, REPO_ROOT)
+    disclosure = module._startup_disclosure(_startup_service_result(module, model, report))
+
+    assert "## Startup Disclosure" in disclosure
+    assert "### Role And Routing" in disclosure
+    assert "### Compact Project State" in disclosure
+    assert "### Init Scope" in disclosure
+    assert "`::open <activity>`" in disclosure
+    assert "### Top Priority Actions" not in disclosure
+    assert "## Session Startup" not in disclosure
+    assert "### Active Work Subject" not in disclosure
 
 
 # ---- Backlog projection / pipeline tests -----------------------------------

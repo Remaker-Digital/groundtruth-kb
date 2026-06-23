@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -60,6 +61,7 @@ def handle_topic_command(
         "action": command.action,
         "topic_type": command.topic_type,
         "accepted_at": utc_now_iso(),
+        "project_root": str(project_root),
         "topic": topic,
     }
     log_dir = project_root / ".gtkb-state" / "topic-envelope-router"
@@ -138,6 +140,80 @@ def _render_activity_profile(result: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _project_root_from_result(result: dict[str, object]) -> Path | None:
+    raw_root = result.get("project_root")
+    if not isinstance(raw_root, str) or not raw_root.strip():
+        return None
+    try:
+        return Path(raw_root).expanduser().resolve()
+    except OSError:
+        return None
+
+
+def _load_startup_module(project_root: Path):
+    root_text = str(project_root)
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
+    from scripts import session_self_initialization as startup  # noqa: PLC0415
+
+    return startup
+
+
+def _render_open_operator_context(result: dict[str, object]) -> str:
+    if result.get("action") != "open":
+        return ""
+    project_root = _project_root_from_result(result)
+    if project_root is None:
+        return "\n".join(
+            [
+                "## Open Activity Operator Context",
+                "",
+                "- status: unavailable",
+                "- reason: project root unavailable in topic-router result",
+            ]
+        )
+    try:
+        startup = _load_startup_module(project_root)
+        model = startup.build_startup_model(project_root, role_profile="prime-builder", fast_hook=True)
+        dashboard = startup.GRAFANA_DASHBOARD_URL
+        active_work_subject = startup.render_active_work_subject(
+            project_root,
+            snapshot=model.get("workstream_focus"),
+            overlay_status=model.get("session_overlay") or {},
+            include_counterpart=True,
+            include_overlay_note=False,
+            include_operational_instructions=False,
+        )
+        startup_briefing = startup._render_session_startup_briefing(model)
+        top_priorities = startup._render_top_priority_actions_section(model)
+    except Exception as exc:  # noqa: BLE001 - topic-open context must not block routing.
+        return "\n".join(
+            [
+                "## Open Activity Operator Context",
+                "",
+                "- status: unavailable",
+                f"- reason: {exc}",
+            ]
+        )
+    return "\n".join(
+        [
+            "## Open Activity Operator Context",
+            "",
+            f"- Dashboard: GroundTruth-KB Project Dashboard: {dashboard}",
+            "",
+            "### Active Work Subject",
+            "",
+            active_work_subject,
+            "",
+            "### Session Startup Briefing",
+            "",
+            startup_briefing,
+            "",
+            top_priorities,
+        ]
+    )
+
+
 def render_topic_context(result: dict[str, object]) -> str:
     topic = result.get("topic") if isinstance(result.get("topic"), dict) else {}
     route_target = topic.get("route_target") if isinstance(topic, dict) else None
@@ -152,6 +228,8 @@ def render_topic_context(result: dict[str, object]) -> str:
         ]
     )
     activity_profile = _render_activity_profile(result)
-    if activity_profile:
-        return f"{base}\n\n{activity_profile}"
+    operator_context = _render_open_operator_context(result)
+    extra_sections = "\n\n".join(section for section in (activity_profile, operator_context) if section)
+    if extra_sections:
+        return f"{base}\n\n{extra_sections}"
     return base

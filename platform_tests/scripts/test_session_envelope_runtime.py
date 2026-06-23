@@ -159,6 +159,7 @@ def test_render_topic_context_injects_activity_profile_for_open(tmp_path: Path) 
     assert command is not None
 
     result = handle_topic_command(tmp_path, command, harness_name="codex")
+    assert result["project_root"] == str(tmp_path)
     context = render_topic_context(result)
 
     assert "## Activity Disposition Profile" in context
@@ -170,6 +171,7 @@ def test_render_topic_context_injects_activity_profile_for_open(tmp_path: Path) 
     assert "- direction.stance: implement-within-scope" in context
     assert "- direction.guardrails: no implementation without a GO'd bridge proposal" in context
     assert "- direction.manipulates: source files, test files" in context
+    assert "## Open Activity Operator Context" in context
 
 
 def test_render_topic_context_does_not_inject_profile_for_close(tmp_path: Path) -> None:
@@ -184,6 +186,58 @@ def test_render_topic_context_does_not_inject_profile_for_close(tmp_path: Path) 
 
     assert "`::close build` accepted." in context
     assert "## Activity Disposition Profile" not in context
+    assert "## Open Activity Operator Context" not in context
+
+
+def test_render_topic_context_injects_operator_context_for_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FakeStartup:
+        GRAFANA_DASHBOARD_URL = "http://localhost:3000/d/gtkb/groundtruth-kb-dashboard"
+
+        @staticmethod
+        def build_startup_model(project_root: Path, *, role_profile: str, fast_hook: bool) -> dict:
+            assert project_root == tmp_path.resolve()
+            assert role_profile == "prime-builder"
+            assert fast_hook is True
+            return {
+                "workstream_focus": {"current_label": "GT-KB Infrastructure Focus"},
+                "session_overlay": {},
+            }
+
+        @staticmethod
+        def render_active_work_subject(*args, **kwargs) -> str:
+            return "- Current work subject is GT-KB Infrastructure Focus."
+
+        @staticmethod
+        def _render_session_startup_briefing(model: dict) -> str:
+            return "- Operator briefing: compact."
+
+        @staticmethod
+        def _render_top_priority_actions_section(model: dict) -> str:
+            return "### Top Priority Actions\n\n1. **WI-1**: Synthetic priority (priority: P1)"
+
+    monkeypatch.setattr(topic_router, "_load_startup_module", lambda _root: FakeStartup)
+    context = render_topic_context(
+        {
+            "action": "open",
+            "topic_type": "build",
+            "project_root": str(tmp_path),
+            "topic": {"route_target": "build-package-scaffold-service"},
+        }
+    )
+
+    assert "## Open Activity Operator Context" in context
+    assert (
+        "- Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/groundtruth-kb-dashboard"
+        in context
+    )
+    assert "### Active Work Subject" in context
+    assert "- Current work subject is GT-KB Infrastructure Focus." in context
+    assert "### Session Startup Briefing" in context
+    assert "- Operator briefing: compact." in context
+    assert "### Top Priority Actions" in context
+    assert "**WI-1**" in context
 
 
 def test_render_topic_context_profile_loader_failure_is_non_blocking(monkeypatch: pytest.MonkeyPatch) -> None:

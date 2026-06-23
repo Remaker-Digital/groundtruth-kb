@@ -1037,7 +1037,12 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "render the startup disclosure and wait for the next message" in prime_context
     assert "## User-Visible Startup Message" not in prime_context
     prime_disclosure = module._startup_disclosure(prime_result)
-    assert prime_disclosure == prime_report
+    assert prime_disclosure != prime_report
+    assert "### Compact Project State" in prime_disclosure
+    assert "### Init Scope" in prime_disclosure
+    assert "`::open <activity>`" in prime_disclosure
+    assert "### Top Priority Actions" not in prime_disclosure
+    assert "## Session Startup" not in prime_disclosure
     assert "### Fresh-Session Input Semantics" not in prime_disclosure
     assert "The first owner message in a fresh session is a session-start stimulus only" not in prime_disclosure
 
@@ -1066,7 +1071,12 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "wait for the next owner message before tool use" not in loyal_context
     assert "## User-Visible Startup Message" not in loyal_context
     loyal_disclosure = module._startup_disclosure(loyal_result)
-    assert loyal_disclosure == loyal_report
+    assert loyal_disclosure != loyal_report
+    assert "### Compact Project State" in loyal_disclosure
+    assert "### Init Scope" in loyal_disclosure
+    assert "`::open <activity>`" in loyal_disclosure
+    assert "### Top Priority Actions" not in loyal_disclosure
+    assert "## Session Startup" not in loyal_disclosure
     assert "### Fresh-Session Input Semantics" not in loyal_disclosure
     assert "The first owner message in a fresh session is a session-start stimulus only" not in loyal_disclosure
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" not in loyal_disclosure
@@ -1840,12 +1850,16 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "### Startup Disclosure Cache Paths" in context
     assert "User-visible startup disclosure is generated in `hookSpecificOutput.startupDisclosure`" in context
     assert "relay the generated startup message verbatim as the first durable assistant answer" not in context
-    assert "Do not summarize, paraphrase, shorten, reorder, or omit cached startup-disclosure content" in context
     assert (
-        "Preserve every generated heading, bullet, A/B/C/D option, `Evidence`, "
-        "`Expected work`, and compact full-list label" in context
+        "Do not summarize, paraphrase, shorten, reorder, or omit the minimized cached startup-disclosure content"
+        in context
     )
-    assert "the A/B/C recommendations and D full focus list must remain present" in context
+    assert (
+        "Prime Builder init disclosure is intentionally bounded: no focus menu, top-priority list, "
+        "operator briefing, or activity disposition profile is cached for `::init`" in context
+    )
+    assert "the A/B/C recommendations and D full focus list must remain present" not in context
+    assert "Operator-facing disclosure moved to the strict topic-envelope path" in context
     assert "routes the first owner message through the init-keyword matcher" in context
     assert "The startup disclosure is generated at SessionStart time and cached for lazy injection" in context
     assert "Only an init-keyword match relays startup disclosure" in context
@@ -1863,8 +1877,11 @@ def test_emit_startup_service_payload_returns_full_codex_session_start_contract(
     assert "\n## Startup Disclosure\n" not in context
     assert "\n## Session Startup\n" not in context
     assert "\n## Startup Disclosure\n" in disclosure
-    assert "\n## Session Startup\n" in disclosure
+    assert "\n## Session Startup\n" not in disclosure
     assert "Programmatic Startup Payload" not in disclosure
+    assert "### Init Scope" in disclosure
+    assert "`::open <activity>`" in disclosure
+    assert "### Top Priority Actions" not in disclosure
     # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: focus picker is dropped from the open
     # disclosure; the full focus list is no longer emitted in the report.
     assert "D. **Full Focus List**" not in disclosure
