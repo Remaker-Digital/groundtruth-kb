@@ -195,6 +195,14 @@ PROJECT_LINE_RE = re.compile(r"^Project:\s*[A-Z0-9-]+\s*$", re.MULTILINE)
 WORK_ITEM_LINE_RE = re.compile(
     r"^Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
 )
+PROJECT_METADATA_FORMAT_HINT = (
+    "Expected plain metadata lines such as "
+    "`Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING`, "
+    "`Project: PROJECT-GTKB-RELIABILITY-FIXES`, and `Work Item: WI-3496`. "
+    "Markdown-bold forms such as `**Project Authorization:** ...`, "
+    "`**Project:** ...`, and `**Work Item:** ...` are not recognized as "
+    "project-linkage metadata lines by this gate. "
+)
 BRIDGE_KIND_LINE_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
 BRIDGE_KIND_METADATA_EXEMPT = frozenset(
     {
@@ -1561,6 +1569,7 @@ def _deny_reason_for_content(
                     "[Governance] Implementation bridge proposals must include "
                     "project-linkage metadata lines: missing "
                     f"{', '.join(metadata_gaps)}. Add the absent line(s), or set "
+                    f"{PROJECT_METADATA_FORMAT_HINT}"
                     "bridge_kind: spec_intake|governance_review|loyal_opposition_advisory "
                     "for a non-implementation proposal. "
                     "(Hard-block per DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
