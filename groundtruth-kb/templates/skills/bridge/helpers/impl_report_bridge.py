@@ -355,7 +355,8 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         "## Specification Links\n\n"
         f"{_format_spec_links(plan.linked_specs)}\n\n"
         "## Owner Decisions / Input\n\n"
-        "No new owner decision is required by this implementation report. Carry forward any proposal-specific owner evidence here if applicable.\n\n"
+        "No new owner decision is required by this implementation report. "
+        "Carry forward any proposal-specific owner evidence here if applicable.\n\n"
         "## Prior Deliberations\n\n"
         f"- `{plan.proposal_path}` - approved implementation proposal carried forward.\n"
         f"- `{plan.go_path}` - Loyal Opposition GO verdict authorizing implementation.\n\n"
@@ -381,7 +382,8 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         "Document residual risk and the rollback path for the changed files. Bridge audit files remain append-only.\n\n"
         "## Loyal Opposition Asks\n\n"
         "1. Verify the implementation against the linked specifications and executed command evidence.\n"
-        "2. Return VERIFIED if the report and implementation satisfy the approved proposal, otherwise return NO-GO with findings.\n"
+        "2. Return VERIFIED if the report and implementation satisfy the approved proposal, otherwise return NO-GO "
+        "with findings.\n"
     )
 
 

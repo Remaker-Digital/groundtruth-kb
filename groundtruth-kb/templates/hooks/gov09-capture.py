@@ -54,10 +54,7 @@ def classify_gov09(prompt: str) -> bool:
     for ap in ANTI_PATTERNS:
         if ap.search(prompt):
             return False
-    for pat in GOV09_PATTERNS:
-        if pat.search(prompt):
-            return True
-    return False
+    return any(pat.search(prompt) for pat in GOV09_PATTERNS)
 
 
 def main() -> int:
