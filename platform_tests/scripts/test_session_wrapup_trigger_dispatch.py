@@ -32,8 +32,33 @@ def test_hook_recognizes_strict_topic_commands() -> None:
     assert command is not None
     assert command.action == "open"
     assert command.topic_type == "spec"
+    ops_open = hook.parse_topic_command("::open ops")
+    assert ops_open is not None
+    assert ops_open.action == "open"
+    assert ops_open.topic_type == "ops"
+    ops_close = hook.parse_topic_command("::close ops")
+    assert ops_close is not None
+    assert ops_close.action == "close"
+    assert ops_close.topic_type == "ops"
     assert hook.parse_topic_command("::open  spec") is None
     assert hook.parse_topic_command("::close unknown") is None
+
+
+def test_hook_render_topic_context_includes_activity_profile() -> None:
+    hook = _load_hook()
+
+    context = hook.render_topic_context(
+        {
+            "action": "open",
+            "topic_type": "build",
+            "topic": {"route_target": "build-package-scaffold-service"},
+        }
+    )
+
+    assert "## Activity Disposition Profile" in context
+    assert "- name: build" in context
+    assert "- headless_eligibility: headless_eligible" in context
+    assert "- direction.stance: implement-within-scope" in context
 
 
 def test_startup_input_gate_uses_harness_state_guard_not_legacy_codex_guard(tmp_path, monkeypatch) -> None:

@@ -6,8 +6,9 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
+from groundtruth_kb.activity.profiles import ActivityProfileError, load_activity_profiles
 from groundtruth_kb.session.envelope import (
     TOPIC_TYPES,
     EnvelopeError,
@@ -16,7 +17,8 @@ from groundtruth_kb.session.envelope import (
     utc_now_iso,
 )
 
-TOPIC_COMMAND_RE = re.compile(r"^::(?P<action>open|close) (?P<topic>spec|build|test|deliberation|project)$")
+_TOPIC_TYPE_PATTERN = "|".join(TOPIC_TYPES)
+TOPIC_COMMAND_RE = re.compile(rf"^::(?P<action>open|close) (?P<topic>{_TOPIC_TYPE_PATTERN})$")
 
 
 @dataclass(frozen=True)
@@ -67,10 +69,79 @@ def handle_topic_command(
     return result  # type: ignore[return-value]
 
 
+def _format_sequence(values: list[str]) -> str:
+    return ", ".join(values) if values else "none"
+
+
+def _format_history_state(history_state: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    sources = history_state.get("sources")
+    if isinstance(sources, list):
+        lines.append(f"- history_state.sources: {_format_sequence([str(item) for item in sources])}")
+    else:
+        lines.append("- history_state.sources: none")
+    return lines
+
+
+def _format_direction(direction: dict[str, Any]) -> list[str]:
+    lines = [f"- direction.stance: {direction.get('stance') or 'n/a'}"]
+    guardrails = direction.get("guardrails")
+    if isinstance(guardrails, list):
+        lines.append(f"- direction.guardrails: {_format_sequence([str(item) for item in guardrails])}")
+    else:
+        lines.append("- direction.guardrails: none")
+    manipulates = direction.get("manipulates")
+    if isinstance(manipulates, list):
+        lines.append(f"- direction.manipulates: {_format_sequence([str(item) for item in manipulates])}")
+    else:
+        lines.append("- direction.manipulates: none")
+    return lines
+
+
+def _render_activity_profile(result: dict[str, object]) -> str:
+    if result.get("action") != "open":
+        return ""
+    topic_type = result.get("topic_type")
+    if not isinstance(topic_type, str):
+        return ""
+    try:
+        profile = load_activity_profiles().get(topic_type)
+    except ActivityProfileError as exc:
+        return "\n".join(
+            [
+                "## Activity Disposition Profile",
+                "",
+                "- status: unavailable",
+                f"- reason: {exc}",
+            ]
+        )
+    if profile is None:
+        return "\n".join(
+            [
+                "## Activity Disposition Profile",
+                "",
+                "- status: unavailable",
+                f"- reason: no profile configured for activity {topic_type!r}",
+            ]
+        )
+    lines = [
+        "## Activity Disposition Profile",
+        "",
+        f"- name: {profile.name}",
+        f"- version: {profile.version}",
+        f"- headless_eligibility: {profile.headless_eligibility}",
+        f"- skills: {_format_sequence(profile.skills)}",
+        f"- terminology: {_format_sequence(profile.terminology)}",
+    ]
+    lines.extend(_format_history_state(profile.history_state))
+    lines.extend(_format_direction(profile.direction))
+    return "\n".join(lines)
+
+
 def render_topic_context(result: dict[str, object]) -> str:
     topic = result.get("topic") if isinstance(result.get("topic"), dict) else {}
     route_target = topic.get("route_target") if isinstance(topic, dict) else None
-    return "\n".join(
+    base = "\n".join(
         [
             "# GroundTruth-KB Topic Envelope Command",
             "",
@@ -80,3 +151,7 @@ def render_topic_context(result: dict[str, object]) -> str:
             f"- route_target: {route_target or 'n/a'}",
         ]
     )
+    activity_profile = _render_activity_profile(result)
+    if activity_profile:
+        return f"{base}\n\n{activity_profile}"
+    return base
