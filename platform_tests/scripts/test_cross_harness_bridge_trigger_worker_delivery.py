@@ -149,7 +149,10 @@ def test_spawned_claude_worker_can_edit_authorized_file(tmp_path: Path) -> None:
     )
     (bridge_dir / "worker-delivery-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
     (bridge_dir / "INDEX.md").write_text(
-        "# Bridge Index\n\nDocument: worker-delivery\nGO: bridge/worker-delivery-002.md\nNEW: bridge/worker-delivery-001.md\n",
+        (
+            "# Bridge Index\n\nDocument: worker-delivery\n"
+            "GO: bridge/worker-delivery-002.md\nNEW: bridge/worker-delivery-001.md\n"
+        ),
         encoding="utf-8",
     )
 

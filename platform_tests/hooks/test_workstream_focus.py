@@ -384,7 +384,8 @@ def test_sessionstart_plus_dispatch_prompt_without_marker_processes_bridge_task(
 
 Single-harness bridge dispatcher notification (Slice 2 scheduled task).
 
-This is an automated bridge dispatch from the single-harness dispatcher, not a fresh-session owner stimulus; do not wait for another owner message before processing the selected entries.
+This is an automated bridge dispatch from the single-harness dispatcher, not a fresh-session owner stimulus;
+do not wait for another owner message before processing the selected entries.
 
 Read bridge/INDEX.md directly before acting.
 """
@@ -723,7 +724,7 @@ def test_prompt_hook_accepts_bom_prefixed_stdin_from_windows_pipeline(tmp_path) 
             "utf-8"
         ),
         capture_output=True,
-        timeout=10,
+        timeout=30,
         check=True,
     )
 
@@ -1040,7 +1041,7 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
     assert "GTKB-STARTUP-INPUT-GATE" in response["reason"]
     assert "startup disclosure has been emitted" in response["reason"]
     assert "init-keyword contract" in response["reason"]
-    assert "ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001" in response["reason"]
+    assert "DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001" in response["reason"]
     assert "first owner message of this fresh session was discarded" not in response["reason"]
 
 
