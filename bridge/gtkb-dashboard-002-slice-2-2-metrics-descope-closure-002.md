@@ -1,29 +1,40 @@
 GO
-author_identity: loyal-opposition/antigravity
+author_identity: loyal-opposition/antigravity/C
 author_harness_id: C
-author_session_context_id: 697b408c-9966-4c89-9093-5efd47e645aa
-author_model: gemini-3.5-flash
-author_model_configuration: explanatory output style; mode=auto
-reviewed_document: bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-001.md
+author_session_context_id: antigravity-gtkb-lo-2026-06-22-dashboard-descope-verdict
+author_model: gemini-2.5-flash
+author_model_version: 2026-06-22
+author_model_configuration: Antigravity IDE interactive session; resolved loyal-opposition
+
+# PROJECT-GTKB-DASHBOARD-002-SLICE-2-2-METRICS Descope and Closure GO Verdict
+
+bridge_kind: loyal_opposition_verdict
+Document: gtkb-dashboard-002-slice-2-2-metrics-descope-closure
+Version: 002
+Status: GO
+Author: Loyal Opposition (Antigravity)
 Date: 2026-06-22 UTC
 
-# GO - gtkb-dashboard-002-slice-2-2-metrics-descope-closure
+Subject Work Item: GTKB-DASHBOARD-002-SLICE-2-2-METRICS
+Subject Project: PROJECT-GTKB-DASHBOARD-002-SLICE-2-2-METRICS
+target_paths: []
 
-## Verdict
+---
 
-GO. The operational state change (version 001) successfully aligns with the owner's explicit descope decision `DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE` to resolve work item `GTKB-DASHBOARD-002-SLICE-2-2-METRICS` and retire project `PROJECT-GTKB-DASHBOARD-002-SLICE-2-2-METRICS`. 
+## Verdict Summary
 
-As an `operational_state_change` bridge kind with `target_paths: []` and no code changes, this thread terminates at this `GO` verdict. Prime Builder is authorized to apply the MemBase mutations on the subject project and work item.
+Loyal Opposition has reviewed the proposal `bridge/gtkb-dashboard-002-slice-2-2-metrics-descope-closure-001.md`.
+The proposal is an `operational_state_change` disposition to descope the broken runtime CI-evidence gate and close the sub-project:
+1. Resolve work item `GTKB-DASHBOARD-002-SLICE-2-2-METRICS` (resolution_status open -> resolved).
+2. Retire project `PROJECT-GTKB-DASHBOARD-002-SLICE-2-2-METRICS` (status active -> retired).
+3. Reclassify the live CI-evidence flow to Agent Red concern `WI-4736`.
 
-## Methodology
+This is a terminal-at-GO disposition; no source changes, test modifications, or deployments are in scope.
+The descope decision is fully authorized by the owner in `DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE`.
 
-- Verified harness role authority via live system checks; harness C is in the Loyal Opposition role.
-- Confirmed that the proposal was authored by harness B (Claude), ensuring harness-separation compliance.
-- Ran the mandatory preflights:
-  - `scripts/bridge_applicability_preflight.py --bridge-id gtkb-dashboard-002-slice-2-2-metrics-descope-closure`
-  - `scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-dashboard-002-slice-2-2-metrics-descope-closure`
-- Inspected MemBase to confirm the project is active and the work item is open.
-- Confirmed that the descope decision `DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE` is present and active in the deliberations database.
+All pre-filing preflights have passed successfully.
+
+Loyal Opposition issues a **GO** verdict. Prime Builder is authorized to execute the two MemBase mutations and close the sub-project.
 
 ## Applicability Preflight
 
@@ -48,12 +59,12 @@ As an `operational_state_change` bridge kind with `target_paths: []` and no code
 | `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:requirement, content:specification, content:ADR, content:DCL, content:work item, content:backlog |
 | `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
 
-## Clause Applicability
+## Clause Applicability Report
 
 - Bridge id: `gtkb-dashboard-002-slice-2-2-metrics-descope-closure`
-- Operative file: `bridge\gtkb-dashboard-002-slice-2-2-metrics-descope-closure-001.md`
+- Operative file: `bridge\gtkb-dashboard-002-slice-2-2-metrics-descope-closure-002.md`
 - Clauses evaluated: 5
-- must_apply: 4, may_apply: 1, not_applicable: 0
+- must_apply: 2, may_apply: 3, not_applicable: 0
 - Evidence gaps in must_apply clauses: 0
 - Blocking gaps (gate-failing): 0
 - Mode: **mandatory** (default invocation). Exit 5 = blocking gap; exit 0 = pass.
@@ -61,20 +72,24 @@ As an `operational_state_change` bridge kind with `target_paths: []` and no code
 | Clause | Spec | Applicability | Evidence found | Severity | Enforcement |
 |---|---|---|---|---|---|
 | `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` | `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | must_apply | yes | blocking | blocking |
-| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | must_apply | yes | blocking | blocking |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | must_apply | yes | blocking | blocking |
+| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | may_apply | — | blocking | blocking |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | may_apply | — | blocking | blocking |
 | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | must_apply | yes | blocking | blocking |
 | `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | — | blocking | blocking |
 
 ## Prior Deliberations
 
-- `DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE` — owner descope decision.
-- `DELIB-0983` — terminal VERIFIED record for the underlying slice2b metrics baseline.
-- `DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM` — bridge-VERIFIED-retires-parent principle.
+- `DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE` — records the owner's decision to descope the CI-evidence gate and close the metrics sub-project.
+- `DELIB-0983` — terminal VERIFIED record for the slice 2.2 metrics implementation.
+- `DELIB-1127` — compressed slice 2.2 metrics bridge thread.
 
-## Owner Decision Needed
+## Findings
 
-None. Already approved by owner (`DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE`).
+None. The proposal meets all requirements of the specification-derived verification gate and matches the authorized scope of the descope decision.
+
+## Owner Decisions / Input
+
+The owner decisions are recorded in `DELIB-DASHBOARD-002-SLICE-2-2-METRICS-DESCOPE-CLOSE` (Option A: Descope gate, close now). No new owner decisions are required.
 
 ---
 
