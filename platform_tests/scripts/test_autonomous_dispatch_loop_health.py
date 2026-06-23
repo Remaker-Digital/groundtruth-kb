@@ -134,8 +134,10 @@ def test_validate_loop_no_files(tmp_path):
 def test_validate_loop_complete_chain(tmp_path):
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    _complete_chain(bridge_dir, "test-slug", wi="WI-1234", session_id="sess-abc")
-    result = adlh.validate_loop(bridge_dir, "test-slug", expected_wi="WI-1234", expected_session_id="sess-abc")
+    _complete_chain(bridge_dir, "test-slug", wi="WI-1234", session_id="deadbeef-cafe-0000-beef-123456789abc")
+    result = adlh.validate_loop(
+        bridge_dir, "test-slug", expected_wi="WI-1234", expected_session_id="deadbeef-cafe-0000-beef-123456789abc"
+    )
     assert result.complete is True
     assert result.phases_missing == []
     assert set(result.phases_present) == {"proposal", "go", "implementation_report", "verified"}
@@ -223,14 +225,18 @@ def test_validate_loop_with_nogo_revised_cycle(tmp_path):
     slug = "test-slug"
     _write_bridge(bridge_dir, slug, 1, "NEW", "Work Item: WI-7")
     _write_bridge(bridge_dir, slug, 2, "GO")
-    _write_bridge(bridge_dir, slug, 3, "NEW", "Work Item: WI-7\nauthor_session_context_id: sess1")
+    _write_bridge(bridge_dir, slug, 3, "NEW", "Work Item: WI-7\nauthor_session_context_id: deadbeef12")
     _write_bridge(bridge_dir, slug, 4, "NO-GO")
     _write_bridge(bridge_dir, slug, 5, "REVISED", "Work Item: WI-7")
     _write_bridge(bridge_dir, slug, 6, "VERIFIED")
-    result = adlh.validate_loop(bridge_dir, slug, expected_wi="WI-7", expected_session_id="sess1")
+    result = adlh.validate_loop(bridge_dir, slug, expected_wi="WI-7", expected_session_id="deadbeef12")
     assert result.complete is True
-    assert "no_go" in result.phases_present
-    assert "revised_report" in result.phases_present
+    # no_go and revised_report are optional phases not in REQUIRED_LIFECYCLE_PHASES;
+    # they appear in lifecycle["versions"] but not in phases_present.
+    all_phase_names = {v["phase"] for v in result.lifecycle["versions"]}
+    assert "no_go" in all_phase_names
+    assert "revised_report" in all_phase_names
+    assert "verified" in all_phase_names
     assert "verified" in result.phases_present
 
 

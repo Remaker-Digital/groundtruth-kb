@@ -22,7 +22,6 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -107,7 +106,7 @@ def _extract_status(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _classify_version(version: BridgeVersion, prev_status: Optional[str]) -> str:
+def _classify_version(version: BridgeVersion, prev_status: str | None) -> str:
     """Map a version status to a semantic lifecycle phase."""
     s = version.status
     if s == "NEW":
@@ -132,7 +131,7 @@ def _classify_version(version: BridgeVersion, prev_status: Optional[str]) -> str
 def _analyze_lifecycle(versions: list[BridgeVersion]) -> dict:
     """Return lifecycle classification and phase sequence."""
     phases: list[dict] = []
-    prev_status: Optional[str] = None
+    prev_status: str | None = None
     for v in versions:
         phase = _classify_version(v, prev_status)
         phases.append(
@@ -161,9 +160,9 @@ class HealthResult:
     phases_present: list[str]
     phases_missing: list[str]
     wi_found: bool
-    expected_wi: Optional[str]
+    expected_wi: str | None
     session_found: bool
-    expected_session_id: Optional[str]
+    expected_session_id: str | None
     version_count: int
     lifecycle: dict
     errors: list[str] = field(default_factory=list)
@@ -190,8 +189,8 @@ def validate_loop(
     bridge_dir: Path,
     slug: str,
     *,
-    expected_wi: Optional[str] = None,
-    expected_session_id: Optional[str] = None,
+    expected_wi: str | None = None,
+    expected_session_id: str | None = None,
 ) -> HealthResult:
     """Validate the autonomous loop evidence for a bridge slug."""
     errors: list[str] = []
@@ -327,13 +326,13 @@ def _build_argparser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_bridge_dir(explicit: Optional[Path]) -> Path:
+def _resolve_bridge_dir(explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit
     return Path(__file__).resolve().parents[1] / "bridge"
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = _build_argparser()
     args = parser.parse_args(argv)
 
