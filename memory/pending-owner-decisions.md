@@ -8153,6 +8153,32 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-23T06:12:12.744082Z
   answer: "Your questions have been answered: \"10 stale Codex-A LO workers (63-138 min old, from before the A→PB role switch) are consuming LO cap slots, blocking all new LO dispatch. Kill workers older than 30 minutes?\"=\"Kill all >30 min (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1355
+  asked_at: 2026-06-23T08:45:52.458540Z
+  question: "How should I capture this dispatcher-control-surface requirement? (Formal SPEC/DCL creation needs your approval per the artifact-approval gate. Implementation is blocked until the review lane is restored behind WI-4670, so this is capture-only.)"
+  options:
+    - "Full capture: SPEC + DCL + project + WIs"
+    - "SPEC + project + WIs; defer DCL/guard"
+    - "Deliberation only for now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d42acd727c2e45ff
+  resolved_at: 2026-06-23T08:45:52.458540Z
+  answer: "Your questions have been answered: \"How should I capture this dispatcher-control-surface requirement? (Formal SPEC/DCL creation needs your approval per the artifact-approval gate. Implementation is blocked until the review lane is restored behind WI-4670, so this is capture-only.)\"=\"Full capture: SPEC + DCL + project + WIs\", \"Where should the dispatcher config + reporting CLI live? (You can change this at proposal time; it sets the design direction.)\"=\"Under `gt bridge dispatch` (write subcommands + report)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1356
+  asked_at: 2026-06-23T08:45:52.458540Z
+  question: "Where should the dispatcher config + reporting CLI live? (You can change this at proposal time; it sets the design direction.)"
+  options:
+    - "Under `gt bridge dispatch` (write subcommands + report)"
+    - "Extend `gt mode` transaction component"
+    - "Both: transactions via `gt mode`, surfaced under `gt bridge dispatch`"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c6923fed10bcb623
+  resolved_at: 2026-06-23T08:45:52.458540Z
+  answer: "Your questions have been answered: \"How should I capture this dispatcher-control-surface requirement? (Formal SPEC/DCL creation needs your approval per the artifact-approval gate. Implementation is blocked until the review lane is restored behind WI-4670, so this is capture-only.)\"=\"Full capture: SPEC + DCL + project + WIs\", \"Where should the dispatcher config + reporting CLI live? (You can change this at proposal time; it sets the design direction.)\"=\"Under `gt bridge dispatch` (write subcommands + report)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

@@ -52,6 +52,7 @@ import datetime as dt
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
@@ -90,6 +91,9 @@ DEFAULT_MAX_ITEMS = 2  # matches cross-harness trigger DEFAULT_MAX_ITEMS
 # GTKB_NO_CROSS_HARNESS_TRIGGER). Used as an operator opt-out, never as
 # automatic loop prevention.
 LOOP_PREVENTION_ENV_VAR = "GTKB_NO_SINGLE_HARNESS_DISPATCHER"
+
+STORM_WATCHDOG_HEARTBEAT_SUBPATH = (".gtkb-state", "ops", "storm-watchdog-heartbeat.txt")
+_HEARTBEAT_STALE_SECONDS = 300  # > 5 min without update → report stale
 
 _LABEL_TO_CANONICAL_MODE = {"prime-builder": "pb", "loyal-opposition": "lo"}
 
@@ -963,6 +967,80 @@ def run_dispatcher(
         }
     finally:
         _release_lock(state_dir)
+
+
+# ---------------------------------------------------------------------------
+# Storm-watchdog heartbeat parsing
+# ---------------------------------------------------------------------------
+
+
+def _parse_storm_watchdog_heartbeat(project_root: Path) -> dict[str, Any]:
+    """Parse the storm-watchdog heartbeat file and return a liveness dict.
+
+    Returns a dict with keys:
+      timestamp (str|None), codex (int|None), family (int|None),
+      noncodex (int|None), threshold (int|None), noncodex_threshold (int|None),
+      age_seconds (float|None), stale (bool), absent (bool),
+      parse_error (str|None).
+    """
+    path = project_root.joinpath(*STORM_WATCHDOG_HEARTBEAT_SUBPATH)
+    base: dict[str, Any] = {
+        "timestamp": None,
+        "codex": None,
+        "family": None,
+        "noncodex": None,
+        "threshold": None,
+        "noncodex_threshold": None,
+        "age_seconds": None,
+        "stale": False,
+        "absent": False,
+        "parse_error": None,
+    }
+    if not path.is_file():
+        base["absent"] = True
+        return base
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        base["parse_error"] = str(exc)
+        return base
+    if not text:
+        base["parse_error"] = "empty file"
+        return base
+
+    # Format: "<ISO-timestamp> key=N [key=N ...]"
+    parts = text.split()
+    if not parts:
+        base["parse_error"] = "unparsable content"
+        return base
+
+    ts_str = parts[0]
+    base["timestamp"] = ts_str
+    try:
+        ts = dt.datetime.fromisoformat(ts_str)
+        base["age_seconds"] = (dt.datetime.now(dt.UTC) - ts.astimezone(dt.UTC)).total_seconds()
+        base["stale"] = base["age_seconds"] > _HEARTBEAT_STALE_SECONDS
+    except ValueError:
+        base["parse_error"] = f"unparsable timestamp: {ts_str!r}"
+
+    kv_re = re.compile(r"^([a-zA-Z]+)=(\d+)$")
+    _KEY_MAP = {
+        "codex": "codex",
+        "family": "family",
+        "noncodex": "noncodex",
+        "threshold": "threshold",
+        "noncodexthreshold": "noncodex_threshold",
+    }
+    for token in parts[1:]:
+        m = kv_re.match(token)
+        if not m:
+            continue
+        key_raw = m.group(1).lower()
+        mapped = _KEY_MAP.get(key_raw)
+        if mapped:
+            base[mapped] = int(m.group(2))
+
+    return base
 
 
 # ---------------------------------------------------------------------------
