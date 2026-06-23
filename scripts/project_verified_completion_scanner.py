@@ -112,6 +112,51 @@ class AuthorizationReadiness:
         }
 
 
+@dataclass(frozen=True)
+class MemberCompletionReadiness:
+    """Member-WI automatic-retirement readiness for one active project."""
+
+    project_id: str
+    active_member_work_item_ids: list[str]
+    terminal_work_item_ids: list[str]
+    nonterminal_work_item_ids: list[str]
+    nonterminal_work_item_statuses: dict[str, str]
+    completion_guarded: bool
+    completion_guard_refs: list[dict[str, Any]]
+    keep_open_elected: bool
+    completion_ready: bool
+    exclusion_reasons: list[str]
+
+    @classmethod
+    def from_service_status(cls, status: dict[str, Any]) -> MemberCompletionReadiness:
+        return cls(
+            project_id=str(status.get("project_id") or ""),
+            active_member_work_item_ids=list(status.get("active_member_work_item_ids") or []),
+            terminal_work_item_ids=list(status.get("terminal_work_item_ids") or []),
+            nonterminal_work_item_ids=list(status.get("nonterminal_work_item_ids") or []),
+            nonterminal_work_item_statuses=dict(status.get("nonterminal_work_item_statuses") or {}),
+            completion_guarded=bool(status.get("completion_guarded")),
+            completion_guard_refs=list(status.get("completion_guard_refs") or []),
+            keep_open_elected=bool(status.get("keep_open_elected")),
+            completion_ready=bool(status.get("completion_ready")),
+            exclusion_reasons=list(status.get("exclusion_reasons") or []),
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "active_member_work_item_ids": self.active_member_work_item_ids,
+            "terminal_work_item_ids": self.terminal_work_item_ids,
+            "nonterminal_work_item_ids": self.nonterminal_work_item_ids,
+            "nonterminal_work_item_statuses": self.nonterminal_work_item_statuses,
+            "completion_guarded": self.completion_guarded,
+            "completion_guard_refs": self.completion_guard_refs,
+            "keep_open_elected": self.keep_open_elected,
+            "completion_ready": self.completion_ready,
+            "exclusion_reasons": self.exclusion_reasons,
+        }
+
+
 def _ensure_groundtruth_importable(project_root: Path) -> None:
     gt_src = project_root / "groundtruth-kb" / "src"
     if gt_src.is_dir() and str(gt_src) not in sys.path:
@@ -408,6 +453,32 @@ def completion_ready(project_root: Path = PROJECT_ROOT) -> list[AuthorizationRea
     )
 
 
+def member_completion_scan(project_root: Path = PROJECT_ROOT) -> list[MemberCompletionReadiness]:
+    """Compute v6 member-WI automatic-retirement readiness for active projects."""
+    _ensure_groundtruth_importable(project_root)
+    from groundtruth_kb.db import KnowledgeDB
+    from groundtruth_kb.project.lifecycle import ProjectLifecycleService
+
+    db = KnowledgeDB(project_root / "groundtruth.db")
+    try:
+        service = ProjectLifecycleService(db)
+        results = [
+            MemberCompletionReadiness.from_service_status(
+                service.member_completion_status(str(project.get("id") or ""))
+            )
+            for project in db.list_projects(include_terminal=False)
+            if str(project.get("id") or "")
+        ]
+    finally:
+        db.close()
+    return sorted(results, key=lambda r: r.project_id)
+
+
+def member_completion_ready(project_root: Path = PROJECT_ROOT) -> list[MemberCompletionReadiness]:
+    """Return only projects ready for v6 member-WI automatic retirement."""
+    return [r for r in member_completion_scan(project_root) if r.completion_ready]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
@@ -416,7 +487,38 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="report every active authorization, not just completion-ready ones",
     )
+    parser.add_argument(
+        "--member-completion",
+        action="store_true",
+        help="report v6 member-WI project retirement readiness instead of authorization readiness",
+    )
     args = parser.parse_args(argv)
+
+    if args.member_completion:
+        member_results = member_completion_scan(PROJECT_ROOT)
+        selected_member = member_results if args.all else [r for r in member_results if r.completion_ready]
+        if args.json:
+            print(json.dumps([r.as_dict() for r in selected_member], indent=2))
+            return 0
+        if not selected_member:
+            print("No member-completion-ready projects.")
+            return 0
+        for r in selected_member:
+            flag = "READY" if r.completion_ready else "not-ready"
+            print(f"[{flag}] {r.project_id}")
+            if r.nonterminal_work_item_ids:
+                print(f"         nonterminal WIs: {', '.join(r.nonterminal_work_item_ids)}")
+            if r.completion_guarded:
+                refs = ", ".join(
+                    f"{ref['artifact_type']}:{ref['artifact_ref']} ({ref['relationship']})"
+                    for ref in r.completion_guard_refs
+                )
+                print(f"         completion guard: {refs}")
+            if r.keep_open_elected:
+                print("         keep-open election: yes")
+            if r.exclusion_reasons:
+                print(f"         exclusion reasons: {', '.join(r.exclusion_reasons)}")
+        return 0
 
     results = scan(PROJECT_ROOT)
     selected = results if args.all else [r for r in results if r.completion_ready]

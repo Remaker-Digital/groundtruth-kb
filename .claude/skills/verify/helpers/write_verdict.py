@@ -310,6 +310,42 @@ def _append_commit_finalization_evidence(body: str, *, commit_message: str, path
     )
 
 
+def _auto_retire_completed_projects_after_verified(project_root: Path) -> tuple[str, ...]:
+    """Best-effort project auto-retirement after VERIFIED finalization.
+
+    This is intentionally outside the git finalization transaction: an
+    actuation failure must never remove or roll back a valid VERIFIED verdict
+    commit.
+    """
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.project.lifecycle import ProjectLifecycleService
+    except ImportError as exc:
+        print(f"VERIFIED auto-retire skipped: import failed: {exc}", file=sys.stderr)
+        return ()
+
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return ()
+
+    db = KnowledgeDB(db_path)
+    try:
+        records = ProjectLifecycleService(db).auto_retire_completed_projects(
+            project_root=project_root,
+            changed_by="auto-verify-finalization",
+        )
+    except Exception as exc:  # noqa: BLE001 - VERIFIED finalization must stay committed.
+        print(f"VERIFIED auto-retire skipped: {exc}", file=sys.stderr)
+        return ()
+    finally:
+        db.close()
+
+    retired = tuple(str(record.get("project_id") or "") for record in records if record.get("project_id"))
+    if retired:
+        print(f"VERIFIED auto-retired completed project(s): {', '.join(retired)}", file=sys.stderr)
+    return retired
+
+
 def finalize_verified_commit(
     slug: str,
     body: str,
@@ -408,6 +444,7 @@ def finalize_verified_commit(
         raise
 
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
+    _auto_retire_completed_projects_after_verified(root)
     return VerifiedFinalizationResult(
         commit_sha=commit_sha,
         verdict_path=verdict_rel_path,

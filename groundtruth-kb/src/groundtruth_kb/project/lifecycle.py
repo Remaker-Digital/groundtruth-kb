@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +15,8 @@ from groundtruth_kb.project.authorization import ACTIVE_PROJECT_AUTHORIZATION_ST
 PROJECT_TERMINAL_STATUS = "retired"
 COMPLETED_PROJECT_AUTHORIZATION_STATUS = "completed"
 PROJECTS_CHANGED_BY = "gt-projects"
+WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = frozenset({"verified", "resolved", "retired", "wont_fix", "not_a_defect"})
+LOGGER = logging.getLogger(__name__)
 
 # Bridge proposal/report metadata line: ``Work Item: WI-1234`` (including
 # spec-intake ``WI-AUTO-*`` ids, or a GTKB-/WORKLIST- descriptive id),
@@ -486,6 +489,90 @@ class ProjectLifecycleService:
             for membership in memberships
             if str(membership.get("membership_status") or "").strip().lower() == "active"
         ]
+
+    def _project_keep_open_elected(self, project_id: str) -> bool:
+        """True when durable project/authorization history preserves keep-open.
+
+        ``complete_project_authorization(..., retire_project=False)`` completes
+        the current authorization while intentionally leaving the project active.
+        There is no separate keep-open boolean, so the conservative durable
+        signal is: current project is active, at least one current authorization
+        is completed, and no current authorization remains active.
+        """
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        project = self.db.get_project(normalized_project_id)
+        if project is None or str(project.get("status") or "").strip().lower() != "active":
+            return False
+        authorizations = self.db.list_project_authorizations(normalized_project_id, include_terminal=True)
+        has_completed = any(
+            str(authorization.get("status") or "").strip().lower() == COMPLETED_PROJECT_AUTHORIZATION_STATUS
+            for authorization in authorizations
+        )
+        has_active = any(
+            str(authorization.get("status") or "").strip().lower() == ACTIVE_PROJECT_AUTHORIZATION_STATUS
+            for authorization in authorizations
+        )
+        return has_completed and not has_active
+
+    def member_completion_status(self, project_id: str) -> dict[str, Any]:
+        """Return the v6 member-WI automatic-retirement readiness record.
+
+        ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v6 retires an
+        active project automatically only when it has active member WIs, every
+        active member WI has a terminal ``resolution_status``, no active
+        ``plan_incomplete`` guard exists, and no caller has taken the
+        keep-open election.
+        """
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        project = self.db.get_project(normalized_project_id)
+        if project is None:
+            raise ProjectLifecycleError(f"Project not found: {normalized_project_id}")
+        memberships = self.db.list_project_work_items(normalized_project_id)
+        member_ids: list[str] = []
+        terminal_ids: list[str] = []
+        nonterminal_ids: list[str] = []
+        nonterminal_statuses: dict[str, str] = {}
+        for membership in memberships:
+            work_item_id = str(membership.get("work_item_id") or "")
+            if not work_item_id:
+                continue
+            member_ids.append(work_item_id)
+            status = str(membership.get("resolution_status") or "").strip().lower()
+            if status in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
+                terminal_ids.append(work_item_id)
+            else:
+                nonterminal_ids.append(work_item_id)
+                nonterminal_statuses[work_item_id] = status
+
+        guard_refs = self._project_completion_guard_refs(normalized_project_id)
+        keep_open_elected = self._project_keep_open_elected(normalized_project_id)
+        completion_ready = bool(member_ids) and not nonterminal_ids and not guard_refs and not keep_open_elected
+        exclusion_reasons: list[str] = []
+        if not member_ids:
+            exclusion_reasons.append("zero_active_members")
+        if nonterminal_ids:
+            exclusion_reasons.append("nonterminal_member_work_items")
+        if guard_refs:
+            exclusion_reasons.append("plan_incomplete_guard")
+        if keep_open_elected:
+            exclusion_reasons.append("keep_open_election")
+
+        return {
+            "project_id": normalized_project_id,
+            "active_member_work_item_ids": member_ids,
+            "terminal_work_item_ids": terminal_ids,
+            "nonterminal_work_item_ids": nonterminal_ids,
+            "nonterminal_work_item_statuses": nonterminal_statuses,
+            "completion_guarded": bool(guard_refs),
+            "completion_guard_refs": guard_refs,
+            "keep_open_elected": keep_open_elected,
+            "completion_ready": completion_ready,
+            "exclusion_reasons": exclusion_reasons,
+        }
+
+    def member_completion_ready(self, project_id: str) -> bool:
+        """Return true when a project satisfies the v6 member-WI criterion."""
+        return bool(self.member_completion_status(project_id)["completion_ready"])
 
     def _authorization_completion_ready(
         self,
@@ -1025,4 +1112,56 @@ class ProjectLifecycleService:
                         "missing_under_v4": missing_under_v4,
                     }
                 )
+        return records
+
+    def auto_retire_completed_projects(
+        self,
+        *,
+        project_root: Path,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str = (
+            "Auto-retired: all active member work items reached terminal resolution "
+            "and no keep-open election is present "
+            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v6 automatic retirement)."
+        ),
+    ) -> list[dict[str, Any]]:
+        """Retire active projects satisfying the v6 member-WI criterion.
+
+        ``project_root`` is accepted for API symmetry with the existing
+        authorization-completion actuator and for call-site traceability; the
+        v6 member-WI criterion itself is MemBase-backed. Best-effort behavior
+        is per project: lifecycle errors are logged and skipped.
+        """
+        _ = project_root
+        records: list[dict[str, Any]] = []
+        for project in self.db.list_projects(include_terminal=False):
+            project_id = str(project.get("id") or "")
+            if not project_id:
+                continue
+            try:
+                status = self.member_completion_status(project_id)
+                if not status["completion_ready"]:
+                    continue
+                self.retire_project(
+                    project_id,
+                    changed_by=changed_by,
+                    change_reason=change_reason,
+                )
+                retired_work_items = self._retire_project_work_items(
+                    project_id,
+                    completed_authorization_id="member-terminal-resolution",
+                    changed_by=changed_by,
+                )
+            except ProjectLifecycleError as exc:
+                LOGGER.warning("Skipping automatic project retirement for %s: %s", project_id, exc)
+                continue
+            records.append(
+                {
+                    "outcome": "retired",
+                    "project_id": project_id,
+                    "project_retired": True,
+                    "retired_work_items": retired_work_items,
+                    "member_completion_status": status,
+                }
+            )
         return records
