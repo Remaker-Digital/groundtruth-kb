@@ -2959,6 +2959,49 @@ def projects_remove_item(
     )
 
 
+@projects_cmd.command("retire-item")
+@click.argument("project_id")
+@click.argument("work_item_id")
+@click.option("--status", default="retired", show_default=True, help="Non-active lifecycle status to set.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason containing the owner approval-packet path.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_retire_item(
+    ctx: click.Context,
+    project_id: str,
+    work_item_id: str,
+    status: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Retire or exclude one project work item with owner approval evidence."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    service = ProjectLifecycleService(db)
+    try:
+        membership = service.retire_project_work_item(
+            project_id,
+            work_item_id,
+            project_root=config.project_root,
+            status=status,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    if json_output:
+        click.echo(json.dumps(membership, indent=2, sort_keys=True))
+        return
+    click.echo(
+        f"Retired {membership['work_item_id']} from {membership['project_id']} (status={membership.get('status')})"
+    )
+
+
 @projects_cmd.command("reorder")
 @click.argument("project_id")
 @click.argument("work_item_ids", nargs=-1)

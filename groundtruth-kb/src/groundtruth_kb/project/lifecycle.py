@@ -6,10 +6,12 @@ import json
 import logging
 import re
 from datetime import UTC, datetime
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.governance.approval_packet import parse_packet_path_from_change_reason, validate_packet
 from groundtruth_kb.project.authorization import ACTIVE_PROJECT_AUTHORIZATION_STATUS
 
 PROJECT_TERMINAL_STATUS = "retired"
@@ -27,6 +29,7 @@ _WORK_ITEM_LINE_RE = re.compile(
 )
 _COMPLETION_GUARD_RELATIONSHIP = "plan_incomplete"
 _COMPLETION_GUARD_ARTIFACT_TYPES = ("completion_guard", "bridge_thread")
+_RETIRE_ITEM_DISALLOWED_STATUSES = frozenset({"", "active", "removed"})
 
 
 # WI-4737: id-agnostic recognition helpers. A work item whose VERIFIED bridge
@@ -94,6 +97,32 @@ def _require_nonempty(value: str, field_name: str) -> str:
     if not normalized:
         raise ProjectLifecycleError(f"{field_name} is required")
     return normalized
+
+
+def _retire_item_action_for_status(status: str) -> str:
+    return "exclude" if status.casefold() in {"exclude", "excluded"} else "retire"
+
+
+def _packet_text(packet: dict[str, Any]) -> str:
+    fields = (
+        "artifact_id",
+        "action",
+        "source_ref",
+        "full_content",
+        "explicit_change_request",
+        "change_reason",
+        "project_id",
+        "work_item_id",
+        "lifecycle_action",
+        "requested_status",
+        "status",
+    )
+    return "\n".join(str(packet.get(field, "") or "") for field in fields)
+
+
+def _packet_text_contains_token(packet_text: str, expected: str) -> bool:
+    pattern = rf"(?<![A-Za-z0-9_-]){re.escape(expected)}(?![A-Za-z0-9_-])"
+    return re.search(pattern, packet_text) is not None
 
 
 class ProjectLifecycleService:
@@ -295,6 +324,128 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(str(exc)) from exc
         if membership is None:
             raise ProjectLifecycleError("Project membership removal did not return a current membership")
+        return membership
+
+    def _validate_retire_item_approval_packet(
+        self,
+        *,
+        project_root: Path,
+        change_reason: str,
+        project_id: str,
+        work_item_id: str,
+        action: str,
+        status: str,
+    ) -> None:
+        rel_path = parse_packet_path_from_change_reason(change_reason)
+        if rel_path is None:
+            raise ProjectLifecycleError(
+                "retire-item requires an owner-approved approval packet path in change_reason. "
+                "No .groundtruth/formal-artifact-approvals/*.json packet path detected."
+            )
+
+        root = project_root.resolve()
+        packet_path = (root / rel_path).resolve()
+        try:
+            packet_path.relative_to(root)
+        except ValueError as exc:
+            raise ProjectLifecycleError(f"Approval-packet path resolves outside the project root: {rel_path}") from exc
+        if not packet_path.is_file():
+            raise ProjectLifecycleError(f"Cited approval packet not found: {rel_path}")
+        try:
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        except (JSONDecodeError, OSError) as exc:
+            raise ProjectLifecycleError(f"Cited approval packet is not readable JSON: {rel_path}: {exc}") from exc
+        if not isinstance(packet, dict):
+            raise ProjectLifecycleError(f"Cited approval packet is not a JSON object: {rel_path}")
+
+        result = validate_packet(packet)
+        if not result.is_valid:
+            detail = result.errors[0] if result.errors else "invalid packet"
+            raise ProjectLifecycleError(f"Cited approval packet fails schema validation: {rel_path}: {detail}")
+        if packet.get("approved_by") != "owner":
+            raise ProjectLifecycleError(f"Cited approval packet is not owner-approved: {rel_path}")
+
+        packet_text = _packet_text(packet)
+        expected = {
+            "project_id": project_id,
+            "work_item_id": work_item_id,
+            "lifecycle_action": action,
+            "requested_status": status,
+        }
+        missing = [
+            field_name
+            for field_name, expected_value in expected.items()
+            if str(packet.get(field_name, "") or "") != expected_value
+            and not _packet_text_contains_token(packet_text, expected_value)
+        ]
+        if missing:
+            raise ProjectLifecycleError(
+                "Cited approval packet does not cover this retire-item request: "
+                + ", ".join(f"{field}={expected[field]!r}" for field in missing)
+            )
+
+    def retire_project_work_item(
+        self,
+        project_id: str,
+        work_item_id: str,
+        *,
+        project_root: Path,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+        status: str = "retired",
+    ) -> dict[str, Any]:
+        """Append a governed non-active membership version for one work item.
+
+        Unlike ``remove_project_item()``, this lifecycle transition is governed
+        by explicit owner approval evidence. The cited packet must resolve
+        inside ``project_root`` and bind to this exact project, work item,
+        lifecycle action, and requested non-active status.
+        """
+        normalized_status = str(status or "").strip()
+        if normalized_status.casefold() in _RETIRE_ITEM_DISALLOWED_STATUSES:
+            raise ProjectLifecycleError(
+                f"retire-item requires a non-active lifecycle status distinct from 'removed'; got {status!r}."
+            )
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        normalized_work_item_id = _require_nonempty(work_item_id, "work_item_id")
+        normalized_change_reason = _require_nonempty(change_reason, "change_reason")
+        action = _retire_item_action_for_status(normalized_status)
+        self._validate_retire_item_approval_packet(
+            project_root=project_root,
+            change_reason=normalized_change_reason,
+            project_id=normalized_project_id,
+            work_item_id=normalized_work_item_id,
+            action=action,
+            status=normalized_status,
+        )
+
+        current = next(
+            (
+                membership
+                for membership in self.db.list_project_work_items(normalized_project_id)
+                if membership.get("work_item_id") == normalized_work_item_id
+            ),
+            None,
+        )
+        if current is None:
+            raise ProjectLifecycleError(
+                f"No active membership to retire for {normalized_work_item_id} in {normalized_project_id}"
+            )
+        try:
+            membership = self.db.link_project_work_item(
+                normalized_project_id,
+                normalized_work_item_id,
+                _require_nonempty(changed_by, "changed_by"),
+                normalized_change_reason,
+                membership_role=current.get("membership_role") or "member",
+                membership_order=current.get("membership_order"),
+                status=normalized_status,
+                source=current.get("membership_source"),
+            )
+        except ValueError as exc:
+            raise ProjectLifecycleError(str(exc)) from exc
+        if membership is None:
+            raise ProjectLifecycleError("Project membership retirement did not return a current membership")
         return membership
 
     def reorder_project_items(
