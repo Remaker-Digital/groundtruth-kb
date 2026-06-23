@@ -14,6 +14,7 @@ from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     load_bridge_dispatch_config,
     select_dispatch_candidates,
 )
+from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report  # noqa: E402
 from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text  # noqa: E402
 
 
@@ -175,3 +176,37 @@ prefer = ["harness_id"]
 
     assert [row["id"] for row in matching] == ["D", "F"]
     assert non_matching == []
+
+
+def test_wi4765_report_builder_preserves_dispatch_runtime_failure_causes(tmp_path: Path) -> None:
+    """The read-only report exposes distinct runtime cause fields for operators."""
+    _write_project(tmp_path)
+    state_dir = tmp_path / ".gtkb-state" / "bridge-poller"
+    state_dir.mkdir(parents=True)
+    (state_dir / "dispatch-state.json").write_text(
+        json.dumps(
+            {
+                "recipients": {
+                    "loyal-opposition:D": {
+                        "pending_count": 1,
+                        "selected_count": 1,
+                        "last_result": "launch_failed",
+                        "failure_class": "provider_failure",
+                        "last_launch": {
+                            "reason": "spawn_rate_limited",
+                            "exit_failure_reason": "no_verdict_produced",
+                        },
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = build_bridge_dispatch_report(tmp_path)
+    taxonomy = report["reliability"]["failure_taxonomy"]
+
+    assert taxonomy["last_result"]["launch_failed"] == 1
+    assert taxonomy["failure_class"]["provider_failure"] == 1
+    assert taxonomy["last_launch.reason"]["spawn_rate_limited"] == 1
+    assert taxonomy["last_launch.exit_failure_reason"]["no_verdict_produced"] == 1

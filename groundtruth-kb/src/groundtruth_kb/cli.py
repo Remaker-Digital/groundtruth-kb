@@ -335,9 +335,20 @@ def _emit_bridge_dispatch_health(ctx: click.Context, *, json_output: bool) -> No
             click.echo(f"- {role}: {', '.join(ids) if ids else '(none)'}")
         if status.health_findings:
             click.echo("Findings:")
-            for finding in status.health_findings:
-                click.echo(f"- {finding}")
+        for finding in status.health_findings:
+            click.echo(f"- {finding}")
     ctx.exit(0 if status.health_status != "FAIL" else 1)
+
+
+def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report, format_bridge_dispatch_report
+
+    config = _resolve_config(ctx)
+    report = build_bridge_dispatch_report(config.project_root)
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+    click.echo(format_bridge_dispatch_report(report))
 
 
 @bridge_group.command("config")
@@ -386,6 +397,14 @@ def bridge_dispatch_status_cmd(ctx: click.Context, json_output: bool) -> None:
 def bridge_dispatch_health_cmd(ctx: click.Context, json_output: bool) -> None:
     """Check whether bridge dispatch has eligible targets for both roles."""
     _emit_bridge_dispatch_health(ctx, json_output=json_output)
+
+
+@bridge_dispatch_group.command("report")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Show a comprehensive read-only bridge dispatch operations report."""
+    _emit_bridge_dispatch_report(ctx, json_output=json_output)
 
 
 def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):
