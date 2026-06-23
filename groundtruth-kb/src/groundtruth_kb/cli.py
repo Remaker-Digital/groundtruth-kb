@@ -435,12 +435,267 @@ def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> Non
             click.echo(f"  cites: {citing_path}")
 
 
-@bridge_dispatch_group.command("config")
+def _emit_dispatch_transaction_result(result: Any, *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
+        return
+    click.echo(result.message)
+    if result.audit_path is not None:
+        click.echo(f"Audit: {result.audit_path}")
+    if result.pending_path is not None:
+        click.echo(f"Pending: {result.pending_path}")
+
+
+def _run_dispatch_transaction(ctx: click.Context, callback: Any, *, json_output: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_transactions import DispatchConfigTransactionError
+
+    config = _resolve_config(ctx)
+    try:
+        result = callback(config.project_root)
+    except DispatchConfigTransactionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    _emit_dispatch_transaction_result(result, json_output=json_output)
+
+
+@bridge_dispatch_group.group("config", invoke_without_command=True)
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def bridge_dispatch_config_cmd(ctx: click.Context, json_output: bool) -> None:
-    """Show the canonical bridge dispatch configuration."""
-    _emit_bridge_dispatch_config(ctx, json_output=json_output)
+    """Show or update the canonical bridge dispatch configuration."""
+    if ctx.invoked_subcommand is None:
+        _emit_bridge_dispatch_config(ctx, json_output=json_output)
+
+
+@bridge_dispatch_config_cmd.command("set-eligibility")
+@click.argument("harness_id")
+@click.option("--can-receive-dispatch/--no-can-receive-dispatch", default=None, help="Set receive eligibility.")
+@click.option("--can-fire-events/--no-can-fire-events", default=None, help="Set event-firing eligibility.")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_set_eligibility_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    can_receive_dispatch: bool | None,
+    can_fire_events: bool | None,
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Set dispatcher eligibility fields for one harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import set_eligibility
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: set_eligibility(
+            root,
+            harness_id,
+            can_receive_dispatch=can_receive_dispatch,
+            can_fire_events=can_fire_events,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
+@bridge_dispatch_config_cmd.command("set-weights")
+@click.argument("harness_id")
+@click.option("--quality", "dispatch_quality", type=float, default=None, help="Set dispatch quality, 0-100.")
+@click.option("--cost", "dispatch_cost", type=float, default=None, help="Set dispatch cost, 0-100.")
+@click.option(
+    "--availability", "dispatch_availability", type=float, default=None, help="Set dispatch availability, 0-100."
+)
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_set_weights_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    dispatch_quality: float | None,
+    dispatch_cost: float | None,
+    dispatch_availability: float | None,
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Set dispatcher ranking weights for one harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import set_weights
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: set_weights(
+            root,
+            harness_id,
+            dispatch_quality=dispatch_quality,
+            dispatch_cost=dispatch_cost,
+            dispatch_availability=dispatch_availability,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
+@bridge_dispatch_config_cmd.command("set-caps")
+@click.argument("harness_id")
+@click.option("--max-items", type=int, required=True, help="Set the per-cycle dispatch item cap.")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_set_caps_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    max_items: int,
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Set dispatcher caps for one harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import set_caps
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: set_caps(
+            root,
+            harness_id,
+            max_items=max_items,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
+@bridge_dispatch_config_cmd.command("set-rule")
+@click.argument("rule_id")
+@click.option("--required-role", "required_roles", multiple=True, help="Replace required role selectors.")
+@click.option("--blocked-role", "blocked_roles", multiple=True, help="Replace blocked role selectors.")
+@click.option("--status", "statuses", multiple=True, help="Replace status selectors.")
+@click.option("--session-subject", "session_subjects", multiple=True, help="Replace session subject selectors.")
+@click.option("--activity", "activities", multiple=True, help="Replace activity selectors.")
+@click.option("--prefer", "prefer", multiple=True, help="Replace ranking preference fields.")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_set_rule_cmd(
+    ctx: click.Context,
+    rule_id: str,
+    required_roles: tuple[str, ...],
+    blocked_roles: tuple[str, ...],
+    statuses: tuple[str, ...],
+    session_subjects: tuple[str, ...],
+    activities: tuple[str, ...],
+    prefer: tuple[str, ...],
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Set dispatcher rule selector fields."""
+    from groundtruth_kb.bridge_dispatch_transactions import set_rule
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: set_rule(
+            root,
+            rule_id,
+            required_roles=required_roles or None,
+            blocked_roles=blocked_roles or None,
+            statuses=statuses or None,
+            session_subjects=session_subjects or None,
+            activities=activities or None,
+            prefer=prefer or None,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
+@bridge_dispatch_config_cmd.command("add-harness")
+@click.argument("harness_id")
+@click.option("--description", default=None, help="Set a dispatcher overlay description.")
+@click.option("--can-receive-dispatch/--no-can-receive-dispatch", default=None, help="Set receive eligibility.")
+@click.option("--can-fire-events/--no-can-fire-events", default=None, help="Set event-firing eligibility.")
+@click.option("--quality", "dispatch_quality", type=float, default=None, help="Set dispatch quality, 0-100.")
+@click.option("--cost", "dispatch_cost", type=float, default=None, help="Set dispatch cost, 0-100.")
+@click.option(
+    "--availability", "dispatch_availability", type=float, default=None, help="Set dispatch availability, 0-100."
+)
+@click.option("--max-items", type=int, default=None, help="Set the per-cycle dispatch item cap.")
+@click.option("--tag", "tags", multiple=True, help="Add a dispatcher tag.")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_add_harness_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    description: str | None,
+    can_receive_dispatch: bool | None,
+    can_fire_events: bool | None,
+    dispatch_quality: float | None,
+    dispatch_cost: float | None,
+    dispatch_availability: float | None,
+    max_items: int | None,
+    tags: tuple[str, ...],
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Add a dispatcher harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import add_harness
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: add_harness(
+            root,
+            harness_id,
+            description=description,
+            can_receive_dispatch=can_receive_dispatch,
+            can_fire_events=can_fire_events,
+            dispatch_quality=dispatch_quality,
+            dispatch_cost=dispatch_cost,
+            dispatch_availability=dispatch_availability,
+            max_items=max_items,
+            tags=tags,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
+@bridge_dispatch_config_cmd.command("remove-harness")
+@click.argument("harness_id")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_remove_harness_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Remove a dispatcher harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import remove_harness
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: remove_harness(
+            root,
+            harness_id,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
 
 
 @bridge_dispatch_group.command("status")
