@@ -13,6 +13,17 @@ Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All right
 
 from __future__ import annotations
 
+from groundtruth_kb.hygiene.supersession import (
+    DEFAULT_MARKERS,
+    SupersessionFinding,
+    SupersessionMarker,
+    SupersessionScanResult,
+    emit_supersession_json,
+    emit_supersession_markdown,
+    run_supersession_scan,
+    scan_supersession_file,
+    walk_live_files,
+)
 from groundtruth_kb.hygiene.sweep import (
     Finding,
     Pattern,
@@ -27,14 +38,23 @@ from groundtruth_kb.hygiene.sweep import (
 )
 
 __all__ = [
+    "DEFAULT_MARKERS",
     "Finding",
     "Pattern",
     "PatternSetError",
+    "SupersessionFinding",
+    "SupersessionMarker",
+    "SupersessionScanResult",
     "SweepResult",
     "emit_json",
     "emit_markdown",
+    "emit_supersession_json",
+    "emit_supersession_markdown",
     "load_pattern_set",
+    "run_supersession_scan",
     "run_sweep",
     "scan_file",
+    "scan_supersession_file",
+    "walk_live_files",
     "walk_repo",
 ]

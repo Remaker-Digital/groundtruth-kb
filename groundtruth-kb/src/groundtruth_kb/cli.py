@@ -67,7 +67,15 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
-from groundtruth_kb.hygiene import PatternSetError, emit_json, emit_markdown, run_sweep
+from groundtruth_kb.hygiene import (
+    PatternSetError,
+    emit_json,
+    emit_markdown,
+    emit_supersession_json,
+    emit_supersession_markdown,
+    run_supersession_scan,
+    run_sweep,
+)
 from groundtruth_kb.project.core_spec_intake import next_missing_slot, next_question, slot_statuses
 from groundtruth_kb.project.lifecycle import (
     PROJECTS_CHANGED_BY,
@@ -1500,6 +1508,65 @@ def hygiene_sweep(
     if fmt in ("md", "both"):
         emit_markdown(result, out_dir / "summary.md")
     click.echo(f"hygiene sweep: {result.finding_count} finding(s); output: {out_dir}")
+    if not report_only and result.finding_count > 0:
+        raise SystemExit(2)
+
+
+@hygiene_group.command("supersession-scan")
+@click.option(
+    "--root",
+    type=click.Path(file_okay=False),
+    default=".",
+    show_default=True,
+    help="Repository root to scan.",
+)
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Output directory; default: .gtkb-state/hygiene-supersession/<run-id>/.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "md", "both"]),
+    default="both",
+    show_default=True,
+    help="Output formats to emit.",
+)
+@click.option(
+    "--include-audit-history",
+    is_flag=True,
+    help="Include audit/history locations that are preserved by default.",
+)
+@click.option(
+    "--report-only/--fail-on-findings",
+    default=True,
+    show_default=True,
+    help="Exit-code policy: --report-only always exits 0; --fail-on-findings exits 2 when any findings emitted.",
+)
+def hygiene_supersession_scan(
+    root: str,
+    output: str | None,
+    fmt: str,
+    include_audit_history: bool,
+    report_only: bool,
+) -> None:
+    """Run a read-only supersession hygiene scan.
+
+    Finds candidate live-file supersession, retirement, withdrawal, and
+    obsolescence signals. Findings are advisory only; the scanner mutates only
+    its own output directory.
+    """
+    root_path = Path(root).resolve()
+    result = run_supersession_scan(root_path, preserve_audit_history=not include_audit_history)
+    out_dir = Path(output) if output else root_path / ".gtkb-state" / "hygiene-supersession" / result.run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if fmt in ("json", "both"):
+        emit_supersession_json(result, out_dir / "findings.json")
+    if fmt in ("md", "both"):
+        emit_supersession_markdown(result, out_dir / "summary.md")
+    click.echo(f"hygiene supersession-scan: {result.finding_count} finding(s); output: {out_dir}")
     if not report_only and result.finding_count > 0:
         raise SystemExit(2)
 
