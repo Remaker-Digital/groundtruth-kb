@@ -17,21 +17,26 @@ from typing import Any
 from groundtruth_kb.harness_projection import HarnessStateError, read_identity, read_roles
 
 ENVELOPE_SCHEMA_VERSION = 1
-TOPIC_TYPES = ("spec", "build", "test", "deliberation", "project")
+TOPIC_TYPES = ("ops", "deliberation", "build", "test", "spec", "project")
 GIT_STATUS_SHORT_LINE_LIMIT = 80
 
 ROUTE_TARGETS = {
-    "spec": "spec-governance-service",
+    "ops": "operations-status-decision-service",
+    "deliberation": "deliberation-archive-service",
     "build": "build-package-scaffold-service",
     "test": "test-assertion-service",
-    "deliberation": "deliberation-archive-service",
+    "spec": "spec-governance-service",
     "project": "project-lifecycle-service",
 }
 
 PRELOAD_STATES = {
-    "spec": {
-        "sources": ["current_specs", "related_bridge_proposals", "proposal_templates"],
-        "commands": ["gt spec", "gt bridge"],
+    "ops": {
+        "sources": ["operations_status", "support_user_activity", "ops_feedback_inputs"],
+        "commands": ["gt projects", "gt backlog"],
+    },
+    "deliberation": {
+        "sources": ["deliberation_archive"],
+        "commands": ["gt deliberations record", "gt deliberations search"],
     },
     "build": {
         "sources": ["pyproject.toml", "package_state", "scaffold_state"],
@@ -41,9 +46,9 @@ PRELOAD_STATES = {
         "sources": ["assertion_history", "failing_assertions", "test_inventory"],
         "commands": ["gt assert", "python -m pytest"],
     },
-    "deliberation": {
-        "sources": ["deliberation_archive"],
-        "commands": ["gt deliberations record", "gt deliberations search"],
+    "spec": {
+        "sources": ["current_specs", "related_bridge_proposals", "proposal_templates"],
+        "commands": ["gt spec", "gt bridge"],
     },
     "project": {
         "sources": ["current_project_authorizations", "open_work_items", "project_memberships"],
