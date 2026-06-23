@@ -1997,7 +1997,7 @@ def guard_tool_use(
             "reason": (
                 "BLOCKED (GTKB-STARTUP-INPUT-GATE): startup disclosure has been emitted; awaiting owner's next message before tool use. "
                 "The init-keyword contract relays the disclosure on match (init gtkb / init gtkb advisory / etc.) and passes through on no-match "
-                "(per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001)."
+                "(per DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001)."
             ),
         }
 

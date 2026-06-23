@@ -43,7 +43,7 @@ class DispatchRule:
     prefer: tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod
-    def from_mapping(cls, raw: dict[str, Any]) -> "DispatchRule":
+    def from_mapping(cls, raw: dict[str, Any]) -> DispatchRule:
         return cls(
             id=str(raw.get("id") or "unnamed-rule").strip(),
             required_roles=_string_tuple(raw.get("required_roles")),
@@ -64,9 +64,7 @@ class DispatchRule:
             return False
         if self.session_subjects and not _matches_optional(context.session_subject, self.session_subjects):
             return False
-        if self.activities and not _matches_optional(context.activity, self.activities):
-            return False
-        return True
+        return not (self.activities and not _matches_optional(context.activity, self.activities))
 
     def to_json_dict(self) -> dict[str, Any]:
         return {

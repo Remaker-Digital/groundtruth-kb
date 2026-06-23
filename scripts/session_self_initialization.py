@@ -4449,7 +4449,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
 
 def _render_fresh_session_input_semantics(model: dict[str, Any]) -> str:
     lines = [
-        "- The harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 and DCL-SESSION-START-INIT-KEYWORD-MATCHING-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the harness-specific startup disclosure; on no-match, process the prompt as normal task content.",
+        "- The harness's UserPromptSubmit hook routes the first owner message through the init-keyword matcher (per DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001 and SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001): on match (e.g., `init gtkb`, `init gtkb advisory`), render the harness-specific startup disclosure; on no-match, process the prompt as normal task content.",
     ]
     if _is_loyal_opposition_model(model):
         lines.append(
@@ -4469,7 +4469,7 @@ def _render_init_keyword_relay_instruction(model: dict[str, Any]) -> str:
     if _is_loyal_opposition_model(model):
         return (
             "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through "
-            "the init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on default LO match "
+            "the init-keyword matcher (per DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001): on default LO match "
             "(e.g., `init gtkb`), render the cached startup disclosure, then continue with the harness-only "
             "Loyal Opposition startup action; on advisory match (e.g., `init gtkb advisory`), report the live "
             "scan and ask Mike whether to switch to auto-process; on no-match, process the prompt as normal "
@@ -4478,7 +4478,7 @@ def _render_init_keyword_relay_instruction(model: dict[str, Any]) -> str:
         )
     return (
         "- After SessionStart, the harness's UserPromptSubmit hook routes the first owner message through the "
-        "init-keyword matcher (per ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001): on match (e.g., `init gtkb`, "
+        "init-keyword matcher (per DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001): on match (e.g., `init gtkb`, "
         "`init gtkb advisory`), render the startup disclosure and wait for the next message; on no-match, "
         "process the prompt as normal task content. The startup disclosure is generated at SessionStart time "
         "and cached for lazy injection by the matcher; it is not unconditionally relayed."

@@ -56,6 +56,7 @@ from implementation_authorization import (  # noqa: E402 (sys.path setup above)
     AuthorizationError,
     approved_files_for_go,
     bridge_entry,
+    extract_metadata_value,
     extract_target_paths,
     load_packet,
     normalize_relative_path,
@@ -250,7 +251,10 @@ def run_preflight(
         result[KEY_MESSAGE] = str(exc)
         return result, EXIT_MISSING_TARGETS
 
-    if not target_paths:
+    scope = extract_metadata_value(markdown, {"implementation scope", "implementation_scope"})
+    is_design_only = scope is not None and "design-only" in scope.lower()
+
+    if not target_paths and not is_design_only:
         result[KEY_VERDICT] = VERDICT_MISSING_TARGETS
         result[KEY_EXIT_CODE] = EXIT_MISSING_TARGETS
         result[KEY_MESSAGE] = f"approved proposal {approved} has no target_paths metadata"

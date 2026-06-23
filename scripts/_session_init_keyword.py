@@ -1,9 +1,9 @@
 """Init-keyword matcher for session-startup symmetry contract.
 
 Authority: bridge `gtkb-loyal-opposition-startup-symmetry-001` GO at -008.
-Specs: ADR-SESSION-START-INIT-KEYWORD-CONTRACT-001 (NEW),
-DCL-SESSION-START-INIT-KEYWORD-MATCHING-001 (NEW),
-DCL-SESSION-START-APP-SCOPE-BINDING-001 (NEW).
+Specs: DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001,
+SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001,
+DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
 
 Init keyword grammar (canonical):
 - Verb forms: ``init``, ``initialize``, ``start``, ``begin``, ``open``.

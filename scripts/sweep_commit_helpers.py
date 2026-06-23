@@ -35,15 +35,19 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
+
 __all__ = [
     "CommitBatch",
     "INVENTORY_DRIFT_TOML_RELATIVE_PATH",
     "BRIDGE_EVIDENCE_PATTERNS",
+    "NONTERMINAL_BRIDGE_STATUSES",
     "load_protected_path_globs",
     "is_protected_path",
     "is_bridge_evidence_path",
     "partition_staged",
     "bridge_files_citing",
+    "active_nonterminal_bridge_threads_citing",
     "plan_commit_batches",
 ]
 
@@ -54,6 +58,7 @@ INVENTORY_DRIFT_TOML_RELATIVE_PATH = Path("config/governance/protected-artifact-
 # in scripts/check_dev_environment_inventory_drift.py. A staged path matching any
 # of these satisfies the gate's review_evidence_present condition.
 BRIDGE_EVIDENCE_PATTERNS = ("bridge/*-[0-9][0-9][0-9].md",)
+NONTERMINAL_BRIDGE_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
 
 
 @dataclass(frozen=True)
@@ -66,6 +71,9 @@ class CommitBatch:
       - ``"protected-missing-evidence"``: protected path(s) with NO co-stageable
         bridge evidence in the staged set; committing this batch will be blocked
         by the inventory-drift gate. The ``rationale`` flags the diagnostic.
+      - ``"protected-active-thread-nonterminal"``: protected path(s) cited by a
+        live non-terminal bridge thread; committing before VERIFIED would bypass
+        the bridge commit-finalization gate.
       - ``"bridge-only"``: bridge file(s) not tied to a specific protected path.
       - ``"unconstrained"``: source, tests, docs, and other non-protected paths.
     """
@@ -144,6 +152,13 @@ def is_bridge_evidence_path(path: str) -> bool:
     return any(fnmatch.fnmatchcase(candidate, pattern) for pattern in BRIDGE_EVIDENCE_PATTERNS)
 
 
+def _body_cites_protected_path(body: str, protected_path: str) -> bool:
+    """Return True when ``body`` mentions the protected path or its basename."""
+    norm_protected = _posix(protected_path)
+    protected_basename = Path(norm_protected).name
+    return norm_protected in body or protected_basename in body
+
+
 def partition_staged(paths: list[str], protected_globs: list[str]) -> dict[str, list[str]]:
     """Split staged paths into ``protected`` / ``bridge`` / ``other`` buckets.
 
@@ -191,12 +206,57 @@ def bridge_files_citing(
     citing: dict[str, list[str]] = {}
     for protected in staged_protected:
         norm_protected = _posix(protected)
-        protected_basename = Path(norm_protected).name
         matches: list[str] = []
         for bridge_file, body in bodies.items():
-            if norm_protected in body or protected_basename in body:
+            if _body_cites_protected_path(body, norm_protected):
                 matches.append(bridge_file)
         citing[norm_protected] = matches
+    return citing
+
+
+def active_nonterminal_bridge_threads_citing(
+    staged_protected: list[str],
+    project_root: Path | str,
+) -> dict[str, list[str]]:
+    """Map protected paths to active non-terminal bridge threads that cite them.
+
+    The live bridge thread status is the latest versioned bridge file's canonical
+    status token. Threads at ``VERIFIED`` or another terminal token do not gate
+    commit planning. Any bridge scan/read problem fails soft and returns no
+    active-thread matches, preserving the helper's planning-only contract.
+    """
+    protected_norm = [_posix(path) for path in staged_protected]
+    empty = {path: [] for path in protected_norm}
+    if not protected_norm:
+        return empty
+
+    root = Path(project_root)
+    try:
+        expected_documents = scan_expected_documents(root)
+    except OSError:
+        return empty
+
+    citing: dict[str, list[str]] = {path: [] for path in protected_norm}
+    for slug, document in sorted(expected_documents.items()):
+        if not document.files:
+            continue
+
+        latest_path = root / document.files[-1]
+        status = status_from_bridge_file(latest_path)
+        if status not in NONTERMINAL_BRIDGE_STATUSES:
+            continue
+
+        try:
+            bodies = [
+                (root / bridge_file).read_text(encoding="utf-8", errors="replace") for bridge_file in document.files
+            ]
+        except (FileNotFoundError, OSError):
+            return empty
+
+        for protected in protected_norm:
+            if any(_body_cites_protected_path(body, protected) for body in bodies):
+                citing[protected].append(f"{slug}@{status}")
+
     return citing
 
 
@@ -210,13 +270,17 @@ def plan_commit_batches(staged: list[str], project_root: Path | str) -> list[Com
       - a protected path with no co-stageable bridge evidence is surfaced in a
         ``protected-missing-evidence`` batch whose rationale flags that the
         commit will be blocked by the gate (the 2026-06-13 incident diagnostic);
+      - a protected path cited by a live non-terminal bridge thread is surfaced
+        in a held ``protected-active-thread-nonterminal`` batch before evidence
+        co-staging is considered, so sweep automation cannot commit ahead of
+        VERIFIED;
       - bridge-only files not tied to a protected path get their own
         ``bridge-only`` batch (preserving the existing swarm bridge-filing
         pattern);
       - other files get an ``unconstrained`` batch.
 
-    Order: protected-with-evidence first (exercise the gate's friendly path
-    early), then protected-missing-evidence, then bridge-only, then unconstrained.
+    Order: active non-terminal holds first, then protected-with-evidence,
+    protected-missing-evidence, bridge-only, and unconstrained.
 
     Fail-soft: when the inventory-drift TOML is missing/unreadable,
     ``load_protected_path_globs`` returns ``[]`` so no path is treated as
@@ -245,12 +309,28 @@ def plan_commit_batches(staged: list[str], project_root: Path | str) -> list[Com
     other_paths = parts["other"]
 
     citing = bridge_files_citing(protected_paths, bridge_files, project_root)
+    active_threads = active_nonterminal_bridge_threads_citing(protected_paths, project_root)
 
     batches: list[CommitBatch] = []
     consumed_bridge: set[str] = set()
 
-    # 1) Protected-with-evidence and protected-missing-evidence batches.
+    # 1) Protected active-thread holds, protected-with-evidence, and missing-evidence batches.
     for protected in protected_paths:
+        nonterminal_threads = active_threads.get(protected, [])
+        if nonterminal_threads:
+            batches.append(
+                CommitBatch(
+                    paths=[protected],
+                    kind="protected-active-thread-nonterminal",
+                    rationale=(
+                        f"Protected path {protected!r} is cited by active non-terminal "
+                        f"bridge thread(s) {nonterminal_threads!r}; hold until the "
+                        "thread reaches VERIFIED before commit finalization."
+                    ),
+                )
+            )
+            continue
+
         evidence = citing.get(protected, [])
         if evidence:
             consumed_bridge.update(evidence)

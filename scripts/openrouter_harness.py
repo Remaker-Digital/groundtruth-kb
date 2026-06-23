@@ -35,7 +35,8 @@ except ImportError:  # pragma: no cover
 
 DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1"
 DEFAULT_TIMEOUT_SECONDS = 240.0
-DEFAULT_MAX_TURNS = 24
+# WI-4734: full bridge verification can exceed the old 24-turn ceiling.
+DEFAULT_MAX_TURNS = 80
 ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50

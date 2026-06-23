@@ -169,11 +169,7 @@ def _normalization_recommendation(histogram: list[dict[str, Any]]) -> dict[str, 
     """Recommend concern_tags normalization decision based on tag distribution."""
     theme_count = sum(1 for h in histogram if h["category"] == "theme")
     topic_count = sum(1 for h in histogram if h["category"] == "topic")
-    ambiguous = sum(
-        1
-        for h in histogram
-        if h["category"] == "topic" and h["count"] >= THEME_THRESHOLD - 1
-    )
+    ambiguous = sum(1 for h in histogram if h["category"] == "topic" and h["count"] >= THEME_THRESHOLD - 1)
     if theme_count >= 5 and topic_count >= 10:
         decision = "normalize_to_taxonomy"
         rationale = (
@@ -215,9 +211,7 @@ def build_report(
         "totals": totals,
         "missing_source_paths": missing,
         "tags_histogram": histogram,
-        "concern_tags_normalization_recommendation": _normalization_recommendation(
-            histogram
-        ),
+        "concern_tags_normalization_recommendation": _normalization_recommendation(histogram),
         "records_needing_backfill_count": len(missing),
     }
 
@@ -258,9 +252,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "|---|---|---|",
     ]
     for entry in report["tags_histogram"]:
-        lines.append(
-            f"| `{entry['tag']}` | {entry['count']} | {entry['category']} |"
-        )
+        lines.append(f"| `{entry['tag']}` | {entry['count']} | {entry['category']} |")
     rec = report["concern_tags_normalization_recommendation"]
     lines += [
         "",
@@ -291,9 +283,7 @@ def _validate_iso_timestamp(value: str) -> str:
         normalized = value.replace("Z", "+00:00")
         dt.datetime.fromisoformat(normalized)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            f"--frozen-timestamp {value!r} is not a valid ISO 8601 timestamp"
-        ) from exc
+        raise argparse.ArgumentTypeError(f"--frozen-timestamp {value!r} is not a valid ISO 8601 timestamp") from exc
     return value
 
 
@@ -329,11 +319,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    generated_at = (
-        args.frozen_timestamp
-        if args.frozen_timestamp is not None
-        else dt.datetime.now(dt.UTC).isoformat()
-    )
+    generated_at = args.frozen_timestamp if args.frozen_timestamp is not None else dt.datetime.now(dt.UTC).isoformat()
 
     db_path = Path(args.db).resolve()
 
