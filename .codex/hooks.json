@@ -17,6 +17,12 @@
           },
           {
             "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\codex-mcp-worker-guard.cmd",
+            "statusMessage": "Checking stale Codex MCP workers",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "python E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --project-root E:\\GT-KB",
             "statusMessage": "Reconciling single-harness bridge automation",
             "timeout": 10

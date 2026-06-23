@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-23T16:03:44Z",
+  "generated_at": "2026-06-23T21:10:33Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -178,7 +178,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 26,
+      "count": 27,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -196,6 +196,7 @@
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
         ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
+        ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd",
         ".codex/gtkb-hooks/credential-scan.cmd",
         ".codex/gtkb-hooks/destructive-gate.cmd",
         ".codex/gtkb-hooks/directive-enforcement.cmd",
@@ -294,7 +295,7 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 36,
+      "count": 37,
       "items": [
         "alternatives-investigation",
         "arch-audit",
@@ -307,6 +308,7 @@
         "code-review-audit",
         "codex-report",
         "decision-capture",
+        "dispatcher-control",
         "grill-me-for-clarification",
         "gtkb-benchmarks",
         "gtkb-hygiene-investigation",
@@ -690,11 +692,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -708,7 +710,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -722,7 +724,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {
