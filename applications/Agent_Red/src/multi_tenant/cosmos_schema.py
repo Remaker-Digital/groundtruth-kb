@@ -1297,6 +1297,10 @@ class PreferencesDocument(BaseModel):
         default=None,
         description="Email address for alert notifications (usage, trial, outage)",
     )
+    whatsapp_business_phone: str | None = Field(
+        default=None,
+        description="WhatsApp Business phone number used for professional+ live escalation deep links",
+    )
 
     # Fine-tuning configuration (Enterprise add-on, Layer 4 — Decision #31, WI #93-96)
     fine_tuning_enabled: bool = Field(

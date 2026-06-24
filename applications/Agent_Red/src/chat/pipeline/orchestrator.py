@@ -19,6 +19,7 @@ import time
 import traceback
 from collections.abc import AsyncGenerator
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -68,6 +69,23 @@ except ImportError:
     AsyncAzureOpenAI = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
+
+
+def _build_whatsapp_escalation_markdown_link(
+    preferences: PreferencesDocument | dict[str, Any],
+    tier: TenantTier,
+    conversation_id: str,
+) -> str | None:
+    """Build the SPEC-1880 WhatsApp escalation markdown link when configured."""
+    wa_phone = getattr(preferences, "whatsapp_business_phone", None) or (
+        preferences.get("whatsapp_business_phone") if isinstance(preferences, dict) else None
+    )
+    if not wa_phone or tier not in (TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE):
+        return None
+
+    wa_text = quote(f"Hi, I need help with my conversation (ref: {conversation_id[:8]})")
+    wa_link = f"https://wa.me/{wa_phone.lstrip('+')}?text={wa_text}"
+    return f"[Open WhatsApp]({wa_link})"
 
 
 class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
@@ -314,14 +332,20 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # Phase 0: Load customer context (Layer 1 + Layer 2)
             # ---------------------------------------------------------------
             profile = await self._load_customer_profile(
-                tenant_id, customer_id, tier, customer_message, trace,
+                tenant_id,
+                customer_id,
+                tier,
+                customer_message,
+                trace,
             )
 
             # Extract asserted identity from customer message (Issue #5b)
             if customer_id and customer_message and self._profile_service:
                 try:
                     await self._profile_service.extract_and_store_identity(
-                        tenant_id, customer_id, customer_message,
+                        tenant_id,
+                        customer_id,
+                        customer_message,
                     )
                 except Exception:
                     logger.debug(
@@ -346,7 +370,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             # Record prompt trace for explainability
             prompt_trace = self._prompt_builder.explain(
-                AgentRole.RESPONSE_GENERATOR, tenant, preferences, profile,
+                AgentRole.RESPONSE_GENERATOR,
+                tenant,
+                preferences,
+                profile,
             )
             trace.set_profile_context(prompt_trace)
 
@@ -368,10 +395,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             quality_experiment_variant: str | None = None
             quality_experiment_id: str | None = None
 
-            if (
-                preferences.fine_tuning_enabled
-                and preferences.fine_tuning_active_model_id
-            ):
+            if preferences.fine_tuning_enabled and preferences.fine_tuning_active_model_id:
                 try:
                     from src.multi_tenant.fine_tuning_pipeline import (
                         get_fine_tuning_service,
@@ -386,25 +410,21 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         )
                         if experiment and customer_id:
                             variant = ft_service.assign_customer_variant(
-                                experiment, customer_id,
+                                experiment,
+                                customer_id,
                             )
                             ab_variant = variant
                             ab_experiment_id = experiment.experiment_id
                             if variant == "treatment":
-                                response_model = (
-                                    preferences.fine_tuning_active_model_id
-                                )
+                                response_model = preferences.fine_tuning_active_model_id
                             # else: variant == "control", keep base model
                             trace.set_ab_variant(ab_variant, ab_experiment_id)
                     else:
                         # No A/B experiment -- use fine-tuned model directly
-                        response_model = (
-                            preferences.fine_tuning_active_model_id
-                        )
+                        response_model = preferences.fine_tuning_active_model_id
 
                     logger.debug(
-                        "Layer 4 model selection: tenant=%s model=%s "
-                        "ab_variant=%s ab_experiment=%s",
+                        "Layer 4 model selection: tenant=%s model=%s ab_variant=%s ab_experiment=%s",
                         tenant_id,
                         response_model,
                         ab_variant,
@@ -412,8 +432,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     )
                 except Exception:
                     logger.debug(
-                        "Layer 4 model selection failed -- falling back "
-                        "to base model for tenant=%s",
+                        "Layer 4 model selection failed -- falling back to base model for tenant=%s",
                         tenant_id,
                     )
                     response_model = "gpt-4o"
@@ -467,13 +486,16 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             ic_task = budget.execute_with_budget(
                 "intent-classifier",
                 self._call_intent_classifier(
-                    tokenized_message, prompts[AgentRole.INTENT_CLASSIFIER],
+                    tokenized_message,
+                    prompts[AgentRole.INTENT_CLASSIFIER],
                 ),
             )
             kr_task = budget.execute_with_budget(
                 "knowledge-retrieval",
                 self._call_knowledge_retrieval(
-                    tokenized_message, "general_inquiry", prompts[AgentRole.KNOWLEDGE_RETRIEVAL],
+                    tokenized_message,
+                    "general_inquiry",
+                    prompts[AgentRole.KNOWLEDGE_RETRIEVAL],
                 ),
             )
 
@@ -497,7 +519,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             detected_intent = intent
 
             yield stage_event(
-                "intent-classifier", "completed",
+                "intent-classifier",
+                "completed",
                 latency_ms=int(budget.stages[0].elapsed_ms) if budget.stages else None,
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
@@ -519,6 +542,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 from src.multi_tenant.superadmin_api._agent_overlays import (
                     _get_tenant_overlays,
                 )
+
                 overlay_store = await _get_tenant_overlays(tenant_id) or None
             except Exception:
                 logger.debug("Overlay store unavailable for routing", exc_info=True)
@@ -527,6 +551,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # This is the async boundary before IntentRouter/dispatch sync code.
             try:
                 from src.agents.plugins.bindings import SkillBindingService
+
                 binding_svc = SkillBindingService.get_instance()
                 if tenant_id not in binding_svc._loaded_tenants:
                     await binding_svc.load_tenant_bindings(tenant_id)
@@ -534,15 +559,14 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 logger.debug("Binding cache hydration failed", exc_info=True)
 
             router = IntentRouter()
-            _ict = getattr(
-                self._current_preferences, "intent_confidence_threshold", 0.0
-            )
+            _ict = getattr(self._current_preferences, "intent_confidence_threshold", 0.0)
             # S251 SPEC-1866: conversation-level agent override
             _conv_override = None
             if hasattr(self, "_session") and self._session:
                 try:
                     _conv_doc = await self._session.get_conversation(
-                        tenant_id, conversation_id,
+                        tenant_id,
+                        conversation_id,
                     )
                     _conv_override = (_conv_doc or {}).get("conversation_agent_override")
                 except Exception:
@@ -562,7 +586,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 conversation_agent_override=_conv_override,
             )
             trace.set_route_decision(
-                route.target.value, route.agent_id, route.fallback_from,
+                route.target.value,
+                route.agent_id,
+                route.fallback_from,
             )
 
             # WI-3030 Phase 2: When escalation is detected, answer the
@@ -574,7 +600,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 _already_escalated = False
                 try:
                     _raw_conv = await self._session._get_conversation(
-                        tenant_id, conversation_id,
+                        tenant_id,
+                        conversation_id,
                     )
                     _already_escalated = _raw_conv.get("escalation_sent", False)
                 except Exception:
@@ -630,9 +657,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 # telemetry, traces, and critic all work normally.
                 intent = "clarification_needed"
                 logger.info(
-                    "IntentRouter: CLARIFICATION route — "
-                    "confidence %.2f below threshold, conv=%s",
-                    confidence, conversation_id,
+                    "IntentRouter: CLARIFICATION route — confidence %.2f below threshold, conv=%s",
+                    confidence,
+                    conversation_id,
                 )
 
             if route.target == RouteTarget.ERROR:
@@ -674,7 +701,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             yield stage_event(
-                "knowledge-retrieval", "completed",
+                "knowledge-retrieval",
+                "completed",
                 latency_ms=int(budget.stages[-1].elapsed_ms) if len(budget.stages) >= 2 else None,
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
@@ -685,8 +713,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # ---------------------------------------------------------------
             logger.info(
                 "RG input: conv=%s intent=%s knowledge_len=%d sources=%d",
-                conversation_id, intent,
-                len(knowledge_context), len(sources),
+                conversation_id,
+                intent,
+                len(knowledge_context),
+                len(sources),
             )
             yield stage_event("response-generator", "started", trace_id=trace_id, elapsed_ms=int(budget.elapsed_ms))
             rg_start = time.monotonic()
@@ -713,10 +743,14 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 code, msg, recoverable = _classify_openai_error(rg_exc)
                 logger.warning(
                     "Response generator error mid-stream: conv=%s tokens_sent=%d code=%s err=%s",
-                    conversation_id, sequence, code, rg_exc,
+                    conversation_id,
+                    sequence,
+                    code,
+                    rg_exc,
                 )
                 yield error_event(
-                    msg, code=code,
+                    msg,
+                    code=code,
                     recoverable=recoverable,
                     tokens_sent=sequence,
                     stage="response-generator",
@@ -732,7 +766,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             yield stage_event(
-                "response-generator", "completed",
+                "response-generator",
+                "completed",
                 latency_ms=int(rg_elapsed),
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
@@ -748,13 +783,19 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             knowledge_titles = [s.get("title", "") for s in sources if s.get("title")]
 
             approved, safe_text, critic_result = await self._validate_with_critic(
-                tenant_id, conversation_id, full_response, tokenized_message, budget,
+                tenant_id,
+                conversation_id,
+                full_response,
+                tokenized_message,
+                budget,
                 knowledge_titles=knowledge_titles,
             )
 
             # SPEC-1544: Detokenize PII in the response after Critic validation
             safe_text = pii_tokenizer.detokenize(
-                safe_text, conversation_id, tenant_id,
+                safe_text,
+                conversation_id,
+                tenant_id,
             )
 
             trace.set_critic_result(
@@ -764,7 +805,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             yield stage_event(
-                "critic-supervisor", "completed",
+                "critic-supervisor",
+                "completed",
                 latency_ms=int(critic_result.latency_ms),
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
@@ -806,13 +848,16 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                         "intent": intent,
                         "confidence": confidence,
                         "total_latency_ms": budget.elapsed_ms,
-                        **({"ab_variant": ab_variant, "ab_experiment_id": ab_experiment_id}
-                           if ab_variant else {}),
-                        **({"quality_experiment_variant": quality_experiment_variant,
-                            "quality_experiment_id": quality_experiment_id}
-                           if quality_experiment_variant else {}),
-                        **({"sources": structured_sources}
-                           if structured_sources else {}),
+                        **({"ab_variant": ab_variant, "ab_experiment_id": ab_experiment_id} if ab_variant else {}),
+                        **(
+                            {
+                                "quality_experiment_variant": quality_experiment_variant,
+                                "quality_experiment_id": quality_experiment_id,
+                            }
+                            if quality_experiment_variant
+                            else {}
+                        ),
+                        **({"sources": structured_sources} if structured_sources else {}),
                     },
                 )
                 # SPEC-1867: Structured answer blocks (tier-gated)
@@ -825,12 +870,14 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 ):
                     try:
                         from src.chat.blocks import extract_blocks
+
                         structured_blocks = extract_blocks(safe_text) or None
                     except Exception:
                         pass  # Block extraction failure is non-fatal
 
                 yield validated_event(
-                    conversation_id, message_id,
+                    conversation_id,
+                    message_id,
                     sources=structured_sources or None,
                     blocks=structured_blocks,
                 )
@@ -839,6 +886,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 # Synchronous (not fire-and-forget) to avoid race with aggregate.
                 try:
                     from src.chat.quality_scorer import quality_scorer
+
                     score = quality_scorer.score_turn(
                         ai_response=safe_text,
                         customer_message=customer_message,
@@ -853,7 +901,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 except Exception:
                     logger.warning(
                         "Quality scoring failed (non-fatal): conv=%s msg=%s",
-                        conversation_id, message_id, exc_info=True,
+                        conversation_id,
+                        message_id,
+                        exc_info=True,
                     )
             else:
                 # Critic rejected -- retract streamed text, deliver fallback
@@ -873,9 +923,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 )
                 yield retracted_event(
                     fallback_text=safe_text,
-                    reason=critic_result.block_reason.value
-                    if critic_result.block_reason
-                    else "rejected",
+                    reason=critic_result.block_reason.value if critic_result.block_reason else "rejected",
                 )
 
             # ---------------------------------------------------------------
@@ -888,21 +936,25 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # ---------------------------------------------------------------
             if _escalation_pending:
                 yield stage_event(
-                    "escalation-handler", "started",
+                    "escalation-handler",
+                    "started",
                     trace_id=trace_id,
                     elapsed_ms=int(budget.elapsed_ms),
                 )
 
                 esc_result = await self._run_escalation_side_effects(
-                    tenant_id, conversation_id, customer_message,
-                    prompts[AgentRole.ESCALATION_HANDLER], budget, trace,
+                    tenant_id,
+                    conversation_id,
+                    customer_message,
+                    prompts[AgentRole.ESCALATION_HANDLER],
+                    budget,
+                    trace,
                 )
 
-                esc_stages = [
-                    s for s in budget.stages if s.stage == "escalation-handler"
-                ]
+                esc_stages = [s for s in budget.stages if s.stage == "escalation-handler"]
                 yield stage_event(
-                    "escalation-handler", "completed",
+                    "escalation-handler",
+                    "completed",
                     latency_ms=int(esc_stages[-1].elapsed_ms) if esc_stages else None,
                     trace_id=trace_id,
                     elapsed_ms=int(budget.elapsed_ms),
@@ -911,34 +963,34 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 if esc_result["email_required"]:
                     sequence += 1
                     yield token_event(
-                        "\n\n" + esc_result["email_prompt"], sequence,
+                        "\n\n" + esc_result["email_prompt"],
+                        sequence,
                     )
                     yield validated_event(
-                        conversation_id, "escalation_email_required",
+                        conversation_id,
+                        "escalation_email_required",
                     )
                 else:
                     sequence += 1
                     yield token_event(
-                        "\n\n" + esc_result["escalation_msg"], sequence,
+                        "\n\n" + esc_result["escalation_msg"],
+                        sequence,
                     )
-                    # SPEC-1880: WhatsApp escalation deep-link
-                    wa_phone = getattr(preferences, "whatsapp_business_phone", None) or (
-                        preferences.get("whatsapp_business_phone") if isinstance(preferences, dict) else None
+                    whatsapp_link = _build_whatsapp_escalation_markdown_link(
+                        preferences,
+                        tier,
+                        conversation_id,
                     )
-                    if wa_phone and tier in (TenantTier.PROFESSIONAL, TenantTier.ENTERPRISE):
-                        import urllib.parse
-                        wa_text = urllib.parse.quote(
-                            f"Hi, I need help with my conversation (ref: {conversation_id[:8]})"
-                        )
-                        wa_link = f"https://wa.me/{wa_phone.lstrip('+')}?text={wa_text}"
+                    if whatsapp_link:
                         sequence += 1
                         yield token_event(
-                            f"\n\nYou can also continue this conversation on WhatsApp: {wa_link}",
+                            f"\n\nYou can also continue this conversation on WhatsApp: {whatsapp_link}",
                             sequence,
                         )
                     sequence += 1
                     yield token_event(
-                        " " + esc_result["continuation_msg"], sequence,
+                        " " + esc_result["continuation_msg"],
+                        sequence,
                     )
                     yield validated_event(conversation_id, "escalation")
 
@@ -947,7 +999,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # ---------------------------------------------------------------
             self._create_background_task(
                 self._fire_analytics(
-                    tenant_id, conversation_id, intent, budget, trace,
+                    tenant_id,
+                    conversation_id,
+                    intent,
+                    budget,
+                    trace,
                 ),
                 name=f"analytics-{conversation_id}",
             )
@@ -993,12 +1049,14 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 from src.observability.langfuse_exporter import (
                     export_trace as langfuse_export,
                 )
+
                 if LANGFUSE_ENABLED:
                     langfuse_export(
                         decision_trace,
                         trace_id=trace_id,
                         system_prompt_template=prompts.get(
-                            AgentRole.RESPONSE_GENERATOR, "",
+                            AgentRole.RESPONSE_GENERATOR,
+                            "",
                         ),
                         tenant_preferences=self._current_preferences,
                     )
@@ -1008,6 +1066,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # SPEC-1855: Emit invocation events for each pipeline stage
             try:
                 from src.agents.plugins.events import emit_invocation
+
                 root_event_id = None
                 for stg in budget.stages:
                     evt = emit_invocation(
@@ -1027,7 +1086,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             logger.debug(
                 "Pipeline complete: conv=%s intent=%s critic=%s latency=%.0fms trace=%s",
-                conversation_id, intent, approved, budget.elapsed_ms, trace_id,
+                conversation_id,
+                intent,
+                approved,
+                budget.elapsed_ms,
+                trace_id,
             )
 
             # Final turn count from the session
@@ -1043,7 +1106,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             pipeline_span.set_attribute("pipeline.error", "timeout")
             logger.warning(
                 "Pipeline timeout: conv=%s stage=%s budget=%dms elapsed=%.0fms",
-                conversation_id, exc.stage, exc.budget_ms, exc.elapsed_ms,
+                conversation_id,
+                exc.stage,
+                exc.budget_ms,
+                exc.elapsed_ms,
             )
             yield error_event(
                 "Response took too long. Please try again.",
@@ -1057,7 +1123,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             pipeline_span.set_attribute("pipeline.error", "service_unavailable")
             logger.warning(
                 "Service unavailable: conv=%s service=%s",
-                conversation_id, exc.service_name,
+                conversation_id,
+                exc.service_name,
             )
             yield error_event(
                 "A required service is temporarily unavailable. Please try again shortly.",
@@ -1076,13 +1143,15 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
 
             # Print to stderr to bypass structured logging formatter
             print(
-                f"[PIPELINE FATAL] conv={conversation_id} "
-                f"tenant={tenant_id}\n{tb_str}",
-                file=sys.stderr, flush=True,
+                f"[PIPELINE FATAL] conv={conversation_id} tenant={tenant_id}\n{tb_str}",
+                file=sys.stderr,
+                flush=True,
             )
             logger.exception(
                 "Pipeline error: conv=%s type=%s msg=%s",
-                conversation_id, exc_type, exc_msg,
+                conversation_id,
+                exc_type,
+                exc_msg,
             )
             yield error_event(
                 f"An unexpected error occurred: {exc_type}: {exc_msg}",
@@ -1121,7 +1190,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         is recorded in pipeline_trace and invocation events only).
         """
         yield stage_event(
-            agent_id, "started",
+            agent_id,
+            "started",
             trace_id=trace_id,
             elapsed_ms=int(budget.elapsed_ms),
         )
@@ -1161,7 +1231,9 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                     latency_ms=budget.stages[-1].elapsed_ms if budget.stages else 0,
                 )
                 logger.warning(
-                    "Peer agent %s dispatch failed: %s", agent_id, result.error,
+                    "Peer agent %s dispatch failed: %s",
+                    agent_id,
+                    result.error,
                 )
                 response = (
                     "I wasn't able to connect to a specialized agent for your request. "
@@ -1189,7 +1261,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             yield stage_event(
-                agent_id, "completed",
+                agent_id,
+                "completed",
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
             )
@@ -1235,8 +1308,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # Fire analytics
             self._create_background_task(
                 self._fire_analytics(
-                    tenant_id, conversation_id, "customer",
-                    budget, trace,
+                    tenant_id,
+                    conversation_id,
+                    "customer",
+                    budget,
+                    trace,
                 ),
                 name=f"analytics-peer-{agent_id}-{conversation_id}",
             )
@@ -1250,7 +1326,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 pass
 
             yield done_event(
-                conversation_id, turn_count,
+                conversation_id,
+                turn_count,
                 trace_id=trace_id,
                 total_latency_ms=int(budget.elapsed_ms),
             )
@@ -1261,10 +1338,13 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         except Exception as exc:
             logger.warning(
                 "Peer agent %s failed: conv=%s error=%s",
-                agent_id, conversation_id, exc,
+                agent_id,
+                conversation_id,
+                exc,
             )
             try:
                 from src.agents.plugins.events import emit_invocation
+
                 emit_invocation(
                     trace_id=trace_id,
                     invoker="intent-router",
@@ -1277,10 +1357,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
                 )
             except Exception:
                 pass
-            fallback = (
-                "I encountered an issue connecting to a specialized agent. "
-                "Please try again in a moment."
-            )
+            fallback = "I encountered an issue connecting to a specialized agent. Please try again in a moment."
             yield token_event(fallback, sequence=0)
             yield done_event(conversation_id, 0, trace_id=trace_id)
 
@@ -1306,7 +1383,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         client receives stage/token/done events as usual.
         """
         yield stage_event(
-            "co-pilot", "started",
+            "co-pilot",
+            "started",
             trace_id=trace_id,
             elapsed_ms=int(budget.elapsed_ms),
         )
@@ -1334,7 +1412,8 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             )
 
             yield stage_event(
-                "co-pilot", "completed",
+                "co-pilot",
+                "completed",
                 trace_id=trace_id,
                 elapsed_ms=int(budget.elapsed_ms),
             )
@@ -1342,6 +1421,7 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # SPEC-1855: Emit invocation event for co-pilot path
             try:
                 from src.agents.plugins.events import emit_invocation
+
                 emit_invocation(
                     trace_id=trace_id,
                     target_agent_id="co-pilot",
@@ -1381,8 +1461,11 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
             # Fire analytics for admin conversation tracking (SPEC-1561)
             self._create_background_task(
                 self._fire_analytics(
-                    tenant_id, conversation_id, "admin_assistance",
-                    budget, trace,
+                    tenant_id,
+                    conversation_id,
+                    "admin_assistance",
+                    budget,
+                    trace,
                 ),
                 name=f"analytics-copilot-{conversation_id}",
             )
@@ -1397,12 +1480,10 @@ class ChatPipeline(AgentDispatchMixin, CriticEscalationMixin, AnalyticsMixin):
         except Exception as exc:
             logger.warning(
                 "Co-pilot failed: conv=%s error=%s",
-                conversation_id, exc,
+                conversation_id,
+                exc,
             )
-            fallback = (
-                "I'm the Agent Red Co-pilot, but I encountered an issue. "
-                "Please try again in a moment."
-            )
+            fallback = "I'm the Agent Red Co-pilot, but I encountered an issue. Please try again in a moment."
             yield token_event(fallback, sequence=0)
             yield validated_event(fallback, trace_id=trace_id)
             yield done_event(trace_id=trace_id)

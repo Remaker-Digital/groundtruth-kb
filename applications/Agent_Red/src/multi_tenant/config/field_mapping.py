@@ -119,6 +119,8 @@ _PREFS_DIRECT_FIELDS: set[str] = {
     "google_analytics_integration_status",
     # Notifications (WI-G)
     "notification_email",
+    # WhatsApp escalation deep-link (SPEC-1880)
+    "whatsapp_business_phone",
     # Retrieval tuning (RAG Phase 1)
     "retrieval_top_k",
     "retrieval_vector_weight",
@@ -139,9 +141,7 @@ _PREFS_DIRECT_FIELDS: set[str] = {
 
 
 # Widget appearance fields — subset of _PREFS_DIRECT_FIELDS used for C4
-_WIDGET_APPEARANCE_FIELDS = frozenset(
-    fname for fname in _PREFS_DIRECT_FIELDS if fname.startswith("widget_")
-)
+_WIDGET_APPEARANCE_FIELDS = frozenset(fname for fname in _PREFS_DIRECT_FIELDS if fname.startswith("widget_"))
 
 
 # ---------------------------------------------------------------------------
