@@ -172,6 +172,7 @@ def test_render_topic_context_injects_activity_profile_for_open(tmp_path: Path) 
     assert "- direction.guardrails: no implementation without a GO'd bridge proposal" in context
     assert "- direction.manipulates: source files, test files" in context
     assert "## Open Activity Operator Context" in context
+    assert "## Ops Activity Status And AUQ Options" not in context
 
 
 def test_render_topic_context_does_not_inject_profile_for_close(tmp_path: Path) -> None:

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from groundtruth_kb.activity.ops import render_ops_activity_context
 from groundtruth_kb.activity.profiles import ActivityProfileError, load_activity_profiles
 from groundtruth_kb.session.envelope import (
     TOPIC_TYPES,
@@ -214,6 +215,32 @@ def _render_open_operator_context(result: dict[str, object]) -> str:
     )
 
 
+def _render_ops_context(result: dict[str, object]) -> str:
+    if result.get("action") != "open" or result.get("topic_type") != "ops":
+        return ""
+    project_root = _project_root_from_result(result)
+    if project_root is None:
+        return "\n".join(
+            [
+                "## Ops Activity Status And AUQ Options",
+                "",
+                "- status: unavailable",
+                "- reason: project root unavailable in topic-router result",
+            ]
+        )
+    try:
+        return render_ops_activity_context(project_root)
+    except Exception as exc:  # noqa: BLE001 - ops context must not block topic routing.
+        return "\n".join(
+            [
+                "## Ops Activity Status And AUQ Options",
+                "",
+                "- status: unavailable",
+                f"- reason: {exc}",
+            ]
+        )
+
+
 def render_topic_context(result: dict[str, object]) -> str:
     topic = result.get("topic") if isinstance(result.get("topic"), dict) else {}
     route_target = topic.get("route_target") if isinstance(topic, dict) else None
@@ -228,8 +255,9 @@ def render_topic_context(result: dict[str, object]) -> str:
         ]
     )
     activity_profile = _render_activity_profile(result)
+    ops_context = _render_ops_context(result)
     operator_context = _render_open_operator_context(result)
-    extra_sections = "\n\n".join(section for section in (activity_profile, operator_context) if section)
+    extra_sections = "\n\n".join(section for section in (activity_profile, ops_context, operator_context) if section)
     if extra_sections:
         return f"{base}\n\n{extra_sections}"
     return base
