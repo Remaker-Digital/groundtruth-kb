@@ -23,6 +23,7 @@ DEFAULT_HARNESS_IDS = {
     "claude": "B",
     "antigravity": "C",
     "ollama": "D",
+    "cursor": "E",
     "openrouter": "F",
 }
 

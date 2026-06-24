@@ -100,10 +100,10 @@ _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 # ``can_fire_events`` so legacy topology readers continue to ask the event
 # source question correctly. New code MUST read ``can_fire_events`` /
 # ``can_receive_dispatch``.
-_EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli"})
+_EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli", "cursor"})
 
 _DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
-    {"claude", "claude-code", "codex", "codex-cli", "ollama", "openrouter", "antigravity"}
+    {"claude", "claude-code", "codex", "codex-cli", "cursor", "ollama", "openrouter", "antigravity"}
 )
 
 # Deprecated alias preserved for back-compat readers; equals the event-firing axis.

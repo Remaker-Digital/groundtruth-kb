@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-23T15:55:37Z",
+  "generated_at": "2026-06-24T22:11:49Z",
   "harnesses": [
     {
       "can_fire_events": true,
@@ -67,10 +67,10 @@
       },
       "reviewer_precedence": 10,
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
-      "status": "suspended",
-      "version": 34
+      "status": "active",
+      "version": 36
     },
     {
       "can_fire_events": false,
@@ -107,8 +107,8 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "suspended",
-      "version": 24
+      "status": "active",
+      "version": 25
     },
     {
       "can_fire_events": false,
@@ -147,8 +147,39 @@
       "version": 19
     },
     {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "event_driven_hooks": true,
+      "harness_name": "cursor",
+      "harness_type": "cursor",
+      "id": "E",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/cursor_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ]
+        },
+        "interactive": {
+          "kind": "ide",
+          "name": "Cursor IDE"
+        }
+      },
+      "reviewer_precedence": 15,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 3
+    },
+    {
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,

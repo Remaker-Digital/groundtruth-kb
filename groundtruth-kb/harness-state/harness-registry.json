@@ -1,9 +1,12 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-01T05:06:21Z",
+  "generated_at": "2026-06-24T00:57:47Z",
   "harnesses": [
     {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
+      "event_driven_hooks": true,
       "harness_name": "codex",
       "harness_type": "codex",
       "id": "A",
@@ -12,21 +15,26 @@
           "argv": [
             "codex",
             "exec",
+            "-c",
+            "approval_policy=\"never\"",
             "{{PROMPT}}",
             "--cd",
             "{{PROJECT_ROOT}}"
           ]
         }
       },
-      "reviewer_precedence": null,
+      "reviewer_precedence": 20,
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
       "status": "active",
-      "version": 17
+      "version": 44
     },
     {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
+      "event_driven_hooks": true,
       "harness_name": "claude",
       "harness_type": "claude",
       "id": "B",
@@ -43,15 +51,18 @@
           ]
         }
       },
-      "reviewer_precedence": null,
+      "reviewer_precedence": 10,
       "role": [
-        "prime-builder"
+        "loyal-opposition"
       ],
       "status": "active",
-      "version": 16
+      "version": 35
     },
     {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
+      "event_driven_hooks": false,
       "harness_name": "antigravity",
       "harness_type": "antigravity",
       "id": "C",
@@ -59,6 +70,9 @@
         "headless": {
           "argv": [
             "gemini",
+            "-m",
+            "gemini-2.5-flash",
+            "--skip-trust",
             "-p",
             "{{PROMPT}}",
             "--approval-mode=yolo"
@@ -69,10 +83,67 @@
           "name": "Antigravity IDE"
         }
       },
-      "reviewer_precedence": null,
-      "role": [],
-      "status": "registered",
-      "version": 2
+      "reviewer_precedence": 30,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 25
+    },
+    {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "event_driven_hooks": false,
+      "harness_name": "ollama",
+      "harness_type": "ollama",
+      "id": "D",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/ollama_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ],
+          "max_items": 1
+        }
+      },
+      "reviewer_precedence": 10,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 19
+    },
+    {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "event_driven_hooks": false,
+      "harness_name": "openrouter",
+      "harness_type": "openrouter",
+      "id": "F",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/openrouter_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ]
+        }
+      },
+      "reviewer_precedence": 20,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 17
     }
   ],
   "schema_version": 1,

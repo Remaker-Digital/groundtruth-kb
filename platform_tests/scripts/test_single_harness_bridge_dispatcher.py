@@ -824,3 +824,60 @@ def test_diagnose_summary_no_false_idle_warning_when_truly_idle(tmp_path: Path) 
     # Section present but no warning
     assert "Worker process-family liveness" in output
     assert "WARNING" not in output
+
+
+def _go_fake_item(doc: str) -> object:
+    return type(
+        "FakeItem",
+        (),
+        {
+            "document_name": doc,
+            "top_status": "GO",
+            "top_file": f"bridge/{doc}-002.md",
+            "dispatchable": True,
+        },
+    )()
+
+
+def test_single_harness_issue_dispatch_auth_quarantines_bad_go_and_continues_healthy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4770: single-harness dispatcher quarantines one bad GO and continues healthy GO."""
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    dispatcher = _load_dispatcher()
+    trigger = dispatcher._load_trigger_module()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    recorded: list[dict[str, object]] = []
+
+    def _fake_create(_root, bridge_id):
+        if bridge_id == "bad-go-thread":
+            raise dispatcher.AuthorizationError("missing approved proposal")
+        return {
+            "bridge_id": bridge_id,
+            "packet_hash": f"hash-{bridge_id}",
+            "target_path_globs": ["scripts/*.py"],
+        }
+
+    def _record_failure(_state_dir, payload):
+        recorded.append(payload)
+
+    monkeypatch.setattr(dispatcher, "create_authorization_packet", _fake_create)
+    monkeypatch.setattr(dispatcher, "write_named_packet", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(dispatcher, "write_packet", lambda *_args, **_kwargs: root / "auth-current.json")
+    monkeypatch.setattr(trigger, "_record_dispatch_failure", _record_failure)
+
+    result = dispatcher._issue_dispatch_authorization_for_selected(
+        [_go_fake_item("bad-go-thread"), _go_fake_item("good-go-thread")],
+        project_root=root,
+        state_dir=state_dir,
+        recipient="prime-builder",
+        dispatch_id="dispatch-single-harness-auth",
+        trigger=trigger,
+    )
+
+    assert result["ok"] is True
+    assert result["context"]["bridge_ids"] == ["good-go-thread"]
+    assert result["quarantined_slugs"] == [{"slug": "bad-go-thread", "error_message": "missing approved proposal"}]
+    assert recorded[-1]["document_name"] == "bad-go-thread"
+    assert recorded[-1]["reason"] == "impl_auth_quarantined"

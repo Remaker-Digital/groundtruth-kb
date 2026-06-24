@@ -105,6 +105,7 @@ STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 2.0
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
+    "cursor": GTKB_HARNESS_STATE_ROOT / "cursor" / "session-lifecycle-guard.json",
 }
 
 # ---- Role profiles (unchanged from prior module) -----------------------
@@ -332,7 +333,7 @@ def lifecycle_guard_path(project_root: Path | None = None) -> Path:
     if override:
         return Path(override).expanduser().resolve()
     harness_name = _resolved_harness_name()
-    if harness_name:
+    if harness_name and harness_name in HARNESS_LIFECYCLE_GUARDS:
         return HARNESS_LIFECYCLE_GUARDS[harness_name].expanduser().resolve()
     root = (project_root or _project_root_from_env()).resolve()
     return root / LIFECYCLE_GUARD_RELATIVE_PATH
@@ -871,6 +872,7 @@ def _harness_state_records_for_project(
     lifecycle_guards: dict[str, Path] = {
         "codex": state_root / "codex" / "session-lifecycle-guard.json",
         "claude": state_root / "claude" / "session-lifecycle-guard.json",
+        "cursor": state_root / "cursor" / "session-lifecycle-guard.json",
     }
     return state_root / "harness-registry.json", lifecycle_guards
 
@@ -1422,6 +1424,8 @@ def _startup_diagnostic_dir(project_root: Path | None = None) -> Path:
         return root / ".codex" / "gtkb-hooks"
     if harness_name == "claude":
         return root / ".claude" / "hooks"
+    if harness_name == "cursor":
+        return root / ".cursor" / "gtkb-hooks"
     return root / ".codex" / "gtkb-hooks"
 
 

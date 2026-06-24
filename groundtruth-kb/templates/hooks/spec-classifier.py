@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Claude Code UserPromptSubmit hook — Specification Classifier (regex gate).
 
-Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2;
-DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
+Enforces: GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2; DCL-REQUIREMENTS-COLLECTION-HOOK-CONTRACT-001 v2.
 See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
-Source rationale: DELIB-S332-NO-LLM-API-PARALLEL-USE-DIRECTIVE;
-DELIB-S332-CANONICAL-TRIGGER-SET-INTUITIVE-CLARIFICATION.
+Source rationale: DELIB-S332-NO-LLM-API-PARALLEL-USE-DIRECTIVE; DELIB-S332-CANONICAL-TRIGGER-SET-INTUITIVE-CLARIFICATION.
 
 Detects owner input that contains canonical specification-language triggers
 and emits a reminder directing the AI agent to use AskUserQuestion to
@@ -22,6 +20,7 @@ Exit:   Always 0
 import json
 import re
 import sys
+
 
 # Canonical specification-language triggers. Owner-intuitive phrasings that
 # invoke the AUQ-only-spec-creation invariant. Pattern set is intentionally
@@ -63,7 +62,10 @@ def detect_specification_language(prompt: str) -> bool:
     for pattern in ANTI_PATTERNS:
         if re.search(pattern, first_line, re.IGNORECASE):
             return False
-    return any(re.search(pattern, stripped, re.IGNORECASE | re.MULTILINE) for pattern in SPEC_PATTERNS)
+    for pattern in SPEC_PATTERNS:
+        if re.search(pattern, stripped, re.IGNORECASE | re.MULTILINE):
+            return True
+    return False
 
 
 # AUQ-only-spec-creation invariant reminder. Cited rules:
@@ -71,15 +73,11 @@ def detect_specification_language(prompt: str) -> bool:
 # - GOV-SPEC-CAPTURE-TRANSPARENCY-001 (surfacing transparency)
 # Per S332 owner directive: "no requirements specifications are created
 # without my explicit choice from an AskUserQuestion."
-REMINDER = (
-    "SPECIFICATION TRIGGER — Your message contains a canonical specification-language trigger.\n\n"
-    "Per GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2: do NOT create or promote any formal artifact "
-    "(SPEC / REQ / GOV / ADR / DCL / PB / DELIB) without first issuing an AskUserQuestion to confirm "
-    "the artifact's existence, scope, and approval.\n\n"
-    "Per GOV-SPEC-CAPTURE-TRANSPARENCY-001: surface the candidate to the owner immediately with "
-    "classification, interpretation, and the artifact that would be created if approved. Wait for the "
-    "AskUserQuestion answer before any KB mutation."
-)
+REMINDER = """SPECIFICATION TRIGGER — Your message contains a canonical specification-language trigger.
+
+Per GOV-REQUIREMENTS-COLLECTION-HOOK-001 v2: do NOT create or promote any formal artifact (SPEC / REQ / GOV / ADR / DCL / PB / DELIB) without first issuing an AskUserQuestion to confirm the artifact's existence, scope, and approval.
+
+Per GOV-SPEC-CAPTURE-TRANSPARENCY-001: surface the candidate to the owner immediately with classification, interpretation, and the artifact that would be created if approved. Wait for the AskUserQuestion answer before any KB mutation."""
 
 
 def main() -> None:

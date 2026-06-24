@@ -237,7 +237,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--role",
         required=True,
-        choices=["claude", "codex"],
+        choices=["claude", "codex", "cursor"],
         help="The harness name whose lock file this heartbeat manages.",
     )
     parser.add_argument(

@@ -85,6 +85,49 @@ def _seed_failures(state_dir: Path) -> None:
     path.write_text("\n".join(json.dumps(f) for f in failures) + "\n", encoding="utf-8")
 
 
+def _seed_idle_state(state_dir: Path) -> None:
+    state_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "recipients": {
+            "prime-builder": {
+                "last_dispatched_signature": "abc12345abc12345",
+                "last_result": "no_actionable_change",
+                "pending_count": 0,
+                "selected_count": 0,
+                "signature": "abc12345abc12345",
+                "updated_at": "2026-06-23T00:00:00+00:00",
+            },
+            "loyal-opposition": {
+                "last_dispatched_signature": "def67890def67890",
+                "last_result": "no_actionable_change",
+                "pending_count": 0,
+                "selected_count": 0,
+                "signature": "def67890def67890",
+                "updated_at": "2026-06-23T00:00:00+00:00",
+            },
+        },
+        "schema_version": 1,
+        "updated_at": "2026-06-23T00:00:00+00:00",
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _write_heartbeat(project_root: Path, content: str) -> Path:
+    path = project_root / ".gtkb-state" / "ops" / "storm-watchdog-heartbeat.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def _diagnose_with_project_root(
+    state_dir: Path,
+    project_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> str:
+    monkeypatch.setattr(cht, "_resolve_project_root", lambda _explicit=None: project_root)
+    return cht._emit_diagnose_summary(state_dir)
+
+
 def test_diagnose_emits_expected_sections(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     _seed_state(state_dir)
@@ -124,6 +167,92 @@ def test_diagnose_classifies_target_active_session_result(
     assert "suppressed (target active session detected; by design)" in output
     assert "HEALTHY" in output
     assert "DEGRADED" not in output
+
+
+def test_diagnose_worker_liveness_absent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    state_dir = tmp_path / "state"
+    _seed_idle_state(state_dir)
+
+    output = _diagnose_with_project_root(state_dir, project_root, monkeypatch)
+
+    assert "== Worker process-family liveness ==" in output
+    assert "Heartbeat ABSENT" in output
+
+
+def test_diagnose_worker_liveness_present(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _write_heartbeat(
+        project_root, "2026-06-23T00:00:00+00:00 codex=3 family=7 threshold=15 noncodex=4 noncodexThreshold=10\n"
+    )
+    state_dir = tmp_path / "state"
+    _seed_idle_state(state_dir)
+
+    output = _diagnose_with_project_root(state_dir, project_root, monkeypatch)
+
+    assert "== Worker process-family liveness ==" in output
+    assert "codex=3" in output
+    assert "family=7" in output
+    assert "threshold=15" in output
+    assert "noncodex=4" in output
+    assert "noncodexThreshold=10" in output
+
+
+def test_diagnose_worker_liveness_stale_heartbeat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _write_heartbeat(project_root, "2000-01-01T00:00:00+00:00 codex=1 family=2 threshold=15\n")
+    state_dir = tmp_path / "state"
+    _seed_idle_state(state_dir)
+
+    output = _diagnose_with_project_root(state_dir, project_root, monkeypatch)
+
+    assert "== Worker process-family liveness ==" in output
+    assert "[STALE]" in output
+
+
+def test_diagnose_worker_liveness_unparsable_heartbeat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _write_heartbeat(project_root, "NOT-A-DATE codex=5 family=10 threshold=15\n")
+    state_dir = tmp_path / "state"
+    _seed_idle_state(state_dir)
+
+    output = _diagnose_with_project_root(state_dir, project_root, monkeypatch)
+
+    assert "== Worker process-family liveness ==" in output
+    assert "Heartbeat PARSE ERROR" in output
+    assert "NOT-A-DATE" in output
+
+
+def test_diagnose_worker_liveness_false_idle_warning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _write_heartbeat(project_root, "2026-06-23T00:00:00+00:00 codex=0 family=5 threshold=15\n")
+    state_dir = tmp_path / "state"
+    _seed_idle_state(state_dir)
+
+    output = _diagnose_with_project_root(state_dir, project_root, monkeypatch)
+
+    assert "WARNING" in output
+    assert "dispatch state appears idle but worker process families are active" in output
 
 
 def test_diagnose_does_not_dispatch_or_modify_state(tmp_path: Path) -> None:
