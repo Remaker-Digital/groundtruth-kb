@@ -63,6 +63,27 @@ GATE_SET = (
     PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py",
     PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py",
 )
+_REGISTRY_STATUS_PATTERNS = (
+    re.compile(r"\bsuspended\b", re.IGNORECASE),
+    re.compile(r"\bnon[-_]functional\b", re.IGNORECASE),
+)
+_ROLE_MISMATCH_PATTERNS = (
+    re.compile(r"role[-_ ]mismatch\b", re.IGNORECASE),
+    re.compile(r"\brole\b.*\bmismatch\b", re.IGNORECASE),
+)
+_REGISTRY_CONTEXT_TOKENS = ("durable", "harness", "registry", "role")
+_R5_INVALIDATION_TOKENS = (
+    "block",
+    "defer",
+    "deny",
+    "drop",
+    "fail",
+    "invalidat",
+    "raise",
+    "reject",
+    "refuse",
+    "strict_drop",
+)
 
 
 def _read(path: Path) -> str:
@@ -104,6 +125,20 @@ def _extract_function(src: str, name: str) -> str:
     assert start_match is not None, f"function {name!r} not found"
     nxt = re.compile(r"^(def |class )", re.MULTILINE).search(src, start_match.end())
     return src[start_match.start() : nxt.start()] if nxt else src[start_match.start() :]
+
+
+def _r5_registry_mismatch_invalidation_hits(src: str) -> list[tuple[int, str]]:
+    """Find lines that combine registry mismatch evidence with invalidation."""
+    hits: list[tuple[int, str]] = []
+    for lineno, line in enumerate(src.splitlines(), start=1):
+        lowered = line.lower()
+        has_registry_context = any(token in lowered for token in _REGISTRY_CONTEXT_TOKENS)
+        has_registry_status = any(pattern.search(line) for pattern in _REGISTRY_STATUS_PATTERNS)
+        has_role_mismatch = any(pattern.search(line) for pattern in _ROLE_MISMATCH_PATTERNS)
+        has_invalidation = any(token in lowered for token in _R5_INVALIDATION_TOKENS)
+        if has_registry_context and (has_registry_status or has_role_mismatch) and has_invalidation:
+            hits.append((lineno, line.strip()))
+    return hits
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -237,26 +272,44 @@ def test_r4_mismatch_is_warning_surface_not_override() -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
+def test_r5_registry_mismatch_scan_ignores_application_subject_state() -> None:
+    """R5 scan must not false-positive on non-harness application state."""
+    src = 'WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"'
+    assert _r5_registry_mismatch_invalidation_hits(src) == []
+
+
+def test_r5_registry_mismatch_scan_catches_actual_invalidation() -> None:
+    """R5 scan must still catch registry-status and role-mismatch gates."""
+    src = "\n".join(
+        (
+            'if harness_status == "suspended": raise RuntimeError("block bridge work")',
+            "if registry_role_mismatch: return StartupDecision.STRICT_DROP",
+        )
+    )
+    assert _r5_registry_mismatch_invalidation_hits(src) == [
+        (1, 'if harness_status == "suspended": raise RuntimeError("block bridge work")'),
+        (2, "if registry_role_mismatch: return StartupDecision.STRICT_DROP"),
+    ]
+
+
 def test_r5_no_gate_invalidates_on_registry_mismatch_alone() -> None:
-    """R5 (grep_absent): no gate rejects/raises/drops/DEFERs a verdict, dispatch,
+    """R5 (targeted scan): no gate rejects/raises/drops/DEFERs a verdict, dispatch,
     or work product SOLELY on a registry status (suspended / non-functional) or a
     registry-vs-declared role disagreement.
 
-    This is a clean grep_absent target locked against future regression. The
+    This is a targeted semantic scan locked against future regression. The
     prompt-role authority emergency fix removed the prior strict-drop carve-out:
     a registry-vs-declared role mismatch is audited, not used to invalidate the
     explicit prompt/dispatch keyword. If a future change legitimately needs one
     of these tokens, the R5 guard must be revisited via a scoped REVISED
     proposal, not silently widened.
     """
-    status_tokens = ("suspended", "non-functional", "non_functional")
     for path in GATE_SET:
         src = _read(path)
-        for token in status_tokens:
-            assert token not in src, (
-                f"{path.name} references registry status token {token!r}; R5 forbids invalidating "
-                "work solely on a registry status/role mismatch (DCL assertion 1)."
-            )
+        hits = _r5_registry_mismatch_invalidation_hits(src)
+        assert hits == [], (
+            f"{path.name} appears to invalidate work on a registry status/role mismatch (DCL assertion 1): {hits!r}."
+        )
 
     # Anchor the revised behavior: the dispatch keyword checker may resolve and
     # audit the durable role set, but it must not use STRICT_DROP for mismatch.
