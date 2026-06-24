@@ -1481,6 +1481,104 @@ def application_unregister_cmd(ctx: click.Context, name: str) -> None:
     click.echo(f"Application '{name}' is not registered.")
 
 
+@main.group("design")
+def design_group() -> None:
+    """Local Claude Design handoff import and registration."""
+
+
+@design_group.command("import")
+@click.argument("handoff_path", type=click.Path(exists=True))
+@click.option("--date", required=True, help="Handoff date in ISO format, e.g. 2026-04-18.")
+@click.option("--session-id", required=True, help="Session id that inspected the handoff, e.g. S302.")
+@click.option("--owner-decision", default=None, help="Triage outcome / owner decision text (becomes a DA section).")
+@click.option("--notes", default=None, help="Owner-supplied inspection notes (redaction-safe free text).")
+@click.option(
+    "--source-ref",
+    default=None,
+    help="Override source_ref (default: claude-design-handoff:<date>:<name>).",
+)
+@click.option(
+    "--apply",
+    is_flag=True,
+    default=False,
+    help="Register the handoff into the Deliberation Archive. Omit for a dry run.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def design_import_cmd(
+    ctx: click.Context,
+    handoff_path: str,
+    date: str,
+    session_id: str,
+    owner_decision: str | None,
+    notes: str | None,
+    source_ref: str | None,
+    apply: bool,
+    json_output: bool,
+) -> None:
+    """Inspect and (with --apply) register a local Claude Design handoff.
+
+    Dry-run by default: inspects the .zip or directory, validates it against
+    SPEC-CD-HANDOFF-FORMAT-001's D1 structure, and reports the deterministic
+    inspection record without touching MemBase. ``--apply`` archives one
+    content-hash-idempotent ``report`` Deliberation Archive row. Imported
+    handoffs remain design intent + evidence (GOV-CD-PRESERVATION); raw design
+    bytes are never inlined. Live Claude Design API integration, production-code
+    adoption, context packs, visual verification, dashboards, and app UI
+    changes remain out of scope.
+    """
+    from groundtruth_kb.design_import import archive
+
+    config = _resolve_config(ctx)
+    db = _open_db(config) if apply else None
+    try:
+        result = archive(
+            handoff_path=Path(handoff_path),
+            date=date,
+            session_id=session_id,
+            owner_decision=owner_decision,
+            notes=notes,
+            source_ref=source_ref,
+            apply=apply,
+            db=db,
+            changed_by="gt design import",
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        if json_output:
+            click.echo(json.dumps({"error": str(exc)}))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(2) from exc
+
+    if json_output:
+        click.echo(
+            json.dumps(
+                {
+                    "action": result.action,
+                    "source_ref": result.source_ref,
+                    "content_hash": result.content_hash,
+                    "delib_id": result.delib_id,
+                    "redaction_reason": result.redaction_reason,
+                    "warnings": result.warnings,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    click.echo(f"action:        {result.action}")
+    click.echo(f"source_ref:    {result.source_ref}")
+    click.echo(f"content_hash:  {result.content_hash}")
+    if result.delib_id is not None:
+        click.echo(f"delib_id:      {result.delib_id}")
+    if result.redaction_reason:
+        click.echo(f"redaction:     {result.redaction_reason}")
+    if result.warnings:
+        click.echo("format warnings:")
+        for w in result.warnings:
+            click.echo(f"  - {w}")
+
+
 @main.group("authority")
 def authority_group() -> None:
     """Resolve GT-KB authority/source-of-truth terms."""

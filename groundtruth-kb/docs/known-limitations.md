@@ -94,12 +94,19 @@ future documentation pass.
 
 ## 5. Claude Design Integration
 
-GroundTruth-KB does not integrate with Claude Design
-([claude.ai/design](https://claude.ai/design)) today. Claude Design
-outputs (HTML prototypes, PPTX, Canva exports) are not registered as
-managed artifacts, and there is no review gate that treats a
-design-handoff as binding. This is a candidate for a future ADR + child
-bridge, not a v0.6.0 capability.
+GroundTruth-KB supports **local manual handoff import only**. The
+`gt design import <handoff>` command inspects a local Claude Design
+handoff (`.zip` or directory), validates it against
+`SPEC-CD-HANDOFF-FORMAT-001`, and — with `--apply` — registers a
+metadata-only inspection record into the Deliberation Archive (raw design
+bytes are never inlined; see [Claude Design Intake](claude-design-intake.md)).
+
+What is **not** supported today: live Claude Design API
+([claude.ai/design](https://claude.ai/design)) integration; treating
+Claude Design outputs (HTML prototypes, PPTX, Canva exports) as production
+code; context-pack generation; visual verification; design dashboards; and
+any review gate that treats a design-handoff as binding. Those remain
+candidates for future ADRs + child bridges, not a v0.x capability.
 
 ## 6. Deployment Provisioning
 
