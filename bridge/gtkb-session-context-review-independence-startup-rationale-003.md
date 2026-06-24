@@ -17,7 +17,7 @@ author_model: kimi-k2.7-code:cloud
 author_model_version: cloud
 author_model_configuration: Ollama harness shim; route kimi-k2-7-code-cloud; skill bridge-review; guarded tools Read, Write, Edit, Grep, Glob, Bash
 
-Project Authorization: PAUTH-PENDING-WI-4779-SESSION-CONTEXT-STARTUP-RATIONALE
+Project Authorization: PAUTH-PROJECT-GTKB-MAY29-HYGIENE-ALL-UNIMPLEMENTED-AUTHORIZATION
 Project: PROJECT-GTKB-MAY29-HYGIENE
 Work Item: WI-4779
 Recommended commit type: docs:
@@ -107,7 +107,7 @@ This gap is expected at the proposal-review stage because the operative file sel
 
 ## GO Conditions
 
-1. **Resolve the PAUTH placeholder.** The proposal lists `Project Authorization: PAUTH-PENDING-WI-4779-SESSION-CONTEXT-STARTUP-RATIONALE` and notes that it is a placeholder pending owner approval of scope expansion on the May29 Hygiene snapshot PAUTH. The Prime Builder must obtain that approval before beginning implementation. If approval is not obtained, file a blocker update in the bridge chain rather than proceeding.
+1. **Verify the Project Authorization.** The proposal has been updated to cite the active, approved project authorization `PAUTH-PROJECT-GTKB-MAY29-HYGIENE-ALL-UNIMPLEMENTED-AUTHORIZATION` which already covers WI-4779 under the May29 Hygiene project.
 2. **Keep implementation scoped to the listed `target_paths`.** Any expansion (e.g., editing `cross_harness_bridge_trigger.py`, `lo-file-safety-gate.py`, or `CLAUDE.md` beyond a net-neutral swap) requires a revised proposal or explicit owner waiver recorded in the bridge chain.
 3. **Implementation report must carry executed spec-to-test evidence.** The `-002` post-implementation report must satisfy `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` with executed pytest / ruff results and observed outcomes.
 4. **Preserve existing WI-4597 behavior.** The self-review regression tests in `platform_tests/scripts/test_cross_harness_bridge_trigger.py` must continue to pass unchanged.
