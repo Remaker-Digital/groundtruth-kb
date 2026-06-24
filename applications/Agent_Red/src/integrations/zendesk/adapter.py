@@ -136,9 +136,7 @@ class ZendeskAdapter:
 
         if self._http is not None:
             # Injected HTTP client (testing)
-            response = await self._http.request(
-                method, url, headers=headers, json=json_body
-            )
+            response = await self._http.request(method, url, headers=headers, json=json_body)
         else:
             raise IntegrationError(
                 "No HTTP client configured",
@@ -153,9 +151,7 @@ class ZendeskAdapter:
                 integration_id=INTEGRATION_ID,
             )
         if status == 429:
-            retry_after = float(
-                getattr(response, "headers", {}).get("Retry-After", "60")
-            )
+            retry_after = float(getattr(response, "headers", {}).get("Retry-After", "60"))
             raise RateLimitError(
                 "Zendesk rate limit exceeded",
                 integration_id=INTEGRATION_ID,
@@ -197,11 +193,7 @@ class ZendeskAdapter:
             priority=PRIORITY_MAP.get(zd_priority, TicketPriority.NORMAL),
             requester=requester,
             tags=raw.get("tags", []),
-            custom_fields={
-                cf["id"]: cf["value"]
-                for cf in raw.get("custom_fields", [])
-                if cf.get("value") is not None
-            },
+            custom_fields={cf["id"]: cf["value"] for cf in raw.get("custom_fields", []) if cf.get("value") is not None},
             created_at=_parse_dt(raw.get("created_at")),
             updated_at=_parse_dt(raw.get("updated_at")),
             raw=raw,
@@ -262,16 +254,10 @@ class ZendeskAdapter:
 
         data = await self._request("GET", "/tickets.json", params=params)
         tickets = [self._normalize_ticket(t) for t in data.get("tickets", [])]
-        next_cursor = (
-            data.get("meta", {}).get("after_cursor")
-            if data.get("meta", {}).get("has_more")
-            else None
-        )
+        next_cursor = data.get("meta", {}).get("after_cursor") if data.get("meta", {}).get("has_more") else None
         return tickets, next_cursor
 
-    async def get_ticket(
-        self, tenant_id: str, ticket_id: str
-    ) -> NormalizedTicket | None:
+    async def get_ticket(self, tenant_id: str, ticket_id: str) -> NormalizedTicket | None:
         """Get a single ticket by external ID."""
         try:
             data = await self._request("GET", f"/tickets/{ticket_id}.json")
@@ -306,9 +292,7 @@ class ZendeskAdapter:
         # Zendesk returns the updated ticket; extract the latest comment
         audit = data.get("audit", {})
         events = audit.get("events", [])
-        comment_event = next(
-            (e for e in events if e.get("type") == "Comment"), {}
-        )
+        comment_event = next((e for e in events if e.get("type") == "Comment"), {})
         return NormalizedMessage(
             external_id=str(comment_event.get("id", "")),
             source=INTEGRATION_ID,
@@ -317,9 +301,7 @@ class ZendeskAdapter:
             body_html=html_body or "",
         )
 
-    async def update_status(
-        self, tenant_id: str, ticket_id: str, status: str
-    ) -> NormalizedTicket:
+    async def update_status(self, tenant_id: str, ticket_id: str, status: str) -> NormalizedTicket:
         """Update a ticket's status."""
         zd_status = REVERSE_STATUS_MAP.get(status, status)
         data = await self._request(
@@ -329,9 +311,7 @@ class ZendeskAdapter:
         )
         return self._normalize_ticket(data.get("ticket", {}))
 
-    async def add_tags(
-        self, tenant_id: str, ticket_id: str, tags: list[str]
-    ) -> NormalizedTicket:
+    async def add_tags(self, tenant_id: str, ticket_id: str, tags: list[str]) -> NormalizedTicket:
         """Add tags to a ticket (non-destructive merge)."""
         await self._request(
             "PUT",
@@ -343,9 +323,7 @@ class ZendeskAdapter:
             external_id=ticket_id, source=INTEGRATION_ID
         )
 
-    async def assign_ticket(
-        self, tenant_id: str, ticket_id: str, assignee_id: str
-    ) -> NormalizedTicket:
+    async def assign_ticket(self, tenant_id: str, ticket_id: str, assignee_id: str) -> NormalizedTicket:
         """Assign a ticket to an agent."""
         data = await self._request(
             "PUT",
@@ -382,9 +360,7 @@ class ZendeskAdapter:
         )
         return self._normalize_ticket(data.get("ticket", {}))
 
-    async def search_tickets(
-        self, tenant_id: str, query: str, *, limit: int = 25
-    ) -> list[NormalizedTicket]:
+    async def search_tickets(self, tenant_id: str, query: str, *, limit: int = 25) -> list[NormalizedTicket]:
         """Search tickets by query string."""
         params = {
             "query": f"type:ticket {query}",
@@ -393,9 +369,7 @@ class ZendeskAdapter:
         data = await self._request("GET", "/search.json", params=params)
         return [self._normalize_ticket(r) for r in data.get("results", [])]
 
-    async def register_webhook(
-        self, tenant_id: str, target_url: str, events: list[str]
-    ) -> dict[str, Any]:
+    async def register_webhook(self, tenant_id: str, target_url: str, events: list[str]) -> dict[str, Any]:
         """Register a webhook for ticket events."""
         data = await self._request(
             "POST",
@@ -407,24 +381,18 @@ class ZendeskAdapter:
                     "http_method": "POST",
                     "request_format": "json",
                     "status": "active",
-                    "subscriptions": [
-                        {"type": event} for event in events
-                    ],
+                    "subscriptions": [{"type": event} for event in events],
                 }
             },
         )
         return data.get("webhook", {})
 
-    async def verify_webhook(
-        self, headers: dict[str, str], body: bytes, secret: str
-    ) -> bool:
+    async def verify_webhook(self, headers: dict[str, str], body: bytes, secret: str) -> bool:
         """Verify Zendesk webhook HMAC-SHA256 signature."""
         signature = headers.get("x-zendesk-webhook-signature", "")
         if not signature:
             return False
-        expected = hmac.new(
-            secret.encode(), body, hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
         return hmac.compare_digest(signature, expected)
 
     async def health_check(self, tenant_id: str) -> bool:
@@ -460,36 +428,36 @@ class ZendeskAdapter:
         next_cursor = str(int(cursor or "1") + 1) if next_page else None
         return articles, next_cursor
 
-    async def get_article(
-        self, tenant_id: str, article_id: str
-    ) -> NormalizedArticle | None:
+    async def get_article(self, tenant_id: str, article_id: str) -> NormalizedArticle | None:
         """Get a single article by ID."""
         try:
-            data = await self._request(
-                "GET", f"/help_center/articles/{article_id}.json"
-            )
+            data = await self._request("GET", f"/help_center/articles/{article_id}.json")
             return self._normalize_article(data.get("article", {}))
         except IntegrationError as e:
             if e.status_code == 404:
                 return None
             raise
 
-    async def search_articles(
-        self, tenant_id: str, query: str, *, limit: int = 25
-    ) -> list[NormalizedArticle]:
+    async def search_articles(self, tenant_id: str, query: str, *, limit: int = 25) -> list[NormalizedArticle]:
         """Search Guide articles by query string."""
         params = {"query": query, "per_page": str(min(limit, 100))}
-        data = await self._request(
-            "GET", "/help_center/articles/search.json", params=params
-        )
+        data = await self._request("GET", "/help_center/articles/search.json", params=params)
         return [self._normalize_article(r) for r in data.get("results", [])]
 
     # -- Customer lookup (EcommerceAdapter-style) ----------------------------
 
     async def lookup_customer(
-        self, tenant_id: str, *, email: str | None = None
+        self,
+        tenant_id: str,
+        *,
+        email: str | None = None,
+        customer_id: str | None = None,
     ) -> NormalizedContact | None:
-        """Look up a Zendesk user by email."""
+        """Look up a Zendesk user by email.
+
+        ``customer_id`` is accepted for shared ActionExecutor protocol
+        compatibility; Zendesk SPEC-1775 lookup remains email-based.
+        """
         if not email:
             return None
         params = {"query": email}
