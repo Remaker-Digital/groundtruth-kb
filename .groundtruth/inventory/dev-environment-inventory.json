@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-23T21:10:33Z",
+  "generated_at": "2026-06-24T14:08:07Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -43,6 +43,10 @@
       },
       "codex": {
         "id": "A",
+        "status": "verified"
+      },
+      "cursor": {
+        "id": "E",
         "status": "verified"
       },
       "ollama": {
@@ -90,6 +94,13 @@
       },
       "D": {
         "harness_type": "ollama",
+        "role": [
+          "loyal-opposition"
+        ],
+        "status": "verified"
+      },
+      "E": {
+        "harness_type": "cursor",
         "role": [
           "loyal-opposition"
         ],
@@ -692,11 +703,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "verified",
+      "classification": "unknown",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "verified",
-      "version": "26.1.2"
+      "status": "unknown",
+      "version": "unknown"
     },
     "playwright": {
       "classification": "unsupported",
@@ -710,7 +721,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.1.0"
     },
     "python": {
       "classification": "verified",
@@ -724,7 +735,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.18"
     }
   },
   "verification": {
