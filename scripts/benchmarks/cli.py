@@ -5,6 +5,7 @@ Subcommands:
   run      Execute one or all benchmarks; write JSON + markdown summary.
   report   Print a previously emitted run summary.
   compare  Diff two runs by idempotency_key and benchmark value.
+  observatory  Build an advisory effectiveness report for an existing run.
 
 Usage examples:
 
@@ -12,6 +13,7 @@ Usage examples:
   python -m scripts.benchmarks.cli run --all --window-start 2026-01-01
   python -m scripts.benchmarks.cli report --run-id 20260514-040000
   python -m scripts.benchmarks.cli compare --baseline RUN_A --candidate RUN_B
+  python -m scripts.benchmarks.cli observatory --run-id 20260514-040000
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import argparse
 import importlib
 import json
 import sys
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,6 +33,17 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.benchmarks.common import write_run_outputs  # noqa: E402
+from scripts.benchmarks.effectiveness_observatory import (  # noqa: E402
+    EffectivenessObservatoryError,
+    build_effectiveness_payload,
+    load_run_payload,
+    write_effectiveness_outputs,
+)
+from scripts.benchmarks.harness_quality_manifest import (  # noqa: E402
+    HARNESS_QUALITY_MANIFEST,
+    manifest_to_dict,
+    validate_manifest,
+)
 
 BENCHMARK_MODULES = [
     "assertion_signal_noise",
@@ -117,6 +131,70 @@ def cmd_compare(args):
     return 0
 
 
+def _path_for_output(path: Path) -> str:
+    try:
+        return path.resolve().as_posix()
+    except OSError:
+        return str(path)
+
+
+def cmd_observatory(args):
+    root = Path(args.project_root).resolve() if args.project_root else _resolve_root()
+    try:
+        paths = write_effectiveness_outputs(args.run_id, project_root=root)
+        payload = build_effectiveness_payload(load_run_payload(args.run_id, project_root=root))
+    except EffectivenessObservatoryError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps({"run_id": args.run_id, **{k: _path_for_output(v) for k, v in paths.items()}}, indent=2))
+    else:
+        print("Effectiveness observatory report")
+        print("run_id:", args.run_id)
+        print("advisory_status:", payload["advisory_status"])
+        print("available_metrics:", payload["summary"]["available_metric_count"])
+        print("missing_metrics:", payload["summary"]["missing_metric_count"])
+        print("json_path:", _path_for_output(paths["json_path"]))
+        print("markdown_path:", _path_for_output(paths["markdown_path"]))
+    return 0
+
+
+def build_manifest_payload() -> dict[str, object]:
+    """Return the read-only harness-quality manifest validation payload."""
+    validation_errors = validate_manifest()
+    manifest = asdict(HARNESS_QUALITY_MANIFEST) if validation_errors else manifest_to_dict()
+    return {
+        "valid": not validation_errors,
+        "validation_errors": validation_errors,
+        "manifest": manifest,
+        "summary": {
+            "modes": len(manifest["modes"]),
+            "tiers": len(manifest["tiers"]),
+            "challenge_families": len(manifest["challenge_families"]),
+            "safety_invariants": len(manifest["safety_invariants"]),
+            "dispatcher_bridge_cli_requirements": len(manifest["dispatcher_bridge_cli_requirements"]),
+        },
+    }
+
+
+def cmd_manifest(args):
+    payload = build_manifest_payload()
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        summary = payload["summary"]
+        print("Harness quality benchmark manifest")
+        print("valid:", payload["valid"])
+        print("modes:", summary["modes"])
+        print("tiers:", summary["tiers"])
+        print("challenge_families:", summary["challenge_families"])
+        print("safety_invariants:", summary["safety_invariants"])
+        print("dispatcher_bridge_cli_requirements:", summary["dispatcher_bridge_cli_requirements"])
+        for error in payload["validation_errors"]:
+            print("manifest validation error:", error, file=sys.stderr)
+    return 0 if payload["valid"] else 1
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="gtkb-benchmarks")
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -133,6 +211,17 @@ def build_parser():
     cmp.add_argument("--baseline", required=True)
     cmp.add_argument("--candidate", required=True)
     cmp.set_defaults(func=cmd_compare)
+    obs = sp.add_parser("observatory", help="write an effectiveness report for an existing run")
+    obs.add_argument("--run-id", required=True)
+    obs.add_argument("--json", action="store_true", help="emit machine-readable output paths")
+    obs.add_argument(
+        "--project-root",
+        help="Project root containing .gtkb-state/benchmarks; defaults to the GT-KB checkout.",
+    )
+    obs.set_defaults(func=cmd_observatory)
+    manifest = sp.add_parser("manifest", help="validate and print the harness-quality manifest")
+    manifest.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    manifest.set_defaults(func=cmd_manifest)
     return p
 
 

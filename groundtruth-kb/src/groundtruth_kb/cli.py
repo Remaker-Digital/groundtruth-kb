@@ -11,6 +11,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import contextlib
+import importlib
 import json
 import subprocess
 import sys
@@ -357,6 +358,101 @@ def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool) -> No
         click.echo(json.dumps(report, indent=2, sort_keys=True))
         return
     click.echo(format_bridge_dispatch_report(report))
+
+
+def _import_benchmark_cli() -> Any:
+    """Import the repo-local benchmark CLI module for bridge wrappers."""
+    try:
+        return importlib.import_module("scripts.benchmarks.cli")
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parents[3]
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+        return importlib.import_module("scripts.benchmarks.cli")
+
+
+def _run_benchmark_cli(argv: list[str]) -> int:
+    benchmark_cli = _import_benchmark_cli()
+    try:
+        result = benchmark_cli.main(argv)
+    except SystemExit as exc:
+        if exc.code is None:
+            return 0
+        if isinstance(exc.code, int):
+            return exc.code
+        return 1
+    return int(result or 0)
+
+
+@bridge_group.group("benchmark")
+def bridge_benchmark_group() -> None:
+    """Harness benchmark execution and manifest commands."""
+
+
+@bridge_benchmark_group.command("run")
+@click.option("--benchmark", default=None, help="Benchmark module name to run.")
+@click.option("--all", "run_all", is_flag=True, default=False, help="Run all benchmarks.")
+@click.option("--window-start", default=None, help="ISO timestamp for benchmark window start.")
+@click.option("--window-end", default=None, help="ISO timestamp for benchmark window end.")
+@click.pass_context
+def bridge_benchmark_run_cmd(
+    ctx: click.Context,
+    benchmark: str | None,
+    run_all: bool,
+    window_start: str | None,
+    window_end: str | None,
+) -> None:
+    """Execute benchmark runs through the Bridge CLI wrapper."""
+    argv = ["run"]
+    if benchmark:
+        argv.extend(["--benchmark", benchmark])
+    if run_all:
+        argv.append("--all")
+    if window_start:
+        argv.extend(["--window-start", window_start])
+    if window_end:
+        argv.extend(["--window-end", window_end])
+    ctx.exit(_run_benchmark_cli(argv))
+
+
+@bridge_benchmark_group.command("report")
+@click.option("--run-id", required=True, help="Benchmark run id to report.")
+@click.pass_context
+def bridge_benchmark_report_cmd(ctx: click.Context, run_id: str) -> None:
+    """Print a benchmark run report through the Bridge CLI wrapper."""
+    ctx.exit(_run_benchmark_cli(["report", "--run-id", run_id]))
+
+
+@bridge_benchmark_group.command("compare")
+@click.option("--baseline", required=True, help="Baseline benchmark run id.")
+@click.option("--candidate", required=True, help="Candidate benchmark run id.")
+@click.pass_context
+def bridge_benchmark_compare_cmd(ctx: click.Context, baseline: str, candidate: str) -> None:
+    """Compare benchmark runs through the Bridge CLI wrapper."""
+    ctx.exit(_run_benchmark_cli(["compare", "--baseline", baseline, "--candidate", candidate]))
+
+
+@bridge_benchmark_group.command("manifest")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_benchmark_manifest_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Validate and print the harness-quality benchmark manifest."""
+    benchmark_cli = _import_benchmark_cli()
+    payload = benchmark_cli.build_manifest_payload()
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        summary = payload["summary"]
+        click.echo("Harness quality benchmark manifest")
+        click.echo(f"valid: {payload['valid']}")
+        click.echo(f"modes: {summary['modes']}")
+        click.echo(f"tiers: {summary['tiers']}")
+        click.echo(f"challenge_families: {summary['challenge_families']}")
+        click.echo(f"safety_invariants: {summary['safety_invariants']}")
+        click.echo(f"dispatcher_bridge_cli_requirements: {summary['dispatcher_bridge_cli_requirements']}")
+        for error in payload["validation_errors"]:
+            click.echo(f"manifest validation error: {error}", err=True)
+    ctx.exit(0 if payload["valid"] else 1)
 
 
 @bridge_group.command("config")
