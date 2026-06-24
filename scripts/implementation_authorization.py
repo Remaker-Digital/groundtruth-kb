@@ -492,6 +492,13 @@ REQUIREMENT_SUFFICIENCY_RES = (REQUIREMENT_SUFFICIENCY_RE,)
 _FUTURE_SCOPED_GAP_CONTEXT_RE = re.compile(
     r"(?i)\b(?:would|could|might|may)\b[^.]{0,80}?\b(?:only|later|future|follow-?on|separate|child)\b"
 )
+_NEGATED_GAP_CONTEXT_RE = re.compile(
+    r"(?i)(?:"
+    r"\bno\s+new\s+or\s+revised\s+requirements?\b[^.]{0,80}?\b(?:required|needed)\b"
+    r"|"
+    r"\bnew\s+or\s+revised\s+requirements?\b[^.]{0,60}?\bnot\b[^.]{0,40}?\b(?:required|needed)\b"
+    r")"
+)
 
 
 def _bullet_has_citation(text: str) -> bool:
@@ -905,22 +912,22 @@ def requirement_sufficiency_state(markdown: str) -> str:
     body = section_body(markdown, "Requirement Sufficiency")
     if not body:
         return "missing"
-    gap_match = REQUIREMENT_GAP_RE.search(body)
     sufficiency_match = REQUIREMENT_SUFFICIENCY_RE.search(body)
-    if gap_match and sufficiency_match:
-        if gap_match.start() < sufficiency_match.start():
+    gap_match = REQUIREMENT_GAP_RE.search(body)
+    if sufficiency_match:
+        for candidate in REQUIREMENT_GAP_RE.finditer(body):
+            gap_sentence_end = body.find(".", candidate.start())
+            if gap_sentence_end == -1:
+                gap_sentence_end = len(body)
+            gap_sentence = body[candidate.start() : gap_sentence_end + 1]
+            if _NEGATED_GAP_CONTEXT_RE.search(gap_sentence):
+                continue
+            if _FUTURE_SCOPED_GAP_CONTEXT_RE.search(gap_sentence):
+                continue
             return "gap"
-        gap_sentence_end = body.find(".", gap_match.start())
-        if gap_sentence_end == -1:
-            gap_sentence_end = len(body)
-        gap_sentence = body[gap_match.start() : gap_sentence_end + 1]
-        if _FUTURE_SCOPED_GAP_CONTEXT_RE.search(gap_sentence):
-            return "sufficient"
-        return "gap"
+        return "sufficient"
     if gap_match:
         return "gap"
-    if sufficiency_match:
-        return "sufficient"
     return "unrecognized"
 
 
