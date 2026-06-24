@@ -62,10 +62,11 @@ path, not source/config/test implementation.
 Loyal Opposition review and verification require an unrelated session context
 from the bridge artifact author's session context. A same-session review is
 self-review and must not receive `GO` or `VERIFIED`; missing or unreadable
-`author_session_context_id` metadata fails closed. The same harness ID alone is
-not a blocker when the author and reviewer session contexts are unrelated and
-the reviewer is operating under a valid Loyal Opposition role or dispatch
-context.
+`author_session_context_id` metadata fails closed. Same-session formal review
+is prohibited because the verifier inherits the author's assumptions and errors.
+Full normative block: `config/agent-control/SESSION-STARTUP-INDEX.md` §
+Session-context review independence (normative). Harness ID and durable registry
+role are routing labels only — not the review boundary.
 
 Interactive sessions do not gain permission to self-review by citing durable
 role assignment or headless-dispatch eligibility. The owner-declared resolved

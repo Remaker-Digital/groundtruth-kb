@@ -43,12 +43,12 @@ session context. If the current reviewer session context matches the artifact's
 unreadable under dispatcher rules, the review must fail closed instead of
 issuing `GO` or `VERIFIED`.
 
-Same harness ID is not, by itself, a self-review blocker. A harness may review
-a bridge artifact authored by the same harness only when the author and
-reviewer session contexts are different and the reviewer is operating under a
-valid Loyal Opposition role or dispatch context. Interactive sessions remain
-bound to the owner-declared resolved role and must not switch roles merely to
-create review eligibility.
+Same-session formal review is prohibited because the verifier inherits the
+author's assumptions and errors. Full normative block:
+`config/agent-control/SESSION-STARTUP-INDEX.md` § Session-context review
+independence (normative). Harness ID, vendor, and durable registry role are not
+the review boundary. Interactive sessions remain bound to the owner-declared
+resolved role and must not switch roles merely to create review eligibility.
 
 ## Loyal Opposition File Safety Rule
 

@@ -32,15 +32,31 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 4. **File bridge** — read current TAFE/dispatcher bridge state and the
    status-bearing versioned files under `bridge/`; generated or cached startup
    counts are not live authority. The retired aggregate queue artifact must
-   not be recreated as a startup dependency. Treat bridge review independence
-   as session-context based: same-session review fails closed, same harness ID
-   alone is not a blocker, and missing author-session metadata fails closed.
+   not be recreated as a startup dependency. Bridge review independence is
+   session-context based — see **Session-context review independence (normative)**
+   below.
 5. **Dashboard / backlog summary** — the generated startup service
    (`scripts/session_self_initialization.py`) emits the current-state summary;
    it is not authoritative after generation.
 6. **Selected task** — map the owner's first non-init message to session work
    (Prime Builder: confirm session focus; Loyal Opposition: process the
    actionable bridge queue by default per the LO overlay).
+
+## Session-context review independence (normative)
+
+Formal bridge review (GO / NO-GO / VERIFIED) must come from a **different model
+session context** than the one that authored or implemented the artifact under
+review. Shared session context means the verifier likely inherits the same
+assumptions and errors as the author — same-session formal review is prohibited
+and must fail closed.
+
+- **Blocker:** reviewer session context equals artifact `author_session_context_id`
+- **Fail closed:** missing or unreadable `author_session_context_id`
+- **Not the boundary:** harness ID, vendor, or durable registry role (routing labels only)
+
+Interactive `::init gtkb pb` grants Prime Builder authority in this session
+regardless of durable registry role. It does **not** permit this same session
+context to later issue GO/VERIFIED on work it authored or implemented here.
 
 ## Antigravity (Harness ID C) Overrides
 

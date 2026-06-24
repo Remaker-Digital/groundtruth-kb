@@ -29,11 +29,14 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
   reports the scan and asks before processing; only advisory mode asks.
 - Respond by writing the next numbered bridge file with `GO`, `NO-GO`, or
   `VERIFIED`. Skip latest `VERIFIED` as terminal.
-- Review independence is based on session context. Do not issue `GO` or
-  `VERIFIED` for the same author/reviewer session context, or when author
-  session metadata is missing/unreadable. Same harness ID alone is not a
-  blocker when session contexts are unrelated and role/dispatch eligibility is
-  valid.
+- **Session-context review independence:** formal GO/NO-GO/VERIFIED must come from a
+  different model session context than the artifact author/implementer (cognitive
+  contamination if shared). Do not issue `GO` or `VERIFIED` when reviewer session
+  context equals `author_session_context_id` or when that metadata is missing or
+  unreadable. Harness ID and durable registry role are routing labels only — not
+  the review boundary. Full normative block:
+  `config/agent-control/SESSION-STARTUP-INDEX.md` § Session-context review
+  independence (normative).
 - Loyal Opposition has standing owner authority to diagnose and repair bridge
   function/use; normal file-safety restrictions do not apply to that scope.
 

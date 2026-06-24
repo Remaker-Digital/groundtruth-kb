@@ -161,12 +161,13 @@ HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
     "antigravity": GTKB_HARNESS_STATE_ROOT / "antigravity" / "session-lifecycle-guard.json",
+    "cursor": GTKB_HARNESS_STATE_ROOT / "cursor" / "session-lifecycle-guard.json",
     "ollama": GTKB_HARNESS_STATE_ROOT / "ollama" / "session-lifecycle-guard.json",
     "openrouter": GTKB_HARNESS_STATE_ROOT / "openrouter" / "session-lifecycle-guard.json",
 }
 BRIDGE_DISPATCH_ROLE_TEXT = (
     "cross-harness event-driven trigger registered as PostToolUse and Stop hooks "
-    "(.claude/settings.json, .codex/hooks.json); fires on tool-use and Stop "
+    "(.claude/settings.json, .codex/hooks.json, .cursor/hooks.json); fires on tool-use and Stop "
     "rather than on a fixed interval; manual TAFE/dispatcher bridge scans "
     "available as fallback; retired smart poller and OS poller remain archived"
 )
@@ -192,6 +193,24 @@ BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "(dispatchable vs non-dispatchable) and inventoried in "
     "`config/agent-control/system-interface-map.toml`."
 )
+SESSION_CONTEXT_REVIEW_INDEPENDENCE_INDEX_REF = (
+    "config/agent-control/SESSION-STARTUP-INDEX.md § Session-context review independence (normative)"
+)
+SESSION_CONTEXT_REVIEW_INDEPENDENCE_CANONICAL = """## Session-context review independence (normative)
+
+Formal bridge review (GO / NO-GO / VERIFIED) must come from a **different model
+session context** than the one that authored or implemented the artifact under
+review. Shared session context means the verifier likely inherits the same
+assumptions and errors as the author — same-session formal review is prohibited
+and must fail closed.
+
+- **Blocker:** reviewer session context equals artifact `author_session_context_id`
+- **Fail closed:** missing or unreadable `author_session_context_id`
+- **Not the boundary:** harness ID, vendor, or durable registry role (routing labels only)
+
+Interactive `::init gtkb pb` grants Prime Builder authority in this session
+regardless of durable registry role. It does **not** permit this same session
+context to later issue GO/VERIFIED on work it authored or implemented here."""
 ROLE_PROFILES: dict[str, dict[str, str]] = {
     "prime-builder": {
         "assumed_role": "Prime Builder",
@@ -3042,6 +3061,7 @@ def _hook_inventory(project_root: Path) -> dict[str, list[str]]:
     for label, path in {
         "claude": project_root / ".claude" / "settings.json",
         "codex": project_root / ".codex" / "hooks.json",
+        "cursor": project_root / ".cursor" / "hooks.json",
     }.items():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -5017,6 +5037,27 @@ def _render_startup_glossary_section(project_root: Path, *, max_terms: int = 8) 
     return "\n".join(lines)
 
 
+def session_context_review_independence_canonical_block() -> str:
+    """Return the full normative review-independence block (startup index authority)."""
+    return SESSION_CONTEXT_REVIEW_INDEPENDENCE_CANONICAL
+
+
+def render_session_context_review_independence_disclosure(role_profile: str | None = None) -> str:
+    """Render compact review-independence bullets for generated startup disclosure."""
+    lines = [
+        "- Formal GO / NO-GO / VERIFIED must come from a different model session context than the artifact author/implementer.",
+        "- Blocker: reviewer session context equals artifact `author_session_context_id`; fail closed when metadata is missing or unreadable.",
+        "- Not the boundary: harness ID, vendor, or durable registry role (routing labels only).",
+    ]
+    if role_profile in (None, "prime-builder", "acting-prime-builder"):
+        lines.append(
+            "- `::init gtkb pb` grants Prime Builder authority regardless of durable registry role; it does not permit this session to GO/VERIFY its own authored or implemented work."
+        )
+    else:
+        lines.append(f"- Full normative block: `{SESSION_CONTEXT_REVIEW_INDEPENDENCE_INDEX_REF}`.")
+    return "\n".join(lines)
+
+
 def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path) -> str:
     """Render the startup report markdown.
 
@@ -5102,6 +5143,10 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
             "",
             _markdown_list(model["governance_stance"]),
+            "",
+            "### Session-Context Review Independence",
+            "",
+            render_session_context_review_independence_disclosure(model.get("role_profile")),
             "",
             "### Live Project Dashboard",
             "",
@@ -6949,6 +6994,10 @@ def _minimized_startup_disclosure(result: dict[str, Any]) -> str:
             f"- Role mapping source: {role.get('role_mapping_source', 'unidentified')}",
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             "",
+            "### Session-Context Review Independence",
+            "",
+            render_session_context_review_independence_disclosure(model.get("role_profile")),
+            "",
             "### Compact Project State",
             "",
             _render_current_project_state(model),
@@ -6997,6 +7046,8 @@ def _startup_relay_cache_lines(project_root: Path, harness_name: str) -> list[st
         out_dir = project_root / ".codex" / "gtkb-hooks"
     elif harness_name == "claude":
         out_dir = project_root / ".claude" / "hooks"
+    elif harness_name == "cursor":
+        out_dir = project_root / ".cursor" / "gtkb-hooks"
     else:
         out_dir = project_root / "harness-state" / harness_name
     return [
@@ -7155,7 +7206,7 @@ def _default_lifecycle_guard_path(project_root: Path, *, harness_name: str | Non
     if override:
         return _normalized_path(Path(override))
     resolved_harness_name = _resolved_harness_name(harness_name)
-    if resolved_harness_name:
+    if resolved_harness_name and resolved_harness_name in HARNESS_LIFECYCLE_GUARDS:
         return _normalized_path(HARNESS_LIFECYCLE_GUARDS[resolved_harness_name])
     return project_root / LIFECYCLE_GUARD_RELATIVE_PATH
 

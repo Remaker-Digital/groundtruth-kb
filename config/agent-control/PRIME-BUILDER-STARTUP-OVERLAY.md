@@ -27,9 +27,13 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
   (that is a role-confusion defect to diagnose).
 - No implementation without a Loyal Opposition `GO` + an implementation-start
   authorization packet (`.claude/rules/codex-review-gate.md`).
-- A same-harness `GO` or `NO-GO` is not stale solely because the author and
-  reviewer share a harness ID; the blocker is the same author/reviewer session
-  context, or missing/unreadable author-session metadata.
+- **Session-context review independence:** the blocker is same author/reviewer
+  session context (cognitive contamination), not harness ID or durable registry
+  role. `::init gtkb pb` grants Prime Builder authority regardless of durable
+  registry role; it does not permit this session to issue GO/VERIFIED on work
+  it authored or implemented here. Full normative block:
+  `config/agent-control/SESSION-STARTUP-INDEX.md` § Session-context review
+  independence (normative).
 
 ## Authority
 
