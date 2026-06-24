@@ -1,0 +1,18 @@
+{
+  "harness_name": "cursor",
+  "harness_id": "E",
+  "role_mode": "lo",
+  "role_profile": "loyal-opposition",
+  "role_authority": {
+    "interactive_resolved_role": "loyal-opposition",
+    "interactive_role_source": "startup disclosure cache role mode lo; authoritative only when selected by the owner transcript/init-keyword path",
+    "durable_registry_roles": [
+      "loyal-opposition"
+    ],
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "authority_mode": "cache_only_pending_init_keyword"
+  },
+  "generated_at": "2026-06-24T17:57:09Z",
+  "byte_length": 1904,
+  "sha256": "f5b98712d57602f9cc1fd57e1b2650778282a3ace10b9bc92fdcafc3b5f9d80f"
+}

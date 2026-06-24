@@ -1,0 +1,18 @@
+{
+  "harness_name": "cursor",
+  "harness_id": "E",
+  "role_mode": "pb",
+  "role_profile": "prime-builder",
+  "role_authority": {
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": "startup disclosure cache role mode pb; authoritative only when selected by the owner transcript/init-keyword path",
+    "durable_registry_roles": [
+      "loyal-opposition"
+    ],
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "authority_mode": "cache_only_pending_init_keyword"
+  },
+  "generated_at": "2026-06-24T17:57:19Z",
+  "byte_length": 7393,
+  "sha256": "701bdf94660c2d98d169de213848503b6514a43d5d9083a6ec8f73fcddee26e2"
+}
