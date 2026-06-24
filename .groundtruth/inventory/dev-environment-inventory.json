@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-24T14:08:07Z",
+  "generated_at": "2026-06-24T22:14:58Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -81,7 +81,7 @@
       "B": {
         "harness_type": "claude",
         "role": [
-          "loyal-opposition"
+          "prime-builder"
         ],
         "status": "verified"
       },
@@ -351,7 +351,7 @@
   "role_by_harness_compatibility": [
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "prime-builder",
@@ -505,7 +505,7 @@
     },
     {
       "assignment": {
-        "current_role": "['loyal-opposition']",
+        "current_role": "['prime-builder']",
         "evidence": "harness-state/harness-registry.json",
         "harness_id": "B",
         "matrix_role": "loyal-opposition",
@@ -721,7 +721,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.1.0"
+      "version": "9.0.3"
     },
     "python": {
       "classification": "verified",
@@ -735,7 +735,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.18"
+      "version": "0.15.12"
     }
   },
   "verification": {
