@@ -1,7 +1,7 @@
 ---
 name: gtkb-benchmarks
-description: "Run GT-KB read-only measurement benchmarks. Outputs JSON plus markdown summary."
-argument-hint: "[run --all | run --benchmark BENCHMARK_ID | report --run-id RUN_ID | compare --baseline ID --candidate ID]"
+description: "Run GT-KB read-only measurement benchmarks and advisory effectiveness summaries. Outputs JSON plus markdown summary."
+argument-hint: "[run --all | run --benchmark BENCHMARK_ID | report --run-id RUN_ID | compare --baseline ID --candidate ID | observatory --run-id RUN_ID]"
 allowed-tools: Bash, Read
 license: "Proprietary - Remaker Digital"
 compatibility:
@@ -53,12 +53,27 @@ Diff two runs by idempotency_key and benchmark value.
 
     python -m scripts.benchmarks.cli compare --baseline RUN_A --candidate RUN_B
 
+### observatory
+
+Write an advisory effectiveness summary for an existing benchmark run.
+
+    python -m scripts.benchmarks.cli observatory --run-id 20260514-040000
+
 ## Output Contract
 
-Each run writes two files under the runs directory:
+Each benchmark run writes two files under the runs directory:
 
 - run.json -- full structured payload (run_id, idempotency_key, results).
 - summary.md -- human-readable markdown summary table.
+
+The observatory command reads run.json and writes two additional advisory files
+beside it:
+
+- effectiveness.json -- deterministic metric registry plus observed values.
+- effectiveness.md -- owner-facing summary with interpretation guardrails.
+
+Effectiveness outputs are experimental/advisory only. They do not create
+release gates, dashboard SLOs, or MemBase authority.
 
 The idempotency_key is a SHA-256 hash of the window bounds, benchmark IDs,
 and source commit. Identical inputs over identical commits produce identical

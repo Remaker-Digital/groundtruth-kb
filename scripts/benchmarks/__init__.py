@@ -21,11 +21,24 @@ from scripts.benchmarks.common import (
     new_run_id,
     write_run_outputs,
 )
+from scripts.benchmarks.effectiveness_observatory import (
+    build_effectiveness_payload,
+    write_effectiveness_outputs,
+)
+from scripts.benchmarks.effectiveness_observatory import (
+    render_markdown as render_effectiveness_markdown,
+)
+from scripts.benchmarks.metric_registry import metric_definitions, registry_payload
 
 __all__ = [
     "BenchmarkResult",
+    "build_effectiveness_payload",
     "benchmark_output_dir",
     "compute_idempotency_key",
+    "metric_definitions",
     "new_run_id",
+    "registry_payload",
+    "render_effectiveness_markdown",
+    "write_effectiveness_outputs",
     "write_run_outputs",
 ]
