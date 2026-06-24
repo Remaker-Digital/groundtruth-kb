@@ -50,6 +50,7 @@ BENCHMARK_MODULES = [
     "advisory_latency",
     "backlog_triage",
     "deliberation_recall",
+    "harness_role_protocol_smoke",
     "linkage_heatmap",
     "recall_coverage",
     "tool_identification",
