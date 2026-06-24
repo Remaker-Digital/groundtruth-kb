@@ -33,7 +33,7 @@ def _load_module():
     return module
 
 
-def _make_fixture(tmp_path: Path, files: dict[str, str], packets: dict[str, dict] | None = None) -> Path:
+def _make_fixture(tmp_path: Path, files: dict[str, str | bytes], packets: dict[str, dict] | None = None) -> Path:
     """Build a synthetic project root with files and approval packets.
 
     `files`: mapping of relative path -> file content (bytes via utf-8). Any
@@ -51,7 +51,10 @@ def _make_fixture(tmp_path: Path, files: dict[str, str], packets: dict[str, dict
     for rel, content in files.items():
         target = tmp_path / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        if isinstance(content, bytes):
+            target.write_bytes(content)
+        else:
+            target.write_text(content, encoding="utf-8")
 
     if packets:
         packets_dir = tmp_path / ".groundtruth" / "formal-artifact-approvals"
@@ -125,6 +128,20 @@ def test_c_allow_with_matching_packet(tmp_path):
     assert result["findings"] == []
 
 
+def test_c_allow_with_lf_normalized_packet_for_crlf_staged_blob(tmp_path):
+    """A valid LF-normalized packet authorizes CRLF staged bytes for text artifacts."""
+    module = _load_module()
+    target = ".claude/rules/example.md"
+    packet_content = "approved narrative content\nsecond line\n"
+    staged_content = b"approved narrative content\r\nsecond line\r\n"
+    packet = _make_packet(target, packet_content)
+    root = _make_fixture(tmp_path, {target: staged_content}, packets={"2026-05-08-test.json": packet})
+    result = module.evaluate(root, paths=[target])
+    assert result["status"] == "pass", result
+    assert target in result["cleared"]
+    assert result["findings"] == []
+
+
 # ---------------------------------------------------------------------------
 # T-C-content-mismatch
 # ---------------------------------------------------------------------------
@@ -142,6 +159,28 @@ def test_c_block_when_packet_content_does_not_match_staged(tmp_path):
     # No matching packet found because target_path matches but sha256 doesn't
     assert result["status"] == "fail"
     assert "no matching approval packet" in result["findings"][0]["reason"]
+
+
+def test_c_block_when_crlf_staged_blob_substantively_differs_from_packet(tmp_path):
+    """EOL normalization must not mask actual text differences."""
+    module = _load_module()
+    target = ".claude/rules/example.md"
+    staged_content = b"what was actually staged\r\n"
+    packet = _make_packet(target, "what the packet describes\n")
+    root = _make_fixture(tmp_path, {target: staged_content}, packets={"2026-05-08-test.json": packet})
+    result = module.evaluate(root, paths=[target])
+    assert result["status"] == "fail"
+    assert "no matching approval packet" in result["findings"][0]["reason"]
+
+
+def test_c_block_non_utf8_staged_blob(tmp_path):
+    """Protected narrative artifacts are UTF-8 text; undecodable staged blobs fail."""
+    module = _load_module()
+    target = ".claude/rules/example.md"
+    root = _make_fixture(tmp_path, {target: b"\xff\xfe\x00"})
+    result = module.evaluate(root, paths=[target])
+    assert result["status"] == "fail"
+    assert "not valid UTF-8" in result["findings"][0]["reason"]
 
 
 def test_c_block_when_packet_target_path_mismatches(tmp_path):

@@ -11,7 +11,7 @@ config/governance/narrative-artifact-approval.toml), requires either:
 
   (a) a matching approval packet under .groundtruth/formal-artifact-approvals/
       whose target_path equals the staged path AND whose full_content_sha256
-      matches the staged blob's sha256.
+      matches the staged blob's LF-normalized UTF-8 text sha256.
   (b) [Future, depends on Slice B spike] a same-session AUQ audit entry under
       .gtkb-state/auq-audit/<session-id>.jsonl with decision_class=artifact-correction
       and a matching content hash.
@@ -99,8 +99,12 @@ def _staged_paths(root: Path) -> list[str]:
     return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
 
 
-def _staged_blob_sha256(root: Path, rel_path: str) -> str | None:
-    """Return sha256 of the staged blob for rel_path, or None on error/missing."""
+def _normalize_lf(content: str) -> str:
+    return content.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _staged_blob_text_sha256(root: Path, rel_path: str) -> tuple[str | None, str | None]:
+    """Return sha256 of the staged blob's LF-normalized UTF-8 text."""
     try:
         result = subprocess.run(
             ["git", "show", f":{rel_path}"],
@@ -109,8 +113,12 @@ def _staged_blob_sha256(root: Path, rel_path: str) -> str | None:
             check=True,
         )
     except subprocess.CalledProcessError:
-        return None
-    return hashlib.sha256(result.stdout).hexdigest()
+        return None, "could not read staged blob (path may be unstaged or deleted)"
+    try:
+        normalized = _normalize_lf(result.stdout.decode("utf-8"))
+    except UnicodeDecodeError:
+        return None, "staged blob is not valid UTF-8 text"
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest(), None
 
 
 def _matches_any(patterns: list[str], rel_path: str) -> bool:
@@ -131,7 +139,7 @@ def _is_protected(rel_path: str, config: dict[str, Any]) -> bool:
     return not (exempted and _matches_any(exempted, rel_path))
 
 
-def _validate_packet(packet: dict[str, Any], rel_path: str, staged_sha256: str) -> str | None:
+def _validate_packet(packet: dict[str, Any], rel_path: str, staged_text_sha256: str) -> str | None:
     missing = sorted(REQUIRED_PACKET_FIELDS - set(packet))
     if missing:
         return f"missing required fields: {', '.join(missing)}"
@@ -147,15 +155,11 @@ def _validate_packet(packet: dict[str, Any], rel_path: str, staged_sha256: str) 
     expected = hashlib.sha256(full_content.encode("utf-8")).hexdigest()
     if packet.get("full_content_sha256") != expected:
         return "full_content_sha256 does not match full_content"
-    # Tie packet to staged content. Note: full_content uses UTF-8 string hashing
-    # and staged blob uses raw bytes hashing; they only match when content is
-    # plain UTF-8 with no BOM/CRLF differences. Prefer .gitattributes
-    # text=auto eol=lf to keep blob bytes identical to authored bytes.
-    if packet.get("full_content_sha256") != staged_sha256:
+    if packet.get("full_content_sha256") != staged_text_sha256:
         return (
-            "full_content_sha256 does not match the staged blob's sha256 "
+            "full_content_sha256 does not match the staged blob's normalized UTF-8 text sha256 "
             "(packet must be regenerated when staged content changes; "
-            "ensure .gitattributes preserves LF for narrative artifacts)"
+            "CRLF and bare CR are normalized to LF for narrative artifacts)"
         )
     for flag in ("presented_to_user", "transcript_captured"):
         if packet.get(flag) is not True:
@@ -166,7 +170,7 @@ def _validate_packet(packet: dict[str, Any], rel_path: str, staged_sha256: str) 
 
 
 def _find_matching_packet(
-    packets_dir: Path, rel_path: str, staged_sha256: str
+    packets_dir: Path, rel_path: str, staged_text_sha256: str
 ) -> tuple[Path, dict[str, Any]] | tuple[None, None]:
     if not packets_dir.exists():
         return None, None
@@ -181,7 +185,7 @@ def _find_matching_packet(
             continue
         if Path(data.get("target_path", "")).as_posix() != rel_path:
             continue
-        if data.get("full_content_sha256") != staged_sha256:
+        if data.get("full_content_sha256") != staged_text_sha256:
             continue
         return packet_file, data
     return None, None
@@ -204,12 +208,12 @@ def evaluate(
         if not _is_protected(rel_path, cfg):
             skipped_unprotected.append(rel_path)
             continue
-        sha256 = _staged_blob_sha256(root, rel_path)
+        sha256, staged_error = _staged_blob_text_sha256(root, rel_path)
         if sha256 is None:
             findings.append(
                 {
                     "path": rel_path,
-                    "reason": "could not read staged blob (path may be unstaged or deleted)",
+                    "reason": staged_error or "could not read staged blob (path may be unstaged or deleted)",
                 }
             )
             continue
@@ -223,7 +227,7 @@ def evaluate(
                     "reason": (
                         f"no matching approval packet found under {PACKETS_REL.as_posix()} "
                         f"with artifact_type={NARRATIVE_ARTIFACT_TYPE!r}, target_path={rel_path!r}, "
-                        f"and full_content_sha256={sha256}"
+                        f"and LF-normalized full_content_sha256={sha256}"
                     ),
                 }
             )
@@ -264,7 +268,7 @@ def _format_human(result: dict[str, Any]) -> str:
     lines.append(
         "Generate a packet under .groundtruth/formal-artifact-approvals/ with "
         f"artifact_type={NARRATIVE_ARTIFACT_TYPE!r}, target_path matching the staged path, "
-        "and full_content_sha256 matching the staged blob's sha256."
+        "and full_content_sha256 matching the staged blob's LF-normalized UTF-8 text sha256."
     )
     lines.append("(Hard-block per GTKB-NARRATIVE-ARTIFACT-APPROVAL-EXTENSION-001 Slice C universal floor.)")
     return "\n".join(lines)
