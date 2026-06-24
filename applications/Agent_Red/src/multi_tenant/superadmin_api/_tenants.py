@@ -6,6 +6,7 @@ Endpoints are registered on the shared router from _monolith.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,7 +58,6 @@ class TenantSummaryItem(CamelCaseModel):
 class TenantDirectoryResponse(CamelCaseModel):
     """Paginated tenant directory response."""
 
-
     tenants: list[TenantSummaryItem]
     total: int
     skip: int
@@ -66,7 +66,6 @@ class TenantDirectoryResponse(CamelCaseModel):
 
 class TenantDistributionSummary(CamelCaseModel):
     """Aggregate tenant distribution statistics."""
-
 
     total_tenants: int = 0
     by_status: dict[str, int] = Field(default_factory=dict)
@@ -90,7 +89,6 @@ class TenantDistributionSummary(CamelCaseModel):
     status_code=200,
 )
 async def list_all_tenants(
-
     status: str | None = Query(None, description="Filter by tenant status"),
     tier: str | None = Query(None, description="Filter by subscription tier"),
     billing_channel: str | None = Query(None, description="Filter by billing channel"),
@@ -131,7 +129,7 @@ async def list_all_tenants(
     # SPEC-1843 v6 / WI-1641: customer_email and shopify_shop_domain restored
     # (tenancy management data per SPEC-1637). ZK masking applied (S262).
     data_query = (
-        f"SELECT c.tenant_id, c.status, c.tier, c.billing_channel, "
+        f"SELECT c.tenant_id, c.display_name, c.status, c.tier, c.billing_channel, "
         f"c.customer_email, c.shopify_shop_domain, "
         f"c.created_at, c.updated_at, c.deactivated_at, "
         f"c.consent_status, c.expires_at "
@@ -165,9 +163,7 @@ async def list_all_tenants(
     description="Aggregate counts by status, tier, and billing channel.",
     status_code=200,
 )
-async def tenant_summary(
-
-) -> TenantDistributionSummary:
+async def tenant_summary() -> TenantDistributionSummary:
     """Get aggregate tenant distribution statistics."""
     if not _state._tenant_repo:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -177,9 +173,7 @@ async def tenant_summary(
     by_channel: dict[str, int] = {}
     total = 0
 
-    query = (
-        "SELECT c.status, c.tier, c.billing_channel FROM c"
-    )
+    query = "SELECT c.status, c.tier, c.billing_channel FROM c"
     async for item in _state._tenant_repo._container.query_items(
         query=query,
         max_item_count=500,
@@ -203,6 +197,115 @@ async def tenant_summary(
 # ---------------------------------------------------------------------------
 # Tier Override — Private support/testing control
 # ---------------------------------------------------------------------------
+
+
+class DisplayNameUpdateRequest(CamelCaseModel):
+    """Request body for setting a tenant display name."""
+
+    display_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Human-readable tenant display name.",
+    )
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str) -> str:
+        display_name = v.strip()
+        if not display_name:
+            raise ValueError("display_name must not be blank")
+        return display_name
+
+
+class DisplayNameUpdateResponse(CamelCaseModel):
+    """Response after setting a tenant display name."""
+
+    tenant_id: str
+    previous_display_name: str | None = None
+    display_name: str
+    updated_at: str
+
+
+@router.patch(
+    "/tenants/{tenant_id}/display-name",
+    response_model=DisplayNameUpdateResponse,
+    summary="Set tenant display name",
+    description="Sets a non-empty, unique human-readable display name for a tenant.",
+    responses={
+        404: {"description": "Tenant not found"},
+        409: {"description": "Display name already in use"},
+        422: {"description": "Validation error"},
+        503: {"description": "Service not initialized"},
+    },
+    status_code=200,
+)
+async def update_tenant_display_name(
+    tenant_id: str,
+    body: DisplayNameUpdateRequest,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> DisplayNameUpdateResponse:
+    """Set a tenant's human-readable display name."""
+    if not _state._tenant_repo:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    try:
+        tenant_doc = await _state._tenant_repo.read(tenant_id, tenant_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    if tenant_doc is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+
+    duplicate_query = "SELECT c.tenant_id FROM c WHERE c.display_name = @display_name AND c.tenant_id != @tenant_id"
+    duplicate_params = [
+        {"name": "@display_name", "value": body.display_name},
+        {"name": "@tenant_id", "value": tenant_id},
+    ]
+    async for item in _state._tenant_repo._container.query_items(
+        query=duplicate_query,
+        parameters=duplicate_params,
+        max_item_count=1,
+    ):
+        duplicate_tenant = item.get("tenant_id") or item.get("id") or "another tenant"
+        raise HTTPException(
+            status_code=409,
+            detail=f"Display name already in use by tenant '{duplicate_tenant}'",
+        )
+
+    previous_display_name = tenant_doc.get("display_name")
+    now = datetime.now(UTC).isoformat()
+    operations = [
+        {"op": "set", "path": "/display_name", "value": body.display_name},
+        {"op": "set", "path": "/updated_at", "value": now},
+    ]
+    await _state._tenant_repo.patch(tenant_id, tenant_id, operations)
+
+    try:
+        if _state._audit_repo:
+            await _state._audit_repo.log_event(
+                event_type=AuditEventType.TENANT_UPDATED,
+                tenant_id=tenant_id,
+                actor=ctx.team_member_email or "spa-console",
+                actor_type="admin",
+                payload={"action": "tenant_display_name_updated"},
+            )
+    except Exception:
+        logger.warning("Audit log failed for display-name update: tenant=%s", tenant_id[:8])
+
+    logger.info(
+        "Tenant display name updated: tenant=%s prev=%s new=%s (by %s)",
+        tenant_id[:12],
+        previous_display_name or "none",
+        body.display_name,
+        ctx.team_member_email or "unknown",
+    )
+
+    return DisplayNameUpdateResponse(
+        tenant_id=tenant_id,
+        previous_display_name=previous_display_name,
+        display_name=body.display_name,
+        updated_at=now,
+    )
 
 
 class TierOverrideResponse(CamelCaseModel):
@@ -234,7 +337,6 @@ VALID_TIERS = {t.value for t in TenantTier}
 async def override_tenant_tier(
     tenant_id: str,
     tier: str = Body(..., embed=True, description="New tier value"),
-
 ) -> TierOverrideResponse:
     """Set a tenant's tier directly, bypassing Stripe."""
     if not _state._tenant_repo:
@@ -288,15 +390,20 @@ class CreateTenantRequest(CamelCaseModel):
     """Request body for SPA tenant creation."""
 
     merchant_name: str = Field(
-        ..., min_length=1, max_length=200,
+        ...,
+        min_length=1,
+        max_length=200,
         description="Merchant display name (becomes brand_name in preferences)",
     )
     merchant_url: str | None = Field(
-        default=None, max_length=500,
+        default=None,
+        max_length=500,
         description="Merchant website or Shopify domain (optional)",
     )
     superadmin_email: str = Field(
-        ..., min_length=5, max_length=320,
+        ...,
+        min_length=5,
+        max_length=320,
         description="Tenant owner email — receives welcome email + SUPERADMIN key",
     )
 
@@ -304,9 +411,11 @@ class CreateTenantRequest(CamelCaseModel):
     @classmethod
     def validate_email_format(cls, v: str) -> str:
         import re
+
         if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", v):
             raise ValueError("Invalid email address format")
         return v
+
     tier: str = Field(
         ...,
         description="Subscription tier: trial, starter, professional, or enterprise",
@@ -539,9 +648,7 @@ async def resend_welcome_email(
     try:
         prefs = await _state._prefs_repo.get_active(tenant_id)
         if prefs:
-            email_addr = prefs.get("notification_email") or prefs.get(
-                "customer_email"
-            )
+            email_addr = prefs.get("notification_email") or prefs.get("customer_email")
     except Exception:
         pass
 
@@ -580,10 +687,7 @@ async def resend_welcome_email(
         if fqdn:
             scheme = "https" if not fqdn.startswith("http") else ""
             prefix = f"{scheme}://{fqdn}" if scheme else fqdn
-            magic_link_url = (
-                f"{prefix}/admin/standalone/verify-magic-link"
-                f"?token={token_id}&tenant={tenant_id}"
-            )
+            magic_link_url = f"{prefix}/admin/standalone/verify-magic-link?token={token_id}&tenant={tenant_id}"
     except Exception:
         logger.warning("Could not generate magic link for welcome email: tenant=%s", tenant_id[:8])
 
@@ -709,10 +813,7 @@ async def set_tenant_expiry(
         )
 
     # If tenant was trial_expired and we're setting a future expiry, reactivate
-    if (
-        body.expires_at
-        and tenant_doc.get("status") == "trial_expired"
-    ):
+    if body.expires_at and tenant_doc.get("status") == "trial_expired":
         try:
             expires_dt = datetime.fromisoformat(body.expires_at)
             if expires_dt.tzinfo is None:
@@ -811,6 +912,7 @@ async def test_provision_tenant(
     keys. It is blocked in production to maintain SPEC-1673 compliance.
     """
     import os as _os
+
     environment = _os.environ.get("ENVIRONMENT", "development").lower()
     if environment == "production":
         raise HTTPException(
@@ -915,18 +1017,14 @@ class RateLimitUpdateRequest(CamelCaseModel):
 
     rate_limit_rpm: int | None = Field(
         default=None,
-        description="RPM limit for this tenant, or null to use tier default. "
-        "Must be >= 10 (minimum floor) when set.",
+        description="RPM limit for this tenant, or null to use tier default. Must be >= 10 (minimum floor) when set.",
     )
 
     @field_validator("rate_limit_rpm")
     @classmethod
     def validate_rpm_floor(cls, v: int | None) -> int | None:
         if v is not None and v < 10:
-            raise ValueError(
-                "rate_limit_rpm must be >= 10 (minimum floor) or null "
-                "to use tier default"
-            )
+            raise ValueError("rate_limit_rpm must be >= 10 (minimum floor) or null to use tier default")
         return v
 
 
@@ -973,9 +1071,7 @@ async def update_tenant_rate_limit(
     try:
         doc = await _state._tenant_repo.read(tenant_id, tenant_id)
     except Exception:
-        raise HTTPException(
-            status_code=404, detail=f"Tenant '{tenant_id}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
 
     now = datetime.now(UTC).isoformat()
 
@@ -995,6 +1091,7 @@ async def update_tenant_rate_limit(
     else:
         tier = doc.get("tier", "starter")
         from src.multi_tenant.entitlement_service import get_entitlement_service
+
         tier_config = await get_entitlement_service().get_tier_config(tier)
         tier_rpm = tier_config.get("rate_limit_rpm")
         effective = max(
@@ -1021,8 +1118,7 @@ async def update_tenant_rate_limit(
     "/tenants/{tenant_id}/rate-limit",
     response_model=RateLimitResponse,
     summary="Get per-tenant RPM rate limit (SPEC-1804)",
-    description="Read the current rate limit for a tenant, including the "
-    "effective RPM after resolution.",
+    description="Read the current rate limit for a tenant, including the effective RPM after resolution.",
     responses={
         404: {"description": "Tenant not found"},
         503: {"description": "Service not initialized"},
@@ -1044,9 +1140,7 @@ async def get_tenant_rate_limit(
     try:
         doc = await _state._tenant_repo.read(tenant_id, tenant_id)
     except Exception:
-        raise HTTPException(
-            status_code=404, detail=f"Tenant '{tenant_id}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
 
     per_tenant_rpm = doc.get("rate_limit_rpm")
 
@@ -1055,6 +1149,7 @@ async def get_tenant_rate_limit(
     else:
         tier = doc.get("tier", "starter")
         from src.multi_tenant.entitlement_service import get_entitlement_service
+
         tier_config = await get_entitlement_service().get_tier_config(tier)
         tier_rpm = tier_config.get("rate_limit_rpm")
         effective = max(
