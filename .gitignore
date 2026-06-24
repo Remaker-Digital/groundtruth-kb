@@ -82,6 +82,11 @@ GT-KB.pytest-*/
 GT-KB.pytest_tmp*/
 .tmp-codex-iso018/pytest-*/
 .test-tmp/
+# Codex per-session pytest/runtime temp roots. Some prior runs leave
+# ACL-locked directories behind; keep Git from descending into them.
+/.codex-pytest-tmp*/
+/.codex-test-tmp*/
+/.codex_pytest_tmp/
 # Malformed pytest cache dir name observed 2026-06-04 (concatenation glitch
 # producing names like GT-KB.gtkb-statepytest-cache without a separator).
 GT-KB.gtkb-state*/
