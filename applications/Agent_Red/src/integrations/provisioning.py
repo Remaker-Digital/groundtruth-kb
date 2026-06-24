@@ -94,6 +94,7 @@ class TenantRecord(BaseModel):
 
     # Contact
     customer_email: str | None = Field(default=None, description="Primary contact email")
+    customer_phone: str | None = Field(default=None, description="Primary contact phone")
 
     # Timestamps (ISO 8601 strings)
     created_at: str = Field(description="When tenant was provisioned")
@@ -109,6 +110,7 @@ class TenantRecord(BaseModel):
 
 # Grace period duration (30 days, per SLA)
 _GRACE_PERIOD = timedelta(days=30)
+_SUPERADMIN_CONTACT_REQUIRED_MESSAGE = "Tenant creation requires a superadministrator email or phone number"
 
 # ---------------------------------------------------------------------------
 # Router
@@ -235,11 +237,32 @@ def _doc_to_record(doc: dict[str, Any]) -> TenantRecord:
         shopify_shop_domain=doc.get("shopify_shop_domain"),
         shopify_subscription_id=doc.get("shopify_subscription_id"),
         customer_email=doc.get("customer_email"),
+        customer_phone=doc.get("customer_phone"),
         created_at=doc.get("created_at", ""),
         updated_at=doc.get("updated_at", ""),
         deactivated_at=doc.get("deactivated_at"),
         grace_period_ends_at=doc.get("grace_period_ends_at"),
     )
+
+
+def _normalize_superadmin_contact(value: str | None) -> str | None:
+    """Return a stripped contact value, treating blanks as absent."""
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _require_superadmin_contact(
+    customer_email: str | None,
+    customer_phone: str | None = None,
+) -> tuple[str | None, str | None]:
+    """Normalize and enforce the SPEC-1882 provisioning contact gate."""
+    normalized_email = _normalize_superadmin_contact(customer_email)
+    normalized_phone = _normalize_superadmin_contact(customer_phone)
+    if normalized_email is None and normalized_phone is None:
+        raise ValueError(_SUPERADMIN_CONTACT_REQUIRED_MESSAGE)
+    return normalized_email, normalized_phone
 
 
 async def _generate_display_name(contact: str) -> str:
@@ -402,6 +425,7 @@ async def provision_tenant(
         shopify_shop_domain: Shopify store domain (for Shopify channel).
         shopify_subscription_id: Shopify subscription GID.
         customer_email: Customer's email address.
+        customer_phone: Customer's phone number.
 
     Returns:
         The created or updated TenantRecord.
@@ -412,12 +436,7 @@ async def provision_tenant(
     if _tenant_repo is None:
         raise RuntimeError("Tenant repository not configured")
 
-    # SPEC-1882: Hard gate — superadmin contact required for credential delivery
-    if not customer_email and not customer_phone:
-        raise ValueError(
-            "Tenant creation requires a superadministrator email or phone number. "
-            "Login credentials cannot be delivered without a valid contact address."
-        )
+    customer_email, customer_phone = _require_superadmin_contact(customer_email, customer_phone)
 
     now_iso = datetime.now(UTC).isoformat()
 
@@ -463,6 +482,8 @@ async def provision_tenant(
         encrypted_updates: dict[str, Any] = {}
         if customer_email:
             encrypted_updates["customer_email"] = customer_email
+        if customer_phone:
+            operations.append({"op": "set", "path": "/customer_phone", "value": customer_phone})
 
         if encrypted_updates:
             # Patch non-encrypted fields first, then read-modify-write encrypted ones
@@ -561,6 +582,7 @@ async def provision_tenant(
         shopify_shop_domain=shopify_shop_domain,
         shopify_subscription_id=shopify_subscription_id,
         customer_email=customer_email,
+        customer_phone=customer_phone,
         created_at=now_iso,
         updated_at=now_iso,
     )
@@ -1030,6 +1052,7 @@ async def spa_provision_tenant(
 
 async def provision_trial_tenant(
     customer_email: str | None = None,
+    customer_phone: str | None = None,
     trial_duration_days: int = 14,
     conversation_limit: int = 50,
 ) -> TenantRecord:
@@ -1045,6 +1068,7 @@ async def provision_trial_tenant(
 
     Args:
         customer_email: Contact email for the trial user.
+        customer_phone: Contact phone for the trial user.
         trial_duration_days: Number of days the trial lasts (default 14).
         conversation_limit: Max conversations during trial (default 50).
 
@@ -1056,6 +1080,8 @@ async def provision_trial_tenant(
     """
     if _tenant_repo is None:
         raise RuntimeError("Tenant repository not configured")
+
+    customer_email, customer_phone = _require_superadmin_contact(customer_email, customer_phone)
 
     now = datetime.now(UTC)
     now_iso = now.isoformat()
@@ -1073,6 +1099,7 @@ async def provision_trial_tenant(
         interval=None,
         addons=[],
         customer_email=customer_email,
+        customer_phone=customer_phone,
         trial_expires_at=trial_end_iso,
         trial_conversation_limit=conversation_limit,
         created_at=now_iso,
@@ -1111,6 +1138,7 @@ async def provision_trial_tenant(
         interval=None,
         addons=[],
         customer_email=customer_email,
+        customer_phone=customer_phone,
         created_at=now_iso,
         updated_at=now_iso,
         widget_key=widget_key,

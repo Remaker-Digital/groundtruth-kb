@@ -47,6 +47,7 @@ from src.multi_tenant.cosmos_schema import (
     TenantTier,
 )
 from src.multi_tenant.entitlement_service import get_entitlement_service
+from src.integrations.provisioning import _require_superadmin_contact
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,7 @@ class TrialManagementService:
     async def provision_trial(
         self,
         customer_email: str | None = None,
+        customer_phone: str | None = None,
         shopify_shop_domain: str | None = None,
         trial_duration_days: int = DEFAULT_TRIAL_DURATION_DAYS,
         conversation_limit: int = DEFAULT_TRIAL_CONVERSATION_LIMIT,
@@ -201,6 +203,7 @@ class TrialManagementService:
 
         Args:
             customer_email: Contact email for the trial user.
+            customer_phone: Contact phone for the trial user.
             shopify_shop_domain: Shopify store domain (if from app install).
             trial_duration_days: Trial period length in days.
             conversation_limit: Hard cap on conversations during trial.
@@ -209,6 +212,8 @@ class TrialManagementService:
         Returns:
             The created tenant document dict.
         """
+        customer_email, customer_phone = _require_superadmin_contact(customer_email, customer_phone)
+
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=trial_duration_days)
         tenant_id = str(uuid.uuid4())
@@ -223,6 +228,7 @@ class TrialManagementService:
             "interval": None,
             "addons": [],
             "customer_email": customer_email,
+            "customer_phone": customer_phone,
             "shopify_shop_domain": shopify_shop_domain,
             "consent_status": ConsentStatus.NOT_ASKED.value,
             "trial_expires_at": expires_at.isoformat(),
@@ -1091,6 +1097,7 @@ class TrialProvisionRequest(PydanticBaseModel):
     """Request to provision a new trial tenant."""
 
     customer_email: str | None = None
+    customer_phone: str | None = None
     shopify_shop_domain: str | None = None
     trial_duration_days: int = DEFAULT_TRIAL_DURATION_DAYS
     conversation_limit: int = DEFAULT_TRIAL_CONVERSATION_LIMIT
@@ -1141,6 +1148,7 @@ async def provision_trial_endpoint(
     """Provision a new trial tenant."""
     tenant_doc = await service.provision_trial(
         customer_email=request.customer_email,
+        customer_phone=request.customer_phone,
         shopify_shop_domain=request.shopify_shop_domain,
         trial_duration_days=request.trial_duration_days,
         conversation_limit=request.conversation_limit,

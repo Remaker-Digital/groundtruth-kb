@@ -25,15 +25,21 @@ class TenantRepository(TenantScopedRepository):
 
     # SPEC-1843 / WI-1627: Fields encrypted at rest with tenant DEK
     # Per architecture plan section 4.1.3: contact PII + merchant identifiers
-    _encryption_fields = frozenset({
-        "customer_email", "shopify_shop_domain", "brand_name",
-    })
+    _encryption_fields = frozenset(
+        {
+            "customer_email",
+            "shopify_shop_domain",
+            "brand_name",
+        }
+    )
 
     def __init__(self) -> None:
         super().__init__(COLLECTION_TENANTS)
 
     async def get_by_stripe_customer_id(
-        self, tenant_id: str, stripe_customer_id: str,
+        self,
+        tenant_id: str,
+        stripe_customer_id: str,
     ) -> dict[str, Any] | None:
         """Find a tenant by Stripe customer ID within a partition.
 
@@ -43,16 +49,15 @@ class TenantRepository(TenantScopedRepository):
         """
         results = await self.query(
             tenant_id=tenant_id,
-            query_text=(
-                "SELECT * FROM c WHERE c.stripe_customer_id = @stripe_id"
-            ),
+            query_text=("SELECT * FROM c WHERE c.stripe_customer_id = @stripe_id"),
             parameters=[{"name": "@stripe_id", "value": stripe_customer_id}],
             max_items=1,
         )
         return results[0] if results else None
 
     async def find_by_stripe_customer_id(
-        self, stripe_customer_id: str,
+        self,
+        stripe_customer_id: str,
     ) -> dict[str, Any] | None:
         """Find a tenant by Stripe customer ID (cross-partition).
 
@@ -78,7 +83,8 @@ class TenantRepository(TenantScopedRepository):
         return items[0] if items else None
 
     async def find_by_shopify_domain(
-        self, shopify_shop_domain: str,
+        self,
+        shopify_shop_domain: str,
     ) -> dict[str, Any] | None:
         """Find a tenant by Shopify shop domain (cross-partition).
 
@@ -104,7 +110,9 @@ class TenantRepository(TenantScopedRepository):
         return items[0] if items else None
 
     async def verify_key_hash(
-        self, tenant_id: str, api_key_hash: str,
+        self,
+        tenant_id: str,
+        api_key_hash: str,
     ) -> dict[str, Any] | None:
         """Verify an API key hash against a known tenant (partition-scoped).
 
@@ -129,7 +137,8 @@ class TenantRepository(TenantScopedRepository):
         return None
 
     async def find_by_customer_email(
-        self, email: str,
+        self,
+        email: str,
     ) -> dict[str, Any] | None:
         """Find a tenant by customer email (cross-partition).
 
@@ -156,7 +165,8 @@ class TenantRepository(TenantScopedRepository):
         return items[0] if items else None
 
     async def find_by_widget_key_hash(
-        self, widget_key_hash: str,
+        self,
+        widget_key_hash: str,
     ) -> dict[str, Any] | None:
         """Find a tenant by widget key hash (cross-partition).
 
@@ -182,7 +192,9 @@ class TenantRepository(TenantScopedRepository):
         return items[0] if items else None
 
     async def list_by_status(
-        self, tenant_id: str, status: TenantStatus,
+        self,
+        tenant_id: str,
+        status: TenantStatus,
     ) -> list[dict[str, Any]]:
         """List tenants with a specific status (within partition)."""
         return await self.query(
@@ -206,6 +218,25 @@ class TenantRepository(TenantScopedRepository):
             if tid and tid not in ids:
                 ids.append(tid)
         return ids
+
+    async def list_active_contactless_tenants(self) -> list[dict[str, Any]]:
+        """List active tenants missing both superadmin contact fields.
+
+        Used by the SPEC-1882 recovery scanner to deactivate legacy active
+        tenants that cannot receive superadministrator credentials.
+        Performs a cross-partition query — call infrequently.
+        """
+        results: list[dict[str, Any]] = []
+        async for item in self._container.query_items(
+            query=(
+                "SELECT * FROM c WHERE c.status = 'active' "
+                "AND (NOT IS_DEFINED(c.customer_email) OR IS_NULL(c.customer_email) OR c.customer_email = '') "
+                "AND (NOT IS_DEFINED(c.customer_phone) OR IS_NULL(c.customer_phone) OR c.customer_phone = '')"
+            ),
+            max_item_count=100,
+        ):
+            results.append(item)
+        return results
 
     async def list_expired_trials(self) -> list[dict[str, Any]]:
         """List active trial tenants whose trial period has expired (cross-partition).
@@ -332,7 +363,9 @@ class TenantRepository(TenantScopedRepository):
         return results
 
     async def update_status(
-        self, tenant_id: str, status: TenantStatus,
+        self,
+        tenant_id: str,
+        status: TenantStatus,
     ) -> dict[str, Any]:
         """Update a tenant's lifecycle status."""
         now = datetime.now(UTC).isoformat()
@@ -369,7 +402,8 @@ class TenantRepository(TenantScopedRepository):
         return await self.patch(tenant_id, tenant_id, operations)
 
     async def get_recovery_address(
-        self, tenant_id: str,
+        self,
+        tenant_id: str,
     ) -> dict[str, Any] | None:
         """Read the tenant's recovery address fields (SPEC-1677).
 

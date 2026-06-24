@@ -9,6 +9,8 @@
   a tenant exceeds 1,000 non-archived conversations (WI-A7).
 - Trial expiry scanner — transitions expired trial tenants from ACTIVE to
   TRIAL_EXPIRED status (WI-D1).
+- Contactless tenant scanner — deactivates legacy active tenants without a
+  superadministrator email or phone contact (SPEC-1882).
 - Trial expiry warning emails — sends warning emails at 7, 3, and 1 day(s)
   before trial end (WI-E3).
 
@@ -36,6 +38,7 @@ _alert_eval_task: asyncio.Task[None] | None = None
 _ingestion_processor_task: asyncio.Task[None] | None = None
 _archival_sweep_task: asyncio.Task[None] | None = None
 _trial_scanner_task: asyncio.Task[None] | None = None
+_contactless_tenant_scanner_task: asyncio.Task[None] | None = None
 
 
 async def _idle_scanner_loop() -> None:
@@ -939,8 +942,98 @@ async def _shutdown_expiry_scanner() -> None:
 
 def register_expiry_scanner(app: FastAPI | None = None) -> None:
     """Collect access expiry scanner startup/shutdown handlers (SPEC-1623)."""
+    register_contactless_tenant_scanner()
     _bg_startup_handlers.append(_startup_expiry_scanner)
     _bg_shutdown_handlers.append(_shutdown_expiry_scanner)
+
+
+# ---------------------------------------------------------------------------
+# Contactless tenant deactivation scanner (SPEC-1882)
+# ---------------------------------------------------------------------------
+
+# Scan interval — every 1 hour (same cadence as access expiry)
+_CONTACTLESS_TENANT_SCAN_INTERVAL = 3600
+# Startup delay — 165 seconds (between trial/access expiry and warning scanners)
+_CONTACTLESS_TENANT_SCAN_STARTUP_DELAY = 165
+
+
+async def _contactless_tenant_scanner_loop() -> None:
+    """Deactivate active tenants that have no superadmin contact."""
+    from src.multi_tenant.repository import TenantRepository
+
+    await asyncio.sleep(_CONTACTLESS_TENANT_SCAN_STARTUP_DELAY)
+
+    while True:
+        try:
+            tenant_repo = TenantRepository()
+            contactless_tenants = await tenant_repo.list_active_contactless_tenants()
+            deactivated_count = 0
+
+            for tenant_doc in contactless_tenants:
+                tid = tenant_doc.get("tenant_id")
+                if not tid:
+                    continue
+
+                try:
+                    now_iso = datetime.now(UTC).isoformat()
+                    await tenant_repo.patch(
+                        tenant_id=tid,
+                        document_id=tid,
+                        operations=[
+                            {"op": "set", "path": "/status", "value": "deactivated"},
+                            {"op": "set", "path": "/updated_at", "value": now_iso},
+                            {"op": "set", "path": "/deactivated_at", "value": now_iso},
+                            {
+                                "op": "set",
+                                "path": "/deactivation_reason",
+                                "value": "missing_superadmin_contact",
+                            },
+                        ],
+                    )
+                    deactivated_count += 1
+                    logger.info("Contactless tenant deactivated: tenant=%s", tid[:8])
+                except Exception:
+                    logger.debug(
+                        "Contactless tenant deactivation failed for tenant %s",
+                        tid[:8],
+                        exc_info=True,
+                    )
+
+            if deactivated_count > 0:
+                logger.info(
+                    "Contactless tenant scanner: deactivated %d tenants",
+                    deactivated_count,
+                )
+        except Exception:
+            logger.debug("Contactless tenant scanner cycle failed", exc_info=True)
+
+        await asyncio.sleep(_CONTACTLESS_TENANT_SCAN_INTERVAL)
+
+
+async def _startup_contactless_tenant_scanner() -> None:
+    """Start the contactless tenant deactivation scanner background task."""
+    global _contactless_tenant_scanner_task  # noqa: PLW0603
+    _contactless_tenant_scanner_task = asyncio.create_task(_contactless_tenant_scanner_loop())
+    logger.info("Contactless tenant scanner started (1-hour interval)")
+
+
+async def _shutdown_contactless_tenant_scanner() -> None:
+    """Cancel the contactless tenant deactivation scanner background task."""
+    global _contactless_tenant_scanner_task  # noqa: PLW0603
+    if _contactless_tenant_scanner_task and not _contactless_tenant_scanner_task.done():
+        _contactless_tenant_scanner_task.cancel()
+        try:
+            await _contactless_tenant_scanner_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Contactless tenant scanner stopped")
+    _contactless_tenant_scanner_task = None
+
+
+def register_contactless_tenant_scanner(app: FastAPI | None = None) -> None:
+    """Collect contactless tenant scanner startup/shutdown handlers."""
+    _bg_startup_handlers.append(_startup_contactless_tenant_scanner)
+    _bg_shutdown_handlers.append(_shutdown_contactless_tenant_scanner)
 
 
 # ---------------------------------------------------------------------------
