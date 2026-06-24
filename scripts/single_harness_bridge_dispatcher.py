@@ -71,7 +71,9 @@ from bridge_lease_registry import is_lease_held  # noqa: E402
 from gtkb_session_id import SESSION_ID_ENV_VARS  # noqa: E402
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
-    issue_dispatch_authorization_packets,
+    create_authorization_packet,
+    write_named_packet,
+    write_packet,
 )
 
 # ---------------------------------------------------------------------------
@@ -456,33 +458,73 @@ def _issue_dispatch_authorization_for_selected(
     dispatch_id: str,
     trigger,
 ) -> dict[str, Any]:
-    """Create implementation-start packets for a selected Prime dispatch batch."""
-    bridge_ids = [str(item.document_name) for item in selected]
-    try:
-        context = issue_dispatch_authorization_packets(project_root, bridge_ids, dispatch_id=dispatch_id)
-    except AuthorizationError as exc:
-        failed_slug = bridge_ids[0] if bridge_ids else None
-        payload: dict[str, Any] = {
-            "ts": _now_iso(),
-            "dispatch_id": dispatch_id,
-            "recipient": recipient,
-            "launched": False,
-            "reason": "implementation_authorization_packet_failed",
-            "error_type": type(exc).__name__,
-            "error_message": str(exc),
-            "bridge_ids": bridge_ids,
-        }
-        if failed_slug is not None:
-            payload["document_name"] = failed_slug
-        trigger._record_dispatch_failure(state_dir, payload)
+    """Create implementation-start packets for a selected Prime dispatch batch.
+
+    Per WI-4770 (``gtkb-dispatch-per-item-auth-quarantine``): when one selected
+    GO item fails authorization, quarantine that item and continue issuing packets
+    for the remaining healthy GO items instead of failing the whole batch.
+    """
+    go_items = [item for item in selected if getattr(item, "top_status", "").upper() == "GO"]
+    bridge_ids = [str(item.document_name) for item in go_items]
+    if not bridge_ids:
+        return {"ok": True, "reason": None, "context": {}}
+
+    successful_bridge_ids: list[str] = []
+    successful_packets: list[dict[str, Any]] = []
+    quarantined_slugs: list[dict[str, Any]] = []
+
+    for bridge_id in bridge_ids:
+        try:
+            packet = create_authorization_packet(project_root, bridge_id)
+        except AuthorizationError as exc:
+            quarantined_slugs.append({"slug": bridge_id, "error_message": str(exc)})
+            quarantine_payload: dict[str, Any] = {
+                "ts": trigger._now_iso(),
+                "dispatch_id": dispatch_id,
+                "recipient": recipient,
+                "launched": False,
+                "reason": "impl_auth_quarantined",
+                "document_name": bridge_id,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+                "bridge_ids": [bridge_id],
+            }
+            trigger._record_dispatch_failure(state_dir, quarantine_payload)
+            continue
+        successful_bridge_ids.append(bridge_id)
+        successful_packets.append(packet)
+
+    if not successful_bridge_ids:
+        first = quarantined_slugs[0] if quarantined_slugs else {}
         return {
             "ok": False,
-            "reason": "implementation_authorization_packet_failed",
+            "reason": "all_impl_auth_quarantined",
             "bridge_ids": bridge_ids,
-            "failed_slug": failed_slug,
-            "error": str(exc),
+            "failed_slug": first.get("slug"),
+            "error": first.get("error_message"),
+            "quarantined_slugs": quarantined_slugs,
         }
-    return {"ok": True, "reason": None, "context": context}
+
+    for bridge_id, packet in zip(successful_bridge_ids, successful_packets, strict=True):
+        write_named_packet(project_root, packet, bridge_id)
+    write_packet(project_root, successful_packets[0])
+    context: dict[str, Any] = {
+        "dispatch_id": dispatch_id,
+        "bridge_ids": list(successful_bridge_ids),
+        "current_bridge_id": successful_bridge_ids[0],
+        "packets": [
+            {
+                "bridge_id": packet["bridge_id"],
+                "packet_hash": packet["packet_hash"],
+                "target_path_globs": packet["target_path_globs"],
+            }
+            for packet in successful_packets
+        ],
+    }
+    result: dict[str, Any] = {"ok": True, "reason": None, "context": context}
+    if quarantined_slugs:
+        result["quarantined_slugs"] = quarantined_slugs
+    return result
 
 
 def _resolve_dispatcher_targets(

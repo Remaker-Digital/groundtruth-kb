@@ -1294,13 +1294,13 @@ def test_prime_spawn_fails_closed_when_dispatch_authorization_fails(
     )
 
     assert meta["launched"] is False
-    assert meta["reason"] == "implementation_authorization_packet_failed"
+    assert meta["reason"] == "all_impl_auth_quarantined"
     assert popen_calls == []
     failures = [
         json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert failures[-1]["document_name"] == doc
-    assert failures[-1]["reason"] == "implementation_authorization_packet_failed"
+    assert failures[-1]["reason"] == "impl_auth_quarantined"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1335,15 +1335,15 @@ def _no_go_fake_item(doc: str, status: str) -> object:
 
 def test_issue_dispatch_auth_skips_no_go_items(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """WI-4358: all-NO-GO selected batch returns ok=True with empty context
-    and never calls issue_dispatch_authorization_packets.
+    and never calls create_authorization_packet.
     """
     root = _make_synthetic_project(tmp_path)
     trigger = _load_trigger()
 
-    def _fake_issue(*_args, **_kwargs):
-        raise AssertionError("issue_dispatch_authorization_packets must not be called for all-NO-GO batch")
+    def _fake_create(*_args, **_kwargs):
+        raise AssertionError("create_authorization_packet must not be called for all-NO-GO batch")
 
-    monkeypatch.setattr(trigger, "issue_dispatch_authorization_packets", _fake_issue)
+    monkeypatch.setattr(trigger, "create_authorization_packet", _fake_create)
 
     result = trigger._issue_dispatch_authorization_for_selected(
         [
@@ -1360,18 +1360,22 @@ def test_issue_dispatch_auth_skips_no_go_items(tmp_path: Path, monkeypatch: pyte
 
 
 def test_issue_dispatch_auth_uses_go_items_from_mixed_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """WI-4358: mixed GO+NO-GO selected batch produces an issue call with only
-    the GO items' document_name(s).
-    """
+    """WI-4358: mixed GO+NO-GO selected batch authorizes only GO items."""
     root = _make_synthetic_project(tmp_path)
     trigger = _load_trigger()
-    captured_bridge_ids: list[list[str]] = []
+    captured_bridge_ids: list[str] = []
 
-    def _fake_issue(_root, bridge_ids, *, dispatch_id):  # noqa: ARG001 (signature mirrors prod)
-        captured_bridge_ids.append(list(bridge_ids))
-        return {"go-thread": {"some": "context"}}
+    def _fake_create(_root, bridge_id):
+        captured_bridge_ids.append(str(bridge_id))
+        return {
+            "bridge_id": bridge_id,
+            "packet_hash": f"hash-{bridge_id}",
+            "target_path_globs": ["scripts/*.py"],
+        }
 
-    monkeypatch.setattr(trigger, "issue_dispatch_authorization_packets", _fake_issue)
+    monkeypatch.setattr(trigger, "create_authorization_packet", _fake_create)
+    monkeypatch.setattr(trigger, "write_named_packet", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(trigger, "write_packet", lambda *_args, **_kwargs: root / "auth-current.json")
 
     result = trigger._issue_dispatch_authorization_for_selected(
         [
@@ -1385,9 +1389,53 @@ def test_issue_dispatch_auth_uses_go_items_from_mixed_list(tmp_path: Path, monke
     )
 
     assert result["ok"] is True
-    assert captured_bridge_ids == [["go-thread"]], (
-        "Only the GO item's document_name should reach issue_dispatch_authorization_packets"
+    assert captured_bridge_ids == ["go-thread"], (
+        "Only the GO item's document_name should reach create_authorization_packet"
     )
+    assert result["context"]["bridge_ids"] == ["go-thread"]
+
+
+def test_issue_dispatch_auth_quarantines_bad_go_and_continues_healthy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4770: one unauthorizable GO item is quarantined while a healthy GO item proceeds."""
+    root = _make_synthetic_project(tmp_path)
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    def _fake_create(_root, bridge_id):
+        if bridge_id == "bad-go-thread":
+            raise trigger.AuthorizationError("missing approved proposal")
+        return {
+            "bridge_id": bridge_id,
+            "packet_hash": f"hash-{bridge_id}",
+            "target_path_globs": ["scripts/*.py"],
+        }
+
+    monkeypatch.setattr(trigger, "create_authorization_packet", _fake_create)
+    monkeypatch.setattr(trigger, "write_named_packet", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(trigger, "write_packet", lambda *_args, **_kwargs: root / "auth-current.json")
+
+    result = trigger._issue_dispatch_authorization_for_selected(
+        [
+            _no_go_fake_item("bad-go-thread", "GO"),
+            _no_go_fake_item("good-go-thread", "GO"),
+        ],
+        project_root=root,
+        state_dir=state_dir,
+        recipient="prime-builder",
+        dispatch_id="dispatch-mixed-auth",
+    )
+
+    assert result["ok"] is True
+    assert result["context"]["bridge_ids"] == ["good-go-thread"]
+    assert result["quarantined_slugs"] == [{"slug": "bad-go-thread", "error_message": "missing approved proposal"}]
+    failures = [
+        json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert failures[-1]["document_name"] == "bad-go-thread"
+    assert failures[-1]["reason"] == "impl_auth_quarantined"
 
 
 def test_spawn_harness_dispatches_no_go_only_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
