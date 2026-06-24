@@ -83,6 +83,17 @@ def test_retired_bridge_aggregate_file_is_denied(gate: ModuleType, tmp_path: Pat
     assert "Retired bridge aggregate files" in reason
 
 
+def test_versioned_bridge_file_gets_normal_proposal_governance_denial(gate: ModuleType, tmp_path: Path) -> None:
+    reason = gate._deny_reason_for_content(
+        cwd_path=tmp_path,
+        file_path="bridge/example-thread-001.md",
+        content="NEW\n\n# Example proposal\n",
+    )
+    assert reason is not None
+    assert "Specification Links" in reason
+    assert "Retired bridge aggregate files" not in reason
+
+
 # --- pending target-path checkpoint -----------------------------------------
 
 
