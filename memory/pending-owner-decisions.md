@@ -8179,6 +8179,87 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-23T08:45:52.458540Z
   answer: "Your questions have been answered: \"How should I capture this dispatcher-control-surface requirement? (Formal SPEC/DCL creation needs your approval per the artifact-approval gate. Implementation is blocked until the review lane is restored behind WI-4670, so this is capture-only.)\"=\"Full capture: SPEC + DCL + project + WIs\", \"Where should the dispatcher config + reporting CLI live? (You can change this at proposal time; it sets the design direction.)\"=\"Under `gt bridge dispatch` (write subcommands + report)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1357
+  asked_at: 2026-06-24T21:49:02.337985Z
+  question: "What should this Prime Builder session focus on? (Dispatch fleet is in WI-4670 P0 FAIL — bridge integrity is the standing top priority, but the protocol still works via interactive/manual review.)"
+  options:
+    - "Stabilize dispatch state"
+    - "Fix dispatch root causes (WI-4670)"
+    - "Work top backlog item"
+    - "Hygiene: sweep-commit"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f2c85f365ebdb955
+  resolved_at: 2026-06-24T21:49:02.337985Z
+  answer: "Your questions have been answered: \"What should this Prime Builder session focus on? (Dispatch fleet is in WI-4670 P0 FAIL — bridge integrity is the standing top priority, but the protocol still works via interactive/manual review.)\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1358
+  asked_at: 2026-06-24T22:17:10.498324Z
+  question: "The kill-switch was auto-set by the storm watchdog ~4h ago and never cleared; the storm is over (counts under threshold) but dispatch stays halted, AND the root failure (WI-4670 hung workers) is unfixed. How do you want to proceed?"
+  options:
+    - "Keep halted, fix root cause"
+    - "Clear now + plan fix"
+    - "Just clear it now"
+    - "Explanation only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ae016da388492121
+  resolved_at: 2026-06-24T22:17:10.498324Z
+  answer: "Your questions have been answered: \"The kill-switch was auto-set by the storm watchdog ~4h ago and never cleared; the storm is over (counts under threshold) but dispatch stays halted, AND the root failure (WI-4670 hung workers) is unfixed. How do you want to proceed?\"=\"Clear now + plan fix\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1359
+  asked_at: 2026-06-24T22:17:10.498324Z
+  question: "How should the remediation proposal scope the watchdog change relative to the WI-4670 root fix? (The watchdog is currently the only reaper of immortal WI-4670 corpses, so disabling it outright before the root fix re-exposes workstation-exhaustion risk.)"
+  options:
+    - "Strip kill-switch, keep reaper"
+    - "Disable watchdog now"
+    - "Root fix first, watchdog later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6e729ddb035ac060
+  resolved_at: 2026-06-24T22:17:10.498324Z
+  answer: "Your questions have been answered: \"How should the remediation proposal scope the watchdog change relative to the WI-4670 root fix? (The watchdog is currently the only reaper of immortal WI-4670 corpses, so disabling it outright before the root fix re-exposes workstation-exhaustion risk.)\"=\"Root fix first, watchdog later\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1360
+  asked_at: 2026-06-24T22:17:10.498324Z
+  question: "Your `::init gtkb pb` doesn't grant write authority on this durably-LO harness, so I can't capture the deliberation/WI or file the WI-4670 proposal as-is. How do you want to handle role authority for executing this?"
+  options:
+    - "Keep me advisory, defer writes"
+    - "Authorize scoped writes"
+    - "Reassign B → Prime Builder"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 790c3780c6c32fa7
+  resolved_at: 2026-06-24T22:17:10.498324Z
+  answer: "Your questions have been answered: \"Your `::init gtkb pb` doesn't grant write authority on this durably-LO harness, so I can't capture the deliberation/WI or file the WI-4670 proposal as-is. How do you want to handle role authority for executing this?\"=\"Reassign B → Prime Builder\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1361
+  asked_at: 2026-06-24T22:31:33.154834Z
+  question: "How do you want to proceed with the role-authority-confusion purge plan?"
+  options:
+    - "Capture principle + file as project"
+    - "Minimal high-leverage first"
+    - "Audit first, then decide"
+    - "Refine the plan first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c6ded0a1d41f27f4
+  resolved_at: 2026-06-24T22:31:33.154834Z
+  answer: "Your questions have been answered: \"How do you want to proceed with the role-authority-confusion purge plan?\"=\"Capture principle + file as project\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1362
+  asked_at: 2026-06-24T22:31:33.154834Z
+  question: "My (mistaken) B→PB registry flip removed the only working harness from the LO dispatch pool. The directive's writes are done, so the write-gate re-block no longer matters. What should B's dispatcher-routing role be?"
+  options:
+    - "Restore B → loyal-opposition"
+    - "Keep B → prime-builder"
+    - "Leave as-is, decide later"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 10819ccc3fb0a0a6
+  resolved_at: 2026-06-24T22:31:33.154834Z
+  answer: "Your questions have been answered: \"My (mistaken) B→PB registry flip removed the only working harness from the LO dispatch pool. The directive's writes are done, so the write-gate re-block no longer matters. What should B's dispatcher-routing role be?\"=\"Leave as-is, decide later\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

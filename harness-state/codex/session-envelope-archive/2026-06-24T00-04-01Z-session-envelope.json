@@ -1,0 +1,70 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-24T00:04:01Z",
+  "envelope_schema_version": 1,
+  "harness_id": "A",
+  "harness_name": "codex",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-24T00:04:01Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolution": {
+    "authority_mode": "durable_registry_fallback",
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "durable_registry_role": "prime-builder",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": null
+  },
+  "role_resolved": "prime-builder",
+  "session_id": "A-2026-06-24T00-04-01Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "canonical_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .agent/skills/alternatives-investigation/SKILL.md\n M .agent/skills/arch-audit/SKILL.md\n M .agent/skills/assertion-triage/SKILL.md\n M .agent/skills/bridge-config/SKILL.md\n M .agent/skills/bridge-propose/SKILL.md\n M .agent/skills/check-deliberations/SKILL.md\n M .agent/skills/code-review-audit/SKILL.md\n M .agent/skills/codex-report/SKILL.md\n M .agent/skills/decision-capture/SKILL.md\n M .agent/skills/grill-me-for-clarification/SKILL.md\n M .agent/skills/gtkb-benchmarks/SKILL.md\n M .agent/skills/gtkb-hygiene-investigation/SKILL.md\n M .agent/skills/gtkb-hygiene-sweep/SKILL.md\n M .agent/skills/gtkb-propose/SKILL.md\n M .agent/skills/gtkb-sweep-commit/SKILL.md\n M .agent/skills/harness-parity-review/SKILL.md\n M .agent/skills/kb-adr/SKILL.md\n M .agent/skills/kb-assert/SKILL.md\n M .agent/skills/kb-batch/SKILL.md\n M .agent/skills/kb-promote/SKILL.md\n M .agent/skills/kb-query/SKILL.md\n M .agent/skills/kb-session-wrap-scan/SKILL.md\n M .agent/skills/kb-spec/SKILL.md\n M .agent/skills/kb-work-item/SKILL.md\n M .agent/skills/lo-opportunity-radar/SKILL.md\n M .agent/skills/loyal-opposition-hygiene-assessment/SKILL.md\n M .agent/skills/projects/SKILL.md\n M .agent/skills/release-candidate-gate/SKILL.md\n M .agent/skills/send-review/SKILL.md\n M .agent/skills/spec-intake/SKILL.md\n M .agent/skills/structural-hygiene-review/SKILL.md\n D .codex/skills/verify/helpers/draft-004-body.md\n D .codex/skills/verify/helpers/draft-gtkb-harness-local-scratchpad-boundary-006-body.md\n D .codex/skills/verify/helpers/draft-gtkb-lo-verified-commit-atomicity-016-body.md\n D .codex/skills/verify/helpers/draft-gtkb-suppress-non-activatable-go-from-pb-scan-006-body.md\n D .codex/skills/verify/helpers/draft-gtkb-target-paths-coverage-preflight-006-body.md\n D .codex/skills/verify/helpers/draft-wi4678-verdict-body.md\n D .codex/skills/verify/helpers/gtkb-lo-verified-commit-atomicity-016-draft-body.md\n M applications/Agent_Red/CLAUDE_ARCHIVE.md\n M bridge/agent-red-wi3192-first-login-setup-guide-002.md\n M bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-003.md\n M bridge/gtkb-pending-owner-decisions-surface-cache-resurface-003.md\n M bridge/gtkb-remove-orphaned-bridge-authority-direction-switch-003.md\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py\n M groundtruth-kb/src/groundtruth_kb/project/doctor.py\n M groundtruth-kb/tests/test_doctor_cross_harness_trigger.py\n M harness-state/harness-registry.json\n M independent-progress-assessments/LOYAL-OPPOSITION-LOG.md\n M memory/MEMORY.md\n M platform_tests/groundtruth_kb/cli/test_bridge_config_cli.py\n M platform_tests/scripts/test_bridge_dispatch_config.py\n M platform_tests/scripts/test_cross_harness_bridge_trigger.py\n M platform_tests/scripts/test_cross_harness_bridge_trigger_diagnose.py\n?? .codex-pytest-tmp-projects-cli-antigravity-1/\n?? .codex-pytest-tmp-skill-path-rerun-A/\n?? .codex-pytest-tmp-skill-specific-rerun-A/\n?? .codex-pytest-tmp-wi4398-pb-rerun/\n?? .codex-pytest-tmp-wi4692-dispatch-suspend-antigravity-1/\n?? .codex-pytest-tmp-wi4692-dispatch-suspend-antigravity-2/\n?? .codex-pytest-tmp-wi4692-lo-verify-no-loop-env/\n?? .codex-pytest-tmp-wi4692-lo-verify/\n?? .codex-pytest-tmp-wi4716-f-review/\n?? .codex-pytest-tmp-wi4735-disclosure-final2/\n?? .codex-pytest-tmp-wi4742-autodispatch-ollama-d-1705/\n?? .codex-pytest-tmp-wi4742-lo-verify/\n?? .codex-pytest-tmp-wi4752-liveguard-antigravity-1/\n?? .codex-pytest-tmp-wi4761-antigravity-1/\n?? .codex-pytest-tmp-wi4768-antigravity-1/\n?? .codex-pytest-tmp-wi4768-debug/\n?? .codex-pytest-tmp-wi4768-dispatch-antigravity/\n?? .codex-pytest-tmp-wi4769-adapters/\n?? .codex-pytest-tmp-wi4769-parity/\n?? .codex-pytest-tmp/\n?? .codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-body.md\n?? .codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-draft.md\n?? .codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-final.md\n?? .codex/skills/verify/helpers/gtkb-wi4761-restore-ci-testing-integration-health-014-body.md\n?? .codex/skills/verify/helpers/verdict_draft_dashboard.md\n?? .codex/skills/verify/helpers/verdict_draft_dispatch_role.md\n?? .temp_verdict_body_gtkb_reconcile.md",
+        "short_line_count": 153,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

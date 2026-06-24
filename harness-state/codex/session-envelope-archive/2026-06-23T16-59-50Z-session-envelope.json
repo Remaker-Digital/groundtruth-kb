@@ -1,0 +1,70 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-23T16:59:50Z",
+  "envelope_schema_version": 1,
+  "harness_id": "A",
+  "harness_name": "codex",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-23T16:59:50Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolution": {
+    "authority_mode": "durable_registry_fallback",
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "durable_registry_role": "prime-builder",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": null
+  },
+  "role_resolved": "prime-builder",
+  "session_id": "A-2026-06-23T16-59-50Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "canonical_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " D .codex/skills/verify/helpers/draft-004-body.md\n D .codex/skills/verify/helpers/draft-gtkb-harness-local-scratchpad-boundary-006-body.md\n D .codex/skills/verify/helpers/draft-gtkb-lo-verified-commit-atomicity-016-body.md\n D .codex/skills/verify/helpers/draft-gtkb-suppress-non-activatable-go-from-pb-scan-006-body.md\n D .codex/skills/verify/helpers/draft-gtkb-target-paths-coverage-preflight-006-body.md\n D .codex/skills/verify/helpers/draft-wi4678-verdict-body.md\n D .codex/skills/verify/helpers/gtkb-lo-verified-commit-atomicity-016-draft-body.md\n M bridge/agent-red-wi3192-first-login-setup-guide-002.md\nA  bridge/gtkb-dispatch-per-item-auth-quarantine-004.md\n M bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-003.md\n M bridge/gtkb-pending-owner-decisions-surface-cache-resurface-003.md\n M bridge/gtkb-remove-orphaned-bridge-authority-direction-switch-003.md\nA  bridge/gtkb-remove-orphaned-bridge-authority-direction-switch-006.md\nA  bridge/gtkb-wi4692-application-subject-dispatch-drain-suspend-004.md\nA  bridge/gtkb-wi4692-application-subject-dispatch-drain-suspend-006.md\nA  bridge/gtkb-wi4693-supersession-hygiene-scanner-002.md\nA  bridge/gtkb-wi4742-autonomous-dispatch-loop-health-004.md\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py\n M groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py\n M groundtruth-kb/src/groundtruth_kb/cli.py\n M groundtruth-kb/src/groundtruth_kb/hygiene/__init__.py\n D groundtruth-kb/tests/test_bridge_authority_direction.py\n D harness-state/bridge-authority-direction.json\n M platform_tests/groundtruth_kb/cli/test_bridge_dispatch_report_cli.py\n M platform_tests/scripts/test_bridge_dispatch_config.py\n M platform_tests/scripts/test_cross_harness_bridge_trigger_diagnose.py\n M platform_tests/scripts/test_single_harness_bridge_dispatcher.py\n M scripts/cross_harness_bridge_trigger.py\n M scripts/single_harness_bridge_dispatcher.py\n?? .codex-pytest-tmp-projects-cli-antigravity-1/\n?? .codex-pytest-tmp-skill-path-rerun-A/\n?? .codex-pytest-tmp-skill-specific-rerun-A/\n?? .codex-pytest-tmp-wi4716-f-review/\n?? .codex-pytest-tmp-wi4735-disclosure-final2/\n?? .codex-pytest-tmp-wi4742-lo-verify/\n?? .codex-pytest-tmp-wi4752-liveguard-antigravity-1/\n?? .codex-pytest-tmp-wi4761-antigravity-1/\n?? .codex-pytest-tmp-wi4768-antigravity-1/\n?? .codex-pytest-tmp-wi4768-debug/\n?? .codex-pytest-tmp/\n?? .codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-body.md\n?? .codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-draft.md\n?? .codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-final.md\n?? .codex/skills/verify/helpers/gtkb-wi4761-restore-ci-testing-integration-health-014-body.md\n?? .codex/skills/verify/helpers/verdict_draft_dashboard.md\n?? .codex/skills/verify/helpers/verdict_draft_dispatch_role.md\n?? .temp_verdict_body_gtkb_reconcile.md\n?? .temp_verdict_body_perrole.md\n?? .temp_verdict_body_reconcile.md\n?? applications/Agent_Red/tests/multi_tenant/test_how_it_works_spec1742.py\n?? bridge/agent-disposition-wi4589-external-mutation-gate-slice1-005.md\n?? bridge/agent-red-wi3185-testable-element-taxonomy-coverage-003.md\n?? bridge/agent-red-wi3193-intent-categories-diagram-003.md\n?? bridge/agent-red-wi3194-knowledge-retrieval-technical-detail-001.md\n?? bridge/agent-red-wi3195-docs-landing-logo-light-mode-001.md\n?? bridge/gtkb-dispatch-per-item-auth-quarantine-001.md\n?? bridge/gtkb-dispatch-per-item-auth-quarantine-002.md\n?? bridge/gtkb-dispatch-per-item-auth-quarantine-003.md\n?? bridge/gtkb-dispatch-per-item-auth-quarantine-005.md\n?? bridge/gtkb-dispatch-per-item-auth-quarantine-006.md\n?? bridge/gtkb-gtkb-sweep-commit-skill-respects-verified-gate-003.md\n?? bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-005.md\n?? bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-006.md\n?? bridge/gtkb-orphan-wi-retire-item-start-gate-repair-003.md\n?? bridge/gtkb-perrole-concurrency-cap-dispatch-005.md\n?? bridge/gtkb-perrole-concurrency-cap-dispatch-006.md\n?? bridge/gtkb-perrole-concurrency-cap-dispatch-006.md.draft\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-003.md\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-004.md\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-005.md\n?? bridge/gtkb-remove-orphaned-bridge-authority-direction-switch-005.md\n?? bridge/gtkb-ruff-format-check-pre-commit-drift-clear-005.md\n?? bridge/gtkb-ruff-format-check-pre-commit-drift-clear-006.md\n?? bridge/gtkb-wi4686-init-minimization-open-disclosure-relocation-001.md\n?? bridge/gtkb-wi4686-init-minimization-open-disclosure-relocation-002.md\n?? bridge/gtkb-wi4686-init-minimization-open-disclosure-relocation-003.md\n?? bridge/gtkb-wi4686-init-minimization-open-disclosure-relocation-004.md\n?? bridge/gtkb-wi4692-application-subject-dispatch-drain-suspend-001.md\n?? bridge/gtkb-wi4692-application-subject-dispatch-drain-suspend-003.md\n?? bridge/gtkb-wi4692-application-subject-dispatch-drain-suspend-005.md",
+        "short_line_count": 107,
+        "short_line_limit": 80,
+        "short_truncated": true
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

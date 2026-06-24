@@ -626,5 +626,41 @@ Loyal Opposition (Antigravity/lo role) verified and filed the `VERIFIED` verdict
 |------|---------|-------------------|------------------|--------|
 | Technical | `gtkb-orphan-wi-backfill-per-wi-retire-exclude-service` implementation passes all 14 project CLI tests and matches isolation guidelines. | `bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-007.md`, successful preflight, zero gaps | File the `VERIFIED` verdict (`bridge/gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-008.md`) and commit the implementation files. | Resolved |
 
+---
+
+### 2026-06-23 - Watchdog Repoint & Process Leak Root Cause
+
+Loyal Opposition (Antigravity/lo role) repointed the desktop watchdog schedules and analyzed the root cause of the `ollama_harness.py` child process leaks. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-23-17-21-ollama-harness-process-leak.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Operations | Scheduled task was executing obsolete watchdog from `.gtkb-state/ops/` instead of tracked `scripts/ops/harness_storm_watchdog.ps1`. | Repointed `.gtkb-state/ops/run_harness_storm_watchdog_hidden.vbs` to execute tracked path. Manually triggered task and confirmed successful exit code `0` and correct heartbeat. | Resolved |
+| Technical | `scripts/run_with_status.py` wrapper leaks child processes if the parent exits early or is terminated. | Process census; lack of termination logic or signal handling in `run_with_status.py` finally block. | Update `scripts/run_with_status.py` to terminate the child process in its `finally` block. | Open |
+
+---
+
+### 2026-06-23 - Session Startup Compliance & Control Map Audit
+
+Loyal Opposition (Antigravity/lo role) performed a compliance audit of the session startup overlays and verified the classified inventory of startup control surfaces. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-23-13-08-role-startup-compliance-audit.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance | `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md` omits the startup disclosure mandates from `AGENTS.md`. | `LOYAL-OPPOSITION-STARTUP-OVERLAY.md` ## Disclosure; `AGENTS.md` startup checklist. | Update LO startup overlay to require disclosure of git state, bridge counts, LO role assertion, and dispatch health. | Open |
+| Registry | `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md` has outdated placeholders and omits multiple active startup surfaces. | `SESSION-STARTUP-CONTROL-MAP.md` ## Role-Specific Overlays; list of files under `config/agent-control/`. | Update the control map to catalog the overlays, index, manifest, and active TOML configuration registries. | Open |
+
+---
+
+### 2026-06-23 - Dispatch Config Drift & Startup Disclosure Audit
+
+Loyal Opposition (Antigravity/lo role) audited the session startup disclosure logic and investigated configuration drift warnings for harnesses B and C. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-23-23-19-dispatch-config-drift.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Operations | Harnesses B and C are suspended in registry but marked `can_receive_dispatch = true` in `rules.toml`. | `rules.toml` vs `harness-registry.json` status; `gt bridge status` warnings. | Reconcile the drift by setting `can_receive_dispatch = false` for harnesses B and C in `rules.toml` using `gt bridge dispatch config set-eligibility`. | Open |
+| Governance | The Loyal Opposition startup disclosure correctly suppresses focus choices and routes default tasks. | `scripts/session_self_initialization.py` implementation vs `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`. | None; audit successfully completed with PASS. | Resolved |
+
+
+
+
 
 
