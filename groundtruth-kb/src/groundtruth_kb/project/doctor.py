@@ -24,6 +24,9 @@ from groundtruth_kb.bridge.role_state import (
 from groundtruth_kb.bridge.role_state import (
     ROLE_STATE_KEYS,
 )
+from groundtruth_kb.bridge_dispatch_config import (
+    cross_harness_trigger_disable_findings,
+)
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -4058,6 +4061,16 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
                 f"hook(s) in .claude/settings.json — bridge dispatch automation will not fire. "
                 f"See {_BRIDGE_DISPATCH_DOC}."
             ),
+        )
+
+    disable_findings = cross_harness_trigger_disable_findings()
+    if disable_findings:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=disable_findings[0],
         )
 
     state_path = target / _BRIDGE_DISPATCH_STATE_PATH

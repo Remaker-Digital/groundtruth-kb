@@ -38,6 +38,11 @@ _CLAUDE_INVOCATION_SURFACES = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _no_cross_harness_trigger_disable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+
+
 def _allowed_tool_set(raw: str) -> set[str]:
     return {part.strip() for part in raw.split() if part.strip()}
 

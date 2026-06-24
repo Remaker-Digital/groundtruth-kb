@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 SCAN_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 
+import groundtruth_kb.bridge_dispatch_config as bridge_dispatch_config  # noqa: E402
 from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     BENIGN_NONLAUNCH_LAUNCH_REASONS,
     _runtime_findings_for_recipient,
@@ -33,6 +34,8 @@ from groundtruth_kb.harness_projection import read_roles  # noqa: E402
 @pytest.fixture(autouse=True)
 def _no_registry_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+    monkeypatch.delenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, raising=False)
+    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", lambda _name, _scope: None)
 
 
 def _write_project(root: Path, *, rules: str = "", harnesses: list[dict] | None = None) -> None:
@@ -131,6 +134,42 @@ def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Pa
 
     assert status.selected_by_role["prime-builder"]
     assert registry_path.read_bytes() == before
+
+
+def test_wi4760_health_warns_when_process_kill_switch_active(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    monkeypatch.setenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, "1")
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    finding = "\n".join(status.health_findings)
+    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in finding
+    assert "Process" in finding
+    assert "no-op" in finding
+
+
+def test_wi4760_health_warns_when_user_scope_kill_switch_active(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+
+    def _persistent_reader(_name: str, scope: str) -> str | None:
+        return "1" if scope == "User" else None
+
+    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", _persistent_reader)
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    finding = "\n".join(status.health_findings)
+    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in finding
+    assert "User" in finding
+    assert "no-op" in finding
 
 
 def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:

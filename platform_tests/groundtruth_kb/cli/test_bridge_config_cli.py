@@ -4,12 +4,20 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
+import groundtruth_kb.bridge_dispatch_config as bridge_dispatch_config  # noqa: E402
 from groundtruth_kb.cli import main  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_cross_harness_trigger_disable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, raising=False)
+    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", lambda _name, _scope: None)
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
@@ -73,6 +81,23 @@ def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> 
     assert payload["health_status"] == "PASS"
     assert [row["id"] for row in payload["selected_by_role"]["prime-builder"]] == ["A"]
     assert [row["id"] for row in payload["selected_by_role"]["loyal-opposition"]] == ["D"]
+
+
+def test_bridge_dispatch_health_cli_warns_when_kill_switch_active(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _root, config = _project(tmp_path)
+    monkeypatch.setenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, "1")
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["health_status"] == "WARN"
+    findings = "\n".join(payload["findings"])
+    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in findings
+    assert "Process" in findings
 
 
 def test_bridge_dispatch_status_cli_reports_health(tmp_path: Path) -> None:

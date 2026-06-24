@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import tomllib
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,9 @@ from groundtruth_kb.bridge_dispatch_rules import DispatchContext, DispatchRule
 
 DISPATCH_CONFIG_RELATIVE_PATH = Path("config") / "dispatcher" / "rules.toml"
 DISPATCH_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "dispatch-state.json"
+CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
+CROSS_HARNESS_TRIGGER_DISABLE_VALUE = "1"
+CROSS_HARNESS_TRIGGER_PERSISTENT_ENV_SCOPES = ("User", "Machine")
 
 ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
@@ -58,6 +63,19 @@ RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
 # collapses all non-launch spawn results to last_result="launch_failed"; only the
 # reason field distinguishes saturation from failure.
 BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached", "per_role_concurrency_cap_reached"})
+
+
+@dataclass(frozen=True)
+class CrossHarnessTriggerDisableScope:
+    """Observed state for one cross-harness trigger kill-switch scope."""
+
+    scope: str
+    value: str | None = None
+    error: str | None = None
+
+    @property
+    def active(self) -> bool:
+        return self.value == CROSS_HARNESS_TRIGGER_DISABLE_VALUE
 
 
 @dataclass(frozen=True)
@@ -275,6 +293,7 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     if config.errors:
         findings.extend(f"config error: {error}" for error in config.errors)
     findings.extend(consistency_findings)
+    findings.extend(cross_harness_trigger_disable_findings())
 
     active_event_sources = [
         record for record in records if _record_status(record) == "active" and record.get("can_fire_events") is True
@@ -318,6 +337,98 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         consistency_findings=tuple(consistency_findings),
         runtime_classifications=tuple(runtime_classifications),
     )
+
+
+def collect_cross_harness_trigger_disable_scopes(
+    *,
+    process_environ: Mapping[str, str] | None = None,
+    persistent_reader: Callable[[str, str], str | None] | None = None,
+) -> tuple[CrossHarnessTriggerDisableScope, ...]:
+    """Return process and persistent Windows kill-switch observations.
+
+    Persistent scope probing is read-only and fail-soft. It reports active
+    ``GTKB_NO_CROSS_HARNESS_TRIGGER=1`` values when readable, and otherwise
+    leaves dispatch behavior unchanged.
+    """
+    env = os.environ if process_environ is None else process_environ
+    reader = persistent_reader or _read_windows_persistent_env_var
+    scopes = [
+        CrossHarnessTriggerDisableScope(
+            scope="Process",
+            value=env.get(CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR),
+        )
+    ]
+    for scope in CROSS_HARNESS_TRIGGER_PERSISTENT_ENV_SCOPES:
+        try:
+            value = reader(CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, scope)
+        except Exception as exc:  # noqa: BLE001 - health reporting must fail soft
+            scopes.append(CrossHarnessTriggerDisableScope(scope=scope, error=str(exc)))
+        else:
+            scopes.append(CrossHarnessTriggerDisableScope(scope=scope, value=value))
+    return tuple(scopes)
+
+
+def active_cross_harness_trigger_disable_scopes(
+    *,
+    process_environ: Mapping[str, str] | None = None,
+    persistent_reader: Callable[[str, str], str | None] | None = None,
+) -> tuple[CrossHarnessTriggerDisableScope, ...]:
+    return tuple(
+        scope
+        for scope in collect_cross_harness_trigger_disable_scopes(
+            process_environ=process_environ,
+            persistent_reader=persistent_reader,
+        )
+        if scope.active
+    )
+
+
+def cross_harness_trigger_disable_findings(
+    *,
+    process_environ: Mapping[str, str] | None = None,
+    persistent_reader: Callable[[str, str], str | None] | None = None,
+) -> tuple[str, ...]:
+    """Human-readable dispatch health finding for an active kill-switch."""
+    active_scopes = active_cross_harness_trigger_disable_scopes(
+        process_environ=process_environ,
+        persistent_reader=persistent_reader,
+    )
+    if not active_scopes:
+        return ()
+    scope_names = ", ".join(scope.scope for scope in active_scopes)
+    noun = "scope" if len(active_scopes) == 1 else "scopes"
+    return (
+        "cross-harness trigger warning: "
+        f"{CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR}=1 active in {scope_names} {noun}; "
+        "current or newly spawned hook invocations will no-op until the operator clears the kill-switch",
+    )
+
+
+def _read_windows_persistent_env_var(name: str, scope: str) -> str | None:
+    """Read a persistent Windows environment variable without mutating it."""
+    try:
+        import winreg
+    except ImportError:
+        return None
+
+    root_and_path = {
+        "User": (winreg.HKEY_CURRENT_USER, "Environment"),
+        "Machine": (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        ),
+    }.get(scope)
+    if root_and_path is None:
+        return None
+    root, path = root_and_path
+    try:
+        with winreg.OpenKey(root, path) as key:
+            value, _value_type = winreg.QueryValueEx(key, name)
+    except FileNotFoundError:
+        return None
+    if value is None:
+        return None
+    return str(value)
 
 
 def format_bridge_dispatch_status(status: BridgeDispatchStatus) -> str:

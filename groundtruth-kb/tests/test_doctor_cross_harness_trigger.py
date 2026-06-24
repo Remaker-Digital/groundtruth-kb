@@ -13,7 +13,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+import groundtruth_kb.bridge_dispatch_config as bridge_dispatch_config
 from groundtruth_kb.project.doctor import _check_cross_harness_trigger
+
+
+@pytest.fixture(autouse=True)
+def _no_cross_harness_trigger_disable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, raising=False)
+    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", lambda _name, _scope: None)
 
 
 def _make_settings(target: Path, *, with_post_tool_use: bool, with_stop: bool) -> Path:
@@ -89,6 +100,46 @@ def test_warn_when_dispatch_state_absent_but_script_and_hooks_present(tmp_path: 
     result = _check_cross_harness_trigger(tmp_path)
     assert result.status == "warning"
     assert "not yet fired" in result.message.lower() or "dispatch-state.json absent" in result.message.lower()
+
+
+def test_warn_when_process_kill_switch_is_active(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Process-scope operator kill-switch is visible before dispatch-state can mask it."""
+    _make_trigger_script(tmp_path)
+    _make_settings(tmp_path, with_post_tool_use=True, with_stop=True)
+    _make_dispatch_state(tmp_path)
+    monkeypatch.setenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, "1")
+
+    result = _check_cross_harness_trigger(tmp_path)
+
+    assert result.status == "warning"
+    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in result.message
+    assert "Process" in result.message
+    assert "no-op" in result.message
+
+
+def test_warn_when_user_scope_kill_switch_is_active(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Persistent User-scope kill-switch is reported without mutating the real environment."""
+    _make_trigger_script(tmp_path)
+    _make_settings(tmp_path, with_post_tool_use=True, with_stop=True)
+    _make_dispatch_state(tmp_path)
+
+    def _persistent_reader(_name: str, scope: str) -> str | None:
+        return "1" if scope == "User" else None
+
+    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", _persistent_reader)
+
+    result = _check_cross_harness_trigger(tmp_path)
+
+    assert result.status == "warning"
+    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in result.message
+    assert "User" in result.message
+    assert "no-op" in result.message
 
 
 # ============================================================================
