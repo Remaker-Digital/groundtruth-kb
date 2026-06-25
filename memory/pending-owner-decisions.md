@@ -8573,6 +8573,32 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-25T05:15:21.109373Z
   answer: "Your questions have been answered: \"Which focus should this Prime Builder session take? (You can also pick something else via 'Other'.)\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1387
+  asked_at: 2026-06-25T06:33:00.012340Z
+  question: "WI-4789 is VERIFIED + resolved but its verified source (bridge_dispatch_config.py + test_bridge_dispatch_config.py) is uncommitted (the LO filed VERIFIED without the commit-finalization). How should I close this gap?"
+  options:
+    - "I commit the verified source (scoped)"
+    - "Leave for your sweep / re-LO"
+    - "Investigate the broader churn first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3e2003866fa1db3b
+  resolved_at: 2026-06-25T06:33:00.012340Z
+  answer: "Your questions have been answered: \"WI-4789 is VERIFIED + resolved but its verified source (bridge_dispatch_config.py + test_bridge_dispatch_config.py) is uncommitted (the LO filed VERIFIED without the commit-finalization). How should I close this gap?\"=\"I commit the verified source (scoped)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1388
+  asked_at: 2026-06-25T06:34:57.239414Z
+  question: "WI-4772 + WI-4775 are finished work (covered by the VERIFIED gtkb-verified-finalization-validation-hardening thread, acceptance criteria a strict subset of the verified WI-4773) but stuck open on a metadata-linkage gap. How should I clear them to retire may29-hygiene?"
+  options:
+    - "Owner-approve resolve → retire"
+    - "Fix the linkage instead"
+    - "Hold — leave open"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0c71f62efa6cfa3e
+  resolved_at: 2026-06-25T06:34:57.239414Z
+  answer: "Your questions have been answered: \"WI-4772 + WI-4775 are finished work (covered by the VERIFIED gtkb-verified-finalization-validation-hardening thread, acceptance criteria a strict subset of the verified WI-4773) but stuck open on a metadata-linkage gap. How should I clear them to retire may29-hygiene?\"=\"Owner-approve resolve → retire\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
