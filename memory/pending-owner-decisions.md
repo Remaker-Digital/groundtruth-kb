@@ -8260,6 +8260,149 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-24T22:31:33.154834Z
   answer: "Your questions have been answered: \"My (mistaken) B→PB registry flip removed the only working harness from the LO dispatch pool. The directive's writes are done, so the write-gate re-block no longer matters. What should B's dispatcher-routing role be?\"=\"Leave as-is, decide later\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1363
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 1 (root) - What runtime shape is the black-box dispatcher service? This decides where active liveness monitoring + automatic KPI capture live, and whether we re-introduce the wasteful-monitor-that-dies-silently problem GT-KB was burned by (S290-292)."
+  options:
+    - "No new daemon; cadence probes"
+    - "Lightweight persistent monitor"
+    - "Full persistent dispatcher daemon"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5b73efa79017cd86
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 1 (root) - What runtime shape is the black-box dispatcher service? This decides where active liveness monitoring + automatic KPI capture live, and whether we re-introduce the wasteful-monitor-that-dies-silently problem GT-KB was burned by (S290-292).\"=\"Full persistent dispatcher daemon\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1364
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 2 - The dispatcher must score quality from GT-KB work, but the work it scores is itself judgment (an LO verdict, a PB build). What is the OBJECTIVE ground-truth anchor that breaks the circularity - the signal that says 'this harness's output was actually good/bad'?"
+  options:
+    - "Downstream outcome"
+    - "Owner adjudication"
+    - "Multi-harness consensus"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 549ef90ae8722785
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 2 - The dispatcher must score quality from GT-KB work, but the work it scores is itself judgment (an LO verdict, a PB build). What is the OBJECTIVE ground-truth anchor that breaks the circularity - the signal that says 'this harness's output was actually good/bad'?\"=\"Multi-harness consensus\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1365
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 2.5 (refines the consensus anchor) - Pure cross-harness consensus is gameable: a jointly-wrong majority, or a dominant harness, sets the 'norm.' What anchors consensus to objective truth so quality isn't just measuring conformity?"
+  options:
+    - "Consensus + seeded-flaw fixtures"
+    - "Consensus + owner adjudication"
+    - "Pure consensus on real work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5b5dc45e418f97e3
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 2.5 (refines the consensus anchor) - Pure cross-harness consensus is gameable: a jointly-wrong majority, or a dominant harness, sets the 'norm.' What anchors consensus to objective truth so quality isn't just measuring conformity?\"=\"Consensus + seeded-flaw fixtures\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1366
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 3 - The current selection machinery (TAFE hard-eligibility-gates + precedence-tier ranking) is solid; what's static is the QUALITY numbers feeding it (hand-set dispatch_quality in rules.toml, reviewer_precedence, agent_capability_snapshots). How should the computed consensus+fixture KPI integrate?"
+  options:
+    - "Feed the existing machinery"
+    - "Advisory-first, then cutover"
+    - "Supersede - new authority"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 597282c2c5c8514e
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 3 - The current selection machinery (TAFE hard-eligibility-gates + precedence-tier ranking) is solid; what's static is the QUALITY numbers feeding it (hand-set dispatch_quality in rules.toml, reviewer_precedence, agent_capability_snapshots). How should the computed consensus+fixture KPI integrate?\"=\"Feed the existing machinery\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1367
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 4 - When NO dispatchable harness meets the required quality for a queued unit of work, what does the dispatcher do? (Your FAIL definition explicitly says FAIL = the dispatcher is unable to INDEPENDENTLY RESTORE any harness - which implies it should try to restore one first.)"
+  options:
+    - "Hold, auto-remediate, then escalate"
+    - "Hold + escalate immediately"
+    - "Best-available with warning"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b3dc5554c2909c46
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 4 - When NO dispatchable harness meets the required quality for a queued unit of work, what does the dispatcher do? (Your FAIL definition explicitly says FAIL = the dispatcher is unable to INDEPENDENTLY RESTORE any harness - which implies it should try to restore one first.)\"=\"Hold, auto-remediate, then escalate\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1368
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 5 - You want the quality KPI to measure the impact of harness-specific adaptations (deviated system prompts, skill language). How should that attribution work?"
+  options:
+    - "Versioned adaptations + fixture A/B"
+    - "Both: fixture A/B + longitudinal drift"
+    - "Longitudinal tracking only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a8b8fcbab2811bc4
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 5 - You want the quality KPI to measure the impact of harness-specific adaptations (deviated system prompts, skill language). How should that attribution work?\"=\"Versioned adaptations + fixture A/B\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1369
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 6 - Your reset halts new dispatches, drains queues, and purges state for a clean restart. The danger: the daemon's learned quality KPI / consensus scores / fixture results are durable ASSETS, not the stuck runtime state you're recovering from. What does reset purge vs preserve?"
+  options:
+    - "Two-tier: soft + hard"
+    - "Transient only; preserve learned"
+    - "Full wipe to clean slate"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e8361933552743d3
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 6 - Your reset halts new dispatches, drains queues, and purges state for a clean restart. The danger: the daemon's learned quality KPI / consensus scores / fixture results are durable ASSETS, not the stuck runtime state you're recovering from. What does reset purge vs preserve?\"=\"Two-tier: soft + hard\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1370
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 8 - How far does the mechanical (PreToolUse) black-box write-gate reach? Today there's only a caller-invoked guard on rules.toml - not a real hook. Your 'black box to all agents' implies more."
+  options:
+    - "Full: config + state + implementation"
+    - "Config + state only"
+    - "Config only, made mechanical"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d467a5753de45de0
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 8 - How far does the mechanical (PreToolUse) black-box write-gate reach? Today there's only a caller-invoked guard on rules.toml - not a real hook. Your 'black box to all agents' implies more.\"=\"Full: config + state + implementation\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1371
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 9 - How do we reconcile this scope with the existing dispatch spec corpus (TAFE R-series, SPEC-CENTRALIZED-DISPATCH-SERVICE-001, DCL-DISPATCH-ENVELOPE-RULES-001) and the unresolved INDEX-vs-dispatcher transition?"
+  options:
+    - "Umbrella ADR + amend in place"
+    - "Minimal - new specs for gaps only"
+    - "Supersede the contending specs"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1fb43199925c546c
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 9 - How do we reconcile this scope with the existing dispatch spec corpus (TAFE R-series, SPEC-CENTRALIZED-DISPATCH-SERVICE-001, DCL-DISPATCH-ENVELOPE-RULES-001) and the unresolved INDEX-vs-dispatcher transition?\"=\"Umbrella ADR + amend in place\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1372
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "Branch 10 (final) - How do we sequence this against the live reality that the LO fleet is broken (WI-4670), the FAIL/WARN bug is live, and B's dispatch role is mis-set - all of which block review of any proposal, including the daemon's own?"
+  options:
+    - "Stabilize first, then build"
+    - "One program, dependency-ordered"
+    - "Build the daemon first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1bd3e2a59133206e
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"Branch 10 (final) - How do we sequence this against the live reality that the LO fleet is broken (WI-4670), the FAIL/WARN bug is live, and B's dispatch role is mis-set - all of which block review of any proposal, including the daemon's own?\"=\"Stabilize first, then build\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1373
+  asked_at: 2026-06-24T23:44:14.547303Z
+  question: "How should I commit this plan? (The grill resolutions are already durable in DELIB-20265882; this is about filing the executable program.)"
+  options:
+    - "File as project now"
+    - "File Phase 0 only now, rest after review"
+    - "Refine the plan first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fa86c675dffa6768
+  resolved_at: 2026-06-24T23:44:14.547303Z
+  answer: "Your questions have been answered: \"How should I commit this plan? (The grill resolutions are already durable in DELIB-20265882; this is about filing the executable program.)\"=\"File as project now\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
