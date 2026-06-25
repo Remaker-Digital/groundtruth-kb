@@ -458,8 +458,13 @@ def test_wi4658_health_ignores_non_dict_quarantine_entries(tmp_path: Path) -> No
     assert "['good']" in quarantine_findings[0]
 
 
-def test_wi4578_health_fails_for_blocked_runtime_candidates(tmp_path: Path) -> None:
-    """Pending LO work plus readiness/backoff/spawn blockers is a runtime FAIL."""
+def test_wi4789_blocked_runtime_candidates_warn_when_role_dispatchable(tmp_path: Path) -> None:
+    """WI-4789 reconciliation (was test_wi4578_health_fails_for_blocked_runtime_candidates).
+
+    Per SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 v2, runtime blockers on still-eligible
+    LO recipients yield WARN, not FAIL: prime-builder and the LO harnesses remain
+    dispatch-eligible. The per-recipient runtime-failure findings are still emitted.
+    """
     _write_project(tmp_path)
     _write_dispatch_state(
         tmp_path,
@@ -494,7 +499,7 @@ def test_wi4578_health_fails_for_blocked_runtime_candidates(tmp_path: Path) -> N
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "FAIL"
+    assert status.health_status == "WARN"
     findings = "\n".join(status.health_findings)
     assert "last_launch.reason=spawn_rate_limited" in findings
     assert "reason=ollama_dispatch_not_ready" in findings
@@ -502,8 +507,12 @@ def test_wi4578_health_fails_for_blocked_runtime_candidates(tmp_path: Path) -> N
     assert "failure_class=process_terminated_abruptly" in findings
 
 
-def test_wi4578_health_fails_for_exit_zero_no_verdict_evidence(tmp_path: Path) -> None:
-    """Exit-zero LO completion without a verdict is runtime failure evidence."""
+def test_wi4789_exit_zero_no_verdict_warns_when_role_dispatchable(tmp_path: Path) -> None:
+    """WI-4789 reconciliation (was test_wi4578_health_fails_for_exit_zero_no_verdict_evidence).
+
+    Exit-zero-no-verdict runtime-failure evidence on a still-eligible LO recipient
+    yields WARN, not FAIL, per SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 v2.
+    """
     _write_project(tmp_path)
     _write_dispatch_state(
         tmp_path,
@@ -519,7 +528,7 @@ def test_wi4578_health_fails_for_exit_zero_no_verdict_evidence(tmp_path: Path) -
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "FAIL"
+    assert status.health_status == "WARN"
     assert any("last_launch.exit_failure_reason=no_verdict_produced" in f for f in status.health_findings)
 
 
@@ -596,8 +605,11 @@ def test_wi4718_no_findings_when_no_pending_work(tmp_path: Path) -> None:
     assert findings == []
 
 
-def test_wi4718_genuine_launch_reason_still_fails(tmp_path: Path) -> None:
-    """A genuine failure reason (spawn_rate_limited) still produces a runtime failure."""
+def test_wi4718_genuine_launch_reason_emits_runtime_failure_finding(tmp_path: Path) -> None:
+    """A genuine failure reason (spawn_rate_limited) still produces a runtime-failure
+    FINDING (WI-4718, unchanged). WI-4789 reconciliation: overall health_status is now
+    WARN, not FAIL, because the recipient and prime-builder remain dispatch-eligible
+    (SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 v2)."""
     _write_project(tmp_path)
     _write_dispatch_state(
         tmp_path,
@@ -613,7 +625,7 @@ def test_wi4718_genuine_launch_reason_still_fails(tmp_path: Path) -> None:
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "FAIL"
+    assert status.health_status == "WARN"
     assert any("last_result=launch_failed" in f for f in status.health_findings)
 
 
@@ -830,3 +842,84 @@ slug = "archived-new"
     assert [thread["document"] for thread in result["actionable"]] == ["live-new"]
     assert [thread["document"] for thread in result["excluded_archived"]] == ["archived-new"]
     assert result["summary"] == {"NEW": 1}
+
+
+def test_wi4789_circuit_breaker_warns_when_role_dispatchable(tmp_path: Path) -> None:
+    """SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 A.1: a tripped circuit breaker with
+    pending work on a still-eligible recipient yields WARN, not FAIL."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "pending_count": 2,
+                "selected_count": 1,
+                "circuit_breaker_tripped": True,
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    assert any("circuit breaker is tripped" in f for f in status.health_findings)
+
+
+def test_wi4789_empty_loyal_opposition_role_fails(tmp_path: Path) -> None:
+    """SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 A.2: a required role with no
+    dispatch-eligible harness yields FAIL (per-role impossibility)."""
+    harnesses = [
+        {
+            "id": "A",
+            "harness_name": "codex",
+            "harness_type": "codex",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_fire_events": True,
+            "can_receive_dispatch": True,
+            "event_driven_hooks": True,
+            "reviewer_precedence": 20,
+        }
+    ]
+    _write_project(tmp_path, harnesses=harnesses)
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "FAIL"
+    assert status.selected_by_role["loyal-opposition"] == []
+    assert any("loyal-opposition" in f and "no active" in f for f in status.health_findings)
+
+
+def test_wi4789_config_error_fails(tmp_path: Path) -> None:
+    """SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 A.3: a dispatch configuration error
+    yields FAIL (the config-error FAIL trigger is preserved by the per-role boundary)."""
+    _write_project(tmp_path, rules="[unclosed-table\n")
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "FAIL"
+    assert any(f.startswith("config error") for f in status.health_findings)
+
+
+def test_wi4789_observed_defect_regression(tmp_path: Path) -> None:
+    """SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 A.5: the observed defect — a runtime
+    failure on a still-eligible loyal-opposition recipient while prime-builder remains
+    dispatchable — yields WARN, not FAIL (gt bridge dispatch status read FAIL while
+    harness B was dispatchable)."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "failure_class": "process_terminated_abruptly",
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
+    assert any("dispatch runtime failure" in f for f in status.health_findings)

@@ -316,14 +316,16 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     runtime_findings, runtime_classifications = _runtime_dispatch_evaluation(root, selected_by_role)
     findings.extend(runtime_findings)
 
+    # WI-4789 / SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 v2 (per-role FAIL):
+    # overall health is FAIL only for genuine dispatch impossibility — a
+    # configuration error, or a required role with no dispatch-eligible harness
+    # (the per-role "no active dispatchable" finding). Selection ignores runtime
+    # backoff, so that finding reflects config/topology impossibility, not a
+    # transient state. A recoverable "dispatch runtime failure" finding (e.g. a
+    # tripped circuit breaker) on a still-eligible harness yields WARN, not FAIL.
     health = (
         "FAIL"
-        if any(
-            "no active dispatchable" in finding
-            or finding.startswith("config error")
-            or finding.startswith("dispatch runtime failure")
-            for finding in findings
-        )
+        if any("no active dispatchable" in finding or finding.startswith("config error") for finding in findings)
         else "PASS"
     )
     if health == "PASS" and findings:
