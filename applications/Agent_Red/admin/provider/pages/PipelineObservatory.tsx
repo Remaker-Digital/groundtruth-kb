@@ -159,7 +159,8 @@ function formatLatency(ms: number): string {
 // Traffic Flow Tab (SPEC-1585)
 // ---------------------------------------------------------------------------
 
-function TrafficFlowTab() {
+// Exported for isolated Vitest component coverage (WI-3221); behavior-neutral.
+export function TrafficFlowTab() {
   const { apiFetch, onNotify } = useProviderContext();
   const [data, setData] = useState<TopologyResponse | null>(null);
   const [loading, setLoading] = useState(true);
