@@ -41,6 +41,7 @@ from groundtruth_kb.cli_deliberations_record import (
     record_deliberation,
 )
 from groundtruth_kb.cli_session_handoff import session_group
+from groundtruth_kb.cli_skills import skills_group
 from groundtruth_kb.cli_spec_record import SPEC_RECORD_TYPES, SpecRecordError, SpecRecordRequest, record_spec
 from groundtruth_kb.cli_spec_update import SpecUpdateError, SpecUpdateRequest, update_spec
 from groundtruth_kb.coherence import (
@@ -186,6 +187,7 @@ def main(ctx: click.Context, config_path: str | None) -> None:
 
 main.add_command(bridge_group)
 main.add_command(session_group)
+main.add_command(skills_group)
 
 
 @main.group("admin")

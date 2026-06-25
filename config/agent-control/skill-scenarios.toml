@@ -1,0 +1,48 @@
+# Skill-Usage Scenario Table — SPEC-SKILL-USAGE-ROUTER-001 (R2, R3)
+#
+# Deterministic, report-only skill-usage router source table. Maps each of the 6
+# initial scenarios to required skills, recommended skills, and a rationale.
+# Retuning this table does NOT require a change to scripts/skill_usage_router.py
+# (R2). Skill names are advisory suggestions; the router never reads or mutates
+# skill CONTENT (R8).
+#
+# Source: INSIGHTS-2026-05-15-14-35-skill-usage-advisory (Opportunity #1 / F3
+# consistent-use table); owner grilling DELIB-20265895; SPEC-SKILL-USAGE-ROUTER-001.
+
+schema_version = 1
+
+[scenarios.lo_bridge_review]
+title = "Loyal Opposition reviews a NEW/REVISED bridge proposal"
+required = ["gtkb-bridge", "proposal-review"]
+recommended = ["check-deliberations", "lo-opportunity-radar"]
+rationale = "Reviewing a NEW/REVISED bridge proposal: drive the bridge protocol and run a structured proposal review; search prior deliberations and scan for token-savings / automation opportunities before issuing GO/NO-GO."
+
+[scenarios.lo_verify_report]
+title = "Loyal Opposition verifies a post-implementation report"
+required = ["verify", "gtkb-bridge"]
+recommended = ["check-deliberations", "lo-opportunity-radar"]
+rationale = "Verifying a post-implementation report: author the VERIFIED/NO-GO verdict via the verify skill against spec-derived tests, finalized through the bridge protocol."
+
+[scenarios.advisory_report]
+title = "Advisory / insight report request"
+required = ["codex-report"]
+recommended = ["lo-opportunity-radar", "check-deliberations"]
+rationale = "Producing an advisory / insight report: use the structured Loyal Opposition report skill with the required evidence structure; bias toward token-savings and deterministic-service opportunities."
+
+[scenarios.harness_surface_change]
+title = "Harness / hook / role / adapter / startup / skill / MCP / plugin change"
+required = ["harness-parity-review"]
+recommended = ["structural-hygiene-review"]
+rationale = "Changing a harness surface (hook, role, adapter, startup, skill, MCP, plugin): review cross-harness parity and structural/authority alignment so Claude / Codex / Antigravity stay consistent."
+
+[scenarios.session_wrap]
+title = "Session wrap-up"
+required = ["kb-session-wrap-scan"]
+recommended = ["decision-capture", "gtkb-sweep-commit"]
+rationale = "Wrapping up a session: run the read-only wrap-up scanner first; capture owner decisions to the Deliberation Archive; sweep-commit verified work only when explicitly authorized."
+
+[scenarios.release_readiness]
+title = "Release / deploy readiness"
+required = ["release-candidate-gate"]
+recommended = ["open-items"]
+rationale = "Assessing release / deploy readiness: run the non-deploying release-candidate gate for governed test evidence; review genuinely-open work items and release blockers."

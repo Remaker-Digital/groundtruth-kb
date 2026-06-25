@@ -6964,6 +6964,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             f"- Harness self-identification: {role.get('harness_id', 'unidentified')}",
             f"- Harness identity source: {role.get('harness_identity_source', 'unidentified')}",
             f"- Work subject: {model.get('current_work_subject') or 'gtkb_infrastructure/default'}",
+            *_suggested_skills_lines(model),
             f"- Dashboard URL: {result['dashboard_url']}",
             f"- Dashboard data: `{data_path}`",
             f"- Dashboard JSON: `{dashboard_path}`",
@@ -6979,6 +6980,36 @@ def _startup_service_context(result: dict[str, Any]) -> str:
             *loyal_opposition_context,
         ]
     )
+
+
+def _suggested_skills_lines(model: dict[str, Any]) -> list[str]:
+    """Report-only suggested-skills advisory line for the resolved role (SPEC-SKILL-USAGE-ROUTER-001 R7).
+
+    Returns a single-line list, or an empty list on ANY router error so the caller omits
+    the line and startup is never broken (R7 fail-safe / AC5). The line is harness-agnostic
+    text in the shared payload, so it renders identically across Claude / Codex / Antigravity.
+    """
+    try:
+        role = model.get("role") or {}
+        resolved = role.get("interactive_resolved_role") or role.get("assumed_role") or ""
+        normalized = str(resolved).strip().lower().replace(" ", "-")
+        role_scenario = {"loyal-opposition": "lo_bridge_review"}.get(normalized)
+        import scripts.skill_usage_router as _router
+
+        suggestion = _router.suggest(scenario=role_scenario, role=str(resolved) or None)
+        if suggestion.scenario is None:
+            return [
+                "- Suggested skills: no scenario-specific suggestion at startup; "
+                "run `gt skills suggest` per task (report-only).",
+            ]
+        required = ", ".join(suggestion.required) or "(none)"
+        recommended = ", ".join(suggestion.recommended) or "(none)"
+        return [
+            f"- Suggested skills ({suggestion.scenario}): required {required}; "
+            f"recommended {recommended} (report-only).",
+        ]
+    except Exception:  # noqa: BLE001 — report-only fail-safe: never break startup (R7)
+        return []
 
 
 def _minimized_startup_disclosure(result: dict[str, Any]) -> str:
@@ -7011,6 +7042,11 @@ def _minimized_startup_disclosure(result: dict[str, Any]) -> str:
             "### Compact Project State",
             "",
             _render_current_project_state(model),
+            *(
+                ["", "### Suggested Skills (report-only)", "", *_suggested_skills_lines(model)]
+                if _suggested_skills_lines(model)
+                else []
+            ),
             "",
             "### Init Scope",
             "",
