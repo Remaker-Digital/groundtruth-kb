@@ -236,3 +236,97 @@ def test_bridge_id_resolution_uses_revised_proposal_under_go(module, tmp_path) -
     assert result["content_file"] == f"bridge/{slug}-003.md"
     assert result["target_paths"] == ["platform_tests/scripts/test_final.py"]
     assert result["verdict"] == "clean"
+
+
+# --- B#2 delta (WI-4809): prose-file-claim + integration-surface coverage ---
+
+
+def test_prose_claimed_uncovered_path_is_reported(module, tmp_path) -> None:
+    proposal = _write_proposal(
+        tmp_path,
+        ["scripts/example.py"],
+        "This slice will add scripts/brand_new_guard.py to the tree.",
+    )
+
+    result, exit_code = module.run_preflight(tmp_path, content_file=str(proposal))
+
+    assert result["implied_prose_paths"] == ["scripts/brand_new_guard.py"]
+    assert result["uncovered_prose_paths"] == ["scripts/brand_new_guard.py"]
+    assert result["verdict"] == "gaps"
+    assert exit_code == module.EXIT_OK  # advisory by default
+
+
+def test_prose_claimed_covered_path_not_reported(module, tmp_path) -> None:
+    proposal = _write_proposal(
+        tmp_path,
+        ["scripts/brand_new_guard.py"],
+        "This slice will add scripts/brand_new_guard.py to the tree.",
+    )
+
+    result, _exit_code = module.run_preflight(tmp_path, content_file=str(proposal))
+
+    assert result["implied_prose_paths"] == ["scripts/brand_new_guard.py"]
+    assert result["uncovered_prose_paths"] == []
+
+
+def test_prose_reference_without_intent_cue_not_flagged(module, tmp_path) -> None:
+    proposal = _write_proposal(
+        tmp_path,
+        ["scripts/example.py"],
+        "It is distinct from scripts/bridge_proposal_wi_id_collision_check.py in scope.",
+    )
+
+    result, _exit_code = module.run_preflight(tmp_path, content_file=str(proposal))
+
+    assert result["implied_prose_paths"] == []
+    assert result["uncovered_prose_paths"] == []
+
+
+def test_integration_surface_classified_and_uncovered(module, tmp_path) -> None:
+    proposal = _write_proposal(
+        tmp_path,
+        ["scripts/example.py"],
+        "This slice will modify config/agent-control/harness-capability-registry.toml.",
+    )
+
+    result, _exit_code = module.run_preflight(tmp_path, content_file=str(proposal))
+
+    assert "config/agent-control/harness-capability-registry.toml" in result["implied_integration_paths"]
+    assert "config/agent-control/harness-capability-registry.toml" in result["uncovered_integration_paths"]
+    assert result["verdict"] == "gaps"
+
+
+def test_additive_keys_present_and_empty_on_command_only(module, tmp_path) -> None:
+    proposal = _write_proposal(
+        tmp_path,
+        [
+            "scripts/proposal_target_paths_coverage_preflight.py",
+            "platform_tests/scripts/test_x.py",
+        ],
+        "    .venv/Scripts/python.exe -m pytest platform_tests/scripts/test_x.py -q",
+    )
+
+    result, _exit_code = module.run_preflight(tmp_path, content_file=str(proposal))
+
+    for key in (
+        "implied_prose_paths",
+        "implied_integration_paths",
+        "uncovered_prose_paths",
+        "uncovered_integration_paths",
+    ):
+        assert key in result
+    assert result["implied_prose_paths"] == []
+    assert result["uncovered_prose_paths"] == []
+
+
+def test_strict_exits_nonzero_on_uncovered_prose(module, tmp_path) -> None:
+    proposal = _write_proposal(
+        tmp_path,
+        ["scripts/example.py"],
+        "This slice will create scripts/another_new.py for the guard.",
+    )
+
+    result, exit_code = module.run_preflight(tmp_path, content_file=str(proposal), strict=True)
+
+    assert result["uncovered_prose_paths"] == ["scripts/another_new.py"]
+    assert exit_code == module.EXIT_STRICT_GAPS
