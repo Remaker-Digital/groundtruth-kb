@@ -44,7 +44,10 @@ def test_watchdog_has_noncodex_threshold_trip() -> None:
 
     assert "$NONCODEX_THRESHOLD = 15" in text
     assert "$noncodexCount -gt $NONCODEX_THRESHOLD" in text
-    assert "GTKB_NO_CROSS_HARNESS_TRIGGER" in text
+    # WI-4780: the watchdog still DETECTS the storm population and intervenes
+    # (corpse-reaping); it no longer auto-asserts the kill-switch
+    # (SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001). The kill-switch-presence
+    # assertion is removed; see test_watchdog_does_not_auto_assert_kill_switch.
     assert "noncodexThreshold=$NONCODEX_THRESHOLD" in text
 
 
@@ -88,6 +91,23 @@ def test_watchdog_preserves_heartbeat_and_logrotate() -> None:
     assert "codex=$codexCount" in text
     assert "family=$familyCount" in text
     assert "noncodex=$noncodexCount" in text
-    assert "GTKB_NO_CROSS_HARNESS_TRIGGER" in text
+    # WI-4780: kill-switch-presence assertion removed (the watchdog no longer
+    # auto-asserts it); heartbeat + logrotate observability is preserved.
     assert "Move-Item $log" in text
     assert "1MB" in text
+
+
+def test_watchdog_does_not_auto_assert_kill_switch() -> None:
+    """WI-4780 / SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001 A.1: the watchdog
+    MUST NOT auto-assert the global GTKB_NO_CROSS_HARNESS_TRIGGER kill-switch.
+
+    Storm protection is the verified concurrency cap (WI-4472) and the
+    worker-lifetime timeout (WI-4806); corpse-reaping is retained but the
+    set-only kill-switch latch is removed (DELIB-20265877, DELIB-20260612).
+    """
+    text = _watchdog_text()
+
+    assert "SetEnvironmentVariable('GTKB_NO_CROSS_HARNESS_TRIGGER'" not in text
+    assert "kill-switch=not-asserted" in text
+    # corpse-reaping retained (WI-4780 option a: reap, do not latch)
+    assert "Stop-Process -Id $p.ProcessId" in text
