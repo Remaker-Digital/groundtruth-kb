@@ -95,7 +95,8 @@ const STEP_LABELS: Record<string, string> = {
  * Parse a semver-style version string and return the next patch version.
  * Handles formats: "v1.98.15", "1.98.15", "v1.98"
  */
-function suggestNextVersion(version: string): string {
+// Exported for isolated Vitest coverage (WI-3224); behavior-neutral.
+export function suggestNextVersion(version: string): string {
   const match = version.match(/^(v?)(\d+)\.(\d+)(?:\.(\d+))?/);
   if (!match) return '';
   const prefix = match[1]; // 'v' or ''
