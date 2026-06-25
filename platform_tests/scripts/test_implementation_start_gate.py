@@ -723,7 +723,7 @@ def test_project_authorization_requires_work_item_membership_or_inclusion(tmp_pa
     )
     _write_thread(tmp_path, proposal=proposal)
 
-    with pytest.raises(auth.AuthorizationError, match="neither included in nor an active member"):
+    with pytest.raises(auth.AuthorizationError, match="not an active member of project"):
         auth.create_authorization_packet(tmp_path, "sample-implementation")
 
 
