@@ -12,7 +12,7 @@
     "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
     "authority_mode": "cache_only_pending_init_keyword"
   },
-  "generated_at": "2026-06-25T01:08:15Z",
-  "byte_length": 16521,
-  "sha256": "fdf42e6f9c4535edeedd8e7030687996a4606c212fad01d4fe2c7ce84a175ffd"
+  "generated_at": "2026-06-25T08:24:17Z",
+  "byte_length": 16683,
+  "sha256": "44a56547c924341236ffe175c49c5beecb8d1762b2ab902539eb275cec3621a3"
 }

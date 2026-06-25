@@ -1,6 +1,6 @@
 # GroundTruth-KB Fresh Session Startup
 
-Generated: 2026-06-25T01:05:49Z
+Generated: 2026-06-25T08:24:01Z
 Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/groundtruth-kb-dashboard
 
 ## Startup Disclosure
@@ -26,8 +26,8 @@ Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/ground
 
 - GT-KB release blockers: 0
 - GT-KB active backlog items: 0
-- GT-KB open MemBase work items: 16
-- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 91
+- GT-KB open MemBase work items: 11 (subject-scoped; 255 across all subjects)
+- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 86
 - GT-KB drift changed paths: 1
 - GT-KB Testing/tool rollup: 0 failing, 2 manual, 15 ready/passing (queried repo: unknown)
 - Active harness role slot: `prime-builder` (prime-builder, loyal-opposition, or shared)

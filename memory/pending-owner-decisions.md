@@ -8599,6 +8599,86 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-25T06:34:57.239414Z
   answer: "Your questions have been answered: \"WI-4772 + WI-4775 are finished work (covered by the VERIFIED gtkb-verified-finalization-validation-hardening thread, acceptance criteria a strict subset of the verified WI-4773) but stuck open on a metadata-linkage gap. How should I clear them to retire may29-hygiene?\"=\"Owner-approve resolve → retire\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1389
+  asked_at: 2026-06-25T08:30:34.928339Z
+  question: "All autonomously-drivable Phase 0 items (WI-4789, WI-4780, WI-4806) are VERIFIED + committed, and no Prime-actionable bridge work remains. What should I do next?"
+  options:
+    - "Scope WI-4670 (read-only diagnosis)"
+    - "Wrap the session"
+    - "Other priority"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f440d6124eba0411
+  resolved_at: 2026-06-25T08:30:34.928339Z
+  answer: "Your questions have been answered: \"All autonomously-drivable Phase 0 items (WI-4789, WI-4780, WI-4806) are VERIFIED + committed, and no Prime-actionable bridge work remains. What should I do next?\"=\"Scope WI-4670 (read-only diagnosis)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1390
+  asked_at: 2026-06-25T08:30:34.928339Z
+  question: "WI-4670 scoping is done: transport retry (WI-4817) + kill-switch + false-FAIL are already resolved; the real remaining root cause is worker subprocess_execution_failed (launch-path failure, cross-harness), plus a rules.toml-vs-registry config drift. How should I proceed?"
+  options:
+    - "Continue diagnosis (read-only)"
+    - "Capture findings to WI-4670 + stop"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5995d416cee3a23c
+  resolved_at: 2026-06-25T08:30:34.928339Z
+  answer: "Your questions have been answered: \"WI-4670 scoping is done: transport retry (WI-4817) + kill-switch + false-FAIL are already resolved; the real remaining root cause is worker subprocess_execution_failed (launch-path failure, cross-harness), plus a rules.toml-vs-registry config drift. How should I proceed?\"=\"Continue diagnosis (read-only)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1391
+  asked_at: 2026-06-25T08:30:34.928339Z
+  question: "WI-4670 read-only diagnosis is complete and reframed: the dominant failure is dispatched workers being killed mid-task during storms (even codex, exit 0xFFFFFFFF mid-verdict), not a cloud-shim bug. How should I close out this scoping?"
+  options:
+    - "Capture diagnosis to WI-4670 + stop"
+    - "Design the controlled dispatch test"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c62f24273969c20c
+  resolved_at: 2026-06-25T08:30:34.928339Z
+  answer: "Your questions have been answered: \"WI-4670 read-only diagnosis is complete and reframed: the dominant failure is dispatched workers being killed mid-task during storms (even codex, exit 0xFFFFFFFF mid-verdict), not a cloud-shim bug. How should I close out this scoping?\"=\"Capture diagnosis to WI-4670 + stop\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1392
+  asked_at: 2026-06-25T08:39:49.770115Z
+  question: "Phase-0 fixes are all VERIFIED. Dispatch is safe-but-off (registry can_receive_dispatch=False vs rules.toml=True drift; kill-switch already cleared). How should I proceed?"
+  options:
+    - "Restore dispatch, then Phase 1"
+    - "Phase 1 now, dispatch stays off"
+    - "Investigate the drift first"
+    - "Pause — I'll direct"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e9621aa6c826bf45
+  resolved_at: 2026-06-25T08:39:49.770115Z
+  answer: "Your questions have been answered: \"Phase-0 fixes are all VERIFIED. Dispatch is safe-but-off (registry can_receive_dispatch=False vs rules.toml=True drift; kill-switch already cleared). How should I proceed?\"=\"Phase 1 now, dispatch stays off\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1393
+  asked_at: 2026-06-25T08:39:49.770115Z
+  question: "The umbrella-ADR proposal is drafted and gate-clean. Filing it needs a formal WI-4786 implementation authorization (GOV-ARTIFACT-APPROVAL-001). Authorize it?"
+  options:
+    - "Authorize + file"
+    - "Defer filing"
+    - "Revise ADR scope first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b2e11253c2ef3349
+  resolved_at: 2026-06-25T08:39:49.770115Z
+  answer: "Your questions have been answered: \"The umbrella-ADR proposal is drafted and gate-clean. Filing it needs a formal WI-4786 implementation authorization (GOV-ARTIFACT-APPROVAL-001). Authorize it?\"=\"Authorize + file\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1394
+  asked_at: 2026-06-25T08:39:49.770115Z
+  question: "Filing the (ready, gate-clean) umbrella-ADR proposal is blocked because an agent can't mint the WI-4786 PAUTH (GOV-ARTIFACT-APPROVAL gate, no packet-capture flow). How do you want to resolve it?"
+  options:
+    - "You mint the PAUTH, I file"
+    - "Fix the authorization tooling first"
+    - "I try a deeper packet workaround"
+    - "Pause — I'll direct"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 13219b309f3bbbeb
+  resolved_at: 2026-06-25T08:39:49.770115Z
+  answer: "Your questions have been answered: \"Filing the (ready, gate-clean) umbrella-ADR proposal is blocked because an agent can't mint the WI-4786 PAUTH (GOV-ARTIFACT-APPROVAL gate, no packet-capture flow). How do you want to resolve it?\"=\"You mint the PAUTH, I file\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
