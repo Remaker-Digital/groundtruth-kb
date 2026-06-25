@@ -85,6 +85,15 @@ class VerifiedFinalizationResult:
         }
 
 
+def append_skills_applied_disclosure(body: str, skills: list[str] | None) -> str:
+    """Append the canonical Skills applied line when *skills* is not None (report-only)."""
+    if skills is None:
+        return body
+    from scripts.skill_disclosure import format_skills_applied
+
+    return body.rstrip() + "\n\n" + format_skills_applied(skills) + "\n"
+
+
 def seed_prior_deliberations(
     slug: str,
     body: str,
@@ -593,12 +602,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--commit-message", help="Commit message for --finalize-verified.")
     parser.add_argument("--project-root", type=Path, help="Project root for --finalize-verified.")
+    parser.add_argument(
+        "--skills-applied",
+        action="append",
+        default=[],
+        help="Skill name for the Skills applied disclosure line (repeatable; report-only).",
+    )
     args = parser.parse_args(argv)
 
     if args.body_file is not None:
         body = args.body_file.read_text(encoding="utf-8")
     else:
         body = sys.stdin.read()
+
+    if args.skills_applied:
+        body = append_skills_applied_disclosure(body, args.skills_applied)
 
     log_path = False if args.no_log else DEFAULT_VERDICT_PREPOPULATION_LOG
     if args.finalize_verified:

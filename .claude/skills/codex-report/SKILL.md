@@ -62,4 +62,12 @@ Update `independent-progress-assessments/loyal-opposition-log.md` if any Open it
 - **P2**: Important improvement that should be planned
 - **P3**: Nice-to-have or future consideration
 
+## Skills applied disclosure (report-only)
+
+When completing this report, append a machine-parseable self-disclosure line listing skills you invoked during authoring. Use the shared emitter in `scripts/skill_disclosure.py`:
+
+- Call `format_skills_applied([...])` or author the equivalent line using the same canonical format.
+- Canonical format: `Skills applied: <comma-separated skill names>`; use `Skills applied: (none)` when none apply.
+- Report-only: this line is advisory input for future `gt skills check` (WI-4810); it does not gate publishing.
+
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
