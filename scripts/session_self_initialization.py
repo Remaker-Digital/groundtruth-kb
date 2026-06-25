@@ -3588,6 +3588,7 @@ def build_startup_model(
             "Standing backlog is the governed cross-session work authority",
             "Strategic self-improvement directive: Prime Builder and Loyal Opposition capture noticed fix-worthy issues and useful workflow enhancements as review/consideration backlog items in MemBase, not MEMORY.md; backlog capture is not implementation approval; implementation-approved backlog items require AskUserQuestion evidence; executing a consideration item means presenting insight/options and obtaining AskUserQuestion approval before implementation proposal work",
             "GT-KB adoption and release-readiness evidence remain release-gate visible",
+            "Published-state SoT-deference (GOV-GTKB-PUBLISHED-STATE-SOT-DEFERENCE-001): GT-KB-subject sessions defer to the released public-repo Main plus public issues tracker and wiki as the authoritative published-state source-of-truth before contemplating GT-KB changes (confirm whether already decided upstream; ensure consistency or knowingly supersede); GT-KB leads the repo, adopters trail it; application-subject sessions emit cross-scope advisories, not direct GT-KB changes (WI-4690)",
             "Harness hook limitations require parity checks and explicit fallback disclosure",
         ],
         "skills": {

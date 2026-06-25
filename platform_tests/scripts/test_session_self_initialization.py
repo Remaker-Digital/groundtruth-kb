@@ -284,6 +284,10 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
     assert "Do NOT create new bridge automations" in model["role"]["bridge_operation_instructions"]
     assert "Strict GOV enforcement" in model["governance_stance"][0]
     assert "Formal artifact approval" in " ".join(model["governance_stance"])
+    # WI-4689: the published-state SoT-deference directive is surfaced at startup.
+    _stance_text = " ".join(model["governance_stance"])
+    assert "Published-state SoT-deference" in _stance_text
+    assert "GOV-GTKB-PUBLISHED-STATE-SOT-DEFERENCE-001" in _stance_text
     assert model["skills"]["count"] > 0
     assert "harness-registry.json" in model["role"]["role_mapping_source"]
     assert model["role"]["interactive_resolved_role"] == "Prime Builder"
