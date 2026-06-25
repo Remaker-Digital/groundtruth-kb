@@ -1,10 +1,10 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-25T00:40:09Z",
+  "generated_at": "2026-06-25T05:05:13Z",
   "harnesses": [
     {
       "can_fire_events": true,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
       "dispatch_cost": 60.0,
@@ -39,7 +39,7 @@
     },
     {
       "can_fire_events": true,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 75.0,
       "dispatch_cost": 60.0,
@@ -74,7 +74,7 @@
     },
     {
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 80.0,
       "dispatch_cost": 30.0,
@@ -107,12 +107,12 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "active",
-      "version": 25
+      "status": "retired",
+      "version": 27
     },
     {
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 95.0,
       "dispatch_cost": 30.0,
@@ -148,7 +148,7 @@
     },
     {
       "can_fire_events": true,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,
@@ -185,7 +185,7 @@
     },
     {
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,
