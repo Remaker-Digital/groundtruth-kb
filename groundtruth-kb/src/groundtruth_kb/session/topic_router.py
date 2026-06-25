@@ -14,19 +14,23 @@ from groundtruth_kb.activity.profiles import ActivityProfileError, load_activity
 from groundtruth_kb.session.envelope import (
     TOPIC_TYPES,
     EnvelopeError,
+    close_current_topic,
     close_topic,
     open_topic,
     utc_now_iso,
 )
 
 _TOPIC_TYPE_PATTERN = "|".join(TOPIC_TYPES)
-TOPIC_COMMAND_RE = re.compile(rf"^::(?P<action>open|close) (?P<topic>{_TOPIC_TYPE_PATTERN})$")
+TOPIC_OPEN_RE = re.compile(rf"^::open (?P<topic>{_TOPIC_TYPE_PATTERN})$")
+# Single-active (SPEC-TOPIC-ENVELOPE-ROUTER-001 v3 / DCL-TOPIC-ENVELOPE-ROUTING-001
+# v3 clause 7): bare ``::close`` and the typed ``::close <type>`` are both accepted.
+TOPIC_CLOSE_RE = re.compile(rf"^::close( (?P<topic>{_TOPIC_TYPE_PATTERN}))?$")
 
 
 @dataclass(frozen=True)
 class TopicCommand:
     action: Literal["open", "close"]
-    topic_type: str
+    topic_type: str | None
     raw: str
 
 
@@ -39,10 +43,14 @@ def first_non_blank_line(prompt: str) -> str:
 
 def parse_topic_command(prompt: str) -> TopicCommand | None:
     line = first_non_blank_line(prompt)
-    match = TOPIC_COMMAND_RE.fullmatch(line)
-    if not match:
-        return None
-    return TopicCommand(action=match.group("action"), topic_type=match.group("topic"), raw=line)  # type: ignore[arg-type]
+    open_match = TOPIC_OPEN_RE.fullmatch(line)
+    if open_match:
+        return TopicCommand(action="open", topic_type=open_match.group("topic"), raw=line)
+    close_match = TOPIC_CLOSE_RE.fullmatch(line)
+    if close_match:
+        # ``topic`` group is None for bare ``::close`` (close the current topic).
+        return TopicCommand(action="close", topic_type=close_match.group("topic"), raw=line)
+    return None
 
 
 def handle_topic_command(
@@ -52,11 +60,16 @@ def handle_topic_command(
     harness_name: str = "codex",
     harness_id: str | None = None,
 ) -> dict[str, object]:
-    if command.topic_type not in TOPIC_TYPES:
-        raise EnvelopeError(f"Unsupported topic type: {command.topic_type}")
     if command.action == "open":
+        if command.topic_type not in TOPIC_TYPES:
+            raise EnvelopeError(f"Unsupported topic type: {command.topic_type}")
         topic = open_topic(project_root, command.topic_type, harness_name=harness_name, harness_id=harness_id)
+    elif command.topic_type is None:
+        # Bare ``::close``: close the single currently-open topic (single-active).
+        topic = close_current_topic(project_root, harness_name=harness_name, harness_id=harness_id)
     else:
+        if command.topic_type not in TOPIC_TYPES:
+            raise EnvelopeError(f"Unsupported topic type: {command.topic_type}")
         topic = close_topic(project_root, command.topic_type, harness_name=harness_name, harness_id=harness_id)
     result = {
         "action": command.action,
@@ -244,13 +257,17 @@ def _render_ops_context(result: dict[str, object]) -> str:
 def render_topic_context(result: dict[str, object]) -> str:
     topic = result.get("topic") if isinstance(result.get("topic"), dict) else {}
     route_target = topic.get("route_target") if isinstance(topic, dict) else None
+    topic_type = result.get("topic_type")
+    # Bare ``::close`` (single-active) carries no topic_type; echo the command
+    # without the ``None`` literal and report the closed topic as "current".
+    command_echo = f"::{result['action']} {topic_type}" if topic_type else f"::{result['action']}"
     base = "\n".join(
         [
             "# GroundTruth-KB Topic Envelope Command",
             "",
-            f"`::{result['action']} {result['topic_type']}` accepted.",
+            f"`{command_echo}` accepted.",
             f"- action: {result['action']}",
-            f"- topic_type: {result['topic_type']}",
+            f"- topic_type: {topic_type if topic_type else 'current'}",
             f"- route_target: {route_target or 'n/a'}",
         ]
     )

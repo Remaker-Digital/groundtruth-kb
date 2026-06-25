@@ -11,8 +11,10 @@ from groundtruth_kb.session.envelope import (
     TOPIC_TYPES,
     EnvelopeError,
     archive_dir,
+    close_current_topic,
     close_topic,
     current_envelope_path,
+    load_current,
     open_session,
     open_topic,
 )
@@ -84,7 +86,7 @@ def test_open_session_without_role_uses_durable_registry_fallback(tmp_path: Path
     assert saved["role_resolution"]["authority_mode"] == "durable_registry_fallback"
 
 
-def test_topic_open_close_is_strict_and_one_per_type(tmp_path: Path) -> None:
+def test_topic_open_close_is_strict_and_single_active(tmp_path: Path) -> None:
     _seed_harness(tmp_path)
     open_session(tmp_path, harness_name="codex")
 
@@ -93,12 +95,70 @@ def test_topic_open_close_is_strict_and_one_per_type(tmp_path: Path) -> None:
     topic = open_topic(tmp_path, "spec", harness_name="codex")
     assert topic["route_target"] == "spec-governance-service"
     assert topic["preload_state"]["sources"]
-    with pytest.raises(EnvelopeError, match="already open"):
-        open_topic(tmp_path, "spec", harness_name="codex")
+
+    # Single-active (SPEC-TOPIC-ENVELOPE-ROUTER-001 v3 / WI-4685): re-opening
+    # supplants the current envelope rather than raising "already open".
+    second = open_topic(tmp_path, "spec", harness_name="codex")
+    assert second["closed_at"] is None
+    envelope = load_current(tmp_path, "codex")
+    open_topics = [t for t in envelope["topics"] if t["closed_at"] is None]
+    assert len(open_topics) == 1
+    assert open_topics[0]["type"] == "spec"
+    assert any(t["close_outcome"] == "auto_closed_by_open_supplant" for t in envelope["topics"])
 
     closed = close_topic(tmp_path, "spec", harness_name="codex")
     assert closed["closed_at"]
     assert closed["close_outcome"] == "closed"
+
+
+def test_open_topic_closes_current_topic_of_other_type(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex")
+
+    open_topic(tmp_path, "spec", harness_name="codex")
+    open_topic(tmp_path, "build", harness_name="codex")
+
+    envelope = load_current(tmp_path, "codex")
+    open_topics = [t for t in envelope["topics"] if t["closed_at"] is None]
+    assert len(open_topics) == 1
+    assert open_topics[0]["type"] == "build"
+    spec_topic = next(t for t in envelope["topics"] if t["type"] == "spec")
+    assert spec_topic["close_outcome"] == "auto_closed_by_open_supplant"
+
+
+def test_bare_close_closes_current_topic(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex")
+
+    open_topic(tmp_path, "build", harness_name="codex")
+    closed = close_current_topic(tmp_path, harness_name="codex")
+    assert closed is not None
+    assert closed["type"] == "build"
+    assert closed["close_outcome"] == "closed"
+
+    envelope = load_current(tmp_path, "codex")
+    assert [t for t in envelope["topics"] if t["closed_at"] is None] == []
+
+
+def test_bare_close_is_idempotent_noop_when_nothing_open(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex")
+
+    assert close_current_topic(tmp_path, harness_name="codex") is None
+    # Typed close with nothing open is also an idempotent no-op (not an error).
+    assert close_topic(tmp_path, "spec", harness_name="codex") is None
+
+
+def test_typed_close_type_mismatch_is_guidance_error(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex")
+
+    open_topic(tmp_path, "build", harness_name="codex")
+    with pytest.raises(EnvelopeError, match="open topic envelope is"):
+        close_topic(tmp_path, "spec", harness_name="codex")
+    # The build topic remains open after the rejected mismatched close.
+    envelope = load_current(tmp_path, "codex")
+    assert [t["type"] for t in envelope["topics"] if t["closed_at"] is None] == ["build"]
 
 
 def test_ops_topic_route_and_preload_are_available(tmp_path: Path) -> None:
@@ -113,8 +173,11 @@ def test_ops_topic_route_and_preload_are_available(tmp_path: Path) -> None:
         "support_user_activity",
         "ops_feedback_inputs",
     ]
-    with pytest.raises(EnvelopeError, match="already open"):
-        open_topic(tmp_path, "ops", harness_name="codex")
+    # Single-active (WI-4685): re-opening supplants rather than raising.
+    second = open_topic(tmp_path, "ops", harness_name="codex")
+    assert second["closed_at"] is None
+    envelope = load_current(tmp_path, "codex")
+    assert len([t for t in envelope["topics"] if t["closed_at"] is None]) == 1
 
 
 def test_run_wrap_archives_envelope_with_mandatory_step_results(tmp_path: Path) -> None:
@@ -147,9 +210,16 @@ def test_wrap_and_topic_command_parsers_are_strict() -> None:
     assert parse_topic_command("::open ops").topic_type == "ops"  # type: ignore[union-attr]
     assert parse_topic_command("::close ops").action == "close"  # type: ignore[union-attr]
     assert parse_topic_command("\n::close project\nnotes").action == "close"  # type: ignore[union-attr]
+    # Bare ::close is recognized (single-active close-current; WI-4685).
+    bare_close = parse_topic_command("::close")
+    assert bare_close is not None
+    assert bare_close.action == "close"
+    assert bare_close.topic_type is None
+    assert parse_topic_command("\n::close\nnotes").topic_type is None  # type: ignore[union-attr]
     assert parse_topic_command("::open") is None
     assert parse_topic_command("::open  spec") is None
     assert parse_topic_command("::close unknown") is None
+    assert parse_topic_command("::close ") is None  # trailing space stays strict
 
 
 def test_render_topic_context_injects_activity_profile_for_open(tmp_path: Path) -> None:

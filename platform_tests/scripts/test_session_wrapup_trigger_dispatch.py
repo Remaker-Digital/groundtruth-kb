@@ -40,6 +40,11 @@ def test_hook_recognizes_strict_topic_commands() -> None:
     assert ops_close is not None
     assert ops_close.action == "close"
     assert ops_close.topic_type == "ops"
+    # Bare ::close is recognized via the shared parser (single-active; WI-4685).
+    bare_close = hook.parse_topic_command("::close")
+    assert bare_close is not None
+    assert bare_close.action == "close"
+    assert bare_close.topic_type is None
     assert hook.parse_topic_command("::open  spec") is None
     assert hook.parse_topic_command("::close unknown") is None
 

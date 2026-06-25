@@ -317,9 +317,13 @@ def open_topic(
         raise EnvelopeError(f"Unsupported topic type: {topic_type}")
     resolved_name, _ = resolve_harness_identity(project_root, harness_name=harness_name, harness_id=harness_id)
     envelope = ensure_current(project_root, harness_name=resolved_name, harness_id=harness_id)
-    for topic in envelope.get("topics", []):
-        if topic.get("type") == topic_type and topic.get("closed_at") is None:
-            raise EnvelopeError(f"Topic envelope already open for type {topic_type!r}.")
+    # Single-active invariant (SPEC-TOPIC-ENVELOPE-ROUTER-001 v3 / WI-4685): at
+    # most one topic envelope may be open at a time. Opening a new topic closes
+    # the currently-open topic (auto-close + dispatch) before opening the new one.
+    for existing in envelope.get("topics", []):
+        if existing.get("closed_at") is None:
+            existing["closed_at"] = utc_now_iso()
+            existing["close_outcome"] = "auto_closed_by_open_supplant"
     topic = {
         "type": topic_type,
         "opened_at": utc_now_iso(),
@@ -333,6 +337,35 @@ def open_topic(
     return topic
 
 
+def _close_open_topic(
+    envelope: dict[str, Any],
+    *,
+    expected_type: str | None,
+    close_outcome: str,
+) -> dict[str, Any] | None:
+    """Close the single currently-open topic in ``envelope`` (single-active).
+
+    Returns the closed topic dict, or ``None`` when no topic is open (an
+    idempotent no-op per SPEC-TOPIC-ENVELOPE-ROUTER-001 v3). When
+    ``expected_type`` is given and the open topic is a different type, raises
+    :class:`EnvelopeError` (a guidance error) rather than silently closing the
+    wrong envelope.
+    """
+    open_topics = [t for t in envelope.get("topics", []) if t.get("closed_at") is None]
+    if not open_topics:
+        return None
+    current = open_topics[-1]
+    if expected_type is not None and current.get("type") != expected_type:
+        raise EnvelopeError(
+            f"::close {expected_type} but the open topic envelope is "
+            f"{current.get('type')!r}; close it with bare ::close or "
+            f"::close {current.get('type')}."
+        )
+    current["closed_at"] = utc_now_iso()
+    current["close_outcome"] = close_outcome
+    return current
+
+
 def close_topic(
     project_root: Path,
     topic_type: str,
@@ -340,18 +373,44 @@ def close_topic(
     harness_name: str = "codex",
     harness_id: str | None = None,
     close_outcome: str = "closed",
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
+    """Close the currently-open topic, asserting it is ``topic_type``.
+
+    Single-active invariant (WI-4685): at most one topic envelope is open.
+    ``::close <type>`` closes it when the open topic is ``topic_type``; a
+    type mismatch is a guidance error; nothing open is an idempotent no-op
+    (returns ``None``).
+    """
     if topic_type not in TOPIC_TYPES:
         raise EnvelopeError(f"Unsupported topic type: {topic_type}")
     resolved_name, _ = resolve_harness_identity(project_root, harness_name=harness_name, harness_id=harness_id)
     envelope = ensure_current(project_root, harness_name=resolved_name, harness_id=harness_id)
-    for topic in reversed(envelope.get("topics", [])):
-        if topic.get("type") == topic_type and topic.get("closed_at") is None:
-            topic["closed_at"] = utc_now_iso()
-            topic["close_outcome"] = close_outcome
-            write_current(project_root, resolved_name, envelope)
-            return dict(topic)
-    raise EnvelopeError(f"No open topic envelope for type {topic_type!r}.")
+    closed = _close_open_topic(envelope, expected_type=topic_type, close_outcome=close_outcome)
+    if closed is None:
+        return None
+    write_current(project_root, resolved_name, envelope)
+    return dict(closed)
+
+
+def close_current_topic(
+    project_root: Path,
+    *,
+    harness_name: str = "codex",
+    harness_id: str | None = None,
+    close_outcome: str = "closed",
+) -> dict[str, Any] | None:
+    """Close the single currently-open topic envelope (bare ``::close``).
+
+    Single-active invariant (WI-4685): at most one topic is open. Returns the
+    closed topic, or ``None`` if no topic is open (an idempotent no-op).
+    """
+    resolved_name, _ = resolve_harness_identity(project_root, harness_name=harness_name, harness_id=harness_id)
+    envelope = ensure_current(project_root, harness_name=resolved_name, harness_id=harness_id)
+    closed = _close_open_topic(envelope, expected_type=None, close_outcome=close_outcome)
+    if closed is None:
+        return None
+    write_current(project_root, resolved_name, envelope)
+    return dict(closed)
 
 
 def _default_wrap_step_results(
