@@ -1980,8 +1980,23 @@ def _self_review_refusal_reason(
     reviewer_session_context_id: str,
     project_root: Path,
 ) -> str | None:
-    """Refuse only same-session review; fail closed when session metadata is missing."""
+    """Refuse only same-session review; fail closed when session metadata is missing.
+
+    The author parse + session comparison are single-sourced via
+    ``scripts/bridge_review_independence.py`` (WI-4829) so the dispatch path, the
+    verdict-write-time gate, and the impl-start backstop share byte-identical
+    refusal semantics. The dispatch path keeps its own target resolution: the
+    latest versioned bridge file (the actionable item being dispatched for review).
+    When no versioned file exists yet there is nothing to self-review, so this
+    returns ``None`` rather than failing closed.
+    """
     import fnmatch
+
+    from bridge_review_independence import (
+        AUTHOR_SESSION_CONTEXT_UNREADABLE,
+        parse_author_session_context_id,
+        self_review_reason,
+    )
 
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
@@ -1990,36 +2005,24 @@ def _self_review_refusal_reason(
     pattern1 = f"gtkb-{bridge_id}-*.md"
     pattern2 = f"{bridge_id}-*.md"
 
-    candidate_files = []
-    for file in bridge_dir.glob("*.md"):
-        name = file.name
-        if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
-            candidate_files.append(file)
-
+    candidate_files = [
+        file
+        for file in bridge_dir.glob("*.md")
+        if fnmatch.fnmatch(file.name, pattern1) or fnmatch.fnmatch(file.name, pattern2)
+    ]
     if not candidate_files:
         return None
 
-    # Sort to find the latest version
     candidate_files.sort(key=lambda f: f.name)
     latest_file = candidate_files[-1]
 
     try:
         content = latest_file.read_text(encoding="utf-8")
-        # Parse the metadata header for author_session_context_id.
-        lines = content.splitlines()[:50]
-        for line in lines:
-            match = re.match(r"^author_session_context_id:\s*(\S+)", line.strip())
-            if match:
-                author_session_context_id = match.group(1).strip().strip('"').strip("'")
-                if not author_session_context_id:
-                    return "author_session_context_missing"
-                if author_session_context_id == reviewer_session_context_id:
-                    return "author_meets_reviewer_refused"
-                return None
     except Exception:
-        return "author_session_context_unreadable"
+        return AUTHOR_SESSION_CONTEXT_UNREADABLE
 
-    return "author_session_context_missing"
+    target_author = parse_author_session_context_id(content)
+    return self_review_reason(reviewer_session_context_id, target_author)
 
 
 def _poll_dispatch_verdict(

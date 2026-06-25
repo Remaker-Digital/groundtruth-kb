@@ -1579,6 +1579,41 @@ def _verdict_evidence_anchor_deny_reason(content: str, project_root: Path) -> st
     )
 
 
+def _verdict_self_review_deny(file_path: str, content: str, cwd_path: Path) -> str | None:
+    """Block a self-review GO/NO-GO/VERIFIED verdict at write time (WI-4829).
+
+    A verdict is a self-review when its ``author_session_context_id`` equals the
+    ``author_session_context_id`` of the artifact it reviews (resolved via the
+    verdict's ``Responds to:`` reference). Such a verdict is invalid under the
+    session-context review-independence rule and must not reach disk. Fails closed
+    on any refusal reason (equal author, missing/unreadable author metadata).
+
+    The comparator import and evaluation are defensive: an unavailable module or an
+    unexpected comparator error must never break legitimate bridge writes, so this
+    returns ``None`` (allow) in those cases — the impl-start backstop remains.
+    """
+    bridge_id = _extract_bridge_id_from_path(file_path)
+    if not bridge_id:
+        return None
+    try:
+        from scripts.bridge_review_independence import verdict_self_review_reason
+
+        project_root = _canonical_project_root(cwd_path)
+        reason = verdict_self_review_reason(content, bridge_id, project_root)
+    except Exception:
+        return None
+    if reason is None:
+        return None
+    return (
+        f"[Governance] Self-review bridge verdict blocked ({reason}): a GO/NO-GO/VERIFIED "
+        "verdict's author_session_context_id must be present and distinct from the reviewed "
+        "artifact's author session. Review independence is session-context based; a verdict "
+        "authored by the same session that authored the reviewed proposal/report is invalid "
+        "and fails closed. File the verdict from a different session context. "
+        "(Hard-block per WI-4829; GOV-DOCUMENT-AUTHOR-PROVENANCE-001; review-independence rule.)"
+    )
+
+
 def _deny_reason_for_content(
     *,
     cwd_path: Path,
@@ -1626,6 +1661,10 @@ def _deny_reason_for_content(
         if kind_err:
             return kind_err
         first_line = _first_nonblank_line(content)
+        if first_line in {"GO", "NO-GO", "VERIFIED"}:
+            self_review_deny = _verdict_self_review_deny(file_path, content, cwd_path)
+            if self_review_deny:
+                return self_review_deny
         if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
             return (
                 "[Governance] ADVISORY bridge reports must match the verified ADVISORY report template: "

@@ -973,6 +973,45 @@ def packet_hash(packet: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def _go_self_review_error(proposal_content: str, go_path: Path) -> None:
+    """Refuse a self-review GO at impl-start (WI-4829 defense-in-depth backstop).
+
+    Catches a ``GO`` whose ``author_session_context_id`` equals the reviewed
+    proposal's — a self-review that should never authorize implementation, even if
+    it reached disk through a path that bypassed the verdict-write-time gate. Fails
+    closed on the affirmative self-review and on missing/unreadable author metadata
+    (review independence cannot be *assumed* off ambiguous data). Current bridge
+    artifacts carry author metadata via the governed writer, so the missing case is
+    limited to legacy pre-provenance threads.
+
+    The comparator import is defensive: if the shared module is unavailable, this
+    check is skipped rather than breaking ``begin`` platform-wide (the
+    verdict-write-time gate remains the primary surface).
+    """
+    try:
+        from bridge_review_independence import (
+            parse_author_session_context_id,
+            self_review_reason,
+        )
+    except ImportError:
+        return
+
+    try:
+        go_content = go_path.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        raise AuthorizationError("GO verdict file is unreadable for the review-independence backstop") from exc
+    go_author = parse_author_session_context_id(go_content)
+    proposal_author = parse_author_session_context_id(proposal_content)
+    reason = self_review_reason(go_author, proposal_author)
+    if reason is not None:
+        raise AuthorizationError(
+            f"Self-review GO refused ({reason}): the GO verdict author session "
+            f"({go_author!r}) and the proposal author session ({proposal_author!r}) must be "
+            "present, distinct, and independent "
+            "(WI-4829; GOV-DOCUMENT-AUTHOR-PROVENANCE-001)."
+        )
+
+
 def create_authorization_packet(
     project_root: Path,
     bridge_id: str,
@@ -1014,6 +1053,11 @@ def create_authorization_packet(
 
     try:
         project_authorization = extract_and_validate_project_authorization(project_root, proposal, spec_links)
+    except AuthorizationError as exc:
+        errors.append(str(exc))
+
+    try:
+        _go_self_review_error(proposal, go_path)
     except AuthorizationError as exc:
         errors.append(str(exc))
 

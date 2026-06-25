@@ -457,6 +457,31 @@ def _auto_retire_completed_projects_after_verified(project_root: Path) -> tuple[
     return retired
 
 
+def _assert_verdict_review_independence(slug: str, body: str, project_root: Path) -> None:
+    """Fail closed if a verdict body is a self-review (WI-4829 write-time helper guard).
+
+    The verify helper writes verdicts via ``write_bridge_file`` (``write_bytes``),
+    which bypasses the bridge-compliance PreToolUse Write hook, so the same
+    self-review check is enforced here. A verdict whose ``author_session_context_id``
+    equals the reviewed artifact's (resolved via ``Responds to:``) is invalid under
+    the session-context review-independence rule. The comparator import is defensive
+    so an unavailable module never breaks finalization (the impl-start backstop
+    remains).
+    """
+    try:
+        from scripts.bridge_review_independence import verdict_self_review_reason
+    except ImportError:
+        return
+    reason = verdict_self_review_reason(body, slug, project_root)
+    if reason is not None:
+        raise VerifiedFinalizationError(
+            f"Self-review verdict refused ({reason}): the verdict author session must be present "
+            f"and distinct from the reviewed artifact's author session for {slug!r}. Review "
+            "independence is session-context based; file the verdict from a different session "
+            "context (WI-4829; GOV-DOCUMENT-AUTHOR-PROVENANCE-001)."
+        )
+
+
 def finalize_verified_commit(
     slug: str,
     body: str,
@@ -514,6 +539,8 @@ def finalize_verified_commit(
         commit_message=commit_message,
         paths=expected_paths,
     )
+
+    _assert_verdict_review_independence(slug, body_to_write, root)
 
     # Determine which expected paths are actually dirty/modified/untracked
     # so we only expect those to be staged after `git add`.
