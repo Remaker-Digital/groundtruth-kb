@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-24T22:14:58Z",
+  "generated_at": "2026-06-25T01:15:29Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -102,7 +102,7 @@
       "E": {
         "harness_type": "cursor",
         "role": [
-          "loyal-opposition"
+          "prime-builder"
         ],
         "status": "verified"
       },
@@ -703,11 +703,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -721,7 +721,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -735,7 +735,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {
