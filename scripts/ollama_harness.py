@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -36,6 +37,13 @@ except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected 
 
 DEFAULT_ENDPOINT = "http://localhost:11434"
 DEFAULT_TIMEOUT_SECONDS = 240.0
+
+# WI-4817: bounded retry for transient cloud transport failures so a dispatched
+# LO worker survives a transient hiccup and still produces a verdict. Total
+# backoff (1+2+4 = 7s) stays far under the 600s worker-lifetime cap (WI-4806).
+CHAT_MAX_ATTEMPTS = 3
+CHAT_RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)
+RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
 # WI-4734: full bridge verification can exceed the old 24-turn ceiling.
 DEFAULT_MAX_TURNS = 80
 ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
@@ -411,18 +419,33 @@ def call_ollama_chat(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
-            data = response.read().decode("utf-8")
-    except urllib.error.URLError as exc:
-        raise OllamaHarnessError(f"Ollama chat request failed: {exc}") from exc
-    try:
-        parsed = json.loads(data)
-    except json.JSONDecodeError as exc:
-        raise OllamaHarnessError(f"Ollama chat response was not JSON: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise OllamaHarnessError("Ollama chat response must be a JSON object")
-    return parsed
+    last_error: Exception | None = None
+    for attempt in range(1, CHAT_MAX_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+                data = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            if exc.code in RETRYABLE_HTTP_STATUS and attempt < CHAT_MAX_ATTEMPTS:
+                time.sleep(CHAT_RETRY_BACKOFF_SECONDS[attempt - 1])
+                continue
+            raise OllamaHarnessError(
+                f"Ollama chat request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            last_error = exc
+            if attempt < CHAT_MAX_ATTEMPTS:
+                time.sleep(CHAT_RETRY_BACKOFF_SECONDS[attempt - 1])
+                continue
+            raise OllamaHarnessError(f"Ollama chat request failed after {attempt} attempt(s): {exc}") from exc
+        try:
+            parsed = json.loads(data)
+        except json.JSONDecodeError as exc:
+            raise OllamaHarnessError(f"Ollama chat response was not JSON: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise OllamaHarnessError("Ollama chat response must be a JSON object")
+        return parsed
+    raise OllamaHarnessError(f"Ollama chat request failed after {CHAT_MAX_ATTEMPTS} attempt(s): {last_error}")
 
 
 def _resolve_tool_path(project_root: Path, path_text: str, *, allow_missing: bool) -> Path:
