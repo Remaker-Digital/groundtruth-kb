@@ -63,8 +63,8 @@ def test_contact_helper_rejects_missing_and_blank_contacts() -> None:
 
 
 def test_contact_helper_strips_email_and_phone() -> None:
-    assert _require_superadmin_contact(" admin@example.com ", " +15555550123 ") == (
-        "admin@example.com",
+    assert _require_superadmin_contact(" info@remakerdigital.com ", " +15555550123 ") == (
+        "info@remakerdigital.com",
         "+15555550123",
     )
 
@@ -89,13 +89,13 @@ async def test_paid_provisioning_normalizes_email_before_persisting(fake_tenant_
         billing_channel=BillingChannel.STRIPE,
         tier="starter",
         stripe_customer_id="cus_email",
-        customer_email=" owner@example.com ",
+        customer_email=" info@remakerdigital.com ",
     )
 
     stored = fake_tenant_repo.store[record.tenant_id]
-    assert record.customer_email == "owner@example.com"
-    assert stored["customer_email"] == "owner@example.com"
-    assert stored["display_name"] == "owner@example.com-001"
+    assert record.customer_email == "info@remakerdigital.com"
+    assert stored["customer_email"] == "info@remakerdigital.com"
+    assert stored["display_name"] == "info@remakerdigital.com-001"
 
 
 @pytest.mark.asyncio

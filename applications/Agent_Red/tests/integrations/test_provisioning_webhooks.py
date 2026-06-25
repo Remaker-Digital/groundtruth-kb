@@ -59,6 +59,7 @@ def fake_tenant_repo():
 # provisioning.py — provision_tenant
 # ===================================================================
 
+
 class TestProvisionTenant:
     """PROV-01: Tenant creation and re-provisioning."""
 
@@ -126,11 +127,15 @@ class TestProvisionTenant:
             customer_email="grace@example.com",
         )
         # Simulate deactivation via direct repo patch
-        await fake_tenant_repo.patch(t.tenant_id, t.tenant_id, [
-            {"op": "set", "path": "/status", "value": "grace_period"},
-            {"op": "set", "path": "/deactivated_at", "value": datetime.now(timezone.utc).isoformat()},
-            {"op": "set", "path": "/grace_period_ends_at", "value": datetime.now(timezone.utc).isoformat()},
-        ])
+        await fake_tenant_repo.patch(
+            t.tenant_id,
+            t.tenant_id,
+            [
+                {"op": "set", "path": "/status", "value": "grace_period"},
+                {"op": "set", "path": "/deactivated_at", "value": datetime.now(timezone.utc).isoformat()},
+                {"op": "set", "path": "/grace_period_ends_at", "value": datetime.now(timezone.utc).isoformat()},
+            ],
+        )
 
         t2 = await provision_tenant(
             billing_channel=BillingChannel.STRIPE,
@@ -180,6 +185,7 @@ class TestProvisionTenant:
 # ===================================================================
 # provisioning.py — activate_tenant
 # ===================================================================
+
 
 class TestActivateTenant:
     """PROV-02: Tenant activation after payment confirmation."""
@@ -233,10 +239,14 @@ class TestActivateTenant:
         )
         # Simulate prior deactivation
         now_iso = datetime.now(timezone.utc).isoformat()
-        await fake_tenant_repo.patch(t.tenant_id, t.tenant_id, [
-            {"op": "set", "path": "/deactivated_at", "value": now_iso},
-            {"op": "set", "path": "/grace_period_ends_at", "value": now_iso},
-        ])
+        await fake_tenant_repo.patch(
+            t.tenant_id,
+            t.tenant_id,
+            [
+                {"op": "set", "path": "/deactivated_at", "value": now_iso},
+                {"op": "set", "path": "/grace_period_ends_at", "value": now_iso},
+            ],
+        )
 
         result = await activate_tenant(stripe_customer_id="cus_clear")
         assert result.deactivated_at is None
@@ -246,6 +256,7 @@ class TestActivateTenant:
 # ===================================================================
 # provisioning.py — update_tenant
 # ===================================================================
+
 
 class TestUpdateTenant:
     """PROV-03: Tenant plan updates (tier, interval, addons)."""
@@ -317,6 +328,7 @@ class TestUpdateTenant:
 # provisioning.py — deactivate_tenant
 # ===================================================================
 
+
 class TestDeactivateTenant:
     """PROV-04: Tenant deactivation with 30-day grace period."""
 
@@ -358,6 +370,7 @@ class TestDeactivateTenant:
 # provisioning.py — flag_payment_issue
 # ===================================================================
 
+
 class TestFlagPaymentIssue:
     """PROV-05: Payment failure flagging."""
 
@@ -394,6 +407,7 @@ class TestFlagPaymentIssue:
 # ===================================================================
 # provisioning.py — get_tenant
 # ===================================================================
+
 
 class TestGetTenant:
     """PROV-06: Tenant lookup by various identifiers."""
@@ -439,6 +453,7 @@ class TestGetTenant:
 # provisioning.py — provision_trial_tenant
 # ===================================================================
 
+
 class TestProvisionTrialTenant:
     """PROV-08: Trial tenant provisioning."""
 
@@ -460,7 +475,10 @@ class TestProvisionTrialTenant:
 
     @pytest.mark.asyncio
     async def test_trial_tenant_has_expiry(self, fake_tenant_repo):
-        t = await provision_trial_tenant(trial_duration_days=7)
+        t = await provision_trial_tenant(
+            customer_email="info@remakerdigital.com",
+            trial_duration_days=7,
+        )
         doc = fake_tenant_repo.store.get(t.tenant_id)
         trial_end = datetime.fromisoformat(doc["trial_expires_at"])
         created = datetime.fromisoformat(doc["created_at"])
@@ -471,6 +489,7 @@ class TestProvisionTrialTenant:
 # ===================================================================
 # provisioning.py — Full lifecycle integration
 # ===================================================================
+
 
 class TestTenantLifecycle:
     """PROV-07: Full provision → activate → update → deactivate → re-provision."""
@@ -548,6 +567,7 @@ class TestTenantLifecycle:
 # stripe_webhooks.py — Idempotency
 # ===================================================================
 
+
 class TestWebhookIdempotency:
     """WH-01: Duplicate event detection."""
 
@@ -572,6 +592,7 @@ class TestWebhookIdempotency:
 # ===================================================================
 # stripe_webhooks.py — Event handler: checkout.session.completed
 # ===================================================================
+
 
 class TestHandleCheckoutCompleted:
     """WH-02: Checkout completion → provisioning or pack credit."""
@@ -678,6 +699,7 @@ class TestHandleCheckoutCompleted:
 # stripe_webhooks.py — Event handler: customer.subscription.deleted
 # ===================================================================
 
+
 class TestHandleSubscriptionDeleted:
     """WH-03: Subscription cancellation → grace period."""
 
@@ -716,6 +738,7 @@ class TestHandleSubscriptionDeleted:
 # ===================================================================
 # stripe_webhooks.py — Event handler: invoice.payment_failed
 # ===================================================================
+
 
 class TestHandlePaymentFailed:
     """WH-04: Payment failure → tenant flagged."""
@@ -756,6 +779,7 @@ class TestHandlePaymentFailed:
 # ===================================================================
 # stripe_webhooks.py — Event handler: invoice.payment_succeeded
 # ===================================================================
+
 
 class TestHandlePaymentSucceeded:
     """WH-05: Payment success → usage reset on renewal."""
