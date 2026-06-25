@@ -1350,6 +1350,80 @@ def test_extract_target_paths_inline_json_precedence(auth_module):
 
 
 # ---------------------------------------------------------------------------
+# WI-4833: fenced-JSON `## target_paths` recognition + fail-closed guard
+# (DCL-IMPL-AUTH-EXTRACT-TARGET-PATHS-FENCED-JSON-FORMAT-001)
+# ---------------------------------------------------------------------------
+
+
+SCAFFOLD_PATH = REPO_ROOT / "scripts" / "gtkb_propose_scaffold.py"
+
+
+@pytest.fixture(scope="module")
+def scaffold_module():
+    """Load gtkb_propose_scaffold.py for the scaffold round-trip lock test."""
+    spec = importlib.util.spec_from_file_location("gtkb_propose_scaffold", SCAFFOLD_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["gtkb_propose_scaffold"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_extract_target_paths_accepts_fenced_json_heading(auth_module):
+    """W1 -- a `## target_paths` heading whose body is a fenced JSON list yields
+    the file list (the form the gtkb-propose scaffold and hand-authors use)."""
+    md = '# Proposal\n\n## target_paths\n\n```json\n[\n  "scripts/a.py",\n  "tests/b.py"\n]\n```\n'
+    assert auth_module.extract_target_paths(md) == ["scripts/a.py", "tests/b.py"]
+
+
+def test_extract_target_paths_fenced_json_wins_over_mutation_class_bullets(auth_module):
+    """W2 -- WI-4829 regression: a `## target_paths` section with BOTH a fenced
+    JSON list AND a "Mutation classes used" bullet list yields the file list,
+    never the mutation-class names."""
+    md = (
+        "## target_paths\n\n"
+        "```json\n"
+        '[\n  "scripts/implementation_authorization.py",\n'
+        '  "platform_tests/scripts/test_implementation_authorization.py"\n]\n'
+        "```\n\n"
+        "Mutation classes used:\n"
+        "- `source` — the parser change.\n"
+        "- `hook_upgrade` — n/a.\n"
+        "- `test_addition` — the new tests.\n"
+    )
+    assert auth_module.extract_target_paths(md) == [
+        "scripts/implementation_authorization.py",
+        "platform_tests/scripts/test_implementation_authorization.py",
+    ]
+
+
+def test_extract_target_paths_raises_on_bareword_only_tokens(auth_module):
+    """W3 -- fail closed: a `## target_paths` heading whose only bullets are
+    bareword mutation-class tokens raises rather than authorizing them."""
+    md = "## target_paths\n\n- `source`\n- `hook_upgrade`\n- `test_addition`\n"
+    with pytest.raises(auth_module.AuthorizationError, match="non-path tokens"):
+        auth_module.extract_target_paths(md)
+
+
+def test_scaffold_target_paths_round_trips_through_extract(auth_module, scaffold_module):
+    """W4 -- the gtkb-propose scaffold's emitted target_paths form parses back to
+    the same path list through extract_target_paths (scaffold->authorizer drift
+    lock; the scaffold itself is not modified by WI-4833)."""
+    paths = [
+        "scripts/implementation_authorization.py",
+        "platform_tests/scripts/test_implementation_authorization.py",
+    ]
+    body = scaffold_module.build_scaffold(
+        slug="gtkb-roundtrip-fixture",
+        work_item="WI-0000",
+        project="PROJECT-FIXTURE",
+        pauth="PAUTH-FIXTURE",
+        target_paths=paths,
+    )
+    assert auth_module.extract_target_paths(body) == paths
+
+
+# ---------------------------------------------------------------------------
 # WI-3333 Bug 2: per-bullet Specification Links placeholder check
 # ---------------------------------------------------------------------------
 

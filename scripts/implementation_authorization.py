@@ -469,6 +469,58 @@ def _target_paths_heading_body(markdown: str) -> str:
     return ""
 
 
+# Matches a single fenced code block (json-tagged or bare triple-backtick fence,
+# or a tilde fence). DOTALL captures multi-line bodies; the non-greedy body stops
+# at the first closing fence so multiple blocks are iterated independently.
+_FENCED_BLOCK_RE = re.compile(
+    r"^[ \t]*(?:`{3,}|~{3,})[^\n]*\n(?P<body>.*?)\n[ \t]*(?:`{3,}|~{3,})[ \t]*$",
+    re.DOTALL | re.MULTILINE,
+)
+
+
+def _fenced_json_target_paths(heading_body: str) -> list[str] | None:
+    """Return a JSON list of paths from a fenced block in a target_paths body.
+
+    Recognizes a fenced code block (a json-tagged or bare triple-backtick fence,
+    or a tilde fence) inside a ``## target_paths`` heading body whose content
+    parses as a JSON list of one or more non-empty strings, and returns the
+    normalized path list (same normalization as the inline-JSON branch:
+    ``strip()`` + backslash-to-forward-slash). Returns ``None`` when no fenced
+    block is present or its content is not a JSON list of non-empty strings, so
+    the caller falls back to the bullet form.
+
+    Per ``DCL-IMPL-AUTH-EXTRACT-TARGET-PATHS-FENCED-JSON-FORMAT-001`` this is
+    tried before the bullet-first-span heuristic, so an explicit JSON list always
+    wins over a sibling "Mutation classes used" bullet list in the same section.
+    """
+    for match in _FENCED_BLOCK_RE.finditer(heading_body):
+        candidate = match.group("body").strip()
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(parsed, list) or not parsed:
+            continue
+        if not all(isinstance(item, str) and item.strip() for item in parsed):
+            continue
+        return [item.strip().replace("\\", "/") for item in parsed]
+    return None
+
+
+def _is_path_shaped(token: str) -> bool:
+    """Return True when a token looks like a file path or glob.
+
+    Every real target path or glob contains at least one path separator (``/``),
+    dotted extension (``.``), or glob wildcard (``*``). A bare identifier such as
+    ``source`` or ``hook_upgrade`` is not path-shaped and is the signature of a
+    mutation-class-bullet misfire harvested from a "Mutation classes used" list
+    (per ``DCL-IMPL-AUTH-EXTRACT-TARGET-PATHS-FENCED-JSON-FORMAT-001``).
+    """
+    return any(char in token for char in "/.*")
+
+
 def _phrase_re(phrase: str) -> re.Pattern[str]:
     """Compile a bounded phrase matcher with whitespace tolerance."""
     pattern = r"\b" + r"\s+".join(re.escape(part) for part in phrase.split()) + r"\b"
@@ -618,13 +670,20 @@ def extract_target_paths(markdown: str) -> list[str]:
         if targets:
             return targets
 
-    # `## target_paths` heading form. These bullets place the path FIRST in
-    # backticks and may add parenthetical annotations in further backtick
-    # spans, so only the first span per bullet is the path. The asymmetry
-    # with `## Files Expected To Change` (all spans) is deliberate: each
-    # section name keeps the extraction matched to its observed convention.
+    # `## target_paths` heading form. Prefer an explicit fenced-JSON list over
+    # the bullet-first-span heuristic so a sibling "Mutation classes used" bullet
+    # list in the same section can never be mistaken for paths (per
+    # DCL-IMPL-AUTH-EXTRACT-TARGET-PATHS-FENCED-JSON-FORMAT-001). Otherwise these
+    # bullets place the path FIRST in backticks and may add parenthetical
+    # annotations in further backtick spans, so only the first span per bullet is
+    # the path. The asymmetry with `## Files Expected To Change` (all spans) is
+    # deliberate: each section name keeps the extraction matched to its observed
+    # convention.
     heading_body = _target_paths_heading_body(markdown)
     if heading_body:
+        fenced_targets = _fenced_json_target_paths(heading_body)
+        if fenced_targets is not None:
+            return fenced_targets
         heading_targets: list[str] = []
         for line in heading_body.splitlines():
             if not line.strip().startswith(("-", "*")):
@@ -633,6 +692,19 @@ def extract_target_paths(markdown: str) -> list[str]:
             if spans and spans[0].strip():
                 heading_targets.append(spans[0].strip().replace("\\", "/"))
         if heading_targets:
+            # Fail closed on a mutation-class-bullet misfire: when every harvested
+            # token is a bare non-path word (no '/', '.', or '*'), these are almost
+            # certainly mutation-class names rather than file paths (per
+            # DCL-IMPL-AUTH-EXTRACT-TARGET-PATHS-FENCED-JSON-FORMAT-001).
+            if not any(_is_path_shaped(target) for target in heading_targets):
+                raise AuthorizationError(
+                    "target_paths under the `## target_paths` heading resolved to "
+                    f"non-path tokens {heading_targets!r}; these look like "
+                    "mutation-class names (e.g. source/hook_upgrade/test_addition) "
+                    "harvested from a 'Mutation classes used' bullet list. Declare "
+                    "the file paths as a fenced JSON list under the heading or as a "
+                    "single-line `target_paths:` metadata line."
+                )
             return heading_targets
 
     raise AuthorizationError("Approved proposal is missing concrete target_paths or Files Expected To Change")
