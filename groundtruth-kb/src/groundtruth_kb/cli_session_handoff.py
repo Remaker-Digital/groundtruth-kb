@@ -20,6 +20,7 @@ from pathlib import Path
 import click
 
 from groundtruth_kb.config import GTConfig
+from groundtruth_kb.session.envelope import TOPIC_TYPES
 
 
 def _resolve_config(ctx: click.Context) -> GTConfig:
@@ -100,7 +101,7 @@ def topic_group() -> None:
 
 
 @topic_group.command("open")
-@click.argument("topic_type", type=click.Choice(["spec", "build", "test", "deliberation", "project"]))
+@click.argument("topic_type", type=click.Choice(list(TOPIC_TYPES)))
 @click.option("--harness-name", default="codex", show_default=True)
 @click.option("--harness-id", default=None)
 @click.pass_context
@@ -114,7 +115,7 @@ def topic_open_cmd(ctx: click.Context, topic_type: str, harness_name: str, harne
 
 
 @topic_group.command("close")
-@click.argument("topic_type", type=click.Choice(["spec", "build", "test", "deliberation", "project"]))
+@click.argument("topic_type", type=click.Choice(list(TOPIC_TYPES)))
 @click.option("--harness-name", default="codex", show_default=True)
 @click.option("--harness-id", default=None)
 @click.pass_context
