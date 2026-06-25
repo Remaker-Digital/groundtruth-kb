@@ -15,9 +15,20 @@ CONFIG_PATH = PROJECT_ROOT / "groundtruth.toml"
 
 
 def test_authority_resolve_bridge_index_json_includes_authority_fields() -> None:
-    result = CliRunner().invoke(
+    # The retired "bridge index" term no longer resolves: the bridge-queue authority
+    # migrated off the retired bridge/INDEX.md aggregate to TAFE/dispatcher state plus
+    # the numbered bridge/*.md chain (GOV-FILE-BRIDGE-AUTHORITY-001). The current
+    # owner-facing term is "bridge queue".
+    retired = CliRunner().invoke(
         main,
         ["--config", str(CONFIG_PATH), "authority", "resolve", "bridge index", "--json"],
+    )
+    assert retired.exit_code == 1, retired.output
+    assert json.loads(retired.output)["status"] == "not_found"
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(CONFIG_PATH), "authority", "resolve", "bridge queue", "--json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -25,7 +36,10 @@ def test_authority_resolve_bridge_index_json_includes_authority_fields() -> None
     system = payload["system"]
     assert payload["status"] == "resolved"
     assert system["id"] == "bridge-queue"
-    assert system["authoritative_source"] == "bridge/INDEX.md"
+    # Authority migrated off the retired aggregate; assert the structural authority
+    # fields rather than a brittle literal source string (per the WI-4798 risk note).
+    assert system["authoritative_source"]
+    assert system["authoritative_source"] != "bridge/INDEX.md"
     assert system["concept_vs_artifact"]
     assert system["read_method"]
     assert system["mutation_method"]
@@ -36,7 +50,7 @@ def test_authority_resolve_bridge_index_json_includes_authority_fields() -> None
 def test_authority_resolves_required_owner_facing_terms() -> None:
     expected = {
         "bridge": "file-bridge",
-        "bridge index": "bridge-queue",
+        "bridge queue": "bridge-queue",
         "bridge status": "bridge-status",
         "parked draft": "parked-draft",
         "project root": "project-root",
