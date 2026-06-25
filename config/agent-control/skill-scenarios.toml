@@ -44,5 +44,5 @@ rationale = "Wrapping up a session: run the read-only wrap-up scanner first; cap
 [scenarios.release_readiness]
 title = "Release / deploy readiness"
 required = ["release-candidate-gate"]
-recommended = ["open-items"]
+recommended = []
 rationale = "Assessing release / deploy readiness: run the non-deploying release-candidate gate for governed test evidence; review genuinely-open work items and release blockers."
