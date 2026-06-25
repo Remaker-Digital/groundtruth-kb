@@ -62,6 +62,18 @@ def _fake_item() -> SimpleNamespace:
     )
 
 
+@pytest.fixture
+def trigger_module() -> ModuleType:
+    return _load_trigger()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_host_dispatch_cap_env(trigger_module: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Host env can override GTKB cap defaults; spawn-gate tests assume defaults."""
+    monkeypatch.delenv(trigger_module.MAX_LIVE_DISPATCHED_PROCESSES_ENV_VAR, raising=False)
+    monkeypatch.delenv(trigger_module.MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR, raising=False)
+
+
 # --------------------------------------------------------------------------- #
 # _max_live_dispatched_per_role — env parsing + fail-safe default
 # --------------------------------------------------------------------------- #
