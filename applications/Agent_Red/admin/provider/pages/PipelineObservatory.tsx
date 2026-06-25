@@ -407,7 +407,8 @@ function AgentMetricsTab() {
 // Tenant Comparison Tab (SPEC-1587)
 // ---------------------------------------------------------------------------
 
-function TenantComparisonTab() {
+// Exported for isolated Vitest component coverage (WI-3223); behavior-neutral.
+export function TenantComparisonTab() {
   const { apiFetch, onNotify } = useProviderContext();
   const [data, setData] = useState<TenantComparisonResponse | null>(null);
   const [loading, setLoading] = useState(true);
