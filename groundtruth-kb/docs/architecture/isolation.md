@@ -254,7 +254,7 @@ predictable order:
 | Surface | Behavior when service is unreachable |
 |---|---|
 | `gt project doctor` | Runs to completion. The `isolation:service-endpoint` check reports the configured endpoint shape but does not test reachability — reachability is intentionally an operator concern, not a doctor invariant. |
-| File-based bridge protocol | Unaffected. `bridge/INDEX.md` and the bridge proposal/review files are filesystem-resident; the bridge protocol does not consult the service. |
+| File-based bridge protocol | Unaffected. The bridge proposal/review files and TAFE/dispatcher bridge state are filesystem-resident; the bridge protocol does not consult the service. |
 | Adopter-scope `groundtruth.db` | Unaffected. Adopter-local queries against the adopter's database continue to work without the service. |
 | Cross-adopter or platform-scope queries | Fail closed. Operations that the service mediates (e.g., platform-scope policy lookups) return an error rather than silently falling back to the adopter-scope database. |
 | `gt project upgrade` | Runs to completion if the service is not on the upgrade path. The upgrade payload uses the registry shipped in the GT-KB package, not a service round-trip. |

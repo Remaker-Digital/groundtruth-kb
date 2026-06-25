@@ -16,7 +16,7 @@ event-driven trigger** at
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`)
 
 The trigger fires on tool-use and Stop events rather than on a fixed
-interval. Manual `bridge/INDEX.md` scans remain available as a
+interval. Manual bridge-state scans remain available as a
 fallback when the trigger is unhealthy.
 
 ## See Instead

@@ -48,7 +48,9 @@ Environment verification and readiness reporting.
 
 Dual-agent projects use a project-owned file bridge:
 
-- `bridge/INDEX.md` is the authoritative review queue.
+- TAFE-backed bridge state plus the status-bearing numbered files under
+  `bridge/` are the authoritative review queue (after the 2026-06-15 WI-4510
+  Phase-3 cutover).
 - Bridge documents under `bridge/` hold implementation reports, reviews, and
   verdicts.
 - Prime Builder writes `NEW` and `REVISED`.

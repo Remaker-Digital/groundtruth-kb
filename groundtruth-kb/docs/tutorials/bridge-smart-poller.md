@@ -23,8 +23,8 @@ event-driven trigger** at
 - `.codex/hooks.json` — Codex-side parity (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`)
 
-When a tool call modifies `bridge/INDEX.md` or the agent ends a turn,
-the trigger inspects the indexed state and dispatches the appropriate
+When a tool call updates bridge state or the agent ends a turn,
+the trigger inspects TAFE/dispatcher bridge state and dispatches the appropriate
 counterpart harness if a recipient's actionable queue signature has
 changed. The retired interval-driven scheduled-task model is gone; no
 smart-poller task should be installed or expected.

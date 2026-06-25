@@ -37,7 +37,7 @@ rather than interval-driven.
 ```mermaid
 graph TD
     EVT[Tool-use or Stop event] -->|fires| TRG[scripts/cross_harness_bridge_trigger.py]
-    TRG -->|reads| IDX[bridge/INDEX.md]
+    TRG -->|reads| IDX[TAFE/dispatcher bridge state]
     TRG -->|writes| DST[.gtkb-state/bridge-poller/dispatch-state.json]
     TRG -->|dispatches| PRIME[Prime Builder harness]
     TRG -->|dispatches| LO[Loyal Opposition harness]
@@ -48,9 +48,9 @@ graph TD
 
 | Component | Responsibility |
 |-----------|----------------|
-| `bridge/INDEX.md` | Authoritative review queue and status index |
+| TAFE/dispatcher bridge state | Authoritative review queue and status index |
 | `bridge/*.md` | Numbered review documents, implementation reports, and verdicts |
-| `scripts/cross_harness_bridge_trigger.py` | Event-driven dispatch entrypoint that inspects INDEX and dispatches the appropriate counterpart harness when its actionable queue signature changes |
+| `scripts/cross_harness_bridge_trigger.py` | Event-driven dispatch entrypoint that inspects bridge state and dispatches the appropriate counterpart harness when its actionable queue signature changes |
 | `.claude/settings.json` (`PostToolUse`, `Stop` hooks) | Claude Code-side trigger registration |
 | `.codex/hooks.json` (`PostToolUse`, `Stop` hooks) | Codex-side parity trigger registration (forward-compatible per `ADR-CODEX-HOOK-PARITY-FALLBACK-001`) |
 | `.gtkb-state/bridge-poller/dispatch-state.json` | Per-recipient dispatch-state record consulted by the doctor's `_check_bridge_dispatch_liveness` check |
@@ -60,7 +60,7 @@ graph TD
 The retired smart-poller and OS-scheduler topology required Windows scheduled
 tasks, hidden VBS launchers, PowerShell scanners, lock files, and short
 polling intervals. None of those pieces remain active. Bridge dispatch fires
-when the agent's tool-call writes the INDEX or the agent's turn ends, not on
+when the agent's tool-call updates bridge state or the agent's turn ends, not on
 a fixed interval.
 
 ## Protocol model
@@ -114,7 +114,7 @@ mechanism when the bridge must operate across sessions.
 
 Recommended trigger properties:
 
-- Fire on `PostToolUse` (so an INDEX-modifying tool call dispatches the
+- Fire on `PostToolUse` (so a bridge-state update dispatches the
   counterpart immediately) and `Stop` (so an end-of-turn check catches
   pending recipient work).
 - Compute an actionable-queue signature for each recipient and dispatch only
@@ -124,10 +124,10 @@ Recommended trigger properties:
 - Skip dispatch when no recipient has actionable work.
 - Keep stdout and stderr from dispatched harness invocations in a
   diagnosable location.
-- Provide a single-instance lock so an INDEX modification under heavy
+- Provide a single-instance lock so a bridge update under heavy
   tool-use does not produce overlapping dispatches.
 
-Manual `bridge/INDEX.md` scans remain available as a fallback when the
+Manual bridge-state scans remain available as a fallback when the
 trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
 prompt such as `Bridge` or `Bridge scan`.
 

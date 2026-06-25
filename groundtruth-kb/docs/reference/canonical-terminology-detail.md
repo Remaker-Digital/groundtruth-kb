@@ -363,8 +363,8 @@ configuration).
 **Definition:** The multi-version conversational unit between Prime Builder
 and Loyal Opposition on a single topic. A bridge thread is identified by a
 kebab-case slug and consists of an ordered sequence of versioned files
-(`bridge/<slug>-001.md`, `-002.md`, …) plus a single entry in
-`bridge/INDEX.md`. The thread terminates at `VERIFIED` or owner-directed
+(`bridge/<slug>-001.md`, `-002.md`, …) tracked in TAFE/dispatcher bridge
+state. The thread terminates at `VERIFIED` or owner-directed
 retirement. `DEFERRED` parks a thread in owner-directed non-actionable state
 until its recorded clear/resume condition is met.
 
@@ -373,8 +373,8 @@ bridge document (the full version chain).
 
 **Source:** `GOV-FILE-BRIDGE-AUTHORITY-001` (live bridge index authority).
 
-**Implementation pointer:** `bridge/<slug>-NNN.md`; `bridge/INDEX.md`;
-`.claude/rules/file-bridge-protocol.md`.
+**Implementation pointer:** `bridge/<slug>-NNN.md`; TAFE/dispatcher bridge
+state; `.claude/rules/file-bridge-protocol.md`.
 
 ### GO / NO-GO / VERIFIED / DEFERRED
 
@@ -394,7 +394,7 @@ spec lifecycle states, distinct from bridge verdicts).
 **Source:** `GOV-FILE-BRIDGE-AUTHORITY-001`.
 
 **Implementation pointer:** Verdict lines in `bridge/<slug>-NNN.md` and the
-corresponding `bridge/INDEX.md` entry; `.claude/rules/file-bridge-protocol.md`
+corresponding TAFE/dispatcher bridge-state entry; `.claude/rules/file-bridge-protocol.md`
 § Statuses.
 
 ### Loyal Opposition advisory
@@ -708,10 +708,10 @@ Resolution rules live in `scripts/session_role_resolution.py`.
 `archive/smart-poller-2026-05-09/`).
 
 **Definition:** The (now-retired) bridge-poller automation that scanned
-`bridge/INDEX.md` periodically and dispatched the appropriate harness when
-a recipient's actionable queue signature changed. The smart poller was
-monitoring/dispatch infrastructure only; `bridge/INDEX.md` remained the
-canonical workflow state. Bridge dispatch is now governed by the
+the legacy bridge index aggregate periodically and dispatched the appropriate
+harness when a recipient's actionable queue signature changed. The smart poller was
+monitoring/dispatch infrastructure only; TAFE/dispatcher bridge state became the
+canonical workflow state after the 2026-06-15 cutover. Bridge dispatch is now governed by the
 `cross-harness event-driven trigger` (see entry below).
 
 **Not to be confused with:** the retired `OS poller` class (halted
@@ -743,8 +743,8 @@ retirement decision); bridge thread
 the retired smart poller. Implemented as
 `scripts/cross_harness_bridge_trigger.py` and registered as PostToolUse +
 Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger
-fires on tool-use and Stop events: when `bridge/INDEX.md` is modified by
-a tool call or the agent ends a turn, the trigger inspects the indexed
+fires on tool-use and Stop events: when bridge state is updated by
+a tool call or the agent ends a turn, the trigger inspects TAFE/dispatcher
 state and dispatches the appropriate counterpart harness if a recipient's
 actionable queue signature has changed. The trigger reuses the smart
 poller's actionable-signature scheme byte-identically per
@@ -842,7 +842,7 @@ topology context).
 operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
 the dispatcher routine on a fixed interval. The dispatcher reads live
-``bridge/INDEX.md``, computes a per-role actionable signature using the same
+TAFE/dispatcher bridge state, computes a per-role actionable signature using the same
 kind-aware-routing path as the cross-harness event-driven trigger, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``

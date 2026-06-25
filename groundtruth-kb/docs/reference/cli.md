@@ -141,7 +141,7 @@ gt status [--json] [--startup] [--component <name> ...]
 ```
 
 Bridge-related components use the standard read-only bridge status driver.
-`bridge` reports live `bridge/INDEX.md` latest-status counts plus role-correct
+`bridge` reports live dispatcher/TAFE latest-status counts plus role-correct
 actionable queues: Prime Builder sees only latest `GO` / `NO-GO`; Loyal
 Opposition sees only latest `NEW` / `REVISED`; latest `VERIFIED`, `WITHDRAWN`,
 and `ADVISORY` are non-actionable. `bridge-dispatch` reports local

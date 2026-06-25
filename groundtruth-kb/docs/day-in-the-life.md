@@ -95,8 +95,8 @@ upgrades the scaffold to `dual-agent`:
 gt project upgrade --profile dual-agent
 ```
 
-The upgrade adds `AGENTS.md`, a `bridge/INDEX.md`, and OS scheduler setup
-instructions. She follows the
+The upgrade adds `AGENTS.md`, bridge automation scaffolding, and dispatcher
+setup instructions. She follows the
 [Dual-Agent Setup](tutorials/dual-agent-setup.md) tutorial to wire up her
 Codex-powered Loyal Opposition. Her first bridge proposal goes up at
 10:47 AM. At 10:51 the Codex poller dispatches a review. At 10:58 she has
@@ -197,7 +197,7 @@ She would configure bridge automation on day one too. The cross-harness
 event-driven trigger is scaffolded automatically by
 `gt project init my-project --profile dual-agent` and registered as PostToolUse and Stop
 hooks in `.claude/settings.json` and `.codex/hooks.json`. The setup walkthrough
-is in [Dual-Agent Setup](tutorials/dual-agent-setup.md). Manual `bridge/INDEX.md`
+is in [Dual-Agent Setup](tutorials/dual-agent-setup.md). Manual bridge-state
 scans remain as a fallback if the trigger is unhealthy. The retired smart
 poller and OS poller (archived under `archive/smart-poller-2026-05-09/`) are
 no longer the active automation path.
@@ -206,7 +206,7 @@ no longer the active automation path.
 
 Yes. The Loyal Opposition role is defined by a protocol (the file
 bridge), not by a specific tool. Any agent that can read markdown from
-`bridge/`, analyze code, write a review, and update `bridge/INDEX.md`
+`bridge/`, analyze code, write a review, and publish verdicts to bridge state
 can serve the role. The default setup uses Codex because it runs
 autonomously via scheduled tasks and has been exercised across hundreds
 of review cycles in the reference project.

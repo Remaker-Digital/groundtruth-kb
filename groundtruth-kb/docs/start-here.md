@@ -349,8 +349,8 @@ rest is your cloud decision.
 propose → review → implement → verify
 ```
 
-- **Propose:** Prime Builder writes `bridge/{topic}-001.md` and inserts a
-  `NEW` entry at the top of `bridge/INDEX.md`.
+- **Propose:** Prime Builder writes `bridge/{topic}-001.md` and publishes a
+  `NEW` entry to TAFE/dispatcher bridge state.
 - **Review:** Loyal Opposition reads the proposal and writes
   `bridge/{topic}-002.md` with verdict `GO` or `NO-GO`.
 - **Implement:** On `GO`, Prime writes the code. On `NO-GO`, Prime writes
@@ -358,8 +358,9 @@ propose → review → implement → verify
 - **Verify:** Prime files a post-implementation report; Loyal Opposition
   reads it and writes `VERIFIED` or another `NO-GO`.
 
-Both agents poll `bridge/INDEX.md` on a 3-minute cadence via the OS
-scheduler. No human has to babysit the queue. See
+The cross-harness event-driven trigger dispatches the counterpart harness on
+tool-use and Stop events (the retired OS scheduler and smart poller are no
+longer used). No human has to babysit the queue. See
 [Method — File Bridge Automation](method/12-file-bridge-automation.md)
 for the full protocol.
 

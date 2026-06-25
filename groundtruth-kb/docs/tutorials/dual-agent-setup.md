@@ -23,7 +23,7 @@ The `dual-agent` profile generates:
 - `CLAUDE.md` and `MEMORY.md` - session state templates
 - `AGENTS.md` - Loyal Opposition operating contract
 - `BRIDGE-INVENTORY.md` - bridge runtime inventory
-- `bridge/INDEX.md` - the file bridge coordination file
+- Status-bearing bridge files under `bridge/` plus TAFE/dispatcher bridge state
 - `.claude/hooks/`, `.claude/rules/`, `.claude/settings.json` - automation
   hooks, rules, and the cross-harness-trigger registration
 - `.codex/hooks.json` - Codex-side hook registration for cross-harness
@@ -39,8 +39,8 @@ references; do not follow its instructions.
 ## Step 2: Confirm Bridge Dispatch Automation
 
 In current GT-KB hosts after the 2026-06-15 TAFE/dispatcher cutover,
-TAFE-backed bridge state is authoritative and `bridge/INDEX.md` is a
-deprecated generated compatibility view for legacy helpers. Bridge dispatch is
+TAFE-backed bridge state is authoritative; the legacy bridge index aggregate
+was retired 2026-06-15. Bridge dispatch is
 automated by the **cross-harness event-driven trigger**, which fires on
 tool-use and Stop events rather than on a fixed interval. The
 retired smart-poller and OS-scheduled-task implementations are no longer
@@ -62,13 +62,13 @@ scaffolded automatically. The relevant artifacts are:
   dispatch-state record (read by the doctor's
   `_check_bridge_dispatch_liveness` check).
 
-When a tool call modifies `bridge/INDEX.md` or the agent ends a turn, the
+When a tool call updates bridge state or the agent ends a turn, the
 trigger evaluates whether the counterpart harness has actionable work and
 dispatches it if so. Dispatch state is recorded in
 `.gtkb-state/bridge-poller/dispatch-state.json` for both `prime-builder` and
 `loyal-opposition` recipients.
 
-Manual `bridge/INDEX.md` scans remain available as a fallback when the
+Manual bridge-state scans remain available as a fallback when the
 trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
 prompt such as `Bridge` or `Bridge scan`; Codex bridge scans are similarly
 owner-triggered in the Codex harness.
@@ -110,36 +110,39 @@ Add a list_tasks() function to src/tasks.py that filters by status.
 - Unit test: list_tasks(status='open') returns only open tasks
 ```
 
-Register it in `bridge/INDEX.md`:
+Publish the proposal through the governed bridge path (the numbered file
+`bridge/my-feature-001.md` carries status `NEW` and updates TAFE/dispatcher
+bridge state):
 
 ```text
 Document: my-feature
-NEW: bridge/my-feature-001.md
+Status: NEW
+File: bridge/my-feature-001.md
 ```
 
 ### Loyal Opposition reviews
 
-The cross-harness event-driven trigger fires when the INDEX update is
-written, dispatching Codex with the actionable signature. Codex picks up
+The cross-harness event-driven trigger fires when bridge state updates,
+dispatching Codex with the actionable signature. Codex picks up
 the NEW entry and writes a review at `bridge/my-feature-002.md` with a GO
-or NO-GO verdict. The INDEX entry becomes:
+or NO-GO verdict. The latest status becomes:
 
 ```text
 Document: my-feature
-GO: bridge/my-feature-002.md
-NEW: bridge/my-feature-001.md
+Latest: GO (bridge/my-feature-002.md)
+Prior: NEW (bridge/my-feature-001.md)
 ```
 
 ### Prime Builder implements
 
 On GO, implement the feature, run tests, and write a post-implementation
-report at `bridge/my-feature-003.md`. Update INDEX.md:
+report at `bridge/my-feature-003.md`. Bridge state records the new report:
 
 ```text
 Document: my-feature
-NEW: bridge/my-feature-003.md
-GO: bridge/my-feature-002.md
-NEW: bridge/my-feature-001.md
+Latest: NEW (bridge/my-feature-003.md)
+Prior: GO (bridge/my-feature-002.md)
+Prior: NEW (bridge/my-feature-001.md)
 ```
 
 ### Loyal Opposition verifies
@@ -149,10 +152,10 @@ NO-GO) at `bridge/my-feature-004.md`:
 
 ```text
 Document: my-feature
-VERIFIED: bridge/my-feature-004.md
-NEW: bridge/my-feature-003.md
-GO: bridge/my-feature-002.md
-NEW: bridge/my-feature-001.md
+Latest: VERIFIED (bridge/my-feature-004.md)
+Prior: NEW (bridge/my-feature-003.md)
+Prior: GO (bridge/my-feature-002.md)
+Prior: NEW (bridge/my-feature-001.md)
 ```
 
 VERIFIED is terminal; Prime Builder takes no further action on this entry.
