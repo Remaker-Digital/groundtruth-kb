@@ -335,10 +335,11 @@ def build_dashboard() -> dict[str, Any]:
             _grid(0, 0, 24, 3),
             "\n".join(
                 [
-                    "# Agent Red GT-KB Dashboard",
+                    "# GT-KB Operations Dashboard",
                     "",
-                    "SQLite-backed project health, setup, delivery, and operations view.",
-                    "[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`",
+                    "Combined GT-KB platform + active adopter/application operations (loopback/local-only).",
+                    "Primary setup: `gt dashboard init` → `gt dashboard install` → `gt dashboard start` → `gt dashboard refresh`.",
+                    "[Manual refresh](http://127.0.0.1:8766/) binds to loopback only; copy local paths from Shortcuts (do not use Open for workspace files).",
                 ]
             ),
         )
@@ -509,7 +510,7 @@ def build_dashboard() -> dict[str, Any]:
             FROM shortcuts
             ORDER BY sort_order;
             """,
-            links={"target": "Open"},
+            links={"target": "Copy path"},
         )
     )
 

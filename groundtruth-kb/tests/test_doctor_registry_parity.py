@@ -21,10 +21,13 @@ remain the sharper regression guard on the registry itself.
 
 from __future__ import annotations
 
+import hashlib
+import subprocess
 from pathlib import Path
 
 import pytest
 
+from groundtruth_kb import get_templates_dir
 from groundtruth_kb.project.doctor import (
     DoctorReport,
     ToolCheck,
@@ -144,3 +147,54 @@ def test_local_only_registry_affected_count_is_one(tmp_path: Path) -> None:
     assert len(checks) == 1
     assert checks[0].name == "Hooks"
     assert checks[0].status == "pass"
+
+
+_REFRESHED_ARTIFACTS = [
+    ("hooks/assertion-check.py", ".claude/hooks/assertion-check.py"),
+    ("hooks/spec-event-surfacer.py", ".claude/hooks/spec-event-surfacer.py"),
+    ("hooks/_delib_common.py", ".claude/hooks/_delib_common.py"),
+    ("hooks/gov09-capture.py", ".claude/hooks/gov09-capture.py"),
+    ("rules/file-bridge-protocol.md", ".claude/rules/file-bridge-protocol.md"),
+]
+
+_REPO_ROOT = Path(__file__).parent.parent.parent
+
+
+@pytest.mark.parametrize("template_rel,live_rel", _REFRESHED_ARTIFACTS)
+def test_managed_artifact_templates_match_live(template_rel: str, live_rel: str) -> None:
+    """CRLF-normalized template hash must equal CRLF-normalized live hash after refresh."""
+    templates_dir = get_templates_dir()
+    template_path = templates_dir / template_rel
+    live_path = _REPO_ROOT / live_rel
+    if not live_path.exists():
+        pytest.skip(f"live file not available: {live_rel}")
+    assert template_path.exists(), f"template not found: {template_path}"
+
+    def norm_hash(p: Path) -> str:
+        return hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+    assert norm_hash(template_path) == norm_hash(live_path), (
+        f"CRLF-normalized template {template_rel!r} does not match live {live_rel!r}"
+    )
+
+
+@pytest.mark.parametrize("live_rel", [pair[1] for pair in _REFRESHED_ARTIFACTS])
+def test_managed_artifact_refresh_leaves_live_files_unchanged(live_rel: str) -> None:
+    """Template refresh must not modify any live .claude/ file (CRLF-normalized comparison)."""
+    live_path = _REPO_ROOT / live_rel
+    if not live_path.exists():
+        pytest.skip(f"live file not available: {live_rel}")
+    result = subprocess.run(
+        ["git", "show", f"HEAD:{live_rel}"],
+        capture_output=True,
+        cwd=_REPO_ROOT,
+    )
+    if result.returncode != 0:
+        pytest.skip(f"git not available or file not tracked: {live_rel}")
+
+    def norm(b: bytes) -> bytes:
+        return b.replace(b"\r\n", b"\n")
+
+    assert norm(live_path.read_bytes()) == norm(result.stdout), (
+        f"live file {live_rel} was unexpectedly modified (content differs from git HEAD after EOL normalization)"
+    )

@@ -135,6 +135,71 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
         assert {"GitHub Actions", "Azure OpenAI", "Shopify Partners", "Stripe"} <= service_names
 
 
+def test_metric_count_status_helpers() -> None:
+    from scripts.gtkb_dashboard.refresh_dashboard_db import _metric_count_status
+
+    assert _metric_count_status(0) == "green"
+    assert _metric_count_status(2) == "red"
+    assert _metric_count_status("bad") == "yellow"
+
+
+def test_current_metric_statuses_green_when_sources_clean(tmp_path) -> None:
+    db_path = tmp_path / "gtkb-dashboard.sqlite"
+    model = _sample_model()
+    model["dashboard_intelligence"]["release_readiness"]["blocker_count"] = 0
+    model["dashboard_intelligence"]["quality_rollup"]["failing"] = 0
+    model["current_work_subject"] = "Agent Red"
+    history = [
+        {
+            "generated_at": "2026-04-21T12:00:00+00:00",
+            "backlog_active_items": 0,
+            "membase_open_work_items": 0,
+            "deliberation_archive_current_total": 0,
+            "pytest_file_count": 0,
+            "specification_current_total": 0,
+            "drift_changed_path_count": 0,
+            "regression_release_blocker_count": 0,
+            "contention_actionable_bridge_count": 0,
+        }
+    ]
+
+    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=history)
+
+    with sqlite3.connect(db_path) as conn:
+        statuses = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT metric_key, status FROM current_metrics WHERE metric_key IN (?, ?, ?)",
+                (
+                    "project_health_issues",
+                    "release_blockers",
+                    "ci_testing_failing",
+                ),
+            )
+        }
+        metadata = dict(conn.execute("SELECT key, value FROM dashboard_metadata"))
+
+    assert statuses == {
+        "project_health_issues": "green",
+        "release_blockers": "green",
+        "ci_testing_failing": "green",
+    }
+    assert "dashboard_subject_scope" in metadata
+    assert "Combined operations" in metadata["dashboard_subject_scope"]
+    assert "Agent Red" in metadata["dashboard_subject_scope"]
+    assert metadata.get("refresh_service_scope", "").startswith("loopback")
+
+
+def test_shortcuts_panel_uses_copy_path_link_title() -> None:
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    shortcuts = next(p for p in flat if p.get("title") == "Shortcuts")
+    overrides = shortcuts["fieldConfig"]["overrides"]
+    target_override = next(o for o in overrides if o["matcher"]["options"] == "target")
+    link_title = target_override["properties"][0]["value"][0]["title"]
+    assert link_title == "Copy path"
+
+
 def test_grafana_provisioning_targets_sqlite_database() -> None:
     datasource = (
         REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "datasources" / "gtkb-dashboard-sqlite.yml"

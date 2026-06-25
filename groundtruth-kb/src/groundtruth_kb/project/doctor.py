@@ -2576,6 +2576,13 @@ def _hash_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _hash_file_normalized(path: Path) -> str:
+    """Hash file content with CRLF→LF normalization for EOL-insensitive comparison."""
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
     """Aggregate doctor-required managed-artifact drift for an adopter project."""
     check_name = "Managed artifact drift"
@@ -2631,8 +2638,8 @@ def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
                 record("template-missing", artifact.id, "fail", f"template {artifact.template_path} missing")
                 continue
             try:
-                target_hash = _hash_file(target_path)
-                template_hash = _hash_file(template_path)
+                target_hash = _hash_file_normalized(target_path)
+                template_hash = _hash_file_normalized(template_path)
             except OSError as exc:
                 record("drifted", artifact.id, "fail", f"could not compare {artifact.target_path}: {exc}")
                 continue

@@ -338,3 +338,19 @@ def test_stop_dashboard_terminates_live_pid_and_cleans_file(tmp_path: Path, monk
     assert stopped == [4321]
     assert terminated == [4321]
     assert not (paths.pids_dir / "refresh-service.pid").exists()
+
+
+def test_dashboard_shortcuts_use_copyable_path_labels(runner: CliRunner, project_dir: Path) -> None:
+    db = KnowledgeDB(project_dir / "groundtruth.db")
+    db.close()
+
+    result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "dashboard", "init"])
+    assert result.exit_code == 0, result.output
+
+    dashboard_db = project_dir / ".groundtruth" / "dashboard" / "gtkb-dashboard.sqlite"
+    with sqlite3.connect(dashboard_db) as conn:
+        descriptions = [row[0] for row in conn.execute("SELECT description FROM shortcuts ORDER BY sort_order")]
+
+    assert descriptions
+    assert all("Copy local path" in text for text in descriptions)
+    assert not any(text.lower().startswith("open the") for text in descriptions)

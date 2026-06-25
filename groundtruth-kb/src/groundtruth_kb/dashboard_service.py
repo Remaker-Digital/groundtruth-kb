@@ -127,7 +127,9 @@ def run_service(
 
 def main() -> None:
     """CLI entry point for ``python -m groundtruth_kb.dashboard_service``."""
-    parser = argparse.ArgumentParser(description="GroundTruth KB dashboard refresh service")
+    parser = argparse.ArgumentParser(
+        description="GroundTruth KB dashboard refresh service (loopback/local-only; default host 127.0.0.1)",
+    )
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--db-path", type=Path, required=True)
     parser.add_argument("--runtime-root", type=Path, required=True)

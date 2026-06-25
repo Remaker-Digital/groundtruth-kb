@@ -168,3 +168,20 @@ def test_profile_with_no_doctor_required_artifacts_reports_info(
     assert check.status == "info"
     assert check.required is False
     assert "no doctor-required managed artifacts" in check.message
+
+
+def test_managed_artifact_drift_crlf_normalized_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CRLF live file and LF template with identical content must not be reported as drift."""
+    artifact = _file_artifact()
+    templates = _patch_registry(monkeypatch, tmp_path, [artifact])
+    templates.joinpath("hooks").mkdir(parents=True)
+    lf_content = b"print('ok')\nprint('line2')\n"
+    templates.joinpath("hooks/sample.py").write_bytes(lf_content)
+    tmp_path.joinpath(".claude/hooks").mkdir(parents=True)
+    crlf_content = lf_content.replace(b"\n", b"\r\n")
+    tmp_path.joinpath(".claude/hooks/sample.py").write_bytes(crlf_content)
+
+    check = doctor._check_managed_artifact_drift(tmp_path, "dual-agent")
+
+    assert check.status == "pass"
+    assert "current=1" in check.message

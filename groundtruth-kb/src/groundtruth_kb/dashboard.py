@@ -836,10 +836,16 @@ def _insert_health_cards(conn: sqlite3.Connection, counts: dict[str, int]) -> No
 
 def _insert_shortcuts(conn: sqlite3.Connection, paths: DashboardPaths) -> None:
     rows = [
-        ("project-root", "Project root", str(paths.project_root), "Open the evaluated project.", 1),
-        ("source-db", "MemBase", str(paths.project_root / "groundtruth.db"), "Canonical GroundTruth database.", 2),
-        ("dashboard-db", "Dashboard DB", str(paths.db_path), "Generated reporting database for Grafana.", 3),
-        ("dashboard-assets", "Dashboard assets", str(paths.dashboards_dir), "Generated Grafana dashboard JSON.", 4),
+        ("project-root", "Project root", str(paths.project_root), "Copy local path (project root).", 1),
+        ("source-db", "MemBase", str(paths.project_root / "groundtruth.db"), "Copy local path (MemBase database).", 2),
+        ("dashboard-db", "Dashboard DB", str(paths.db_path), "Copy local path (dashboard SQLite DB).", 3),
+        (
+            "dashboard-assets",
+            "Dashboard assets",
+            str(paths.dashboards_dir),
+            "Copy local path (Grafana dashboard JSON).",
+            4,
+        ),
     ]
     conn.executemany("INSERT INTO shortcuts VALUES (?, ?, ?, ?, ?)", rows)
 

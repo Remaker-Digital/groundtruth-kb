@@ -4639,7 +4639,11 @@ def serve(ctx: click.Context, port: int, host: str) -> None:
 
 @main.group()
 def dashboard() -> None:
-    """Generate and run the local Grafana operations dashboard."""
+    """Generate and run the local Grafana operations dashboard (loopback-only).
+
+    Use ``gt dashboard init``, ``install``, ``start``, ``refresh``, and ``stop`` as the
+    primary setup path. Maintainer scripts under ``scripts/gtkb_dashboard/`` are secondary.
+    """
 
 
 def _resolve_dashboard_config(ctx: click.Context, target_dir: str | None) -> GTConfig:
@@ -4786,9 +4790,10 @@ def dashboard_start(
         )
     except FileNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo("GroundTruth KB dashboard started.")
+    click.echo("GroundTruth KB dashboard started (loopback/local-only).")
     click.echo(f"  Grafana: {info.grafana_url} (pid {info.grafana_pid})")
     click.echo(f"  Refresh service: {info.refresh_url} (pid {info.refresh_pid})")
+    click.echo("  Primary commands: gt dashboard refresh | gt dashboard stop")
 
 
 @dashboard.command("stop")
@@ -5939,7 +5944,9 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
     )
     result = db.rebuild_deliberation_index()
     if result.get("errors") and result["errors"] == ["ChromaDB not installed"]:
-        click.echo("Error: ChromaDB is not installed. Install it into the gt venv with:\n  uv pip install chromadb")
+        click.echo(
+            'Error: ChromaDB is not installed. Install it into the gt venv with:\n  pip install "groundtruth-kb[search]"'
+        )
         raise SystemExit(1)
     click.echo(f"Indexed {result['indexed']} deliberation(s), {result['chunks']} chunk(s).")
     if result.get("errors"):
@@ -6376,7 +6383,7 @@ def deliberations_search(
 
         if not getattr(_db_mod, "HAS_CHROMADB", False):
             click.echo(
-                "Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n  uv pip install chromadb"
+                'Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n  pip install "groundtruth-kb[search]"'
             )
             raise SystemExit(1)
 

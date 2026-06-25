@@ -774,6 +774,9 @@ def _write_model_to_db(
             "generated_at": model.get("generated_at", ""),
             "role": model.get("role", {}).get("assumed_role", ""),
             "scope_note": model.get("dashboard_requirements", {}).get("scope_note", ""),
+            "dashboard_subject_scope": _dashboard_subject_scope_label(model),
+            "dashboard_subject_badge": "GT-KB platform + active adopter",
+            "refresh_service_scope": "loopback/local-only (127.0.0.1)",
             "raw_model_json": json.dumps(model, sort_keys=True),
         }
         conn.executemany(
@@ -1575,43 +1578,66 @@ def _kpi_rows(history: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
     return rows
 
 
+def _metric_count_status(value: Any, *, zero: str = "green", positive: str = "red") -> str:
+    """Map a numeric counter to a dashboard status color."""
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return "yellow"
+    return zero if count == 0 else positive
+
+
+def _dashboard_subject_scope_label(model: dict[str, Any]) -> str:
+    """Render combined GT-KB + adopter scope for dashboard metadata."""
+    work_subject = model.get("current_work_subject")
+    if not work_subject:
+        work_subject = model.get("metrics", {}).get("work_subject", {}).get("current_subject")
+    if work_subject and work_subject not in {"platform", "GT-KB", "gt-kb"}:
+        return f"Combined operations: GT-KB platform + {work_subject}"
+    return "Combined operations: GT-KB platform + active adopter/application"
+
+
 def _current_metric_rows(metrics: dict[str, Any], intelligence: dict[str, Any]) -> list[tuple[Any, ...]]:
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
+    project_health = _num(quality.get("failing", 0)) + _num(release.get("blocker_count", 0))
+    release_blockers = release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0))
+    ci_failing = quality.get("failing", 0)
+    bridge_actionable = metrics.get("contention", {}).get("actionable_count", 0)
     return [
         (
             "project_health_issues",
             "Project Health Issues",
-            _num(quality.get("failing", 0)) + _num(release.get("blocker_count", 0)),
-            "red",
+            project_health,
+            _metric_count_status(project_health),
             "Failing checks plus release blockers.",
         ),
         (
             "release_blockers",
             "Release Blockers",
-            release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0)),
-            "red",
+            release_blockers,
+            _metric_count_status(release_blockers),
             "Visible release blocker count.",
         ),
         (
             "ci_testing_failing",
             "CI / Testing Failing",
-            quality.get("failing", 0),
-            "red",
+            ci_failing,
+            _metric_count_status(ci_failing),
             "Failing integration/tool checks.",
         ),
         (
             "security_scan_posture",
             "Security Scan Posture",
             quality.get("ready_or_passing", 0),
-            "green",
+            "green" if _num(quality.get("failing", 0)) == 0 else "yellow",
             "Ready or passing checks.",
         ),
         (
             "governance_bridge_items",
             "Governance Bridge Items",
-            metrics.get("contention", {}).get("actionable_count", 0),
-            "green",
+            bridge_actionable,
+            "green" if _num(bridge_actionable) == 0 else "yellow",
             "Actionable bridge/contention entries.",
         ),
         ("data_freshness", "Data Freshness", 1, "green", "Live probe freshness status."),
