@@ -631,3 +631,70 @@ def test_dispatch_edit_raises_on_missing_file(tmp_path: Path):
             root,
             guard_runner=allow_runner(records),
         )
+
+
+# --- WI-4817: bounded transient-failure retry for call_ollama_chat ---
+
+
+class _RetryResponse:
+    def __init__(self, body: str) -> None:
+        self._body = body
+
+    def __enter__(self) -> _RetryResponse:
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return self._body.encode("utf-8")
+
+
+def _ollama_http_error(code: int) -> oh.urllib.error.HTTPError:
+    return oh.urllib.error.HTTPError("http://ollama.test/api/chat", code, "err", None, None)
+
+
+def _patch_ollama_urlopen(monkeypatch: pytest.MonkeyPatch, behaviors: list, calls: list) -> None:
+    def fake_urlopen(request, timeout: float):
+        calls.append(request.full_url)
+        behavior = behaviors[min(len(calls) - 1, len(behaviors) - 1)]
+        if isinstance(behavior, Exception):
+            raise behavior
+        return _RetryResponse(behavior)
+
+    monkeypatch.setattr(oh.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(oh.time, "sleep", lambda _seconds: None)
+
+
+def test_wi4817_ollama_retry_then_success(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    body = json.dumps({"message": {"content": "ok"}})
+    _patch_ollama_urlopen(monkeypatch, [_ollama_http_error(502), body], calls)
+    result = oh.call_ollama_chat("http://ollama.test", {"model": "m"})
+    assert result == {"message": {"content": "ok"}}
+    assert len(calls) == 2
+
+
+def test_wi4817_ollama_bounded_exhaustion(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    behaviors = [_ollama_http_error(503)] * (oh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_ollama_urlopen(monkeypatch, behaviors, calls)
+    with pytest.raises(oh.OllamaHarnessError, match="HTTP 503"):
+        oh.call_ollama_chat("http://ollama.test", {"model": "m"})
+    assert len(calls) == oh.CHAT_MAX_ATTEMPTS
+
+
+def test_wi4817_ollama_fail_fast_on_non_transient(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    _patch_ollama_urlopen(monkeypatch, [_ollama_http_error(401)], calls)
+    with pytest.raises(oh.OllamaHarnessError, match="HTTP 401"):
+        oh.call_ollama_chat("http://ollama.test", {"model": "m"})
+    assert len(calls) == 1
+
+
+def test_wi4817_ollama_happy_path_single_attempt(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    _patch_ollama_urlopen(monkeypatch, [json.dumps({"ok": True})], calls)
+    result = oh.call_ollama_chat("http://ollama.test", {"model": "m"})
+    assert result == {"ok": True}
+    assert len(calls) == 1

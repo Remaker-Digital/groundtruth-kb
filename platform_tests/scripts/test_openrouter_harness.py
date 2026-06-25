@@ -257,3 +257,88 @@ def test_dispatch_edit_raises_on_missing_file(tmp_path: Path):
             root,
             guard_runner=allow_runner(records),
         )
+
+
+# --- WI-4817: bounded transient-failure retry for call_openrouter_chat ---
+
+
+class _RetryResponse:
+    def __init__(self, body: str) -> None:
+        self._body = body
+
+    def __enter__(self) -> _RetryResponse:
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return self._body.encode("utf-8")
+
+
+def _openrouter_http_error(code: int) -> orh.urllib.error.HTTPError:
+    return orh.urllib.error.HTTPError("https://openrouter.test/chat/completions", code, "err", None, None)
+
+
+def _patch_openrouter_urlopen(monkeypatch: pytest.MonkeyPatch, behaviors: list, calls: list) -> None:
+    def fake_urlopen(request, timeout: float):
+        calls.append(request.full_url)
+        behavior = behaviors[min(len(calls) - 1, len(behaviors) - 1)]
+        if isinstance(behavior, Exception):
+            raise behavior
+        return _RetryResponse(behavior)
+
+    monkeypatch.setattr(orh.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(orh.time, "sleep", lambda _seconds: None)
+
+
+def test_wi4817_openrouter_retry_then_success(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    body = orh.json.dumps({"choices": [{"message": {"content": "ok"}}]})
+    _patch_openrouter_urlopen(monkeypatch, [_openrouter_http_error(502), body], calls)
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert result["choices"][0]["message"]["content"] == "ok"
+    assert len(calls) == 2
+
+
+def test_wi4817_openrouter_bounded_exhaustion(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    behaviors = [_openrouter_http_error(500)] * (orh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_openrouter_urlopen(monkeypatch, behaviors, calls)
+    with pytest.raises(orh.OpenRouterHarnessError, match="HTTP 500"):
+        orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert len(calls) == orh.CHAT_MAX_ATTEMPTS
+
+
+def test_wi4817_openrouter_fail_fast_on_non_transient(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    _patch_openrouter_urlopen(monkeypatch, [_openrouter_http_error(401)], calls)
+    with pytest.raises(orh.OpenRouterHarnessError, match="HTTP 401"):
+        orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert len(calls) == 1
+
+
+def test_wi4817_openrouter_non_json_retry_then_success(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    good = orh.json.dumps({"choices": []})
+    _patch_openrouter_urlopen(monkeypatch, ["<html>proxy</html>", "not json", good], calls)
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert result == {"choices": []}
+    assert len(calls) == 3
+
+
+def test_wi4817_openrouter_non_json_exhaustion_includes_body_snippet(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    behaviors = ["<html>err</html>"] * (orh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_openrouter_urlopen(monkeypatch, behaviors, calls)
+    with pytest.raises(orh.OpenRouterHarnessError, match="body snippet"):
+        orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert len(calls) == orh.CHAT_MAX_ATTEMPTS
+
+
+def test_wi4817_openrouter_happy_path_single_attempt(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    _patch_openrouter_urlopen(monkeypatch, [orh.json.dumps({"ok": True})], calls)
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert result == {"ok": True}
+    assert len(calls) == 1
