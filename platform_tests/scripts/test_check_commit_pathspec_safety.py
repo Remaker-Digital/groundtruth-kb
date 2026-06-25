@@ -38,17 +38,17 @@ checker = _load_checker()
 
 def test_mixed_bridge_and_source_is_flagged() -> None:
     """Contamination signature (WI-4464; bridge-essential "Scoped commits only")."""
-    result = checker.classify_staged(["bridge/INDEX.md", "scripts/x.py"])
+    result = checker.classify_staged(["bridge/foo-001.md", "scripts/x.py"])
     assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/INDEX.md"]
+    assert result["bridge_queue"] == ["bridge/foo-001.md"]
     assert result["other"] == ["scripts/x.py"]
 
 
 def test_bridge_only_not_mixed() -> None:
     """No false positive on a legit bridge-only commit (GOV-FILE-BRIDGE-AUTHORITY-001)."""
-    result = checker.classify_staged(["bridge/INDEX.md", "bridge/foo-001.md"])
+    result = checker.classify_staged(["bridge/foo-001.md", "bridge/bar-002.md"])
     assert result["mixed"] is False
-    assert result["bridge_queue"] == ["bridge/INDEX.md", "bridge/foo-001.md"]
+    assert result["bridge_queue"] == ["bridge/bar-002.md", "bridge/foo-001.md"]
     assert result["other"] == []
 
 
@@ -70,9 +70,9 @@ def test_empty_not_mixed() -> None:
 
 def test_nested_bridge_path_is_other() -> None:
     """Conservative matcher: nested bridge/ paths are NOT queue surface."""
-    result = checker.classify_staged(["bridge/sub/foo.md", "bridge/INDEX.md"])
+    result = checker.classify_staged(["bridge/sub/foo.md", "bridge/bar-001.md"])
     assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/INDEX.md"]
+    assert result["bridge_queue"] == ["bridge/bar-001.md"]
     assert result["other"] == ["bridge/sub/foo.md"]
 
 
@@ -86,9 +86,9 @@ def test_non_md_bridge_path_is_other() -> None:
 
 def test_backslash_paths_normalized() -> None:
     """Windows-style backslash paths normalize to forward slashes."""
-    result = checker.classify_staged(["bridge\\INDEX.md", "scripts\\x.py"])
+    result = checker.classify_staged(["bridge\\bar-001.md", "scripts\\x.py"])
     assert result["mixed"] is True
-    assert result["bridge_queue"] == ["bridge/INDEX.md"]
+    assert result["bridge_queue"] == ["bridge/bar-001.md"]
     assert result["other"] == ["scripts/x.py"]
 
 
@@ -97,19 +97,19 @@ def test_backslash_paths_normalized() -> None:
 
 def test_advisory_exit_zero_on_mixed(monkeypatch, capsys) -> None:
     """Advisory mode never blocks a commit (fail-open; protects swarm + sweep-commit)."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/INDEX.md", "scripts/x.py"])
+    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "scripts/x.py"])
     rc = checker.main(["--staged"])
     captured = capsys.readouterr()
     assert rc == 0
     assert "WARNING" in captured.err
-    assert "bridge/INDEX.md" in captured.err
+    assert "bridge/foo-001.md" in captured.err
     assert "scripts/x.py" in captured.err
     assert captured.out == ""
 
 
 def test_strict_exit_nonzero_on_mixed(monkeypatch, capsys) -> None:
     """Strict mode blocks on contamination with a distinct exit code."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/INDEX.md", "scripts/x.py"])
+    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "scripts/x.py"])
     rc = checker.main(["--staged", "--strict"])
     captured = capsys.readouterr()
     assert rc == checker.STRICT_CONTAMINATION_EXIT
@@ -119,7 +119,7 @@ def test_strict_exit_nonzero_on_mixed(monkeypatch, capsys) -> None:
 
 def test_strict_exit_zero_on_clean(monkeypatch, capsys) -> None:
     """Strict mode passes a clean (bridge-only) staged set."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/INDEX.md", "bridge/foo-001.md"])
+    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "bridge/bar-002.md"])
     rc = checker.main(["--staged", "--strict"])
     captured = capsys.readouterr()
     assert rc == 0
@@ -128,15 +128,17 @@ def test_strict_exit_zero_on_clean(monkeypatch, capsys) -> None:
 
 def test_json_output(monkeypatch, capsys) -> None:
     """JSON output shape: parseable with mixed/bridge_queue/other keys."""
-    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/INDEX.md", "scripts/x.py"])
+    monkeypatch.setattr(checker, "_staged_names", lambda: ["bridge/foo-001.md", "scripts/x.py"])
     rc = checker.main(["--staged", "--json"])
     captured = capsys.readouterr()
     assert rc == 0
     payload = json.loads(captured.out)
     assert payload == {
         "mixed": True,
-        "bridge_queue": ["bridge/INDEX.md"],
+        "bridge_queue": ["bridge/foo-001.md"],
         "other": ["scripts/x.py"],
+        "foreign_verdicts": [],
+        "foreign_blocked": False,
     }
 
 

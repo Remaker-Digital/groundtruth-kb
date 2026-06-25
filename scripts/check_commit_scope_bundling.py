@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_REL = Path("config/governance/narrative-artifact-approval.toml")
 PACKETS_REL = Path(".groundtruth/formal-artifact-approvals")
+PATHSPEC_SAFETY_SCRIPT = PROJECT_ROOT / "scripts" / "check_commit_pathspec_safety.py"
 
 DELIB_RE = re.compile(r"\bDELIB-[A-Z0-9_-]+\b")
 SPEC_RE = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_-]*\b")
@@ -37,6 +38,20 @@ BRIDGE_VERSION_SUFFIX_RE = re.compile(r"-\d{3}$")
 
 class ScopeBundlingError(RuntimeError):
     """Raised when the predicate cannot evaluate safely."""
+
+
+def _load_pathspec_safety_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "check_commit_pathspec_safety_for_scope_bundling",
+        PATHSPEC_SAFETY_SCRIPT,
+    )
+    if spec is None or spec.loader is None:
+        raise ScopeBundlingError("check_commit_pathspec_safety module unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @dataclass(frozen=True, order=True)
@@ -166,7 +181,13 @@ def _match_packets_to_path(rel_path: str, packets: list[dict[str, Any]]) -> list
     return [matches[-1]]
 
 
-def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
+def evaluate(
+    root: Path,
+    *,
+    paths: list[str] | None = None,
+    committing_session_id: str | None = None,
+    pathspec_names: set[str] | None = None,
+) -> dict[str, Any]:
     """Pure evaluation entry point used by tests and the CLI."""
 
     cfg = _load_config(root)
@@ -213,6 +234,23 @@ def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
             }
         )
 
+    if committing_session_id is not None:
+        pathspec_safety = _load_pathspec_safety_module()
+        foreign_result = pathspec_safety.detect_foreign_staged_verdicts(
+            root,
+            rel_paths,
+            committing_session_id,
+            pathspec_names=pathspec_names,
+        )
+        if foreign_result["foreign_blocked"]:
+            findings.append(
+                {
+                    "kind": "foreign_staged_verdict",
+                    "paths": [item["path"] for item in foreign_result["foreign_verdicts"]],
+                    "foreign_verdicts": foreign_result["foreign_verdicts"],
+                }
+            )
+
     return {
         "status": "warn" if findings else "pass",
         "scopes": {key: scopes[key] for key in sorted(scopes)},
@@ -248,6 +286,11 @@ def _format_human(result: dict[str, Any]) -> str:
         lines.append("  Protected paths with no matching approval packet:")
         for path in result["unscoped_protected"]:
             lines.append(f"    - {path}")
+    for finding in result["findings"]:
+        if finding.get("kind") == "foreign_staged_verdict":
+            lines.append("  Foreign-session staged bridge verdict(s) outside owned pathspec:")
+            for path in finding.get("paths", []):
+                lines.append(f"    - {path}")
     lines.append("  Slice 1 is WARN-only; commit proceeds. Slice 2 may promote to BLOCK after empirical tuning.")
     return "\n".join(lines)
 
@@ -288,6 +331,17 @@ def main(argv: list[str] | None = None, *, repository_root: Path | None = None) 
     parser.add_argument("--paths", nargs="*", help="Explicit paths to check, relative to project root")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     parser.add_argument("--project-root", type=Path, default=default_project_root)
+    parser.add_argument(
+        "--committing-session-id",
+        default=None,
+        help="Committing session id for foreign staged verdict detection.",
+    )
+    parser.add_argument(
+        "--pathspec",
+        nargs="*",
+        default=None,
+        help="Explicit commit pathspec paths that intentionally include staged verdict files.",
+    )
     args = parser.parse_args(raw_argv)
 
     if not args.staged and not args.paths:
@@ -296,7 +350,16 @@ def main(argv: list[str] | None = None, *, repository_root: Path | None = None) 
     repo_root = _repository_root(PROJECT_ROOT if explicit_project_root else default_project_root)
     try:
         project_root = _resolve_project_root(args.project_root, repo_root)
-        result = evaluate(project_root, paths=list(args.paths) if args.paths else None)
+        committing_session_id = args.committing_session_id
+        if committing_session_id is None:
+            pathspec_safety = _load_pathspec_safety_module()
+            committing_session_id = pathspec_safety._resolve_committing_session_id(None)
+        result = evaluate(
+            project_root,
+            paths=list(args.paths) if args.paths else None,
+            committing_session_id=committing_session_id,
+            pathspec_names=set(args.pathspec or []),
+        )
     except (ScopeBundlingError, subprocess.CalledProcessError) as exc:
         sys.stderr.write(f"commit-scope bundling check error: {exc}\n")
         return 2
