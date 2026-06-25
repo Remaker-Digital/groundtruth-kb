@@ -1,0 +1,146 @@
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""Tests for scripts/gtkb_dispatcher_daemon.py (WI-4787)."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import time
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from click.testing import CliRunner
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DAEMON_PATH = _REPO_ROOT / "scripts" / "gtkb_dispatcher_daemon.py"
+_CODEX_INVOCATION = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
+_CLAUDE_INVOCATION = {
+    "headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]}
+}
+
+
+def _load_daemon():
+    spec = importlib.util.spec_from_file_location("gtkb_dispatcher_daemon_test", _DAEMON_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _make_project(root: Path) -> Path:
+    (root / "groundtruth.toml").write_text(
+        '[project]\nproject_name = "TestSynthetic"\nprofile = "dual-agent"\n',
+        encoding="utf-8",
+    )
+    (root / "bridge").mkdir(exist_ok=True)
+    harness_state = root / "harness-state"
+    harness_state.mkdir(exist_ok=True)
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}, "codex": {"id": "A"}}}),
+        encoding="utf-8",
+    )
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["loyal-opposition"],
+                        "invocation_surfaces": _CODEX_INVOCATION,
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["prime-builder"],
+                        "invocation_surfaces": _CLAUDE_INVOCATION,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return root
+
+
+def _write_bridge(root: Path, stem: str, status: str, version: int) -> None:
+    body = f"{status}\n\n# {stem} v{version}\nauthor_session_context_id: fixture-author-session\n"
+    (root / "bridge" / f"{stem}-{version:03d}.md").write_text(body, encoding="utf-8")
+
+
+def test_daemon_tick_computes_shadow_decision(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    result = daemon.run_tick(root)
+    assert result["decisions"]
+    log_path = daemon.daemon_state_dir(root) / daemon.SHADOW_LOG_FILENAME
+    assert log_path.is_file()
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[-1])
+    assert record.get("shadow_mode") is True
+    assert record.get("spawned") is False
+    assert "role" in record
+
+
+def test_daemon_shadow_mode_never_spawns(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    with patch("subprocess.Popen") as popen:
+        for _ in range(3):
+            daemon.run_tick(root)
+        popen.assert_not_called()
+
+
+def test_daemon_writes_heartbeat_each_tick(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    hb = daemon.daemon_state_dir(root) / daemon.HEARTBEAT_FILENAME
+    daemon.run_tick(root)
+    first = hb.read_text(encoding="utf-8").strip()
+    time.sleep(1.1)
+    daemon.run_tick(root)
+    second = hb.read_text(encoding="utf-8").strip()
+    assert second >= first
+
+
+def test_daemon_single_instance_lock(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    state_dir = daemon.daemon_state_dir(tmp_path)
+    assert daemon.acquire_daemon_lock(state_dir)
+    assert not daemon.acquire_daemon_lock(state_dir)
+    daemon.release_daemon_lock(state_dir)
+    assert daemon.acquire_daemon_lock(state_dir)
+
+
+def test_daemon_control_cli_status_reports_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from groundtruth_kb import cli as cli_module
+    from groundtruth_kb.cli import main
+
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    config = root / "groundtruth.toml"
+    config.write_text(
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
+        encoding="utf-8",
+    )
+    daemon.run_tick(root)
+    monkeypatch.setattr(cli_module, "_import_dispatcher_daemon_module", lambda _project_root: daemon)
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "daemon", "status", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["mode"] == "shadow"
+    assert payload.get("heartbeat_at")

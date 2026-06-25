@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -826,6 +827,94 @@ def bridge_dispatch_health_cmd(ctx: click.Context, json_output: bool) -> None:
 def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool) -> None:
     """Show a comprehensive read-only bridge dispatch operations report."""
     _emit_bridge_dispatch_report(ctx, json_output=json_output)
+
+
+@bridge_dispatch_group.group("daemon")
+def bridge_dispatch_daemon_group() -> None:
+    """Shadow-mode dispatcher daemon control (WI-4787)."""
+
+
+def _import_dispatcher_daemon_module(project_root: Path):
+    import importlib.util
+
+    script = project_root / "scripts" / "gtkb_dispatcher_daemon.py"
+    spec = importlib.util.spec_from_file_location("gtkb_dispatcher_daemon_cli", script)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"dispatcher daemon script missing: {script}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_dispatch_daemon_group.command("status")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_status_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Report shadow daemon running state, heartbeat age, and last decision."""
+    config = _resolve_config(ctx)
+    daemon = _import_dispatcher_daemon_module(config.project_root)
+    payload = daemon.collect_daemon_status(config.project_root)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Dispatcher daemon mode: {payload['mode']}")
+    click.echo(f"Running: {payload['running']}")
+    click.echo(f"Heartbeat: {payload.get('heartbeat_at') or '(none)'}")
+    if payload.get("heartbeat_age_seconds") is not None:
+        click.echo(f"Heartbeat age (s): {payload['heartbeat_age_seconds']:.1f}")
+    last = payload.get("last_decision")
+    if isinstance(last, dict):
+        click.echo(
+            f"Last shadow decision: role={last.get('role')} recipient={last.get('recipient')} "
+            f"signature={str(last.get('signature', ''))[:12]}..."
+        )
+
+
+@bridge_dispatch_daemon_group.command("start")
+@click.option("--interval", type=int, default=30, show_default=True, help="Tick interval in seconds.")
+@click.pass_context
+def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
+    """Start the shadow dispatcher daemon in the background."""
+    config = _resolve_config(ctx)
+    daemon = _import_dispatcher_daemon_module(config.project_root)
+    if daemon.read_daemon_status(config.project_root).get("running"):
+        raise click.ClickException("dispatcher daemon already running (lock held)")
+    script = config.project_root / "scripts" / "gtkb_dispatcher_daemon.py"
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            str(script),
+            "--loop",
+            "--project-root",
+            str(config.project_root),
+            "--tick-seconds",
+            str(interval),
+        ],
+        cwd=str(config.project_root),
+    )
+    click.echo(f"Started shadow dispatcher daemon pid={proc.pid}")
+
+
+@bridge_dispatch_daemon_group.command("stop")
+@click.pass_context
+def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
+    """Stop the shadow dispatcher daemon and release its lock."""
+    config = _resolve_config(ctx)
+    daemon = _import_dispatcher_daemon_module(config.project_root)
+    state_dir = daemon.daemon_state_dir(config.project_root)
+    lock_path = state_dir / daemon.LOCK_FILENAME
+    if lock_path.is_file():
+        try:
+            import signal
+
+            lock_payload = json.loads(lock_path.read_text(encoding="utf-8"))
+            pid = int(lock_payload.get("pid", 0))
+            if pid > 0:
+                os.kill(pid, signal.SIGTERM)
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+    daemon.release_daemon_lock(state_dir)
+    click.echo("Stopped shadow dispatcher daemon (lock released).")
 
 
 def _flow_service(ctx: click.Context) -> tuple[KnowledgeDB, TypedArtifactFlowService]:
