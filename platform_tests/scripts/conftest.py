@@ -57,6 +57,8 @@ def mock_harness_registry_for_tests(request) -> None:
             "test_session_self_initialization_canonical_consistency",
             "test_harness_registry_reader_migration",
             "test_bridge_dispatch_per_document_lease",
+            "test_gtkb_dispatcher_daemon",
+            "test_gtkb_dispatcher_heartbeat",
         ]
     ):
         yield

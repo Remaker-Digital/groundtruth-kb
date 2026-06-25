@@ -281,6 +281,7 @@ def _is_actionable_for(status: str, recipient: BridgeAgent) -> bool:
 
 
 _SCOPING_SUFFIX = "-scoping"
+_IMPLEMENTATION_SUFFIX = "-implementation"
 
 
 def _scoping_terminal_with_successor(doc_name: str, parse_result: ParseResult) -> bool:
@@ -300,6 +301,27 @@ def _scoping_terminal_with_successor(doc_name: str, parse_result: ParseResult) -
     if not successor_name:
         return False
     return any(d.name == successor_name for d in parse_result.documents)
+
+
+def _has_verified_implementation_sibling(doc_name: str, parse_result: ParseResult) -> bool:
+    """Return True if ``<doc_name>-implementation`` exists at VERIFIED.
+
+    A proposal or umbrella thread frequently terminates at ``GO`` while its
+    implementation work completes on a separate ``<slug>-implementation``
+    sibling thread that reaches ``VERIFIED``. Once that sibling is VERIFIED the
+    parent thread's work is complete and the parent is no longer actionable for
+    either role.
+
+    Parallel to :func:`_scoping_terminal_with_successor`. Per WI-4549
+    (umbrella/proposal threads stuck at GO polluting the prime-actionable
+    surface).
+    """
+    sibling_name = doc_name + _IMPLEMENTATION_SUFFIX
+    for doc in parse_result.documents:
+        if doc.name == sibling_name and doc.versions:
+            if str(doc.versions[0].status.value) == "VERIFIED":
+                return True
+    return False
 
 
 def compute_actionable_pending(
@@ -342,6 +364,13 @@ def compute_actionable_pending(
         # successor slug; the scoping thread itself is not actionable for
         # either role (per WI-3442 + classifier-fix GO -002).
         if _scoping_terminal_with_successor(doc.name, parse_result):
+            continue
+
+        # Suppress proposal/umbrella threads whose implementation sibling has
+        # reached VERIFIED. The parent thread's work is complete; it is not
+        # actionable for either role (per WI-4549; parallel to the scoping-
+        # terminal suppression above).
+        if _has_verified_implementation_sibling(doc.name, parse_result):
             continue
 
         # Kind-aware classification per smart-poller-kind-aware-routing

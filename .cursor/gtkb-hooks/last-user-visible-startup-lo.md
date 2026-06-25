@@ -1,6 +1,6 @@
 # GroundTruth-KB Fresh Session Startup
 
-Generated: 2026-06-25T08:24:10Z
+Generated: 2026-06-25T18:33:49Z
 Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groundtruth-kb-dashboard](http://localhost:3000/d/gtkb/groundtruth-kb-dashboard)
 
 ## Startup Disclosure
@@ -51,46 +51,43 @@ Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groun
 
 - GT-KB release blockers: 0
 - GT-KB active backlog items: 0
-- GT-KB open MemBase work items: 11 (subject-scoped; 255 across all subjects)
-- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 86
-- GT-KB drift changed paths: 1
+- GT-KB open MemBase work items: 7 (subject-scoped; 238 across all subjects)
+- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 70
+- GT-KB drift changed paths: 2
 - GT-KB Testing/tool rollup: 0 failing, 2 manual, 15 ready/passing (queried repo: unknown)
 - Active harness role slot: `prime-builder` (prime-builder, loyal-opposition, or shared)
 - Harness topology: `multi_harness` (single_harness or multi_harness)
 - GT-KB infrastructure posture: package 0.7.0rc1; dry-run upgrade plan available: True
 - GT-KB dev environment inventory: stale; generated 2026-05-08T19:04:30Z; redaction pass
-- Harness parity: fail (harness=all, role=loyal-opposition, MISSING=27, PASS=123)
+- Harness parity: fail (harness=all, role=loyal-opposition, MISSING=25, PASS=125)
 
 ### Project State Rollup
 
 - Source: MemBase tables: current_work_items + current_project_work_item_memberships grouped by `current_project_work_item_memberships.project_id`.
-- Current work items: 3597; non-terminal: 255; active projects: 46; ungrouped non-terminal: 136.
-- Status counts: deferred=1, not_a_defect=7, open=254, resolved=3066, retired=144, verified=64, wont_fix=61.
+- Current work items: 3608; non-terminal: 238; active projects: 42; ungrouped non-terminal: 141.
+- Status counts: deferred=1, not_a_defect=7, open=237, resolved=3069, retired=169, verified=64, wont_fix=61.
 - Active project states:
-  - `GTKB-DISPATCHER-COMPLETION`: 11 non-terminal (open=11); top: `WI-4786` - Phase 1 - Umbrella ADR for dispatcher architecture (persistent daemon + computed-quality + full black box); amend TAFE R-series, SPEC-CENTRALIZED-DISPATCH-SERVICE-001, DCL-DISPATCH-ENVELOPE-RULES-001 in place; resolve INDEX-vs-dispatcher transition [open, P1].
-  - `GT-KB Skill Activation and Enforcement`: 6 non-terminal (open=6); top: `WI-4810` - Skill-usage router: scripts/skill_usage_router.py + gt skills suggest|check (deterministic scenario table, report-only) [open, P2].
-  - `GTKB-ADOPTER-EXPERIENCE`: 6 non-terminal (open=6); top: `GTKB-GOV-001` - Complete Agent Red Tier A managed-skill adoption apply [open, order 1029].
-  - `GTKB-SOURCE-OF-TRUTH-FRESHNESS`: 6 non-terminal (open=6); top: `WI-3501` - Formalize the source-of-truth-freshness principle as governance (DA decision + GOV + DCL) [open, P2].
-  - `Harness State SoT Consolidation`: 6 non-terminal (open=6); top: `WI-4328` - Define canonical reader entrypoint in groundtruth_kb.harness_projection (or equivalent) [open, P2].
+  - `GTKB-DISPATCHER-COMPLETION`: 11 non-terminal (open=11); top: `WI-4788` - Phase 2 - Full black-box mechanical PreToolUse mutation gate: block all agent writes to dispatcher config + runtime state + implementation source; config/state via CLI+skill only; implementation only under owner-authorized WI packet [open, P1].
   - `Omnigent Alignment`: 6 non-terminal (open=6); top: `WI-4550` - Omnigent#1: Cost/token-iteration budget policy for dispatched bridge workers [open, P1].
-  - `GTKB Obsolete Reference Purge`: 5 non-terminal (open=5); top: `WI-4794` - Methodology: obsolete-reference-purge ADR + DCL [open, P2].
-  - `GTKB-RELIABILITY-FIXES`: 5 non-terminal (open=5); top: `WI-3510` - Reconcile divergent included_work_item_ids semantics between Write-time bridge-compliance gate and impl-start authorization gate [open, P2].
   - `GTKB-ROLE-AUTHORITY-DISPATCHER-ONLY-PURGE`: 5 non-terminal (open=5); top: `WI-4781` - Phase 0 - Amend GOV-SESSION-ROLE-AUTHORITY-001 to carry the canonical registry-role-is-dispatcher-only principle as single source; split DCL-SESSION-ROLE-RESOLUTION-001 (self-role-choice MAY use hint; enforcement-gate MUST NOT) [open, P1].
+  - `GTKB-SOURCE-OF-TRUTH-FRESHNESS`: 5 non-terminal (open=5); top: `WI-3502` - Audit all cached/snapshot surfaces against the fresh-read source-of-truth principle [open, P2].
   - `Harness Testing and Quality Benchmarking 1`: 5 non-terminal (open=5); top: `WI-4580` - Build isolated GT-KB benchmark fixture corpus with seeded flaws [open, P1].
   - `GTKB-APPROVAL-PACKET-ERGONOMICS`: 4 non-terminal (open=4); top: `WI-3378` - Build a first-class gap-state formal-artifact MemBase capture lane [open, P2].
+  - `GTKB-BRIDGE-PROTOCOL-RELIABILITY`: 4 non-terminal (open=4); top: `WI-4778` - Cursor harness dispatch readiness (rules overlay, headless shim, readiness probe) [open, P1].
+  - `GTKB-RELIABILITY-FIXES`: 4 non-terminal (open=4); top: `WI-4356` - Define and implement recurring work-tree hygiene + stash-stray-cleanup mechanism [open, P2].
   - `GTKB-WINDOWS-GOVERNANCE-PREFLIGHT-SURFACE`: 4 non-terminal (open=4); top: `WI-4255` - Windows governance preflight evidence model [open, P2].
   - `Agent Red Readiness Program`: 3 non-terminal (open=3); top: `WI-4655` - Phase 1.2 - App-root minimization validator (sub-slice 5) [open, P1].
-  - `AGENT-RED-TEST-COVERAGE-GAPS`: 3 non-terminal (open=3); top: `WI-3222` - Test coverage gap: SPEC-1586 needs deterministic test evidence [open, P3].
   - `Backlog Triage and Hygiene`: 3 non-terminal (open=3); top: `WI-4665` - intake-pipeline auto-confirm path leaves SPEC description field NULL [open, P2].
   - `GT-KB v1.0 Release Strategy`: 3 non-terminal (open=3); top: `WI-3400` - Capture Antigravity 2026-05-27 V1-RELEASE-STRATEGY-REVIEW advisory disposition (peer-solution-advisory-loop) [open, P2].
   - `GTKB-BRIDGE-SIGNAL-QUALITY`: 3 non-terminal (open=3); top: `WI-4253` - Bridge signal quality inactive substrate diagnostics [open, P2].
-  - `GTKB-BRIDGE-PROTOCOL-RELIABILITY`: 2 non-terminal (open=2); top: `WI-4778` - Cursor harness dispatch readiness (rules overlay, headless shim, readiness probe) [open, P1].
+  - `GT-KB Skill Activation and Enforcement`: 2 non-terminal (open=2); top: `WI-4813` - Skill catalog-contract regression test (scoped 2026-06-25, advisory enforcement-model section 3) [open, P2].
+  - `GTKB Obsolete Reference Purge`: 2 non-terminal (open=2); top: `WI-4801` - Decouple legacy harness-name/role + reviewer-harness language [open, P2].
   - `GTKB-DASHBOARD-OBSERVABILITY`: 2 non-terminal (open=2); top: `GTKB-DASHBOARD-003` - Dashboard industry-alignment Slice 3 (SLO, flow metrics, PR health, incident/MTTR, remote exposure, WCAG) [open, order 1007].
+  - `GTKB-DETERMINISTIC-SERVICES-001`: 2 non-terminal (open=2); top: `WI-4831` - Add startup [Shell] hint line: gt resolves via PowerShell (Windows PATH), not the Claude Bash-tool Git-Bash PATH; venv Python needs PYTHONPATH=groundtruth-kb/src [open, P2].
   - `GTKB-GOVERNANCE-HARDENING`: 2 non-terminal (open=2); top: `GTKB-GOV-004` - Reconcile legacy MemBase work items into a high-quality unified backlog [open, order 1032].
   - `GTKB-IMPLEMENTATION-START-GATE-HARDENING-001`: 2 non-terminal (open=2); top: `WI-3350` - implementation_authorization project-auth validator should accept a parent-project PAUTH for a sub-project proposal [open, P2].
   - `PROJECT-GTKB-ENV-SOT-TOPOLOGY`: 2 non-terminal (open=2); top: `WI-3430` - Migrate Agent Red from 3-file SoT layout to single SoT + CLI-generated per-sub-app views [open, P2].
   - `PROJECT-GTKB-TYPED-ARTIFACT-FLOW-ENGINE`: 2 non-terminal (open=2); top: `WI-4566` - TAFE Phase B residual cutover-evidence cleanup [open, P1].
-  - `Activity-Envelope Disposition and Autonomous Dispatch`: 1 non-terminal (open=1); top: `WI-4689` - Standing SoT-deference rule: GT-KB-subject sessions defer to released Main, then issues/wiki [open, P1].
   - `AGENT-RED-CLAUDE-DESIGN-GUI-EXPLORATION`: 1 non-terminal (open=1); top: `WORKLIST-OWNER-DIRECTED-BACKLOG-ADDITION-2026-04-17-CLAUDE-DESIGN-GUI-EXPLORATION` - Explore Claude Design GUI workflow for Agent Red GUI work [open, order 1037].
   - `AGENT-RED-DEPLOY-PIPELINE`: 1 non-terminal (open=1); top: `WI-3172` - Resolve deploy pipeline Phase 0 environment validation failure [open].
   - `AGENT-RED-SPEC-HYGIENE`: 1 non-terminal (open=1); top: `WI-3183` - KB integrity -- SPA cluster test-ID investigation closure: 10 SPA specs have no current test linkage [open, P2].
@@ -102,7 +99,6 @@ Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groun
   - `GTKB-ADR-DCL-CLAUSE-TEST-ENFORCEMENT-001`: 1 non-terminal (open=1); top: `GTKB-ADR-DCL-CLAUSE-TEST-ENFORCEMENT-001` - GTKB-ADR-DCL-CLAUSE-TEST-ENFORCEMENT-001 (Apply ADR/DCL logic as clause-level review tests) [open, order 44].
   - `GTKB-AI-ASSISTED-DELIVERY-MATURITY-MODEL`: 1 non-terminal (open=1); top: `GTKB-AI-ASSISTED-DELIVERY-MATURITY-MODEL` - GTKB-AI-ASSISTED-DELIVERY-MATURITY-MODEL [open, order 32].
   - `GTKB-DASHBOARD`: 1 non-terminal (deferred=1); top: `GTKB-DASHBOARD-RETENTION` - Dashboard history retention policy (contingent) [deferred, order 1010].
-  - `GTKB-DETERMINISTIC-SERVICES-001`: 1 non-terminal (open=1); top: `WI-4567` - Deterministic service: end-to-end bridge implementation-proposal filing (DELIB + PAUTH + claim + write + preflight) [open, P3].
   - `GTKB-GOV-PROPOSAL-STANDARDS`: 1 non-terminal (open=1); top: `WI-4537` - gtkb_propose_scaffold defaults are stale vs current bridge gates (bridge_kind + pytest -p flag) [open, P3].
   - `GTKB-ISOLATION`: 1 non-terminal (open=1); top: `GTKB-ISOLATION-018` - Execute Agent Red child-directory cutover [open, order 1025].
   - `GTKB-ISOLATION-017-SLICE-2.5`: 1 non-terminal (open=1); top: `GTKB-ISOLATION-017-SLICE-2.5` - GTKB-ISOLATION-017-SLICE-2.5 (registry rationale schema extension) [open, order 26].

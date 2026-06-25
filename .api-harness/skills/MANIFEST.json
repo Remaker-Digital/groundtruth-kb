@@ -42,12 +42,20 @@
       "source_sha256": "9c674fade46e95b76bf877f059253ddac687aba75d54eb3c054399b6f83d58a3"
     },
     {
+      "adapter_relative_path": ".api-harness/skills/dispatcher-control/SKILL.md",
+      "canonical_name": "dispatcher-control",
+      "capability_id": "skill.dispatcher-control",
+      "description": "Use the governed GT-KB bridge dispatcher control surface for reporting and configuration. Trigger when Codex needs to inspect dispatcher health, status, report data, selected targets, live workers, dispatch history, or change dispatcher eligibility, ranking weights, caps, rules, or harness overlays through gt bridge dispatch commands instead of editing config/dispatcher/rules.toml or runtime JSON.",
+      "source_relative_path": ".claude/skills/dispatcher-control/SKILL.md",
+      "source_sha256": "2dc26c0578410bdc1a028dc360503b11d18d96a24c739917906873d0b21b0ed5"
+    },
+    {
       "adapter_relative_path": ".api-harness/skills/bridge-propose/SKILL.md",
       "canonical_name": "gtkb-bridge-propose",
       "capability_id": "skill.bridge-propose",
       "description": "Write a bridge proposal to ``bridge/<topic>-001.md`` through the governed no-index bridge path under governance-safe credential-scan and concurrency controls. Use when drafting a new NEW or REVISED proposal through the helper path (non-Claude-Write).",
       "source_relative_path": ".claude/skills/bridge-propose/SKILL.md",
-      "source_sha256": "cdfe7bb7020fe0b55209bd684c5390ee0b86decd792743cfb2c63498136edf8e"
+      "source_sha256": "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
     },
     {
       "adapter_relative_path": ".api-harness/skills/bridge-reconciliation/SKILL.md",
@@ -95,7 +103,7 @@
       "capability_id": "skill.codex-report",
       "description": "Generate a Loyal Opposition report with required evidence structure. Writes timestamped INSIGHTS file to CODEX-INSIGHT-DROPBOX.",
       "source_relative_path": ".claude/skills/codex-report/SKILL.md",
-      "source_sha256": "f11ea1e3ae1c7a122f49ead1c4c475f7788c1c5fbfcf410924d3364dd05c1ccd"
+      "source_sha256": "912b6bc5c661ecbf42c2687ce61ae37617d482f249588fd0d9cca630a04e9825"
     },
     {
       "adapter_relative_path": ".api-harness/skills/decision-capture/SKILL.md",
@@ -159,7 +167,7 @@
       "capability_id": "skill.kb-session-wrap",
       "description": "Execute the GT-KB knowledge-first session wrap-up procedure. Collects durable session knowledge, updates governed memory surfaces, records blockers, syncs the current branch, and generates the next-session handoff prompt.",
       "source_relative_path": ".claude/skills/kb-session-wrap/SKILL.md",
-      "source_sha256": "a53004274f049998ded8c8d61edb9f54f43101df5a0af311449fa2dd91af8465"
+      "source_sha256": "eb2b6752e238357a449081afe47f77a486d92126dde72f7bc64377784a803c63"
     },
     {
       "adapter_relative_path": ".api-harness/skills/kb-session-wrap-scan/SKILL.md",
@@ -237,9 +245,9 @@
       "adapter_relative_path": ".api-harness/skills/gtkb-benchmarks/SKILL.md",
       "canonical_name": "gtkb-benchmarks",
       "capability_id": "skill.gtkb-benchmarks",
-      "description": "Run GT-KB read-only measurement benchmarks. Outputs JSON plus markdown summary.",
+      "description": "Run GT-KB read-only measurement benchmarks and advisory effectiveness summaries. Outputs JSON plus markdown summary.",
       "source_relative_path": ".claude/skills/gtkb-benchmarks/SKILL.md",
-      "source_sha256": "95940f9fecb54eee364558ad2c15b6f34395a1e2a0d8d6e760b90e80c62926be"
+      "source_sha256": "f456f8bf39cbd93300befe37e35a9ef9da2efccd4fe55e06d51d2636d9c36262"
     },
     {
       "adapter_relative_path": ".api-harness/skills/grill-me-for-clarification/SKILL.md",

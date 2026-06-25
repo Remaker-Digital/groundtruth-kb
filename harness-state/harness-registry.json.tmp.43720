@@ -1,0 +1,223 @@
+{
+  "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
+  "generated_at": "2026-06-25T20:40:57Z",
+  "harnesses": [
+    {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 60.0,
+      "dispatch_quality": 90.0,
+      "dispatch_tags": [
+        "prime-builder",
+        "event-source"
+      ],
+      "event_driven_hooks": true,
+      "harness_name": "codex",
+      "harness_type": "codex",
+      "id": "A",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "codex",
+            "exec",
+            "-c",
+            "approval_policy=\"never\"",
+            "{{PROMPT}}",
+            "--cd",
+            "{{PROJECT_ROOT}}"
+          ]
+        }
+      },
+      "reviewer_precedence": 20,
+      "role": [
+        "prime-builder"
+      ],
+      "status": "active",
+      "version": 44
+    },
+    {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "dispatch_availability": 75.0,
+      "dispatch_cost": 60.0,
+      "dispatch_quality": 95.0,
+      "dispatch_tags": [
+        "prime-builder",
+        "event-source"
+      ],
+      "event_driven_hooks": true,
+      "harness_name": "claude",
+      "harness_type": "claude",
+      "id": "B",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "claude",
+            "-p",
+            "{{PROMPT}}",
+            "--add-dir",
+            "{{PROJECT_ROOT}}",
+            "--output-format",
+            "json"
+          ]
+        }
+      },
+      "reviewer_precedence": 10,
+      "role": [
+        "prime-builder"
+      ],
+      "status": "active",
+      "version": 36
+    },
+    {
+      "can_fire_events": false,
+      "can_receive_dispatch": false,
+      "capabilities_ref": null,
+      "dispatch_availability": 80.0,
+      "dispatch_cost": 30.0,
+      "dispatch_quality": 80.0,
+      "dispatch_tags": [
+        "loyal-opposition"
+      ],
+      "event_driven_hooks": false,
+      "harness_name": "antigravity",
+      "harness_type": "antigravity",
+      "id": "C",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "gemini",
+            "-m",
+            "gemini-2.5-flash",
+            "--skip-trust",
+            "-p",
+            "{{PROMPT}}",
+            "--approval-mode=yolo"
+          ]
+        },
+        "interactive": {
+          "kind": "ide",
+          "name": "Antigravity IDE"
+        }
+      },
+      "reviewer_precedence": 30,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "retired",
+      "version": 27
+    },
+    {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "dispatch_availability": 95.0,
+      "dispatch_cost": 30.0,
+      "dispatch_max_items": 2,
+      "dispatch_quality": 80.0,
+      "dispatch_tags": [
+        "loyal-opposition",
+        "low-cost"
+      ],
+      "event_driven_hooks": false,
+      "harness_name": "ollama",
+      "harness_type": "ollama",
+      "id": "D",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/ollama_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ],
+          "max_items": 1
+        }
+      },
+      "reviewer_precedence": 10,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 19
+    },
+    {
+      "can_fire_events": true,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 20.0,
+      "dispatch_quality": 80.0,
+      "dispatch_tags": [
+        "prime-builder"
+      ],
+      "event_driven_hooks": true,
+      "harness_name": "cursor",
+      "harness_type": "cursor",
+      "id": "E",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/cursor_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ]
+        },
+        "interactive": {
+          "kind": "ide",
+          "name": "Cursor IDE"
+        }
+      },
+      "reviewer_precedence": 15,
+      "role": [
+        "prime-builder"
+      ],
+      "status": "active",
+      "version": 4
+    },
+    {
+      "can_fire_events": false,
+      "can_receive_dispatch": true,
+      "capabilities_ref": null,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 20.0,
+      "dispatch_quality": 80.0,
+      "dispatch_tags": [
+        "loyal-opposition",
+        "low-cost"
+      ],
+      "event_driven_hooks": false,
+      "harness_name": "openrouter",
+      "harness_type": "openrouter",
+      "id": "F",
+      "invocation_surfaces": {
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/openrouter_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review"
+          ]
+        }
+      },
+      "reviewer_precedence": 20,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 17
+    }
+  ],
+  "schema_version": 1,
+  "source_of_truth": "MemBase harnesses table (groundtruth.db)"
+}

@@ -8679,6 +8679,209 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-25T08:39:49.770115Z
   answer: "Your questions have been answered: \"Filing the (ready, gate-clean) umbrella-ADR proposal is blocked because an agent can't mint the WI-4786 PAUTH (GOV-ARTIFACT-APPROVAL gate, no packet-capture flow). How do you want to resolve it?\"=\"You mint the PAUTH, I file\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1395
+  asked_at: 2026-06-25T09:26:06.869463Z
+  question: "Routing the 2 NEW proposals headlessly requires un-quiescing dispatch (reversing the deliberate storm-mitigation; recent storms were openrouter-F LO-worker hangs). How should I route them to LO review?"
+  options:
+    - "You open an interactive LO"
+    - "I un-quiesce LO:D + monitor"
+    - "Leave queued; go to WI-4813"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ab92b3228325a200
+  resolved_at: 2026-06-25T09:26:06.869463Z
+  answer: "Your questions have been answered: \"Routing the 2 NEW proposals headlessly requires un-quiescing dispatch (reversing the deliberate storm-mitigation; recent storms were openrouter-F LO-worker hangs). How should I route them to LO review?\"=\"You open an interactive LO\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1396
+  asked_at: 2026-06-25T09:26:06.869463Z
+  question: "WI-4813 scoping pass: narrow to just test_skill_catalog_contract.py (defer scenario-omission to WI-4811; drop the redundant check_skill_loadability.py + duplicate doctor check, both already covered by parity/load-health). Commit this re-scope to the WI record?"
+  options:
+    - "Re-scope WI-4813 now"
+    - "Record finding, leave WI as-is"
+    - "Different scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5f385f19d93f311d
+  resolved_at: 2026-06-25T09:26:06.869463Z
+  answer: "Your questions have been answered: \"WI-4813 scoping pass: narrow to just test_skill_catalog_contract.py (defer scenario-omission to WI-4811; drop the redundant check_skill_loadability.py + duplicate doctor check, both already covered by parity/load-health). Commit this re-scope to the WI record?\"=\"Re-scope WI-4813 now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1397
+  asked_at: 2026-06-25T09:43:42.610956Z
+  question: "WI-4810 commit (3a2e3c87d) carries ~15K lines of whitespace churn on cli.py + session_self_initialization.py around a correct 38-line change (not CRLF; recurs on every fleet-harness edit). It's committed + functional. How to handle?"
+  options:
+    - "Capture as hygiene backlog item"
+    - "Investigate prevention now"
+    - "Accept and note"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9b4847dfaaadc60b
+  resolved_at: 2026-06-25T09:43:42.610956Z
+  answer: "Your questions have been answered: \"WI-4810 commit (3a2e3c87d) carries ~15K lines of whitespace churn on cli.py + session_self_initialization.py around a correct 38-line change (not CRLF; recurs on every fleet-harness edit). It's committed + functional. How to handle?\"=\"Capture as hygiene backlog item\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1398
+  asked_at: 2026-06-25T15:14:03.463724Z
+  question: "WI-4811 (registry scenario-metadata) premise is stale: the shipped router reads skill-scenarios.toml only (never the registry), the MODERNIZATION registry-parity work is resolved, and nothing consumes per-skill registry scenario fields. How should I dispose of WI-4811?"
+  options:
+    - "Retire it; fold check into WI-4813"
+    - "Re-scope to standalone consistency check"
+    - "Build full registry-meta (speculative)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c182c6e07d67728b
+  resolved_at: 2026-06-25T15:14:03.463724Z
+  answer: "Your questions have been answered: \"WI-4811 (registry scenario-metadata) premise is stale: the shipped router reads skill-scenarios.toml only (never the registry), the MODERNIZATION registry-parity work is resolved, and nothing consumes per-skill registry scenario fields. How should I dispose of WI-4811?\"=\"Retire it; fold check into WI-4813\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1399
+  asked_at: 2026-06-25T16:10:23.629741Z
+  question: "The PB startup-disclosure relay flagged its cache as unusable, but verification shows the cache is intact (sha256 + byte-length + harness + role all match) — the real issue is the cached disclosure predates your `::init gtkb pb` declaration and was built in durable-fallback / `cache_only_pending_init_keyword` mode. How should I handle this session's startup?"
+  options:
+    - "Regenerate live now"
+    - "Proceed, skip disclosure"
+    - "Investigate relay defect"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e370a81d8de270b5
+  resolved_at: 2026-06-25T16:10:23.629741Z
+  answer: "Your questions have been answered: \"The PB startup-disclosure relay flagged its cache as unusable, but verification shows the cache is intact (sha256 + byte-length + harness + role all match) — the real issue is the cached disclosure predates your `::init gtkb pb` declaration and was built in durable-fallback / `cache_only_pending_init_keyword` mode. How should I handle this session's startup?\"=\"Regenerate live now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1400
+  asked_at: 2026-06-25T17:06:06.482186Z
+  question: "WI-3352's LO review came back GO and is substantively sound, BUT the verdict (-002) stamped author_session_context_id = my session (2bb5c7b5), making it an invalid self-review by the metadata. I can't implement on it, and I won't edit another session's verdict to fix it. How should we get a valid, independent GO?"
+  options:
+    - "LO re-files corrected GO (-003)"
+    - "Fresh LO session reviews clean"
+    - "Diagnose the mis-stamp first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 123a2f711ad77cbe
+  resolved_at: 2026-06-25T17:06:06.482186Z
+  answer: "Your questions have been answered: \"WI-3352's LO review came back GO and is substantively sound, BUT the verdict (-002) stamped author_session_context_id = my session (2bb5c7b5), making it an invalid self-review by the metadata. I can't implement on it, and I won't edit another session's verdict to fix it. How should we get a valid, independent GO?\"=\"LO re-files corrected GO (-003)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1401
+  asked_at: 2026-06-25T17:41:44.243615Z
+  question: "Confirmed: the existing author-meets-reviewer guard only fires at headless dispatch selection; an interactive LO session (which produced the -002 self-review) bypasses it, and nothing validates self-review at verdict-write time or impl-start. I'll file this as a new WI (sibling to WI-4823) and run the full bridge cycle. What scope should the fix have?"
+  options:
+    - "Defense-in-depth (write-time + impl-start)"
+    - "Write-time only"
+    - "Hold — file WI, don't implement yet"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 940538b99cb4dc7d
+  resolved_at: 2026-06-25T17:41:44.243615Z
+  answer: "Your questions have been answered: \"Confirmed: the existing author-meets-reviewer guard only fires at headless dispatch selection; an interactive LO session (which produced the -002 self-review) bypasses it, and nothing validates self-review at verdict-write time or impl-start. I'll file this as a new WI (sibling to WI-4823) and run the full bridge cycle. What scope should the fix have?\"=\"Defense-in-depth (write-time + impl-start)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1403
+  asked_at: 2026-06-25T18:00:06.411818Z
+  question: "My proposal got a correct NO-GO (I misdiagnosed gtkb-bridge as dead; only open-items is). A REVISED is needed: keep Deliverable 1, scope Deliverable 2 to open-items removal only, fix the narrative. No Cursor-E Prime is currently on it (claim free). Who files the REVISED?"
+  options:
+    - "I file the REVISED now (Recommended)"
+    - "Let Cursor-E auto-file the REVISED"
+    - "Pause for your review"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: eff1e4f9c5944305
+  resolved_at: 2026-06-25T18:00:06.411818Z
+  answer: "Your questions have been answered: \"My proposal got a correct NO-GO (I misdiagnosed gtkb-bridge as dead; only open-items is). A REVISED is needed: keep Deliverable 1, scope Deliverable 2 to open-items removal only, fix the narrative. No Cursor-E Prime is currently on it (claim free). Who files the REVISED?\"=\"I file the REVISED now (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1402
+  asked_at: 2026-06-25T17:41:44.243615Z
+  question: "want me to **pre-draft the implementation** (the comparator module + tests) in scratch so it's near-instant on GO, or..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: cd401ae78e44fd1a
+  resolved_at: 2026-06-25T18:21:38.466945Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1404
+  asked_at: 2026-06-25T19:08:54.946275Z
+  question: "The -005 GO has sat unimplemented since 18:18Z (claim null, files untouched) — the Cursor-E Prime side isn't picking it up. To advance, I'd implement it myself, reversing the earlier 'Cursor-E advances; I monitor' split. Proceed?"
+  options:
+    - "I implement now (Recommended)"
+    - "Keep waiting for Cursor-E"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1e302fd5d3c493c6
+  resolved_at: 2026-06-25T19:08:54.946275Z
+  answer: "Your questions have been answered: \"The -005 GO has sat unimplemented since 18:18Z (claim null, files untouched) — the Cursor-E Prime side isn't picking it up. To advance, I'd implement it myself, reversing the earlier 'Cursor-E advances; I monitor' split. Proceed?\"=\"I implement now (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1405
+  asked_at: 2026-06-25T19:49:29.221445Z
+  question: "Report -005 (self-review gate) is implemented and tests-green but stuck ~25 min at independent-LO verification: the dispatcher can't launch an LO worker (D/F can_receive_dispatch drift, WI-4670), and the interactive Cursor LO that did -002/-004 is idle. How do you want to reach VERIFIED?"
+  options:
+    - "I verify + finalize it now"
+    - "Route to an independent harness LO"
+    - "Keep waiting for the Cursor LO"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6e8712a4de091439
+  resolved_at: 2026-06-25T19:49:29.221445Z
+  answer: "Your questions have been answered: \"Report -005 (self-review gate) is implemented and tests-green but stuck ~25 min at independent-LO verification: the dispatcher can't launch an LO worker (D/F can_receive_dispatch drift, WI-4670), and the interactive Cursor LO that did -002/-004 is idle. How do you want to reach VERIFIED?\"=\"I verify + finalize it now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1406
+  asked_at: 2026-06-25T20:08:07.654220Z
+  question: "WI-4829 is implemented and independently VERIFIED (Cursor LO -006, 20 tests pass, ruff clean), and MemBase marks it resolved — but the Cursor LO filed a file-only VERIFIED with no commit-finalization, so my 7 implementation files + report -005 + verdict -006 are uncommitted in the shared worktree (97 unrelated dirty files also present). How should I land the verified work?"
+  options:
+    - "Commit the scoped WI-4829 set now"
+    - "Leave uncommitted for now"
+    - "Capture the finalization defect first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5742b5fef9879d57
+  resolved_at: 2026-06-25T20:08:07.654220Z
+  answer: "Your questions have been answered: \"WI-4829 is implemented and independently VERIFIED (Cursor LO -006, 20 tests pass, ruff clean), and MemBase marks it resolved — but the Cursor LO filed a file-only VERIFIED with no commit-finalization, so my 7 implementation files + report -005 + verdict -006 are uncommitted in the shared worktree (97 unrelated dirty files also present). How should I land the verified work?\"=\"Commit the scoped WI-4829 set now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1407
+  asked_at: 2026-06-25T20:22:27.958809Z
+  question: "WI-4807's fix is investigated and designed (targeted per-project actuation wired into the non-VERIFIED terminal-transition path in cli_backlog_update.py, reusing the v6 guards). But WI-4807 is open inside a RETIRED project with no covering PAUTH, so implementation needs an authorization home. How should I proceed?"
+  options:
+    - "Reliability fast-lane + implement"
+    - "Fresh dedicated authorization"
+    - "File design proposal for review first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ab7a311fc25f1c99
+  resolved_at: 2026-06-25T20:22:27.958809Z
+  answer: "Your questions have been answered: \"WI-4807's fix is investigated and designed (targeted per-project actuation wired into the non-VERIFIED terminal-transition path in cli_backlog_update.py, reusing the v6 guards). But WI-4807 is open inside a RETIRED project with no covering PAUTH, so implementation needs an authorization home. How should I proceed?\"=\"Reliability fast-lane + implement\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1408
+  asked_at: 2026-06-25T20:25:58.291315Z
+  question: "WI-4813 is legitimately VERIFIED (-007) but the Cursor-E LO did a file-only verdict — nothing is committed (my test + scenarios.toml, report -006, verdict -007 all uncommitted). The LO's atomic commit-finalization was skipped. How should I complete it?"
+  options:
+    - "I commit the verified work (Recommended)"
+    - "Leave for the Cursor-E fleet"
+    - "Pause for your review"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c026db408f282895
+  resolved_at: 2026-06-25T20:25:58.291315Z
+  answer: "Your questions have been answered: \"WI-4813 is legitimately VERIFIED (-007) but the Cursor-E LO did a file-only verdict — nothing is committed (my test + scenarios.toml, report -006, verdict -007 all uncommitted). The LO's atomic commit-finalization was skipped. How should I complete it?\"=\"I commit the verified work (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1409
+  asked_at: 2026-06-25T20:38:42.871730Z
+  question: "The WI-4807 proposal is filed correctly at NEW, but it has no working Loyal Opposition review channel: bridge dispatch is quiesced (can_receive_dispatch=false in the registry for all harnesses — the storm remedy applied earlier today), so the trigger fires but launches nothing ('no_active_target_for_role'). Even if re-enabled, the LO workers are flaky (D/ollama suspended, F/openrouter prone to 44-60min hangs). I can't self-review (independence gate). How do you want WI-4807 reviewed?"
+  options:
+    - "Manual LO session (recommended)"
+    - "Re-enable LO dispatch"
+    - "Hold at NEW; investigate dispatch"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 83af813634344377
+  resolved_at: 2026-06-25T20:38:42.871730Z
+  answer: "Your questions have been answered: \"The WI-4807 proposal is filed correctly at NEW, but it has no working Loyal Opposition review channel: bridge dispatch is quiesced (can_receive_dispatch=false in the registry for all harnesses — the storm remedy applied earlier today), so the trigger fires but launches nothing ('no_active_target_for_role'). Even if re-enabled, the LO workers are flaky (D/ollama suspended, F/openrouter prone to 44-60min hangs). I can't self-review (independence gate). How do you want WI-4807 reviewed?\"=\"Manual LO session (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1410
+  asked_at: 2026-06-25T21:26:12.731395Z
+  question: "WI-4815 is groomed into WI-4839..4842. Both your directed items this session are done (WI-4813 shipped, WI-4815 split). What next?"
+  options:
+    - "Wrap the session (Recommended)"
+    - "Elevate WI-4839 to implement"
+    - "Pick different backlog work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5a68b815a226b1eb
+  resolved_at: 2026-06-25T21:26:12.731395Z
+  answer: "Your questions have been answered: \"WI-4815 is groomed into WI-4839..4842. Both your directed items this session are done (WI-4813 shipped, WI-4815 split). What next?\"=\"Wrap the session (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

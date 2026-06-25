@@ -287,6 +287,70 @@ def test_scoping_terminal_without_successor_is_included(tmp_path: Path) -> None:
     assert len(codex) == 0
 
 
+def test_go_thread_with_verified_implementation_sibling_suppressed(tmp_path: Path) -> None:
+    """A GO proposal thread is excluded from the actionable surface when its
+    ``<slug>-implementation`` sibling is VERIFIED (WI-4549; parallel to the
+    scoping-terminal suppression)."""
+    n = _notify()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-example-002.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-001.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-implementation-006.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-implementation-005.md").write_text("# stub\n", encoding="utf-8")
+    text = (
+        "Document: gtkb-example\n"
+        "GO: bridge/gtkb-example-002.md\n"
+        "NEW: bridge/gtkb-example-001.md\n\n"
+        "Document: gtkb-example-implementation\n"
+        "VERIFIED: bridge/gtkb-example-implementation-006.md\n"
+        "NEW: bridge/gtkb-example-implementation-005.md\n"
+    )
+    parsed = n.parse_index(text)
+    prime, _codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    prime_names = {item.document_name for item in prime}
+    assert "gtkb-example" not in prime_names, (
+        f"GO proposal must be suppressed when its -implementation sibling is VERIFIED; got {prime_names}"
+    )
+
+
+def test_go_thread_with_unverified_implementation_sibling_still_actionable(tmp_path: Path) -> None:
+    """A GO proposal thread remains actionable when its ``<slug>-implementation``
+    sibling exists but has NOT reached VERIFIED."""
+    n = _notify()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-example-002.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-001.md").write_text("# stub\n", encoding="utf-8")
+    (bridge_dir / "gtkb-example-implementation-001.md").write_text("# stub\n", encoding="utf-8")
+    text = (
+        "Document: gtkb-example\n"
+        "GO: bridge/gtkb-example-002.md\n"
+        "NEW: bridge/gtkb-example-001.md\n\n"
+        "Document: gtkb-example-implementation\n"
+        "NEW: bridge/gtkb-example-implementation-001.md\n"
+    )
+    parsed = n.parse_index(text)
+    prime, _codex = n.compute_actionable_pending(parsed, project_root=tmp_path)
+    prime_names = {item.document_name for item in prime}
+    assert "gtkb-example" in prime_names, (
+        f"GO proposal must remain actionable when -implementation sibling is not VERIFIED; got {prime_names}"
+    )
+
+
+def test_go_thread_without_sibling_unaffected(tmp_path: Path) -> None:
+    """A GO thread with no ``<slug>-implementation`` sibling is not
+    over-suppressed (no false-negative on ordinary actionable work)."""
+    n = _notify()
+    text, root = _make_index_with_top_file(tmp_path, "gtkb-example", "GO")
+    parsed = n.parse_index(text)
+    prime, _codex = n.compute_actionable_pending(parsed, project_root=root)
+    prime_names = {item.document_name for item in prime}
+    assert "gtkb-example" in prime_names, (
+        f"GO thread without an -implementation sibling must remain actionable; got {prime_names}"
+    )
+
+
 def test_scoping_helper_classification_safety(tmp_path: Path) -> None:
     """Unit test of `_scoping_terminal_with_successor` edge cases.
 

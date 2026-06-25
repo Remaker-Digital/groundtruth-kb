@@ -57,6 +57,9 @@ def test_watchdog_covers_registry_lowcost_backends() -> None:
 
     expected_scripts: set[str] = set()
     for harness in registry["harnesses"]:
+        tags = set(harness.get("dispatch_tags") or [])
+        if "low-cost" not in tags:
+            continue
         surfaces = harness.get("invocation_surfaces", {})
         for surface in surfaces.values():
             argv = surface.get("argv", [])

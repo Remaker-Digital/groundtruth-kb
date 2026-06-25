@@ -7,6 +7,7 @@ Authority: bridge/gtkb-backlog-update-cli-slice-1-003.md (REVISED-1), Codex GO a
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sys
 from dataclasses import dataclass
@@ -15,6 +16,9 @@ from typing import Any, cast
 
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project.lifecycle import ProjectLifecycleService
+
+LOGGER = logging.getLogger(__name__)
 
 # The attribution resolver lives under ``scripts/`` at the project root.
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -229,9 +233,21 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
     if row is None:
         raise BacklogUpdateError(f"Unexpected error: updated work item {request.work_item_id} not found on readback.")
 
+    auto_retired_projects: list[dict[str, Any]] = []
+    if is_terminal_transition:
+        try:
+            auto_retired_projects = ProjectLifecycleService(db).auto_retire_projects_for_work_item(
+                request.work_item_id,
+                project_root=_PROJECT_ROOT,
+                changed_by=changed_by,
+            )
+        except Exception as exc:  # noqa: BLE001 - the work-item update already committed; actuation is best-effort.
+            LOGGER.warning("Skipping automatic project retirement after %s update: %s", request.work_item_id, exc)
+
     return {
         "updated": True,
         "dry_run": False,
         "work_item_id": row["id"],
         "row": row,
+        "auto_retired_projects": auto_retired_projects,
     }

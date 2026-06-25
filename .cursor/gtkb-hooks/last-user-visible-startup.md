@@ -1,6 +1,6 @@
 # GroundTruth-KB Fresh Session Startup
 
-Generated: 2026-06-25T08:24:01Z
+Generated: 2026-06-25T18:31:23Z
 Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/groundtruth-kb-dashboard
 
 ## Startup Disclosure
@@ -26,15 +26,19 @@ Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/ground
 
 - GT-KB release blockers: 0
 - GT-KB active backlog items: 0
-- GT-KB open MemBase work items: 11 (subject-scoped; 255 across all subjects)
-- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 86
-- GT-KB drift changed paths: 1
+- GT-KB open MemBase work items: 7 (subject-scoped; 238 across all subjects)
+- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 70
+- GT-KB drift changed paths: 2
 - GT-KB Testing/tool rollup: 0 failing, 2 manual, 15 ready/passing (queried repo: unknown)
 - Active harness role slot: `prime-builder` (prime-builder, loyal-opposition, or shared)
 - Harness topology: `multi_harness` (single_harness or multi_harness)
 - GT-KB infrastructure posture: package 0.7.0rc1; dry-run upgrade plan available: True
 - GT-KB dev environment inventory: stale; generated 2026-05-08T19:04:30Z; redaction pass
-- Harness parity: fail (harness=all, role=prime-builder, MISSING=32, PASS=142, STALE=6)
+- Harness parity: fail (harness=all, role=prime-builder, MISSING=30, PASS=150)
+
+### Suggested Skills (report-only)
+
+- Suggested skills: no scenario-specific suggestion at startup; run `gt skills suggest` per task (report-only).
 
 ### Init Scope
 

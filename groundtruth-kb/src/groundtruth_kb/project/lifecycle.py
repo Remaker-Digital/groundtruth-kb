@@ -1276,43 +1276,103 @@ class ProjectLifecycleService:
             "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v6 automatic retirement)."
         ),
     ) -> list[dict[str, Any]]:
-        """Retire active projects satisfying the v6 member-WI criterion.
+        """Retire all active projects satisfying the v6 member-WI criterion.
 
         ``project_root`` is accepted for API symmetry with the existing
         authorization-completion actuator and for call-site traceability; the
         v6 member-WI criterion itself is MemBase-backed. Best-effort behavior
         is per project: lifecycle errors are logged and skipped.
         """
-        _ = project_root
         records: list[dict[str, Any]] = []
         for project in self.db.list_projects(include_terminal=False):
             project_id = str(project.get("id") or "")
             if not project_id:
                 continue
-            try:
-                status = self.member_completion_status(project_id)
-                if not status["completion_ready"]:
-                    continue
-                self.retire_project(
-                    project_id,
-                    changed_by=changed_by,
-                    change_reason=change_reason,
-                )
-                retired_work_items = self._retire_project_work_items(
-                    project_id,
-                    completed_authorization_id="member-terminal-resolution",
-                    changed_by=changed_by,
-                )
-            except ProjectLifecycleError as exc:
-                LOGGER.warning("Skipping automatic project retirement for %s: %s", project_id, exc)
-                continue
-            records.append(
-                {
-                    "outcome": "retired",
-                    "project_id": project_id,
-                    "project_retired": True,
-                    "retired_work_items": retired_work_items,
-                    "member_completion_status": status,
-                }
+            record = self.auto_retire_project_if_ready(
+                project_id,
+                project_root=project_root,
+                changed_by=changed_by,
+                change_reason=change_reason,
             )
+            if record is not None:
+                records.append(record)
         return records
+
+    def auto_retire_projects_for_work_item(
+        self,
+        work_item_id: str,
+        *,
+        project_root: Path,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str = (
+            "Auto-retired: active member work item reached terminal resolution "
+            "and all project members are now terminal "
+            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v6 automatic retirement)."
+        ),
+    ) -> list[dict[str, Any]]:
+        """Retire ready active projects containing ``work_item_id``.
+
+        This is the non-VERIFIED terminal-transition actuator: it scopes the
+        v6 readiness check to the updated work item's active project
+        memberships rather than sweeping every project after each resolve.
+        """
+        normalized_work_item_id = _require_nonempty(work_item_id, "work_item_id")
+        records: list[dict[str, Any]] = []
+        for project in self.db.list_projects(include_terminal=False):
+            project_id = str(project.get("id") or "")
+            if not project_id:
+                continue
+            if not any(
+                str(membership.get("work_item_id") or "") == normalized_work_item_id
+                for membership in self.db.list_project_work_items(project_id)
+            ):
+                continue
+            record = self.auto_retire_project_if_ready(
+                project_id,
+                project_root=project_root,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+            if record is not None:
+                records.append(record)
+        return records
+
+    def auto_retire_project_if_ready(
+        self,
+        project_id: str,
+        *,
+        project_root: Path,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str = (
+            "Auto-retired: all active member work items reached terminal resolution "
+            "and no keep-open election is present "
+            "(GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v6 automatic retirement)."
+        ),
+    ) -> dict[str, Any] | None:
+        """Retire one project if it satisfies the v6 member-WI criterion."""
+        _ = project_root
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        try:
+            status = self.member_completion_status(normalized_project_id)
+            if not status["completion_ready"]:
+                return None
+            self.retire_project(
+                normalized_project_id,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+            retired_work_items = self._retire_project_work_items(
+                normalized_project_id,
+                completed_authorization_id="member-terminal-resolution",
+                changed_by=changed_by,
+            )
+        except ProjectLifecycleError as exc:
+            LOGGER.warning("Skipping automatic project retirement for %s: %s", normalized_project_id, exc)
+            return None
+        return {
+            "outcome": "retired",
+            "project_id": normalized_project_id,
+            "project_retired": True,
+            "retired_work_items": retired_work_items,
+            "member_completion_status": status,
+        }
