@@ -408,7 +408,7 @@ class TestBootstrapDesktop:
         assert "client-prototype" in claude_text
         assert "Acme Labs" in claude_text
         assert "{{AGENT_OR_PROCESS_1}}" not in bridge_text
-        assert "bridge/INDEX.md" in bridge_prompt
+        assert "bridge/INDEX.md" not in bridge_prompt
         assert "PRIME_BRIDGE_DB" not in gitignore_text
 
         db = KnowledgeDB(db_path=target / "groundtruth.db")
@@ -449,7 +449,7 @@ class TestBootstrapDesktop:
 
             bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
             gitignore_text = (target / ".gitignore").read_text(encoding="utf-8")
-            assert "bridge/INDEX.md" in bridge_text
+            assert "bridge/INDEX.md" not in bridge_text
             assert "gt bridge serve" not in bridge_text
             assert "groundtruth_kb.bridge.worker" not in bridge_text
             assert "bridge.db" not in gitignore_text
