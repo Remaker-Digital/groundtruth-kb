@@ -1,15 +1,8 @@
-# Bridge dispatch configuration.
-#
-# Role membership, dispatchability, and event-firing capability are independent
-# axes. Durable operating roles remain in harness-state/harness-registry.json;
-# this file controls whether a role holder can receive headless bridge dispatch
-# and how eligible candidates are ranked.
-
 schema_version = 1
 selection_order = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
 
 [harnesses.A]
-description = "Codex: active Prime Builder and dispatchable PB target."
+description = "Codex: high-quality dispatch target."
 can_receive_dispatch = true
 can_fire_events = true
 dispatch_cost = 60
@@ -18,7 +11,7 @@ dispatch_availability = 90
 tags = ["prime-builder", "event-source"]
 
 [harnesses.B]
-description = "Claude Code: active Prime Builder; headless-dispatchable PB fallback (A wins on cost by default)."
+description = "Claude Code: high-quality dispatch target."
 can_receive_dispatch = true
 can_fire_events = true
 dispatch_cost = 60
@@ -45,6 +38,15 @@ dispatch_availability = 95
 max_items = 2
 tags = ["loyal-opposition", "low-cost"]
 
+[harnesses.E]
+description = "Cursor: high-quality dispatch target."
+can_receive_dispatch = true
+can_fire_events = true
+dispatch_cost = 20
+dispatch_quality = 80
+dispatch_availability = 90
+tags = ["prime-builder"]
+
 [harnesses.F]
 description = "OpenRouter: low-cost Loyal Opposition dispatch target."
 can_receive_dispatch = true
@@ -58,10 +60,10 @@ tags = ["loyal-opposition", "low-cost"]
 id = "bridge-prime-builder-default"
 required_roles = ["prime-builder"]
 statuses = ["GO", "NO-GO"]
-prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+prefer = ["availability", "quality", "cost"]
 
 [[rules]]
 id = "bridge-loyal-opposition-cheap-fast-default"
 required_roles = ["loyal-opposition"]
 statuses = ["NEW", "REVISED"]
-prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+prefer = ["availability", "quality", "cost"]

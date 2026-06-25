@@ -27,9 +27,15 @@
       "assigned_by": "owner-directed-identity-registration",
       "id": "F",
       "status": "active"
+    },
+    "cursor": {
+      "assigned_at": "2026-06-24T00:00:00Z",
+      "assigned_by": "owner-directed-identity-registration",
+      "id": "E",
+      "status": "active"
     }
   },
   "schema_version": 1,
   "source_of_truth": "GT-KB harness installation identities",
-  "updated_at": "2026-06-09T15:47:00Z"
+  "updated_at": "2026-06-24T00:00:00Z"
 }
