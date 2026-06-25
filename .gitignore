@@ -629,3 +629,10 @@ bridge/draft-verdict-*.txt
 .claude/skills/verify/helpers/draft-*
 .claude/skills/verify/helpers/_temp_verdict_*
 .claude/skills/verify/helpers/*-draft-body.md
+
+# Orphaned atomic-write temp files from projection/registry regeneration
+# (failed os.replace under cloud-sync/concurrent lock leaves <name>.tmp.<pid>).
+# Note: the existing `*.tmp` pattern does NOT match the `.tmp.<pid>` form.
+harness-state/*.tmp.*
+# Throwaway test scaffold directory (swept in by S20260625 worktree sweep).
+tmp_test/
