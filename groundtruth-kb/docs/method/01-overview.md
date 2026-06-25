@@ -69,6 +69,8 @@ flowchart TD
 
 This is not a waterfall process. Steps overlap and repeat. The key discipline is that specifications come *before* implementation, not after — and that every change flows through this cycle.
 
+The **full integrated GT-KB lifecycle** adds a **deliberate** front bookend (Deliberation Archive capture before planning), project authorization and bridge **GO** / **VERIFIED** gates around implementation, and a **commit** back bookend after verification. See [The End-to-End Lifecycle](14-lifecycle.md) for the canonical nine-stage pipeline.
+
 ## MemBase (Canonical Knowledge and Specifications)
 
 All artifacts live in an append-only SQLite database. The term "append-only" means:

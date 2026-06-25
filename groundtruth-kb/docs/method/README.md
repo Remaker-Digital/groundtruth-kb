@@ -8,6 +8,7 @@ Engineering discipline for AI-powered systems — from specification to producti
 |---|----------|-------------|
 | 00 | [Vision](00-vision.md) | Software-factory goal and owner-burden decision filter |
 | 01 | [Method Overview](01-overview.md) | What GroundTruth is, core workflow, governance model |
+| 14 | [The End-to-End Lifecycle](14-lifecycle.md) | Canonical deliberate → plan → specify → propose → GO → implement → report → VERIFIED → commit cycle |
 | 02 | [Specifications](02-specifications.md) | Writing and managing specifications — the decision log |
 | 03 | [Testing](03-testing.md) | Test forms, outside-in testing, pipeline organization |
 | 04 | [Work Items & Backlog](04-work-items.md) | Tracking gaps between specs and implementation |

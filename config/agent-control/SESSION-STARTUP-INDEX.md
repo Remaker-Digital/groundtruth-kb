@@ -65,6 +65,13 @@ To minimize token cost and resource consumption, the Antigravity harness modifie
 - **Skip Rules/Logs Reads**: Antigravity is exempt from reading the extensive Phase B rule/log payload. It only loads essential baseline files (`CLAUDE.md`, `AGENTS.md`, `canonical-terminology.md`, `file-bridge-protocol.md`, `memory/MEMORY.md`).
 - **Omit Heavy Subprocesses**: Any startup dispatching or background scripts (e.g. `session_self_initialization.py`) must be run with `--fast-hook` and `--skip-bridge-maintenance` to skip reachability probes and PDF exports.
 
+## New-agent orientation
+
+For the canonical end-to-end GT-KB lifecycle (deliberate through commit), read
+`groundtruth-kb/docs/method/14-lifecycle.md`. This pointer is the role-neutral
+startup surfacing for WI-3352; it does not expand the minimized init-disclosure
+payload (`DCL-SESSION-STARTUP-TOKEN-BUDGET-001`).
+
 ## Role Overlays
 
 - **Prime Builder** → `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md`.
