@@ -3,8 +3,56 @@
 """Lightweight process execution wrapper that writes exit code to a status file."""
 
 import os
+import signal
 import subprocess
 import sys
+
+# Phase 0 reliability fix (WI-4806, GO at bridge/gtkb-run-with-status-worker-lifetime-timeout-002.md):
+# a bare p.wait() let a hung wrapped harness (cloud non-JSON body, HTTP 502, stuck socket)
+# leave this wrapper immortal, accumulating into the storm-watchdog threshold (WI-4670 root cause).
+# A fixed module-level default keeps this a pure defect fix with no new config surface; tests
+# monkeypatch the constant, and the Phase 2 daemon makes it configurable.
+DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS = 600  # 10-minute generous Phase 0 baseline (LO GO -002)
+TIMEOUT_EXIT_CODE = 124  # coreutils `timeout` convention; distinguishes a lifetime-timeout kill
+TERMINATE_GRACE_SECONDS = 10
+
+
+def _terminate_process_tree(proc: subprocess.Popen) -> None:
+    """Best-effort termination of the wrapped process AND its descendants.
+
+    ``Popen.terminate()``/``kill()`` only signal the immediate child, so a hung
+    harness's node/python grandchildren would be orphaned and keep accumulating
+    (the WI-4670 immortal-worker leak). On Windows use ``taskkill /T`` to walk and
+    kill the whole tree; on POSIX kill the process group (the child is spawned with
+    ``start_new_session=True``). Reap the root afterward so no zombie remains.
+    """
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    else:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    try:
+        proc.wait(timeout=TERMINATE_GRACE_SECONDS)
+    except Exception:
+        pass
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -71,16 +119,38 @@ def main(argv: list[str] | None = None) -> None:
         # (scripts/cross_harness_bridge_trigger.py). No-op (0) off Windows.
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
 
-        p = subprocess.Popen(
-            cmd_args,
-            stdin=stdin_fh,
-            stdout=out_fh,
-            stderr=err_fh,
-            creationflags=creationflags,
-        )
+        popen_kwargs: dict[str, object] = {
+            "stdin": stdin_fh,
+            "stdout": out_fh,
+            "stderr": err_fh,
+            "creationflags": creationflags,
+        }
+        if os.name != "nt":
+            # New POSIX session/process group so the whole tree can be reaped via
+            # os.killpg on a lifetime timeout. No-op on Windows (taskkill /T walks
+            # the tree); not passed on Windows where the kwarg is unsupported.
+            popen_kwargs["start_new_session"] = True
 
-        p.wait()
-        exit_code = p.returncode
+        p = subprocess.Popen(cmd_args, **popen_kwargs)
+
+        try:
+            p.wait(timeout=DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS)
+            exit_code = p.returncode
+        except subprocess.TimeoutExpired:
+            _terminate_process_tree(p)
+            exit_code = TIMEOUT_EXIT_CODE
+            timeout_msg = (
+                f"run_with_status.py: worker exceeded the "
+                f"{DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS}s lifetime timeout; "
+                f"terminated process tree (pid={p.pid}).\n"
+            )
+            if err_fh and err_fh != subprocess.DEVNULL:
+                try:
+                    err_fh.write(timeout_msg)
+                    err_fh.flush()
+                except Exception:
+                    pass
+            print(timeout_msg, file=sys.stderr)
 
     except Exception as exc:
         msg = f"run_with_status.py failed to run subprocess (args={cmd_args}): {exc}\n"
