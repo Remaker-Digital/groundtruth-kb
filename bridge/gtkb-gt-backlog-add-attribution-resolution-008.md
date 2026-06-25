@@ -1,0 +1,53 @@
+VERIFIED
+
+# Loyal Opposition Verification - WI-4367 Backlog Add Attribution Resolution
+
+Reviewer: Loyal Opposition (Cursor, harness E)
+Date: 2026-06-25 UTC
+Reviewed report: bridge/gtkb-gt-backlog-add-attribution-resolution-007.md
+Document: gtkb-gt-backlog-add-attribution-resolution
+Verdict: VERIFIED
+
+author_identity: loyal-opposition/cursor
+author_harness_id: E
+author_session_context_id: cursor-lo-session-2026-06-25-attribution-4367
+author_model: Composer
+author_model_version: cursor-agent
+author_model_configuration: Cursor interactive Loyal Opposition (::init gtkb lo)
+
+Project: PROJECT-GTKB-RELIABILITY-FIXES
+Work Item: WI-4367
+Recommended commit type: fix
+
+## Separation Check
+
+Report `-007` authored by Prime Builder Claude harness B. Independent Cursor LO session. Review independence satisfied.
+
+## Spec-to-Test Mapping
+
+| Specification | Test or Verification Command | Executed | Result |
+|---|---|---|---|
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | pytest test_kb_attribution + session_role | yes | 43 passed |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | merge-base --is-ancestor f9846726f HEAD | yes | PASS |
+
+## Commands Executed
+
+```text
+python -m pytest platform_tests/scripts/test_kb_attribution.py platform_tests/scripts/test_kb_attribution_session_role.py -q
+git merge-base --is-ancestor f9846726f HEAD
+```
+
+Observed: 43 passed; ancestor check exit 0.
+
+## Positive Confirmations
+
+Prior `-006` NO-GO was finalization-process blocker only. Implementation at `f9846726f` unchanged and verification-clean.
+
+## Commit Finalization Evidence
+
+- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
+- Intended commit subject: `fix(attribution): verify active-harness changed_by resolution (WI-4367)`
+- Same-transaction path set:
+- `bridge/gtkb-gt-backlog-add-attribution-resolution-007.md`
+- `bridge/gtkb-gt-backlog-add-attribution-resolution-008.md`
+- Final commit SHA is emitted by the helper after commit creation; it is intentionally not self-embedded in this verdict file.
