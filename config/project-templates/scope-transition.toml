@@ -1,0 +1,54 @@
+# Scope-Transition project template (WI-4688 Slice B).
+# Reusable declarative skeleton for a GT-KB-exclusive -> application-exclusive
+# scope transition. Instantiated by scripts/scope_transition_project.py per
+# GOV-SCOPE-TRANSITION-PROCEDURE-001 (the 5-step procedure) and SPEC-1830
+# (operational procedures must be code, not conversation).
+
+[template]
+id = "scope-transition"
+procedure_spec = "GOV-SCOPE-TRANSITION-PROCEDURE-001"
+name_pattern = "Scope Transition: GT-KB to {application}"
+purpose = "Transition the host from GT-KB-platform-exclusive work to application-exclusive work for {application} without leaving the application inoperable, insecure, unmanageable, or unsafe, per GOV-SCOPE-TRANSITION-PROCEDURE-001."
+target_outcome = "Baseline self-test passed; all transition-blocking work items VERIFIED (or owner-deferred); active-subject default flipped to application ({application}); disposition change recorded."
+scope_note = "Reusable scope-transition skeleton. Member work items map 1:1 to the five GOV-SCOPE-TRANSITION-PROCEDURE-001 steps. Deterministic steps (self-test, config flip, disposition record) invoke the scope_transition service; triage and drive-blockers are AI-mediated."
+
+# Member work items map 1:1 to the five procedure steps.
+[[work_items]]
+step = 1
+title = "Self-test baseline health before scope transition to {application}"
+component = "operations"
+origin = "new"
+priority = "P1"
+description = "Run gt project doctor + scripts/release_candidate_gate.py + the governance-adoption check; a failing baseline blocks the transition until remediated. (GOV-SCOPE-TRANSITION-PROCEDURE-001 step 1; deterministic.)"
+
+[[work_items]]
+step = 2
+title = "Triage at-risk work items for {application} scope transition"
+component = "governance"
+origin = "new"
+priority = "P1"
+description = "Identify open work items that could leave {application} inoperable/insecure/unmanageable/unsafe; classify transition-blocking vs deferrable. (GOV-SCOPE-TRANSITION-PROCEDURE-001 step 2; AI-mediated.)"
+
+[[work_items]]
+step = 3
+title = "Drive transition-blocking work items to VERIFIED for {application}"
+component = "governance"
+origin = "new"
+priority = "P1"
+description = "Drive every transition-blocking work item to VERIFIED via the autonomous drive (WI-4297 / dispatcher fan-out, WI-4691) before flipping scope; record deferrals explicitly. (GOV-SCOPE-TRANSITION-PROCEDURE-001 step 3; AI-mediated.)"
+
+[[work_items]]
+step = 4
+title = "Flip active-subject config default to application ({application})"
+component = "config"
+origin = "new"
+priority = "P1"
+description = "Set the active work-subject default to application; under ::init application GT-KB is read-only + advisory-only (WI-4690) and GT-KB-scoped dispatch drains-then-suspends (WI-4692). (GOV-SCOPE-TRANSITION-PROCEDURE-001 step 4; deterministic.)"
+
+[[work_items]]
+step = 5
+title = "Record the scope-transition disposition for {application}"
+component = "governance"
+origin = "new"
+priority = "P1"
+description = "Record a DELIB + durable disposition record capturing the transition direction, the triaged blocker set + VERIFIED evidence, the deferred set, and the config flip. (GOV-SCOPE-TRANSITION-PROCEDURE-001 step 5; deterministic.)"
