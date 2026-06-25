@@ -857,10 +857,14 @@ def validate_project_authorization_row(
             raise AuthorizationError(
                 f"Work item {work_item_id} is excluded by project authorization {authorization_id}"
             )
-        if work_item_id not in included_items and not _work_item_in_project(project_root, project_id, work_item_id):
-            raise AuthorizationError(
-                f"Work item {work_item_id} is neither included in nor an active member of project {project_id}"
-            )
+        if included_items:
+            if work_item_id not in included_items:
+                raise AuthorizationError(
+                    f"Work item {work_item_id} is not in the authorizing included_work_item_ids list "
+                    f"for project authorization {authorization_id}"
+                )
+        elif not _work_item_in_project(project_root, project_id, work_item_id):
+            raise AuthorizationError(f"Work item {work_item_id} is not an active member of project {project_id}")
 
     excluded_specs = set(_json_list(row, "excluded_spec_ids"))
     blocked_specs = sorted(excluded_specs.intersection(spec_links or []))

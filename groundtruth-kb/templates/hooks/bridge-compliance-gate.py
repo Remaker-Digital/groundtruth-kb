@@ -1149,9 +1149,9 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     warning) so the gate never blocks on infrastructure failure. The check only
     runs when all three metadata lines are present (the metadata-presence gate
     handles absence). Condition tokens, in evaluation order:
-    wi-not-found-in-project, wi-membership-inactive, authorization-not-found,
-    authorization-inactive, authorization-expired, wi-excluded-from-authorization,
-    wi-not-included-by-authorization.
+    authorization-not-found, authorization-inactive, authorization-expired,
+    wi-excluded-from-authorization, wi-not-included-by-authorization,
+    wi-not-found-in-project, wi-membership-inactive.
     """
     authorization_id, project_id, work_item_id = _extract_project_metadata(content)
     if not (authorization_id and project_id and work_item_id):
@@ -1163,14 +1163,6 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
         conn.row_factory = sqlite3.Row
-        membership = conn.execute(
-            "SELECT status FROM current_project_work_item_memberships WHERE work_item_id = ? AND project_id = ?",
-            (work_item_id, project_id),
-        ).fetchone()
-        if membership is None:
-            return "wi-not-found-in-project"
-        if membership["status"] != "active":
-            return "wi-membership-inactive"
         auth = conn.execute(
             "SELECT project_id, status, "
             "(expires_at IS NOT NULL AND expires_at <= datetime('now')) AS is_expired, "
@@ -1187,8 +1179,18 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
         if work_item_id in _parse_json_id_list(auth["excluded_work_item_ids"]):
             return "wi-excluded-from-authorization"
         included = _parse_json_id_list(auth["included_work_item_ids"])
-        if included and work_item_id not in included:
-            return "wi-not-included-by-authorization"
+        if included:
+            if work_item_id not in included:
+                return "wi-not-included-by-authorization"
+            return None
+        membership = conn.execute(
+            "SELECT status FROM current_project_work_item_memberships WHERE work_item_id = ? AND project_id = ?",
+            (work_item_id, project_id),
+        ).fetchone()
+        if membership is None:
+            return "wi-not-found-in-project"
+        if membership["status"] != "active":
+            return "wi-membership-inactive"
     except (sqlite3.Error, OSError) as exc:
         print(f"[Governance] WI-project membership check warning: {exc}", file=sys.stderr)
         return None

@@ -199,6 +199,39 @@ def test_wi_not_in_included_list_blocked(tmp_path: Path) -> None:
     assert reason is not None and "wi-not-included-by-authorization" in reason
 
 
+def test_listed_wi_without_membership_passes(tmp_path: Path) -> None:
+    _make_db(
+        tmp_path,
+        membership=None,
+        authorization=_auth(included_work_item_ids=f'["{_WI_ID}"]'),
+    )
+    reason = _deny(tmp_path, _proposal())
+    assert reason is None, f"listed WI without membership should pass: {reason}"
+
+
+def test_member_not_listed_with_nonempty_included_blocked(tmp_path: Path) -> None:
+    _make_db(
+        tmp_path,
+        membership=(_WI_ID, _PROJECT_ID, "active"),
+        authorization=_auth(included_work_item_ids='["WI-0001"]'),
+    )
+    reason = _deny(tmp_path, _proposal())
+    assert reason is not None and "wi-not-included-by-authorization" in reason
+
+
+def test_excluded_precedence_over_included_list(tmp_path: Path) -> None:
+    _make_db(
+        tmp_path,
+        membership=(_WI_ID, _PROJECT_ID, "active"),
+        authorization=_auth(
+            included_work_item_ids=f'["{_WI_ID}"]',
+            excluded_work_item_ids=f'["{_WI_ID}"]',
+        ),
+    )
+    reason = _deny(tmp_path, _proposal())
+    assert reason is not None and "wi-excluded-from-authorization" in reason
+
+
 # --- passing cases --------------------------------------------------------------
 
 

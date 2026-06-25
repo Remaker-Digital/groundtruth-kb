@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 from groundtruth_kb.cli import main as cli_main
 from groundtruth_kb.db import KnowledgeDB
@@ -406,3 +407,63 @@ def test_autocomplete_membership_only_project_unaffected(tmp_path: Path) -> None
         assert db.get_project("PROJECT-AUTOCOMPLETE-MEMBERSHIP-ONLY")["status"] == "retired"
     finally:
         db.close()
+
+
+def test_restrictive_included_list_authorizes_only_listed_wi(tmp_path: Path) -> None:
+    import importlib.util
+    import sys
+
+    auth_path = Path(__file__).resolve().parents[2] / "scripts" / "implementation_authorization.py"
+    spec = importlib.util.spec_from_file_location("implementation_authorization_proj_auth", auth_path)
+    assert spec and spec.loader
+    auth = importlib.util.module_from_spec(spec)
+    sys.modules["implementation_authorization_proj_auth"] = auth
+    spec.loader.exec_module(auth)
+
+    _seed_project_authorization_inputs(tmp_path)
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_project("Restrictive Auth Project", "test", "seed", id="PROJECT-RESTRICT", status="active")
+        db.insert_work_item(
+            "WI-9001",
+            "Listed WI",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed",
+            stage="backlogged",
+        )
+        db.insert_work_item(
+            "WI-MEMBER-ONLY",
+            "Member only WI",
+            "new",
+            "platform",
+            "open",
+            "test",
+            "seed",
+            stage="backlogged",
+        )
+        db.link_project_work_item("PROJECT-RESTRICT", "WI-MEMBER-ONLY", "test", "link member")
+        db.insert_project_authorization(
+            "PROJECT-RESTRICT",
+            "Restrictive included list",
+            "DELIB-TEST-PROJECT-AUTH",
+            "Restrictive scope test.",
+            "test",
+            "seed auth",
+            id="PAUTH-RESTRICT",
+            included_work_item_ids=["WI-LISTED"],
+            included_spec_ids=["SPEC-SCOPED-IMPL"],
+        )
+    finally:
+        db.close()
+
+    row = auth._project_authorization_row(tmp_path, "PAUTH-RESTRICT")
+    auth.validate_project_authorization_row(tmp_path, row, work_item_id="WI-LISTED")
+
+    with pytest.raises(auth.AuthorizationError, match="not in the authorizing included_work_item_ids list"):
+        auth.validate_project_authorization_row(tmp_path, row, work_item_id="WI-MEMBER-ONLY")
+
+    with pytest.raises(auth.AuthorizationError, match="not in the authorizing included_work_item_ids list"):
+        auth.validate_project_authorization_row(tmp_path, row, work_item_id="WI-NOT-ANYWHERE")
