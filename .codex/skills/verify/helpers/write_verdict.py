@@ -37,6 +37,25 @@ DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
 VERSIONED_BRIDGE_RE_TEMPLATE = r"^{slug}-(?P<version>\d{{3}})\.md$"
 RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
+UNRESOLVED_PLACEHOLDER_RE = re.compile(
+    r"\bPLACEHOLDER(?:_[A-Z0-9]+)+\b|<fill in [^>\n]+>",
+    re.IGNORECASE,
+)
+FAILED_PREFLIGHT_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?[`\"']?preflight_passed[`\"']?\s*[:=]\s*[`\"']?false[`\"']?\b")
+MISSING_REQUIRED_SPECS_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?[`\"']?missing_required_specs[`\"']?\s*[:=]\s*(?P<value>[^\n]*)$"
+)
+WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w`])(?P<path>[A-Za-z]:[\\/][^\s`|<>'\"]+)")
+FENCED_CODE_BLOCK_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)(?:\n```|$)", re.DOTALL)
+EVIDENCE_SECTION_HEADINGS = (
+    "Applicability Preflight",
+    "Clause Applicability",
+    "Preflight Evidence",
+    "Verification Evidence",
+    "Command Output",
+    "Commands Executed",
+    "Commit Finalization Evidence",
+)
 
 
 class VerifiedFinalizationError(RuntimeError):
@@ -146,7 +165,57 @@ def _section_body(text: str, heading: str) -> str:
     return text[start:end].strip()
 
 
-def validate_verified_body(body: str) -> None:
+def _reject_unresolved_placeholders(body: str) -> None:
+    match = UNRESOLVED_PLACEHOLDER_RE.search(body)
+    if match is not None:
+        raise VerifiedFinalizationError(
+            f"VERIFIED verdict body contains unresolved placeholder evidence: {match.group(0)!r}."
+        )
+
+
+def _reject_failed_preflight_evidence(body: str) -> None:
+    match = FAILED_PREFLIGHT_RE.search(body)
+    if match is not None:
+        raise VerifiedFinalizationError("VERIFIED verdict body embeds failed preflight evidence.")
+    for match in MISSING_REQUIRED_SPECS_RE.finditer(body):
+        value = match.group("value").strip().strip("`").rstrip(",")
+        if value != "[]":
+            raise VerifiedFinalizationError(
+                "VERIFIED verdict body embeds preflight evidence with non-empty missing_required_specs."
+            )
+
+
+def _evidence_spans(body: str) -> tuple[str, ...]:
+    spans: list[str] = []
+    for match in FENCED_CODE_BLOCK_RE.finditer(body):
+        spans.append(match.group("body"))
+    for heading in EVIDENCE_SECTION_HEADINGS:
+        section = _section_body(body, heading)
+        if section:
+            spans.append(section)
+    return tuple(spans)
+
+
+def _path_within_project_root(path_text: str, project_root: Path) -> bool:
+    try:
+        path = Path(path_text).resolve()
+        path.relative_to(project_root.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _reject_out_of_root_evidence_paths(body: str, project_root: Path) -> None:
+    for span in _evidence_spans(body):
+        for match in WINDOWS_ABSOLUTE_PATH_RE.finditer(span):
+            path_text = match.group("path").rstrip(".,;:)]}")
+            if not _path_within_project_root(path_text, project_root):
+                raise VerifiedFinalizationError(
+                    f"VERIFIED verdict body embeds out-of-root path evidence: {path_text!r} is outside {project_root}."
+                )
+
+
+def validate_verified_body(body: str, *, project_root: Path | None = None) -> None:
     """Validate the evidence floor before a VERIFIED verdict can be committed."""
     if _first_nonblank_line(body) != "VERIFIED":
         raise VerifiedFinalizationError(
@@ -163,6 +232,10 @@ def validate_verified_body(body: str) -> None:
         )
     if not _section_body(body, "Commands Executed"):
         raise VerifiedFinalizationError("VERIFIED verdict body must include a ## Commands Executed section.")
+    root = _project_root_from_arg(project_root)
+    _reject_unresolved_placeholders(body)
+    _reject_failed_preflight_evidence(body)
+    _reject_out_of_root_evidence_paths(body, root)
 
 
 def _normalize_repo_path(project_root: Path, path_text: str) -> str:
@@ -194,6 +267,35 @@ def _unique_paths(project_root: Path, paths: list[str]) -> tuple[str, ...]:
             unique.append(normalized)
             seen.add(normalized)
     return tuple(unique)
+
+
+def _assert_predecessor_chain_committed(
+    slug: str,
+    project_root: Path,
+    next_version: int,
+    transaction_paths: tuple[str, ...],
+) -> None:
+    transaction_set = set(transaction_paths)
+    problems: list[str] = []
+    for version in range(1, next_version):
+        rel_path = f"bridge/{slug}-{version:03d}.md"
+        abs_path = project_root / rel_path
+        if not abs_path.is_file():
+            problems.append(f"{rel_path} is missing")
+            continue
+        if rel_path in transaction_set:
+            continue
+        tracked = _run_git(["ls-files", "--error-unmatch", "--", rel_path], cwd=project_root, check=False)
+        if tracked.returncode != 0:
+            problems.append(f"{rel_path} is not git-tracked and is not included in the VERIFIED transaction")
+            continue
+        status = _run_git(["status", "--porcelain", "--", rel_path], cwd=project_root, check=True).stdout.strip()
+        if status:
+            problems.append(f"{rel_path} has uncommitted changes and is not included in the VERIFIED transaction")
+    if problems:
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization requires a committed predecessor bridge chain; " + "; ".join(problems)
+        )
 
 
 def _run_git(args: list[str], *, cwd: Path, check: bool = False) -> subprocess.CompletedProcess[str]:
@@ -380,6 +482,7 @@ def finalize_verified_commit(
     expected_paths = _unique_paths(root, [*include_paths, verdict_rel_path])
     if len(expected_paths) != len(include_paths) + 1:
         raise VerifiedFinalizationError("VERIFIED finalization include paths must not duplicate the verdict path.")
+    _assert_predecessor_chain_committed(slug, root, next_version, expected_paths)
 
     # Pre-existing staged paths from other sessions in the shared index are
     # tolerated: the final commit below uses an explicit pathspec, so only the
@@ -396,7 +499,7 @@ def finalize_verified_commit(
         log_path=log_path,
         pre_populate=pre_populate,
     )
-    validate_verified_body(body_to_write)
+    validate_verified_body(body_to_write, project_root=root)
     body_to_write = _append_commit_finalization_evidence(
         body_to_write,
         commit_message=commit_message,
