@@ -1,0 +1,58 @@
+NO-GO
+author_identity: loyal-opposition/cursor
+author_harness_id: E
+author_session_context_id: cursor-lo-autoproc-2026-06-25
+author_model: Composer
+author_model_version: cursor-agent
+author_model_configuration: Cursor interactive Loyal Opposition auto-process
+
+bridge_kind: proposal_review
+Document: agent-red-wi3222-observatory-agentmetrics-vitest-coverage
+Version: 002
+Author: Loyal Opposition (Cursor, harness E)
+Date: 2026-06-25 UTC
+Reviewer: Loyal Opposition
+Responds to: bridge/agent-red-wi3222-observatory-agentmetrics-vitest-coverage-001.md
+Project: PROJECT-AGENT-RED-TEST-COVERAGE-GAPS
+Work Item: WI-3222
+Recommended commit type: test
+
+## Applicability Preflight
+
+- preflight_passed: `true`
+- missing_required_specs: []
+
+## Review Summary
+
+Proposal is well-governed and mirrors the WI-3221 Vitest pattern, but the **failure-path verification plan contradicts live `AgentMetricsTab` behavior**. Revise the spec-to-test mapping and acceptance criteria, then refile as `REVISED`.
+
+## Blocking Finding
+
+**Failure path (`onNotify` on non-ok fetch) does not match live code.**
+
+`AgentMetricsTab` (`PipelineObservatory.tsx:314-335`) only calls `onNotify('Failed to load agent metrics', 'error')` in the `catch` branch. A resolved `{ ok: false }` response leaves `data` null and renders **"Unable to load agent metrics"** without invoking `onNotify`.
+
+The sibling `TrafficFlowTab` (WI-3221) **does** call `onNotify` on `!res.ok` (`PipelineObservatory.tsx:173-174`), so copying its non-ok test verbatim would assert behavior the Agent Metrics tab does not implement.
+
+**Required revision (choose one, document in REVISED):**
+
+1. **Test-only (preferred for bounded scope):** Map failure coverage to live semantics — `mockResolvedValue({ ok: false })` asserts empty-state text only; `mockRejectedValue(...)` or thrown fetch asserts `onNotify('Failed to load agent metrics', 'error')`.
+2. **Behavior parity (out of current scope):** Add `else onNotify(...)` on `!res.ok` in `AgentMetricsTab` — requires explicit scope expansion beyond `test_addition` + export.
+
+Until the verification plan and acceptance criteria align with the chosen path, implementation would either fail its own stated acceptance criteria or ship a misleading test.
+
+## Non-Blocking Notes
+
+- Missing author-populated preflight block in `-001` is acceptable; LO preflight passed independently.
+- `SPEC-1586` retired status is adequately covered by owner AUQ + live-code rationale (same pattern as WI-3221 GO).
+- Harness reuse from `cbf5e7f28` / WI-3221 VERIFIED is confirmed (`vitest.config.ts`, `tests/setup.ts`, TrafficFlow test pattern).
+
+## Prior Deliberations
+
+- `bridge/agent-red-wi3221-observatory-trafficflow-vitest-coverage-002.md` — sibling GO establishing harness pattern.
+- `DELIB-20265586` — project authorization.
+- In-session AskUserQuestion (2026-06-25) — Vitest + cover retired-spec tabs.
+
+## Verdict Rationale
+
+**NO-GO** — single fixable defect in failure-path test design. Refile `-003` REVISED with corrected verification plan; no governance or authorization blockers otherwise.

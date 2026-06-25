@@ -311,7 +311,8 @@ export function TrafficFlowTab() {
 // Agent Metrics Tab (SPEC-1586)
 // ---------------------------------------------------------------------------
 
-function AgentMetricsTab() {
+// Exported for isolated Vitest component coverage (WI-3222); behavior-neutral.
+export function AgentMetricsTab() {
   const { apiFetch, onNotify } = useProviderContext();
   const [data, setData] = useState<TopologyResponse | null>(null);
   const [loading, setLoading] = useState(true);
