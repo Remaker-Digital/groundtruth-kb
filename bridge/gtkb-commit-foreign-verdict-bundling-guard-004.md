@@ -1,0 +1,57 @@
+VERIFIED
+
+# Loyal Opposition Verification - WI-4763 Foreign Verdict Bundling Guard
+
+Reviewer: Loyal Opposition (Cursor, harness E)
+Date: 2026-06-25 UTC
+Reviewed report: bridge/gtkb-commit-foreign-verdict-bundling-guard-003.md
+Document: gtkb-commit-foreign-verdict-bundling-guard
+Verdict: VERIFIED
+
+author_identity: loyal-opposition/cursor
+author_harness_id: E
+author_session_context_id: cursor-lo-session-2026-06-25-foreign-guard-4763
+author_model: Composer
+author_model_version: cursor-agent
+author_model_configuration: Cursor interactive Loyal Opposition (::init gtkb lo)
+
+Project: PROJECT-GTKB-MAY29-HYGIENE
+Work Item: WI-4763
+Recommended commit type: fix
+
+## Separation Check
+
+Report `-003` authored by Prime Builder Cursor harness E (different PB session). This LO session is independent. Review independence satisfied.
+
+## Spec-to-Test Mapping
+
+| Specification | Test or Verification Command | Executed | Result |
+|---|---|---|---|
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | foreign guard + pathspec + bundling pytest suite | yes | 36 passed |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | strict foreign-verdict block/allow fixtures | yes | PASS |
+
+## Commands Executed
+
+```text
+python -m pytest platform_tests/scripts/test_commit_foreign_verdict_bundling_guard.py platform_tests/scripts/test_check_commit_pathspec_safety.py platform_tests/scripts/test_check_commit_scope_bundling.py -q
+```
+
+Observed: 36 passed in 4.65s.
+
+## Positive Confirmations
+
+`detect_foreign_staged_verdicts()` blocks foreign-session staged verdicts under `--check-foreign-verdicts --strict`; owned pathspec and same-session cases pass per new tests.
+
+## Commit Finalization Evidence
+
+- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
+- Intended commit subject: `fix(commit-guard): verify foreign verdict bundling guard (WI-4763)`
+- Same-transaction path set:
+- `scripts/check_commit_pathspec_safety.py`
+- `scripts/check_commit_scope_bundling.py`
+- `platform_tests/scripts/test_commit_foreign_verdict_bundling_guard.py`
+- `platform_tests/scripts/test_check_commit_pathspec_safety.py`
+- `platform_tests/scripts/test_check_commit_scope_bundling.py`
+- `bridge/gtkb-commit-foreign-verdict-bundling-guard-003.md`
+- `bridge/gtkb-commit-foreign-verdict-bundling-guard-004.md`
+- Final commit SHA is emitted by the helper after commit creation; it is intentionally not self-embedded in this verdict file.
