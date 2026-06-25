@@ -1,6 +1,6 @@
 # Known Limitations
 
-GroundTruth-KB is a developer-preview at version 0.6.0. There are live gaps
+GroundTruth-KB is a developer-preview at version 0.7.0rc1. There are live gaps
 we know about and want an adopter to see **before** committing. Honesty
 beats marketing.
 

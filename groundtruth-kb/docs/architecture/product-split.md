@@ -104,7 +104,7 @@ The patterns packaged by `groundtruth-kb` were developed and validated in a
 production commercial SaaS project. The current reusable dual-agent pattern is:
 
 - File bridge queue and status protocol
-- OS-level scheduled pollers
+- Cross-harness event-driven bridge dispatch (PostToolUse + Stop hooks)
 - Prompt and agent-configuration capture
 - Session hook and rule file conventions
 - Operational expectations for evidence, auditability, and owner burden
@@ -115,7 +115,7 @@ production commercial SaaS project. The current reusable dual-agent pattern is:
 
 | Component | Version | Status |
 |-----------|---------|--------|
-| groundtruth-kb | 0.6.0 | Alpha / developer-preview — extracted from production system (2,000+ specs, 11,000+ tests) |
+| groundtruth-kb | 0.7.0rc1 | Release candidate — extracted from production system (2,000+ specs, 11,000+ tests) |
 
 ---
 

@@ -35,6 +35,14 @@ EXPECTED_MIN_COMMANDS = 14
 # File extensions to scan for install references
 _INSTALL_REF_EXTENSIONS = {".md", ".yml", ".yaml", ".py", ".toml", ".cfg", ".txt"}
 
+# Live public docs that must not claim stale 0.6.x release state (WI-3306).
+_LIVE_VERSION_DOC_PATHS = (
+    DOCS_DIR / "known-limitations.md",
+    DOCS_DIR / "groundtruth-kb-executive-overview.md",
+    DOCS_DIR / "architecture" / "product-split.md",
+)
+_STALE_RELEASE_VERSION_MARKERS = ("0.6.0", "0.6.1")
+
 
 def _collect_scannable_files() -> list[Path]:
     """Collect all user-facing files that may contain install references.
@@ -108,6 +116,21 @@ def get_cli_commands() -> list[str]:
 
     _walk(cli_root)
     return commands
+
+
+def check_live_release_version_language() -> list[str]:
+    """Fail when live public docs still claim the pre-0.7.0rc1 release line."""
+    failures: list[str] = []
+    version = _get_package_version()
+    for path in _LIVE_VERSION_DOC_PATHS:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for marker in _STALE_RELEASE_VERSION_MARKERS:
+            if marker in text:
+                rel = path.relative_to(ROOT)
+                failures.append(f"{rel}: stale release version {marker} present; package __version__ is {version}")
+    return failures
 
 
 def check_cli_coverage() -> list[str]:
@@ -341,6 +364,7 @@ def main() -> int:
         ("Python prerequisite", check_python_prerequisite),
         ("gt --version output", check_gt_version_output),
         ("ChromaDB install message", check_chromadb_install_message),
+        ("live release version language", check_live_release_version_language),
     ]
 
     for name, check_fn in checks:

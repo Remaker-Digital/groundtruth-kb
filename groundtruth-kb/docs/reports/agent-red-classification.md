@@ -1,5 +1,9 @@
 # Agent Red Classification Report
 
+> **Historical archive context (WI-3306):** This point-in-time report was generated
+> against `E:\Claude-Playground\...` on 2026-04-18. It is retained as audit
+> evidence only — not a live dependency or current GT-KB install path.
+
 - Generated: 2026-04-18T00:01:35+00:00
 - GT-KB version: 0.6.0
 - GT-KB HEAD: e12aab3
