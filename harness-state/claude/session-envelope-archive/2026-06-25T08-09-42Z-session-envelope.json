@@ -1,0 +1,70 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-25T08:09:42Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-25T08:09:42Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolution": {
+    "authority_mode": "durable_registry_fallback",
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "durable_registry_role": "prime-builder",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": null
+  },
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-25T08-09-42Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .cursor/gtkb-hooks/last-session-start.json\n M .cursor/gtkb-hooks/last-user-visible-startup-lo.md\n M .cursor/gtkb-hooks/last-user-visible-startup-lo.meta.json\n M .cursor/gtkb-hooks/last-user-visible-startup-pb.md\n M .cursor/gtkb-hooks/last-user-visible-startup-pb.meta.json\n M .cursor/gtkb-hooks/last-user-visible-startup.md\n M .cursor/gtkb-hooks/last-user-visible-startup.meta.json\n M AGENTS.md\n M applications/Agent_Red/admin/provider/pages/PipelineObservatory.tsx\n M config/dispatcher/rules.toml\n M groundtruth-kb/src/groundtruth_kb/project/doctor.py\n M platform_tests/scripts/test_harness_storm_watchdog.py\n M platform_tests/scripts/test_session_self_initialization.py\n M scripts/session_self_initialization.py\n?? .draft-delib-may29-wi4774-wi4745-closure.md\n?? .draft-delib-wi4755-closure.md\n?? .draft-delib-wi4771-closure.md\n?? .draft-revised-wi4649-004.md\n?? .draft-verdict-gtkb-rationale-003.md\n?? .draft-wi3327-001.md\n?? .temp_go_3222_seeded.md\n?? .temp_go_3223_seeded.md\n?? .temp_go_3224_seeded.md\n?? .temp_verdict_attribution_008.md\n?? .temp_verdict_body_gtkb_reconcile.md\n?? .temp_verdict_body_perrole.md\n?? .temp_verdict_body_reconcile.md\n?? .temp_verdict_consolidate_008.md\n?? .temp_verdict_dashboard_006.md\n?? .temp_verdict_foreign_guard_004.md\n?? .temp_verdict_sweep_008.md\n?? .temp_verdict_wi3306_006.md\n?? .temp_verdict_wi4773_006.md\n?? .temp_verified_body_gtkb_auto_retire.txt\n?? __tmp_4282_test/\n?? applications/Agent_Red/.claude/session/\n?? applications/Agent_Red/admin/provider/tests/PipelineObservatory.agentmetrics.test.tsx\n?? bridge/.draft-gtkb-reconcile-included-work-item-ids-semantics-017-body.md\n?? bridge/agent-red-wi3222-observatory-agentmetrics-vitest-coverage-001.md\n?? bridge/agent-red-wi3222-observatory-agentmetrics-vitest-coverage-002.md\n?? bridge/agent-red-wi3223-observatory-tenants-vitest-coverage-001.md\n?? bridge/agent-red-wi3223-observatory-tenants-vitest-coverage-002.md\n?? bridge/agent-red-wi3224-deployment-modal-version-prefill-coverage-001.md\n?? bridge/agent-red-wi3224-deployment-modal-version-prefill-coverage-002.md\n?? bridge/gtkb-perrole-concurrency-cap-dispatch-006.md.draft\n?? bridge/gtkb-wi4689-sot-deference-startup-injection-001.md\n?? bridge/gtkb-wi4689-sot-deference-startup-injection-002.md\n?? bridge/gtkb-wi4689-sot-deference-startup-injection-003.md\n?? bridge/gtkb-wi4689-sot-deference-startup-injection-004.md\n?? diagnose_pb_context.md\n?? harness-state/claude/session-envelope.json\n?? platform_tests/scripts/test_check_obsolete_reference_purge.py\n?? tmp_test/",
+        "short_line_count": 53,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}
