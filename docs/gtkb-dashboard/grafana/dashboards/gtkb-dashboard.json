@@ -32,7 +32,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "# Agent Red GT-KB Dashboard\n\nSQLite-backed project health, setup, delivery, and operations view.\n[Manual refresh](http://127.0.0.1:8766/) | `memory/gtkb-dashboard.sqlite` | `scripts\\gtkb_dashboard\\start_local_dashboard.ps1`"
+        "content": "# GT-KB Operations Dashboard\n\nCombined GT-KB platform + active adopter/application operations (loopback/local-only).\nPrimary setup: `gt dashboard init` \u2192 `gt dashboard install` \u2192 `gt dashboard start` \u2192 `gt dashboard refresh`.\n[Manual refresh](http://127.0.0.1:8766/) binds to loopback only; copy local paths from Shortcuts (do not use Open for workspace files)."
       }
     },
     {
@@ -1404,7 +1404,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Open",
+                    "title": "Copy path",
                     "url": "${__value.raw}",
                     "targetBlank": true
                   }

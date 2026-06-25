@@ -212,7 +212,7 @@ Common failures to review explicitly:
 
 | Failure | Signal | Correction |
 |---------|--------|------------|
-| Trigger script missing | `_check_cross_harness_trigger` reports FAIL on script presence | Restore from scaffold or `gt project init --profile dual-agent` |
+| Trigger script missing | `_check_cross_harness_trigger` reports FAIL on script presence | Restore from scaffold or `gt project init my-project --profile dual-agent` |
 | Hook registration missing | `_check_cross_harness_trigger` reports FAIL on hook registrations | Update `.claude/settings.json` PostToolUse/Stop arrays or `.codex/hooks.json` |
 | Dispatch-state stale | `_check_bridge_dispatch_liveness` reports WARN/ALARM | Inspect last hook invocation and INDEX state; verify hooks fire on tool-use |
 | Completed items re-dispatch | Trigger treats `VERIFIED` as actionable | Verify dispatch-filter logic ignores `VERIFIED` |

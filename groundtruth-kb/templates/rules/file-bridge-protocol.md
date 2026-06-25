@@ -281,13 +281,17 @@ numbered bridge file.
 
 ## Review Independence Boundary
 
+Formal bridge review must come from a **different model session context** than
+the one that authored or implemented the artifact under review — shared context
+means the verifier likely inherits the same assumptions and errors. Full
+normative block: `config/agent-control/SESSION-STARTUP-INDEX.md` §
+Session-context review independence (normative).
+
 Bridge review independence is determined by session context, not by harness ID
-alone. A review or verification is invalid when the reviewer session context is
-the same as the bridge artifact author's `author_session_context_id`, or when
-the author session metadata is missing or unreadable under the dispatcher
-fail-closed rules. The same harness may author a proposal in one session and
-review it in a different, unrelated session context only when the reviewer is
-operating under a valid Loyal Opposition role or dispatch context.
+or durable registry role (routing labels only). A review or verification is
+invalid when the reviewer session context equals the bridge artifact author's
+`author_session_context_id`, or when the author session metadata is missing or
+unreadable under the dispatcher fail-closed rules.
 
 Interactive sessions remain bound to the owner-declared resolved role for that
 session. An interactive session must not switch from Prime Builder to Loyal

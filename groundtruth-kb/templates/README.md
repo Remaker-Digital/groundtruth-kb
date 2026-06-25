@@ -33,7 +33,7 @@ The shipped CLAUDE.md / MEMORY.md / deliberation-protocol templates implement AD
 | `rules/canonical-terminology.md` | Canonical ADR-0001 glossary (MemBase, DA, Prime Builder, Loyal Opposition, etc.) | `.claude/rules/canonical-terminology.md` |
 | `rules/canonical-terminology.toml` | Profile-aware doctor config for required canonical terms | `.claude/rules/canonical-terminology.toml` |
 | `BRIDGE-INVENTORY.md` | Optional inventory of bridge directives, roles, schedules, prompts, and automations | Project root |
-| `bridge-os-poller-setup-prompt.md` | DEPRECATED stub. Smart poller and OS poller both retired in Slice 4 (2026-05-09); retained as compatibility stub for two release cycles. Use the cross-harness event-driven trigger via `gt project init --profile dual-agent`. | Project root or operations docs |
+| `bridge-os-poller-setup-prompt.md` | DEPRECATED stub. Smart poller and OS poller both retired in Slice 4 (2026-05-09); retained as compatibility stub for two release cycles. Use the cross-harness event-driven trigger via `gt project init my-project --profile dual-agent`. | Project root or operations docs |
 | `hooks/assertion-check.py` | SessionStart hook — run assertions on session start | `.claude/hooks/` |
 | `hooks/spec-classifier.py` | UserPromptSubmit hook — detect spec language, enforce spec-first | `.claude/hooks/` |
 | `rules/loyal-opposition.md` | Review agent behavior rules | `.claude/rules/` |
@@ -87,7 +87,7 @@ If your project uses a bridge, multiple agents, or recurring automation, also
 customize `BRIDGE-INVENTORY.md` so the runtime entrypoints, directives, role
 descriptions, prompts, plugin/skill dependencies, and trigger registrations
 are discoverable from the project. For file-based Prime Builder + Loyal
-Opposition bridges, run `gt project init --profile dual-agent` (which
+Opposition bridges, run `gt project init my-project --profile dual-agent` (which
 scaffolds the cross-harness event-driven trigger,
 `.claude/settings.json`, `.codex/hooks.json`, and the dispatch-state path)
 and then record the resulting setup in `BRIDGE-INVENTORY.md`.

@@ -195,7 +195,7 @@ would have caught in one pass.
 
 She would configure bridge automation on day one too. The cross-harness
 event-driven trigger is scaffolded automatically by
-`gt project init --profile dual-agent` and registered as PostToolUse and Stop
+`gt project init my-project --profile dual-agent` and registered as PostToolUse and Stop
 hooks in `.claude/settings.json` and `.codex/hooks.json`. The setup walkthrough
 is in [Dual-Agent Setup](tutorials/dual-agent-setup.md). Manual `bridge/INDEX.md`
 scans remain as a fallback if the trigger is unhealthy. The retired smart

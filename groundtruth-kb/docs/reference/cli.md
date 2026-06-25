@@ -1266,3 +1266,369 @@ gt [--config <path>] [--version]
 ---
 
 *Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+
+## Complete Command Reference
+
+_Auto-generated index of every `gt` leaf command, derived from the live Click command tree by `scripts/gen_cli_ref` and verified by `scripts/check_docs_cli_coverage.py`. The sections above give detailed usage for the most common commands; this index guarantees full coverage so the reference never drifts behind the CLI. The package `gt` CLI is the primary interface._
+
+### gt admin
+
+| Command | Description |
+| --- | --- |
+| `gt admin inventory refresh` | Check the declared SoT artifact inventory without mutating artifacts. |
+| `gt admin inventory scan-strings` | Scan declared inventory artifacts for literal strings. |
+
+### gt application
+
+| Command | Description |
+| --- | --- |
+| `gt application register` | Register a developed application and enforce slot occupancy constraint. |
+| `gt application unregister` | Unregister a developed application slot. |
+
+### gt assert
+
+| Command | Description |
+| --- | --- |
+| `gt assert` | Run feature assertions against the project codebase. |
+
+### gt authority
+
+| Command | Description |
+| --- | --- |
+| `gt authority resolve` | Resolve an owner-facing term against the governed system-interface map. |
+| `gt authority status` | Report compact system-interface map health. |
+
+### gt backlog
+
+| Command | Description |
+| --- | --- |
+| `gt backlog add` | Capture a single MemBase work_items backlog candidate row. |
+| `gt backlog add-work-item` | Create a work item + linked test (GOV-12) + test-plan phase assignment (GOV-13). |
+| `gt backlog authorize-implementation` | Authorize a single owner-selected work item for implementation. |
+| `gt backlog list` | List unified backlog items from MemBase work_items. |
+| `gt backlog resolve` | Resolve a work item (shortcut for update --resolution-status resolved --stage resolved). |
+| `gt backlog show` | Show one unified backlog item from MemBase work_items. |
+| `gt backlog status` | Report unified backlog status: projects, work-item rollups, optional scanner-backed annotations. |
+| `gt backlog update` | Update field values of a single backlog work item. |
+
+### gt bootstrap-desktop
+
+| Command | Description |
+| --- | --- |
+| `gt bootstrap-desktop` | Create a same-day desktop prototype scaffold for a new GroundTruth project. |
+
+### gt bridge
+
+| Command | Description |
+| --- | --- |
+| `gt bridge benchmark compare` | Compare benchmark runs through the Bridge CLI wrapper. |
+| `gt bridge benchmark manifest` | Validate and print the harness-quality benchmark manifest. |
+| `gt bridge benchmark report` | Print a benchmark run report through the Bridge CLI wrapper. |
+| `gt bridge benchmark run` | Execute benchmark runs through the Bridge CLI wrapper. |
+| `gt bridge config` | Show the canonical bridge dispatch configuration. |
+| `gt bridge dispatch config add-harness` | Add a dispatcher harness overlay. |
+| `gt bridge dispatch config remove-harness` | Remove a dispatcher harness overlay. |
+| `gt bridge dispatch config set-caps` | Set dispatcher caps for one harness overlay. |
+| `gt bridge dispatch config set-eligibility` | Set dispatcher eligibility fields for one harness overlay. |
+| `gt bridge dispatch config set-rule` | Set dispatcher rule selector fields. |
+| `gt bridge dispatch config set-weights` | Set dispatcher ranking weights for one harness overlay. |
+| `gt bridge dispatch health` | Check whether bridge dispatch has eligible targets for both roles. |
+| `gt bridge dispatch report` | Show a comprehensive read-only bridge dispatch operations report. |
+| `gt bridge dispatch status` | Show current harness eligibility and selected dispatch candidates. |
+| `gt bridge health` | Check whether bridge dispatch has eligible targets for both roles. |
+| `gt bridge propose` | Emit a deterministic, non-dispatchable bridge proposal draft. |
+| `gt bridge show` | Show one bridge thread's version chain. |
+| `gt bridge status` | Show current harness eligibility and selected dispatch candidates. |
+| `gt bridge threads` | List bridge threads that cite a work item. |
+| `gt bridge verify-embedded-evidence` | Verify embedded appendix evidence in a bridge report. |
+
+### gt canonical-terms
+
+| Command | Description |
+| --- | --- |
+| `gt canonical-terms history` | Show all versions of a canonical term, oldest first. |
+| `gt canonical-terms list` | List canonical_terms current state (latest version per id). |
+| `gt canonical-terms seed` | Seed (or plan to seed) canonical_terms from the markdown glossary. |
+
+### gt check
+
+| Command | Description |
+| --- | --- |
+| `gt check adrs` | Verify all 13 instance ADRs have been answered by the adopter-owner. |
+
+### gt config
+
+| Command | Description |
+| --- | --- |
+| `gt config` | Show resolved configuration. |
+
+### gt core-specs
+
+| Command | Description |
+| --- | --- |
+| `gt core-specs next-question` | Report the next missing core-spec intake question. |
+| `gt core-specs status` | Report baseline core-spec intake completion state. |
+
+### gt dashboard
+
+| Command | Description |
+| --- | --- |
+| `gt dashboard init` | Create dashboard DB, Grafana provisioning, and dashboard JSON. |
+| `gt dashboard install` | Install local Grafana OSS and the SQLite datasource plugin. |
+| `gt dashboard refresh` | Refresh the generated dashboard SQLite database. |
+| `gt dashboard start` | Start Grafana and the local dashboard refresh service. |
+| `gt dashboard stop` | Stop dashboard processes started by ``gt dashboard start``. |
+
+### gt db
+
+| Command | Description |
+| --- | --- |
+| `gt db snapshot` | Create a consistent, integrity-checked SQLite snapshot. |
+
+### gt deliberations
+
+| Command | Description |
+| --- | --- |
+| `gt deliberations add` | Add a new deliberation (append-only; requires --id). |
+| `gt deliberations get` | Show a deliberation by ID (latest version by default). |
+| `gt deliberations link` | Link an existing deliberation to a spec or work item. |
+| `gt deliberations list` | List deliberations with optional filters. |
+| `gt deliberations rebuild-index` | Rebuild the ChromaDB semantic search index from SQLite. |
+| `gt deliberations record` | Record an AUQ-backed deliberation through the governed service path. |
+| `gt deliberations search` | Search deliberations by semantic similarity (with SQLite text fallback). |
+| `gt deliberations show` | Show a deliberation by ID (alias for get). |
+| `gt deliberations upsert` | Upsert a deliberation keyed by (source_type, source_ref, content_hash). |
+
+### gt design
+
+| Command | Description |
+| --- | --- |
+| `gt design import` | Inspect and (with --apply) register a local Claude Design handoff. |
+
+### gt export
+
+| Command | Description |
+| --- | --- |
+| `gt export` | Export the entire database to JSON. |
+
+### gt flow
+
+| Command | Description |
+| --- | --- |
+| `gt flow advance` | No-op Phase 0 placeholder for stage advancement. |
+| `gt flow claim` | Acquire one active TAFE stage lease. |
+| `gt flow define` | Read canonical Phase 0 reviewed-task flow definitions. |
+| `gt flow dispatch health` | Aggregate dispatch readiness across pending unclaimed stages. |
+| `gt flow dispatch tick` | Evaluate need-driven dispatch (SPEC-TAFE-R5) for eligible unclaimed stages. |
+| `gt flow heartbeat` | Renew the active TAFE stage lease heartbeat for this holder. |
+| `gt flow list` | Read current TAFE flow instances. |
+| `gt flow pilot` | No-op Phase 0 placeholder for pilot mode. |
+| `gt flow recover-leases` | Recover expired active TAFE stage leases and requeue their stages. |
+| `gt flow release` | Release the active TAFE stage lease held by this holder. |
+| `gt flow show` | Read one current TAFE flow instance. |
+| `gt flow start` | No-op Phase 0 placeholder for starting a TAFE flow. |
+| `gt flow status` | Read a current TAFE flow status or an aggregate Phase 0 status. |
+| `gt flow stuck` | Detect and self-diagnose stuck TAFE flows (SPEC-TAFE-R3). |
+
+### gt generate-approval-packet
+
+| Command | Description |
+| --- | --- |
+| `gt generate-approval-packet` | Generate formal or narrative-artifact approval packets. |
+
+### gt harness
+
+| Command | Description |
+| --- | --- |
+| `gt harness activate` | Activate a registered or suspended harness. |
+| `gt harness capabilities` | Print the harness-state ``harness-capability-registry.toml`` as JSON (WI-4327). |
+| `gt harness identity` | Print the harness-state ``harness-identities.json`` content (WI-4327). |
+| `gt harness list` | List all harness registry records (current versions). |
+| `gt harness register` | Register a new harness at status 'registered'. |
+| `gt harness resume` | Resume a suspended harness (suspended -> active). |
+| `gt harness retire` | Retire a harness. |
+| `gt harness roles` | Print the harness-state ``harness-registry.json`` content (WI-4327). |
+| `gt harness set-precedence` | Set a harness's reviewer precedence. |
+| `gt harness set-role` | Assign one default operating-role metadata value to one harness. |
+| `gt harness show` | Show one harness registry record (current version). |
+| `gt harness suspend` | Suspend an active harness (active -> suspended). |
+
+### gt health
+
+| Command | Description |
+| --- | --- |
+| `gt health snapshot` | Capture a health snapshot for a session and display it. |
+| `gt health trends` | Show recent health snapshots with per-snapshot metric deltas. |
+
+### gt history
+
+| Command | Description |
+| --- | --- |
+| `gt history` | Print recent changes across all artifact types. |
+
+### gt hygiene
+
+| Command | Description |
+| --- | --- |
+| `gt hygiene supersession-scan` | Run a read-only supersession hygiene scan. |
+| `gt hygiene sweep` | Run a deterministic hygiene sweep against the repository. |
+
+### gt import
+
+| Command | Description |
+| --- | --- |
+| `gt import` | Import database from a JSON export file. |
+
+### gt init
+
+| Command | Description |
+| --- | --- |
+| `gt init` | Create a new GroundTruth project with config and empty database. |
+
+### gt intake
+
+| Command | Description |
+| --- | --- |
+| `gt intake capture` | Capture a requirement candidate for later review. |
+| `gt intake classify` | Classify owner intent and show related specs. |
+| `gt intake confirm` | Confirm a captured candidate and create a KB spec. |
+| `gt intake list` | List intake candidates. |
+| `gt intake reject` | Reject a captured candidate with a reason. |
+
+### gt kb
+
+| Command | Description |
+| --- | --- |
+| `gt kb reconcile` | Reconcile specs against the current project state. |
+
+### gt mode
+
+| Command | Description |
+| --- | --- |
+| `gt mode apply-pending` | Drain the pending queue. |
+| `gt mode list-pending` | List pending mode-switch transactions. |
+| `gt mode set-bridge-substrate` | Apply (or defer) a bridge-substrate transaction. |
+| `gt mode set-role` | Apply (or defer) a role-switch transaction. |
+
+### gt policy
+
+| Command | Description |
+| --- | --- |
+| `gt policy check` | Evaluate a policy decision without installing an adapter. |
+
+### gt project
+
+| Command | Description |
+| --- | --- |
+| `gt project chroma regenerate` | Regenerate the disposable ChromaDB cache from groundtruth.db. |
+| `gt project classify-tree` | Classify every file under --dir against the ownership matrix. |
+| `gt project doctor` | Check workstation readiness and optionally install missing tools. |
+| `gt project init` | Scaffold a new GroundTruth project with the selected profile. |
+| `gt project rollback` | Roll back a previously-applied ``gt project upgrade --apply``. |
+| `gt project upgrade` | Update scaffold files to match the current GroundTruth version. |
+
+### gt projects
+
+| Command | Description |
+| --- | --- |
+| `gt projects add-item` | Add one work item to a project. |
+| `gt projects authorizations` | List project-scoped implementation authorizations. |
+| `gt projects authorize` | Authorize a bounded project for implementation work. |
+| `gt projects complete-authorization` | Complete a project-scoped implementation authorization. |
+| `gt projects create` | Create a first-class project record. |
+| `gt projects link-bridge` | Link a project to a bridge thread artifact without editing bridge files. |
+| `gt projects list` | List first-class project records. |
+| `gt projects reconcile-doubled-prefix` | Reconcile doubled-leading-segment phantom projects. |
+| `gt projects remove-item` | Detach one work item from a project (append-only, non-active membership). |
+| `gt projects reorder` | Reorder all active work-item memberships in one project. |
+| `gt projects retire` | Retire a project by appending a terminal project version. |
+| `gt projects retire-item` | Retire or exclude one project work item with owner approval evidence. |
+| `gt projects revoke-authorization` | Revoke a project-scoped implementation authorization. |
+| `gt projects show` | Show a project with its work items, dependencies, and artifact links. |
+| `gt projects show-authorization` | Show one current project authorization by ID. |
+| `gt projects update` | Update a project by appending a new project version. |
+
+### gt registry
+
+| Command | Description |
+| --- | --- |
+| `gt registry diff` | Show diff between TOML and MemBase projection (non-mutating validate). |
+| `gt registry list` | List all SoT artifact records from the TOML registry. |
+| `gt registry show` | Show details of a single SoT artifact record by id. |
+| `gt registry sync` | Sync MemBase sot_artifacts projection from the TOML registry. |
+| `gt registry validate` | Check parity between TOML registry and MemBase projection. |
+
+### gt scaffold
+
+| Command | Description |
+| --- | --- |
+| `gt scaffold adrs` | Generate instance-ADR skeletons for the given profile (D2). |
+| `gt scaffold cicd` | Generate GitHub Actions CI/CD skeleton files for the given profile (D4). |
+| `gt scaffold iac` | Generate Terraform skeleton files for the given profile (D3). |
+| `gt scaffold specs` | Generate a starter set of specs for the current project. |
+
+### gt secrets
+
+| Command | Description |
+| --- | --- |
+| `gt secrets scan` | Run the shared scanner without exposing raw matched values. |
+
+### gt seed
+
+| Command | Description |
+| --- | --- |
+| `gt seed` | Load generic governance starter data (and optionally example specs). |
+
+### gt serve
+
+| Command | Description |
+| --- | --- |
+| `gt serve` | Start the GroundTruth KB web UI (requires groundtruth-kb[web]). |
+
+### gt session
+
+| Command | Description |
+| --- | --- |
+| `gt session dispatcher tick` | Evaluate dispatch-envelope activity gates and persist scheduler state. |
+| `gt session dispatcher validate` | Load dispatch-envelope rules and fail on schema errors. |
+| `gt session envelope open` | Open a current per-harness session-envelope file. |
+| `gt session envelope show` | Print the current per-harness session envelope as JSON. |
+| `gt session handoff generate` | Generate the deterministic handoff prompt for a session. |
+| `gt session handoff get` | Print the latest ``session_prompts`` row for ``session_id``. |
+| `gt session topic close` | Close one open topic envelope for the given type. |
+| `gt session topic open` | Open one topic envelope for the given type. |
+| `gt session wrap` | Run the deterministic wrap service used by the canonical ::wrap trigger. |
+
+### gt spec
+
+| Command | Description |
+| --- | --- |
+| `gt spec list` | List current specifications with deterministic filters. |
+| `gt spec record` | Record an AUQ-backed specification through the governed service path. |
+| `gt spec show` | Show a specification by ID. |
+| `gt spec update` | Create a new version of an existing AUQ-backed specification. |
+
+### gt status
+
+| Command | Description |
+| --- | --- |
+| `gt status` | Report deterministic local operating state. |
+
+### gt summary
+
+| Command | Description |
+| --- | --- |
+| `gt summary` | Print spec/test/work-item counts. |
+
+### gt tests
+
+| Command | Description |
+| --- | --- |
+| `gt tests list` | List current test artifacts with deterministic filters. |
+| `gt tests show` | Show a test artifact by ID. |
+
+### gt validate
+
+| Command | Description |
+| --- | --- |
+| `gt validate spec-coherence` | Run deterministic Layer A spec-coherence checks. |
