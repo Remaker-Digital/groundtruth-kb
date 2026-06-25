@@ -4556,6 +4556,15 @@ def _dev_inventory_compact_text(status: dict[str, Any]) -> str:
     return f"{state}; generated {generated_at}; redaction {redaction}"
 
 
+def _format_open_work_items_count(membase: dict[str, Any]) -> str:
+    """Render scoped open-WI count, appending raw all-subjects count when it differs."""
+    scoped = membase.get("open_work_items")
+    raw = membase.get("raw_open_work_items")
+    if raw is None or raw == scoped:
+        return str(scoped)
+    return f"{scoped} (subject-scoped; {raw} across all subjects)"
+
+
 def _render_current_project_state(model: dict[str, Any]) -> str:
     metrics = model["metrics"]
     intelligence = model.get("dashboard_intelligence", {})
@@ -4611,7 +4620,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
         [
             f"- {subject_label} release blockers: {release.get('blocker_count', metrics['regression'].get('release_blocker_count'))}",
             f"- {subject_label} active backlog items: {metrics['backlog'].get('active_item_count')}",
-            f"- {subject_label} open MemBase work items: {metrics['membase'].get('open_work_items')}",
+            f"- {subject_label} open MemBase work items: {_format_open_work_items_count(metrics['membase'])}",
             f"- {subject_label} dashboard-scoped bridge/contention entries, non-authoritative for queue state: {metrics['contention'].get('actionable_count')}",
             f"- {subject_label} drift changed paths: {metrics['drift'].get('changed_path_count')}",
             (
@@ -5213,7 +5222,7 @@ def render_wrapup_notice(model: dict[str, Any], dashboard_link: str) -> str:
             "## Current Priority Signals",
             "",
             f"- Active backlog items: {metrics['backlog'].get('active_item_count')}",
-            f"- Open MemBase work items: {metrics['membase'].get('open_work_items')}",
+            f"- Open MemBase work items: {_format_open_work_items_count(metrics['membase'])}",
             f"- Release blockers: {metrics['regression'].get('release_blocker_count')}",
             f"- Actionable bridge/contention entries: {metrics['contention'].get('actionable_count')}",
             f"- Drift changed paths: {metrics['drift'].get('changed_path_count')}",

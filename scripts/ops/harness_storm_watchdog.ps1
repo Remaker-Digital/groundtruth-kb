@@ -1,15 +1,21 @@
 # Emergency watchdog for the cross-harness dispatch process-storm.
 #
 # Authority: owner AUQ 2026-06-12 ("Both: kill-switch + watchdog") after a
-# ~300-process Codex dispatch cascade exhausted the workstation.
+# ~300-process Codex dispatch cascade exhausted the workstation. SUPERSEDED in
+# part by DELIB-20265877 (kill-switch is emergency-only; congestion is not
+# failure), DELIB-20260612 (watchdog OFF after the concurrency cap was VERIFIED),
+# and SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001 / WI-4780: this watchdog NO
+# LONGER auto-asserts the global kill-switch.
 #
 # Behavior (runs every ~1 min via the GTKB-HarnessStormWatchdog task):
 #   - Counts codex-family headless processes.
 #   - Counts non-Codex Python harness processes declared by the harness
 #     registry for low-cost Loyal Opposition dispatch.
-#   - If either population exceeds its threshold, assert the
-#     GTKB_NO_CROSS_HARNESS_TRIGGER kill-switch, kill the matched harness
-#     process family, and log the intervention.
+#   - If either population exceeds its threshold, kill the matched harness
+#     process family and log the intervention. It does NOT assert the global
+#     kill-switch (emergency-only, manual). Storm protection is the verified
+#     concurrency cap (WI-4472); hung-worker reaping is the worker-lifetime
+#     timeout in run_with_status.py (WI-4806).
 #   - Otherwise: write a heartbeat (overwrite, no log growth).
 #
 # Conservative by design: it NEVER kills claude and only kills node_repl whose
@@ -61,7 +67,11 @@ $noncodexCount = $noncodex.Count
 Set-Content $beat "$now codex=$codexCount family=$familyCount noncodex=$noncodexCount threshold=$CODEX_THRESHOLD noncodexThreshold=$NONCODEX_THRESHOLD"
 
 if (($codexCount -gt $CODEX_THRESHOLD) -or ($noncodexCount -gt $NONCODEX_THRESHOLD)) {
-    [Environment]::SetEnvironmentVariable('GTKB_NO_CROSS_HARNESS_TRIGGER', '1', 'User')
+    # WI-4780 / SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001: the global
+    # GTKB_NO_CROSS_HARNESS_TRIGGER kill-switch is emergency-only and is no
+    # longer auto-asserted here (DELIB-20265877, DELIB-20260612). Corpse-reaping
+    # is retained as a secondary net behind the verified concurrency cap
+    # (WI-4472) and the worker-lifetime timeout (WI-4806).
     $killed = 0
 
     foreach ($p in $family) {
@@ -83,7 +93,7 @@ if (($codexCount -gt $CODEX_THRESHOLD) -or ($noncodexCount -gt $NONCODEX_THRESHO
         try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop; $killed++ } catch {}
     }
 
-    Add-Content $log "$now STORM codex=$codexCount family=$familyCount noncodex=$noncodexCount killed=$killed kill-switch=asserted(User)"
+    Add-Content $log "$now STORM codex=$codexCount family=$familyCount noncodex=$noncodexCount killed=$killed kill-switch=not-asserted(emergency-only)"
 }
 
 # Log-rotate guard so the audit log cannot grow unbounded.

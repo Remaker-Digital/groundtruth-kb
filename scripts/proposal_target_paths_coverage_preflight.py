@@ -51,6 +51,42 @@ _COMMAND_START_RE = re.compile(
     r"^(?:\.venv[/\\]Scripts[/\\]python(?:\.exe)?|python(?:\.exe)?|py(?:\.exe)?|pytest|uv|poetry)\b"
 )
 
+# B#2 (WI-4809) delta: prose-file-claim + integration-surface coverage. The
+# original preflight derived implied paths only from pytest commands and the
+# generator-output map; these two dimensions catch paths a proposal claims in
+# prose (or integration/registration surfaces) but omits from ``target_paths``.
+_PROSE_PATH_RE = re.compile(
+    r"`?(?P<path>(?:scripts|platform_tests|tests|config|groundtruth-kb|templates|docs|"
+    r"\.claude|\.codex|\.github|\.gtkb-state)[/\\][\w./\\-]+?"
+    r"\.(?:py|toml|md|json|cfg|ini|txt|ya?ml|sh|ps1|vbs))`?"
+)
+# A prose path counts as a *claim* (vs. an incidental reference) only when its
+# line carries a modification-intent cue. This is the deterministic guard
+# against the over-report false-positive class (references like "reuse the API
+# from X" or "distinct from Y" carry no cue and are not flagged).
+_PROSE_INTENT_CUES = (
+    "add",
+    "create",
+    "new ",
+    "modif",
+    "edit",
+    "extend",
+    "write",
+    "update",
+    "delete",
+    "remove",
+    "rename",
+    "introduce",
+    "scaffold",
+    "replace",
+)
+# Integration/registration surfaces whose omission from ``target_paths`` is a
+# common scope miss. Classified out of the union of implied paths.
+_INTEGRATION_SURFACE_RE = re.compile(
+    r"(?:^|/)(?:settings(?:\.local)?\.json|hooks\.json|"
+    r"harness-capability-registry\.toml|rules\.toml)$"
+)
+
 
 @dataclass(frozen=True)
 class PathIssue:
@@ -124,6 +160,51 @@ def extract_generator_paths(markdown: str) -> list[str]:
     return found
 
 
+def _prose_lines(markdown: str) -> list[str]:
+    """Return non-fenced, non-command prose lines (raw, for cue + path scanning)."""
+    lines: list[str] = []
+    in_fence = False
+    for raw_line in markdown.splitlines():
+        if raw_line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        candidate = _strip_prompt(raw_line)
+        if not candidate or _COMMAND_START_RE.search(candidate):
+            continue
+        lines.append(raw_line)
+    return lines
+
+
+def extract_prose_file_claims(markdown: str) -> list[str]:
+    """Repo-relative paths named in prose lines that carry a modification cue."""
+    found: list[str] = []
+    seen: set[str] = set()
+    for line in _prose_lines(markdown):
+        lowered = line.lower()
+        if not any(cue in lowered for cue in _PROSE_INTENT_CUES):
+            continue
+        for match in _PROSE_PATH_RE.finditer(line):
+            path = _clean_path_token(match.group("path"))
+            if path and path not in seen:
+                seen.add(path)
+                found.append(path)
+    return found
+
+
+def classify_integration_paths(paths: list[str]) -> list[str]:
+    """Return the subset of ``paths`` that are integration/registration surfaces."""
+    found: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        normalized = path.replace("\\", "/")
+        if _INTEGRATION_SURFACE_RE.search(normalized) and normalized not in seen:
+            seen.add(normalized)
+            found.append(normalized)
+    return found
+
+
 def _normalize_implied_paths(project_root: Path, paths: list[str]) -> tuple[list[str], list[PathIssue]]:
     normalized: list[str] = []
     issues: list[PathIssue] = []
@@ -184,8 +265,12 @@ def run_preflight(
         "target_paths": [],
         "implied_verification_paths": [],
         "implied_generator_paths": [],
+        "implied_prose_paths": [],
+        "implied_integration_paths": [],
         "uncovered_verification_paths": [],
         "uncovered_generator_paths": [],
+        "uncovered_prose_paths": [],
+        "uncovered_integration_paths": [],
         "out_of_root": [],
         "strict": strict,
         "verdict": "clean",
@@ -204,21 +289,35 @@ def run_preflight(
 
     verification_raw = extract_verification_paths(markdown)
     generator_raw = extract_generator_paths(markdown)
+    prose_raw = extract_prose_file_claims(markdown)
     verification_paths, verification_issues = _normalize_implied_paths(project_root, verification_raw)
     generator_paths, generator_issues = _normalize_implied_paths(project_root, generator_raw)
+    prose_paths, prose_issues = _normalize_implied_paths(project_root, prose_raw)
 
-    out_of_root = [issue.to_dict() for issue in [*verification_issues, *generator_issues]]
+    out_of_root = [issue.to_dict() for issue in [*verification_issues, *generator_issues, *prose_issues]]
     uncovered_verification = _uncovered(verification_paths, target_paths)
     uncovered_generator = _uncovered(generator_paths, target_paths)
+    uncovered_prose = _uncovered(prose_paths, target_paths)
 
-    has_gaps = bool(uncovered_verification or uncovered_generator or out_of_root)
+    # Integration surfaces are classified out of the full implied union, then
+    # the uncovered subset is reported as its own coverage dimension.
+    implied_integration = classify_integration_paths([*verification_paths, *generator_paths, *prose_paths])
+    uncovered_integration = _uncovered(implied_integration, target_paths)
+
+    has_gaps = bool(
+        uncovered_verification or uncovered_generator or uncovered_prose or uncovered_integration or out_of_root
+    )
     result.update(
         {
             "target_paths": target_paths,
             "implied_verification_paths": verification_paths,
             "implied_generator_paths": generator_paths,
+            "implied_prose_paths": prose_paths,
+            "implied_integration_paths": implied_integration,
             "uncovered_verification_paths": uncovered_verification,
             "uncovered_generator_paths": uncovered_generator,
+            "uncovered_prose_paths": uncovered_prose,
+            "uncovered_integration_paths": uncovered_integration,
             "out_of_root": out_of_root,
             "verdict": "gaps" if has_gaps else "clean",
             "message": "target_paths coverage gaps found" if has_gaps else "all implied paths covered",
@@ -240,8 +339,12 @@ def format_markdown(result: dict[str, Any]) -> str:
         f"- target_paths: `{json.dumps(result['target_paths'])}`",
         f"- implied_verification_paths: `{json.dumps(result['implied_verification_paths'])}`",
         f"- implied_generator_paths: `{json.dumps(result['implied_generator_paths'])}`",
+        f"- implied_prose_paths: `{json.dumps(result['implied_prose_paths'])}`",
+        f"- implied_integration_paths: `{json.dumps(result['implied_integration_paths'])}`",
         f"- uncovered_verification_paths: `{json.dumps(result['uncovered_verification_paths'])}`",
         f"- uncovered_generator_paths: `{json.dumps(result['uncovered_generator_paths'])}`",
+        f"- uncovered_prose_paths: `{json.dumps(result['uncovered_prose_paths'])}`",
+        f"- uncovered_integration_paths: `{json.dumps(result['uncovered_integration_paths'])}`",
         f"- out_of_root: `{json.dumps(result['out_of_root'])}`",
         f"- message: `{result['message']}`",
     ]
