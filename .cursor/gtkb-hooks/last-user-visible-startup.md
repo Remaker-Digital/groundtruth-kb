@@ -1,6 +1,6 @@
 # GroundTruth-KB Fresh Session Startup
 
-Generated: 2026-06-24T17:56:59Z
+Generated: 2026-06-24T23:40:51Z
 Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/groundtruth-kb-dashboard
 
 ## Startup Disclosure
@@ -15,12 +15,19 @@ Dashboard: GroundTruth-KB Project Dashboard: http://localhost:3000/d/gtkb/ground
 - Role mapping source: harness-state/harness-registry.json
 - Harness self-identification: E
 
+### Session-Context Review Independence
+
+- Formal GO / NO-GO / VERIFIED must come from a different model session context than the artifact author/implementer.
+- Blocker: reviewer session context equals artifact `author_session_context_id`; fail closed when metadata is missing or unreadable.
+- Not the boundary: harness ID, vendor, or durable registry role (routing labels only).
+- Full normative block: `config/agent-control/SESSION-STARTUP-INDEX.md § Session-context review independence (normative)`.
+
 ### Compact Project State
 
 - GT-KB release blockers: 0
 - GT-KB active backlog items: 0
 - GT-KB open MemBase work items: 16
-- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 83
+- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 79
 - GT-KB drift changed paths: 0
 - GT-KB Testing/tool rollup: 0 failing, 2 manual, 15 ready/passing (queried repo: unknown)
 - Active harness role slot: `loyal-opposition` (prime-builder, loyal-opposition, or shared)

@@ -1,6 +1,6 @@
 # GroundTruth-KB Fresh Session Startup
 
-Generated: 2026-06-24T17:57:09Z
+Generated: 2026-06-24T23:41:11Z
 Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groundtruth-kb-dashboard](http://localhost:3000/d/gtkb/groundtruth-kb-dashboard)
 
 ## Startup Disclosure
@@ -27,6 +27,13 @@ Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groun
 - GT-KB adoption and release-readiness evidence remain release-gate visible
 - Harness hook limitations require parity checks and explicit fallback disclosure
 
+### Session-Context Review Independence
+
+- Formal GO / NO-GO / VERIFIED must come from a different model session context than the artifact author/implementer.
+- Blocker: reviewer session context equals artifact `author_session_context_id`; fail closed when metadata is missing or unreadable.
+- Not the boundary: harness ID, vendor, or durable registry role (routing labels only).
+- `::init gtkb pb` grants Prime Builder authority regardless of durable registry role; it does not permit this session to GO/VERIFY its own authored or implemented work.
+
 ### Live Project Dashboard
 
 - Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groundtruth-kb-dashboard](http://localhost:3000/d/gtkb/groundtruth-kb-dashboard)
@@ -44,7 +51,7 @@ Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groun
 - GT-KB release blockers: 0
 - GT-KB active backlog items: 0
 - GT-KB open MemBase work items: 16
-- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 83
+- GT-KB dashboard-scoped bridge/contention entries, non-authoritative for queue state: 79
 - GT-KB drift changed paths: 0
 - GT-KB Testing/tool rollup: 0 failing, 2 manual, 15 ready/passing (queried repo: unknown)
 - Active harness role slot: `loyal-opposition` (prime-builder, loyal-opposition, or shared)
@@ -84,4 +91,4 @@ Dashboard: GroundTruth-KB Project Dashboard: [http://localhost:3000/d/gtkb/groun
 - Testing/tools: 0 failing, 2 manual, 15 ready/passing (queried repo: unknown).
 - Dev environment inventory: stale; generated 2026-05-08T19:04:30Z; redaction pass
 - Harness parity: fail (harness=all, role=prime-builder, MISSING=32, PASS=142, STALE=6)
-- Data freshness: 2026-06-24T17:57:09Z.
+- Data freshness: 2026-06-24T23:41:11Z.
