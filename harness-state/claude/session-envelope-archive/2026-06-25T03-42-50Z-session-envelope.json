@@ -1,0 +1,70 @@
+{
+  "active_work_item_id": null,
+  "application_id": null,
+  "closed_at": "2026-06-25T03:42:50Z",
+  "envelope_schema_version": 1,
+  "harness_id": "B",
+  "harness_name": "claude",
+  "init_keyword": null,
+  "last_error": null,
+  "model_id": "unknown",
+  "model_version": "unknown",
+  "opened_at": "2026-06-25T03:42:50Z",
+  "project_id": null,
+  "role": "prime-builder",
+  "role_asserted": null,
+  "role_resolution": {
+    "authority_mode": "durable_registry_fallback",
+    "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
+    "durable_registry_role": "prime-builder",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": null
+  },
+  "role_resolved": "prime-builder",
+  "session_id": "B-2026-06-25T03-42-50Z",
+  "status": "closed",
+  "subject": "gtkb_infrastructure",
+  "subject_asserted": null,
+  "subject_resolved": "gtkb_infrastructure",
+  "topics": [],
+  "work_item_ids": [],
+  "wrap_outcome": "manual_wrap",
+  "wrap_step_results": [
+    {
+      "name": "finalize_session_envelope",
+      "status": "pass",
+      "step": 1
+    },
+    {
+      "name": "deliberation_archive_harvest",
+      "reason": "no uncaptured harvest input",
+      "status": "not_run",
+      "step": 4
+    },
+    {
+      "details": {
+        "available": true,
+        "dirty": true,
+        "returncode": 0,
+        "short": " M .cursor/skills/verify/helpers/write_verdict.py\n M AGENTS.md\n M groundtruth-kb/docs/architecture/product-split.md\n M groundtruth-kb/docs/groundtruth-kb-executive-overview.md\n M groundtruth-kb/docs/known-limitations.md\n M groundtruth-kb/docs/reports/agent-red-classification.md\n M groundtruth-kb/scripts/check_docs_cli_coverage.py\n?? .draft-verdict-gtkb-rationale-003.md\n?? .temp_verdict_attribution_008.md\n?? .temp_verdict_body_gtkb_reconcile.md\n?? .temp_verdict_body_perrole.md\n?? .temp_verdict_body_reconcile.md\n?? .temp_verdict_consolidate_008.md\n?? .temp_verdict_dashboard_006.md\n?? .temp_verdict_foreign_guard_004.md\n?? .temp_verdict_sweep_008.md\n?? .temp_verified_body_gtkb_auto_retire.txt\n?? __tmp_4282_test/\n?? applications/Agent_Red/.claude/session/\n?? bridge/.draft-gtkb-reconcile-included-work-item-ids-semantics-017-body.md\n?? bridge/gtkb-docs-quality-remediation-remaining-scope-wi3306-003.md\n?? bridge/gtkb-perrole-concurrency-cap-dispatch-006.md.draft\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-020.md\n?? bridge/gtkb-reconcile-included-work-item-ids-semantics-021.md\n?? bridge/gtkb-run-with-status-worker-lifetime-timeout-005.md\n?? diagnose_pb_context.md\n?? groundtruth-kb/tests/test_docs_cli_coverage.py\n?? harness-state/claude/session-envelope-archive/2026-06-25T03-36-00Z-session-envelope.json\n?? harness-state/claude/session-envelope.json\n?? tmp_test/",
+        "short_line_count": 30,
+        "short_line_limit": 80,
+        "short_truncated": false
+      },
+      "name": "git_status_attestation",
+      "status": "pass",
+      "step": 8
+    },
+    {
+      "closed_topic_count": 0,
+      "name": "topic_auto_close",
+      "status": "pass",
+      "step": 11
+    },
+    {
+      "name": "archive_session_envelope",
+      "status": "pass",
+      "step": 12
+    }
+  ]
+}

@@ -8531,6 +8531,48 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-25T02:04:37.655021Z
   answer: "Your questions have been answered: \"Canonical state shows the bridge quiesced, not flowing: GTKB_NO_CROSS_HARNESS_TRIGGER=1 (User scope) disables auto-dispatch, and the LO circuit breaker is tripped (C/D/F provider failures per WI-4670). The drive's 8 remaining WIs each need LO review (GO / VERIFIED / finalization) to reach terminal. How should LO review happen for the drain?\"=\"Keep kill-switch; route capable cross-review (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1384
+  asked_at: 2026-06-25T04:23:04.842898Z
+  question: "Stop the loop at the dispatcher-config layer (the only layer that reaches switch-immune workers)?"
+  options:
+    - "Disable all + kill in-flight"
+    - "Disable broken targets only"
+    - "Kill in-flight only"
+    - "Stand down — you direct"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ae9204fba1a9f38c
+  resolved_at: 2026-06-25T04:23:04.842898Z
+  answer: "Your questions have been answered: \"Stop the loop at the dispatcher-config layer (the only layer that reaches switch-immune workers)?\"=\"Disable all + kill in-flight\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1385
+  asked_at: 2026-06-25T04:31:54.809738Z
+  question: "How should I formalize this dispatch-architecture directive? (Capture/structure only — no implementation, which stays gated behind the program's phases + bridge protocol.)"
+  options:
+    - "Archive + fold into WI-4786 ADR"
+    - "Archive + standalone ADR/DCLs"
+    - "Archive only; queue rest"
+    - "Archive + start implementation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d9290e248cac6637
+  resolved_at: 2026-06-25T04:31:54.809738Z
+  answer: "Your questions have been answered: \"How should I formalize this dispatch-architecture directive? (Capture/structure only — no implementation, which stays gated behind the program's phases + bridge protocol.)\"=\"Archive + fold into WI-4786 ADR\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1386
+  asked_at: 2026-06-25T05:15:21.109373Z
+  question: "Which focus should this Prime Builder session take? (You can also pick something else via 'Other'.)"
+  options:
+    - "Bridge dispatch fix (D+F)"
+    - "Dispatcher completion P0"
+    - "Working-tree hygiene"
+    - "Continue a retirement drive"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: fd74c8af58c9859d
+  resolved_at: 2026-06-25T05:15:21.109373Z
+  answer: "Your questions have been answered: \"Which focus should this Prime Builder session take? (You can also pick something else via 'Other'.)\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

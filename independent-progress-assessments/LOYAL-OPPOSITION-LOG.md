@@ -659,6 +659,20 @@ Loyal Opposition (Antigravity/lo role) audited the session startup disclosure lo
 | Operations | Harnesses B and C are suspended in registry but marked `can_receive_dispatch = true` in `rules.toml`. | `rules.toml` vs `harness-registry.json` status; `gt bridge status` warnings. | Reconcile the drift by setting `can_receive_dispatch = false` for harnesses B and C in `rules.toml` using `gt bridge dispatch config set-eligibility`. | Open |
 | Governance | The Loyal Opposition startup disclosure correctly suppresses focus choices and routes default tasks. | `scripts/session_self_initialization.py` implementation vs `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`. | None; audit successfully completed with PASS. | Resolved |
 
+---
+
+### 2026-06-25 - Cursor LO bridge resume wrap (S467-class)
+
+Loyal Opposition (Cursor harness E, `::init gtkb lo`) auto-processed bridge reviews across `Resume` continuations. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-25-05-10-cursor-lo-bridge-resume-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Bridge | VERIFIED finalization commits landed for WI-3217, WI-3218, WI-3212, and per-role concurrency cap (WI-CA9165). | Commits `7a9b2d69`, `3c41ba45`, `c70c50a8`, `7cf4bf11`; independent pytest reruns. | None; threads terminal for LO. | Resolved |
+| Bridge | GO verdicts for WI-4789, WI-4649, WI-3327, WI-4795 authored but uncommitted on disk. | `bridge/gtkb-wi4789-*-002.md`, `gtkb-stale-git-worktree-*-005.md`, etc. | Prime Builder implement + commit GO chains. | Open |
+| Bridge | `gtkb-reconcile-included-work-item-ids-semantics` blocked on owner semantics choice. | GO `-021` blocker record; `DELIB-2547`. | Owner AUQ: additive vs restrictive vs defense-in-depth. | Open |
+| Operations | Dispatch health FAIL; no eligible targets; `GTKB_NO_CROSS_HARNESS_TRIGGER=1` active. | `gt bridge dispatch status`; all harnesses `dispatchable=False`. | Clear kill-switch when desired; implement WI-4789; reconcile rules.toml drift. | Open |
+| Process | Uncommitted GO files + broad dirty worktree may block impl-start / foreign-file gates. | `git status`; temp `.temp_verdict_*` files. | PB hygiene sweep before unrelated commits. | Open |
+
 
 
 
