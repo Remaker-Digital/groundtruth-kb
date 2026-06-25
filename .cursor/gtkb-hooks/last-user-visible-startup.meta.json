@@ -1,18 +1,18 @@
 {
   "harness_name": "cursor",
   "harness_id": "E",
-  "role_mode": "lo",
-  "role_profile": "loyal-opposition",
+  "role_mode": "pb",
+  "role_profile": "prime-builder",
   "role_authority": {
-    "interactive_resolved_role": "loyal-opposition",
-    "interactive_role_source": "startup disclosure cache role mode lo; authoritative only when selected by the owner transcript/init-keyword path",
+    "interactive_resolved_role": "prime-builder",
+    "interactive_role_source": "startup disclosure cache role mode pb; authoritative only when selected by the owner transcript/init-keyword path",
     "durable_registry_roles": [
-      "loyal-opposition"
+      "prime-builder"
     ],
     "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
     "authority_mode": "cache_only_pending_init_keyword"
   },
-  "generated_at": "2026-06-24T23:41:11Z",
-  "byte_length": 2409,
-  "sha256": "cab4735bd230ca9567b9f71081115db0df31f5528261c17d8b45bed28b80bf4b"
+  "generated_at": "2026-06-25T01:07:31Z",
+  "byte_length": 2449,
+  "sha256": "818871a787c7d98407bdb4125f320f834c587432a800b01af5f4b8c7ad63a9cc"
 }

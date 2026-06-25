@@ -8403,6 +8403,134 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-24T23:44:14.547303Z
   answer: "Your questions have been answered: \"How should I commit this plan? (The grill resolutions are already durable in DELIB-20265882; this is about filing the executable program.)\"=\"File as project now\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1374
+  asked_at: 2026-06-25T01:00:52.369464Z
+  question: "Live state shows a 150+ process storm with the kill-switch correctly armed (NOT cleared as Cursor's plan assumed). Clearing the switch now would resume spawning on top of the storm. How do you want to handle the storm cleanup?"
+  options:
+    - "I clean up, switch stays armed"
+    - "Defer execution to Cursor/owner"
+    - "Hold — armed switch + fix upstream"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 662003062fffc082
+  resolved_at: 2026-06-25T01:00:52.369464Z
+  answer: "Your questions have been answered: \"Live state shows a 150+ process storm with the kill-switch correctly armed (NOT cleared as Cursor's plan assumed). Clearing the switch now would resume spawning on top of the storm. How do you want to handle the storm cleanup?\"=\"I clean up, switch stays armed\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1375
+  asked_at: 2026-06-25T01:00:52.369464Z
+  question: "Corrected: no storm exists, the kill-switch is a ~7h-stale leftover (watchdog dormant since 17:52, its own counts under threshold), and there's just 1 hung worker (PID 27128). The real fix is the inverse of 'switch stays armed' — clear it. How do you want to proceed?"
+  options:
+    - "Clear stale switch + kill hung worker"
+    - "Restore watchdog first, then clear"
+    - "Kill hung worker only, leave switch armed"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 80d4cb4b7a6a1e8d
+  resolved_at: 2026-06-25T01:00:52.369464Z
+  answer: "Your questions have been answered: \"Corrected: no storm exists, the kill-switch is a ~7h-stale leftover (watchdog dormant since 17:52, its own counts under threshold), and there's just 1 hung worker (PID 27128). The real fix is the inverse of 'switch stays armed' — clear it. How do you want to proceed?\"=\"Clear stale switch + kill hung worker\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1376
+  asked_at: 2026-06-25T01:12:40.536840Z
+  question: "How broad should the new project / umbrella be? (The WI-3330 advisory spans a whole skill-activation & enforcement layer: a usage-router PLUS bridge-propose hardening, /verify hardening, registry scenario-metadata, CI/doctor checks, and report self-disclosure.)"
+  options:
+    - "Full enforcement program"
+    - "Just the usage-router"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e65f9be14eec46e9
+  resolved_at: 2026-06-25T01:12:40.536840Z
+  answer: "Your questions have been answered: \"How broad should the new project / umbrella be? (The WI-3330 advisory spans a whole skill-activation & enforcement layer: a usage-router PLUS bridge-propose hardening, /verify hardening, registry scenario-metadata, CI/doctor checks, and report self-disclosure.)\"=\"Full enforcement program\", \"Which enforcement target is the FIRST slice? (The advisory leaves this open and recommends A first, then B, then C, because A is the smallest cross-cutting win that makes B/C cheaper.)\"=\"Bridge-shape hardening (B)\", \"What enforcement posture should the umbrella commit to initially?\"=\"Advisory-first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1377
+  asked_at: 2026-06-25T01:12:40.536840Z
+  question: "Which enforcement target is the FIRST slice? (The advisory leaves this open and recommends A first, then B, then C, because A is the smallest cross-cutting win that makes B/C cheaper.)"
+  options:
+    - "Advisory router (A)"
+    - "Bridge-shape hardening (B)"
+    - "Verify hardening (C)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a30ddd11e8e59bb6
+  resolved_at: 2026-06-25T01:12:40.536840Z
+  answer: "Your questions have been answered: \"How broad should the new project / umbrella be? (The WI-3330 advisory spans a whole skill-activation & enforcement layer: a usage-router PLUS bridge-propose hardening, /verify hardening, registry scenario-metadata, CI/doctor checks, and report self-disclosure.)\"=\"Full enforcement program\", \"Which enforcement target is the FIRST slice? (The advisory leaves this open and recommends A first, then B, then C, because A is the smallest cross-cutting win that makes B/C cheaper.)\"=\"Bridge-shape hardening (B)\", \"What enforcement posture should the umbrella commit to initially?\"=\"Advisory-first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1378
+  asked_at: 2026-06-25T01:12:40.536840Z
+  question: "What enforcement posture should the umbrella commit to initially?"
+  options:
+    - "Advisory-first"
+    - "Hard-gate governed paths now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d0206c952c7cb149
+  resolved_at: 2026-06-25T01:12:40.536840Z
+  answer: "Your questions have been answered: \"How broad should the new project / umbrella be? (The WI-3330 advisory spans a whole skill-activation & enforcement layer: a usage-router PLUS bridge-propose hardening, /verify hardening, registry scenario-metadata, CI/doctor checks, and report self-disclosure.)\"=\"Full enforcement program\", \"Which enforcement target is the FIRST slice? (The advisory leaves this open and recommends A first, then B, then C, because A is the smallest cross-cutting win that makes B/C cheaper.)\"=\"Bridge-shape hardening (B)\", \"What enforcement posture should the umbrella commit to initially?\"=\"Advisory-first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1379
+  asked_at: 2026-06-25T01:47:34.926918Z
+  question: "WI-4731 (this project, open) is a duplicate of WI-4741 (PROJECT-GTKB-BACKLOG-TRIAGE-AND-HYGIENE-001, resolved) — identical root causes (VERIFIED-finalization actuation gap + detector archival-blindness), same component. WI-4741 was implemented and VERIFIED (Slice-1 @-013, 40 tests); its work satisfies WI-4731's acceptance criteria, and RC2 is moot under v6. May I resolve WI-4731 as terminal (superseded by WI-4741) instead of re-implementing duplicate work?"
+  options:
+    - "Yes — supersede WI-4731 (Recommended)"
+    - "No — implement WI-4731 fresh here"
+    - "Investigate the overlap further"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0d141822718a3935
+  resolved_at: 2026-06-25T01:47:34.926918Z
+  answer: "Your questions have been answered: \"WI-4731 (this project, open) is a duplicate of WI-4741 (PROJECT-GTKB-BACKLOG-TRIAGE-AND-HYGIENE-001, resolved) — identical root causes (VERIFIED-finalization actuation gap + detector archival-blindness), same component. WI-4741 was implemented and VERIFIED (Slice-1 @-013, 40 tests); its work satisfies WI-4731's acceptance criteria, and RC2 is moot under v6. May I resolve WI-4731 as terminal (superseded by WI-4741) instead of re-implementing duplicate work?\"=\"Yes — supersede WI-4731 (Recommended)\", \"The `gt backlog resolve` / any-non-VERIFIED-terminal-transition path still doesn't trigger the v6 retirement actuator (it only fires on VERIFIED finalization, which sweeps all projects). This is a real defect, but it's NEW scope — covered by neither WI-4731 nor WI-4741. Per your ACID-invariant a new WI is outside this drive's snapshot PAUTH and needs fresh approval. How should it be tracked?\"=\"New WI in the lifecycle/hygiene project (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1380
+  asked_at: 2026-06-25T01:47:34.926918Z
+  question: "The `gt backlog resolve` / any-non-VERIFIED-terminal-transition path still doesn't trigger the v6 retirement actuator (it only fires on VERIFIED finalization, which sweeps all projects). This is a real defect, but it's NEW scope — covered by neither WI-4731 nor WI-4741. Per your ACID-invariant a new WI is outside this drive's snapshot PAUTH and needs fresh approval. How should it be tracked?"
+  options:
+    - "New WI in the lifecycle/hygiene project (Recommended)"
+    - "New WI in THIS project + authorize now"
+    - "Defer — capture only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c393f47ebdd3ee49
+  resolved_at: 2026-06-25T01:47:34.926918Z
+  answer: "Your questions have been answered: \"WI-4731 (this project, open) is a duplicate of WI-4741 (PROJECT-GTKB-BACKLOG-TRIAGE-AND-HYGIENE-001, resolved) — identical root causes (VERIFIED-finalization actuation gap + detector archival-blindness), same component. WI-4741 was implemented and VERIFIED (Slice-1 @-013, 40 tests); its work satisfies WI-4731's acceptance criteria, and RC2 is moot under v6. May I resolve WI-4731 as terminal (superseded by WI-4741) instead of re-implementing duplicate work?\"=\"Yes — supersede WI-4731 (Recommended)\", \"The `gt backlog resolve` / any-non-VERIFIED-terminal-transition path still doesn't trigger the v6 retirement actuator (it only fires on VERIFIED finalization, which sweeps all projects). This is a real defect, but it's NEW scope — covered by neither WI-4731 nor WI-4741. Per your ACID-invariant a new WI is outside this drive's snapshot PAUTH and needs fresh approval. How should it be tracked?\"=\"New WI in the lifecycle/hygiene project (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1381
+  asked_at: 2026-06-25T01:47:34.926918Z
+  question: "PROJECT-GTKB-RELIABILITY-FIXES is a STANDING defect home that keeps receiving new gating WIs mid-drive (WI-4806 just landed from WI-4670 Phase 0; WI-4770 landed+resolved earlier). Since v6 retirement requires ALL active members terminal, every new arrival blocks retirement and sits outside your snapshot PAUTH. Concurrent harnesses + the bridge-verified-backlog-reconciler are helping drain it (8 of the original 16 now terminal), but it can't deterministically retire while defects keep landing in it. How do you want to reach retirement?"
+  options:
+    - "Freeze inflow + drain (Recommended)"
+    - "Authorize arrivals case-by-case"
+    - "Keep it as the standing home"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 57e4ee27796b2197
+  resolved_at: 2026-06-25T01:47:34.926918Z
+  answer: "Your questions have been answered: \"PROJECT-GTKB-RELIABILITY-FIXES is a STANDING defect home that keeps receiving new gating WIs mid-drive (WI-4806 just landed from WI-4670 Phase 0; WI-4770 landed+resolved earlier). Since v6 retirement requires ALL active members terminal, every new arrival blocks retirement and sits outside your snapshot PAUTH. Concurrent harnesses + the bridge-verified-backlog-reconciler are helping drain it (8 of the original 16 now terminal), but it can't deterministically retire while defects keep landing in it. How do you want to reach retirement?\"=\"Freeze inflow + drain (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1382
+  asked_at: 2026-06-25T02:02:13.597681Z
+  question: "The methodology GO is terminal; the next gate is inserting the ADR + DCL as canonical MemBase specs (GOV-ARTIFACT-APPROVAL-001 requires your explicit content-approval). The full text above was GO'd by Loyal Opposition. Approve insertion?"
+  options:
+    - "Approve — insert ADR + DCL"
+    - "Refine the text first"
+    - "Hold — checkpoint here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: cf947c4668e27b58
+  resolved_at: 2026-06-25T02:02:13.597681Z
+  answer: "Your questions have been answered: \"The methodology GO is terminal; the next gate is inserting the ADR + DCL as canonical MemBase specs (GOV-ARTIFACT-APPROVAL-001 requires your explicit content-approval). The full text above was GO'd by Loyal Opposition. Approve insertion?\"=\"Approve — insert ADR + DCL\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1383
+  asked_at: 2026-06-25T02:04:37.655021Z
+  question: "Canonical state shows the bridge quiesced, not flowing: GTKB_NO_CROSS_HARNESS_TRIGGER=1 (User scope) disables auto-dispatch, and the LO circuit breaker is tripped (C/D/F provider failures per WI-4670). The drive's 8 remaining WIs each need LO review (GO / VERIFIED / finalization) to reach terminal. How should LO review happen for the drain?"
+  options:
+    - "Keep kill-switch; route capable cross-review (Recommended)"
+    - "Clear the kill-switch, resume auto-dispatch"
+    - "Pause the drive until WI-4670 lands"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d1b6db19d5d92658
+  resolved_at: 2026-06-25T02:04:37.655021Z
+  answer: "Your questions have been answered: \"Canonical state shows the bridge quiesced, not flowing: GTKB_NO_CROSS_HARNESS_TRIGGER=1 (User scope) disables auto-dispatch, and the LO circuit breaker is tripped (C/D/F provider failures per WI-4670). The drive's 8 remaining WIs each need LO review (GO / VERIFIED / finalization) to reach terminal. How should LO review happen for the drain?\"=\"Keep kill-switch; route capable cross-review (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 

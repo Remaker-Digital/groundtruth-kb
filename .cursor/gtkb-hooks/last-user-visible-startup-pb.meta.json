@@ -7,12 +7,12 @@
     "interactive_resolved_role": "prime-builder",
     "interactive_role_source": "startup disclosure cache role mode pb; authoritative only when selected by the owner transcript/init-keyword path",
     "durable_registry_roles": [
-      "loyal-opposition"
+      "prime-builder"
     ],
     "durable_registry_authority": "headless dispatch routing and interactive fallback only; non-overriding when a transcript-defined interactive role is present",
     "authority_mode": "cache_only_pending_init_keyword"
   },
-  "generated_at": "2026-06-24T23:41:44Z",
-  "byte_length": 7944,
-  "sha256": "3231d42a3dc1c2e9d998d58c5c7ffb243a96146eb5aec29ebd661ee9003e3d32"
+  "generated_at": "2026-06-25T01:07:31Z",
+  "byte_length": 2449,
+  "sha256": "818871a787c7d98407bdb4125f320f834c587432a800b01af5f4b8c7ad63a9cc"
 }
