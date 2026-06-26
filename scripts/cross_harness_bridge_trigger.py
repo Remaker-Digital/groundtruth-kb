@@ -83,6 +83,10 @@ if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
 from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS  # noqa: E402
+from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
+    dispatch_is_draining,
+    terminate_pid_tree as _terminate_pid_tree,
+)
 
 
 def _repo_venv_command(executable_name: str) -> str:
@@ -746,40 +750,6 @@ def _reset_recipient_state(
         return ("not_found", 0, 0)
     finally:
         _release_reset_guard(state_dir, token)
-
-
-def _terminate_pid_tree(pid: int) -> None:
-    """Best-effort termination of a recorded dispatch-run pid AND its descendants.
-
-    Mirrors ``run_with_status.py._terminate_process_tree`` but is keyed on a bare
-    pid recorded in ``last_launch`` (the reset path holds no ``Popen`` handle). On
-    Windows use ``taskkill /F /T`` to walk and kill the whole tree; on POSIX kill
-    the process group. Best-effort and swallows every error: an operator reset
-    must never fail because the pid was already gone or already reparented.
-    """
-    try:
-        pid_int = int(pid)
-    except (TypeError, ValueError):
-        return
-    if pid_int <= 0:
-        return
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(pid_int)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-        except Exception:  # noqa: BLE001 - best-effort reap; a reset never fails on a dead pid
-            pass
-    else:
-        try:
-            import signal  # noqa: PLC0415
-
-            os.killpg(os.getpgid(pid_int), signal.SIGKILL)
-        except Exception:  # noqa: BLE001 - best-effort reap; a reset never fails on a dead pid
-            pass
 
 
 def _reap_stale_dispatch_pid(prior_last_launch: Any, now: float) -> bool:
@@ -4138,6 +4108,9 @@ def run_trigger(
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
+
+    if dispatch_is_draining(project_root, state_dir):
+        return {"skipped": True, "reason": "dispatch_drain_active"}
 
     _cleanup_stale_tmp_files(state_dir)
     retention_result = _apply_runtime_evidence_retention(project_root, state_dir)
