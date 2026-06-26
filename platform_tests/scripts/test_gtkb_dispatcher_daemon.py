@@ -144,3 +144,34 @@ def test_daemon_control_cli_status_reports_state(tmp_path: Path, monkeypatch: py
     payload = json.loads(result.output)
     assert payload["mode"] == "shadow"
     assert payload.get("heartbeat_at")
+
+
+def test_run_tick_includes_health_monitoring(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    result = daemon.run_tick(root)
+    assert "monitoring" in result
+    assert "health" in result
+    assert "generated_at" in result["monitoring"]
+    assert "per_role" in result["monitoring"]
+    assert isinstance(result["health"], dict)
+    status_path = daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    assert "monitoring" in status
+    assert "health" in status
+
+
+def test_run_tick_monitoring_failsoft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+
+    def boom():
+        raise RuntimeError("monitoring unavailable")
+
+    monkeypatch.setattr(daemon, "_load_dispatch_monitor", boom)
+    result = daemon.run_tick(root)
+    assert result["decisions"]
+    assert result.get("monitoring_error") == "monitoring unavailable"
+    assert "monitoring" not in result

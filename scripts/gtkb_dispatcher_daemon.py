@@ -71,6 +71,31 @@ def _load_trigger_module():
     return module
 
 
+def _load_dispatch_monitor():
+    name = "_dispatch_monitor_for_daemon"
+    if name in sys.modules:
+        return sys.modules[name]
+    monitor_path = _SCRIPTS_DIR / "ops" / "dispatch_monitor.py"
+    spec = importlib.util.spec_from_file_location(name, monitor_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not load dispatch monitor from {monitor_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _health_response_to_json(health: dict) -> dict[str, dict]:
+    return {
+        role: {
+            "action": action.action,
+            "reasons": list(action.reasons),
+            "remediation_hint": action.remediation_hint,
+        }
+        for role, action in health.items()
+    }
+
+
 def _resolve_project_root(explicit: Path | None) -> Path:
     if explicit is not None:
         candidate = explicit.resolve()
@@ -216,18 +241,44 @@ def run_tick(
     """Execute one shadow tick: compute decisions, log them, refresh heartbeat."""
     state_dir = _daemon_state_dir(project_root)
     decisions = compute_shadow_decisions(project_root, max_items=max_items)
+    monitoring: dict[str, Any] | None = None
+    health: dict[str, dict] | None = None
+    monitoring_error: str | None = None
+    try:
+        monitor = _load_dispatch_monitor()
+        outcomes = monitor.gather_outcomes(project_root)
+        snapshot = monitor.compute_snapshot(outcomes, caps={}, now=time.time())
+        response = monitor.health_response(snapshot)
+        monitoring = snapshot.to_json_dict()
+        health = _health_response_to_json(response)
+    except Exception as exc:  # noqa: BLE001 - fail-soft monitoring must not break tick
+        monitoring_error = str(exc)
+    tick_at = _now_iso()
+    result: dict[str, Any] = {"tick_at": tick_at, "decisions": decisions, "dry_run": dry_run}
+    if monitoring is not None:
+        result["monitoring"] = monitoring
+    if health is not None:
+        result["health"] = health
+    if monitoring_error is not None:
+        result["monitoring_error"] = monitoring_error
     if not dry_run:
         for record in decisions:
             _append_shadow_decision(state_dir, record)
         write_heartbeat(state_dir)
-        status = {
-            "updated_at": _now_iso(),
+        status: dict[str, Any] = {
+            "updated_at": tick_at,
             "mode": "shadow",
             "decision_count": len(decisions),
             "pid": os.getpid(),
         }
+        if monitoring is not None:
+            status["monitoring"] = monitoring
+        if health is not None:
+            status["health"] = health
+        if monitoring_error is not None:
+            status["monitoring_error"] = monitoring_error
         (state_dir / STATUS_FILENAME).write_text(json.dumps(status, indent=2), encoding="utf-8")
-    return {"tick_at": _now_iso(), "decisions": decisions, "dry_run": dry_run}
+    return result
 
 
 def run_loop(
