@@ -215,8 +215,9 @@ def compute_shadow_decisions(
                 }
             )
             continue
+        remaining = list(items)
         for target in targets:
-            selected, signature = trigger._target_selected_signature(target, items, max_items)
+            selected, signature = trigger._target_selected_signature(target, remaining, max_items)
             decisions.append(
                 {
                     "timestamp": _now_iso(),
@@ -229,6 +230,11 @@ def compute_shadow_decisions(
                     "spawned": False,
                 }
             )
+            if not selected:
+                break
+            remaining = trigger._without_selected_dispatch_items(remaining, selected)
+            if not any(getattr(item, "dispatchable", True) for item in remaining):
+                break
     return decisions
 
 

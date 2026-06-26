@@ -175,3 +175,34 @@ def test_run_tick_monitoring_failsoft(tmp_path: Path, monkeypatch: pytest.Monkey
     assert result["decisions"]
     assert result.get("monitoring_error") == "monitoring unavailable"
     assert "monitoring" not in result
+
+
+def test_shadow_decision_shrinks_remaining_items(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Multi-target roles must not re-offer the same docs (WI-4848 slice 2)."""
+    from types import SimpleNamespace
+
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "lo-doc-one", "NEW", 1)
+    _write_bridge(root, "lo-doc-two", "NEW", 1)
+
+    target_a = SimpleNamespace(dispatch_state_key="lo:A", harness_id="A", invocation_surfaces={})
+    target_b = SimpleNamespace(dispatch_state_key="lo:B", harness_id="B", invocation_surfaces={})
+
+    trigger = daemon._load_trigger_module()
+
+    def _fake_resolve(role_label, project_root, state_dir, *, items=None):
+        if role_label == "loyal-opposition":
+            return [target_a, target_b]
+        return []
+
+    monkeypatch.setattr(trigger, "_resolve_dispatch_targets", _fake_resolve)
+
+    decisions = daemon.compute_shadow_decisions(root, max_items=1)
+    lo_decisions = [d for d in decisions if d.get("role") == "loyal-opposition" and d.get("would_dispatch")]
+    assert len(lo_decisions) >= 2
+    first_docs = set(lo_decisions[0]["would_dispatch"])
+    second_docs = set(lo_decisions[1]["would_dispatch"])
+    assert first_docs
+    assert second_docs
+    assert not first_docs & second_docs, (first_docs, second_docs)
