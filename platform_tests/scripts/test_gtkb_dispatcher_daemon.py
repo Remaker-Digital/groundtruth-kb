@@ -206,3 +206,39 @@ def test_shadow_decision_shrinks_remaining_items(tmp_path: Path, monkeypatch: py
     assert first_docs
     assert second_docs
     assert not first_docs & second_docs, (first_docs, second_docs)
+
+
+def test_daemon_default_substrate_stays_shadow(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    with patch("subprocess.Popen") as popen:
+        result = daemon.run_tick(root)
+    assert result["mode"] == "shadow"
+    status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
+    assert status["mode"] == "shadow"
+    popen.assert_not_called()
+
+
+def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    harness_state = root / "harness-state"
+    (harness_state / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    trigger = daemon._load_trigger_module()
+    calls: list[dict] = []
+
+    def _fake_spawn(**kwargs):
+        calls.append(kwargs)
+        return {"launched": True, "recipient": kwargs["target"].dispatch_state_key}
+
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
+    result = daemon.run_tick(root)
+    assert result["mode"] == "live"
+    status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
+    assert status["mode"] == "live"
+    assert calls, "expected live tick to invoke _spawn_harness"

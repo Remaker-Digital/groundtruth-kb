@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""GT-KB dispatcher daemon foundation — shadow mode (WI-4787).
+"""GT-KB dispatcher daemon — shadow by default; substrate-gated live (WI-4787/WI-4848).
 
-Persistent always-on loop that owns the dispatch *decision* path without
-spawning workers. Reuses ``cross_harness_bridge_trigger`` signature and target
-resolution so shadow decisions are comparable to the transitional trigger.
+Persistent always-on loop that owns the dispatch decision path. Default substrate
+stays shadow (records, never spawns). When ``bridge-substrate.json`` names the
+daemon substrate, live ticks reuse ``cross_harness_bridge_trigger._spawn_harness``.
 """
 
 from __future__ import annotations
@@ -29,6 +29,9 @@ if _PACKAGE_SRC.is_dir() and str(_PACKAGE_SRC) not in sys.path:
 
 DAEMON_STATE_SUBDIR = (".gtkb-state", "dispatcher-daemon")
 TRIGGER_STATE_SUBDIR = (".gtkb-state", "cross-harness-trigger")
+BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
+DAEMON_SUBSTRATE = "dispatcher_daemon"
+DEFAULT_SUBSTRATE = "cross_harness_trigger"
 LOCK_FILENAME = "daemon.lock"
 HEARTBEAT_FILENAME = "heartbeat.txt"
 SHADOW_LOG_FILENAME = "shadow-decisions.jsonl"
@@ -55,6 +58,30 @@ def _daemon_state_dir(project_root: Path) -> Path:
 
 def _trigger_state_dir(project_root: Path) -> Path:
     return project_root.joinpath(*TRIGGER_STATE_SUBDIR)
+
+
+def _bridge_poller_state_dir(project_root: Path) -> Path:
+    return project_root.joinpath(*BRIDGE_POLLER_STATE_SUBDIR)
+
+
+def _active_substrate(project_root: Path) -> str:
+    """Read harness-state/bridge-substrate.json substrate; fail-soft default."""
+    path = project_root / "harness-state" / "bridge-substrate.json"
+    if not path.is_file():
+        return DEFAULT_SUBSTRATE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            substrate = data.get("substrate")
+            if isinstance(substrate, str) and substrate.strip():
+                return substrate.strip()
+    except Exception:
+        pass
+    return DEFAULT_SUBSTRATE
+
+
+def _public_decision(record: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in record.items() if not key.startswith("_")}
 
 
 def _load_trigger_module():
@@ -228,6 +255,8 @@ def compute_shadow_decisions(
                     "would_dispatch": [getattr(item, "document_name", "") for item in selected],
                     "shadow_mode": True,
                     "spawned": False,
+                    "_spawn_target": target,
+                    "_spawn_selected": selected,
                 }
             )
             if not selected:
@@ -238,15 +267,97 @@ def compute_shadow_decisions(
     return decisions
 
 
+def _execute_live_spawns(
+    project_root: Path,
+    decision_records: list[dict[str, Any]],
+    *,
+    max_items: int,
+    dry_run: bool,
+) -> list[dict[str, Any]]:
+    """Spawn workers for daemon-substrate ticks via trigger _spawn_harness."""
+    trigger = _load_trigger_module()
+    state_dir = _bridge_poller_state_dir(project_root)
+    state = trigger._load_dispatch_state(state_dir, project_root)
+    recipients_state = state.get("recipients")
+    if not isinstance(recipients_state, dict):
+        recipients_state = {}
+        state["recipients"] = recipients_state
+
+    spawn_results: list[dict[str, Any]] = []
+    for record in decision_records:
+        target = record.get("_spawn_target")
+        selected = record.get("_spawn_selected") or []
+        if target is None or not selected:
+            continue
+        recipient = target.dispatch_state_key
+        signature = record.get("signature")
+        prior = recipients_state.get(recipient, {})
+        if isinstance(prior, dict):
+            prior_sig = prior.get("last_dispatched_signature")
+            if prior_sig is not None and prior_sig == signature:
+                record["spawned"] = False
+                record["spawn_reason"] = "unchanged"
+                spawn_results.append({"recipient": recipient, "launched": False, "reason": "unchanged"})
+                continue
+
+        spawn_items = list(reversed(selected))
+        result = trigger._spawn_harness(
+            target=target,
+            items=spawn_items,
+            project_root=project_root,
+            state_dir=state_dir,
+            max_items=max_items,
+            dry_run=dry_run,
+        )
+        recipient_state = recipients_state.get(recipient)
+        if not isinstance(recipient_state, dict):
+            recipient_state = {}
+        recipient_state["updated_at"] = _now_iso()
+        if result.get("launched"):
+            recipient_state["last_dispatched_signature"] = signature
+            recipient_state["signature"] = signature
+            record["spawned"] = True
+        else:
+            record["spawned"] = False
+            record["spawn_reason"] = result.get("reason")
+        recipient_state["last_result"] = result.get("reason") or (
+            "launched" if result.get("launched") else "not_launched"
+        )
+        recipients_state[recipient] = recipient_state
+        spawn_results.append(result)
+
+    if not dry_run:
+        state["updated_at"] = _now_iso()
+        trigger._write_dispatch_state(state_dir, state)
+    return spawn_results
+
+
 def run_tick(
     project_root: Path,
     *,
     max_items: int = DEFAULT_MAX_ITEMS,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Execute one shadow tick: compute decisions, log them, refresh heartbeat."""
+    """Execute one tick: substrate-gated shadow or live dispatch."""
     state_dir = _daemon_state_dir(project_root)
-    decisions = compute_shadow_decisions(project_root, max_items=max_items)
+    active_substrate = _active_substrate(project_root)
+    mode = "live" if active_substrate == DAEMON_SUBSTRATE else "shadow"
+    raw_decisions = compute_shadow_decisions(project_root, max_items=max_items)
+    for record in raw_decisions:
+        record["shadow_mode"] = mode == "shadow"
+        if mode == "live" and "spawned" not in record:
+            record["spawned"] = False
+
+    spawn_results: list[dict[str, Any]] = []
+    if mode == "live":
+        spawn_results = _execute_live_spawns(
+            project_root,
+            raw_decisions,
+            max_items=max_items,
+            dry_run=dry_run,
+        )
+
+    decisions = [_public_decision(record) for record in raw_decisions]
     monitoring: dict[str, Any] | None = None
     health: dict[str, dict] | None = None
     monitoring_error: str | None = None
@@ -260,7 +371,15 @@ def run_tick(
     except Exception as exc:  # noqa: BLE001 - fail-soft monitoring must not break tick
         monitoring_error = str(exc)
     tick_at = _now_iso()
-    result: dict[str, Any] = {"tick_at": tick_at, "decisions": decisions, "dry_run": dry_run}
+    result: dict[str, Any] = {
+        "tick_at": tick_at,
+        "mode": mode,
+        "active_substrate": active_substrate,
+        "decisions": decisions,
+        "dry_run": dry_run,
+    }
+    if spawn_results:
+        result["spawn_results"] = spawn_results
     if monitoring is not None:
         result["monitoring"] = monitoring
     if health is not None:
@@ -273,10 +392,13 @@ def run_tick(
         write_heartbeat(state_dir)
         status: dict[str, Any] = {
             "updated_at": tick_at,
-            "mode": "shadow",
+            "mode": mode,
+            "active_substrate": active_substrate,
             "decision_count": len(decisions),
             "pid": os.getpid(),
         }
+        if spawn_results:
+            status["spawn_count"] = sum(1 for item in spawn_results if item.get("launched"))
         if monitoring is not None:
             status["monitoring"] = monitoring
         if health is not None:
