@@ -2356,6 +2356,150 @@ def test_reset_recipient_fails_fast_when_guard_held(
     assert recipient["circuit_breaker_tripped"] is True
 
 
+def test_reset_recipient_clears_stale_last_launch_and_signature(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4805: --reset-recipient is a true clean slate.
+
+    ADR-DISPATCHER-ARCHITECTURE-001: after a reset the recipient must have no
+    stale ``last_launch`` and its signature fields must be cleared, while the
+    existing failure-count / circuit-breaker resets still apply (regression).
+    """
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # No reap should fire here (we are testing clearing); force pid-not-alive so a
+    # present pid cannot be reaped regardless of age.
+    monkeypatch.setattr(trigger, "_pid_alive", lambda pid: False)
+    state = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "failure_count": 3,
+                "circuit_breaker_tripped": True,
+                "circuit_breaker_tripped_at": "2026-06-21T00:00:00+00:00",
+                "circuit_breaker_half_open": True,
+                "updated_at": "2026-06-21T00:00:00+00:00",
+                "signature": "oldsig",
+                "last_dispatched_signature": "oldsig",
+                "last_suppressed_signature": "oldsup",
+                "last_launch": {
+                    "launched": True,
+                    "pid": 12345,
+                    "signature": "oldsig",
+                    "launched_at": "2026-06-21T00:00:00+00:00",
+                },
+            }
+        },
+        "schema_version": 1,
+    }
+    trigger._write_dispatch_state(state_dir, state)
+
+    status, reset_count, reap_count = trigger._reset_recipient_state(state_dir, root, "loyal-opposition")
+    assert status == "reset"
+    assert reset_count == 1
+    assert reap_count == 0
+
+    recipient = trigger._load_dispatch_state(state_dir, root)["recipients"]["loyal-opposition:A"]
+    # Clean slate: stale launch + signature state gone.
+    assert "last_launch" not in recipient
+    assert recipient["signature"] is None
+    assert recipient["last_dispatched_signature"] is None
+    assert recipient["last_suppressed_signature"] is None
+    # Regression: existing resets still applied.
+    assert recipient["failure_count"] == 0
+    assert recipient["circuit_breaker_tripped"] is False
+    assert "circuit_breaker_tripped_at" not in recipient
+    assert "circuit_breaker_half_open" not in recipient
+
+
+def test_reset_recipient_reaps_stale_alive_dispatch_pid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4805: a recipient whose recorded dispatch-run pid is alive AND from a
+    launch older than the straggler threshold is reaped (its process tree
+    terminated) on the operator reset."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(trigger, "_pid_alive", lambda pid: True)
+    reaped: list[int] = []
+    monkeypatch.setattr(trigger, "_terminate_pid_tree", lambda pid: reaped.append(pid))
+    state = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "failure_count": 1,
+                "circuit_breaker_tripped": True,
+                "updated_at": "2020-01-01T00:00:00+00:00",
+                "last_launch": {
+                    "launched": True,
+                    "pid": 4242,
+                    # Far past RESET_STRAGGLER_AGE_SECONDS (a definitely-hung straggler).
+                    "launched_at": "2020-01-01T00:00:00+00:00",
+                },
+            }
+        },
+        "schema_version": 1,
+    }
+    trigger._write_dispatch_state(state_dir, state)
+
+    status, reset_count, reap_count = trigger._reset_recipient_state(state_dir, root, "loyal-opposition")
+    assert status == "reset"
+    assert reset_count == 1
+    assert reap_count == 1
+    assert reaped == [4242]
+
+
+def test_reset_recipient_does_not_reap_fresh_or_dead_pid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4805 (SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001 over-reap guard): a
+    fresh launch (age below the straggler threshold) or a dead pid is NOT
+    terminated, so the reset cannot kill a healthy in-flight worker."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # pid 111 (fresh recipient) is alive; pid 222 (stale recipient) is dead.
+    monkeypatch.setattr(trigger, "_pid_alive", lambda pid: pid == 111)
+    reaped: list[int] = []
+    monkeypatch.setattr(trigger, "_terminate_pid_tree", lambda pid: reaped.append(pid))
+    state = {
+        "recipients": {
+            "loyal-opposition:FRESH": {
+                "failure_count": 1,
+                "last_launch": {
+                    "launched": True,
+                    "pid": 111,
+                    # Just launched: age is below the straggler threshold.
+                    "launched_at": trigger._now_iso(),
+                },
+            },
+            "loyal-opposition:DEAD": {
+                "failure_count": 1,
+                "last_launch": {
+                    "launched": True,
+                    "pid": 222,
+                    # Stale launch, but the pid is dead -> nothing to reap.
+                    "launched_at": "2020-01-01T00:00:00+00:00",
+                },
+            },
+        },
+        "schema_version": 1,
+    }
+    trigger._write_dispatch_state(state_dir, state)
+
+    status, reset_count, reap_count = trigger._reset_recipient_state(state_dir, root, "loyal-opposition")
+    assert status == "reset"
+    assert reset_count == 2
+    assert reap_count == 0
+    assert reaped == []
+
+
 def test_diagnose_is_read_only_and_lock_free(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

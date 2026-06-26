@@ -701,32 +701,113 @@ def _reset_recipient_state(
     state_dir: Path,
     project_root: Path,
     target_recipient: str,
-) -> tuple[str, int]:
+) -> tuple[str, int, int]:
     token = _try_acquire_reset_guard(state_dir)
     if token is None:
-        return ("contended", 0)
+        return ("contended", 0, 0)
     try:
         state = _load_dispatch_state(state_dir, project_root)
         recipients_state = state.get("recipients") if isinstance(state, dict) else {}
         if not isinstance(recipients_state, dict):
             recipients_state = {}
         reset_count = 0
+        reap_count = 0
+        now = time.time()
         for key in list(recipients_state.keys()):
             if key == target_recipient or key.startswith(target_recipient + ":"):
-                if isinstance(recipients_state[key], dict):
-                    recipients_state[key]["failure_count"] = 0
-                    recipients_state[key]["circuit_breaker_tripped"] = False
-                    recipients_state[key]["updated_at"] = _now_iso()
-                    recipients_state[key].pop("circuit_breaker_tripped_at", None)
-                    recipients_state[key].pop("circuit_breaker_half_open", None)
+                entry = recipients_state[key]
+                if isinstance(entry, dict):
+                    # Capture the prior launch before clearing so we can reap its
+                    # straggler process below (WI-4805).
+                    prior_last_launch = entry.get("last_launch")
+                    # Existing circuit-breaker / failure resets (unchanged).
+                    entry["failure_count"] = 0
+                    entry["circuit_breaker_tripped"] = False
+                    entry["updated_at"] = _now_iso()
+                    entry.pop("circuit_breaker_tripped_at", None)
+                    entry.pop("circuit_breaker_half_open", None)
+                    # Clean slate (WI-4805): drop the stale launch + signature
+                    # state so re-dispatch arms on a fresh evaluation rather than
+                    # stale signature equality or stale failure markers.
+                    entry.pop("last_launch", None)
+                    entry["signature"] = None
+                    entry["last_dispatched_signature"] = None
+                    entry["last_suppressed_signature"] = None
                     reset_count += 1
+                    # Reap the recipient's own hung dispatch-run straggler, if any
+                    # (WI-4805): operator-initiated only, scoped to this
+                    # recipient's recorded pid, gated on liveness + staleness.
+                    if _reap_stale_dispatch_pid(prior_last_launch, now):
+                        reap_count += 1
         if reset_count > 0:
             state["recipients"] = recipients_state
             _write_dispatch_state(state_dir, state)
-            return ("reset", reset_count)
-        return ("not_found", 0)
+            return ("reset", reset_count, reap_count)
+        return ("not_found", 0, 0)
     finally:
         _release_reset_guard(state_dir, token)
+
+
+def _terminate_pid_tree(pid: int) -> None:
+    """Best-effort termination of a recorded dispatch-run pid AND its descendants.
+
+    Mirrors ``run_with_status.py._terminate_process_tree`` but is keyed on a bare
+    pid recorded in ``last_launch`` (the reset path holds no ``Popen`` handle). On
+    Windows use ``taskkill /F /T`` to walk and kill the whole tree; on POSIX kill
+    the process group. Best-effort and swallows every error: an operator reset
+    must never fail because the pid was already gone or already reparented.
+    """
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return
+    if pid_int <= 0:
+        return
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid_int)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception:  # noqa: BLE001 - best-effort reap; a reset never fails on a dead pid
+            pass
+    else:
+        try:
+            import signal  # noqa: PLC0415
+
+            os.killpg(os.getpgid(pid_int), signal.SIGKILL)
+        except Exception:  # noqa: BLE001 - best-effort reap; a reset never fails on a dead pid
+            pass
+
+
+def _reap_stale_dispatch_pid(prior_last_launch: Any, now: float) -> bool:
+    """Reap the recipient's recorded dispatch-run process iff it is a
+    definitely-hung straggler (WI-4805).
+
+    A reap is attempted only when ``prior_last_launch`` carries an int ``pid``
+    that is (a) still alive AND (b) from a launch older than
+    ``RESET_STRAGGLER_AGE_SECONDS`` (the longest legitimate worker lifetime plus
+    a margin). The provenance is the recipient's OWN ``last_launch`` (written at
+    spawn), and the only call site is the explicit operator ``--reset-recipient``
+    action, so this can never reach an interactive session or a freshly-launched
+    healthy worker. Returns True iff a termination was attempted.
+    """
+    if not isinstance(prior_last_launch, dict):
+        return False
+    pid = prior_last_launch.get("pid")
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    launch_ts = _launch_ts(prior_last_launch)
+    if launch_ts is None:
+        return False
+    if (now - launch_ts) < RESET_STRAGGLER_AGE_SECONDS:
+        return False
+    if not _pid_alive(pid):
+        return False
+    _terminate_pid_tree(pid)
+    return True
 
 
 def _write_quiesce_state(state_dir: Path, payload: dict[str, Any]) -> None:
@@ -2356,6 +2437,19 @@ def _load_antigravity_rules(project_root: Path, mode: str) -> str:
 # concurrency cap (WI-4472) remain the runaway guards, so a longer lifetime does
 # not re-open the storm.
 LO_REVIEW_WORKER_LIFETIME_SECONDS = 1800
+
+# WI-4805: staleness threshold (seconds) for the operator --reset-recipient
+# straggler reap. A dispatched worker is capped at run_with_status.py's worker
+# lifetime (600s default; LO_REVIEW_WORKER_LIFETIME_SECONDS=1800s for LO reviews
+# — the longest legitimate lifetime). A recorded dispatch-run pid still alive
+# past the longest legitimate lifetime plus this margin is a definitely-hung
+# straggler that the lifetime cap failed to reap, so an operator-initiated
+# --reset-recipient may safely terminate it without endangering a healthy
+# in-flight worker. (The WI-4805 proposal cited the 600s default; the faithful
+# read of its "older than any legitimate worker lifetime" invariant is the
+# longest cap, 1800s, since LO workers legitimately run to 1800s.)
+RESET_STRAGGLER_MARGIN_SECONDS = 300
+RESET_STRAGGLER_AGE_SECONDS = LO_REVIEW_WORKER_LIFETIME_SECONDS + RESET_STRAGGLER_MARGIN_SECONDS
 
 
 def worker_lifetime_seconds(role_label: str | None) -> int | None:
@@ -5307,14 +5401,15 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.reset_recipient:
             target_recipient = args.reset_recipient.strip()
-            reset_result, reset_count = _reset_recipient_state(state_dir, project_root, target_recipient)
+            reset_result, reset_count, reap_count = _reset_recipient_state(state_dir, project_root, target_recipient)
             if reset_result == "contended":
                 if args.verbose or not args.stop_hook:
                     print("Another trigger instance is mutating dispatch-state; retry the reset.")
             elif reset_result == "reset":
                 if args.verbose or not args.stop_hook:
                     print(
-                        f"Reset circuit breaker and failure count for recipient '{target_recipient}' (updated {reset_count} entries)."
+                        f"Reset circuit breaker and failure count for recipient '{target_recipient}' "
+                        f"(updated {reset_count} entries; reaped {reap_count} stale dispatch-run process(es))."
                     )
             else:
                 if args.verbose or not args.stop_hook:
