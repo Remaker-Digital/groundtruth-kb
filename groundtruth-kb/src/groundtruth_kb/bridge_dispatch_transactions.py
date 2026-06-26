@@ -336,15 +336,54 @@ def _apply_transaction(
     _append_jsonl(
         audit_path, _record(transaction, parameters, before_hash=before_hash, after_hash=after_hash, status="applied")
     )
+    # WI-4820: the cross-harness trigger resolves dispatchability from the static
+    # harness-registry projection, NOT from config/dispatcher/rules.toml. The
+    # projection generator already merges this overlay, so regenerate it now as a
+    # write-through; otherwise the trigger keeps reading a stale projection and
+    # `set-eligibility` (and the other overlay mutators) is a false-green. This
+    # runs only on the applied path (dry_run / defer_to_next_session return
+    # earlier), and fails soft so the rules.toml write is never half-applied.
+    regen_message = _regenerate_harness_projection(root)
+    message = f"{transaction}: applied"
+    if regen_message:
+        message = f"{message}; {regen_message}"
     return DispatchConfigTransactionResult(
         transaction=transaction,
         status="applied",
         mutated=True,
         config_path=config_path,
         audit_path=audit_path,
-        message=f"{transaction}: applied",
+        message=message,
         config=updated,
     )
+
+
+def _regenerate_harness_projection(root: Path) -> str:
+    """Write-through the dispatcher-config overlay into the harness-registry projection.
+
+    The cross-harness trigger resolves dispatchability from the static
+    ``harness-state/harness-registry.json`` projection, not from
+    ``config/dispatcher/rules.toml``. ``generate_harness_projection`` already
+    merges the rules.toml overlay per harness, so regenerating here keeps the
+    trigger's source consistent with the just-applied config change (WI-4820).
+
+    Fails soft: on any error the rules.toml write is preserved and a warning
+    string is returned for the caller to surface, rather than raising and leaving
+    the transaction half-applied (graceful degradation per the GO review notes).
+    """
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.harness_projection import generate_harness_projection
+
+        db = KnowledgeDB(db_path=root / "groundtruth.db")
+        generate_harness_projection(db, root)
+        return "harness-registry projection regenerated"
+    except Exception as exc:  # intentional-catch: regen must never half-fail the config write
+        return (
+            "WARNING: harness-registry projection regen failed "
+            f"({type(exc).__name__}: {exc}); rules.toml written but the dispatch "
+            "trigger may read a stale projection until the next regeneration"
+        )
 
 
 def _read_config_bytes(path: Path) -> bytes:
