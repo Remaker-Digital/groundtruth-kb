@@ -3747,6 +3747,96 @@ _BRIDGE_DISPATCH_DOC = "docs/tutorials/dual-agent-setup.md"
 _BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
 
 
+_KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
+# WI-4804: WARN once a manual emergency-stop kill-switch has been set this long.
+_KILL_SWITCH_STALE_SECONDS = 7200  # 2h
+_KILL_SWITCH_FIRST_SEEN_REL = Path(".gtkb-state") / "ops" / "kill-switch-first-seen.json"
+
+
+def _read_kill_switch_first_seen(path: Path) -> datetime | None:
+    """Read the recorded first-seen timestamp; None when absent/unreadable (fail-soft)."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    raw = data.get("first_seen") if isinstance(data, dict) else None
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _write_kill_switch_first_seen(path: Path, when: datetime) -> None:
+    """Record the first-seen timestamp (fail-soft; bookkeeping only, never canonical)."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"first_seen": when.isoformat()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _check_kill_switch_staleness(target: Path) -> ToolCheck:
+    """Surface a long-standing cross-harness dispatch kill-switch (WI-4804).
+
+    ``GTKB_NO_CROSS_HARNESS_TRIGGER=1`` is the manual, emergency-only operator
+    kill-switch (the cross-harness trigger no-ops while it is set; see
+    ``SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001``). A forgotten kill-switch
+    otherwise disables dispatch indefinitely with no surfaced signal. This check
+    records a first-seen timestamp when the kill-switch is observed set, WARNs
+    once it has been set beyond ``_KILL_SWITCH_STALE_SECONDS``, and clears the
+    record when the env var is unset. It NEVER auto-clears the env var (visibility
+    only, per DELIB-20266140 / DELIB-20266166).
+    """
+    name = "Dispatch kill-switch staleness"
+    first_seen_path = target / _KILL_SWITCH_FIRST_SEEN_REL
+
+    if os.environ.get(_KILL_SWITCH_ENV_VAR) != "1":
+        # Not kill-switched: clear stale bookkeeping so a future set starts fresh.
+        with suppress(OSError):
+            first_seen_path.unlink(missing_ok=True)
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"{_KILL_SWITCH_ENV_VAR} not set; cross-harness dispatch is not kill-switched",
+        )
+
+    now = datetime.now(UTC)
+    first_seen = _read_kill_switch_first_seen(first_seen_path)
+    if first_seen is None:
+        first_seen = now
+        _write_kill_switch_first_seen(first_seen_path, now)
+    age_seconds = max(0.0, (now - first_seen).total_seconds())
+
+    if age_seconds >= _KILL_SWITCH_STALE_SECONDS:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"{_KILL_SWITCH_ENV_VAR}=1 set since {first_seen.isoformat()} "
+                f"(~{age_seconds / 3600.0:.1f}h); cross-harness dispatch is disabled. "
+                f"Clear it if the emergency has passed (emergency-only/manual per "
+                f"SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001; this check never auto-clears it)."
+            ),
+        )
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="info",
+        message=(
+            f"{_KILL_SWITCH_ENV_VAR}=1 set recently (since {first_seen.isoformat()}); "
+            f"deliberate manual stop, under the {_KILL_SWITCH_STALE_SECONDS // 3600}h staleness threshold"
+        ),
+    )
+
+
 def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
     """Check file bridge dispatch liveness for *agent* (``'claude'`` or ``'codex'``).
 
@@ -5691,6 +5781,7 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        checks.append(_check_kill_switch_staleness(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
         # (deterministic obsolete-reference-purge pairing check).
