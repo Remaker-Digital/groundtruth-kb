@@ -132,3 +132,66 @@ def test_snapshot_flags_saturation_and_stale_live() -> None:
     overage = [_outcome(exit_code=None, pid_alive=True, age=dm.DEFAULT_MAX_LIFETIME_SECONDS + 100)]
     role3 = dm.compute_snapshot(overage, caps={"loyal-opposition": 3}, now=NOW).per_role["loyal-opposition"]
     assert role3.stale_live_count == 1
+
+
+# --- WI-4790 slice 2: health_response decision -----------------------------
+
+
+def _role_snap(
+    role: str = "loyal-opposition", *, saturation: float = 0.0, corrupt: int = 0, stale: int = 0
+) -> dm.RoleMonitorSnapshot:
+    return dm.RoleMonitorSnapshot(
+        role=role,
+        total=1,
+        error_class_counts={},
+        corrupt_output_count=corrupt,
+        in_flight_count=0,
+        saturation_ratio=saturation,
+        stale_live_count=stale,
+        healthy=(saturation < 1.0 and corrupt == 0 and stale == 0),
+    )
+
+
+def _snapshot(*role_snaps: dm.RoleMonitorSnapshot) -> dm.DispatchMonitorSnapshot:
+    return dm.DispatchMonitorSnapshot(
+        per_role={s.role: s for s in role_snaps},
+        generated_at="2026-01-01T00:00:00Z",
+        window_seconds=3600,
+    )
+
+
+def test_health_response_holds_on_unhealth() -> None:
+    snap = _snapshot(
+        _role_snap("loyal-opposition", saturation=1.0),
+        _role_snap("prime-builder", corrupt=1),
+        _role_snap("ollama", stale=2),
+        _role_snap("openrouter"),  # healthy
+    )
+    resp = dm.health_response(snap)
+    assert resp["loyal-opposition"].action == "hold"
+    assert resp["prime-builder"].action == "hold"
+    assert resp["ollama"].action == "hold"
+    assert resp["openrouter"].action == "allow"
+    # purity: identical snapshot -> identical response
+    assert dm.health_response(snap) == resp
+
+
+def test_health_response_remediation_hint() -> None:
+    resp = dm.health_response(
+        _snapshot(
+            _role_snap("ollama", stale=2),  # stale-dominated
+            _role_snap("loyal-opposition", saturation=1.0),  # saturated, no stale
+        )
+    )
+    assert resp["ollama"].remediation_hint == "reap_stale_dispatch_runs"
+    assert resp["loyal-opposition"].remediation_hint == "drain_and_hold"
+    # allow -> no remediation hint
+    assert dm.health_response(_snapshot(_role_snap("openrouter")))["openrouter"].remediation_hint is None
+
+
+def test_health_response_escalates_on_severe_corrupt() -> None:
+    severe = dm.health_response(_snapshot(_role_snap("openrouter", corrupt=3)))["openrouter"]
+    assert severe.action == "escalate"
+    assert "severe_corrupt_output_outage" in severe.reasons
+    mild = dm.health_response(_snapshot(_role_snap("openrouter", corrupt=1)))["openrouter"]
+    assert mild.action == "hold"

@@ -135,6 +135,28 @@ class DispatchMonitorSnapshot:
         }
 
 
+@dataclass(frozen=True)
+class HealthResponseConfig:
+    """Thresholds for the hold/remediate/escalate health response (WI-4790 slice 2)."""
+
+    hold_corrupt_threshold: int = 1
+    hold_stale_threshold: int = 1
+    escalate_corrupt_threshold: int = 3
+
+
+DEFAULT_RESPONSE_CONFIG = HealthResponseConfig()
+
+
+@dataclass(frozen=True)
+class ResponseAction:
+    """Per-role restoration decision derived from a DispatchMonitorSnapshot."""
+
+    role: str
+    action: str  # "allow" | "hold" | "escalate"
+    reasons: tuple[str, ...]
+    remediation_hint: str | None
+
+
 def classify_outcome(outcome: DispatchOutcome) -> str:
     """Classify one dispatch outcome into the canonical monitoring taxonomy.
 
@@ -226,6 +248,46 @@ def compute_snapshot(
         generated_at=_iso(now),
         window_seconds=window_seconds,
     )
+
+
+def health_response(
+    snapshot: DispatchMonitorSnapshot,
+    *,
+    config: HealthResponseConfig = DEFAULT_RESPONSE_CONFIG,
+) -> dict[str, ResponseAction]:
+    """Pure: decide the per-role restoration action from a monitoring snapshot.
+
+    Implements the decision core of the ADR "hold -> auto-remediate -> escalate"
+    loop. Conservative (hold-first): the cost of an unnecessary hold is a brief
+    dispatch pause, while the cost of not holding is the storm class this program
+    prevents. The daemon (slice 3) executes the holds, performs the remediation
+    hint, and raises the escalation.
+    """
+    result: dict[str, ResponseAction] = {}
+    for role, snap in snapshot.per_role.items():
+        reasons: list[str] = []
+        if snap.saturation_ratio >= 1.0:
+            reasons.append("saturated")
+        if snap.corrupt_output_count >= config.hold_corrupt_threshold:
+            reasons.append("corrupt_output")
+        if snap.stale_live_count >= config.hold_stale_threshold:
+            reasons.append("stale_live")
+        severe = snap.corrupt_output_count >= config.escalate_corrupt_threshold
+        if severe:
+            reasons.append("severe_corrupt_output_outage")
+            action = "escalate"
+        elif reasons:
+            action = "hold"
+        else:
+            action = "allow"
+        if snap.stale_live_count >= config.hold_stale_threshold:
+            hint: str | None = "reap_stale_dispatch_runs"
+        elif action in ("hold", "escalate"):
+            hint = "drain_and_hold"
+        else:
+            hint = None
+        result[role] = ResponseAction(role=role, action=action, reasons=tuple(reasons), remediation_hint=hint)
+    return result
 
 
 def _iso(epoch: float) -> str:
