@@ -89,6 +89,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/code-quality-baseline-proposal-check.py\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/dispatch_blackbox_gate.py\"",
+            "timeout": 5
           }
         ]
       },
