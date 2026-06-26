@@ -53,7 +53,7 @@ $pythonExe  = Join-Path $root 'groundtruth-kb\.venv\Scripts\python.exe'
 $CODEX_THRESHOLD = 15
 $NONCODEX_THRESHOLD = 15
 
-$NONCODEX_HARNESS_SCRIPTS = @('ollama_harness.py', 'openrouter_harness.py')
+$NONCODEX_HARNESS_SCRIPTS = @('ollama_harness.py', 'openrouter_harness.py', 'cursor_harness.py')
 $NONCODEX_HARNESS_SCRIPT_PATTERN =
     'scripts\\(' + (($NONCODEX_HARNESS_SCRIPTS | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
 $GTKB_VENV_PYTHON_PATTERN = 'groundtruth-kb\\\.venv\\Scripts\\python\.exe'

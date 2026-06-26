@@ -35,6 +35,7 @@ def test_watchdog_detects_ollama_and_openrouter_backends() -> None:
     assert "Get-CimInstance Win32_Process" in text
     assert "ollama_harness.py" in text
     assert "openrouter_harness.py" in text
+    assert "cursor_harness.py" in text
     assert "$NONCODEX_HARNESS_SCRIPT_PATTERN" in text
     assert "$GTKB_VENV_PYTHON_PATTERN" in text
 
@@ -51,14 +52,28 @@ def test_watchdog_has_noncodex_threshold_trip() -> None:
     assert "noncodexThreshold=$NONCODEX_THRESHOLD" in text
 
 
-def test_watchdog_covers_registry_lowcost_backends() -> None:
+def test_watchdog_covers_registry_python_dispatch_harnesses() -> None:
+    """The watchdog watched non-codex script set must cover every ACTIVE
+    dispatch-capable python harness the registry declares (WI-4818).
+
+    Supersedes the prior low-cost-only coverage definition, which filtered on
+    the ``low-cost`` dispatch tag and therefore missed the high-quality Cursor
+    harness (``dispatch_tags = ["prime-builder"]``) that nonetheless dispatches
+    headless via ``scripts/cursor_harness.py``. The expected set is derived from
+    active harnesses whose headless argv invokes a ``scripts/*_harness.py``
+    python backend (ollama / openrouter / cursor); codex / claude / gemini
+    invocations carry no ``*_harness.py`` and are excluded. ``can_receive_dispatch``
+    is intentionally NOT used as a filter (it is overlay-controlled and currently
+    false for all python backends). The watchdog watched-set must be a superset of
+    the registry-derived set so a future python harness cannot silently regress
+    coverage.
+    """
     text = _watchdog_text()
     registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 
     expected_scripts: set[str] = set()
     for harness in registry["harnesses"]:
-        tags = set(harness.get("dispatch_tags") or [])
-        if "low-cost" not in tags:
+        if harness.get("status") != "active":
             continue
         surfaces = harness.get("invocation_surfaces", {})
         for surface in surfaces.values():
@@ -70,9 +85,13 @@ def test_watchdog_covers_registry_lowcost_backends() -> None:
                 if path.name.endswith("_harness.py"):
                     expected_scripts.add(path.name)
 
-    assert expected_scripts == {"ollama_harness.py", "openrouter_harness.py"}
+    assert expected_scripts == {
+        "ollama_harness.py",
+        "openrouter_harness.py",
+        "cursor_harness.py",
+    }, expected_scripts
     for script_name in expected_scripts:
-        assert script_name in text
+        assert script_name in text, f"watchdog watched-set missing {script_name}"
 
 
 def test_watchdog_never_kills_claude() -> None:
