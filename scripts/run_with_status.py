@@ -55,23 +55,53 @@ def _terminate_process_tree(proc: subprocess.Popen) -> None:
         pass
 
 
+def _parse_lifetime(value: str) -> int:
+    """Parse and validate a ``--lifetime <seconds>`` argument (WI-4845).
+
+    Returns a positive integer second count. Fails closed (exit 2) on a
+    non-positive or non-numeric value so a malformed dispatch cannot silently
+    run unbounded.
+    """
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        print(
+            f"run_with_status.py: --lifetime must be a positive integer, got {value!r}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from None
+    if parsed <= 0:
+        print(
+            f"run_with_status.py: --lifetime must be a positive integer, got {value!r}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
 
     stdin_path = None
     stdout_path = None
     stderr_path = None
+    # WI-4845: dispatched Loyal Opposition / verification reviews need a longer
+    # lifetime than the 600s default to complete a full multi-turn bridge review.
+    # The dispatcher passes --lifetime; absent it, the module default applies.
+    lifetime_seconds: int = DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS
 
-    # Parse optional stdin/stdout/stderr redirections
-    while len(args) >= 2 and args[0] in ("--stdin", "--stdout", "--stderr"):
+    # Parse optional stdin/stdout/stderr/lifetime arguments
+    while len(args) >= 2 and args[0] in ("--stdin", "--stdout", "--stderr", "--lifetime"):
         flag = args.pop(0)
         val = args.pop(0)
         if flag == "--stdin":
             stdin_path = val
         elif flag == "--stdout":
             stdout_path = val
-        else:
+        elif flag == "--stderr":
             stderr_path = val
+        else:  # --lifetime
+            lifetime_seconds = _parse_lifetime(val)
 
     if len(args) < 2:
         print(
@@ -89,19 +119,19 @@ def main(argv: list[str] | None = None) -> None:
     err_fh = None
     try:
         if stdin_path:
-            stdin_fh = open(stdin_path, "r", encoding="utf-8")
+            stdin_fh = open(stdin_path, encoding="utf-8")  # noqa: SIM115
         else:
             stdin_fh = subprocess.DEVNULL
 
         if stdout_path:
             os.makedirs(os.path.dirname(os.path.abspath(stdout_path)), exist_ok=True)
-            out_fh = open(stdout_path, "w", encoding="utf-8")
+            out_fh = open(stdout_path, "w", encoding="utf-8")  # noqa: SIM115
         else:
             out_fh = subprocess.DEVNULL
 
         if stderr_path:
             os.makedirs(os.path.dirname(os.path.abspath(stderr_path)), exist_ok=True)
-            err_fh = open(stderr_path, "w", encoding="utf-8")
+            err_fh = open(stderr_path, "w", encoding="utf-8")  # noqa: SIM115
         else:
             err_fh = subprocess.DEVNULL
 
@@ -134,14 +164,14 @@ def main(argv: list[str] | None = None) -> None:
         p = subprocess.Popen(cmd_args, **popen_kwargs)
 
         try:
-            p.wait(timeout=DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS)
+            p.wait(timeout=lifetime_seconds)
             exit_code = p.returncode
         except subprocess.TimeoutExpired:
             _terminate_process_tree(p)
             exit_code = TIMEOUT_EXIT_CODE
             timeout_msg = (
                 f"run_with_status.py: worker exceeded the "
-                f"{DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS}s lifetime timeout; "
+                f"{lifetime_seconds}s lifetime timeout; "
                 f"terminated process tree (pid={p.pid}).\n"
             )
             if err_fh and err_fh != subprocess.DEVNULL:

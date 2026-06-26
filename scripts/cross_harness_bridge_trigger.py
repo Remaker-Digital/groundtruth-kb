@@ -2348,6 +2348,29 @@ def _load_antigravity_rules(project_root: Path, mode: str) -> str:
     return "\n".join(parts)
 
 
+# WI-4845: worker-lifetime cap (seconds) for dispatched Loyal Opposition /
+# verification reviews. A full multi-turn bridge review (read the version chain,
+# proposal, and specs; run preflights; author and finalize the verdict) exceeds
+# the 600s default that run_with_status.py applies, so LO dispatches get a longer
+# budget. The 80-turn ceiling, per-call timeout, storm-watchdog (WI-4828), and
+# concurrency cap (WI-4472) remain the runaway guards, so a longer lifetime does
+# not re-open the storm.
+LO_REVIEW_WORKER_LIFETIME_SECONDS = 1800
+
+
+def worker_lifetime_seconds(role_label: str | None) -> int | None:
+    """Return the worker-lifetime cap (seconds) for a dispatched role, or None to
+    use run_with_status.py's built-in default (WI-4845).
+
+    Loyal Opposition / verification dispatches receive
+    LO_REVIEW_WORKER_LIFETIME_SECONDS; every other role returns None so the
+    wrapper is not passed a ``--lifetime`` override and keeps its default.
+    """
+    if role_label == "loyal-opposition":
+        return LO_REVIEW_WORKER_LIFETIME_SECONDS
+    return None
+
+
 def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, project_root: Path | None = None) -> str:
     """Build the dispatch prompt mirroring the smart-poller phrasing.
 
@@ -3448,6 +3471,12 @@ def _spawn_harness(
         except OSError:
             pass
         wrapped_command.extend(["--stdin", str(stdin_path)])
+    # WI-4845: give dispatched Loyal Opposition / verification workers a longer
+    # lifetime so a full multi-turn bridge review can complete; other roles keep
+    # run_with_status.py's default.
+    _worker_lifetime = worker_lifetime_seconds(target.needed_role_label)
+    if _worker_lifetime is not None:
+        wrapped_command.extend(["--lifetime", str(_worker_lifetime)])
     wrapped_command.append(str(status_file_path))
     wrapped_command += command
 

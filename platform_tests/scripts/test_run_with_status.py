@@ -165,3 +165,61 @@ def test_terminate_process_tree_reaps_grandchild_on_windows(tmp_path: Path) -> N
         assert not _pid_alive(gc_pid), "grandchild process must be reaped (tree-kill)"
     finally:
         run_with_status._terminate_process_tree(proc)
+
+
+# --- WI-4845: configurable worker-lifetime cap ----------------------------- #
+
+
+def _wait_timeout_for(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, extra_args: list[str]) -> float | None:
+    """Run main() with Popen stubbed and return the timeout passed to p.wait()."""
+    recorded: dict[str, object] = {}
+
+    class _TimeoutRecordingProcess:
+        returncode = 0
+        pid = 4321
+
+        def wait(self, timeout: float | None = None) -> int:
+            recorded["timeout"] = timeout
+            return 0
+
+        def poll(self) -> int:
+            return 0
+
+    monkeypatch.setattr(run_with_status.os, "name", "posix")
+    monkeypatch.setattr(run_with_status.subprocess, "Popen", lambda *a, **k: _TimeoutRecordingProcess())
+
+    status_file = tmp_path / "status.txt"
+    with pytest.raises(SystemExit):
+        run_with_status.main([*extra_args, str(status_file), sys.executable, "--version"])
+    return recorded.get("timeout")  # type: ignore[return-value]
+
+
+def test_lifetime_arg_sets_wait_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """SPEC-CENTRALIZED-DISPATCH-SERVICE-001: --lifetime N is applied as the wait timeout."""
+    assert _wait_timeout_for(monkeypatch, tmp_path, ["--lifetime", "1800"]) == 1800
+
+
+def test_default_lifetime_preserved_when_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """DCL-DISPATCH-ENVELOPE-RULES-001: absent --lifetime keeps the bounded default (600)."""
+    assert _wait_timeout_for(monkeypatch, tmp_path, []) == run_with_status.DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS
+
+
+def test_lifetime_rejects_nonpositive(tmp_path: Path) -> None:
+    """ADR-DISPATCHER-ARCHITECTURE-001: a non-positive or non-numeric --lifetime fails closed."""
+    status_file = tmp_path / "status.txt"
+    for bad in ("0", "-5", "abc"):
+        with pytest.raises(SystemExit) as exc_info:
+            run_with_status.main(["--lifetime", bad, str(status_file), sys.executable, "--version"])
+        assert exc_info.value.code == 2, bad
+
+
+def test_dispatch_lo_gets_review_lifetime() -> None:
+    """SPEC-CENTRALIZED-DISPATCH-SERVICE-001 (LO budget routing): the dispatcher routes the
+    longer review lifetime to Loyal Opposition / verification dispatches and None (the wrapper
+    default) to every other role."""
+    from scripts import cross_harness_bridge_trigger as trigger
+
+    assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS
+    assert trigger.worker_lifetime_seconds("prime-builder") is None
+    assert trigger.worker_lifetime_seconds(None) is None
