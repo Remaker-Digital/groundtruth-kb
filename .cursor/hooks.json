@@ -100,6 +100,11 @@
         "timeout": 5
       },
       {
+        "command": "python E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\scripts\\dispatch_blackbox_gate.py",
+        "matcher": "Write",
+        "timeout": 5
+      },
+      {
         "command": "python E:\\GT-KB\\scripts\\cursor_hook_adapter.py E:\\GT-KB\\.claude\\hooks\\bridge-proposal-wi-id-collision-gate.py",
         "matcher": "Write",
         "timeout": 5

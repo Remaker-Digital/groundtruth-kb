@@ -69,3 +69,22 @@ def test_registered_gate_denies_protected_write(tmp_path: Path) -> None:
         tmp_path,
     )
     assert allowed == {}, allowed
+
+
+_CURSOR_HOOKS = _REPO_ROOT / ".cursor" / "hooks.json"
+
+
+def test_blackbox_gate_registered_on_cursor() -> None:
+    """The gate is registered on Cursor's preToolUse Write surface via cursor_hook_adapter (WI-4788 s3)."""
+    cfg = json.loads(_CURSOR_HOOKS.read_text(encoding="utf-8"))
+    pretooluse = cfg.get("hooks", {}).get("preToolUse", []) or []
+    matched = [
+        entry
+        for entry in pretooluse
+        if "dispatch_blackbox_gate.py" in entry.get("command", "")
+        and "cursor_hook_adapter.py" in entry.get("command", "")
+    ]
+    assert matched, "dispatch_blackbox_gate.py not registered in .cursor/hooks.json preToolUse"
+    assert any(entry.get("matcher") == "Write" for entry in matched), (
+        f"gate registered on Cursor but not under a Write matcher: {matched}"
+    )
