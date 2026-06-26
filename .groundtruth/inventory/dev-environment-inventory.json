@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-26T00:58:13Z",
+  "generated_at": "2026-06-26T21:49:02Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -145,7 +145,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 2,
+    "sensitive_environment_entry_count": 1,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -266,7 +266,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 34,
+      "count": 35,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
@@ -286,6 +286,7 @@
         ".claude/rules/codex-standing-priorities.md",
         ".claude/rules/codex-way-of-working.md",
         ".claude/rules/deliberation-protocol.md",
+        ".claude/rules/dispatcher-daemon-substrate-rollback-runbook.md",
         ".claude/rules/file-bridge-protocol.md",
         ".claude/rules/groundtruth-kb-vision.md",
         ".claude/rules/gtkb-capability-import-policy.md",
