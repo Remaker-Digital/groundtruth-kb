@@ -37,6 +37,8 @@ HEARTBEAT_FILENAME = "heartbeat.txt"
 SHADOW_LOG_FILENAME = "shadow-decisions.jsonl"
 STATUS_FILENAME = "status.json"
 PID_FILENAME = "daemon.pid"
+WATCHDOG_HEARTBEAT_RELPATH = ".gtkb-state/ops/storm-watchdog-heartbeat.txt"
+WATCHDOG_TASK_NAME_DEFAULT = "GTKB-HarnessStormWatchdog"
 LOCK_SANITY_TTL_ENV_VAR = "GTKB_DISPATCHER_DAEMON_LOCK_TTL_SECONDS"
 LOCK_SANITY_TTL_DEFAULT_SECONDS = 120
 TICK_SECONDS_ENV_VAR = "GTKB_DISPATCHER_DAEMON_TICK_SECONDS"
@@ -242,23 +244,57 @@ def compute_shadow_decisions(
                 }
             )
             continue
+        poller_state_dir = _bridge_poller_state_dir(project_root)
+        dispatch_state = trigger._load_dispatch_state(poller_state_dir, project_root)
+        recipients_state = dispatch_state.get("recipients")
+        if not isinstance(recipients_state, dict):
+            recipients_state = {}
+        role_map = trigger._read_role_assignments(project_root)
+        harnesses = role_map.get("harnesses")
+        if not isinstance(harnesses, dict):
+            harnesses = {}
         remaining = list(items)
         for target in targets:
             selected, signature = trigger._target_selected_signature(target, remaining, max_items)
-            decisions.append(
-                {
-                    "timestamp": _now_iso(),
-                    "role": role_label,
-                    "recipient": target.dispatch_state_key,
-                    "harness_id": target.harness_id,
-                    "signature": signature,
-                    "would_dispatch": [getattr(item, "document_name", "") for item in selected],
-                    "shadow_mode": True,
-                    "spawned": False,
-                    "_spawn_target": target,
-                    "_spawn_selected": selected,
-                }
-            )
+            h_info = harnesses.get(target.harness_id) or {}
+            harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
+            record: dict[str, Any] = {
+                "timestamp": _now_iso(),
+                "role": role_label,
+                "recipient": target.dispatch_state_key,
+                "harness_id": target.harness_id,
+                "signature": signature,
+                "would_dispatch": [getattr(item, "document_name", "") for item in selected],
+                "shadow_mode": True,
+                "spawned": False,
+            }
+            spawn_blocked_reason: str | None = None
+            if not trigger._is_dispatch_ready(
+                target.harness_id,
+                h_info,
+                project_root,
+                poller_state_dir,
+                role_label,
+            ):
+                spawn_blocked_reason = f"{harness_type}_dispatch_not_ready"
+            else:
+                prior = recipients_state.get(target.dispatch_state_key)
+                if not isinstance(prior, dict):
+                    prior = {}
+                backoff_skip = trigger._provider_failure_backoff_skip(
+                    prior=prior,
+                    recipient=target.dispatch_state_key,
+                    signature=signature,
+                    state_dir=poller_state_dir,
+                )
+                if backoff_skip is not None:
+                    spawn_blocked_reason = str(backoff_skip.get("reason") or "provider_failure_backoff_active")
+            if spawn_blocked_reason is not None:
+                record["reason"] = spawn_blocked_reason
+            else:
+                record["_spawn_target"] = target
+                record["_spawn_selected"] = selected
+            decisions.append(record)
             if not selected:
                 break
             remaining = trigger._without_selected_dispatch_items(remaining, selected)
@@ -332,6 +368,43 @@ def _execute_live_spawns(
     return spawn_results
 
 
+def _read_watchdog_heartbeat_epoch(project_root: Path) -> float:
+    """Read the storm watchdog heartbeat file; return epoch or 0.0 on failure.
+
+    The storm watchdog writes a single line whose FIRST whitespace-delimited
+    token is an ISO-8601 timestamp, followed by space-separated population
+    fields (e.g. ``2026-06-26T14:21:02.09-07:00 codex=9 family=15 ... mode=...``).
+    Only the leading timestamp token is parsed; the trailing fields are ignored.
+    Feeding the whole line to ``datetime.fromisoformat`` raises ``ValueError`` on
+    the trailing text, which would mis-read every fresh heartbeat as ``0.0``
+    (dormant) and restart a healthy watchdog every tick.
+    """
+    hb_path = project_root / WATCHDOG_HEARTBEAT_RELPATH
+    if not hb_path.is_file():
+        return 0.0
+    try:
+        text = hb_path.read_text(encoding="utf-8").strip()
+        token = text.split()[0]  # leading ISO timestamp; ignore trailing population fields
+        return dt.datetime.fromisoformat(token.replace("Z", "+00:00")).timestamp()
+    except (OSError, ValueError, IndexError):
+        return 0.0
+
+
+def _restart_storm_watchdog(task_name: str = WATCHDOG_TASK_NAME_DEFAULT) -> dict[str, Any]:
+    """Fail-soft: re-run the storm watchdog scheduled task. Never raises."""
+    import subprocess  # noqa: PLC0415
+
+    try:
+        proc = subprocess.run(
+            ["schtasks.exe", "/Run", "/TN", task_name],
+            capture_output=True,
+            timeout=15,
+        )
+        return {"launched": proc.returncode == 0, "returncode": proc.returncode}
+    except Exception as exc:  # noqa: BLE001
+        return {"launched": False, "error": str(exc)}
+
+
 def run_tick(
     project_root: Path,
     *,
@@ -370,6 +443,30 @@ def run_tick(
         health = _health_response_to_json(response)
     except Exception as exc:  # noqa: BLE001 - fail-soft monitoring must not break tick
         monitoring_error = str(exc)
+    watchdog_verdict: dict[str, Any] | None = None
+    watchdog_restart: dict[str, Any] | None = None
+    watchdog_error: str | None = None
+    try:
+        monitor = _load_dispatch_monitor()
+        hb_epoch = _read_watchdog_heartbeat_epoch(project_root)
+        verdict = monitor.watchdog_dormancy(hb_epoch, time.time())
+        watchdog_verdict = {
+            "dormant": verdict.dormant,
+            "age_seconds": verdict.age_seconds,
+            "reason": verdict.reason,
+        }
+        if verdict.dormant:
+            watchdog_verdict["remediation_hint"] = "restart_storm_watchdog"
+            # Execute the restart only in LIVE mode. Shadow mode observes and
+            # records the dormancy verdict + remediation_hint (like the
+            # monitoring/health block above) but performs NO subprocess spawn,
+            # per the committed shadow-never-spawns invariant
+            # (test_daemon_shadow_mode_never_spawns). The daemon owns executing
+            # remediation only when it is the live dispatch substrate.
+            if not dry_run and mode == "live":
+                watchdog_restart = _restart_storm_watchdog()
+    except Exception as exc:  # noqa: BLE001 - fail-soft: never abort tick
+        watchdog_error = str(exc)
     tick_at = _now_iso()
     result: dict[str, Any] = {
         "tick_at": tick_at,
@@ -386,6 +483,12 @@ def run_tick(
         result["health"] = health
     if monitoring_error is not None:
         result["monitoring_error"] = monitoring_error
+    if watchdog_verdict is not None:
+        result["watchdog_dormancy"] = watchdog_verdict
+    if watchdog_restart is not None:
+        result["watchdog_restart"] = watchdog_restart
+    if watchdog_error is not None:
+        result["watchdog_error"] = watchdog_error
     if not dry_run:
         for record in decisions:
             _append_shadow_decision(state_dir, record)
@@ -405,6 +508,12 @@ def run_tick(
             status["health"] = health
         if monitoring_error is not None:
             status["monitoring_error"] = monitoring_error
+        if watchdog_verdict is not None:
+            status["watchdog_dormancy"] = watchdog_verdict
+        if watchdog_restart is not None:
+            status["watchdog_restart"] = watchdog_restart
+        if watchdog_error is not None:
+            status["watchdog_error"] = watchdog_error
         (state_dir / STATUS_FILENAME).write_text(json.dumps(status, indent=2), encoding="utf-8")
     return result
 

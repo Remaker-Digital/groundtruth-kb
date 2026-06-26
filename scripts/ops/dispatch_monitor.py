@@ -46,6 +46,8 @@ DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 
 DEFAULT_WINDOW_SECONDS = 3600
+WATCHDOG_HEARTBEAT_RELPATH = ".gtkb-state/ops/storm-watchdog-heartbeat.txt"
+DEFAULT_WATCHDOG_DORMANCY_THRESHOLD_SECONDS = 600  # 2x the assumed 5-min watchdog cadence
 # Backstop matching the storm-watchdog max-lifetime (WI-4828) and the
 # run_with_status worker-lifetime timeout (WI-4806 / WI-4845): a record believed
 # in-flight (no exit) older than this is a stale/phantom record, not a healthy
@@ -288,6 +290,33 @@ def health_response(
             hint = None
         result[role] = ResponseAction(role=role, action=action, reasons=tuple(reasons), remediation_hint=hint)
     return result
+
+
+@dataclass(frozen=True)
+class WatchdogDormancyVerdict:
+    """Structured verdict from the pure watchdog-dormancy detector (WI-4852)."""
+
+    dormant: bool
+    age_seconds: float
+    reason: str
+
+
+def watchdog_dormancy(
+    last_evidence_epoch: float,
+    now: float,
+    threshold_seconds: int = DEFAULT_WATCHDOG_DORMANCY_THRESHOLD_SECONDS,
+) -> WatchdogDormancyVerdict:
+    """Pure: return a structured dormancy verdict for the storm watchdog.
+
+    A missing or zero ``last_evidence_epoch`` is treated as dormant (worst-case
+    safe). ``threshold_seconds`` defaults to 2x the assumed watchdog cadence.
+    """
+    if not last_evidence_epoch:
+        return WatchdogDormancyVerdict(dormant=True, age_seconds=float("inf"), reason="no_evidence")
+    age = now - last_evidence_epoch
+    if age > threshold_seconds:
+        return WatchdogDormancyVerdict(dormant=True, age_seconds=round(age, 1), reason="stale")
+    return WatchdogDormancyVerdict(dormant=False, age_seconds=round(age, 1), reason="fresh")
 
 
 def _iso(epoch: float) -> str:
