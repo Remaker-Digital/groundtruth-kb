@@ -3845,6 +3845,26 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                 },
             )
 
+            # WI-4803: release the dispatched Prime worker's leaked work-intent
+            # claim now that the failure exit has been observed. The launch path
+            # (`run_trigger`) releases the claim only when the spawn fails to
+            # LAUNCH (`not launch.get("launched")`); a launched worker that later
+            # exits non-zero / abruptly (4294967295) / over-lifetime (124) is
+            # never released there, so without this the thread stays claim-blocked
+            # against re-dispatch until the claim TTL expires. The release is
+            # idempotent (`_release_prime_work_intents` swallows registry errors)
+            # and keyed to the recorded dispatch session, so it frees only this
+            # launch's own claim. Only Prime launches stamp work_intent_slugs.
+            wi_slugs = last_launch.get("work_intent_slugs")
+            wi_session = last_launch.get("work_intent_session_id")
+            if wi_slugs and wi_session and not last_launch.get("work_intent_released_on_failure"):
+                _release_prime_work_intents(
+                    list(wi_slugs),
+                    project_root=project_root,
+                    session_id=str(wi_session),
+                )
+                last_launch["work_intent_released_on_failure"] = True
+
 
 def _prior_dispatched_signature(prior: dict[str, Any]) -> Any:
     return (

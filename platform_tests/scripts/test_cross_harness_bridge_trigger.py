@@ -333,6 +333,104 @@ def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_pa
     assert _failure_records(state_dir) == []
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# WI-4803: release the dispatched Prime worker's work-intent claim on
+# subprocess failure (the launch path only releases on launch failure, so a
+# launched-then-failed worker leaks its claim until TTL). Tests target
+# _process_pending_exit_codes directly, NOT the run_trigger integration path
+# (which carries pre-existing failures tracked as WI-4712).
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _prime_failure_last_launch(*, dispatch_id: str, slug: str) -> dict[str, object]:
+    return {
+        "launched": True,
+        "dispatch_id": dispatch_id,
+        "needed_role_label": "prime-builder",
+        "work_intent_slugs": [slug],
+        "work_intent_session_id": dispatch_id,
+        "signature": "sig-fixture",
+    }
+
+
+def test_process_pending_exit_codes_releases_work_intent_on_failure(tmp_path: Path) -> None:
+    """A launched Prime worker that exits non-zero must release its work-intent
+    claim so the thread is not claim-blocked against re-dispatch until TTL."""
+    trigger = _load_trigger()
+    registry = sys.modules["bridge_work_intent_registry"]
+    root = tmp_path / "proj"
+    root.mkdir()
+    state_dir = tmp_path / "state"
+    did = "2026-06-26T05-00-00Z-prime-builder-B-abc123"
+    slug = "gtkb-fixture-thread-4803"
+
+    assert registry.acquire(slug, did, ttl_seconds=300, project_root=root)
+    runs = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs.mkdir(parents=True)
+    (runs / f"{did}.exit_code").write_text("1", encoding="utf-8")
+
+    recipients_state = {"prime-builder:B": {"last_launch": _prime_failure_last_launch(dispatch_id=did, slug=slug)}}
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    last_launch = recipients_state["prime-builder:B"]["last_launch"]
+    assert last_launch["work_intent_released_on_failure"] is True
+    # The claim is freed: a different session can now acquire it.
+    assert registry.acquire(slug, "other-session", ttl_seconds=300, project_root=root)
+
+
+def test_process_pending_exit_codes_releases_work_intent_on_abrupt_termination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A launched Prime worker with a missing status file and a dead pid (the
+    4294967295 abrupt-termination path) also releases the claim."""
+    trigger = _load_trigger()
+    registry = sys.modules["bridge_work_intent_registry"]
+    root = tmp_path / "proj"
+    root.mkdir()
+    state_dir = tmp_path / "state"
+    (state_dir / trigger.DISPATCH_RUNS_SUBDIR).mkdir(parents=True)
+    did = "2026-06-26T05-00-00Z-prime-builder-B-def456"
+    slug = "gtkb-fixture-thread-4803-abrupt"
+
+    assert registry.acquire(slug, did, ttl_seconds=300, project_root=root)
+    monkeypatch.setattr(trigger, "_pid_alive", lambda pid: False)
+
+    last_launch_in = _prime_failure_last_launch(dispatch_id=did, slug=slug)
+    last_launch_in["pid"] = 999999
+    recipients_state = {"prime-builder:B": {"last_launch": last_launch_in}}
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    last_launch = recipients_state["prime-builder:B"]["last_launch"]
+    assert last_launch["exit_code"] == 4294967295
+    assert last_launch["work_intent_released_on_failure"] is True
+    assert registry.acquire(slug, "other-session", ttl_seconds=300, project_root=root)
+
+
+def test_process_pending_exit_codes_keeps_work_intent_on_success(tmp_path: Path) -> None:
+    """Scope guard: a launched worker that exits 0 must NOT release the claim
+    (failure-only scope; success-path release is intentionally excluded)."""
+    trigger = _load_trigger()
+    registry = sys.modules["bridge_work_intent_registry"]
+    root = tmp_path / "proj"
+    root.mkdir()
+    state_dir = tmp_path / "state"
+    did = "2026-06-26T05-00-00Z-prime-builder-B-ghi789"
+    slug = "gtkb-fixture-thread-4803-success"
+
+    assert registry.acquire(slug, did, ttl_seconds=300, project_root=root)
+    runs = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs.mkdir(parents=True)
+    (runs / f"{did}.exit_code").write_text("0", encoding="utf-8")
+
+    recipients_state = {"prime-builder:B": {"last_launch": _prime_failure_last_launch(dispatch_id=did, slug=slug)}}
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    last_launch = recipients_state["prime-builder:B"]["last_launch"]
+    assert "work_intent_released_on_failure" not in last_launch
+    # The claim is still held by the dispatch session (NOT released on success).
+    assert not registry.acquire(slug, "other-session", ttl_seconds=300, project_root=root)
+
+
 def test_application_subject_suppresses_prime_dispatch_before_acquire_or_spawn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
