@@ -141,7 +141,7 @@ if ($candidates.Count -gt 0) {
             # normalizes a dict to a one-element list, so this is safe.
             $procFile = Join-Path $opsDir 'storm-watchdog-candidates.json'
             Set-Content -Path $procFile -Value $procJson -Encoding utf8
-            $decisionRaw = (& $pythonExe $reapScript --now $nowEpoch --project-root $root --processes-file $procFile 2>$null)
+            $decisionRaw = (& $pythonExe $reapScript --now $nowEpoch --project-root $root --provenance-dir '.gtkb-state/ops/dispatch-provenance' --processes-file $procFile 2>$null)
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($decisionRaw)) {
                 $failSafe = $true; $failReason = "decider exit=$LASTEXITCODE output-empty=$([string]::IsNullOrWhiteSpace($decisionRaw))"
             }

@@ -31,6 +31,7 @@ def _load_module():
 _M = _load_module()
 Process = _M.Process
 Lease = _M.Lease
+ProvenanceRecord = _M.ProvenanceRecord
 decide_reap = _M.decide_reap
 
 NOW = 1_000_000.0
@@ -51,6 +52,11 @@ def _root(pid: int, *, name: str = "codex", age: float = 300.0) -> Process:
 def _helper(pid: int, ppid: int, *, name: str = "node_repl", age: float = 300.0) -> Process:
     """A non-root family helper (dispatched=False; in scope via its root)."""
     return Process(pid=pid, ppid=ppid, name=name, create_time_epoch=_old(age), dispatched=False)
+
+
+def _prov(pid: int, *, root: int, age: float = 300.0):
+    """A provenance record for ``pid`` (create-time matched to ``_helper`` default)."""
+    return ProvenanceRecord(pid=pid, create_time_epoch=_old(age), dispatch_root_pid=root)
 
 
 def test_live_lease_holder_protected() -> None:
@@ -167,3 +173,62 @@ def test_stale_lease_not_protective() -> None:
     assert 600 not in d.protect
     assert d.reap == [600]
     assert d.reasons[600] == "over_lifetime_straggler"
+
+
+# --------------------------------------------------------------------------- #
+# WI-4834: precise dead-root orphan attribution via the pid-provenance ledger. #
+# --------------------------------------------------------------------------- #
+
+
+def test_decide_reap_reaps_provenance_attributed_dead_root_orphan() -> None:
+    # Orphan helpers whose dispatched root (800) has died. Recorded in provenance
+    # while the root was alive, they are precisely attributable and reapable.
+    procs = [_helper(801, 800), _helper(802, 801)]  # ppid 800 (root) is gone
+    provenance = [_prov(801, root=800), _prov(802, root=800)]
+    d = decide_reap(procs, [], now=NOW, provenance=provenance)
+    assert d.reap == [801, 802]
+    assert d.reasons[801] == "orphan_dead_dispatched_root"
+    assert d.reasons[802] == "orphan_dead_dispatched_root"
+
+
+def test_decide_reap_leaves_unattributed_orphan_untouched() -> None:
+    # The same orphan family, but provenance covers only an unrelated pid. With
+    # no provenance record, the orphans are left entirely untouched -- the
+    # interactive-session safety boundary (an interactive tree is never recorded).
+    procs = [_helper(801, 800), _helper(802, 801)]
+    provenance = [_prov(999, root=998)]  # unrelated
+    d = decide_reap(procs, [], now=NOW, provenance=provenance)
+    assert d.reap == []
+    assert d.protect == []
+    assert d.reasons == {}
+
+
+def test_decide_reap_provenance_requires_create_time_match() -> None:
+    # pid-reuse guard: a provenance record with the same pid but a DIFFERENT
+    # create_time (the recorded process exited and the pid was reused) must not
+    # attribute/reap the current process.
+    procs = [_helper(801, 800)]  # current create_time = _old(300)
+    provenance = [ProvenanceRecord(pid=801, create_time_epoch=_old(900.0), dispatch_root_pid=800)]
+    d = decide_reap(procs, [], now=NOW, provenance=provenance)
+    assert d.reap == []
+    assert 801 not in d.reasons
+
+
+def test_decide_reap_live_dispatched_root_unchanged_with_provenance() -> None:
+    # When the dispatched root is alive, the in-scope path governs and provenance
+    # does not double-act: the family is protected, not reaped.
+    procs = [_root(100), _helper(101, 100)]
+    leases = [Lease(pid=100, acquired_at_epoch=NOW - 300)]
+    provenance = [_prov(101, root=100)]  # root 100 is alive (in processes)
+    d = decide_reap(procs, leases, now=NOW, provenance=provenance)
+    assert d.reap == []
+    assert set(d.protect) == {100, 101}
+
+
+def test_decide_reap_provenance_orphan_within_grace_protected() -> None:
+    # Cold-start grace is honored even for a provenance-attributed dead-root
+    # orphan: a young orphan is not reaped.
+    young = Process(pid=801, ppid=800, name="node_repl", create_time_epoch=NOW - 30, dispatched=False)
+    provenance = [ProvenanceRecord(pid=801, create_time_epoch=NOW - 30, dispatch_root_pid=800)]
+    d = decide_reap([young], [], now=NOW, provenance=provenance)
+    assert d.reap == []

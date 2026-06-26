@@ -88,6 +88,26 @@ class Lease:
 
 
 @dataclass(frozen=True)
+class ProvenanceRecord:
+    """A pid observed to belong to a dispatched run (WI-4834).
+
+    Recorded by the watchdog glue while a process was a member of a dispatched
+    component (a component containing a live ``dispatched`` root). It lets the
+    decider precisely attribute an orphaned helper to a dispatched run AFTER that
+    run's root has died: a still-alive process matching ``(pid,
+    create_time_epoch)`` whose ``dispatch_root_pid`` is no longer alive is a
+    leftover of a dead dispatched run and is reapable. Interactive sessions are
+    never in a dispatched component, are never recorded, and therefore can never
+    match -- so they are never reaped via this path. The ``create_time_epoch``
+    match (not pid alone) guards against pid reuse re-attributing a fresh pid.
+    """
+
+    pid: int
+    create_time_epoch: float
+    dispatch_root_pid: int
+
+
+@dataclass(frozen=True)
 class ReapDecision:
     """Result of ``decide_reap``: pids to reap, pids protected, and per-pid reasons."""
 
@@ -136,6 +156,7 @@ def decide_reap(
     now: float,
     startup_grace_seconds: float = DEFAULT_STARTUP_GRACE_SECONDS,
     max_lifetime_seconds: float = DEFAULT_MAX_LIFETIME_SECONDS,
+    provenance: list[ProvenanceRecord] | None = None,
 ) -> ReapDecision:
     """Decide which candidate dispatch processes to reap.
 
@@ -212,6 +233,27 @@ def decide_reap(
             reasons[p.pid] = "orphan_no_lease"
         reap.append(p.pid)
 
+    # WI-4834: precise dead-root orphan attribution. Processes NOT in scope (no
+    # live dispatched root in their component) are otherwise left untouched. A
+    # process recorded in provenance while it was in a dispatched component --
+    # matched by (pid, create_time_epoch) to guard pid reuse -- whose recorded
+    # dispatch_root_pid is no longer alive is a leftover of a dead dispatched run
+    # and is reapable. Unrecorded processes (interactive sessions) never match,
+    # so they are never reaped here; cold-start grace is still honored.
+    if provenance:
+        live_pids = set(by_pid)
+        prov_by_key = {(rec.pid, rec.create_time_epoch): rec for rec in provenance}
+        for p in processes:
+            if p.pid in in_scope_pids or p.pid in reasons:
+                continue
+            rec = prov_by_key.get((p.pid, p.create_time_epoch))
+            if rec is None or rec.dispatch_root_pid in live_pids:
+                continue
+            if (now - p.create_time_epoch) < startup_grace_seconds:
+                continue
+            reasons[p.pid] = "orphan_dead_dispatched_root"
+            reap.append(p.pid)
+
     return ReapDecision(reap=sorted(reap), protect=sorted(protect), reasons=reasons)
 
 
@@ -272,6 +314,81 @@ def read_leases(lease_dirs: list[Path]) -> list[Lease]:
     return leases
 
 
+DEFAULT_PROVENANCE_DIR = ".gtkb-state/ops/dispatch-provenance"
+_PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
+
+
+def read_provenance(provenance_dir: Path) -> list[ProvenanceRecord]:
+    """Read the dispatch-run pid-provenance ledger (WI-4834).
+
+    Tolerant of a missing/corrupt ledger (returns ``[]``) so the watchdog fails
+    soft -- no provenance means no dead-root orphan reaping, never an error.
+    """
+    ledger = provenance_dir / _PROVENANCE_LEDGER_FILENAME
+    if not ledger.is_file():
+        return []
+    try:
+        data = json.loads(ledger.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    out: list[ProvenanceRecord] = []
+    if isinstance(data, list):
+        for row in data:
+            if not isinstance(row, dict):
+                continue
+            try:
+                out.append(
+                    ProvenanceRecord(
+                        pid=int(row["pid"]),
+                        create_time_epoch=float(row["create_time_epoch"]),
+                        dispatch_root_pid=int(row["dispatch_root_pid"]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+    return out
+
+
+def update_provenance(provenance_dir: Path, processes: list[Process], prior: list[ProvenanceRecord]) -> None:
+    """Update + self-prune the pid-provenance ledger (WI-4834).
+
+    Records every current dispatched-component member tagged with its dispatched
+    root pid, carries forward prior records whose pid is still alive (so a
+    just-died root's descendants stay attributable for at least one more tick),
+    and drops records whose pid is gone. Best-effort: a write failure is
+    swallowed (the ledger is regenerable runtime state). A direct overwrite is
+    used rather than ``os.replace`` because the project root may live on a
+    cloud-synced volume where rename can fail; a torn read is handled by
+    ``read_provenance``'s fail-soft parse.
+    """
+    live_pids = {p.pid for p in processes}
+    by_pid = {p.pid: p for p in processes}
+    dispatched_pids = {p.pid for p in processes if p.dispatched}
+    records: dict[tuple[int, float], ProvenanceRecord] = {}
+    for rec in prior:
+        if rec.pid in live_pids:
+            records[(rec.pid, rec.create_time_epoch)] = rec
+    for comp in _components(processes):
+        roots = sorted(pid for pid in comp if pid in dispatched_pids)
+        if not roots:
+            continue
+        root_pid = roots[0]
+        for pid in comp:
+            p = by_pid[pid]
+            records[(p.pid, p.create_time_epoch)] = ProvenanceRecord(
+                pid=p.pid, create_time_epoch=p.create_time_epoch, dispatch_root_pid=root_pid
+            )
+    payload = [
+        {"pid": r.pid, "create_time_epoch": r.create_time_epoch, "dispatch_root_pid": r.dispatch_root_pid}
+        for r in records.values()
+    ]
+    try:
+        provenance_dir.mkdir(parents=True, exist_ok=True)
+        (provenance_dir / _PROVENANCE_LEDGER_FILENAME).write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI glue for the .ps1: read processes JSON (stdin) + leases, print decision.
 
@@ -286,6 +403,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--startup-grace-seconds", type=float, default=DEFAULT_STARTUP_GRACE_SECONDS)
     parser.add_argument("--max-lifetime-seconds", type=float, default=DEFAULT_MAX_LIFETIME_SECONDS)
     parser.add_argument("--project-root", type=Path, default=Path("."))
+    parser.add_argument(
+        "--provenance-dir",
+        type=Path,
+        default=Path(DEFAULT_PROVENANCE_DIR),
+        help="Dispatch-run pid-provenance ledger dir (WI-4834), resolved under --project-root.",
+    )
     parser.add_argument(
         "--processes-file",
         type=Path,
@@ -308,13 +431,21 @@ def main(argv: list[str] | None = None) -> int:
     lease_dirs = [(args.project_root / d).resolve() for d in lease_dir_strs]
     leases = read_leases(lease_dirs)
 
+    provenance_dir = (args.project_root / args.provenance_dir).resolve()
+    prior_provenance = read_provenance(provenance_dir)
+
     decision = decide_reap(
         processes,
         leases,
         now=args.now,
         startup_grace_seconds=args.startup_grace_seconds,
         max_lifetime_seconds=args.max_lifetime_seconds,
+        provenance=prior_provenance,
     )
+
+    # WI-4834: refresh the provenance ledger AFTER deciding, with the current
+    # process set, so a just-died root's descendants stay attributable next tick.
+    update_provenance(provenance_dir, processes, prior_provenance)
     print(json.dumps({"reap": decision.reap, "protect": decision.protect, "reasons": decision.reasons}, sort_keys=True))
     return 0
 
