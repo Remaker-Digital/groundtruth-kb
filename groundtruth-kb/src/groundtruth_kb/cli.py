@@ -388,6 +388,96 @@ def bridge_dispatch_health_cmd(ctx: click.Context, json_output: bool) -> None:
     _emit_bridge_dispatch_health(ctx, json_output=json_output)
 
 
+def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):
+    from groundtruth_kb.bridge_dispatch_reset import DispatchStateDirs
+
+    config = _resolve_config(ctx)
+    primary = Path(state_dir).resolve() if state_dir else None
+    return DispatchStateDirs.resolve(config.project_root, state_dir=primary)
+
+
+@bridge_dispatch_group.command("reset")
+@click.option("--soft", is_flag=True, default=False, help="Clear transient dispatcher runtime state.")
+@click.option("--hard", is_flag=True, default=False, help="Owner-gated factory reset (soft + quality wipe).")
+@click.option("--confirm", is_flag=True, default=False, help="Required for --hard reset.")
+@click.option("--dry-run", is_flag=True, default=False, help="Report without mutating state.")
+@click.option("--state-dir", type=click.Path(path_type=Path), default=None, help="Primary dispatcher state directory.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_reset_cmd(
+    ctx: click.Context,
+    soft: bool,
+    hard: bool,
+    confirm: bool,
+    dry_run: bool,
+    state_dir: Path | None,
+    json_output: bool,
+) -> None:
+    """Reset bridge dispatcher transient state (WI-4793)."""
+    from groundtruth_kb.bridge_dispatch_reset import hard_reset, soft_reset
+
+    if (soft and hard) or (not soft and not hard):
+        raise click.ClickException("Specify exactly one of --soft or --hard.")
+    if hard and not confirm:
+        raise click.ClickException(
+            "Refusing --hard reset without --confirm. Use --soft for transient-only clear, or pass --confirm."
+        )
+    state_dirs = _resolve_dispatch_state_dirs(ctx, str(state_dir) if state_dir else None)
+    result = hard_reset(state_dirs, dry_run=dry_run) if hard else soft_reset(state_dirs, dry_run=dry_run)
+    payload = result.to_json_dict()
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        tier = "hard" if hard else "soft"
+        click.echo(f"Bridge dispatch {tier} reset {'(dry-run)' if dry_run else 'complete'}.")
+        for key in (
+            "recipients_cleared",
+            "quiesce_records_cleared",
+            "reset_guards_removed",
+            "lease_locks_removed",
+            "provenance_ledgers_removed",
+            "quality_surfaces_cleared",
+        ):
+            if payload.get(key):
+                click.echo(f"- {key}: {payload[key]}")
+        for detail in payload.get("details", []):
+            click.echo(f"- {detail}")
+
+
+@bridge_dispatch_group.command("drain")
+@click.option(
+    "--timeout",
+    "timeout_seconds",
+    type=float,
+    default=60.0,
+    show_default=True,
+    help="Seconds to wait for in-flight leases.",
+)
+@click.option("--dry-run", is_flag=True, default=False, help="Report without mutating state.")
+@click.option("--state-dir", type=click.Path(path_type=Path), default=None, help="Primary dispatcher state directory.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_drain_cmd(
+    ctx: click.Context,
+    timeout_seconds: float,
+    dry_run: bool,
+    state_dir: Path | None,
+    json_output: bool,
+) -> None:
+    """Gracefully drain in-flight dispatcher work (WI-4793)."""
+    from groundtruth_kb.bridge_dispatch_reset import drain
+
+    state_dirs = _resolve_dispatch_state_dirs(ctx, str(state_dir) if state_dir else None)
+    result = drain(state_dirs, timeout_seconds=timeout_seconds, dry_run=dry_run)
+    payload = result.to_json_dict()
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Bridge dispatch drain {'(dry-run)' if dry_run else 'complete'}.")
+        if payload.get("terminated_pids"):
+            click.echo(f"- terminated_pids: {payload['terminated_pids']}")
+
+
 def _flow_service(ctx: click.Context) -> tuple[KnowledgeDB, TypedArtifactFlowService]:
     config = _resolve_config(ctx)
     db = _open_db(config)

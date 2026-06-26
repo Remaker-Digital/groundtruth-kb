@@ -82,6 +82,8 @@ _PACKAGE_SRC = str(Path(__file__).resolve().parents[1] / "groundtruth-kb" / "src
 if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
+from groundtruth_kb.bridge_dispatch_reset import dispatch_is_draining  # noqa: E402
+
 from bridge_lease_registry import is_lease_held  # noqa: E402, I001
 from bridge_work_intent_registry import (  # noqa: E402, I001
     WorkIntentRegistryError,
@@ -3236,6 +3238,9 @@ def run_trigger(
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
+
+    if dispatch_is_draining(project_root, state_dir):
+        return {"skipped": True, "reason": "dispatch_drain_active"}
 
     _cleanup_stale_tmp_files(state_dir)
     retention_result = _apply_runtime_evidence_retention(project_root, state_dir)
