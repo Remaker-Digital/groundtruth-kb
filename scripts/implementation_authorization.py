@@ -893,6 +893,70 @@ def _work_item_in_project(project_root: Path, project_id: str, work_item_id: str
     return row is not None
 
 
+def _project_parent(project_root: Path, project_id: str) -> str | None:
+    conn = sqlite3.connect(groundtruth_db_path(project_root))
+    try:
+        row = conn.execute("SELECT parent_project_id FROM current_projects WHERE id = ?", (project_id,)).fetchone()
+    finally:
+        conn.close()
+    return str(row[0]) if row and row[0] is not None else None
+
+
+def _is_descendant_project(
+    project_root: Path,
+    candidate_project_id: str,
+    ancestor_project_id: str,
+    *,
+    max_depth: int = 32,
+) -> bool:
+    """Return True when ``candidate_project_id`` is ``ancestor_project_id`` itself or a
+    descendant of it via the ``current_projects.parent_project_id`` chain.
+
+    The walk is bounded by ``max_depth`` and guarded by a visited-set; it
+    fail-closes (returns False) on a cycle, a missing parent row, or exceeding
+    ``max_depth``. This honors the backlog → projects → sub-projects taxonomy:
+    a parent-project authorization covers a proposal scoped to one of its
+    sub-projects (WI-3350).
+    """
+    if candidate_project_id == ancestor_project_id:
+        return True
+    seen: set[str] = {candidate_project_id}
+    current = candidate_project_id
+    for _ in range(max_depth):
+        parent = _project_parent(project_root, current)
+        if parent is None:
+            return False
+        if parent == ancestor_project_id:
+            return True
+        if parent in seen:
+            return False  # cycle guard — fail closed
+        seen.add(parent)
+        current = parent
+    return False  # depth cap exceeded — fail closed
+
+
+def _work_item_in_project_or_descendant(project_root: Path, project_id: str, work_item_id: str) -> bool:
+    """Return True when ``work_item_id`` is an active member of ``project_id`` or of any
+    active sub-project whose ancestry reaches ``project_id``."""
+    if _work_item_in_project(project_root, project_id, work_item_id):
+        return True
+    conn = sqlite3.connect(groundtruth_db_path(project_root))
+    try:
+        rows = conn.execute(
+            """SELECT DISTINCT project_id FROM current_project_work_item_memberships
+               WHERE work_item_id = ? AND status = 'active'""",
+            (work_item_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    for (member_project_id,) in rows:
+        if member_project_id is None:
+            continue
+        if _is_descendant_project(project_root, str(member_project_id), project_id):
+            return True
+    return False
+
+
 def validate_project_authorization_row(
     project_root: Path,
     row: sqlite3.Row,
@@ -911,9 +975,14 @@ def validate_project_authorization_row(
         raise AuthorizationError(f"Project authorization {authorization_id} has invalid expires_at") from exc
     if expires_at is not None and expires_at < now_utc():
         raise AuthorizationError(f"Project authorization {authorization_id} has expired")
-    if proposal_project_id and proposal_project_id != project_id:
+    if (
+        proposal_project_id
+        and proposal_project_id != project_id
+        and not _is_descendant_project(project_root, proposal_project_id, project_id)
+    ):
         raise AuthorizationError(
-            f"Project authorization {authorization_id} is for {project_id}, not proposal project {proposal_project_id}"
+            f"Project authorization {authorization_id} is for {project_id}, not proposal "
+            f"project {proposal_project_id} (which is not a sub-project of {project_id})"
         )
     project_status = _project_status(project_root, project_id)
     allowed_mutation_classes = set(_json_list(row, "allowed_mutation_classes"))
@@ -935,8 +1004,10 @@ def validate_project_authorization_row(
                     f"Work item {work_item_id} is not in the authorizing included_work_item_ids list "
                     f"for project authorization {authorization_id}"
                 )
-        elif not _work_item_in_project(project_root, project_id, work_item_id):
-            raise AuthorizationError(f"Work item {work_item_id} is not an active member of project {project_id}")
+        elif not _work_item_in_project_or_descendant(project_root, project_id, work_item_id):
+            raise AuthorizationError(
+                f"Work item {work_item_id} is not an active member of project {project_id} or any of its sub-projects"
+            )
 
     excluded_specs = set(_json_list(row, "excluded_spec_ids"))
     blocked_specs = sorted(excluded_specs.intersection(spec_links or []))

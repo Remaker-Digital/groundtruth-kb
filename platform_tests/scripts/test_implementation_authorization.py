@@ -508,6 +508,127 @@ def test_project_authorization_rejects_retired_project_without_retirement_reconc
         auth_module.create_authorization_packet(tmp_path, slug)
 
 
+def _seed_project_hierarchy(tmp_path: Path, *, included_work_item_ids: list[str] | None = None):
+    """Seed a parent/sub-project hierarchy for WI-3350 validator tests.
+
+    Projects: PROJECT-PARENT (active, no parent), PROJECT-SUB (active,
+    parent=PROJECT-PARENT), PROJECT-UNRELATED (active, no parent). PAUTH on
+    PROJECT-PARENT. WI-CHILD is an active member of PROJECT-SUB. Returns the
+    PAUTH row (sqlite3.Row) for direct ``validate_project_authorization_row`` calls.
+    """
+    _make_groundtruth_toml(tmp_path)
+    db_path = tmp_path / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "CREATE TABLE current_projects (id TEXT PRIMARY KEY, status TEXT NOT NULL, parent_project_id TEXT)"
+        )
+        conn.execute(
+            """CREATE TABLE current_project_authorizations (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL, status TEXT NOT NULL,
+                authorization_name TEXT, owner_decision_deliberation_id TEXT, scope_summary TEXT,
+                expires_at TEXT, allowed_mutation_classes TEXT, forbidden_operations TEXT,
+                included_work_item_ids TEXT, excluded_work_item_ids TEXT, included_spec_ids TEXT,
+                excluded_spec_ids TEXT
+            )"""
+        )
+        conn.execute(
+            "CREATE TABLE current_project_work_item_memberships (project_id TEXT, work_item_id TEXT, status TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO current_projects (id, status, parent_project_id) VALUES (?, ?, ?)",
+            [
+                ("PROJECT-PARENT", "active", None),
+                ("PROJECT-SUB", "active", "PROJECT-PARENT"),
+                ("PROJECT-UNRELATED", "active", None),
+            ],
+        )
+        conn.execute(
+            """INSERT INTO current_project_authorizations
+               (id, project_id, status, authorization_name, owner_decision_deliberation_id,
+                scope_summary, expires_at, allowed_mutation_classes, forbidden_operations,
+                included_work_item_ids, excluded_work_item_ids, included_spec_ids, excluded_spec_ids)
+               VALUES ('PAUTH-PARENT', 'PROJECT-PARENT', 'active', 'Parent PAUTH', 'DELIB-FIXTURE',
+                       'Parent-project authority.', NULL, ?, ?, ?, ?, ?, ?)""",
+            (
+                json.dumps(["source", "test_addition"]),
+                json.dumps([]),
+                json.dumps(included_work_item_ids or []),
+                json.dumps([]),
+                json.dumps([]),
+                json.dumps([]),
+            ),
+        )
+        conn.execute(
+            "INSERT INTO current_project_work_item_memberships (project_id, work_item_id, status) VALUES (?, ?, ?)",
+            ("PROJECT-SUB", "WI-CHILD", "active"),
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM current_project_authorizations WHERE id = 'PAUTH-PARENT'").fetchone()
+    finally:
+        conn.close()
+    return row
+
+
+def test_validate_accepts_subproject_proposal_under_parent_pauth(auth_module, tmp_path):
+    """WI-3350: a proposal citing a sub-project validates under the parent's PAUTH."""
+    row = _seed_project_hierarchy(tmp_path)
+    result = auth_module.validate_project_authorization_row(
+        tmp_path, row, proposal_project_id="PROJECT-SUB", work_item_id=None
+    )
+    assert result["project_id"] == "PROJECT-PARENT"
+    assert result["proposal_project_id"] == "PROJECT-SUB"
+
+
+def test_validate_accepts_work_item_in_subproject_under_parent_pauth(auth_module, tmp_path):
+    """WI-3350: with an empty included list, a WI that is a member of a sub-project
+    validates under the parent's PAUTH (membership honors the hierarchy)."""
+    row = _seed_project_hierarchy(tmp_path)
+    result = auth_module.validate_project_authorization_row(
+        tmp_path, row, proposal_project_id="PROJECT-SUB", work_item_id="WI-CHILD"
+    )
+    assert result["work_item_id"] == "WI-CHILD"
+
+
+def test_validate_rejects_unrelated_project_proposal(auth_module, tmp_path):
+    """WI-3350 guard: a proposal citing a project that is neither the PAUTH project nor a
+    descendant of it is still rejected (no over-acceptance)."""
+    row = _seed_project_hierarchy(tmp_path)
+    with pytest.raises(auth_module.AuthorizationError, match="not a sub-project"):
+        auth_module.validate_project_authorization_row(
+            tmp_path, row, proposal_project_id="PROJECT-UNRELATED", work_item_id=None
+        )
+
+
+def test_validate_included_list_still_authoritative_for_subproject(auth_module, tmp_path):
+    """DELIB-20266083 preserved: a non-empty included_work_item_ids list remains
+    authoritative even for a sub-project member not in the list."""
+    row = _seed_project_hierarchy(tmp_path, included_work_item_ids=["WI-OTHER"])
+    with pytest.raises(auth_module.AuthorizationError, match="not in the authorizing included_work_item_ids"):
+        auth_module.validate_project_authorization_row(
+            tmp_path, row, proposal_project_id="PROJECT-SUB", work_item_id="WI-CHILD"
+        )
+
+
+def test_is_descendant_project_handles_cycle(auth_module, tmp_path):
+    """WI-3350 fail-closed: a parent_project_id cycle returns False without hanging."""
+    _make_groundtruth_toml(tmp_path)
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute("CREATE TABLE current_projects (id TEXT PRIMARY KEY, status TEXT, parent_project_id TEXT)")
+        conn.executemany(
+            "INSERT INTO current_projects (id, status, parent_project_id) VALUES (?, ?, ?)",
+            [("A", "active", "B"), ("B", "active", "A")],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    assert auth_module._is_descendant_project(tmp_path, "A", "ZZZ-NOT-AN-ANCESTOR") is False
+    # And a genuine descendant still resolves True.
+    assert auth_module._is_descendant_project(tmp_path, "A", "B") is True
+
+
 def test_activate_restores_named_packet_to_current_json(auth_module, tmp_path):
     """activate copies the named packet back to current.json after current.json
     has been overwritten by another bridge.
