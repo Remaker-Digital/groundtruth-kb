@@ -236,9 +236,202 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
         calls.append(kwargs)
         return {"launched": True, "recipient": kwargs["target"].dispatch_state_key}
 
+    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
     monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
     result = daemon.run_tick(root)
     assert result["mode"] == "live"
     status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
     assert status["mode"] == "live"
     assert calls, "expected live tick to invoke _spawn_harness"
+
+
+def test_daemon_live_skips_not_ready_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    trigger = daemon._load_trigger_module()
+    spawn_calls: list[dict] = []
+
+    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: False)
+    monkeypatch.setattr(
+        trigger,
+        "_spawn_harness",
+        lambda **kwargs: spawn_calls.append(kwargs) or {"launched": True},
+    )
+    result = daemon.run_tick(root)
+    assert result["mode"] == "live"
+    assert not spawn_calls
+    reasons = [d.get("reason") for d in result["decisions"] if d.get("reason")]
+    assert any(str(r).endswith("_dispatch_not_ready") for r in reasons)
+
+
+def test_daemon_live_honors_provider_backoff_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    trigger = daemon._load_trigger_module()
+    spawn_calls: list[dict] = []
+
+    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(
+        trigger,
+        "_provider_failure_backoff_skip",
+        lambda **kwargs: {"reason": "provider_failure_backoff_active"},
+    )
+    monkeypatch.setattr(
+        trigger,
+        "_spawn_harness",
+        lambda **kwargs: spawn_calls.append(kwargs) or {"launched": True},
+    )
+    result = daemon.run_tick(root)
+    assert result["mode"] == "live"
+    assert not spawn_calls
+    assert any(d.get("reason") == "provider_failure_backoff_active" for d in result["decisions"])
+
+
+# --- WI-4852: watchdog dormancy detection and fail-soft restart ---------------
+
+
+_WATCHDOG_HEARTBEAT_TAIL = "codex=0 family=0 noncodex=0 threshold=15 noncodexThreshold=15 mode=liveness-aware(WI-4828)"
+
+
+def _write_stale_watchdog_heartbeat(root: Path) -> None:
+    """Write a watchdog heartbeat old enough to trigger dormancy detection.
+
+    Uses the REAL storm-watchdog line format (leading ISO timestamp followed by
+    space-separated population fields), so the daemon's heartbeat parse is
+    exercised exactly as ``scripts/ops/harness_storm_watchdog.ps1`` writes it.
+    """
+    import datetime as dt
+
+    watchdog_dir = root / ".gtkb-state" / "ops"
+    watchdog_dir.mkdir(parents=True, exist_ok=True)
+    stale_ts = dt.datetime(2020, 1, 1, 0, 0, 0, tzinfo=dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    line = f"{stale_ts} {_WATCHDOG_HEARTBEAT_TAIL}"
+    (watchdog_dir / "storm-watchdog-heartbeat.txt").write_text(line, encoding="utf-8")
+
+
+def _write_fresh_watchdog_heartbeat(root: Path) -> None:
+    """Write a current-timestamp heartbeat in the REAL storm-watchdog line format."""
+    import datetime as dt
+
+    watchdog_dir = root / ".gtkb-state" / "ops"
+    watchdog_dir.mkdir(parents=True, exist_ok=True)
+    fresh_ts = dt.datetime.now(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    line = f"{fresh_ts} {_WATCHDOG_HEARTBEAT_TAIL}"
+    (watchdog_dir / "storm-watchdog-heartbeat.txt").write_text(line, encoding="utf-8")
+
+
+def _set_live_substrate(daemon, root: Path) -> None:
+    """Switch the daemon to LIVE mode (it owns executing remediation actions)."""
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}), encoding="utf-8"
+    )
+
+
+def test_run_tick_emits_restart_watchdog_when_dormant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """LIVE-mode daemon emits restart_storm_watchdog and executes the restart on dormancy."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _set_live_substrate(daemon, root)
+    _write_stale_watchdog_heartbeat(root)
+
+    monkeypatch.setattr(daemon, "_restart_storm_watchdog", lambda: {"launched": True, "returncode": 0})
+
+    result = daemon.run_tick(root, dry_run=False)
+    assert result["mode"] == "live"
+    assert "watchdog_dormancy" in result
+    wd = result["watchdog_dormancy"]
+    assert wd["dormant"] is True
+    assert wd.get("remediation_hint") == "restart_storm_watchdog"
+    assert "watchdog_restart" in result
+    assert result["watchdog_restart"]["launched"] is True
+
+
+def test_run_tick_watchdog_restart_failsoft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A restart failure must not abort the tick (fail-soft: watchdog_error recorded, tick succeeds)."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _set_live_substrate(daemon, root)
+    _write_stale_watchdog_heartbeat(root)
+
+    def _failing_restart() -> None:
+        raise RuntimeError("schtasks.exe not available in test environment")
+
+    monkeypatch.setattr(daemon, "_restart_storm_watchdog", _failing_restart)
+
+    result = daemon.run_tick(root, dry_run=False)
+    assert result.get("tick_at")  # tick completed normally despite restart failure
+    assert "watchdog_error" in result
+    assert "schtasks" in result["watchdog_error"]
+
+
+def test_run_tick_fresh_real_format_heartbeat_not_dormant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fresh real-format heartbeat is parsed as NOT dormant and triggers no restart.
+
+    Regression guard for the heartbeat-parse defect: the storm watchdog writes
+    the leading ISO timestamp followed by space-separated population fields, so
+    the daemon must parse only the first token. A parse that fed the whole line
+    to ``datetime.fromisoformat`` mis-reads every fresh heartbeat as ``0.0`` /
+    dormant and would restart the healthy watchdog on every tick. Runs in LIVE
+    mode so the buggy-parse failure mode (a restart firing) is observable.
+    """
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _set_live_substrate(daemon, root)
+    _write_fresh_watchdog_heartbeat(root)
+
+    called = {"restart": False}
+
+    def _should_not_restart() -> dict:
+        called["restart"] = True
+        return {"launched": True, "returncode": 0}
+
+    monkeypatch.setattr(daemon, "_restart_storm_watchdog", _should_not_restart)
+
+    result = daemon.run_tick(root, dry_run=False)
+    assert result["mode"] == "live"
+    assert "watchdog_dormancy" in result
+    wd = result["watchdog_dormancy"]
+    assert wd["dormant"] is False
+    assert "remediation_hint" not in wd
+    assert "watchdog_restart" not in result
+    assert called["restart"] is False
+
+
+def test_run_tick_shadow_mode_records_dormancy_without_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SHADOW mode records the dormancy verdict + hint but executes NO restart.
+
+    Guards the mode-gating decision: the dormancy verdict is observability
+    (recorded like monitoring/health in both modes), but executing the restart
+    is a subprocess spawn reserved for the live substrate, per the committed
+    shadow-never-spawns invariant.
+    """
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_stale_watchdog_heartbeat(root)
+
+    called = {"restart": False}
+
+    def _should_not_restart() -> dict:
+        called["restart"] = True
+        return {"launched": True, "returncode": 0}
+
+    monkeypatch.setattr(daemon, "_restart_storm_watchdog", _should_not_restart)
+
+    result = daemon.run_tick(root, dry_run=False)
+    assert result["mode"] == "shadow"
+    assert "watchdog_dormancy" in result
+    wd = result["watchdog_dormancy"]
+    assert wd["dormant"] is True
+    assert wd.get("remediation_hint") == "restart_storm_watchdog"
+    assert "watchdog_restart" not in result
+    assert called["restart"] is False

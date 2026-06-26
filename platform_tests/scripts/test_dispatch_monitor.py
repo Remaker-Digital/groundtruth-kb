@@ -195,3 +195,33 @@ def test_health_response_escalates_on_severe_corrupt() -> None:
     assert "severe_corrupt_output_outage" in severe.reasons
     mild = dm.health_response(_snapshot(_role_snap("openrouter", corrupt=1)))["openrouter"]
     assert mild.action == "hold"
+
+
+# --- WI-4852: watchdog_dormancy pure detection --------------------------------
+
+
+def test_watchdog_dormancy_detected_when_stale() -> None:
+    """Age exceeding threshold → dormant=True, reason='stale'."""
+    threshold = dm.DEFAULT_WATCHDOG_DORMANCY_THRESHOLD_SECONDS
+    last_epoch = NOW - (threshold + 60)
+    verdict = dm.watchdog_dormancy(last_epoch, NOW, threshold)
+    assert verdict.dormant is True
+    assert verdict.reason == "stale"
+    assert verdict.age_seconds > threshold
+
+
+def test_watchdog_dormancy_not_flagged_when_fresh() -> None:
+    """Recent evidence → dormant=False, reason='fresh'."""
+    threshold = dm.DEFAULT_WATCHDOG_DORMANCY_THRESHOLD_SECONDS
+    last_epoch = NOW - 30  # 30 s old, well inside the threshold
+    verdict = dm.watchdog_dormancy(last_epoch, NOW, threshold)
+    assert verdict.dormant is False
+    assert verdict.reason == "fresh"
+
+
+def test_watchdog_dormancy_missing_evidence_is_dormant() -> None:
+    """Missing or zero last_evidence_epoch → dormant=True, reason='no_evidence'."""
+    verdict_zero = dm.watchdog_dormancy(0.0, NOW)
+    assert verdict_zero.dormant is True
+    assert verdict_zero.reason == "no_evidence"
+    assert verdict_zero.age_seconds == float("inf")
