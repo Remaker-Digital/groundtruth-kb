@@ -131,13 +131,10 @@ The bridge protocol has TWO live dispatch substrates as of Slice 2 of
    which is registered from both ``.claude/settings.json`` and
    ``.codex/hooks.json``. That manager enables or updates the scheduled task
    only when the live role map is single-harness, deactivates it when the
-   topology is multi-harness, and may run a one-shot dispatch after Stop once
-   the active-session lock has been cleared.
+   topology is multi-harness, and may run a one-shot dispatch after Stop on single-harness topology.
 
 Both substrates honor the same actionable-signature scheme (byte-identical
-``_signature`` computation), the same active-session-suppression contract
-(per ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``
-VERIFIED), and the same fire-and-forget audit-log discipline
+``_signature`` computation), per-document lease/contention suppression, and the same fire-and-forget audit-log discipline
 (``.gtkb-state/bridge-poller/dispatch-failures.jsonl``).
 
 They are **mutually exclusive at runtime**:

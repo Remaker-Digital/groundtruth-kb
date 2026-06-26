@@ -10,7 +10,7 @@ dispatch operation. It is safe to call from either Codex or Claude Code hooks:
 * optional one-shot dispatch -> delegate to single_harness_bridge_dispatcher.py.
 
 The dispatcher itself remains the source of truth for bridge queue parsing,
-signature deduplication, active-session suppression, and worker spawning.
+signature deduplication, per-document lease/contention suppression, and worker spawning.
 """
 
 from __future__ import annotations

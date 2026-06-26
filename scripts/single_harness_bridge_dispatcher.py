@@ -24,7 +24,7 @@ Substrate selection at runtime:
   dispatch.
 
 The two substrates are mutually exclusive at runtime; both honor the same
-actionable-signature scheme, active-session-suppression contract, and
+actionable-signature scheme, per-document lease/contention suppression, and
 fire-and-forget audit-log discipline.
 
 Specs:
@@ -85,7 +85,7 @@ DISPATCH_STATE_FILENAME = "dispatch-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 LOCK_FILENAME = "dispatcher.lock"
-LOCK_SANITY_TTL_ENV_VAR = "GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS"
+LOCK_SANITY_TTL_ENV_VAR = "GTKB_DISPATCHER_LOCK_SANITY_TTL_SECONDS"
 LOCK_SANITY_TTL_DEFAULT_SECONDS = 120
 DEFAULT_MAX_ITEMS = 2  # matches cross-harness trigger DEFAULT_MAX_ITEMS
 
@@ -105,7 +105,7 @@ _LABEL_TO_CANONICAL_MODE = {"prime-builder": "pb", "loyal-opposition": "lo"}
 # ---------------------------------------------------------------------------
 #
 # Reuse the cross-harness trigger's signature scheme, audit-log helpers,
-# active-session-suppression contract, and dispatch-state I/O. Per IP-1 of
+# per-document lease/contention suppression, and dispatch-state I/O. Per IP-1 of
 # bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md, the two
 # substrates share state-path + signature scheme so future liveness diagnosis
 # does not need substrate-specific parsing.
@@ -327,7 +327,7 @@ def _acquire_lock(state_dir: Path) -> bool:
     """Attempt to acquire the single-instance dispatcher lock.
 
     Returns True on success, False if another instance holds a fresh lock.
-    Stale-lock reclamation: a lock older than GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS
+    Stale-lock reclamation: a lock older than GTKB_DISPATCHER_LOCK_SANITY_TTL_SECONDS
     (default 120 s) is considered abandoned and reclaimed.
     """
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -363,44 +363,6 @@ def _release_lock(state_dir: Path) -> None:
         pass
     except OSError:
         pass
-
-
-# ---------------------------------------------------------------------------
-# Active-session suppression (foreground session held by active harness)
-# ---------------------------------------------------------------------------
-
-
-def _foreground_session_active(state_dir: Path, harness_id: str, project_root: Path) -> bool:
-    """Return True iff the active harness has a fresh foreground-session lock.
-
-    Lock file path: ``<state-dir>/active-<command-handle>-session.lock``,
-    where command_handle is resolved from harness-identities.json. Lock is
-    "fresh" if its mtime is within GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS
-    (default 120 s).
-    """
-    trigger = _load_trigger_module()
-    try:
-        identities = trigger._read_harness_identities(project_root)
-        id_to_handle = trigger._invert_identities(identities)
-    except (ValueError, KeyError):
-        return False
-    handle = id_to_handle.get(harness_id)
-    if not handle:
-        return False
-    lock_path = state_dir / f"active-{handle}-session.lock"
-    if not lock_path.exists():
-        return False
-    try:
-        sanity_ttl = int(os.environ.get(LOCK_SANITY_TTL_ENV_VAR, LOCK_SANITY_TTL_DEFAULT_SECONDS))
-    except (TypeError, ValueError):
-        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
-    if sanity_ttl <= 0:
-        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
-    try:
-        age_seconds = dt.datetime.now().timestamp() - lock_path.stat().st_mtime
-    except OSError:
-        return False
-    return age_seconds <= sanity_ttl
 
 
 def _resolve_command_handle(project_root: Path, harness_id: str) -> str | None:

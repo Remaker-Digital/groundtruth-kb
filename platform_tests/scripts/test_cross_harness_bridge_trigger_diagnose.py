@@ -39,7 +39,7 @@ def _seed_state(state_dir: Path) -> None:
             },
             "prime": {
                 "last_dispatched_signature": "111aaa111aaa111a",
-                "last_result": "counterpart_active_session_present",
+                "last_result": "document_lease_held",
                 "pending_count": 36,
                 "selected_count": 2,
                 "signature": "111aaa111aaa111a",
@@ -138,10 +138,10 @@ def test_diagnose_emits_expected_sections(tmp_path: Path) -> None:
     assert "== Recent failures ==" in output
     assert "== Liveness ==" in output
     assert "== Overall ==" in output
-    assert "suppressed (target active session detected; by design)" in output
+    assert "suppressed (document lease held" in output
 
 
-def test_diagnose_classifies_target_active_session_result(
+def test_diagnose_classifies_document_lease_held_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -149,7 +149,7 @@ def test_diagnose_classifies_target_active_session_result(
     _seed_state(state_dir)
     state_path = state_dir / "dispatch-state.json"
     payload = json.loads(state_path.read_text(encoding="utf-8"))
-    payload["recipients"]["prime"]["last_result"] = "target_active_session_present"
+    payload["recipients"]["prime"]["last_result"] = "document_lease_held"
     state_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
     monkeypatch.setattr(
@@ -164,7 +164,7 @@ def test_diagnose_classifies_target_active_session_result(
     )
     output = cht._emit_diagnose_summary(state_dir)
 
-    assert "suppressed (target active session detected; by design)" in output
+    assert "suppressed (document lease held" in output
     assert "HEALTHY" in output
     assert "DEGRADED" not in output
 

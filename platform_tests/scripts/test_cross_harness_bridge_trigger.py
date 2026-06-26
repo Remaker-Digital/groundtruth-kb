@@ -1955,58 +1955,6 @@ def _single_command_index(commands: list[str], *needles: str) -> int:
     return matches[0]
 
 
-def test_stop_hook_order_clears_codex_lock_before_bridge_reconciliation() -> None:
-    commands = _real_stop_hook_commands(".codex/hooks.json")
-
-    session_stop_index = _single_command_index(
-        commands,
-        "active_session_heartbeat.py",
-        "--mode session-stop",
-        "--role codex",
-    )
-    bridge_stop_index = _single_command_index(commands, "cross_harness_bridge_trigger.py", "--stop-hook")
-
-    assert session_stop_index == bridge_stop_index - 1
-    assert _command_indices(commands[bridge_stop_index + 1 :], "--mode session-stop", "--role codex") == []
-
-
-def test_stop_hook_order_clears_claude_lock_before_bridge_reconciliation() -> None:
-    commands = _real_stop_hook_commands(".claude/settings.json")
-
-    owner_stop_index = _single_command_index(commands, "owner-decision-tracker.py", "--mode stop")
-    session_stop_index = _single_command_index(
-        commands,
-        "active_session_heartbeat.py",
-        "--mode session-stop",
-        "--role claude",
-    )
-    bridge_stop_index = _single_command_index(commands, "cross_harness_bridge_trigger.py", "--stop-hook")
-
-    assert owner_stop_index < bridge_stop_index
-    assert session_stop_index == bridge_stop_index - 1
-    assert _command_indices(commands[bridge_stop_index + 1 :], "--mode session-stop", "--role claude") == []
-
-
-def test_stop_reconciliation_after_session_stop_sees_inactive_lock(tmp_path: Path) -> None:
-    state_dir = tmp_path / "state"
-    state_dir.mkdir()
-    trigger = _load_trigger()
-    target = trigger.DispatchTarget(
-        needed_role_label="loyal-opposition",
-        harness_id="A",
-        command_handle="codex",
-        canonical_mode="lo",
-        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
-    )
-
-    lock_path = state_dir / target.active_session_lock_name
-    lock_path.write_text(json.dumps({"role": "codex"}), encoding="utf-8")
-    assert trigger.check_counterpart_active(target, state_dir) is True
-
-    lock_path.unlink()
-    assert trigger.check_counterpart_active(target, state_dir) is False
-
-
 def test_stop_reconciliation_preserves_existing_output_contract(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -2239,7 +2187,7 @@ def test_diagnose_migrates_legacy_recipient_keys_before_liveness(
                 "updated_at": "2026-05-19T21:00:00+00:00",
             },
             "codex": {
-                "last_result": "target_active_session_present",
+                "last_result": "document_lease_held",
                 "pending_count": 2,
                 "selected_count": 2,
                 "updated_at": "2026-05-19T21:00:00+00:00",
@@ -2264,7 +2212,7 @@ def test_diagnose_migrates_legacy_recipient_keys_before_liveness(
     output = trigger._emit_diagnose_summary(state_dir)
 
     assert "- prime-builder: last_result=no_pending" in output
-    assert "- loyal-opposition: last_result=target_active_session_present" in output
+    assert "- loyal-opposition: last_result=document_lease_held" in output
     assert "- prime: last_result=" not in output
     assert "- codex: last_result=" not in output
     assert "HEALTHY" in output
@@ -2568,9 +2516,9 @@ def test_diagnostic_emitted_per_invocation(tmp_path: Path) -> None:
     assert len(second) == 4, "instrumentation fires on every invocation"
 
 
-def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
+def test_diagnostic_classifies_document_lease_held(tmp_path: Path) -> None:
     """WI-3265 IP-2: a held target lease drives the
-    loyal-opposition recipient to the `active_session_suppressed` class.
+    loyal-opposition recipient to the `document_lease_held` class.
     """
     from bridge_lease_registry import acquire_lease
 
@@ -2588,8 +2536,8 @@ def test_diagnostic_classifies_suppressed(tmp_path: Path) -> None:
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
     assert len(lo) == 1
-    assert lo[0]["last_result"] == "target_active_session_present"
-    assert lo[0]["classification"] == "active_session_suppressed"
+    assert lo[0]["last_result"] == "document_lease_held"
+    assert lo[0]["classification"] == "document_lease_held"
 
 
 def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path: Path) -> None:
@@ -2613,7 +2561,7 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
         dry_run=True,
         invocation_source="Stop",
     )
-    assert held["results"]["loyal-opposition"]["reason"] == "target_active_session_present"
+    assert held["results"]["loyal-opposition"]["reason"] == "document_lease_held"
     state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
     suppressed_signature = state["recipients"]["loyal-opposition"]["last_suppressed_signature"]
     assert suppressed_signature

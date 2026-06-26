@@ -359,28 +359,6 @@ def test_dispatcher_keyword_pb_mode(tmp_path: Path) -> None:
     assert first_line == "::init gtkb pb"
 
 
-# ──────────────────────────────────────────────────────────────────────────
-# T-SHD-S2-active-session-suppression
-# ──────────────────────────────────────────────────────────────────────────
-
-
-def test_dispatcher_does_not_suppress_on_active_session_lock(tmp_path: Path) -> None:
-    """Active-session suppression is disabled in the unified periodic dispatcher by design."""
-    root = _make_synthetic_project(tmp_path, single_harness=True)
-    _write_index(root, _index_with_one_new(root))
-    state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True, exist_ok=True)
-
-    # Write a fresh active-session lock for Claude.
-    lock_path = state_dir / "active-claude-session.lock"
-    lock_path.write_text(json.dumps({"role": "claude"}), encoding="utf-8")
-
-    dispatcher = _load_dispatcher()
-    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
-    assert summary["skipped"] is False
-    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
-
-
 def test_dispatcher_suppresses_on_document_lease(tmp_path: Path) -> None:
     """Verify that if a document has a lease held, it is not dispatched by the dispatcher."""
     from bridge_lease_registry import acquire_lease, release_lease

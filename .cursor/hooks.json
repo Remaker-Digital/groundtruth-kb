@@ -3,10 +3,6 @@
   "hooks": {
     "sessionStart": [
       {
-        "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-start --role cursor --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-        "timeout": 5
-      },
-      {
         "command": "python E:\\GT-KB\\.cursor\\gtkb-hooks\\session_start_dispatch.py",
         "timeout": 180
       },
@@ -141,11 +137,6 @@
         "timeout": 5
       },
       {
-        "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role cursor --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-        "matcher": "Shell",
-        "timeout": 5
-      },
-      {
         "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
         "matcher": "Shell",
         "timeout": 10
@@ -154,11 +145,6 @@
         "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
         "matcher": "Shell",
         "timeout": 10
-      },
-      {
-        "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role cursor --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-        "matcher": "Write",
-        "timeout": 5
       },
       {
         "command": "python E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
@@ -172,14 +158,6 @@
       }
     ],
     "stop": [
-      {
-        "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role cursor --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-        "timeout": 5
-      },
-      {
-        "command": "python E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-stop --role cursor --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-        "timeout": 5
-      },
       {
         "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
         "timeout": 10

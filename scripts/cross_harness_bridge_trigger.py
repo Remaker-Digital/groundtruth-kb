@@ -85,6 +85,8 @@ if _PACKAGE_SRC not in sys.path:
 from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS  # noqa: E402
 from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
     dispatch_is_draining,
+)
+from groundtruth_kb.bridge_dispatch_reset import (
     terminate_pid_tree as _terminate_pid_tree,
 )
 
@@ -305,7 +307,7 @@ TRIGGER_DIAGNOSTIC_FILENAME = "trigger-diagnostic.jsonl"
 # behavior that the -004 GO explicitly excludes from scope).
 TRIGGER_DIAGNOSTIC_CLASSIFICATIONS = frozenset(
     {
-        "active_session_suppressed",
+        "document_lease_held",
         "dispatch_blocked",
         "dispatched",
         "no_change",
@@ -316,8 +318,14 @@ TRIGGER_DIAGNOSTIC_CLASSIFICATIONS = frozenset(
     }
 )
 
-TARGET_ACTIVE_SESSION_RESULT = "target_active_session_present"
-LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT = "counterpart_active_session_present"
+DOCUMENT_LEASE_HELD_RESULT = "document_lease_held"
+# Legacy lease-path tokens retained for read/classify compatibility only.
+_LEGACY_LEASE_HELD_RESULT_TOKENS = frozenset(
+    {
+        "target_active_session_present",
+        "counterpart_active_session_present",
+    }
+)
 
 # Maps a per-recipient ``last_result`` (the existing dispatch-branch outcome)
 # to a diagnostic classification. Unmapped results classify as ``other``.
@@ -325,8 +333,9 @@ LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT = "counterpart_active_session_present"
 # was entered (dry-run or a real spawn failure); the raw ``last_result`` is
 # also recorded verbatim so the two remain distinguishable.
 _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
-    TARGET_ACTIVE_SESSION_RESULT: "active_session_suppressed",
-    LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT: "active_session_suppressed",
+    DOCUMENT_LEASE_HELD_RESULT: "document_lease_held",
+    "target_active_session_present": "document_lease_held",
+    "counterpart_active_session_present": "document_lease_held",
     "launched": "dispatched",
     "launch_failed": "dispatched",
     "ollama_dispatch_not_ready": "dispatch_blocked",
@@ -2670,35 +2679,6 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
 
 
 # ---------------------------------------------------------------------------
-# Active-session suppression (cross-harness-trigger-active-session-suppression
-# at -005 GO at -006).
-#
-# When the target harness holds an active foreground session (its heartbeat
-# lock file is present and fresh), suppress dispatch to that
-# role to prevent duplicate auto-dispatched parallel-revision work. The
-# suppression state-machine uses two signature fields:
-#
-# - last_dispatched_signature: the signature actually spawned. Slice 2
-#   dedup field — current signature == last_dispatched_signature → skip.
-# - last_suppressed_signature: marker that suppression fired. Allows
-#   retry after target exits because last_dispatched_signature was
-#   never updated.
-#
-# Legacy ``signature`` field is preserved for backward-compat readers and
-# is updated only on real dispatch (not on suppression).
-#
-# Lock files live in the same ``--state-dir`` the trigger uses (typically
-# ``.gtkb-state/bridge-poller``). The hook commands MUST pass identical
-# ``--state-dir`` values to both ``active_session_heartbeat.py`` and this
-# script. Heartbeat script enforces ``--state-dir`` as REQUIRED so the
-# coupling is explicit at config time.
-# ---------------------------------------------------------------------------
-
-
-HEARTBEAT_LOCK_TEMPLATE = "active-{role}-session.lock"
-
-
-# ---------------------------------------------------------------------------
 # IP-3a: Routing data model and durable-record-driven dispatch resolution.
 #
 # Per ``bridge/gtkb-canonical-init-keyword-syntax-001-007.md`` (Codex GO at
@@ -2733,7 +2713,6 @@ class DispatchTarget:
       - ``_dispatch_prompt`` (uses ``canonical_mode`` for ``::init gtkb <mode>``
         keyword first-line per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001).
       - ``_harness_command`` (uses ``command_handle`` for invocation choice).
-      - ``check_target_active`` (uses ``active_session_lock_name``).
       - dispatch-state operations (use ``dispatch_state_key``).
     """
 
@@ -2745,20 +2724,6 @@ class DispatchTarget:
     invocation_surfaces: dict[str, Any] | None = (
         None  # WI-3344: headless argv template from the harness-registry projection; None when the projection carries no record for this harness
     )
-
-    @property
-    def active_session_lock_name(self) -> str:
-        """Target harness active-session lock file name.
-
-        Per the existing suppression contract (VERIFIED at
-        ``bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md``):
-        receiver harnesses write ``active-{command_handle}-session.lock`` to
-        signal foreground activity. Naming is unchanged from
-        ``HEARTBEAT_LOCK_TEMPLATE``; only its construction is now derived
-        from the resolved command handle rather than a hardcoded recipient
-        map.
-        """
-        return HEARTBEAT_LOCK_TEMPLATE.format(role=self.command_handle)
 
     @property
     def dispatch_state_key(self) -> str:
@@ -3242,53 +3207,6 @@ def _resolve_dispatch_target(
     if not _is_dispatch_ready(target.harness_id, h_info, project_root, state_dir, needed_role_label):
         raise DispatchTargetNotReady(f"{harness_type}_dispatch_not_ready", target.harness_id)
     return target
-
-
-def check_target_active(target: DispatchTarget, state_dir: Path) -> bool:
-    """Return True if the dispatch target's harness has a fresh active-session lock.
-
-    Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md (Codex
-    GO at -008): the legacy ``_counterpart_role`` recipient-handle map has
-    been removed; the lock file name is now derived from
-    ``target.active_session_lock_name`` which uses
-    ``HEARTBEAT_LOCK_TEMPLATE.format(role=target.command_handle)``. This
-    preserves the existing active-session suppression contract (VERIFIED
-    at bridge/gtkb-cross-harness-trigger-active-session-suppression-001-008.md)
-    end-to-end while enabling correct lock resolution under harness role-switch.
-
-    Reads ``<state-dir>/<target.active_session_lock_name>`` and treats the
-    target as active when:
-
-    - The lock file exists, AND
-    - Its mtime is within ``GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS``
-      (default 120, matching the owner-stated value in
-      ``DELIB-S337-OWNER-ACTIVE-SESSION-SUPPRESSION-DIRECTIVE-2026-05-09``).
-
-    Locks older than the sanity TTL are treated as orphaned (the harness
-    crashed without firing its Stop hook) and the function returns False.
-    Locks that are unreadable due to OSError also return False (fail open
-    rather than falsely suppress).
-    """
-    lock_path = state_dir / target.active_session_lock_name
-    if not lock_path.exists():
-        return False
-    try:
-        mtime = lock_path.stat().st_mtime
-    except OSError:
-        return False
-    age_seconds = time.time() - mtime
-    try:
-        sanity_ttl = int(os.environ.get("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "120"))
-    except (TypeError, ValueError):
-        sanity_ttl = 120
-    if sanity_ttl <= 0:
-        sanity_ttl = 120
-    return age_seconds <= sanity_ttl
-
-
-def check_counterpart_active(target: DispatchTarget, state_dir: Path) -> bool:
-    """Compatibility wrapper for callers still using the legacy predicate name."""
-    return check_target_active(target, state_dir)
 
 
 def _is_spawn_rate_limited(runs_dir: Path) -> bool:
@@ -4437,17 +4355,14 @@ def run_trigger(
 
             if len(leased_items) == len(selected):
                 # Lease/contention suppression: all selected documents are
-                # already leased by active target-side work. Keep the legacy
-                # target-active result token for compatibility with existing
-                # diagnostics, but do not consult harness active-session locks.
-                # Record the signature in the suppressed field (NOT the
+                # already leased by active target-side work. Record the signature in the suppressed field (NOT the
                 # dispatched field) so it remains retryable when the lease is
                 # released. Do NOT update legacy `signature`.
                 recipient_state["last_suppressed_signature"] = signature
-                recipient_state["last_result"] = TARGET_ACTIVE_SESSION_RESULT
+                recipient_state["last_result"] = DOCUMENT_LEASE_HELD_RESULT
                 results[recipient] = {
                     "launched": False,
-                    "reason": TARGET_ACTIVE_SESSION_RESULT,
+                    "reason": DOCUMENT_LEASE_HELD_RESULT,
                 }
             else:
                 dispatched_filtered = [
@@ -5177,8 +5092,10 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
             lines.append(
                 f"- {name}: inert (single-harness topology; cross-harness dispatch not applicable).{annotation}"
             )
-        elif last_result in {TARGET_ACTIVE_SESSION_RESULT, LEGACY_COUNTERPART_ACTIVE_SESSION_RESULT}:
-            lines.append(f"- {name}: suppressed (target active session detected; by design).{annotation}")
+        elif last_result == DOCUMENT_LEASE_HELD_RESULT:
+            lines.append(f"- {name}: suppressed (document lease held).{annotation}")
+        elif last_result in _LEGACY_LEASE_HELD_RESULT_TOKENS:
+            lines.append(f"- {name}: suppressed (document lease held; legacy result token).{annotation}")
         elif sig == last_dispatched and sig:
             lines.append(f"- {name}: dispatched (signature matches last_dispatched).{annotation}")
         elif last_result == "unchanged":

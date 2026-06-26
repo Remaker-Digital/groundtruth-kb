@@ -121,11 +121,6 @@
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-start --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\" --startup-service \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --harness-name claude",
             "timeout": 60
           },
@@ -184,11 +179,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode tool-use --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 10
           },
@@ -202,11 +192,6 @@
       {
         "matcher": "Write|Edit",
         "hooks": [
-          {
-            "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode tool-use --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
-            "timeout": 5
-          },
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
@@ -231,16 +216,6 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode tool-use --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/active_session_heartbeat.py\" --mode session-stop --role claude --state-dir \"$CLAUDE_PROJECT_DIR/.gtkb-state/bridge-poller\"",
             "timeout": 5
           },
           {
