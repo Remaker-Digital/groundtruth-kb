@@ -98,16 +98,65 @@ class ApplicableSpec:
     exists_in_membase: bool | None = None
 
 
+_FENCE_OPEN_RE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
+
+
+def _is_fence_opener(run: str, rest: str) -> bool:
+    """Return True when a fence-marker line is a genuine opener.
+
+    An opener is a run of >=3 of the same fence char (backtick or tilde) optionally
+    followed by a single-token info string. For backtick fences the info string must
+    contain no backtick (the CommonMark rule). The single-token requirement keeps a
+    wrapped prose line that merely begins with a fence marker followed by several words
+    from being misread as a fence opener (WI-4838 prose-wrap desync).
+    """
+    info = rest.strip()
+    if run[0] == "`" and "`" in info:
+        return False
+    return len(info.split()) <= 1
+
+
+def _is_fence_closer(line: str, fence_char: str, fence_len: int) -> bool:
+    """Return True when ``line`` closes a fence opened by ``fence_len`` of ``fence_char``.
+
+    A closer is a run of at least the opener length of the SAME fence char followed by
+    only whitespace (CommonMark). This keeps a marker-plus-language line inside a fence
+    from closing it early (WI-4838 inner-marker desync).
+    """
+    return re.match(rf"^\s*{re.escape(fence_char)}{{{fence_len},}}\s*$", line) is not None
+
+
 def _strip_code_fences(lines: list[str]) -> list[str]:
-    fence_re = re.compile(r"^\s*(?:```|~~~)")
+    """Blank fenced code blocks (and their delimiters) so residual prose can be scanned.
+
+    Uses a matched open/close parser: a fence opens only on a valid opener
+    (:func:`_is_fence_opener`) and closes only on a bare, same-char, length-matched
+    closer (:func:`_is_fence_closer`). This replaces the prior single-toggle form that
+    flipped ``in_fence`` on any marker-prefixed line and desynced on prose-wrap and
+    inner-marker inputs (WI-4838).
+    """
     in_fence = False
+    fence_char = ""
+    fence_len = 0
     out: list[str] = []
     for line in lines:
-        if fence_re.match(line):
-            in_fence = not in_fence
+        if not in_fence:
+            match = _FENCE_OPEN_RE.match(line)
+            if match and _is_fence_opener(match.group(1), match.group(2)):
+                in_fence = True
+                fence_char = match.group(1)[0]
+                fence_len = len(match.group(1))
+                out.append("")
+                continue
+            out.append(line)
+        else:
+            if _is_fence_closer(line, fence_char, fence_len):
+                in_fence = False
+                fence_char = ""
+                fence_len = 0
+                out.append("")
+                continue
             out.append("")
-            continue
-        out.append("" if in_fence else line)
     return out
 
 

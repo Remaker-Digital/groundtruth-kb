@@ -476,6 +476,73 @@ def test_classify_spec_links_section_distinguishes_statuses() -> None:
     assert unrecognized["status"] == "heading_unrecognized"
     assert unrecognized["candidate_heading"] == "## Carried-Forward Specification Links"
 
+
+def test_strip_code_fences_ignores_prose_marker_line():
+    """WI-4838 prose-wrap: a line that is a fence marker followed by multiple prose
+    words is NOT treated as a fence opener; following prose is preserved for scanning."""
+    lines = [
+        "before prose",
+        "``` describes the fence format and more words",
+        "SPEC-TRIGGER prose that must remain scannable",
+    ]
+    out = preflight._strip_code_fences(lines)
+    assert out[0] == "before prose"
+    assert out[1] == "``` describes the fence format and more words"
+    assert out[2] == "SPEC-TRIGGER prose that must remain scannable"
+
+
+def test_strip_code_fences_inner_marker_does_not_close():
+    """WI-4838 inner-marker: inside a fence, a marker-plus-language line does NOT close
+    the fence; only a bare matched closer ends it."""
+    lines = [
+        "intro prose",
+        "```",
+        "code line one",
+        "```python",
+        "code line two",
+        "```",
+        "outro prose",
+    ]
+    out = preflight._strip_code_fences(lines)
+    assert out[0] == "intro prose"
+    assert out[1] == ""  # opener blanked
+    assert out[2] == ""  # interior
+    assert out[3] == ""  # inner ```python is interior, not a closer
+    assert out[4] == ""  # interior
+    assert out[5] == ""  # bare closer blanked
+    assert out[6] == "outro prose"
+
+
+def test_strip_code_fences_strips_paired_block():
+    """No regression: a normal opener/interior/bare-closer block is blanked and the
+    surrounding prose is preserved."""
+    lines = ["alpha", "```", "secret code", "```", "omega"]
+    out = preflight._strip_code_fences(lines)
+    assert out == ["alpha", "", "", "", "omega"]
+
+
+def test_strip_code_fences_opener_with_single_info_token():
+    """A marker run plus a single language token is a valid opener."""
+    lines = ["pre", "```python", "x = 1", "```", "post"]
+    out = preflight._strip_code_fences(lines)
+    assert out == ["pre", "", "", "", "post"]
+
+
+def test_strip_code_fences_closer_must_match_char_and_length():
+    """A closer must be the same fence char and at least the opener length; a shorter run
+    or a different fence char does not close the fence."""
+    lines = ["pre", "````", "inside", "```", "still inside", "~~~", "still", "````", "after"]
+    out = preflight._strip_code_fences(lines)
+    assert out[0] == "pre"
+    assert out[1] == ""  # 4-backtick opener
+    assert out[2] == ""  # inside
+    assert out[3] == ""  # 3-backtick line is shorter than opener -> interior, not a closer
+    assert out[4] == ""  # still inside
+    assert out[5] == ""  # ~~~ is a different fence char -> interior, not a closer
+    assert out[6] == ""  # still
+    assert out[7] == ""  # 4-backtick bare closer -> closes
+    assert out[8] == "after"
+
     absent = preflight.classify_spec_links_section("# P\n\nNo spec links section here.\n")
     assert absent["status"] == "no_section"
 
