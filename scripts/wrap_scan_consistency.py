@@ -20,7 +20,9 @@ import argparse
 import json
 import re
 import sqlite3
+import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -55,18 +57,61 @@ def _ensure_bridge_helpers_importable(project_root: Path) -> None:
             sys.path.insert(0, src_text)
 
 
-def check_bridge_numbered_files_have_status(project_root: Path) -> list[dict]:
+def _git_head_bridge_files(project_root: Path) -> set[str] | None:
+    """Return paths of bridge numbered files present at HEAD, or None when git is unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", "bridge"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        return set(result.stdout.strip().splitlines())
+    except Exception:
+        return None
+
+
+def check_bridge_numbered_files_have_status(
+    project_root: Path,
+    *,
+    head_resolver: Callable[[Path], set[str] | None] = _git_head_bridge_files,
+) -> list[dict]:
+    """Flag numbered bridge files that are new (not at HEAD) and missing a status token.
+
+    Files already present at HEAD are grandfathered per GOV-FILE-BRIDGE-AUTHORITY-001's
+    body-status-token grandfather clause.  When the HEAD resolver is unavailable, all
+    files are treated as grandfathered and a single INFO finding is emitted instead of
+    potentially false-positive ERRORs.
+    """
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
         return []
     _ensure_bridge_helpers_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
+    head_files = head_resolver(project_root)
+
+    if head_files is None:
+        # Fail toward not over-reporting: grandfather everything when git is unavailable.
+        # The Write-time bridge-compliance gate remains the primary enforcement for new files.
+        return [
+            _finding(
+                "bridge_status_grandfather_unavailable",
+                SEVERITY_INFO,
+                "Git HEAD unavailable; all bridge numbered files grandfathered (no missing-status check performed)",
+            )
+        ]
+
     findings: list[dict] = []
     for entry in bridge_dir.iterdir():
         if not entry.is_file() or not BRIDGE_NUMBERED_FILE_PATTERN.match(entry.name):
             continue
         ref = f"bridge/{entry.name}"
+        if ref in head_files:
+            continue  # grandfathered: already in committed history
         if status_from_bridge_file(entry) is None:
             findings.append(
                 _finding(
