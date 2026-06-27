@@ -13,6 +13,8 @@ import argparse
 import datetime as dt
 import importlib.util
 import json
+import logging
+import logging.handlers
 import os
 import sys
 import time
@@ -37,6 +39,14 @@ HEARTBEAT_FILENAME = "heartbeat.txt"
 SHADOW_LOG_FILENAME = "shadow-decisions.jsonl"
 STATUS_FILENAME = "status.json"
 PID_FILENAME = "daemon.pid"
+# WI-4882: persistent rotating daemon activity/error log. The daemon previously
+# wrote only status.json + shadow-decisions.jsonl, so an unsupervised death left
+# no diagnostic trail. This log records loop start/exit, per-tick completion, and
+# crucially any fatal exception that breaks the loop, so the next death is
+# diagnosable.
+DAEMON_LOG_FILENAME = "daemon.log"
+DAEMON_LOG_MAX_BYTES = 1_000_000
+DAEMON_LOG_BACKUP_COUNT = 3
 WATCHDOG_HEARTBEAT_RELPATH = ".gtkb-state/ops/storm-watchdog-heartbeat.txt"
 WATCHDOG_TASK_NAME_DEFAULT = "GTKB-HarnessStormWatchdog"
 LOCK_SANITY_TTL_ENV_VAR = "GTKB_DISPATCHER_DAEMON_LOCK_TTL_SECONDS"
@@ -54,6 +64,41 @@ HEARTBEAT_STALE_DEFAULT_SECONDS = 180
 
 def _now_iso() -> str:
     return dt.datetime.now(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def get_daemon_logger(state_dir: Path) -> logging.Logger:
+    """Return the persistent rotating daemon logger (WI-4882).
+
+    Idempotent: re-adds no handler if one already exists. Handler setup is
+    fail-soft — an OSError creating the log directory/file never propagates, so
+    logging can never break daemon startup.
+    """
+    logger = logging.getLogger("gtkb.dispatcher_daemon")
+    if not logger.handlers:
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            handler = logging.handlers.RotatingFileHandler(
+                state_dir / DAEMON_LOG_FILENAME,
+                maxBytes=DAEMON_LOG_MAX_BYTES,
+                backupCount=DAEMON_LOG_BACKUP_COUNT,
+                encoding="utf-8",
+            )
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+            logger.propagate = False
+        except OSError:
+            # Fail-soft: a logging-setup failure must never break the daemon.
+            pass
+    return logger
+
+
+def _safe_log(logger: logging.Logger, level: str, msg: str, *args: object) -> None:
+    """Emit a log record fail-soft — a logging error never breaks a tick (WI-4882)."""
+    try:
+        getattr(logger, level)(msg, *args)
+    except Exception:  # noqa: BLE001 - logging must never break a tick or the loop
+        pass
 
 
 def _heartbeat_stale_seconds() -> float:
@@ -602,15 +647,23 @@ def run_loop(
     state_dir = _daemon_state_dir(project_root)
     if not acquire_daemon_lock(state_dir):
         raise SystemExit("another dispatcher daemon instance is running")
+    logger = get_daemon_logger(state_dir)
+    _safe_log(logger, "info", "dispatcher daemon loop started pid=%s tick_seconds=%s", os.getpid(), tick_seconds)
     # WI-4857: holding the lock proves no prior daemon is alive — any live
     # dispatched worker at this point is an orphan from a crashed predecessor.
     _reap_dispatched_workers(project_root)
     (state_dir / PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
     try:
         while True:
-            run_tick(project_root, max_items=max_items)
+            try:
+                run_tick(project_root, max_items=max_items)
+            except Exception:  # noqa: BLE001 - WI-4882: log the fatal exception before the loop dies
+                _safe_log(logger, "exception", "fatal exception in daemon tick; loop exiting pid=%s", os.getpid())
+                raise
+            _safe_log(logger, "info", "tick completed pid=%s", os.getpid())
             time.sleep(max(1, tick_seconds))
     finally:
+        _safe_log(logger, "info", "dispatcher daemon loop exiting pid=%s", os.getpid())
         # WI-4857: reap in-flight workers before releasing the lock so a
         # graceful termination does not leave orphaned workers running.
         _reap_dispatched_workers(project_root)
