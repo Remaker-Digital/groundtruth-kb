@@ -542,6 +542,65 @@ def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> Non
             click.echo(f"  cites: {citing_path}")
 
 
+@bridge_group.command("wait")
+@click.argument("slug")
+@click.option(
+    "--timeout",
+    "timeout_seconds",
+    default=3600.0,
+    show_default=True,
+    help="Maximum seconds to wait before giving up.",
+)
+@click.option(
+    "--interval",
+    "poll_interval_seconds",
+    default=30.0,
+    show_default=True,
+    help="Seconds between polls.",
+)
+@click.option(
+    "--no-require-commit",
+    "require_commit",
+    is_flag=True,
+    default=True,
+    flag_value=False,
+    help="Accept VERIFIED status without waiting for the finalize commit to land.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_wait_cmd(
+    ctx: click.Context,
+    slug: str,
+    timeout_seconds: float,
+    poll_interval_seconds: float,
+    require_commit: bool,
+    json_output: bool,
+) -> None:
+    """Poll bridge thread SLUG until VERIFIED (or timeout/stopped)."""
+    from groundtruth_kb.bridge.wait_commands import wait_for_thread
+
+    config = _resolve_config(ctx)
+    result = wait_for_thread(
+        config.project_root,
+        slug,
+        timeout_seconds=timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+        require_commit=require_commit,
+    )
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    outcome = result["outcome"]
+    status = result.get("latest_status") or "unknown"
+    version = result.get("latest_version")
+    elapsed = result.get("elapsed_seconds", 0.0)
+    polls = result.get("polls", 0)
+    version_str = f" (v{version:03d})" if version is not None else ""
+    click.echo(f"Bridge wait: {slug} → {outcome.upper()} [{status}{version_str}]  elapsed={elapsed:.1f}s polls={polls}")
+    if outcome not in ("verified",):
+        ctx.exit(1)
+
+
 def _emit_dispatch_transaction_result(result: Any, *, json_output: bool) -> None:
     if json_output:
         click.echo(json.dumps(result.to_json_dict(), indent=2, sort_keys=True))
@@ -3111,6 +3170,14 @@ def backlog_status(
     default=None,
     help="New description. Subject to the disjunctive text-edit gate (WI-4357).",
 )
+@click.option(
+    "--description-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Read the new description from an in-root file's UTF-8 contents. Avoids "
+    "PowerShell native-exe arg-split corruption of embedded quotes; mutually "
+    "exclusive with --description.",
+)
 @click.option("--source-spec-id", default=None, help="New source specification id (set, backfill, or correct).")
 @click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
 @click.option("--change-reason", required=True, help="History reason for the update.")
@@ -3127,6 +3194,7 @@ def backlog_update(
     status_detail: str | None,
     title: str | None,
     description: str | None,
+    description_file: Path | None,
     source_spec_id: str | None,
     owner_approved: bool,
     change_reason: str,
@@ -3135,6 +3203,10 @@ def backlog_update(
 ) -> None:
     """Update field values of a single backlog work item."""
     config = _resolve_config(ctx)
+    if description is not None and description_file is not None:
+        raise click.UsageError("Cannot specify both --description and --description-file.")
+    if description_file is not None:
+        description = description_file.read_text(encoding="utf-8")
     request = BacklogUpdateRequest(
         work_item_id=work_item_id,
         resolution_status=resolution_status,
@@ -7410,7 +7482,7 @@ def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defe
     "--substrate",
     "substrate",
     required=True,
-    type=click.Choice(["cross_harness_trigger", "single_harness_dispatcher", "none"]),
+    type=click.Choice(["cross_harness_trigger", "single_harness_dispatcher", "none", "dispatcher_daemon"]),
     help="Bridge dispatch substrate to assign",
 )
 @click.option("--reason", "reason", default="manual substrate-switch via gt mode set-bridge-substrate")
