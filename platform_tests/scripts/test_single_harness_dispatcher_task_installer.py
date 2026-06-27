@@ -271,8 +271,8 @@ def test_installer_task_action_uses_absolute_script_path() -> None:
         )
         assert probe.returncode == 0
         lines = probe.stdout.splitlines()
-        exec_line = next((l for l in lines if l.startswith("EXEC=")), "")
-        args_line = next((l for l in lines if l.startswith("ARGS=")), "")
+        exec_line = next((line for line in lines if line.startswith("EXEC=")), "")
+        args_line = next((line for line in lines if line.startswith("ARGS=")), "")
         assert exec_line.endswith("pythonw.exe"), f"F4: Execute must be pythonw.exe (got {exec_line!r})"
         # Tokenize Arguments respecting quoted segments. First token = script path.
         args_value = args_line[len("ARGS=") :]
@@ -444,8 +444,8 @@ def test_installer_task_action_uses_no_console_settings() -> None:
             f'Write-Output "HIDDEN=$($t.Settings.Hidden)"',
         )
         lines = probe.stdout.splitlines()
-        exec_line = next((l for l in lines if l.startswith("EXEC=")), "")
-        hidden_line = next((l for l in lines if l.startswith("HIDDEN=")), "")
+        exec_line = next((line for line in lines if line.startswith("EXEC=")), "")
+        hidden_line = next((line for line in lines if line.startswith("HIDDEN=")), "")
         assert exec_line.endswith("pythonw.exe"), f"F4: Execute must be pythonw.exe (got {exec_line!r})"
         assert "True" in hidden_line, f"F4: Settings.Hidden must be True (got {hidden_line!r})"
     finally:

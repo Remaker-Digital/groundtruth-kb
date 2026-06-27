@@ -3,8 +3,8 @@
 > **An Internal Developer Platform for AI-assisted software development.**
 > You supply specifications, clarifications, and decisions. GT-KB and its AI agents preserve the durable artifacts, draft and review the work, implement what's approved, and verify it against the specs — so the project's *truth* and its *reasoning* both survive past any single session.
 
-[![Python Tests](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml)
-[![Lint](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml/badge.svg?branch=develop)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml)
+[![Python Tests](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/python-tests.yml)
+[![Lint](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/Remaker-Digital/groundtruth-kb/actions/workflows/lint.yml)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Version 0.7.0-rc1](https://img.shields.io/badge/version-0.7.0--rc1-orange)
 ![License AGPL-3.0-or-later](https://img.shields.io/badge/package%20license-AGPL--3.0--or--later-green)

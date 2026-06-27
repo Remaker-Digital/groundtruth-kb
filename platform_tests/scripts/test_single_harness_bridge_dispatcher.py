@@ -520,7 +520,7 @@ def test_dispatcher_records_dispatch_failures_jsonl(tmp_path: Path, monkeypatch:
 
     failures_path = state_dir / "dispatch-failures.jsonl"
     assert failures_path.is_file(), "dispatch-failures.jsonl not written on spawn failure"
-    lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert lines, "dispatch-failures.jsonl was empty"
     # At least one line should reference the simulated failure.
     parsed = [json.loads(line) for line in lines]

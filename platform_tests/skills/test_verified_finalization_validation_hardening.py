@@ -76,7 +76,7 @@ _No prior deliberations: validation hardening fixture._
 
 | Specification | Test or Verification Command | Executed | Result |
 | --- | --- | --- | --- |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `pytest platform_tests/skills/test_verified_finalization_validation_hardening.py` | yes | PASS |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | this validation fixture test | yes | PASS |
 
 ## Positive Confirmations
 

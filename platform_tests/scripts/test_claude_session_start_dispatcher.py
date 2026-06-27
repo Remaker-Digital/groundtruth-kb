@@ -530,7 +530,7 @@ def test_dispatch_authorized_with_audit_when_mode_not_in_own_role_set(
 
     # Audit log written with structured fields.
     assert failures_path.is_file()
-    lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert lines
     record = json.loads(lines[-1])
     assert record["kind"] == "dispatch_role_mismatch_authorized"

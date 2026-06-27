@@ -271,7 +271,7 @@ tools you probably already have. Here is the named inventory:
 |------|------------------|
 | **Claude Code** | Prime Builder — reads the bridge, writes proposals, edits code. |
 | **Codex** (OpenAI) | Loyal Opposition — reads the bridge, writes GO/NO-GO reviews. |
-| **OS Scheduler** (Windows Task Scheduler / Linux cron / macOS launchd) | Runs the bridge pollers every 3 minutes, independent of open chat sessions. |
+| **Bridge dispatcher hooks** | Run cross-harness bridge dispatch on tool-use and Stop events; no interval poller is active. |
 | **GitHub** | Hosts the repo and runs the CI templates. Not required for local-only mode. |
 | **PyPI** | Distributes the `groundtruth-kb` wheel. Required for install. |
 | **MkDocs + Material theme** | Renders the docs site (this page). Optional but recommended for team-scale adoption. |
@@ -359,8 +359,8 @@ propose → review → implement → verify
   reads it and writes `VERIFIED` or another `NO-GO`.
 
 The cross-harness event-driven trigger dispatches the counterpart harness on
-tool-use and Stop events (the retired OS scheduler and smart poller are no
-longer used). No human has to babysit the queue. See
+tool-use and Stop events; legacy interval dispatchers are no longer used. No
+human has to babysit the queue. See
 [Method — File Bridge Automation](method/12-file-bridge-automation.md)
 for the full protocol.
 
@@ -371,7 +371,7 @@ Once this page makes sense, walk through these in order:
 - **[Your First Specification](tutorials/first-spec.md)** — write a spec,
   link a test, run an assertion. 15 minutes.
 - **[Dual-Agent Setup](tutorials/dual-agent-setup.md)** — add the Loyal
-  Opposition and wire the file-bridge poller. 30 minutes.
+  Opposition and wire bridge automation. 30 minutes.
 - **[A Day in the Life](day-in-the-life.md)** — a synthetic first week
   with a solo developer using Claude Code + GroundTruth-KB together.
 - **[Evidence](evidence.md)** — live metrics from the reference

@@ -58,12 +58,18 @@ def _init_verified_repo(tmp_path: Path) -> Path:
     _git(repo, "config", "user.email", "test@example.com")
     _git(repo, "config", "user.name", "Test User")
     _git(repo, "config", "commit.gpgsign", "false")
-    _write(repo / "bridge" / "parity-fixture-001.md", "NEW\n\n# Proposal\n")
+    _write(
+        repo / "bridge" / "parity-fixture-001.md",
+        "NEW\nauthor_session_context_id: prime-session-parity\n\n# Proposal\n",
+    )
     _write(repo / "bridge" / "parity-fixture-002.md", "GO\n\n# GO\n")
     _write(repo / "scripts" / "feature.py", "VALUE = 1\n")
     _git(repo, "add", "--", "bridge/parity-fixture-001.md", "bridge/parity-fixture-002.md", "scripts/feature.py")
     _git(repo, "commit", "-m", "chore: seed bridge thread")
-    _write(repo / "bridge" / "parity-fixture-003.md", "NEW\n\n# Implementation report\n")
+    _write(
+        repo / "bridge" / "parity-fixture-003.md",
+        "NEW\nauthor_session_context_id: prime-session-parity\n\n# Implementation report\n",
+    )
     _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
     return repo
 
@@ -94,7 +100,7 @@ _No prior deliberations: parity fixture._
 
 | Specification | Test or Verification Command | Executed | Result |
 | --- | --- | --- | --- |
-| `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` | `pytest platform_tests/skills/test_auto_retire_actuation_helper_parity.py` | yes | PASS |
+| `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` | this parity fixture test | yes | PASS |
 
 ## Positive Confirmations
 

@@ -413,7 +413,7 @@ def test_misdirected_dispatch_writes_audit_log(tmp_path: Path, monkeypatch: pyte
     assert failures_path.is_file(), (
         "Role mismatch must leave an audit-log entry at the dispatch-failures path; no file was created."
     )
-    lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert lines, "dispatch-failures.jsonl was empty after role mismatch"
     record = json.loads(lines[-1])
     assert record["kind"] == "dispatch_role_mismatch_authorized"

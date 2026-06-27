@@ -99,7 +99,7 @@ The upgrade adds `AGENTS.md`, bridge automation scaffolding, and dispatcher
 setup instructions. She follows the
 [Dual-Agent Setup](tutorials/dual-agent-setup.md) tutorial to wire up her
 Codex-powered Loyal Opposition. Her first bridge proposal goes up at
-10:47 AM. At 10:51 the Codex poller dispatches a review. At 10:58 she has
+10:47 AM. At 10:51 the bridge trigger dispatches a review. At 10:58 she has
 a NO-GO back citing a missing input-validation check.
 
 She addresses the finding, writes a REVISED proposal, and gets a GO on
@@ -135,7 +135,7 @@ All green. She merges to `main` and the production deployment runs.
 A customer reports that cancelling a booking with a past start time
 throws a 500 error. Allison opens Claude Code and describes the bug.
 Claude reads the bridge protocol and proposes a fix as
-`bridge/past-booking-cancel-500-001.md`. She lets the OS scheduler pick
+`bridge/past-booking-cancel-500-001.md`. She lets bridge automation pick
 it up.
 
 The Loyal Opposition NO-GO's the first draft: Codex points out that the
@@ -179,12 +179,12 @@ bridge cycle has a file. Every decision has a deliberation. If she forgot
 what she did yesterday, `gt history` shows it.
 
 **The cost is small.** Her API bill for the week — Claude Code tokens
-plus Codex reviews — was under $20. The OS scheduler costs nothing and
-only wakes the agents when there is bridge work to do.
+plus Codex reviews — was under $20. The local bridge trigger adds no hosted
+scheduler bill and only wakes the agents when there is bridge work to do.
 
-**The AI agents work while she is away.** The bridge pollers run every
-three minutes via Windows Task Scheduler, independent of whether Claude
-Code is open. When she comes back from lunch, the queue is usually empty.
+**The AI agents work while she is away.** Bridge automation dispatches
+counterpart reviews when bridge state changes and records state for health
+checks. When she comes back from lunch, the queue is usually empty.
 
 ## What Allison Might Choose Differently
 
@@ -198,9 +198,8 @@ event-driven trigger is scaffolded automatically by
 `gt project init my-project --profile dual-agent` and registered as PostToolUse and Stop
 hooks in `.claude/settings.json` and `.codex/hooks.json`. The setup walkthrough
 is in [Dual-Agent Setup](tutorials/dual-agent-setup.md). Manual bridge-state
-scans remain as a fallback if the trigger is unhealthy. The retired smart
-poller and OS poller (archived under `archive/smart-poller-2026-05-09/`) are
-no longer the active automation path.
+scans remain as a fallback if the trigger is unhealthy. The archived
+interval-driven dispatchers are no longer the active automation path.
 
 ## Can I Use Different Tools for the Loyal Opposition?
 
@@ -208,7 +207,7 @@ Yes. The Loyal Opposition role is defined by a protocol (the file
 bridge), not by a specific tool. Any agent that can read markdown from
 `bridge/`, analyze code, write a review, and publish verdicts to bridge state
 can serve the role. The default setup uses Codex because it runs
-autonomously via scheduled tasks and has been exercised across hundreds
+autonomously through bridge automation and has been exercised across hundreds
 of review cycles in the reference project.
 
 ## Getting Started

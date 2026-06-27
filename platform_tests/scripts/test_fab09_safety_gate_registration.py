@@ -94,7 +94,7 @@ def test_owner_decision_capture_is_not_stub():
     path = _HOOKS_DIR / "owner-decision-capture.py"
     assert path.exists(), "owner-decision-capture.py must exist"
     content = path.read_text(encoding="utf-8")
-    lines = [l for l in content.strip().splitlines() if l.strip()]
+    lines = [line for line in content.strip().splitlines() if line.strip()]
     assert len(lines) > 35, (
         f"owner-decision-capture.py has {len(lines)} non-blank lines; "
         "stubs have <35 — this should be a real implementation"
@@ -114,7 +114,7 @@ def test_gov09_capture_is_not_stub():
     path = _HOOKS_DIR / "gov09-capture.py"
     assert path.exists(), "gov09-capture.py must exist"
     content = path.read_text(encoding="utf-8")
-    lines = [l for l in content.strip().splitlines() if l.strip()]
+    lines = [line for line in content.strip().splitlines() if line.strip()]
     assert len(lines) > 35, (
         f"gov09-capture.py has {len(lines)} non-blank lines; stubs have <35 — this should be a real implementation"
     )

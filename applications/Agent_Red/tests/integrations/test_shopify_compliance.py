@@ -13,7 +13,20 @@ Master Test Plan: §4 Gap Register — Shopify Compliance (1.0-required)
 from __future__ import annotations
 
 
+def _registered_route_paths(app) -> list[str]:
+    """Return direct and included-router paths from the FastAPI app."""
+    paths: list[str] = []
+    for route in app.routes:
+        path = getattr(route, "path", None)
+        if isinstance(path, str):
+            paths.append(path)
 
+        route_contexts = getattr(route, "effective_route_contexts", None)
+        if callable(route_contexts):
+            paths.extend(
+                context.path for context in route_contexts() if isinstance(getattr(context, "path", None), str)
+            )
+    return paths
 
 
 # ---------------------------------------------------------------------------
@@ -45,8 +58,9 @@ class TestShopifyGraphQLOnly:
         assert hasattr(ShopifyGraphQLClient, "execute")
         # Should NOT have REST-style convenience methods
         for rest_method in ["get_product", "get_order", "list_products", "rest_request"]:
-            assert not hasattr(ShopifyGraphQLClient, rest_method), \
+            assert not hasattr(ShopifyGraphQLClient, rest_method), (
                 f"ShopifyGraphQLClient should not have REST method: {rest_method}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -63,15 +77,15 @@ class TestShopifyBillingTestMode:
 
         # Check that the billing module references test mode
         source = open(shopify_billing.__file__).read()
-        assert "test" in source.lower(), \
-            "shopify_billing.py should reference test mode for Shopify app review"
+        assert "test" in source.lower(), "shopify_billing.py should reference test mode for Shopify app review"
 
     def test_billing_subscription_mutation_exists(self):
         """appSubscriptionCreate mutation function exists as module-level function."""
         from src.integrations import shopify_billing
 
-        assert hasattr(shopify_billing, "create_subscription"), \
+        assert hasattr(shopify_billing, "create_subscription"), (
             "shopify_billing module should have create_subscription function"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -89,8 +103,9 @@ class TestPlanUpgradeDowngrade:
 
         # Verify create_subscription accepts tier information
         source = inspect.getsource(create_subscription)
-        assert "tier" in source.lower() or "plan" in source.lower(), \
+        assert "tier" in source.lower() or "plan" in source.lower(), (
             "create_subscription should accept tier/plan parameter"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +120,7 @@ class TestKBCRUDViaAPI:
         """Admin knowledge API registers all CRUD routes."""
         from src.main import app
 
-        routes = [route.path for route in app.routes]
+        routes = _registered_route_paths(app)
         # Verify essential KB routes exist
         kb_patterns = [
             "/api/admin/knowledge",
@@ -139,7 +154,7 @@ class TestTeamListViaAPI:
         """Admin team API registers list route."""
         from src.main import app
 
-        routes = [route.path for route in app.routes]
+        routes = _registered_route_paths(app)
         team_routes = [r for r in routes if "/api/team" in r or "/api/admin/team" in r]
         assert len(team_routes) > 0, "Missing team list route"
 
@@ -167,7 +182,7 @@ class TestGDPRExportViaAPI:
         """GDPR export route is registered."""
         from src.main import app
 
-        routes = [route.path for route in app.routes]
+        routes = _registered_route_paths(app)
         gdpr_routes = [r for r in routes if "/api/gdpr" in r]
         assert len(gdpr_routes) > 0, "Missing GDPR admin routes"
 
@@ -198,12 +213,14 @@ class TestGDPRWebhookURLs:
         content = toml_path.read_text()
 
         # Verify GDPR URLs are NOT localhost
-        assert "localhost" not in content.lower() or "# localhost" in content.lower(), \
+        assert "localhost" not in content.lower() or "# localhost" in content.lower(), (
             "shopify.app.toml should not contain localhost URLs for GDPR webhooks"
+        )
 
         # Verify a real FQDN is used (production or staging)
-        assert "agent-red-api-gateway" in content or "agent-red-staging" in content or "agentred" in content, \
+        assert "agent-red-api-gateway" in content or "agent-red-staging" in content or "agentred" in content, (
             "shopify.app.toml should reference the API Gateway (production or staging)"
+        )
 
     def test_shopify_app_toml_has_all_gdpr_endpoints(self):
         """shopify.app.toml references all three mandatory GDPR webhook paths."""
@@ -214,8 +231,7 @@ class TestGDPRWebhookURLs:
 
         # Shopify requires these three GDPR webhook URLs
         for path in ["customers-data-request", "customers-redact", "shop-redact"]:
-            assert path in content, \
-                f"shopify.app.toml missing GDPR webhook path: {path}"
+            assert path in content, f"shopify.app.toml missing GDPR webhook path: {path}"
 
 
 # ---------------------------------------------------------------------------
@@ -232,13 +248,16 @@ class TestAPIVersioning:
         assert response.status_code == 200
 
         # Check for API version in response headers or body
-        has_version_header = "x-api-version" in {
-            k.lower() for k in response.headers.keys()
-        }
-        has_version_body = "version" in response.json() if response.headers.get("content-type", "").startswith("application/json") else False
+        has_version_header = "x-api-version" in {k.lower() for k in response.headers.keys()}
+        has_version_body = (
+            "version" in response.json()
+            if response.headers.get("content-type", "").startswith("application/json")
+            else False
+        )
 
-        assert has_version_header or has_version_body, \
+        assert has_version_header or has_version_body, (
             "API should include version information in header or response body"
+        )
 
     def test_api_version_format(self, app_client):
         """API version follows semver format."""

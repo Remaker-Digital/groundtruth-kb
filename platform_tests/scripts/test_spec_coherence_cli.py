@@ -41,11 +41,12 @@ id = "surface-overlap-opposite-polarity"
 class = "surface_overlap"
 description = "surface overlap"
 surface_tags = ["cached_startup_snapshot_authority"]
-polarity_pairs = [
-  { positive = "\\blive\\s+(?:project\\s+)?sources\\b", negative = "\\bcached\\s+startup\\s+snapshots\\b|\\bcached\\s+summaries\\b" },
-]
 classification = "contradiction_candidate"
 remediation_hint = "clarify authority"
+
+[[rules.polarity_pairs]]
+positive = "\\blive\\s+(?:project\\s+)?sources\\b"
+negative = "\\bcached\\s+startup\\s+snapshots\\b|\\bcached\\s+summaries\\b"
 
 [[rules]]
 id = "authority-hierarchy-invariant"

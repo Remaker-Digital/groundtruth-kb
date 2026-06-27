@@ -2,7 +2,7 @@
 
 <!-- © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. -->
 
-This guide covers authentication failures that the bridge poller may
+This guide covers authentication failures that bridge automation may
 encounter when invoking Prime Builder (Claude Code) or Loyal Opposition
 (Codex). groundtruth-kb does not manage tokens or credentials — it only
 documents the steps needed to restore a working session.
@@ -11,7 +11,7 @@ documents the steps needed to restore a working session.
 
 ## "Bridge says AUTH FAILURE"
 
-The poller writes `AUTH FAILURE` (or similar) to the scan-status file when
+The bridge dispatcher records `AUTH FAILURE` (or similar) in dispatch state or logs when
 the underlying agent CLI exits with an authentication error. The most common
 causes are:
 
@@ -20,7 +20,7 @@ causes are:
 | Expired OAuth session | `claude` exits non-zero; logs show 401 or "session expired" |
 | Missing `ANTHROPIC_API_KEY` | Claude Desktop / API mode exits with key error |
 | Codex token expired | `codex exec` exits with 401 or token-expired message |
-| Environment variable not inherited | Scheduled-task spawn does not see the token |
+| Environment variable not inherited | Dispatched harness process does not see the token |
 
 ---
 
@@ -31,10 +31,10 @@ session expires:
 
 1. Open **Claude Desktop** on your workstation.
 2. Sign out and sign back in — this refreshes the OAuth token.
-3. If the poller runs in a scheduled task, verify the task inherits the
-   updated session by running one manual foreground scan.
-4. On Windows: the scheduled task must run as your user account (not
-   SYSTEM) to inherit the Claude Desktop session context.
+3. If bridge automation runs headlessly, verify the dispatched process inherits
+   the updated session by running one manual foreground scan.
+4. On Windows: the headless dispatch process must run as your user account
+   (not SYSTEM) to inherit the Claude Desktop session context.
 
 ---
 
@@ -44,9 +44,9 @@ If you run `claude` with an API key instead of Claude Desktop OAuth:
 
 1. Verify the key is valid: visit [console.anthropic.com](https://console.anthropic.com) and confirm the key is active.
 2. Export the key in your shell: `export ANTHROPIC_API_KEY=sk-ant-...`
-3. If using a scheduled task or cron job, add the environment variable
-   to the task or cron entry explicitly — inherited environment from your
-   shell is often not available in scheduled contexts.
+3. If using a headless launcher, add the environment variable to that process
+   explicitly — inherited environment from your shell is often not available
+   in background contexts.
 
 ---
 
@@ -57,8 +57,8 @@ expires:
 
 1. Run `codex auth` (or the equivalent command for your Codex version)
    to refresh the token.
-2. If the poller runs as a scheduled task, re-run the auth command in the
-   same user context the scheduled task uses.
+2. If bridge automation runs headlessly, re-run the auth command in the
+   same user context the dispatcher uses.
 3. Verify with a manual `codex exec "echo ok"` before relying on the
    scheduler.
 
@@ -66,12 +66,12 @@ expires:
 
 ## Environment Variable Not Inherited
 
-Scheduled tasks (Windows Task Scheduler, cron) often run with a minimal
-environment that does not include variables set in your shell profile.
+Headless dispatch processes often run with a minimal environment that does not
+include variables set in your shell profile.
 
-**Windows Task Scheduler fix:**
+**Windows process-launch fix:**
 
-In the poller script, explicitly set the environment variable before
+In the dispatch launcher, explicitly set the environment variable before
 invoking the agent:
 
 ```powershell
@@ -79,7 +79,7 @@ $psi = [System.Diagnostics.ProcessStartInfo]::new("claude", $args)
 $psi.EnvironmentVariables["ANTHROPIC_API_KEY"] = $env:ANTHROPIC_API_KEY
 ```
 
-**cron fix:**
+**cron or service-manager fix:**
 
 Add the variable to the crontab entry:
 
@@ -87,7 +87,7 @@ Add the variable to the crontab entry:
 */3 * * * * ANTHROPIC_API_KEY=sk-ant-... /path/to/poller.sh
 ```
 
-Or source your profile at the top of the poller script:
+Or source your profile at the top of the launcher script:
 
 ```bash
 #!/bin/bash
@@ -99,14 +99,12 @@ source ~/.bashrc
 ## Still Not Working?
 
 1. Run `gt project doctor` — it reports bridge status and freshness.
-2. Check the scan-status file directly:
-   - Claude: `independent-progress-assessments/bridge-automation/logs/claude-scan-status.json`
-   - Codex: `independent-progress-assessments/bridge-automation/logs/codex-scan-status.json`
-3. Check the raw poller log under
-   `independent-progress-assessments/bridge-automation/` for the most
-   recent error output.
-4. Run the poller script manually in a foreground terminal to see the
-   exact error without scheduled-task buffering.
+2. Check bridge dispatch state directly:
+   - `.gtkb-state/bridge-poller/dispatch-state.json`
+   - `.gtkb-state/dispatcher-daemon/`
+3. Check the raw dispatch logs for the most recent error output.
+4. Run the failing harness command manually in a foreground terminal to see
+   the exact error without headless-process buffering.
 
 ---
 

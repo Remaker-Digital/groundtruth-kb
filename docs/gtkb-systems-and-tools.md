@@ -27,10 +27,9 @@ Dashboard/startup surfaces are summaries only.
 | MEMORY.md | `memory/MEMORY.md` | Harness-memory operational notepad in this checkout. |
 | canonical glossary | `.claude/rules/canonical-terminology.md` | Term meanings, not concrete artifact lookup. |
 | operating model | `.claude/rules/operating-model.md` | Rule-cited soft authority. |
-| file bridge | TAFE-backed bridge state + bridge dispatcher CLI | `.claude/rules/file-bridge-protocol.md` describes legacy helper behavior and historical audit semantics. |
+| file bridge | TAFE-backed bridge state + bridge dispatcher CLI | `.claude/rules/file-bridge-protocol.md` defines status semantics and implementation-start authorization. |
 | bridge queue | TAFE-backed bridge state | Retired bridge-index artifacts are not live queue authority. |
-| smart poller | `independent-progress-assessments/bridge-automation/` | Optional helper for bridge monitoring. |
-| retired OS poller | `.claude/rules/file-bridge-protocol.md` | Must not be restored. |
+| bridge dispatch automation | cross-harness event-driven trigger and dispatcher daemon substrate | Active dispatch path; retired smart-poller and OS-poller surfaces must not be restored. |
 | dashboard | `docs/gtkb-dashboard/session-startup-report.md` | Generated summary, not authority. |
 | release readiness | `memory/release-readiness.md` | Working release evidence record. |
 | release gate | `scripts/release_candidate_gate.py` | Local non-deploying gate script. |
