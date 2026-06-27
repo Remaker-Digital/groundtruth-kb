@@ -452,3 +452,137 @@ def test_backlog_update_invalid_stage_transition(runner: CliRunner, project_dir:
     )
     assert result.exit_code != 0
     assert "Invalid stage transition" in result.output
+
+
+def test_update_description_file_with_embedded_quotes(runner: CliRunner, project_dir: Path) -> None:
+    """WI-4727 / GOV-STANDING-BACKLOG-001: --description-file sets a description
+    containing embedded double-quotes correctly. The file content never transits
+    argv, so PowerShell native-exe arg-split cannot corrupt the embedded quotes."""
+    _seed_db(project_dir)
+    description_text = 'Realign the "foo" widget and the "bar" gadget per owner note.'
+    desc_path = project_dir / "wi4727_desc.txt"
+    desc_path.write_text(description_text, encoding="utf-8")
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "update",
+            "WI-IMPROVEMENT",
+            "--description-file",
+            str(desc_path),
+            "--owner-approved",
+            "--change-reason",
+            "set description from file (WI-4727)",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Updated work item WI-IMPROVEMENT." in result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        latest = db.get_work_item("WI-IMPROVEMENT")
+        assert latest is not None
+        assert latest["description"] == description_text
+    finally:
+        db.close()
+
+
+def test_update_description_inline_still_works(runner: CliRunner, project_dir: Path) -> None:
+    """WI-4727 / GOV-STANDING-BACKLOG-001: the existing --description TEXT path is
+    unchanged (backward compatibility)."""
+    _seed_db(project_dir)
+    description_text = "Inline description unchanged by the new option."
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "update",
+            "WI-IMPROVEMENT",
+            "--description",
+            description_text,
+            "--owner-approved",
+            "--change-reason",
+            "set description inline",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        latest = db.get_work_item("WI-IMPROVEMENT")
+        assert latest is not None
+        assert latest["description"] == description_text
+    finally:
+        db.close()
+
+
+def test_update_description_and_file_mutually_exclusive(runner: CliRunner, project_dir: Path) -> None:
+    """DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001: supplying both
+    --description and --description-file is a usage error (no traceback) and writes
+    nothing."""
+    _seed_db(project_dir)
+    desc_path = project_dir / "wi4727_both.txt"
+    desc_path.write_text("file content", encoding="utf-8")
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "update",
+            "WI-IMPROVEMENT",
+            "--description",
+            "inline content",
+            "--description-file",
+            str(desc_path),
+            "--owner-approved",
+            "--change-reason",
+            "both inputs supplied",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Cannot specify both --description and --description-file" in result.output
+    assert "Traceback" not in result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        assert len(db.get_work_item_history("WI-IMPROVEMENT")) == 1
+    finally:
+        db.close()
+
+
+def test_update_description_file_missing_path_errors(runner: CliRunner, project_dir: Path) -> None:
+    """DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001: a missing --description-file
+    path is rejected by Click's exists=True validation with a clear usage error and
+    no traceback, writing nothing."""
+    _seed_db(project_dir)
+    missing_path = project_dir / "wi4727_missing.txt"
+
+    result = runner.invoke(
+        main,
+        [
+            *_config_args(project_dir),
+            "backlog",
+            "update",
+            "WI-IMPROVEMENT",
+            "--description-file",
+            str(missing_path),
+            "--owner-approved",
+            "--change-reason",
+            "missing description file",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--description-file" in result.output
+    assert "does not exist" in result.output
+    assert "Traceback" not in result.output
+
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        assert len(db.get_work_item_history("WI-IMPROVEMENT")) == 1
+    finally:
+        db.close()
