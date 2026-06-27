@@ -149,13 +149,15 @@ def _start_detached(
             "-WindowStyle Hidden -PassThru; "
             "Write-Output $p.Id"
         )
-        completed = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps],
-            cwd=str(project_dir),
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        run_kwargs: dict[str, object] = {
+            "cwd": str(project_dir),
+            "capture_output": True,
+            "text": True,
+            "check": True,
+            "stdin": subprocess.DEVNULL,
+            "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        }
+        completed = subprocess.run(["powershell", "-NoProfile", "-Command", ps], **run_kwargs)
         lines = [line.strip() for line in (completed.stdout or "").splitlines() if line.strip()]
         if not lines:
             raise RuntimeError("launcher did not receive child PID")

@@ -81,6 +81,36 @@ def test_ensure_restarts_dead_daemon(tmp_path, monkeypatch):
     assert spawn_calls[0][1] == 45
 
 
+def test_spawn_detached_daemon_runs_headless_on_windows(tmp_path, monkeypatch):
+    """The supervisor's Windows fallback must not create a visible console window."""
+    expected_no_window = 0x08000000
+    expected_detached = 0x00000008
+    expected_new_group = 0x00000200
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            self.pid = 2468
+
+    monkeypatch.setattr(ensure.os, "name", "nt")
+    monkeypatch.setattr(ensure.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(ensure.subprocess, "DETACHED_PROCESS", expected_detached, raising=False)
+    monkeypatch.setattr(ensure.subprocess, "CREATE_NEW_PROCESS_GROUP", expected_new_group, raising=False)
+    monkeypatch.setattr(ensure.subprocess, "Popen", _FakePopen)
+
+    assert ensure._spawn_detached_daemon(tmp_path, 30) == 2468
+    kwargs = captured["kwargs"]
+    flags = int(kwargs.get("creationflags", 0))
+    assert flags & expected_no_window
+    assert flags & expected_detached
+    assert flags & expected_new_group
+    assert kwargs.get("stdin") == subprocess.DEVNULL
+    assert kwargs.get("stdout") == subprocess.DEVNULL
+    assert kwargs.get("stderr") == subprocess.DEVNULL
+
+
 # --- Persistent log + diagnosability -----------------------------------------
 
 

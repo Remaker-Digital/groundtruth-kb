@@ -945,10 +945,17 @@ def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
     script = config.project_root / "scripts" / "gtkb_dispatcher_daemon.py"
     # True detach (WI-4855 defect 3): the daemon must survive its launching
     # shell / scheduled task.
-    popen_kwargs: dict[str, object] = {"cwd": str(config.project_root)}
+    popen_kwargs: dict[str, object] = {
+        "cwd": str(config.project_root),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
     if os.name == "nt":
-        popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        popen_kwargs["creationflags"] = (
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
         )
     else:
         popen_kwargs["start_new_session"] = True
@@ -6220,7 +6227,8 @@ def deliberations_rebuild_index(ctx: click.Context) -> None:
     result = db.rebuild_deliberation_index()
     if result.get("errors") and result["errors"] == ["ChromaDB not installed"]:
         click.echo(
-            'Error: ChromaDB is not installed. Install it into the gt venv with:\n  pip install "groundtruth-kb[search]"'
+            "Error: ChromaDB is not installed. Install it into the gt venv with:\n"
+            '  pip install "groundtruth-kb[search]"'
         )
         raise SystemExit(1)
     click.echo(f"Indexed {result['indexed']} deliberation(s), {result['chunks']} chunk(s).")
@@ -6658,7 +6666,8 @@ def deliberations_search(
 
         if not getattr(_db_mod, "HAS_CHROMADB", False):
             click.echo(
-                'Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n  pip install "groundtruth-kb[search]"'
+                "Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n"
+                '  pip install "groundtruth-kb[search]"'
             )
             raise SystemExit(1)
 

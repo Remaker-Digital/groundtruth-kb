@@ -33,10 +33,17 @@ import gtkb_dispatcher_daemon as daemon  # noqa: E402
 def _spawn_detached_daemon(project_root: Path, interval: int) -> int:
     """Spawn the detached daemon loop, mirroring the cli start spawn (WI-4855 true detach)."""
     script = _SCRIPTS_DIR / "gtkb_dispatcher_daemon.py"
-    popen_kwargs: dict[str, object] = {"cwd": str(project_root)}
+    popen_kwargs: dict[str, object] = {
+        "cwd": str(project_root),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
     if os.name == "nt":
-        popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        popen_kwargs["creationflags"] = (
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
         )
     else:
         popen_kwargs["start_new_session"] = True

@@ -388,6 +388,9 @@ def test_codex_hook_commands_avoid_shell_specific_command_substitution() -> None
     assert 'HARNESS_ID = "A"' not in stop_text
     assert "resolved_harness_id" in stop_text
     assert "--role-profile" not in stop_text
+    assert "CREATE_NO_WINDOW" in stop_text
+    assert "CREATE_NEW_PROCESS_GROUP" in stop_text
+    assert "subprocess.DEVNULL" in stop_text
 
     wrapup_dispatcher = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_wrapup_trigger_dispatch.py"
     wrapup_text = wrapup_dispatcher.read_text(encoding="utf-8")

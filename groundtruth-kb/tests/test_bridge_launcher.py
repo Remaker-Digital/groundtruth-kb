@@ -123,6 +123,46 @@ def test_main_with_no_worker_falls_back(isolated_bridge: Path, tmp_path: Path) -
     assert result == 0
 
 
+def test_start_detached_windows_wrapper_runs_headless(isolated_bridge: Path, tmp_path: Path, monkeypatch) -> None:
+    """The Windows PowerShell wrapper for Start-Process must not flash a console."""
+    import types
+
+    from groundtruth_kb.bridge import launcher  # noqa: PLC0415
+
+    expected_no_window = 0x08000000
+    captured: dict[str, Any] = {}
+
+    def _fake_run(args: list[str], **kwargs: object) -> object:
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return types.SimpleNamespace(stdout="4321\n")
+
+    monkeypatch.setattr(launcher.os, "name", "nt")
+    monkeypatch.setattr(launcher.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(launcher.subprocess, "run", _fake_run)
+
+    pid = launcher._start_detached(  # type: ignore[attr-defined]
+        tmp_path,
+        agent="codex",
+        cadence_minutes=9,
+        timeout_seconds=20,
+        poll_interval_ms=500,
+        limit=3,
+        max_dispatch_targets=1,
+        exec_timeout_seconds=120,
+        error_backoff_seconds=60,
+    )
+
+    assert pid == 4321
+    args = captured["args"]
+    kwargs = captured["kwargs"]
+    assert args[:2] == ["powershell", "-NoProfile"]
+    assert "-WindowStyle Hidden" in args[-1]
+    assert int(kwargs.get("creationflags", 0)) & expected_no_window
+    assert kwargs.get("stdin") == launcher.subprocess.DEVNULL
+    assert kwargs.get("capture_output") is True
+
+
 def test_main_with_scheduled_task(isolated_bridge: Path, tmp_path: Path) -> None:
     """main() when scheduled task exists, starts it."""
     from groundtruth_kb.bridge import launcher  # noqa: PLC0415

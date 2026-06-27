@@ -476,8 +476,12 @@ def test_daemon_start_spawns_detached(tmp_path: Path) -> None:
         flags = int(kwargs.get("creationflags", 0))
         assert flags & subprocess.DETACHED_PROCESS
         assert flags & subprocess.CREATE_NEW_PROCESS_GROUP
+        assert flags & subprocess.CREATE_NO_WINDOW
     else:
         assert kwargs.get("start_new_session") is True
+    assert kwargs.get("stdin") == subprocess.DEVNULL
+    assert kwargs.get("stdout") == subprocess.DEVNULL
+    assert kwargs.get("stderr") == subprocess.DEVNULL
     assert captured["args"][0] == sys.executable
 
 

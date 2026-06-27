@@ -1,5 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -18,8 +19,21 @@ def _persistent_harness_id() -> str:
         raise RuntimeError(f"Could not resolve persistent harness identity for {HARNESS_NAME}")
     return harness_id
 
+
 stdout = (OUT_DIR / "last-session-stop.json").open("w", encoding="utf-8")
 stderr = (OUT_DIR / "last-session-stop.err").open("w", encoding="utf-8")
+
+popen_kwargs: dict[str, object] = {
+    "stdin": subprocess.DEVNULL,
+    "stdout": stdout,
+    "stderr": stderr,
+    "cwd": str(PROJECT_ROOT),
+    "close_fds": True,
+}
+if os.name == "nt":
+    popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
+        subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+    )
 
 subprocess.Popen(
     [
@@ -34,10 +48,7 @@ subprocess.Popen(
         "--harness-id",
         _persistent_harness_id(),
     ],
-    stdout=stdout,
-    stderr=stderr,
-    cwd=str(PROJECT_ROOT),
-    close_fds=True,
+    **popen_kwargs,
 )
 
 print("{}")
