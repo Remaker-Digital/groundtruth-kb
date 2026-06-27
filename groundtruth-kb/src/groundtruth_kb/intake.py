@@ -418,6 +418,7 @@ def confirm_intake(
     spec = db.insert_spec(
         id=spec_id,
         title=content.get("proposed_title", "Untitled"),
+        description=content.get("raw_text"),
         status="specified",
         changed_by=changed_by,
         change_reason=f"Confirmed from intake {deliberation_id}",
