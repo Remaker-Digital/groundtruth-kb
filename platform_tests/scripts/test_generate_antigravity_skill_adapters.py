@@ -283,3 +283,24 @@ def test_codex_and_antigravity_registry_updates_converge(
     assert first_module.update_registry(tmp_path, first_adapters) is False
     assert second_module.update_registry(tmp_path, second_adapters) is False
     assert registry_path.read_text(encoding="utf-8") == converged_text
+
+
+def _assert_lf_clean_output(path: Path) -> None:
+    data = path.read_bytes()
+    assert b"\r" not in data, f"{path} contains CR bytes"
+    for lineno, line in enumerate(data.decode("utf-8").splitlines(), start=1):
+        if line != line.rstrip():
+            pytest.fail(f"{path}:{lineno}: trailing whitespace")
+
+
+def test_antigravity_generated_output_is_lf_no_trailing_ws(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_skill(tmp_path, "build")
+    _write_registry(tmp_path)
+    changed, _ = module.generate(tmp_path)
+    adapters = module.build_adapters(tmp_path)
+    if module.update_registry(tmp_path, adapters):
+        changed.append("config/agent-control/harness-capability-registry.toml")
+    for rel_path in changed:
+        _assert_lf_clean_output(tmp_path / rel_path)

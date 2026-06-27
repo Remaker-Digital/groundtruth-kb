@@ -415,6 +415,11 @@ def test_update_registry_points_codex_at_generated_adapter(tmp_path: Path) -> No
 # ---------------------------------------------------------------------------
 
 
+def test_codex_generated_output_is_lf_no_trailing_ws(tmp_path: Path) -> None:
+    """WI-4717: guard that codex generator output has no CR bytes or trailing whitespace."""
+    test_generate_emits_lf_only_line_endings(tmp_path)
+
+
 def test_generate_emits_lf_only_line_endings(tmp_path: Path) -> None:
     """WI-4701: generate must write adapter SKILL.md and MANIFEST.json with LF only."""
     module = _load_module()

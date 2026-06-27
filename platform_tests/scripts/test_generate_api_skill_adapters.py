@@ -85,3 +85,19 @@ def test_frontmatter_validation_fails_closed(tmp_path: Path) -> None:
 
     with pytest.raises(gen.ApiSkillAdapterError, match="description"):
         gen.build_adapters(tmp_path)
+
+
+def _assert_lf_clean_output(path: Path) -> None:
+    data = path.read_bytes()
+    assert b"\r" not in data, f"{path} contains CR bytes"
+    for lineno, line in enumerate(data.decode("utf-8").splitlines(), start=1):
+        if line != line.rstrip():
+            pytest.fail(f"{path}:{lineno}: trailing whitespace")
+
+
+def test_api_generated_output_is_lf_no_trailing_ws(tmp_path: Path) -> None:
+    write_registry(tmp_path)
+    write_skill(tmp_path)
+    changed, _ = gen.generate(tmp_path)
+    for rel_path in changed:
+        _assert_lf_clean_output(tmp_path / rel_path)

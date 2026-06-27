@@ -193,14 +193,21 @@ def render_adapter(adapter: ApiSkillAdapter, *, generated_at: str) -> str:
     return "\n".join(lines)
 
 
+def _assert_no_trailing_whitespace(content: str, path: str) -> None:
+    for lineno, line in enumerate(content.splitlines(), start=1):
+        if line != line.rstrip():
+            raise ApiSkillAdapterError(f"{path}:{lineno}: generated content has trailing whitespace: {line!r}")
+
+
 def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
-    existing = path.read_text(encoding="utf-8") if path.is_file() else None
+    existing = path.read_bytes().decode("utf-8") if path.is_file() else None
     if existing == content:
         return False
+    _assert_no_trailing_whitespace(content, path.as_posix())
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content, encoding="utf-8", newline="\n")
     return True
 
 

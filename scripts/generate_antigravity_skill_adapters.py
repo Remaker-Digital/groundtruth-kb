@@ -235,12 +235,13 @@ def _apply_antigravity_registry(text: str, adapters: list[SkillAdapter]) -> str:
 
 def update_registry(project_root: Path, adapters: list[SkillAdapter], *, check: bool = False) -> bool:
     registry_path = project_root / REGISTRY_RELATIVE_PATH
-    current = registry_path.read_text(encoding="utf-8")
+    current = registry_path.read_bytes().decode("utf-8")
     updated = _apply_antigravity_registry(current, adapters)
     if current == updated:
         return False
     if not check:
-        registry_path.write_text(updated, encoding="utf-8")
+        codex_gen._assert_no_trailing_whitespace(updated, registry_path.as_posix())
+        registry_path.write_text(updated, encoding="utf-8", newline="\n")
     return True
 
 
