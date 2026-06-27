@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-26T21:49:02Z",
+  "generated_at": "2026-06-27T06:04:49Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -266,7 +266,7 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 35,
+      "count": 36,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
@@ -288,6 +288,7 @@
         ".claude/rules/deliberation-protocol.md",
         ".claude/rules/dispatcher-daemon-substrate-rollback-runbook.md",
         ".claude/rules/file-bridge-protocol.md",
+        ".claude/rules/governance-emergency-bootstrap-protocol.md",
         ".claude/rules/groundtruth-kb-vision.md",
         ".claude/rules/gtkb-capability-import-policy.md",
         ".claude/rules/loyal-opposition.md",

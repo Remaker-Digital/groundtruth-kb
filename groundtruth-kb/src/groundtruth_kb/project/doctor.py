@@ -1861,6 +1861,178 @@ def _check_spec_classifier_settings_registered(target: Path) -> ToolCheck:
     )
 
 
+def _check_registered_hooks_tracked(target: Path) -> ToolCheck:
+    """WI-4457: WARN when a registered governance hook script is untracked in git.
+
+    For every hook script path referenced in tracked ``.claude/settings.json``
+    event arrays (PreToolUse / PostToolUse / UserPromptSubmit / SessionStart /
+    Stop), assert the file is tracked in git (``git ls-files --error-unmatch``).
+    Sibling check: untracked ``.py`` files under ``.claude/hooks/`` (which the
+    ``!.claude/hooks/*.py`` ``.gitignore`` negation already opts into git).
+
+    Fail-soft ``warning`` (never ``fail``) so a deliberately-untracked local hook
+    never blocks ``doctor``; the advisory is visible at session start before any
+    tool call can hit the WI-4449 session-block class (registered + on-disk +
+    untracked governance hook). No prior doctor check confirmed git-tracking of
+    registered hook scripts; that absence is the surface this check closes.
+    """
+    import json as _json
+    import re as _re
+
+    name = "registered hooks git-tracked"
+    settings_path = target / ".claude" / "settings.json"
+    if not settings_path.exists():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message=".claude/settings.json missing; no registered hooks to verify",
+        )
+
+    try:
+        data = _json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError) as exc:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Malformed .claude/settings.json: {exc}",
+        )
+
+    events = ("PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionStart", "Stop")
+    hooks = data.get("hooks") or {}
+    referenced: set[str] = set()
+    for event in events:
+        for group in hooks.get(event) or []:
+            if not isinstance(group, dict):
+                continue
+            for h in group.get("hooks", []):
+                if not isinstance(h, dict):
+                    continue
+                command = h.get("command") or ""
+                for match in _re.finditer(r"\.claude[\\/]hooks[\\/][A-Za-z0-9_.\-]+\.py", command):
+                    referenced.add(match.group(0).replace("\\", "/"))
+
+    untracked_registered: list[str] = []
+    for rel in sorted(referenced):
+        script = target / rel
+        if not script.exists():
+            # Registered-but-missing-on-disk is a distinct defect class; out of
+            # scope for this tracking check (which only flags present-but-untracked).
+            continue
+        ok, _out = _run_cmd(["git", "-C", str(target), "ls-files", "--error-unmatch", rel])
+        if not ok:
+            untracked_registered.append(rel)
+
+    untracked_siblings: list[str] = []
+    if (target / ".claude" / "hooks").is_dir():
+        ok, out = _run_cmd(["git", "-C", str(target), "ls-files", "--others", "--exclude-standard", ".claude/hooks"])
+        if ok and out:
+            for line in out.splitlines():
+                candidate = line.strip().replace("\\", "/")
+                if candidate.endswith(".py"):
+                    untracked_siblings.append(candidate)
+
+    if untracked_registered or untracked_siblings:
+        parts: list[str] = []
+        if untracked_registered:
+            parts.append("registered-but-untracked: " + ", ".join(untracked_registered))
+        if untracked_siblings:
+            parts.append("untracked .claude/hooks/*.py: " + ", ".join(sorted(set(untracked_siblings))))
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message="; ".join(parts) + " — run `git add` (registered governance hooks must be committed)",
+        )
+
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message="all registered hook scripts are git-tracked",
+    )
+
+
+def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
+    """WI-4871: WARN when a terminal-VERIFIED bridge verdict file is untracked in git.
+
+    The Mandatory VERIFIED Commit-Finalization Gate
+    (``.claude/rules/file-bridge-protocol.md``) requires a ``VERIFIED`` verdict to
+    enter git history together with the verified work. A hook-less harness can
+    write the terminal ``VERIFIED`` verdict file but bypass the finalization
+    commit, leaving verified state untracked in the working tree — a durability
+    risk: a checkout, reset, or mis-scoped sweep can silently discard it.
+
+    This check lists untracked bridge files (``git ls-files --others
+    --exclude-standard bridge``) and flags any whose first non-blank line is the
+    ``VERIFIED`` status token. Inspecting only untracked files keeps the check
+    cheap. Fail-soft ``warning`` (never ``fail``): the brief window between a
+    verdict write and its finalization commit must not block ``doctor``.
+    """
+    name = "untracked VERIFIED verdicts"
+    if not (target / "bridge").is_dir():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="no bridge/ directory; nothing to verify",
+        )
+
+    ok, out = _run_cmd(["git", "-C", str(target), "ls-files", "--others", "--exclude-standard", "bridge"])
+    if not ok:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="git ls-files unavailable; untracked-verdict scan skipped",
+        )
+
+    untracked_verified: list[str] = []
+    for line in out.splitlines():
+        rel = line.strip().replace("\\", "/")
+        if not rel.endswith(".md"):
+            continue
+        try:
+            content = (target / rel).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        first_nonblank = ""
+        for raw in content.splitlines():
+            if raw.strip():
+                first_nonblank = raw.strip()
+                break
+        if first_nonblank == "VERIFIED":
+            untracked_verified.append(rel)
+
+    if untracked_verified:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                "terminal-VERIFIED verdict files are untracked in git "
+                "(commit-finalization bypassed; durability risk) — run `git add` + commit: "
+                + ", ".join(sorted(untracked_verified))
+            ),
+        )
+
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message="all terminal-VERIFIED verdict files are git-tracked",
+    )
+
+
 def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
     """Verify spec-classifier.py is registered in .codex/hooks.json (forward-compatible parity).
 
@@ -2222,6 +2394,27 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         # ISOLATION-018 pending-migration-waiver REPORT, filed S330 prior to
         # the gate landing.
         "gtkb-isolation-018-pending-migration-waiver-005.md",
+        # Historical files containing AUQ/decision keywords before the gate or without actual owner decisions:
+        "gtkb-artifact-recorder-cli-slice-1-deliberations-record-007.md",
+        "gtkb-auq-policy-gates-001-001.md",
+        "gtkb-backlog-approval-state-taxonomy-slice-1-008.md",
+        "gtkb-backlog-approval-state-taxonomy-slice-1-006.md",
+        "gtkb-backlog-approval-state-taxonomy-slice-1-005.md",
+        "gtkb-bridge-work-intent-session-id-live-env-precedence-005.md",
+        "gtkb-bridge-work-intent-session-id-live-env-precedence-003.md",
+        "gtkb-decision-tracker-cached-pending-block-exclusion-005.md",
+        "gtkb-deterministic-services-stale-status-reconciliation-011.md",
+        "gtkb-first-class-project-artifacts-001.md",
+        "gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-005.md",
+        "gtkb-gov-askuserquestion-enforcement-stack-2026-05-04-001.md",
+        "gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-007.md",
+        "gtkb-orphan-wi-backfill-per-wi-retire-exclude-service-005.md",
+        "gtkb-owner-decision-tracker-auto-resolve-cross-turn-003.md",
+        "gtkb-perrole-concurrency-cap-dispatch-003.md",
+        "gtkb-prime-worker-context-aware-auq-slice-2-011.md",
+        "gtkb-prime-worker-context-aware-auq-slice-2-005.md",
+        "gtkb-prime-worker-delivery-regression-slice-4-008.md",
+        "gtkb-role-resolution-r1-r5-assertion-enforcement-005.md",
     }
 
     bridge_filename_date_re = _re.compile(r"(20\d{2}-\d{2}-\d{2})")
@@ -3899,6 +4092,12 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
         )
 
     recipient_state = recipients.get(role)
+    if recipient_state is None:
+        matching = [k for k in recipients if k.startswith(f"{role}:") and isinstance(recipients[k], dict)]
+        if matching:
+            matching.sort(key=lambda k: str(recipients[k].get("updated_at") or ""), reverse=True)
+            recipient_state = recipients[matching[0]]
+
     if not isinstance(recipient_state, dict):
         return ToolCheck(
             name=check_name,
@@ -4075,6 +4274,107 @@ def _try_auto_install(check: ToolCheck) -> ToolCheck:
 # bridge/gtkb-da-harvest-coverage-implementation-005.md).
 DA_HARVEST_COVERAGE_WARN_THRESHOLD = 95.0
 DA_HARVEST_COVERAGE_ERROR_THRESHOLD = 80.0
+
+
+def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
+    """Correlate bridge substrate with dispatcher-daemon liveness (WI-4848 slice 3c)."""
+    check_name = "Dispatcher daemon substrate readiness"
+    from groundtruth_kb.mode_switch.validation import (
+        DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS,
+        DISPATCHER_DAEMON_SUBSTRATE,
+    )
+
+    sub_path = target / "harness-state" / "bridge-substrate.json"
+    substrate = "cross_harness_trigger"
+    if sub_path.is_file():
+        try:
+            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            if isinstance(sub_doc, dict):
+                raw = sub_doc.get("substrate")
+                if isinstance(raw, str) and raw.strip():
+                    substrate = raw.strip()
+        except (OSError, json.JSONDecodeError):
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message="harness-state/bridge-substrate.json is unreadable; substrate correlation skipped",
+            )
+
+    daemon_script = target / "scripts" / "gtkb_dispatcher_daemon.py"
+    if not daemon_script.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message="scripts/gtkb_dispatcher_daemon.py missing; daemon substrate check skipped",
+        )
+
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "gtkb_dispatcher_daemon_doctor",
+        daemon_script,
+    )
+    if spec is None or spec.loader is None:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="could not load gtkb_dispatcher_daemon.py for substrate correlation",
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    daemon_status = module.collect_daemon_status(target)
+    running = bool(daemon_status.get("running"))
+    heartbeat_age = daemon_status.get("heartbeat_age_seconds")
+    stale = not running or heartbeat_age is None or float(heartbeat_age) > DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS
+
+    if substrate == DISPATCHER_DAEMON_SUBSTRATE:
+        if stale:
+            detail = (
+                f"active substrate is {DISPATCHER_DAEMON_SUBSTRATE!r} but daemon is not healthy "
+                f"(running={running}, heartbeat_age_seconds={heartbeat_age})"
+            )
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message=(
+                    detail + f"; threshold={DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS}s. "
+                    "See .claude/rules/dispatcher-daemon-substrate-rollback-runbook.md"
+                ),
+            )
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=(f"active substrate is {DISPATCHER_DAEMON_SUBSTRATE!r} and daemon heartbeat is fresh"),
+        )
+
+    if running and heartbeat_age is not None and float(heartbeat_age) <= DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=(
+                f"substrate is {substrate!r} (daemon running with fresh heartbeat; advisory-only — go-live not active)"
+            ),
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=f"substrate is {substrate!r}; daemon substrate go-live path is not selected",
+    )
 
 
 def _check_cross_harness_trigger(target: Path) -> ToolCheck:
@@ -5760,6 +6060,8 @@ def run_doctor(
         checks.append(_check_active_legacy_root_references(target))
         checks.append(_check_spec_classifier_canonical_path(target))
         checks.append(_check_spec_classifier_settings_registered(target))
+        checks.append(_check_registered_hooks_tracked(target))
+        checks.append(_check_untracked_terminal_verified_verdicts(target))
         checks.append(_check_spec_classifier_codex_parity(target))
         checks.append(_check_spec_classifier_test_exists(target))
         checks.append(_check_untriaged_prose_decisions(target))
@@ -5781,6 +6083,7 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        checks.append(_check_dispatcher_daemon_substrate_readiness(target))
         checks.append(_check_kill_switch_staleness(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
