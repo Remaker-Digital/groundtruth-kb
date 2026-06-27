@@ -182,6 +182,31 @@ OWNER_APPROVAL_MARKER_RES = (
     ),
 )
 
+# Cross-Harness Disposition gate (Slice 4 of PROJECT-GTKB-CROSS-HARNESS-PARITY;
+# DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion PARITY-DISPOSITION-GATE;
+# ADR-CROSS-HARNESS-PARITY-001 Q8). An implementation proposal whose target_paths
+# touch a harness-surface file must declare, per applicable harness, behavioral
+# parity or an owner-approved typed waiver in a ## Cross-Harness Disposition
+# section. The harness-surface marker set is scoped to the demonstrated
+# behavioral-surface set; .cursor/ surfaces and registry-driven expansion are a
+# Slice-6 follow-on.
+CROSS_HARNESS_DISPOSITION_HEADING_RE = re.compile(
+    r"^#{1,6}\s*cross[-\s]?harness\s+disposition\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+HARNESS_SURFACE_PATH_MARKERS = (
+    ".claude/settings.json",
+    ".codex/hooks.json",
+    ".claude/hooks/",
+    ".codex/gtkb-hooks/",
+    ".claude/skills/",
+    ".codex/skills/",
+)
+# Leading bullet / punctuation markers stripped before testing a disposition
+# line for real (alphanumeric) content, so a bare "-", blank bullet, or
+# placeholder line is not mistaken for substantive content.
+DISPOSITION_NONCONTENT_PREFIX_RE = re.compile(r"^[\s>*`_:\-]+")
+
 # Project-linkage metadata gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001).
 # WI-3314: metadata-presence enabling slice. Implementation bridge proposals
 # (NEW/REVISED status, not bridge_kind-exempt) must carry three machine-readable
@@ -975,6 +1000,47 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _target_paths_touch_harness_surface(content: str) -> bool:
+    """Return True when any declared target path is a harness-behavioral surface.
+
+    Realizes the PARITY-DISPOSITION-GATE trigger: a proposal whose target_paths
+    touch ``.claude/settings.json``, ``.codex/hooks.json``, ``.claude/hooks/**``,
+    ``.codex/gtkb-hooks/**``, ``.claude/skills/**``, or ``.codex/skills/**`` is a
+    harness-surface change. Paths are normalized by ``_target_path_set_from_content``.
+    """
+    for path in _target_path_set_from_content(content):
+        for marker in HARNESS_SURFACE_PATH_MARKERS:
+            normalized_marker = marker.rstrip("/")
+            if path == normalized_marker or path.startswith(marker):
+                return True
+    return False
+
+
+def _has_concrete_cross_harness_disposition_section(content: str) -> bool:
+    """Heading present AND at least one substantive (non-placeholder, non-bullet) line.
+
+    Mirrors ``_has_concrete_owner_decisions_section`` but additionally rejects
+    lines that are only bullet/punctuation markers (a bare ``-`` or blank bullet)
+    so a disposition section must carry real per-harness content, not a token.
+    """
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if CROSS_HARNESS_DISPOSITION_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+    for raw in _collect_section_lines(lines, start):
+        stripped = raw.strip()
+        if not stripped or OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(stripped):
+            continue
+        residue = DISPOSITION_NONCONTENT_PREFIX_RE.sub("", stripped)
+        if re.search(r"[A-Za-z0-9]", residue):
+            return True
+    return False
 
 
 def _prior_deliberations_has_unedited_placeholder(content: str) -> bool:
@@ -1782,6 +1848,27 @@ def _deny_reason_for_content(
                     "(Hard-block per .claude/rules/file-bridge-protocol.md "
                     "'Mandatory Implementation-Start Authorization Metadata'; WI-3439.)"
                 )
+        if (
+            first_line in PROJECT_METADATA_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _target_paths_touch_harness_surface(content)
+            and not _has_concrete_cross_harness_disposition_section(content)
+        ):
+            _record_gate_denial(
+                "cross-harness-disposition-missing",
+                file_path,
+                "harness-surface target_paths without a Cross-Harness Disposition section",
+                root=cwd_path,
+            )
+            return (
+                "[Governance] Implementation proposals whose target_paths touch a harness-surface "
+                "file (.claude/settings.json, .codex/hooks.json, .claude/hooks/**, "
+                ".codex/gtkb-hooks/**, .claude/skills/**, .codex/skills/**) must include a "
+                "non-empty ## Cross-Harness Disposition section declaring, per applicable harness, "
+                "behavioral parity or an owner-approved typed waiver. "
+                "(Hard-block per DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion "
+                "PARITY-DISPOSITION-GATE; ADR-CROSS-HARNESS-PARITY-001 Q8.)"
+            )
         if run_pending_preflight and first_line in PENDING_PREFLIGHT_STATUSES:
             bridge_id = _extract_bridge_id_from_path(file_path)
             if bridge_id:
