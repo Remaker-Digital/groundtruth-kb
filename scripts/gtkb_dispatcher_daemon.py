@@ -186,6 +186,46 @@ def release_daemon_lock(state_dir: Path) -> None:
 release_lock = release_daemon_lock
 
 
+def _pid_is_running(pid: int) -> bool:
+    """Best-effort cross-platform liveness probe for a process id (WI-4855)."""
+    if pid <= 0:
+        return False
+    import subprocess  # noqa: PLC0415
+
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True,
+                text=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return str(pid) in result.stdout
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def daemon_process_alive(state_dir: Path) -> bool:
+    """Return True when the PID recorded in daemon.pid is a live process.
+
+    Single-instance enforcement (WI-4855 defect 2): detects a live-but-lockless
+    daemon so ``start`` refuses to spawn a second instance even when the lock is
+    stale or absent. Reads the PID file written by ``run_loop``.
+    """
+    pid_path = state_dir / PID_FILENAME
+    try:
+        pid = int(pid_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return False
+    return _pid_is_running(pid)
+
+
 def write_heartbeat(state_dir: Path) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / HEARTBEAT_FILENAME).write_text(_now_iso() + "\n", encoding="utf-8")

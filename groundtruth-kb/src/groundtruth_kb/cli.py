@@ -877,9 +877,21 @@ def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
     """Start the shadow dispatcher daemon in the background."""
     config = _resolve_config(ctx)
     daemon = _import_dispatcher_daemon_module(config.project_root)
-    if daemon.read_daemon_status(config.project_root).get("running"):
-        raise click.ClickException("dispatcher daemon already running (lock held)")
+    state_dir = daemon.daemon_state_dir(config.project_root)
+    # Single-instance enforcement (WI-4855 defect 2): refuse when the lock is
+    # held OR a live-but-lockless daemon process is detected via daemon.pid.
+    if daemon.read_daemon_status(config.project_root).get("running") or daemon.daemon_process_alive(state_dir):
+        raise click.ClickException("dispatcher daemon already running (lock held or live process detected)")
     script = config.project_root / "scripts" / "gtkb_dispatcher_daemon.py"
+    # True detach (WI-4855 defect 3): the daemon must survive its launching
+    # shell / scheduled task.
+    popen_kwargs: dict[str, object] = {"cwd": str(config.project_root)}
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        )
+    else:
+        popen_kwargs["start_new_session"] = True
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -890,7 +902,7 @@ def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
             "--tick-seconds",
             str(interval),
         ],
-        cwd=str(config.project_root),
+        **popen_kwargs,
     )
     click.echo(f"Started shadow dispatcher daemon pid={proc.pid}")
 
@@ -901,20 +913,29 @@ def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
     """Stop the shadow dispatcher daemon and release its lock."""
     config = _resolve_config(ctx)
     daemon = _import_dispatcher_daemon_module(config.project_root)
-    state_dir = daemon.daemon_state_dir(config.project_root)
-    lock_path = state_dir / daemon.LOCK_FILENAME
-    if lock_path.is_file():
-        try:
-            import signal
+    from groundtruth_kb.bridge_dispatch_reset import terminate_pid_tree
 
-            lock_payload = json.loads(lock_path.read_text(encoding="utf-8"))
-            pid = int(lock_payload.get("pid", 0))
-            if pid > 0:
-                os.kill(pid, signal.SIGTERM)
-        except (OSError, ValueError, json.JSONDecodeError):
-            pass
+    state_dir = daemon.daemon_state_dir(config.project_root)
+    # Terminate the daemon process tree via the authoritative daemon.pid file
+    # (WI-4855 defect 1) before releasing the lock, so neither the daemon nor
+    # its children are orphaned. terminate_pid_tree is best-effort and no-ops on
+    # an already-dead pid.
+    pid_path = state_dir / daemon.PID_FILENAME
+    terminated_pid = 0
+    try:
+        pid = int(pid_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        pid = 0
+    if pid > 0:
+        terminate_pid_tree(pid)
+        terminated_pid = pid
+    with contextlib.suppress(OSError):
+        pid_path.unlink()
     daemon.release_daemon_lock(state_dir)
-    click.echo("Stopped shadow dispatcher daemon (lock released).")
+    if terminated_pid:
+        click.echo(f"Stopped dispatcher daemon (pid={terminated_pid} tree terminated, lock released).")
+    else:
+        click.echo("Stopped dispatcher daemon (no recorded pid; lock released).")
 
 
 def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):

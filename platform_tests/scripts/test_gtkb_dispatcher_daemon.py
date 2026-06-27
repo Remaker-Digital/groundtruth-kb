@@ -5,7 +5,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 import time
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -354,6 +358,112 @@ def test_run_tick_emits_restart_watchdog_when_dormant(tmp_path: Path, monkeypatc
     assert wd.get("remediation_hint") == "restart_storm_watchdog"
     assert "watchdog_restart" in result
     assert result["watchdog_restart"]["launched"] is True
+
+
+# ---------------------------------------------------------------------------
+# WI-4855: daemon process-lifecycle hardening (start/stop control surface).
+# These tests exercise the production CLI commands
+# (gt bridge dispatch daemon start|stop) in groundtruth_kb/cli.py via
+# CliRunner — the exposed control surface — per GOV-10/GOV-19 outside-in
+# testing. cli is imported lazily inside each test so the daemon-script tests
+# above stay independent of cli package importability.
+# ---------------------------------------------------------------------------
+
+
+def _daemon_cli_patches(gtcli, daemon, project_root: Path):
+    """Patch context: resolve config to ``project_root`` and reuse the already
+    loaded daemon module, so the synthetic project needs no real daemon script."""
+    cfg = types.SimpleNamespace(project_root=project_root)
+    return (
+        patch.object(gtcli, "_resolve_config", return_value=cfg),
+        patch.object(gtcli, "_import_dispatcher_daemon_module", return_value=daemon),
+    )
+
+
+def test_daemon_start_spawns_detached(tmp_path: Path) -> None:
+    """Defect (3) true detach: ``start`` spawns the daemon with platform-detach
+    flags so the daemon survives its launching shell / scheduled task."""
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            self.pid = 4242
+
+    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+    with cfg_patch, import_patch, patch.object(gtcli.subprocess, "Popen", _FakePopen):
+        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
+
+    assert result.exit_code == 0, result.output
+    kwargs = captured["kwargs"]
+    if os.name == "nt":
+        flags = int(kwargs.get("creationflags", 0))
+        assert flags & subprocess.DETACHED_PROCESS
+        assert flags & subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        assert kwargs.get("start_new_session") is True
+    assert captured["args"][0] == sys.executable
+
+
+def test_daemon_start_refuses_when_live_instance_present(tmp_path: Path) -> None:
+    """Defect (2) single-instance: with a live (lock-cleared) daemon process
+    recorded in daemon.pid, a second ``start`` is refused via the real
+    process-liveness probe (no lock file is present)."""
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    state_dir = daemon.daemon_state_dir(tmp_path)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Record the current (alive) test-process pid. No lock file is present, so
+    # only process-liveness detection can catch the running instance.
+    (state_dir / daemon.PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+
+    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+    with cfg_patch, import_patch:
+        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
+
+    # Refusal raises ClickException before the spawn branch; the success branch
+    # would instead echo "Started ..." and exit 0.
+    assert result.exit_code != 0
+    assert "already running" in result.output
+    assert "Started" not in result.output
+
+
+def test_daemon_stop_terminates_process_tree(tmp_path: Path) -> None:
+    """Defect (1) clean stop: ``stop`` terminates the recorded daemon process
+    tree (via daemon.pid), clears the pid file, and releases the lock."""
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    state_dir = daemon.daemon_state_dir(tmp_path)
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    # Real throwaway child process for stop to terminate.
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+    try:
+        (state_dir / daemon.PID_FILENAME).write_text(str(child.pid) + "\n", encoding="utf-8")
+        assert daemon.acquire_daemon_lock(state_dir) is True
+
+        cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+        with cfg_patch, import_patch:
+            result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_stop_cmd, [], obj={})
+
+        assert result.exit_code == 0, result.output
+        # taskkill /T is asynchronous on Windows; poll for termination.
+        deadline = time.time() + 10
+        while time.time() < deadline and daemon._pid_is_running(child.pid):
+            time.sleep(0.2)
+        assert daemon._pid_is_running(child.pid) is False
+        assert not (state_dir / daemon.PID_FILENAME).exists()
+        assert daemon.read_daemon_status(tmp_path).get("running") is not True
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=10)
 
 
 def test_run_tick_watchdog_restart_failsoft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
