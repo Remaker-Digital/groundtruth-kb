@@ -34,7 +34,12 @@ class _RecordingProcess:
         return 0
 
 
-def _invoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, os_name: str) -> dict[str, object]:
+def _invoke(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    os_name: str,
+    command: list[str] | None = None,
+) -> dict[str, object]:
     """Run run_with_status.main() with Popen stubbed, returning the captured Popen kwargs."""
     captured: dict[str, object] = {}
 
@@ -48,7 +53,7 @@ def _invoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, os_name: str) -> di
 
     status_file = tmp_path / "status.txt"
     with pytest.raises(SystemExit) as exc_info:
-        run_with_status.main([str(status_file), sys.executable, "--version"])
+        run_with_status.main([str(status_file), *(command or [sys.executable, "--version"])])
 
     captured["exit_code"] = exc_info.value.code
     captured["status_file"] = status_file
@@ -82,6 +87,30 @@ def test_status_file_records_exit_code(monkeypatch: pytest.MonkeyPatch, tmp_path
     status_file = captured["status_file"]
     assert isinstance(status_file, Path)
     assert status_file.read_text(encoding="utf-8").strip() == "0"
+
+
+def test_windows_python_command_uses_sibling_pythonw_when_available(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    python_exe = tmp_path / "Scripts" / "python.exe"
+    pythonw_exe = tmp_path / "Scripts" / "pythonw.exe"
+    pythonw_exe.parent.mkdir()
+    pythonw_exe.write_text("", encoding="utf-8")
+
+    captured = _invoke(monkeypatch, tmp_path, "nt", [str(python_exe), "--version"])
+
+    assert captured["cmd_args"][0] == str(pythonw_exe)
+
+
+def test_windows_python_command_falls_back_when_pythonw_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    python_exe = tmp_path / "Scripts" / "python.exe"
+    python_exe.parent.mkdir()
+
+    captured = _invoke(monkeypatch, tmp_path, "nt", [str(python_exe), "--version"])
+
+    assert captured["cmd_args"][0] == str(python_exe)
 
 
 class _HangingProcess:
@@ -215,11 +244,11 @@ def test_lifetime_rejects_nonpositive(tmp_path: Path) -> None:
 
 def test_dispatch_lo_gets_review_lifetime() -> None:
     """SPEC-CENTRALIZED-DISPATCH-SERVICE-001 (LO budget routing): the dispatcher routes the
-    longer review lifetime to Loyal Opposition / verification dispatches and None (the wrapper
-    default) to every other role."""
+    longer review lifetime to Loyal Opposition / verification dispatches and the bounded
+    implementation lifetime to Prime Builder dispatches."""
     from scripts import cross_harness_bridge_trigger as trigger
 
     assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
     assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS
-    assert trigger.worker_lifetime_seconds("prime-builder") is None
+    assert trigger.worker_lifetime_seconds("prime-builder") == trigger.PB_IMPL_WORKER_LIFETIME_SECONDS
     assert trigger.worker_lifetime_seconds(None) is None

@@ -105,7 +105,11 @@ def test_reachability_probe_returns_true_when_endpoint_alive(verify_module, monk
 
 
 def test_autostart_probe_detects_windows_task(verify_module) -> None:
+    captured: dict[str, object] = {}
+
     def _runner(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        captured["kwargs"] = kwargs
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -123,6 +127,10 @@ def test_autostart_probe_detects_windows_task(verify_module) -> None:
     assert result["configured"] is True
     assert result["scheduled_tasks"] == ["GTKB-Ollama-Serve"]
     assert "warning" not in result
+    assert captured["args"][:4] == ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive"]
+    kwargs = captured["kwargs"]
+    assert kwargs["stdin"] is subprocess.DEVNULL
+    assert kwargs["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 
 
 def test_autostart_probe_warns_when_no_task_or_service(verify_module) -> None:

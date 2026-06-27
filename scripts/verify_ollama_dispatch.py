@@ -134,13 +134,25 @@ $services = @(Get-Service | Where-Object {
 } | ConvertTo-Json -Compress
 """
     runner = command_runner or subprocess.run
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
     try:
         completed = runner(
-            [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                ps_script,
+            ],
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
+            creationflags=creationflags,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {

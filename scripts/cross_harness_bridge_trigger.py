@@ -86,7 +86,7 @@ from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS  # noqa: E402
 from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
     dispatch_is_draining,
 )
-from groundtruth_kb.bridge_dispatch_reset import (
+from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
     terminate_pid_tree as _terminate_pid_tree,
 )
 
@@ -98,6 +98,20 @@ def _repo_venv_command(executable_name: str) -> str:
     if os.name == "nt" and not exe_name.endswith(".exe"):
         exe_name = f"{exe_name}.exe"
     return Path("groundtruth-kb", ".venv", bin_dir, exe_name).as_posix()
+
+
+def _prefer_windows_gui_python(command: str) -> str:
+    """Return sibling pythonw.exe for Windows python.exe commands when present."""
+    if os.name != "nt":
+        return command
+    last_backslash = command.rfind("\\")
+    last_slash = command.rfind("/")
+    split_at = max(last_backslash, last_slash)
+    executable_name = command[split_at + 1 :] if split_at >= 0 else command
+    if executable_name.lower() != "python.exe":
+        return command
+    candidate = f"{command[: split_at + 1]}pythonw.exe" if split_at >= 0 else "pythonw.exe"
+    return candidate if os.path.isfile(candidate) else command
 
 
 def _worker_pythonpath(inherited: str | None) -> str:
@@ -2239,7 +2253,7 @@ def _post_dispatch_poll(
 ) -> None:
     """Spawn a durable subprocess to poll for dispatch verdict in background."""
     command = [
-        sys.executable,
+        _prefer_windows_gui_python(sys.executable),
         str(Path(__file__).resolve()),
         "--project-root",
         str(project_root),
@@ -3525,7 +3539,7 @@ def _spawn_harness(
     sig = _signature(selected)
     status_file_path = runs_dir / f"{dispatch_id}.exit_code"
     wrapped_command = [
-        sys.executable,
+        _prefer_windows_gui_python(sys.executable),
         str(project_root / "scripts" / "run_with_status.py"),
         "--stdout",
         str(stdout_path),

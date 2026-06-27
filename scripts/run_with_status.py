@@ -17,6 +17,20 @@ TIMEOUT_EXIT_CODE = 124  # coreutils `timeout` convention; distinguishes a lifet
 TERMINATE_GRACE_SECONDS = 10
 
 
+def _prefer_windows_gui_python(command: str) -> str:
+    """Return sibling pythonw.exe for Windows python.exe commands when present."""
+    if os.name != "nt":
+        return command
+    last_backslash = command.rfind("\\")
+    last_slash = command.rfind("/")
+    split_at = max(last_backslash, last_slash)
+    executable_name = command[split_at + 1 :] if split_at >= 0 else command
+    if executable_name.lower() != "python.exe":
+        return command
+    candidate = f"{command[: split_at + 1]}pythonw.exe" if split_at >= 0 else "pythonw.exe"
+    return candidate if os.path.isfile(candidate) else command
+
+
 def _terminate_process_tree(proc: subprocess.Popen) -> None:
     """Best-effort termination of the wrapped process AND its descendants.
 
@@ -141,6 +155,8 @@ def main(argv: list[str] | None = None) -> None:
             and (cmd_args[0].lower().endswith(".cmd") or cmd_args[0].lower().endswith(".bat"))
         ):
             cmd_args = ["cmd.exe", "/c"] + cmd_args
+        elif cmd_args:
+            cmd_args[0] = _prefer_windows_gui_python(cmd_args[0])
 
         # On Windows, suppress the per-child console window. Without this flag
         # the wrapped harness — which lives for the entire dispatched run —
