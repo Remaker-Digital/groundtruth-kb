@@ -13,6 +13,7 @@ reserved.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 from dataclasses import dataclass
@@ -23,6 +24,9 @@ from pathlib import Path
 # numbered bridge file — including the legacy/non-canonical ``ACCEPTED`` /
 # ``BLOCKED`` — is grandfathered legacy observability, NOT a newly-accepted
 # canonical token (WI-4696 GO -002 condition 3).
+DISPATCHER_DAEMON_SUBSTRATE = "dispatcher_daemon"
+DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS = 120
+
 BRIDGE_STATUS_TOKENS = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"})
 
 _BRIDGE_FILE_RE = re.compile(r"^.+-\d{3}\.md$")
@@ -99,6 +103,7 @@ def validate_role_artifact(project_root: Path) -> ValidationResult:
                     axis,
                     f"harness {harness_id!r} has unknown role token {token!r}",
                 )
+
     return _ok(axis)
 
 
@@ -188,6 +193,34 @@ def validate_session_state_artifact(project_root: Path) -> ValidationResult:
     return _ok(axis)
 
 
+def _probe_dispatcher_daemon_readiness(project_root: Path) -> dict[str, object]:
+    """Return {ok: bool, message: str} for switch-time daemon substrate probe."""
+    script = project_root / "scripts" / "gtkb_dispatcher_daemon.py"
+    if not script.is_file():
+        return {"ok": False, "message": "scripts/gtkb_dispatcher_daemon.py is missing"}
+    state_dir = project_root / ".gtkb-state" / "dispatcher-daemon"
+    heartbeat_path = state_dir / "heartbeat.txt"
+    lock_path = state_dir / "daemon.lock"
+    if not lock_path.is_file():
+        return {"ok": False, "message": "dispatcher daemon lock is absent; daemon is not running"}
+    if not heartbeat_path.is_file():
+        return {"ok": False, "message": "dispatcher daemon heartbeat file is missing"}
+    try:
+        heartbeat_text = heartbeat_path.read_text(encoding="utf-8").strip()
+        parsed = dt.datetime.fromisoformat(heartbeat_text.replace("Z", "+00:00"))
+        age = (dt.datetime.now(dt.UTC) - parsed).total_seconds()
+    except (OSError, ValueError):
+        return {"ok": False, "message": "dispatcher daemon heartbeat is unreadable"}
+    if age > DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS:
+        return {
+            "ok": False,
+            "message": (
+                f"dispatcher daemon heartbeat is stale ({age:.0f}s > {DISPATCHER_DAEMON_HEARTBEAT_MAX_AGE_SECONDS}s)"
+            ),
+        }
+    return {"ok": True, "message": "dispatcher daemon heartbeat is fresh"}
+
+
 def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: str) -> ValidationResult:
     """Validate bridge substrate configuration against topology and registrations.
 
@@ -199,7 +232,7 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
     3. 'single_harness_dispatcher' when on Windows probes GTKB-SingleHarnessBridgeDispatcher scheduled task.
     """
     axis = "bridge_substrate"
-    allowed = {"cross_harness_trigger", "single_harness_dispatcher", "none"}
+    allowed = {"cross_harness_trigger", "single_harness_dispatcher", "none", DISPATCHER_DAEMON_SUBSTRATE}
     if new_substrate not in allowed:
         return _fail(axis, f"unknown bridge substrate {new_substrate!r}")
 
@@ -271,5 +304,10 @@ def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: 
                     axis,
                     f"Failed to check GTKB-SingleHarnessBridgeDispatcher scheduled task: {exc}",
                 )
+
+    if new_substrate == DISPATCHER_DAEMON_SUBSTRATE:
+        probe = _probe_dispatcher_daemon_readiness(project_root)
+        if not probe.get("ok"):
+            return _fail(axis, str(probe.get("message") or "dispatcher daemon is not ready"))
 
     return _ok(axis)
