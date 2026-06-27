@@ -2033,6 +2033,92 @@ def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
     )
 
 
+def _check_parity_discovery_diff(target: Path) -> ToolCheck:
+    """Cross-harness parity discovery-diff (Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY).
+
+    Realizes ``DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001`` assertion
+    **PARITY-DIFF-WIRED**: the discovery-diff
+    (``scripts/parity_discovery_diff.py``) runs as a doctor check. Per owner
+    grill Q6, the severity is **WARN** at Slice 3 (never ``fail``); the
+    WARN→FAIL promotion and the release/CI hard gate land in Slice 6 after a
+    coverage-audit window.
+
+    Status mapping:
+      - script absent → ``info`` (Slice-3 surface, not a required dependency)
+      - run error / discovery errors → ``warning``
+      - unwaived asymmetry present → ``warning`` (lists the asymmetric keys)
+      - no unwaived asymmetry → ``pass``
+    """
+    import importlib.util as _importlib_util
+
+    name = "Cross-harness parity discovery-diff"
+    script = target / "scripts" / "parity_discovery_diff.py"
+    if not script.is_file():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="scripts/parity_discovery_diff.py not present; cross-harness parity discovery-diff not wired",
+        )
+
+    # Ensure the script's guarded sibling imports (scripts/check_harness_parity.py,
+    # scripts/harness_projection_reader.py) resolve when the doctor runs from the
+    # installed package rather than the repo root.
+    for extra in (str(target), str(target / "scripts")):
+        if extra not in sys.path:
+            sys.path.insert(0, extra)
+
+    try:
+        spec = _importlib_util.spec_from_file_location("gtkb_parity_discovery_diff", script)
+        if spec is None or spec.loader is None:
+            raise ImportError("could not build module spec for parity_discovery_diff")
+        module = _importlib_util.module_from_spec(spec)
+        # Register before exec so the module's frozen dataclasses resolve their
+        # own module via sys.modules (Python 3.12+ dataclasses._is_type lookup).
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        report = module.run_discovery_diff(target)
+    except Exception as exc:  # intentional-catch: doctor health check stays fail-soft
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"discovery-diff failed to run: {exc}",
+        )
+
+    if report.errors:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message="discovery-diff errors: " + "; ".join(report.errors),
+        )
+
+    if report.overall_status == "ASYMMETRY":
+        keys = ", ".join(finding.capability_key for finding in report.findings)
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"{len(report.findings)} unwaived cross-harness hook asymmetry(ies) "
+                f"(WARN at Slice 3; FAIL ramp + CI gate in Slice 6): {keys}"
+            ),
+        )
+
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message=f"no unwaived cross-harness hook asymmetry (population: {', '.join(report.population) or 'none'})",
+    )
+
+
 def _check_spec_classifier_codex_parity(target: Path) -> ToolCheck:
     """Verify spec-classifier.py is registered in .codex/hooks.json (forward-compatible parity).
 
@@ -6083,6 +6169,11 @@ def run_doctor(
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
         checks.append(_check_cross_harness_trigger(target))
+        # Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY: discovery-diff over actual
+        # harness hook surfaces (DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion
+        # PARITY-DIFF-WIRED). WARN-only at Slice 3 per Q6; FAIL ramp + CI gate land
+        # in Slice 6 after a coverage audit.
+        checks.append(_check_parity_discovery_diff(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
         checks.append(_check_kill_switch_staleness(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
