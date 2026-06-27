@@ -402,6 +402,45 @@ class TestF5RedactionAndCLI:
         assert result.exit_code == 0, result.output
         assert "Rejected" in result.output
 
+    # 35. Reject retires confirmed spec (GOV-SPEC-CAPTURE-TRANSPARENCY-001)
+    def test_reject_intake_retires_confirmed_spec(self, db):
+        """Rejecting an auto-confirmed intake retires its SPEC-INTAKE row."""
+        cap = capture_requirement(
+            db,
+            "The system must validate all inputs",
+            proposed_title="Input Validation",
+            proposed_section="core",
+        )
+        delib_id = cap["deliberation_id"]
+
+        # Confirm intake so a SPEC-INTAKE-* row is created
+        confirmed = confirm_intake(db, delib_id)
+        spec_id = confirmed["confirmed_spec_id"]
+        assert db.get_spec(spec_id)["status"] == "specified"
+
+        # Reject the intake — should retire the spec
+        reject_intake(db, delib_id, reason="Out of scope after review")
+
+        retired = db.get_spec(spec_id)
+        assert retired is not None
+        assert retired["status"] == "retired"
+
+    # 36. Reject without confirmed spec is a safe no-op (DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001)
+    def test_reject_intake_pending_has_no_spec_to_retire(self, db):
+        """Rejecting a still-pending intake (no confirmed_spec_id) does not error."""
+        cap = capture_requirement(
+            db,
+            "Just exploring an idea",
+            proposed_title="Exploration",
+            proposed_section="misc",
+        )
+        delib_id = cap["deliberation_id"]
+
+        result = reject_intake(db, delib_id, reason="Not a directive")
+
+        assert result["rejected"] is True
+        assert result["reason"] == "Not a directive"
+
 
 class TestF5Scaffold:
     """Scaffold adoption tests."""

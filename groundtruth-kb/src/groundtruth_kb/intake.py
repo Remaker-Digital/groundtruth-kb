@@ -526,6 +526,18 @@ def reject_intake(
         change_reason=f"Intake rejected: {reason}",
     )
 
+    # Retire the auto-confirmed spec stub created by confirm_intake, if any.
+    confirmed_spec_id = content.get("confirmed_spec_id")
+    if confirmed_spec_id:
+        existing = db.get_spec(confirmed_spec_id)
+        if existing and existing.get("status") != "retired":
+            db.update_spec(
+                confirmed_spec_id,
+                changed_by=changed_by,
+                change_reason=f"Spec retired: intake rejected — {reason[:80]}",
+                status="retired",
+            )
+
     return {"deliberation_id": deliberation_id, "rejected": True, "reason": reason}
 
 
