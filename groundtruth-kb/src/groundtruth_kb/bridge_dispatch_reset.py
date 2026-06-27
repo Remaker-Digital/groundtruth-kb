@@ -20,6 +20,7 @@ RESET_GUARD_FILENAME = "dispatch-state-reset.lock"
 DRAIN_MARKER_FILENAME = "dispatch-drain.json"
 LEASES_DIR_NAME = "leases"
 PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
+DISPATCH_RUNS_DIR_NAME = "dispatch-runs"
 KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 DEFAULT_LEASE_TTL_SECONDS = 300
 COMPUTED_QUALITY_RELATIVE = Path(".gtkb-state") / "ops" / "dispatch-quality.json"
@@ -57,6 +58,7 @@ class ResetResult:
     lease_locks_removed: int = 0
     provenance_ledgers_removed: int = 0
     quality_surfaces_cleared: int = 0
+    stale_dispatch_runs_pruned: int = 0
     details: list[str] = field(default_factory=list)
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -68,6 +70,7 @@ class ResetResult:
             "lease_locks_removed": self.lease_locks_removed,
             "provenance_ledgers_removed": self.provenance_ledgers_removed,
             "quality_surfaces_cleared": self.quality_surfaces_cleared,
+            "stale_dispatch_runs_pruned": self.stale_dispatch_runs_pruned,
             "details": list(self.details),
         }
 
@@ -272,6 +275,87 @@ def _clear_computed_quality_surfaces(state_dirs: DispatchStateDirs, *, dry_run: 
     return 0
 
 
+def _dispatch_run_pid_alive(pid: int) -> bool:
+    """Best-effort cross-platform liveness probe for a dispatched-worker PID (WI-4861).
+
+    Defined locally (not imported from ``cross_harness_bridge_trigger``) to
+    preserve the module dependency direction. Fails closed to not-alive on any
+    probe error so a malformed sidecar can never preserve a dead record.
+    """
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid_int <= 0:
+        return False
+    try:
+        import psutil  # noqa: PLC0415
+
+        return bool(psutil.pid_exists(pid_int))
+    except Exception:  # noqa: BLE001 - degrade to the OS-native probe
+        pass
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid_int}", "/NH"],
+                capture_output=True,
+                text=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return str(pid_int) in result.stdout
+    try:
+        os.kill(pid_int, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _prune_stale_dispatch_runs(dispatch_dir: Path, *, dry_run: bool) -> int:
+    """Prune stale/orphaned dispatch-runs sidecars so the live-worker count is
+    accurate after a soft reset (WI-4861).
+
+    A dispatch is stale iff its worker has exited (``<id>.exit_code`` present and
+    non-empty) OR its PID is no longer alive (or unparseable). Stale dispatches
+    have their full ``<dispatch_id>.*`` sidecar set removed. A genuinely-live
+    worker (PID alive, no exit_code) is preserved -- a soft reset must not drop a
+    live worker's record. Returns the count of dispatches pruned.
+    """
+    runs_dir = dispatch_dir / DISPATCH_RUNS_DIR_NAME
+    if not runs_dir.is_dir():
+        return 0
+    pruned = 0
+    for pid_file in sorted(runs_dir.glob("*.pid")):
+        dispatch_id = pid_file.name[: -len(".pid")]
+        exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
+        try:
+            exited = exit_code_file.exists() and exit_code_file.stat().st_size > 0
+        except OSError:
+            exited = False
+        alive = False
+        if not exited:
+            try:
+                pid = int(pid_file.read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                pid = -1
+            alive = _dispatch_run_pid_alive(pid)
+        if exited or not alive:
+            for suffix in (
+                ".pid",
+                ".exit_code",
+                ".stdout.log",
+                ".stderr.log",
+                ".prompt.txt",
+                ".input.json",
+                ".stdin.log",
+            ):
+                _remove_path(runs_dir / f"{dispatch_id}{suffix}", dry_run=dry_run)
+            pruned += 1
+    return pruned
+
+
 def soft_reset(state_dirs: DispatchStateDirs, *, dry_run: bool = False) -> ResetResult:
     result = ResetResult(dry_run=dry_run)
     for dispatch_dir in state_dirs.dispatch_dirs:
@@ -291,6 +375,12 @@ def soft_reset(state_dirs: DispatchStateDirs, *, dry_run: bool = False) -> Reset
         if _remove_path(guard, dry_run=dry_run):
             result.reset_guards_removed += 1
         result.lease_locks_removed += _clear_lease_locks(dispatch_dir, dry_run=dry_run)
+        pruned = _prune_stale_dispatch_runs(dispatch_dir, dry_run=dry_run)
+        result.stale_dispatch_runs_pruned += pruned
+        if pruned:
+            result.details.append(
+                f"pruned {pruned} stale dispatch-runs record(s) in {dispatch_dir / DISPATCH_RUNS_DIR_NAME}"
+            )
     result.provenance_ledgers_removed += _clear_provenance_ledger(state_dirs.provenance_dir, dry_run=dry_run)
     return result
 
