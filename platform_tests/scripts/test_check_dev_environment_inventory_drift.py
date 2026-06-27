@@ -332,6 +332,68 @@ def test_non_version_toolchain_change_still_gates(tmp_path: Path) -> None:
     assert result["diff_keys"] == ["toolchain"]
 
 
+def test_staged_mode_material_drift_warns_when_no_staged_surface(tmp_path: Path) -> None:
+    """WI-4862: in staged (pre-commit) mode, material inventory drift whose
+    staged set touches NO inventoried surface is downgraded to a warning and the
+    commit is not blocked. A whole-tree drift from untracked/unstaged surfaces
+    must not block an unrelated commit (the headless-finalization defect)."""
+    module = _load_module()
+    _write_registry(tmp_path)
+    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=["docs/notes.md"],
+        current_inventory=_payload(python_version="3.14.0"),
+        staged=True,
+    )
+
+    assert result["material_inventory_drift"] is True
+    assert result["status"] == "pass"
+    assert result["outcome"] == "clean"
+    assert result["blocking"] == []
+    assert any("downgraded to warning in staged mode" in warning for warning in result["warnings"])
+
+
+def test_staged_mode_material_drift_blocks_when_staged_surface(tmp_path: Path) -> None:
+    """WI-4862: in staged mode, when a staged path IS an inventoried surface
+    (e.g. .claude/rules/*.md), THIS commit changes the inventory, so the
+    material-drift block is retained."""
+    module = _load_module()
+    _write_registry(tmp_path)
+    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=[".claude/rules/new-rule.md"],
+        current_inventory=_payload(python_version="3.14.0"),
+        staged=True,
+    )
+
+    assert result["material_inventory_drift"] is True
+    assert result["status"] == "fail"
+    assert result["blocking"][0]["reason"] == "normalized_inventory_drift"
+
+
+def test_unstaged_mode_material_drift_still_blocks(tmp_path: Path) -> None:
+    """WI-4862: release-gate mode (staged=False, whole-tree) is unchanged —
+    material drift always blocks regardless of changed-path surface membership."""
+    module = _load_module()
+    _write_registry(tmp_path)
+    _write_inventory(tmp_path, _payload(python_version="3.12.0"))
+
+    result = module.evaluate_drift(
+        tmp_path,
+        changed_paths=["docs/notes.md"],
+        current_inventory=_payload(python_version="3.14.0"),
+        staged=False,
+    )
+
+    assert result["material_inventory_drift"] is True
+    assert result["status"] == "fail"
+    assert result["blocking"][0]["reason"] == "normalized_inventory_drift"
+
+
 def test_toolchain_availability_flux_with_same_public_probe_evidence_is_not_material_drift(tmp_path: Path) -> None:
     module = _load_module()
     _write_toolchain_availability_volatile_registry(tmp_path)
