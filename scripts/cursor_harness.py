@@ -13,6 +13,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TIMEOUT_SECONDS = 600.0
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
+# WI-4872: the harness-registry Cursor invocation surfaces pass the canonical
+# Loyal Opposition route keys ('bridge-review', 'verification'), but no SKILL.md
+# exists under those names; resolve them to the real skill directories so headless
+# LO dispatch loads a contract instead of failing closed.
+_SKILL_ROUTE_ALIASES = {
+    "bridge-review": "proposal-review",
+    "verification": "verify",
+}
 
 
 class CursorHarnessError(RuntimeError):
@@ -36,6 +44,7 @@ def _resolve_agent_executable() -> str:
 def _skill_system_prompt(skill: str | None) -> str | None:
     if not skill:
         return None
+    skill = _SKILL_ROUTE_ALIASES.get(skill, skill)
     skill_path = PROJECT_ROOT / ".cursor" / "skills" / skill / "SKILL.md"
     if not skill_path.is_file():
         skill_path = PROJECT_ROOT / ".codex" / "skills" / skill / "SKILL.md"
