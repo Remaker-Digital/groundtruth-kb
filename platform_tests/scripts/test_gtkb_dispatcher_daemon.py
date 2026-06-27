@@ -466,6 +466,121 @@ def test_daemon_stop_terminates_process_tree(tmp_path: Path) -> None:
             child.wait(timeout=10)
 
 
+# ---------------------------------------------------------------------------
+# WI-4845: daemon passes a per-role worker --lifetime override so headless
+# workers complete (LO ~1800s, PB ~5400s, env-configurable). The cap is
+# resolved by trigger.worker_lifetime_seconds and threaded into the spawn
+# command (run_with_status.py --lifetime) by trigger._spawn_harness, which the
+# daemon's live-spawn path reuses.
+# ---------------------------------------------------------------------------
+
+
+def _spawn_target(trigger, role_label: str, mode: str):
+    return trigger.DispatchTarget(
+        needed_role_label=role_label,
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode=mode,
+        invocation_surfaces={"headless": {"argv": ["worker-cmd", "{{PROMPT}}"]}},
+    )
+
+
+def _capture_worker_command(trigger, target, tmp_path: Path, monkeypatch) -> list[str]:
+    """Invoke _spawn_harness with a fake Popen; return the worker command (the
+    one wrapping run_with_status.py), robust against any secondary poll spawn."""
+    calls: list[tuple] = []
+
+    class _FakeProcess:
+        pid = 4242
+
+    def _fake_popen(*args, **kwargs):
+        calls.append(args)
+        return _FakeProcess()
+
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    # Prime (implementer) dispatches issue impl-auth packets for the GO item
+    # (WI-4770). That is orthogonal to the lifetime feature under test, so pass
+    # it for the synthetic item; LO review dispatches do not reach this gate.
+    monkeypatch.setattr(
+        trigger,
+        "_issue_dispatch_authorization_for_selected",
+        lambda *a, **k: {"ok": True, "reason": None, "context": {}},
+    )
+    monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
+
+    # Isolate each capture so a same-signature dedup from a prior spawn in the
+    # same test cannot suppress this one.
+    role = target.needed_role_label
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": f"gtkb-wi4845-{role}-thread",
+            "top_status": "GO",
+            "top_file": f"bridge/gtkb-wi4845-{role}-thread-002.md",
+        },
+    )()
+    trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / role / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id=f"dispatch-wi4845-{role}",
+    )
+    for args in calls:
+        if args and isinstance(args[0], list) and any("run_with_status" in str(part) for part in args[0]):
+            return list(args[0])
+    return []
+
+
+def _lifetime_value(command: list[str]) -> str | None:
+    if "--lifetime" not in command:
+        return None
+    return command[command.index("--lifetime") + 1]
+
+
+def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The daemon live-spawn command carries the per-role --lifetime override:
+    LO target -> 1800s, PB target -> 5400s (WI-4845 defaults)."""
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+    monkeypatch.delenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
+    monkeypatch.delenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
+
+    lo_cmd = _capture_worker_command(trigger, _spawn_target(trigger, "loyal-opposition", "lo"), tmp_path, monkeypatch)
+    assert _lifetime_value(lo_cmd) == str(trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS) == "1800"
+
+    pb_cmd = _capture_worker_command(trigger, _spawn_target(trigger, "prime-builder", "pb"), tmp_path, monkeypatch)
+    assert _lifetime_value(pb_cmd) == str(trigger.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
+
+
+def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GTKB_WORKER_LIFETIME_LO_SECONDS / _PB_SECONDS override the per-role
+    defaults; invalid/non-positive falls back; other roles get no cap (WI-4845)."""
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+
+    monkeypatch.delenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
+    monkeypatch.delenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
+    assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert trigger.worker_lifetime_seconds("prime-builder") == 5400
+    assert trigger.worker_lifetime_seconds("some-other-role") is None
+    assert trigger.worker_lifetime_seconds(None) is None
+
+    monkeypatch.setenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, "2400")
+    monkeypatch.setenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, "7200")
+    assert trigger.worker_lifetime_seconds("loyal-opposition") == 2400
+    assert trigger.worker_lifetime_seconds("prime-builder") == 7200
+
+    monkeypatch.setenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, "0")
+    monkeypatch.setenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, "not-an-int")
+    assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert trigger.worker_lifetime_seconds("prime-builder") == 5400
+
+
 def test_run_tick_watchdog_restart_failsoft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A restart failure must not abort the tick (fail-soft: watchdog_error recorded, tick succeeds)."""
     daemon = _load_daemon()

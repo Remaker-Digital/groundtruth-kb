@@ -2408,40 +2408,69 @@ def _load_antigravity_rules(project_root: Path, mode: str) -> str:
     return "\n".join(parts)
 
 
-# WI-4845: worker-lifetime cap (seconds) for dispatched Loyal Opposition /
-# verification reviews. A full multi-turn bridge review (read the version chain,
-# proposal, and specs; run preflights; author and finalize the verdict) exceeds
-# the 600s default that run_with_status.py applies, so LO dispatches get a longer
-# budget. The 80-turn ceiling, per-call timeout, storm-watchdog (WI-4828), and
-# concurrency cap (WI-4472) remain the runaway guards, so a longer lifetime does
-# not re-open the storm.
-LO_REVIEW_WORKER_LIFETIME_SECONDS = 1800
+# WI-4845: per-role worker-lifetime caps (seconds) for dispatched workers. A
+# full multi-turn bridge review (read the version chain, proposal, and specs;
+# run preflights; author and finalize the verdict) or a Prime Builder
+# implementation routinely exceeds the 600s default that run_with_status.py
+# applies, so dispatched workers get a longer, per-role, env-tunable budget. The
+# 80-turn ceiling, per-call timeout, storm-watchdog (WI-4828), and per-role
+# concurrency cap (WI-4472/WI-4858) remain the runaway guards, so a longer
+# lifetime does not re-open the storm. Per Q3 of DELIB-20266203: LO review
+# ~30 min, PB implementation ~90 min, each env-configurable.
+LO_REVIEW_WORKER_LIFETIME_SECONDS = 1800  # 30 min: LO/verification review default
+PB_IMPL_WORKER_LIFETIME_SECONDS = 5400  # 90 min: PB implementation default
+LO_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_LO_SECONDS"
+PB_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_PB_SECONDS"
 
-# WI-4805: staleness threshold (seconds) for the operator --reset-recipient
-# straggler reap. A dispatched worker is capped at run_with_status.py's worker
-# lifetime (600s default; LO_REVIEW_WORKER_LIFETIME_SECONDS=1800s for LO reviews
-# — the longest legitimate lifetime). A recorded dispatch-run pid still alive
-# past the longest legitimate lifetime plus this margin is a definitely-hung
-# straggler that the lifetime cap failed to reap, so an operator-initiated
-# --reset-recipient may safely terminate it without endangering a healthy
-# in-flight worker. (The WI-4805 proposal cited the 600s default; the faithful
-# read of its "older than any legitimate worker lifetime" invariant is the
-# longest cap, 1800s, since LO workers legitimately run to 1800s.)
-RESET_STRAGGLER_MARGIN_SECONDS = 300
-RESET_STRAGGLER_AGE_SECONDS = LO_REVIEW_WORKER_LIFETIME_SECONDS + RESET_STRAGGLER_MARGIN_SECONDS
+
+def _positive_int_env(name: str, default: int) -> int:
+    """Return a positive-int env override for ``name``, else ``default``."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
 
 
 def worker_lifetime_seconds(role_label: str | None) -> int | None:
-    """Return the worker-lifetime cap (seconds) for a dispatched role, or None to
-    use run_with_status.py's built-in default (WI-4845).
+    """Return the per-role worker-lifetime cap (seconds) for a dispatched role,
+    or None to use run_with_status.py's built-in default (WI-4845).
 
-    Loyal Opposition / verification dispatches receive
-    LO_REVIEW_WORKER_LIFETIME_SECONDS; every other role returns None so the
-    wrapper is not passed a ``--lifetime`` override and keeps its default.
+    Loyal Opposition / verification dispatches receive the LO cap (default
+    ``LO_REVIEW_WORKER_LIFETIME_SECONDS``); Prime Builder implementation
+    dispatches receive the PB cap (default ``PB_IMPL_WORKER_LIFETIME_SECONDS``).
+    Both are env-tunable via ``LO_WORKER_LIFETIME_ENV_VAR`` /
+    ``PB_WORKER_LIFETIME_ENV_VAR`` (Q3 of DELIB-20266203). Every other role
+    returns None so the wrapper is not passed a ``--lifetime`` override and keeps
+    its default.
     """
     if role_label == "loyal-opposition":
-        return LO_REVIEW_WORKER_LIFETIME_SECONDS
+        return _positive_int_env(LO_WORKER_LIFETIME_ENV_VAR, LO_REVIEW_WORKER_LIFETIME_SECONDS)
+    if role_label == "prime-builder":
+        return _positive_int_env(PB_WORKER_LIFETIME_ENV_VAR, PB_IMPL_WORKER_LIFETIME_SECONDS)
     return None
+
+
+# WI-4805: staleness threshold (seconds) for the operator --reset-recipient
+# straggler reap. A dispatched worker is capped at run_with_status.py's per-role
+# worker lifetime; the longest legitimate lifetime is the PB implementation cap
+# (WI-4845). A recorded dispatch-run pid still alive past the longest legitimate
+# lifetime plus this margin is a definitely-hung straggler that the lifetime cap
+# failed to reap, so an operator-initiated --reset-recipient may safely terminate
+# it without endangering a healthy in-flight worker. The threshold tracks the PB
+# default (the longest cap), so raising the PB lifetime past its default via env
+# also widens the straggler floor accordingly.
+RESET_STRAGGLER_MARGIN_SECONDS = 300
+RESET_STRAGGLER_AGE_SECONDS = (
+    max(
+        worker_lifetime_seconds("loyal-opposition") or 0,
+        worker_lifetime_seconds("prime-builder") or 0,
+    )
+    + RESET_STRAGGLER_MARGIN_SECONDS
+)
 
 
 def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, project_root: Path | None = None) -> str:
