@@ -1463,6 +1463,53 @@ def test_extract_target_paths_raises_when_all_forms_absent(auth_module):
         auth_module.extract_target_paths(md)
 
 
+# ---------------------------------------------------------------------------
+# WI-4854: extract_target_paths tries every accepted form before failing
+# (no fail-closed on a leftmost invalid inline match).
+# ---------------------------------------------------------------------------
+
+
+def test_extract_target_paths_inline_single_line(auth_module):
+    """WI-4854 -- a valid inline single-line list is returned (unchanged)."""
+    md = 'target_paths: ["scripts/x.py", "tests/y.py"]\n\n## Summary\n\nx\n'
+    assert auth_module.extract_target_paths(md) == ["scripts/x.py", "tests/y.py"]
+
+
+def test_extract_target_paths_heading_fenced(auth_module):
+    """WI-4854 -- a `## target_paths` heading with a fenced JSON list is returned."""
+    md = '# Proposal\n\n## target_paths\n\n```json\n["scripts/x.py", "tests/y.py"]\n```\n'
+    assert auth_module.extract_target_paths(md) == ["scripts/x.py", "tests/y.py"]
+
+
+def test_extract_target_paths_falls_through_invalid_inline_to_heading(auth_module):
+    """WI-4854 -- a leftmost inline `target_paths:` match whose capture is not
+    valid JSON (a prose placeholder, as on the WI-4852 thread) must NOT fail
+    closed; the real list under a later `## target_paths` fenced-JSON block is
+    returned instead of raising."""
+    md = (
+        "# Proposal\n\n"
+        "An earlier revision quoted a prose example like target_paths: [...] which\n"
+        "is not valid JSON and previously failed closed before the heading form.\n\n"
+        "## target_paths\n\n"
+        '```json\n["scripts/x.py", "tests/y.py"]\n```\n'
+    )
+    assert auth_module.extract_target_paths(md) == ["scripts/x.py", "tests/y.py"]
+
+
+def test_extract_target_paths_files_expected_section(auth_module):
+    """WI-4854 -- the `## Files Expected To Change` bullet section is returned."""
+    md = "## Files Expected To Change\n\n- `scripts/x.py`\n- `tests/y.py`\n"
+    assert auth_module.extract_target_paths(md) == ["scripts/x.py", "tests/y.py"]
+
+
+def test_extract_target_paths_raises_when_no_valid_form(auth_module):
+    """WI-4854 -- an invalid inline match with no other valid form still raises;
+    fall-through does not swallow a genuinely malformed-only proposal."""
+    md = "# Proposal\n\ntarget_paths: [not, valid, json]\n\n## Summary\n\nx\n"
+    with pytest.raises(auth_module.AuthorizationError, match="not valid JSON"):
+        auth_module.extract_target_paths(md)
+
+
 def test_extract_target_paths_inline_json_precedence(auth_module):
     """T6 -- when both inline JSON and a `## target_paths` heading are present,
     the inline JSON form wins."""

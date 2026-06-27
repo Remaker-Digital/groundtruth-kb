@@ -646,16 +646,24 @@ def extract_spec_links(markdown: str) -> list[str]:
 
 
 def extract_target_paths(markdown: str) -> list[str]:
+    # WI-4854: try every accepted form before failing. A leftmost inline match
+    # whose captured text is not a valid non-empty JSON list (e.g. a prose
+    # placeholder that quotes the ``target_paths:`` label) must NOT fail closed
+    # here -- the real list may appear in a later form (the ``## target_paths``
+    # heading or ``## Files Expected To Change``). Record the inline-invalid
+    # reason and fall through; raise only if no form yields a valid list.
+    inline_invalid_reason: str | None = None
     match = TARGET_PATHS_RE.search(markdown)
     if match:
         raw = match.group(1)
         try:
             parsed = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise AuthorizationError("target_paths metadata is not valid JSON") from exc
-        if not isinstance(parsed, list) or not all(isinstance(item, str) and item.strip() for item in parsed):
-            raise AuthorizationError("target_paths must be a non-empty JSON list of strings")
-        return [item.strip().replace("\\", "/") for item in parsed]
+        except json.JSONDecodeError:
+            inline_invalid_reason = "target_paths metadata is not valid JSON"
+        else:
+            if isinstance(parsed, list) and all(isinstance(item, str) and item.strip() for item in parsed):
+                return [item.strip().replace("\\", "/") for item in parsed]
+            inline_invalid_reason = "target_paths must be a non-empty JSON list of strings"
 
     # Section fallback. `## Files Expected To Change` bullets may carry
     # multiple backtick spans per line (path plus annotation); all are taken.
@@ -707,6 +715,8 @@ def extract_target_paths(markdown: str) -> list[str]:
                 )
             return heading_targets
 
+    if inline_invalid_reason is not None:
+        raise AuthorizationError(inline_invalid_reason)
     raise AuthorizationError("Approved proposal is missing concrete target_paths or Files Expected To Change")
 
 
