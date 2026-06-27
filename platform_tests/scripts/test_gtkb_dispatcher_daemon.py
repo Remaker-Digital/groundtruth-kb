@@ -432,6 +432,32 @@ def test_run_tick_emits_restart_watchdog_when_dormant(tmp_path: Path, monkeypatc
     assert result["watchdog_restart"]["launched"] is True
 
 
+def test_restart_storm_watchdog_invokes_schtasks_headless_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The daemon's one-minute watchdog remediation must not allocate a console."""
+    daemon = _load_daemon()
+    expected_no_window = 0x08000000
+    captured: dict[str, object] = {}
+
+    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args=args, returncode=0)
+
+    monkeypatch.setattr(daemon.os, "name", "nt")
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+
+    result = daemon._restart_storm_watchdog("GTKB-HarnessStormWatchdog-Test")
+
+    assert result == {"launched": True, "returncode": 0}
+    assert captured["args"] == ["schtasks.exe", "/Run", "/TN", "GTKB-HarnessStormWatchdog-Test"]
+    kwargs = captured["kwargs"]
+    assert kwargs["stdin"] == subprocess.DEVNULL
+    assert kwargs["capture_output"] is True
+    assert kwargs["timeout"] == 15
+    assert int(kwargs["creationflags"]) & expected_no_window
+
+
 # ---------------------------------------------------------------------------
 # WI-4855: daemon process-lifecycle hardening (start/stop control surface).
 # These tests exercise the production CLI commands
@@ -482,7 +508,73 @@ def test_daemon_start_spawns_detached(tmp_path: Path) -> None:
     assert kwargs.get("stdin") == subprocess.DEVNULL
     assert kwargs.get("stdout") == subprocess.DEVNULL
     assert kwargs.get("stderr") == subprocess.DEVNULL
-    assert captured["args"][0] == sys.executable
+    assert captured["args"][0] == gtcli._prefer_windows_gui_python(sys.executable)
+
+
+def test_daemon_start_prefers_pythonw_on_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows daemon loops should use GUI-subsystem Python to avoid console focus steal."""
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    python_dir = tmp_path / "venv" / "Scripts"
+    python_dir.mkdir(parents=True)
+    python_exe = python_dir / "python.exe"
+    pythonw_exe = python_dir / "pythonw.exe"
+    python_exe.write_text("", encoding="utf-8")
+    pythonw_exe.write_text("", encoding="utf-8")
+    expected_no_window = 0x08000000
+    expected_detached = 0x00000008
+    expected_new_group = 0x00000200
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            self.pid = 5252
+
+    monkeypatch.setattr(gtcli.os, "name", "nt")
+    monkeypatch.setattr(gtcli.sys, "executable", str(python_exe))
+    monkeypatch.setattr(gtcli.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(gtcli.subprocess, "DETACHED_PROCESS", expected_detached, raising=False)
+    monkeypatch.setattr(gtcli.subprocess, "CREATE_NEW_PROCESS_GROUP", expected_new_group, raising=False)
+    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+    with cfg_patch, import_patch, patch.object(gtcli.subprocess, "Popen", _FakePopen):
+        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
+
+    assert result.exit_code == 0, result.output
+    assert captured["args"][0] == str(pythonw_exe)
+    flags = int(captured["kwargs"].get("creationflags", 0))
+    assert flags & expected_no_window
+    assert flags & expected_detached
+    assert flags & expected_new_group
+
+
+def test_daemon_start_falls_back_when_pythonw_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The daemon start command must remain usable when a sibling pythonw.exe is unavailable."""
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    python_dir = tmp_path / "venv" / "Scripts"
+    python_dir.mkdir(parents=True)
+    python_exe = python_dir / "python.exe"
+    python_exe.write_text("", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            self.pid = 5353
+
+    monkeypatch.setattr(gtcli.os, "name", "nt")
+    monkeypatch.setattr(gtcli.sys, "executable", str(python_exe))
+    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+    with cfg_patch, import_patch, patch.object(gtcli.subprocess, "Popen", _FakePopen):
+        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
+
+    assert result.exit_code == 0, result.output
+    assert captured["args"][0] == str(python_exe)
 
 
 def test_daemon_start_refuses_when_live_instance_present(tmp_path: Path) -> None:

@@ -9,6 +9,7 @@ monkeypatch — no real background daemon or Task Scheduler mutation.
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import subprocess
 import sys
@@ -23,6 +24,15 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import ensure_dispatcher_daemon as ensure  # noqa: E402
 import gtkb_dispatcher_daemon as daemon  # noqa: E402
+
+
+def _load_watchdog_launcher():
+    path = _SCRIPTS_DIR / "ops" / "harness_storm_watchdog_launcher.py"
+    spec = importlib.util.spec_from_file_location("harness_storm_watchdog_launcher_under_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.fixture(autouse=True)
@@ -86,6 +96,12 @@ def test_spawn_detached_daemon_runs_headless_on_windows(tmp_path, monkeypatch):
     expected_no_window = 0x08000000
     expected_detached = 0x00000008
     expected_new_group = 0x00000200
+    python_dir = tmp_path / "venv" / "Scripts"
+    python_dir.mkdir(parents=True)
+    python_exe = python_dir / "python.exe"
+    pythonw_exe = python_dir / "pythonw.exe"
+    python_exe.write_text("", encoding="utf-8")
+    pythonw_exe.write_text("", encoding="utf-8")
     captured: dict[str, object] = {}
 
     class _FakePopen:
@@ -99,8 +115,10 @@ def test_spawn_detached_daemon_runs_headless_on_windows(tmp_path, monkeypatch):
     monkeypatch.setattr(ensure.subprocess, "DETACHED_PROCESS", expected_detached, raising=False)
     monkeypatch.setattr(ensure.subprocess, "CREATE_NEW_PROCESS_GROUP", expected_new_group, raising=False)
     monkeypatch.setattr(ensure.subprocess, "Popen", _FakePopen)
+    monkeypatch.setattr(ensure.sys, "executable", str(python_exe))
 
     assert ensure._spawn_detached_daemon(tmp_path, 30) == 2468
+    assert captured["args"][0] == str(pythonw_exe)
     kwargs = captured["kwargs"]
     flags = int(kwargs.get("creationflags", 0))
     assert flags & expected_no_window
@@ -109,6 +127,55 @@ def test_spawn_detached_daemon_runs_headless_on_windows(tmp_path, monkeypatch):
     assert kwargs.get("stdin") == subprocess.DEVNULL
     assert kwargs.get("stdout") == subprocess.DEVNULL
     assert kwargs.get("stderr") == subprocess.DEVNULL
+
+
+def test_spawn_detached_daemon_falls_back_when_pythonw_missing(tmp_path, monkeypatch):
+    """The supervisor should keep spawning with python.exe when pythonw.exe is not installed."""
+    python_dir = tmp_path / "venv" / "Scripts"
+    python_dir.mkdir(parents=True)
+    python_exe = python_dir / "python.exe"
+    python_exe.write_text("", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            self.pid = 3579
+
+    monkeypatch.setattr(ensure.os, "name", "nt")
+    monkeypatch.setattr(ensure.sys, "executable", str(python_exe))
+    monkeypatch.setattr(ensure.subprocess, "Popen", _FakePopen)
+
+    assert ensure._spawn_detached_daemon(tmp_path, 30) == 3579
+    assert captured["args"][0] == str(python_exe)
+
+
+def test_storm_watchdog_launcher_runs_powershell_headless_on_windows(monkeypatch):
+    """The scheduled watchdog launcher must invoke PowerShell without a console."""
+    launcher = _load_watchdog_launcher()
+    expected_no_window = 0x08000000
+    captured: dict[str, object] = {}
+
+    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args=args, returncode=0)
+
+    monkeypatch.setattr(launcher.os, "name", "nt")
+    monkeypatch.setattr(launcher.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(launcher.subprocess, "run", _fake_run)
+
+    assert launcher.main() == 0
+    args = captured["args"]
+    kwargs = captured["kwargs"]
+    assert args[0] == "powershell.exe"
+    assert "-NonInteractive" in args
+    assert args[args.index("-WindowStyle") + 1] == "Hidden"
+    assert kwargs["stdin"] == subprocess.DEVNULL
+    assert kwargs["stdout"] == subprocess.DEVNULL
+    assert kwargs["stderr"] == subprocess.DEVNULL
+    assert int(kwargs["creationflags"]) & expected_no_window
 
 
 # --- Persistent log + diagnosability -----------------------------------------

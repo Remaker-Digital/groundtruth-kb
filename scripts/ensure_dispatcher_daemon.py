@@ -30,6 +30,20 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import gtkb_dispatcher_daemon as daemon  # noqa: E402
 
 
+def _prefer_windows_gui_python(command: str) -> str:
+    """Return sibling pythonw.exe for Windows python.exe commands when present."""
+    if os.name != "nt":
+        return command
+    last_backslash = command.rfind("\\")
+    last_slash = command.rfind("/")
+    split_at = max(last_backslash, last_slash)
+    executable_name = command[split_at + 1 :] if split_at >= 0 else command
+    if executable_name.lower() != "python.exe":
+        return command
+    candidate = f"{command[: split_at + 1]}pythonw.exe" if split_at >= 0 else "pythonw.exe"
+    return candidate if os.path.isfile(candidate) else command
+
+
 def _spawn_detached_daemon(project_root: Path, interval: int) -> int:
     """Spawn the detached daemon loop, mirroring the cli start spawn (WI-4855 true detach)."""
     script = _SCRIPTS_DIR / "gtkb_dispatcher_daemon.py"
@@ -49,7 +63,7 @@ def _spawn_detached_daemon(project_root: Path, interval: int) -> int:
         popen_kwargs["start_new_session"] = True
     proc = subprocess.Popen(
         [
-            sys.executable,
+            _prefer_windows_gui_python(sys.executable),
             str(script),
             "--loop",
             "--project-root",

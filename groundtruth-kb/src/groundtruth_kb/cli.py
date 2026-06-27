@@ -140,6 +140,20 @@ def _resolve_config(ctx: click.Context) -> GTConfig:
     return GTConfig.load(config_path=config_path)
 
 
+def _prefer_windows_gui_python(command: str) -> str:
+    """Return sibling pythonw.exe for Windows python.exe commands when present."""
+    if os.name != "nt":
+        return command
+    last_backslash = command.rfind("\\")
+    last_slash = command.rfind("/")
+    split_at = max(last_backslash, last_slash)
+    executable_name = command[split_at + 1 :] if split_at >= 0 else command
+    if executable_name.lower() != "python.exe":
+        return command
+    candidate = f"{command[: split_at + 1]}pythonw.exe" if split_at >= 0 else "pythonw.exe"
+    return candidate if os.path.isfile(candidate) else command
+
+
 def _open_db(config: GTConfig, *, check_same_thread: bool = True) -> KnowledgeDB:
     """Open a KnowledgeDB from resolved config, wiring governance gates."""
     registry = GateRegistry.from_config(
@@ -961,7 +975,7 @@ def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
         popen_kwargs["start_new_session"] = True
     proc = subprocess.Popen(
         [
-            sys.executable,
+            _prefer_windows_gui_python(sys.executable),
             str(script),
             "--loop",
             "--project-root",
