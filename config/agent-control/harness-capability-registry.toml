@@ -776,6 +776,30 @@ status = "native"
 surface = ".claude/hooks/advisory-router-scan.py"
 status = "native"
 [[capabilities]]
+# Slice 5 of PROJECT-GTKB-CROSS-HARNESS-PARITY (first conformance case): unifies
+# the Claude and Codex ::open/::close topic-envelope routing adapters under one
+# capability id so the Slice-3 discovery-diff keys both harness surfaces together
+# (the prior unregistered hook:session_wrapup_trigger_dispatch asymmetry resolves
+# to a registered, present-on-both capability). Behavioral (Q1) equivalence: both
+# adapters call the shared groundtruth_kb.session.topic_router.
+id = "hook.session-topic-envelope-routing"
+kind = "hook"
+canonical_name = "session-topic-envelope-routing"
+canonical_purpose = "UserPromptSubmit routing of ::open/::close topic-envelope commands via groundtruth_kb.session.topic_router."
+canonical_source = ".claude/hooks/session-topic-envelope-router.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+notes = "Claude adapter handles topic routing only (Claude wraps via its Stop hook); the Codex adapter (session_wrapup_trigger_dispatch.py) additionally handles wrap-trigger phrases. Both call the shared topic_router."
+
+[capabilities.claude]
+surface = ".claude/hooks/session-topic-envelope-router.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py"
+status = "native"
+[[capabilities]]
 id = "skill.gtkb-benchmarks"
 kind = "skill"
 canonical_name = "gtkb-benchmarks"

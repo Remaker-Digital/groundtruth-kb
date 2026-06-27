@@ -85,18 +85,23 @@ def test_live_codex_userpromptsubmit_discovers_session_wrapup() -> None:
 # ── acceptance: ::open asymmetry detected on the live tree (PARITY-DIFF-EXISTS) ──
 
 
-def test_open_asymmetry_detected_live_pre_slice5() -> None:
-    """Acceptance criterion 1: the diff detects the ::open routing asymmetry now.
+def test_open_asymmetry_resolved_post_slice5() -> None:
+    """Acceptance criterion 1 (post-Slice-5): the ::open routing asymmetry is resolved.
 
-    This must hold until Slice 5 wires session_wrapup_trigger_dispatch into the
-    Claude UserPromptSubmit chain (then it goes green).
+    This was a pre-Slice-5 checkpoint (it formerly asserted the asymmetry was
+    present, codex-only). Slice 5 (WI-4891) wired the behavioral equivalent of
+    ``session_wrapup_trigger_dispatch`` into the Claude UserPromptSubmit chain
+    (``.claude/hooks/session-topic-envelope-router.py``) and registered both
+    harness surfaces under the single capability ``hook.session-topic-envelope-routing``,
+    so the discovery-diff no longer reports the asymmetry under either the old
+    unregistered key or the new capability id. The diff's *detection* capability
+    remains proven independently by
+    ``test_synthetic_unregistered_single_harness_hook_caught``.
     """
     report = diff.run_discovery_diff(_PROJECT_ROOT)
-    assert report.overall_status == "ASYMMETRY"
-    finding = next((f for f in report.findings if f.capability_key == _OPEN_KEY), None)
-    assert finding is not None, "::open (session_wrapup_trigger_dispatch) asymmetry not detected"
-    assert finding.present_on == ["codex"]
-    assert finding.absent_on == ["claude"]
+    resolved_keys = {_OPEN_KEY, "hook.session-topic-envelope-routing"}
+    offending = {f.capability_key for f in report.findings if f.capability_key in resolved_keys}
+    assert not offending, f"::open conformance asymmetry still reported post-Slice-5: {offending}"
 
 
 # ── regression: synthetic unregistered single-harness hook (PARITY-DIFF-EXISTS) ──
