@@ -173,6 +173,34 @@ def test_always_applicable_specs_seeded_by_default():
         assert f"`{sid}`" in body, sid
 
 
+# --- WI-4537: scaffold test-command is scanner-clean --------------------------
+
+
+def test_scaffold_test_command_scanner_clean():
+    """The emitted verification-command template must not contain credential-scanner-tripping flags.
+
+    GOV-FILE-BRIDGE-AUTHORITY-001: generated scaffold body passes bridge-compliance /
+    credential-scan audit; the emitted pytest command must not contain a
+    plugin-disable flag whose value pattern matches the scanner's password-flag heuristic.
+    """
+    body = _scaffold()
+    # The credential scanner rejects "-p no:<value>" patterns (password-like flag heuristic).
+    assert "-p no:" not in body
+
+
+def test_scaffold_body_passes_compliance_audit():
+    """The full generated scaffold body must not contain any credential-scanner-blocked string.
+
+    GOV-FILE-BRIDGE-AUTHORITY-001: proposals emitted by the scaffold must pass the
+    bridge-compliance / credential-scan gate at Write time without manual editing.
+    """
+    body = _scaffold()
+    # These are the scanner-blocked flag patterns known to trip the credential gate:
+    blocked_patterns = ["-p no:cacheprovider", "-p no:cache"]
+    for pattern in blocked_patterns:
+        assert pattern not in body, f"Scaffold body contains credential-scanner-blocked pattern: {pattern!r}"
+
+
 def test_gtkb_propose_guidance_surfaces_document_taxonomy_valid_default():
     for relative in (
         ".claude/skills/gtkb-propose/SKILL.md",

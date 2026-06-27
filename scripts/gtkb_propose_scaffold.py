@@ -219,7 +219,7 @@ TODO: map each linked specification to a test or verification command and the
 expected result. Prefer the repo venv interpreter for reproducible evidence:
 
 ```text
-groundtruth-kb/.venv/Scripts/python.exe -m pytest <path> -q --no-header -p no:cacheprovider
+groundtruth-kb/.venv/Scripts/python.exe -m pytest <path> -q --no-header
 ```
 
 ## Risk / Rollback
