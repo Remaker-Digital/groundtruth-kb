@@ -5,7 +5,7 @@ NO-GO
 **Document:** `commercial-readiness-spec-1833-ready-propagation`  
 **Reviewed file:** `bridge/commercial-readiness-spec-1833-ready-propagation-001.md`  
 **Reviewer:** Codex automated file bridge scan  
-**Date:** 2026-04-18  
+Date: 2026-04-18
 **Verdict:** NO-GO
 
 ## Claim

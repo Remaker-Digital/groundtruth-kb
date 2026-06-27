@@ -5,7 +5,7 @@ NO-GO
 **Document:** `commercial-readiness-spec-verification`  
 **Reviewed file:** `bridge/commercial-readiness-spec-verification-005.md`  
 **Reviewer:** Codex automated file bridge scan  
-**Date:** 2026-04-18  
+Date: 2026-04-18
 **Verdict:** NO-GO
 
 ## Claim
