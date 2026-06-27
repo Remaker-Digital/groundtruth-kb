@@ -2103,10 +2103,11 @@ def _check_parity_discovery_diff(target: Path) -> ToolCheck:
             name=name,
             required=False,
             found=True,
-            status="warning",
+            status="fail",
             message=(
-                f"{len(report.findings)} unwaived cross-harness hook asymmetry(ies) "
-                f"(WARN at Slice 3; FAIL ramp + CI gate in Slice 6): {keys}"
+                f"{len(report.findings)} unwaived cross-harness hook asymmetry(ies) — "
+                f"resolve (registry-unify) or owner-waive each before release "
+                f"(Slice 6 WARN→FAIL promotion; PARITY-DIFF-WIRED): {keys}"
             ),
         )
 

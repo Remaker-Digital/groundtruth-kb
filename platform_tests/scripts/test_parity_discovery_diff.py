@@ -19,6 +19,8 @@ the live-tree checks are read-only.
 
 from __future__ import annotations
 
+import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -190,12 +192,60 @@ def test_live_population_is_hook_config_declaring_only() -> None:
 # ── doctor wiring (PARITY-DIFF-WIRED) ────────────────────────────────────────
 
 
-def test_doctor_check_warns_on_live_asymmetry_never_fails() -> None:
+def test_doctor_check_passes_on_clean_live_tree() -> None:
+    """Slice 6: after the coverage audit (resolve/waive all 26) the live tree has
+    0 unwaived asymmetries, so the FAIL-promoted doctor check returns ``pass``.
+
+    This is also the regression guard: if any future change reintroduces an
+    unwaived cross-harness asymmetry, the live diff returns ASYMMETRY and the
+    doctor check returns ``fail``, failing this test.
+    """
     from groundtruth_kb.project.doctor import _check_parity_discovery_diff
 
     result = _check_parity_discovery_diff(_PROJECT_ROOT)
-    # Slice 3: WARN ramp — must never be ``fail``.
-    assert result.status != "fail"
-    # The live tree has unwaived asymmetries (incl. ::open), so the check WARNs.
-    assert result.status == "warning"
+    assert result.status == "pass", f"unexpected: {result.status} — {result.message}"
+
+
+def test_doctor_check_fails_on_synthetic_asymmetry(tmp_path: Path) -> None:
+    """Slice 6 WARN→FAIL promotion: the doctor check returns ``fail`` (not
+    ``warning``) on an unwaived asymmetry.
+
+    Builds a tmp tree the doctor's importlib path can load: copies the diff +
+    its sibling scripts and the live (active claude+codex) harness projection,
+    plus an asymmetric hook-config pair (a synthetic hook on claude only) and a
+    minimal registry that leaves it unregistered + unwaived.
+    """
+    from groundtruth_kb.project.doctor import _check_parity_discovery_diff
+
+    (tmp_path / "scripts").mkdir()
+    for name in ("parity_discovery_diff.py", "check_harness_parity.py", "harness_projection_reader.py"):
+        shutil.copy(_SCRIPTS / name, tmp_path / "scripts" / name)
+    (tmp_path / "groundtruth.toml").write_text("", encoding="utf-8")
+    (tmp_path / "harness-state").mkdir()
+    shutil.copy(
+        _PROJECT_ROOT / "harness-state" / "harness-registry.json",
+        tmp_path / "harness-state" / "harness-registry.json",
+    )
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "UserPromptSubmit": [
+                        {"hooks": [{"type": "command", "command": "python .claude/hooks/synthetic-doctor-fail.py"}]}
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".codex" / "hooks.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
+    (tmp_path / "config" / "agent-control").mkdir(parents=True)
+    (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").write_text(
+        "parity_schema_version = 1\n", encoding="utf-8"
+    )
+
+    result = _check_parity_discovery_diff(tmp_path)
+    assert result.status == "fail", f"expected fail, got {result.status} — {result.message}"
     assert "asymmetry" in result.message.lower()

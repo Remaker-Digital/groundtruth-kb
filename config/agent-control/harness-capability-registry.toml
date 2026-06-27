@@ -967,6 +967,335 @@ surface = ".agent/skills/verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/verify/SKILL.md"
 source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
+# ── Slice 6 of PROJECT-GTKB-CROSS-HARNESS-PARITY: coverage audit ──
+# 4 Group-A unifications + 18 Group-B/C single-harness capabilities whose
+# absent-harness asymmetry is owner-waived below (owner_approval_ref DELIB-20266285).
+
+[[capabilities]]
+id = "hook.directive-enforcement"
+kind = "hook"
+canonical_name = "directive-enforcement"
+canonical_purpose = "Directive root-boundary enforcement; same capability exposed via a Claude adapter and a Codex .cmd wrapper."
+canonical_source = ".claude/hooks/directive-enforcement-claude-adapter.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/directive-enforcement-claude-adapter.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/directive-enforcement.cmd"
+status = "native"
+
+[[capabilities]]
+id = "hook.formal-artifact-approval"
+kind = "hook"
+canonical_name = "formal-artifact-approval"
+canonical_purpose = "Formal-artifact approval gate; Claude gate vs Codex .cmd wrapper of the same capability."
+canonical_source = ".claude/hooks/formal-artifact-approval-gate.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/formal-artifact-approval-gate.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/formal-artifact-approval.cmd"
+status = "native"
+
+[[capabilities]]
+id = "hook.sot-read-discipline"
+kind = "hook"
+canonical_name = "sot-read-discipline"
+canonical_purpose = "SoT read discipline; Claude Read/Grep/Glob hook vs Codex Bash adapter of the same capability."
+canonical_source = ".claude/hooks/sot-read-discipline.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/sot-read-discipline.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/sot-read-discipline-bash-adapter.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.wi-id-collision-gate"
+kind = "hook"
+canonical_name = "wi-id-collision-gate"
+canonical_purpose = "Bridge WI-ID collision gate; same capability under different adapter names on each harness."
+canonical_source = ".claude/hooks/bridge-proposal-wi-id-collision-gate.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/bridge-proposal-wi-id-collision-gate.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/wi-id-collision-gate.cmd"
+status = "native"
+
+[[capabilities]]
+id = "hook.bridge-compliance-gate-apply-patch-adapter"
+kind = "hook"
+canonical_name = "bridge-compliance-gate-apply-patch-adapter"
+canonical_purpose = "Claude has no apply_patch tool; the adapter only exists to cover Codex's apply_patch path."
+canonical_source = ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd"
+status = "native"
+
+[[capabilities]]
+id = "hook.codex-mcp-worker-guard"
+kind = "hook"
+canonical_name = "codex-mcp-worker-guard"
+canonical_purpose = "Guards stale Codex MCP workers; Claude has no Codex MCP worker surface."
+canonical_source = ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd"
+status = "native"
+
+[[capabilities]]
+id = "hook.bridge-compliance-audit"
+kind = "hook"
+canonical_name = "bridge-compliance-audit"
+canonical_purpose = "Codex PostToolUse audit of the apply_patch path; Claude enforces bridge compliance at PreToolUse Write."
+canonical_source = ".codex/gtkb-hooks/bridge-compliance-audit.cmd"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/bridge-compliance-audit.cmd"
+status = "native"
+
+[[capabilities]]
+id = "hook.assertion-check"
+kind = "hook"
+canonical_name = "assertion-check"
+canonical_purpose = "Claude SessionStart assertion surfacing; Codex handles assertions outside the hook surface."
+canonical_source = ".claude/hooks/assertion-check.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/assertion-check.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.bridge-axis-2-surface"
+kind = "hook"
+canonical_name = "bridge-axis-2-surface"
+canonical_purpose = "Claude prompt-driven AXIS-2 bridge surfacing; Codex AXIS-2 is app-thread automation, not a UPS hook."
+canonical_source = ".claude/hooks/bridge-axis-2-surface.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/bridge-axis-2-surface.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.delib-search-gate"
+kind = "hook"
+canonical_name = "delib-search-gate"
+canonical_purpose = "Claude UserPromptSubmit deliberation-search gate; prompt-driven, no Codex UPS equivalent."
+canonical_source = ".claude/hooks/delib-search-gate.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/delib-search-gate.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.delib-search-tracker"
+kind = "hook"
+canonical_name = "delib-search-tracker"
+canonical_purpose = "Claude PostToolUse deliberation-search tracking."
+canonical_source = ".claude/hooks/delib-search-tracker.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/delib-search-tracker.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.dispatch_blackbox_gate"
+kind = "hook"
+canonical_name = "dispatch_blackbox_gate"
+canonical_purpose = "Claude Write/Edit dispatch-blackbox gate."
+canonical_source = "scripts/dispatch_blackbox_gate.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = "scripts/dispatch_blackbox_gate.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.gov09-capture"
+kind = "hook"
+canonical_name = "gov09-capture"
+canonical_purpose = "Claude UserPromptSubmit GOV-09 requirements capture; prompt-driven."
+canonical_source = ".claude/hooks/gov09-capture.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/gov09-capture.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.intake-classifier"
+kind = "hook"
+canonical_name = "intake-classifier"
+canonical_purpose = "Claude UserPromptSubmit intake classifier; prompt-driven."
+canonical_source = ".claude/hooks/intake-classifier.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/intake-classifier.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.kb-not-markdown"
+kind = "hook"
+canonical_name = "kb-not-markdown"
+canonical_purpose = "Claude PreToolUse kb-not-markdown gate."
+canonical_source = ".claude/hooks/kb-not-markdown.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/kb-not-markdown.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.narrative-artifact-approval-gate"
+kind = "hook"
+canonical_name = "narrative-artifact-approval-gate"
+canonical_purpose = "Claude Write/Edit narrative-artifact approval gate; the Codex apply_patch path is covered by its own gates."
+canonical_source = ".claude/hooks/narrative-artifact-approval-gate.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/narrative-artifact-approval-gate.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.owner-decision-capture"
+kind = "hook"
+canonical_name = "owner-decision-capture"
+canonical_purpose = "Claude PostToolUse owner-decision capture."
+canonical_source = ".claude/hooks/owner-decision-capture.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/owner-decision-capture.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.owner-decision-tracker"
+kind = "hook"
+canonical_name = "owner-decision-tracker"
+canonical_purpose = "Claude UserPromptSubmit + Stop owner-decision tracker; prompt-driven."
+canonical_source = ".claude/hooks/owner-decision-tracker.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/owner-decision-tracker.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.scanner-safe-writer"
+kind = "hook"
+canonical_name = "scanner-safe-writer"
+canonical_purpose = "Claude bridge-scoped credential scan; Codex credential-scan.cmd covers the Bash/apply_patch credential surface."
+canonical_source = ".claude/hooks/scanner-safe-writer.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/scanner-safe-writer.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.session-start-governance"
+kind = "hook"
+canonical_name = "session-start-governance"
+canonical_purpose = "Claude SessionStart governance disclosure; Codex session_start_dispatch handles startup orientation."
+canonical_source = ".claude/hooks/session-start-governance.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/session-start-governance.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.session_self_initialization"
+kind = "hook"
+canonical_name = "session_self_initialization"
+canonical_purpose = "Codex invokes session_self_initialization.py as a subprocess of session_start_dispatch.py, so it is not a directly-registered Codex hook surface though the behavior is present."
+canonical_source = "scripts/session_self_initialization.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = "scripts/session_self_initialization.py"
+status = "native"
+
+[[capabilities]]
+id = "hook.spec-before-code"
+kind = "hook"
+canonical_name = "spec-before-code"
+canonical_purpose = "Claude PreToolUse spec-before-code gate; Codex uses spec-classifier on UserPromptSubmit."
+canonical_source = ".claude/hooks/spec-before-code.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.claude]
+surface = ".claude/hooks/spec-before-code.py"
+status = "native"
+
+
 [harnesses.ollama]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3
 # (spec inserted by Child 4; draft assertions updated from capabilities.ollama.* to
@@ -1005,3 +1334,148 @@ skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
 skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
 skill_adapter_drift_check_supported = true
 phase_1_only = true
+
+# ── Slice 6 owner-approved typed parity waivers (DELIB-20266285) ──
+[[parity_waivers]]
+capability_id = "hook.bridge-compliance-gate-apply-patch-adapter"
+harness = "claude"
+reason_class = "hard-limitation"
+rationale = "Claude has no apply_patch tool; the adapter only exists to cover Codex's apply_patch path."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.codex-mcp-worker-guard"
+harness = "claude"
+reason_class = "harness-surface-difference"
+rationale = "Guards stale Codex MCP workers; Claude has no Codex MCP worker surface."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.bridge-compliance-audit"
+harness = "claude"
+reason_class = "harness-surface-difference"
+rationale = "Codex PostToolUse audit of the apply_patch path; Claude enforces bridge compliance at PreToolUse Write."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.assertion-check"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude SessionStart assertion surfacing; Codex handles assertions outside the hook surface."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.bridge-axis-2-surface"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude prompt-driven AXIS-2 bridge surfacing; Codex AXIS-2 is app-thread automation, not a UPS hook."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.delib-search-gate"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude UserPromptSubmit deliberation-search gate; prompt-driven, no Codex UPS equivalent."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.delib-search-tracker"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude PostToolUse deliberation-search tracking."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.dispatch_blackbox_gate"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude Write/Edit dispatch-blackbox gate."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.gov09-capture"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude UserPromptSubmit GOV-09 requirements capture; prompt-driven."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.intake-classifier"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude UserPromptSubmit intake classifier; prompt-driven."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.kb-not-markdown"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude PreToolUse kb-not-markdown gate."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.narrative-artifact-approval-gate"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude Write/Edit narrative-artifact approval gate; the Codex apply_patch path is covered by its own gates."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.owner-decision-capture"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude PostToolUse owner-decision capture."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.owner-decision-tracker"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude UserPromptSubmit + Stop owner-decision tracker; prompt-driven."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.scanner-safe-writer"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude bridge-scoped credential scan; Codex credential-scan.cmd covers the Bash/apply_patch credential surface."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.session-start-governance"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude SessionStart governance disclosure; Codex session_start_dispatch handles startup orientation."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.session_self_initialization"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Codex invokes session_self_initialization.py as a subprocess of session_start_dispatch.py, so it is not a directly-registered Codex hook surface though the behavior is present."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
+capability_id = "hook.spec-before-code"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude PreToolUse spec-before-code gate; Codex uses spec-classifier on UserPromptSubmit."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
