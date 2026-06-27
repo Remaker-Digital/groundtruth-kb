@@ -20,6 +20,26 @@ DEFAULT_VOLATILE_PATHS = ("generated_at",)
 PASSING_OUTCOMES = {"clean", "accepted_baseline_update", "local_only_notice", "review_evidence_present"}
 BRIDGE_REVIEW_EVIDENCE_PATTERNS = ("bridge/*-[0-9][0-9][0-9].md",)
 
+# Inventoried surfaces that drive the public dev-environment inventory. This is a
+# hand-maintained mirror of the surfaces collected by
+# scripts/collect_dev_environment_inventory.py `_repo_surfaces` (.claude/rules,
+# .claude/skills SKILL.md, .claude/hooks, .claude/commands/registry.json,
+# .github/workflows) plus the .claude/settings.json settings-state surface. A
+# staged path matching any of these is "surface-affecting": it is the only case
+# in staged (pre-commit) mode where THIS commit changes the inventory, so the
+# material-drift block is retained. If the collector adds a surface and this list
+# is not updated, a staged change to the new surface would not block at
+# pre-commit time; the release-candidate gate (staged=False, whole-tree) is the
+# backstop. (WI-4862.)
+INVENTORIED_SURFACE_PATTERNS = (
+    ".claude/rules/*.md",
+    ".claude/skills/*/SKILL.md",
+    ".claude/hooks/*.py",
+    ".claude/commands/registry.json",
+    ".claude/settings.json",
+    ".github/workflows/*",
+)
+
 
 class DriftCheckError(RuntimeError):
     """Raised for configuration or boundary errors in the drift checker."""
@@ -193,6 +213,18 @@ def has_bridge_review_evidence(changed_paths: list[str]) -> bool:
     )
 
 
+def staged_paths_touch_inventoried_surface(changed_paths: list[str]) -> bool:
+    """Return True when any changed path is an inventoried surface (WI-4862).
+
+    Used only in staged (pre-commit) mode to decide whether material inventory
+    drift reflects THIS commit's staged set. When True, the material-drift block
+    is retained; when False, the staged-mode block is downgraded to a warning.
+    """
+    return any(
+        any(fnmatch.fnmatchcase(path, pattern) for pattern in INVENTORIED_SURFACE_PATTERNS) for path in changed_paths
+    )
+
+
 def evaluate_drift(
     project_root: Path,
     *,
@@ -224,13 +256,26 @@ def evaluate_drift(
     warnings: list[str] = []
 
     if material_inventory_drift:
-        blocking.append(
-            {
-                "reason": "normalized_inventory_drift",
-                "message": "current public inventory differs from committed baseline",
-                "diff_keys": diff_keys,
-            }
-        )
+        staged_surface_touched = staged_paths_touch_inventoried_surface(normalized_changed_paths)
+        if staged and not staged_surface_touched:
+            # Pre-commit (staged) mode: the whole-tree material drift is from
+            # untracked/unstaged inventoried surfaces unrelated to THIS commit's
+            # staged set (no staged path is an inventoried surface). Downgrade the
+            # material-drift block to a warning so the commit is not blocked. The
+            # release-candidate gate (staged=False, whole-tree) still hard-blocks.
+            # (WI-4862.)
+            warnings.append(
+                "material inventory drift present but no staged path is an inventoried surface; "
+                "downgraded to warning in staged mode (release gate still blocks)"
+            )
+        else:
+            blocking.append(
+                {
+                    "reason": "normalized_inventory_drift",
+                    "message": "current public inventory differs from committed baseline",
+                    "diff_keys": diff_keys,
+                }
+            )
 
     accepted_baseline_update = False
     local_only_notice = False
