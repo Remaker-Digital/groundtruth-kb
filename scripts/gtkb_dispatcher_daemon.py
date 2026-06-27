@@ -84,6 +84,23 @@ def _bridge_poller_state_dir(project_root: Path) -> Path:
     return project_root.joinpath(*BRIDGE_POLLER_STATE_SUBDIR)
 
 
+def _reap_dispatched_workers(project_root: Path) -> int:
+    """Reap live dispatched workers that have no exit_code sidecar (WI-4857).
+
+    Delegates to the trigger module's ``reap_inflight_dispatched_workers`` so
+    the sidecar contract stays in one place.  Wraps the call to never raise so
+    a reap failure cannot break daemon startup or shutdown.
+
+    Returns the count of workers reaped (0 when the trigger cannot be loaded).
+    """
+    try:
+        trigger = _load_trigger_module()
+        runs_dir = _bridge_poller_state_dir(project_root) / trigger.DISPATCH_RUNS_SUBDIR
+        return trigger.reap_inflight_dispatched_workers(runs_dir)
+    except Exception:
+        return 0
+
+
 def _active_substrate(project_root: Path) -> str:
     """Read harness-state/bridge-substrate.json substrate; fail-soft default."""
     path = project_root / "harness-state" / "bridge-substrate.json"
@@ -585,12 +602,18 @@ def run_loop(
     state_dir = _daemon_state_dir(project_root)
     if not acquire_daemon_lock(state_dir):
         raise SystemExit("another dispatcher daemon instance is running")
+    # WI-4857: holding the lock proves no prior daemon is alive — any live
+    # dispatched worker at this point is an orphan from a crashed predecessor.
+    _reap_dispatched_workers(project_root)
     (state_dir / PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
     try:
         while True:
             run_tick(project_root, max_items=max_items)
             time.sleep(max(1, tick_seconds))
     finally:
+        # WI-4857: reap in-flight workers before releasing the lock so a
+        # graceful termination does not leave orphaned workers running.
+        _reap_dispatched_workers(project_root)
         try:
             (state_dir / PID_FILENAME).unlink()
         except FileNotFoundError:

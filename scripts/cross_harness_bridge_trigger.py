@@ -1952,6 +1952,63 @@ def _count_live_dispatched_processes_for_role(runs_dir: Path, role_label: str) -
     return live
 
 
+def reap_inflight_dispatched_workers(runs_dir: Path) -> int:
+    """Terminate and record orphaned dispatched workers that never exited cleanly.
+
+    Called by the daemon at two lifecycle points (startup-reclaim and graceful
+    shutdown) to prevent worker leakage when the daemon dies abruptly or is
+    stopped while workers are still running.
+
+    A worker is reaped iff:
+    - its ``<dispatch_id>.pid`` sidecar exists and contains a parseable PID,
+    - its ``<dispatch_id>.exit_code`` sidecar is absent or empty, and
+    - the PID is alive (``_pid_alive``).
+
+    For each matched worker: terminate the process tree via
+    ``_terminate_pid_tree``, then write ``"124"`` to its ``exit_code`` sidecar
+    so the dispatch monitor classifies the outcome as a killed worker rather than
+    ``corrupt_output`` / dangling.
+
+    Workers that have already exited (exit_code present) or whose PID is dead are
+    skipped untouched.  File errors never raise (best-effort).
+
+    Returns the count of workers actually reaped.
+    """
+    if not runs_dir.is_dir():
+        return 0
+    reaped = 0
+    for pid_file in sorted(runs_dir.glob("*.pid")):
+        dispatch_id = pid_file.name[: -len(".pid")]
+        try:
+            pid_text = pid_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        try:
+            pid = int(pid_text)
+        except (TypeError, ValueError):
+            continue
+        status_file = runs_dir / f"{dispatch_id}.exit_code"
+        try:
+            exited = status_file.exists() and status_file.stat().st_size > 0
+        except OSError:
+            exited = False
+        if exited:
+            continue
+        if not _pid_alive(pid):
+            continue
+        # Live worker with no exit_code — orphan; terminate and record.
+        try:
+            _terminate_pid_tree(pid)
+        except Exception:
+            pass
+        try:
+            status_file.write_text("124\n", encoding="utf-8")
+        except OSError:
+            pass
+        reaped += 1
+    return reaped
+
+
 def _rotate_dispatch_failures_if_needed(target: Path) -> None:
     """Rotate dispatch-failures.jsonl through 5 rollovers when oversized."""
     _rotate_jsonl_if_needed(

@@ -732,3 +732,136 @@ def test_run_tick_shadow_mode_records_dormancy_without_restart(tmp_path: Path, m
     assert wd.get("remediation_hint") == "restart_storm_watchdog"
     assert "watchdog_restart" not in result
     assert called["restart"] is False
+
+
+# ---------------------------------------------------------------------------
+# WI-4857: reap_inflight_dispatched_workers + _reap_dispatched_workers tests
+# ---------------------------------------------------------------------------
+
+
+def _make_runs_dir(root: Path) -> Path:
+    """Return the bridge-poller dispatch-runs directory (created on demand)."""
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+    runs_dir = daemon._bridge_poller_state_dir(root) / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    return runs_dir
+
+
+def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:
+    """A live worker with no exit_code sidecar is terminated and recorded.
+
+    Spec-derived from WI-4857: ``reap_inflight_dispatched_workers`` must
+    terminate the process, write exit_code "124", and return count 1.
+    """
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+    runs_dir = _make_runs_dir(tmp_path)
+
+    # Spawn a real long-lived sleeper so we have a live PID to reap.
+    sleeper = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    dispatch_id = "test-dispatch-live-001"
+    try:
+        (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        # No exit_code sidecar — simulates an orphaned worker.
+        reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+        assert reaped == 1
+        exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
+        assert exit_code_file.exists(), "exit_code sidecar must be written"
+        assert exit_code_file.read_text(encoding="utf-8").strip() == "124"
+        # Process should be dead now.
+        sleeper.wait(timeout=5)
+    finally:
+        if sleeper.poll() is None:
+            sleeper.terminate()
+            sleeper.wait(timeout=5)
+
+
+def test_reap_inflight_skips_completed_worker(tmp_path: Path) -> None:
+    """A live worker whose exit_code sidecar is already populated is not reaped.
+
+    Spec-derived from WI-4857: already-exited workers must not be disturbed.
+    """
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+    runs_dir = _make_runs_dir(tmp_path)
+
+    sleeper = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    dispatch_id = "test-dispatch-completed-002"
+    try:
+        (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        # Pre-populate exit_code — worker already recorded its outcome.
+        (runs_dir / f"{dispatch_id}.exit_code").write_text("0\n", encoding="utf-8")
+        reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+        assert reaped == 0
+        # Process must still be alive (we did not kill it).
+        assert sleeper.poll() is None, "completed worker must not be killed"
+    finally:
+        sleeper.terminate()
+        sleeper.wait(timeout=5)
+
+
+def test_reap_inflight_skips_dead_pid(tmp_path: Path) -> None:
+    """A sidecar whose PID is already dead produces no reap and no error.
+
+    Spec-derived from WI-4857: dead-PID sidecars (stale orphans) are safe to
+    skip and must not cause ``reap_inflight_dispatched_workers`` to raise.
+    """
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+    runs_dir = _make_runs_dir(tmp_path)
+
+    # Spawn and immediately wait so the PID is definitely dead.
+    gone = subprocess.Popen(
+        [sys.executable, "-c", "raise SystemExit(0)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    gone.wait(timeout=10)
+    dead_pid = gone.pid
+
+    dispatch_id = "test-dispatch-dead-003"
+    (runs_dir / f"{dispatch_id}.pid").write_text(str(dead_pid) + "\n", encoding="utf-8")
+    # No exit_code sidecar.
+    reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+    assert reaped == 0
+    exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
+    assert not exit_code_file.exists(), "no exit_code should be written for a dead PID"
+
+
+def test_daemon_reap_helper_reaps_orphan(tmp_path: Path) -> None:
+    """_reap_dispatched_workers terminates a live orphan under the bridge-poller dir.
+
+    Spec-derived from WI-4857: the daemon-level wrapper resolves the correct
+    runs_dir path and delegates to the trigger helper successfully.
+    """
+    daemon = _load_daemon()
+    runs_dir = _make_runs_dir(tmp_path)
+
+    sleeper = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    dispatch_id = "test-daemon-orphan-004"
+    try:
+        (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        # No exit_code sidecar — simulate orphaned worker.
+        reaped = daemon._reap_dispatched_workers(tmp_path)
+        assert reaped == 1
+        exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
+        assert exit_code_file.exists()
+        assert exit_code_file.read_text(encoding="utf-8").strip() == "124"
+        sleeper.wait(timeout=5)
+    finally:
+        if sleeper.poll() is None:
+            sleeper.terminate()
+            sleeper.wait(timeout=5)
