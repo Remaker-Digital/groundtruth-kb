@@ -38,6 +38,24 @@ CAPABILITY_FLOOR_REQUIRED_FIELDS = (
 )
 CANONICAL_TOOL_SUBSET = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 
+# ── Cross-harness parity schema (Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY) ──
+# Additive surface derived from ADR-CROSS-HARNESS-PARITY-001 +
+# DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 (assertions PARITY-WAIVER-SCHEMA and
+# PARITY-APPLICABILITY-RULE). These accessors/validators are consumed by the
+# Slice-3 discovery-diff and the Slice-6 release/CI gate; they do NOT change the
+# existing per-capability per-harness parity matrix evaluated by
+# check_harness_parity().
+PARITY_SCHEMA_VERSION = 1
+VALID_APPLICABILITY = frozenset({"role-relative", "universal"})
+WAIVER_REASON_CLASSES = frozenset({"hard-limitation", "harness-surface-difference", "deliberate-deferral"})
+WAIVER_REQUIRED_FIELDS = (
+    "capability_id",
+    "harness",
+    "reason_class",
+    "rationale",
+    "owner_approval_ref",
+)
+
 
 def _load_known_harnesses_from_projection(project_root: Path | None = None) -> tuple[str, ...]:
     """Derive KNOWN_HARNESSES from registry projection per REQ-HARNESS-REGISTRY-001 FR5.
@@ -559,6 +577,119 @@ def _evaluate_capability_floor(harness_name: str, registry_data: dict[str, Any])
     return results
 
 
+def resolve_applicability(capability: dict[str, Any]) -> str:
+    """Resolve a capability's parity applicability (PARITY-APPLICABILITY-RULE).
+
+    An explicit valid ``applicability`` field wins. Otherwise the default is
+    ``role-relative`` when ``required_for_roles`` is non-empty (the capability
+    is role-specific) and ``universal`` when it is empty (session/governance).
+    """
+    explicit = str(capability.get("applicability") or "").strip().lower()
+    if explicit in VALID_APPLICABILITY:
+        return explicit
+    return "role-relative" if _as_string_list(capability.get("required_for_roles")) else "universal"
+
+
+def build_surface_map(registry: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+    """Per-capability per-harness surface map: ``id -> {harness: {surface, status}}``.
+
+    Formalizes the per-harness surface map the ADR demotes the registry to. The
+    harness subtables are detected structurally (any capability value that is a
+    table carrying a ``surface`` key), so the map tracks whatever harnesses a
+    capability declares without a hardcoded harness list.
+    """
+    raw = registry.get("capabilities")
+    capabilities = [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+    surface_map: dict[str, dict[str, dict[str, Any]]] = {}
+    for capability in capabilities:
+        cap_id = str(capability.get("id") or "")
+        if not cap_id:
+            continue
+        harness_surfaces: dict[str, dict[str, Any]] = {}
+        for key, value in capability.items():
+            if isinstance(value, dict) and "surface" in value:
+                harness_surfaces[key] = {
+                    "surface": value.get("surface"),
+                    "status": value.get("status"),
+                }
+        surface_map[cap_id] = harness_surfaces
+    return surface_map
+
+
+def load_parity_waivers(registry: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the typed ``[[parity_waivers]]`` records (empty list when absent)."""
+    raw = registry.get("parity_waivers")
+    return [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+
+
+def validate_parity_waiver(waiver: dict[str, Any]) -> list[str]:
+    """Validate one typed waiver record (PARITY-WAIVER-SCHEMA). Empty list = valid."""
+    if not isinstance(waiver, dict):
+        return ["waiver is not a table"]
+    errors: list[str] = []
+    for field in WAIVER_REQUIRED_FIELDS:
+        value = waiver.get(field)
+        if not (isinstance(value, str) and value.strip()):
+            errors.append(f"missing required waiver field {field!r}")
+    reason_class = str(waiver.get("reason_class") or "").strip()
+    if reason_class and reason_class not in WAIVER_REASON_CLASSES:
+        errors.append(f"invalid reason_class {reason_class!r} (expected one of {sorted(WAIVER_REASON_CLASSES)})")
+    has_trigger = bool(str(waiver.get("review_trigger") or "").strip())
+    has_expiry = bool(str(waiver.get("expiry") or "").strip())
+    if not (has_trigger or has_expiry):
+        errors.append("waiver must declare a review_trigger or an expiry")
+    return errors
+
+
+def validate_parity_schema(
+    registry: dict[str, Any],
+    *,
+    known_harnesses: tuple[str, ...] | set[str] | None = None,
+) -> list[str]:
+    """Validate the cross-harness parity schema. Empty list = valid.
+
+    Checks: ``parity_schema_version`` present and current; every capability's
+    explicit ``applicability`` (when set) is a valid value; every waiver record
+    validates and references a registered capability id and a known harness.
+    """
+    if not isinstance(registry, dict):
+        return ["registry is not a table"]
+    errors: list[str] = []
+
+    version = registry.get("parity_schema_version")
+    if version != PARITY_SCHEMA_VERSION:
+        errors.append(f"parity_schema_version is {version!r}; expected {PARITY_SCHEMA_VERSION}")
+
+    raw_caps = registry.get("capabilities")
+    capabilities = [item for item in raw_caps if isinstance(item, dict)] if isinstance(raw_caps, list) else []
+    capability_ids: set[str] = set()
+    for capability in capabilities:
+        cap_id = str(capability.get("id") or "")
+        if cap_id:
+            capability_ids.add(cap_id)
+        explicit = capability.get("applicability")
+        if explicit is not None and str(explicit).strip().lower() not in VALID_APPLICABILITY:
+            errors.append(
+                f"capability {cap_id!r} has invalid applicability {explicit!r} "
+                f"(expected one of {sorted(VALID_APPLICABILITY)})"
+            )
+
+    if known_harnesses is None:
+        known = set(_load_known_harnesses_from_projection())
+    else:
+        known = set(known_harnesses)
+    for index, waiver in enumerate(load_parity_waivers(registry)):
+        for err in validate_parity_waiver(waiver):
+            errors.append(f"parity_waivers[{index}]: {err}")
+        cap_ref = str(waiver.get("capability_id") or "")
+        if cap_ref and cap_ref not in capability_ids:
+            errors.append(f"parity_waivers[{index}]: capability_id {cap_ref!r} matches no registered capability")
+        harness_ref = str(waiver.get("harness") or "")
+        if harness_ref and known and harness_ref not in known:
+            errors.append(f"parity_waivers[{index}]: harness {harness_ref!r} is not a known harness {sorted(known)}")
+    return errors
+
+
 def check_harness_parity(
     project_root: Path = PROJECT_ROOT,
     *,
@@ -733,7 +864,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="Emit JSON.")
     parser.add_argument("--markdown", action="store_true", help="Emit Markdown.")
     parser.add_argument("--show-pass", action="store_true", help="Include PASS rows in Markdown output.")
+    parser.add_argument(
+        "--validate-schema",
+        action="store_true",
+        help="Validate the cross-harness parity schema (applicability + waiver records) and exit.",
+    )
     args = parser.parse_args(argv)
+
+    if args.validate_schema:
+        try:
+            registry, _ = load_registry(args.project_root.resolve())
+        except FileNotFoundError:
+            print("parity schema INVALID:\n  - registry file not found")
+            return 1
+        except tomllib.TOMLDecodeError as exc:
+            print(f"parity schema INVALID:\n  - invalid registry TOML: {exc}")
+            return 1
+        schema_errors = validate_parity_schema(registry)
+        if schema_errors:
+            print("parity schema INVALID:")
+            for err in schema_errors:
+                print(f"  - {err}")
+            return 1
+        print("parity schema OK")
+        return 0
 
     report = check_harness_parity(
         args.project_root,

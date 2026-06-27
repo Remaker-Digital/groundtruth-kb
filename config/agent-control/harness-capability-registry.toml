@@ -1,7 +1,37 @@
 schema_version = 1
 registry_id = "gtkb-harness-capability-registry"
 purpose = "Canonical registry for semantic capability parity across Claude Code and Codex harnesses."
-last_updated = "2026-05-06"
+last_updated = "2026-06-27"
+
+# ── Cross-harness parity schema (ADR-CROSS-HARNESS-PARITY-001 / DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001) ──
+# Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY. `parity_schema_version` declares
+# the parity schema described here is present; scripts/check_harness_parity.py
+# validates it (validate_parity_schema) and the discovery-diff (Slice 3)
+# consumes the applicability rule + waiver store.
+#
+# Per-capability applicability (resolved by resolve_applicability()):
+#   role-relative — checked across active harnesses holding the capability's
+#                   required_for_roles. Default when required_for_roles is
+#                   non-empty.
+#   universal     — checked across all active harnesses running the surface.
+#                   Default when required_for_roles is empty; may be set
+#                   explicitly via `applicability = "universal"` on a capability
+#                   (e.g. a session/governance hook that runs on every harness).
+#
+# Typed waiver store — owner-approved legitimate asymmetry (assertion
+# PARITY-WAIVER-SCHEMA). Declare records as the top-level array-of-tables
+# `[[parity_waivers]]`; each record is validated by validate_parity_waiver():
+#   [[parity_waivers]]
+#   capability_id      = "<capability id from a [[capabilities]] entry>"
+#   harness            = "<harness name lacking the surface>"
+#   reason_class       = "hard-limitation" | "harness-surface-difference" | "deliberate-deferral"
+#   rationale          = "<why this harness legitimately lacks the surface>"
+#   owner_approval_ref = "DELIB-<id>"
+#   review_trigger     = "<event that re-opens the waiver>"   # OR: expiry = "YYYY-MM-DD"
+# No live waiver records exist yet — the first disposition is the Slice-5
+# `::open` conformance case (a real Claude-vs-Codex asymmetry to resolve, not
+# waive).
+parity_schema_version = 1
 
 [[capabilities]]
 id = "skill.alternatives-investigation"
@@ -731,6 +761,7 @@ canonical_purpose = "Stop-event hook that invokes the advisory-to-backlog router
 canonical_source = ".claude/hooks/advisory-router-scan.py"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "shared"
+applicability = "universal"
 notes = "Both harnesses invoke the canonical script directly; no adapter file needed. Registered in .claude/settings.json (Claude) and .codex/hooks.json (Codex)."
 
 [capabilities.claude]
