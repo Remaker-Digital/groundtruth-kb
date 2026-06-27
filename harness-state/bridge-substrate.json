@@ -1,5 +1,5 @@
 {
-  "applied_at": "2026-06-15T16:32:34.492920Z",
-  "applied_by": "B",
-  "substrate": "cross_harness_trigger"
+  "applied_at": "2026-06-27T06:22:08.491822Z",
+  "applied_by": "A",
+  "substrate": "dispatcher_daemon"
 }

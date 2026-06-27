@@ -3,7 +3,7 @@ selection_order = ["quality", "cost", "availability", "reviewer_precedence", "ha
 
 [harnesses.A]
 description = "Codex: high-quality dispatch target."
-can_receive_dispatch = true
+can_receive_dispatch = false
 can_fire_events = true
 dispatch_cost = 60
 dispatch_quality = 90
@@ -17,6 +17,7 @@ can_fire_events = true
 dispatch_cost = 60
 dispatch_quality = 95
 dispatch_availability = 75
+max_items = 3
 tags = ["prime-builder", "event-source"]
 
 [harnesses.C]
@@ -30,7 +31,7 @@ tags = ["loyal-opposition"]
 
 [harnesses.D]
 description = "Ollama-shim: cloud-routed LO dispatch target (current route: kimi-k2-7-code-cloud via cloud API)."
-can_receive_dispatch = true
+can_receive_dispatch = false
 can_fire_events = false
 dispatch_cost = 30
 dispatch_quality = 80
@@ -45,11 +46,12 @@ can_fire_events = true
 dispatch_cost = 20
 dispatch_quality = 80
 dispatch_availability = 90
+max_items = 3
 tags = ["prime-builder"]
 
 [harnesses.F]
 description = "OpenRouter: low-cost Loyal Opposition dispatch target."
-can_receive_dispatch = true
+can_receive_dispatch = false
 can_fire_events = false
 dispatch_cost = 20
 dispatch_quality = 80
