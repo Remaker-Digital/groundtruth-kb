@@ -154,6 +154,19 @@ class TestF5CoreIntake:
         assert created.get("type") == "requirement"
         assert created.get("authority") == "stated"
 
+    def test_confirm_intake_populates_description_from_raw_text(self, db):
+        raw_text = "The system must log all API errors with request correlation IDs"
+        cap = capture_requirement(
+            db,
+            raw_text,
+            proposed_title="API error logging",
+            proposed_section="observability",
+        )
+        result = confirm_intake(db, cap["deliberation_id"])
+        created = db.get_spec(result["confirmed_spec_id"])
+        assert created is not None
+        assert created.get("description") == raw_text
+
     # 9. Confirm with default type/authority when proposed fields absent
     def test_confirm_default_type_authority(self, db):
         # Capture with explicit defaults (the defaults that capture uses)
@@ -283,7 +296,7 @@ class TestF5RedactionAndCLI:
 
     # 17. Redaction: credential stored redacted, still filterable
     def test_redaction(self, db):
-        secret_text = 'The API must use api_key="AKIAIOSFODNN7EXAMPLEKEY" for auth'
+        secret_text = 'The API must use api_key="AKIAIOSFODNN7EXAMPLEKEY" for auth'  # placeholder
         cap = capture_requirement(
             db,
             secret_text,
@@ -303,7 +316,7 @@ class TestF5RedactionAndCLI:
         # Fetch the deliberation and verify the stored content has been redacted
         delib = db.get_deliberation(cap["deliberation_id"])
         assert delib is not None
-        assert "AKIAIOSFODNN7EXAMPLEKEY" not in delib.get("content", "")
+        assert "AKIAIOSFODNN7EXAMPLEKEY" not in delib.get("content", "")  # placeholder
 
     # 18. CLI smoke: gt intake list
     def test_cli_intake_list(self, tmp_path):
