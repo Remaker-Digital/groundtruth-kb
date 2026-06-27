@@ -140,7 +140,12 @@ if ($candidates.Count -gt 0) {
             # (not array) is emitted unwrapped by ConvertTo-Json; the decider
             # normalizes a dict to a one-element list, so this is safe.
             $procFile = Join-Path $opsDir 'storm-watchdog-candidates.json'
-            Set-Content -Path $procFile -Value $procJson -Encoding utf8
+            # BOM-less UTF-8 write (WI-4882 Slice 2): Windows PowerShell 5.1
+            # `Set-Content -Encoding utf8` prepends a BOM that the decider's
+            # json.loads cannot parse (FAILSAFE). WriteAllText emits no BOM on
+            # all PowerShell versions; the decider also reads utf-8-sig as a
+            # belt-and-suspenders.
+            [System.IO.File]::WriteAllText($procFile, $procJson)
             $decisionRaw = (& $pythonExe $reapScript --now $nowEpoch --project-root $root --provenance-dir '.gtkb-state/ops/dispatch-provenance' --processes-file $procFile 2>$null)
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($decisionRaw)) {
                 $failSafe = $true; $failReason = "decider exit=$LASTEXITCODE output-empty=$([string]::IsNullOrWhiteSpace($decisionRaw))"

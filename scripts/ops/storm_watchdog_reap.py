@@ -298,7 +298,7 @@ def read_leases(lease_dirs: list[Path]) -> list[Lease]:
             continue
         for path in sorted(lease_dir.glob("*.lock")):
             try:
-                record = json.loads(path.read_text(encoding="utf-8"))
+                record = json.loads(path.read_text(encoding="utf-8-sig"))
             except (OSError, json.JSONDecodeError):
                 continue
             if not isinstance(record, dict):
@@ -328,7 +328,7 @@ def read_provenance(provenance_dir: Path) -> list[ProvenanceRecord]:
     if not ledger.is_file():
         return []
     try:
-        data = json.loads(ledger.read_text(encoding="utf-8"))
+        data = json.loads(ledger.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return []
     out: list[ProvenanceRecord] = []
@@ -419,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.processes_file is not None:
-        raw = args.processes_file.read_text(encoding="utf-8")
+        raw = args.processes_file.read_text(encoding="utf-8-sig")
     else:
         raw = sys.stdin.read()
     rows = json.loads(raw) if raw.strip() else []

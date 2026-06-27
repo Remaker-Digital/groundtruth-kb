@@ -9,6 +9,7 @@ determinism with an injected ``now`` so there is no clock dependency.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -232,3 +233,22 @@ def test_decide_reap_provenance_orphan_within_grace_protected() -> None:
     provenance = [ProvenanceRecord(pid=801, create_time_epoch=NOW - 30, dispatch_root_pid=800)]
     d = decide_reap([young], [], now=NOW, provenance=provenance)
     assert d.reap == []
+
+
+# --------------------------------------------------------------------------- #
+# WI-4882 Slice 2: the decider CLI must parse a BOM-prefixed processes file.   #
+# --------------------------------------------------------------------------- #
+
+
+def test_main_parses_bom_prefixed_processes_file(tmp_path, capsys) -> None:
+    # Windows PowerShell 5.1 `Set-Content -Encoding utf8` prepends a UTF-8 BOM.
+    # The decider previously read the file as plain utf-8, so json.loads raised
+    # "Unexpected UTF-8 BOM" -> exit 1 -> the watchdog sat in FAILSAFE. With the
+    # utf-8-sig read, a BOM-prefixed processes file parses and a decision prints.
+    rows = [{"pid": 100, "ppid": 1, "name": "codex.exe", "create_time_epoch": NOW - 500, "dispatched": True}]
+    proc_file = tmp_path / "candidates.json"
+    proc_file.write_bytes(b"\xef\xbb\xbf" + json.dumps(rows).encode("utf-8"))
+    rc = _M.main(["--now", str(NOW), "--project-root", str(tmp_path), "--processes-file", str(proc_file)])
+    assert rc == 0
+    decision = json.loads(capsys.readouterr().out)
+    assert "reap" in decision and "protect" in decision and "reasons" in decision
