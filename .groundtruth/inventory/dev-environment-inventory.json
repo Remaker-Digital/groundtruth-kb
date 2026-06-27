@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-27T06:04:49Z",
+  "generated_at": "2026-06-27T15:16:05Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -151,7 +151,7 @@
   "repo_configured_surfaces": {
     "claude_hooks": {
       "classification": "public_safe",
-      "count": 32,
+      "count": 33,
       "items": [
         ".claude/hooks/_delib_common.py",
         ".claude/hooks/advisory-router-scan.py",
@@ -179,6 +179,7 @@
         ".claude/hooks/project-completion-surface.py",
         ".claude/hooks/scanner-safe-writer.py",
         ".claude/hooks/session-start-governance.py",
+        ".claude/hooks/session-topic-envelope-router.py",
         ".claude/hooks/session_start_dispatch.py",
         ".claude/hooks/sot-read-discipline.py",
         ".claude/hooks/spec-before-code.py",
@@ -266,10 +267,11 @@
     },
     "rules": {
       "classification": "public_safe",
-      "count": 36,
+      "count": 37,
       "items": [
         ".claude/rules/acting-prime-builder.md",
         ".claude/rules/active-workspace.md",
+        ".claude/rules/auto-finalization-sweep.md",
         ".claude/rules/backlog-approval-state.md",
         ".claude/rules/bridge-essential.md",
         ".claude/rules/bridge-permanent-operations-runbook.md",
@@ -709,7 +711,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.2"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -723,7 +725,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -737,7 +739,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {
