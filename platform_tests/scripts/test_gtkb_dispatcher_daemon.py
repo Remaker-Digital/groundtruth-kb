@@ -150,6 +150,78 @@ def test_daemon_control_cli_status_reports_state(tmp_path: Path, monkeypatch: py
     assert payload.get("heartbeat_at")
 
 
+# ---------------------------------------------------------------------------
+# WI-4856: daemon status must be liveness-accurate (running derives from process
+# liveness + heartbeat freshness, not lock presence) and mode/active_substrate
+# derive from the active substrate selection.
+# ---------------------------------------------------------------------------
+
+
+def test_status_running_false_on_stale_lock_dead_daemon(tmp_path: Path) -> None:
+    """A stale lock left by a dead daemon (no live PID, stale heartbeat) must
+    report running=False (WI-4856 fix 1)."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / daemon.LOCK_FILENAME).write_text(json.dumps({"pid": 999999}), encoding="utf-8")
+    # No PID file -> daemon_process_alive False; far-past heartbeat -> not fresh.
+    (state_dir / daemon.HEARTBEAT_FILENAME).write_text("2020-01-01T00:00:00Z\n", encoding="utf-8")
+    status = daemon.collect_daemon_status(root)
+    assert status["running"] is False
+
+
+def test_status_running_true_when_pid_alive(tmp_path: Path) -> None:
+    """A live daemon PID reports running=True regardless of lock/heartbeat
+    (WI-4856 fix 1)."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / daemon.PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    status = daemon.collect_daemon_status(root)
+    assert status["running"] is True
+
+
+def test_status_running_true_when_lock_and_heartbeat_fresh(tmp_path: Path) -> None:
+    """A fresh heartbeat plus a held lock reports running even when the PID file
+    is absent (WI-4856 fix 1)."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / daemon.LOCK_FILENAME).write_text(json.dumps({"pid": 999999}), encoding="utf-8")
+    (state_dir / daemon.HEARTBEAT_FILENAME).write_text(daemon._now_iso() + "\n", encoding="utf-8")
+    status = daemon.collect_daemon_status(root)
+    assert status["running"] is True
+
+
+def test_status_mode_live_when_substrate_daemon(tmp_path: Path) -> None:
+    """mode=live and active_substrate are reported when the active substrate is
+    dispatcher_daemon (WI-4856 fix 2)."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": "dispatcher_daemon"}), encoding="utf-8"
+    )
+    status = daemon.collect_daemon_status(root)
+    assert status["mode"] == "live"
+    assert status["active_substrate"] == "dispatcher_daemon"
+
+
+def test_status_mode_shadow_when_substrate_cross_harness(tmp_path: Path) -> None:
+    """mode=shadow when the active substrate is the cross-harness trigger
+    (WI-4856 fix 2)."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": "cross_harness_trigger"}), encoding="utf-8"
+    )
+    status = daemon.collect_daemon_status(root)
+    assert status["mode"] == "shadow"
+    assert status["active_substrate"] == "cross_harness_trigger"
+
+
 def test_run_tick_includes_health_monitoring(tmp_path: Path) -> None:
     daemon = _load_daemon()
     root = _make_project(tmp_path)

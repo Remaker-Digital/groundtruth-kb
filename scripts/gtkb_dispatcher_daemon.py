@@ -44,10 +44,28 @@ LOCK_SANITY_TTL_DEFAULT_SECONDS = 120
 TICK_SECONDS_ENV_VAR = "GTKB_DISPATCHER_DAEMON_TICK_SECONDS"
 DEFAULT_TICK_SECONDS = 60
 DEFAULT_MAX_ITEMS = 2
+# WI-4856: heartbeat-freshness window for liveness-accurate status. A daemon
+# whose newest heartbeat is older than this is treated as not-fresh; combined
+# with PID-liveness it gates the reported ``running`` flag so a stale lock left
+# by a dead daemon no longer reports running. ~3x the default 60s tick.
+HEARTBEAT_STALE_SECONDS_ENV_VAR = "GTKB_DISPATCHER_DAEMON_HEARTBEAT_STALE_SECONDS"
+HEARTBEAT_STALE_DEFAULT_SECONDS = 180
 
 
 def _now_iso() -> str:
     return dt.datetime.now(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _heartbeat_stale_seconds() -> float:
+    """Return the heartbeat-freshness window in seconds (env-overridable, WI-4856)."""
+    raw = os.environ.get(HEARTBEAT_STALE_SECONDS_ENV_VAR)
+    if raw is None:
+        return float(HEARTBEAT_STALE_DEFAULT_SECONDS)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return float(HEARTBEAT_STALE_DEFAULT_SECONDS)
+    return value if value > 0 else float(HEARTBEAT_STALE_DEFAULT_SECONDS)
 
 
 def daemon_state_dir(project_root: Path) -> Path:
@@ -586,29 +604,40 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
     state_dir = _daemon_state_dir(project_root)
     lock_path = state_dir / LOCK_FILENAME
     heartbeat_path = state_dir / HEARTBEAT_FILENAME
+    # WI-4856 fix 2: mode/active_substrate derive from the active substrate
+    # selection (mirrors run_tick), not a hardcoded "shadow".
+    active_substrate = _active_substrate(project_root)
     status: dict[str, Any] = {
         "state_dir": str(state_dir),
         "running": False,
-        "mode": "shadow",
+        "mode": "live" if active_substrate == DAEMON_SUBSTRATE else "shadow",
+        "active_substrate": active_substrate,
         "heartbeat_path": str(heartbeat_path),
         "lock_path": str(lock_path),
     }
-    if lock_path.is_file():
+    lock_present = lock_path.is_file()
+    if lock_present:
         try:
-            lock_payload = json.loads(lock_path.read_text(encoding="utf-8"))
-            status["lock"] = lock_payload
-            status["running"] = True
+            status["lock"] = json.loads(lock_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            status["running"] = lock_path.is_file()
+            pass
+    heartbeat_age: float | None = None
     if heartbeat_path.is_file():
         try:
             heartbeat_text = heartbeat_path.read_text(encoding="utf-8").strip()
             status["heartbeat_at"] = heartbeat_text
             parsed = dt.datetime.fromisoformat(heartbeat_text.replace("Z", "+00:00"))
-            age = (dt.datetime.now(dt.UTC) - parsed).total_seconds()
-            status["heartbeat_age_seconds"] = age
+            heartbeat_age = (dt.datetime.now(dt.UTC) - parsed).total_seconds()
+            status["heartbeat_age_seconds"] = heartbeat_age
         except (OSError, ValueError):
             status["heartbeat_at"] = None
+    # WI-4856 fix 1: derive running from process liveness + heartbeat freshness,
+    # not lock presence alone. A stale lock left by a dead daemon (PID gone,
+    # heartbeat aged out) no longer reports running; a cleanly stopped daemon
+    # (lock released) reports not-running even if the heartbeat file lingers.
+    pid_alive = daemon_process_alive(state_dir)
+    heartbeat_fresh = heartbeat_age is not None and heartbeat_age <= _heartbeat_stale_seconds()
+    status["running"] = bool(pid_alive or (lock_present and heartbeat_fresh))
     log_path = state_dir / SHADOW_LOG_FILENAME
     if log_path.is_file():
         try:

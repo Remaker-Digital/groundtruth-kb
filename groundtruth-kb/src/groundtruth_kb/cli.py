@@ -858,6 +858,7 @@ def bridge_dispatch_daemon_status_cmd(ctx: click.Context, json_output: bool) -> 
         click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
     click.echo(f"Dispatcher daemon mode: {payload['mode']}")
+    click.echo(f"Active substrate: {payload.get('active_substrate')}")
     click.echo(f"Running: {payload['running']}")
     click.echo(f"Heartbeat: {payload.get('heartbeat_at') or '(none)'}")
     if payload.get("heartbeat_age_seconds") is not None:
