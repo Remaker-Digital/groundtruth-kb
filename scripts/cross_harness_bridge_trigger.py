@@ -100,20 +100,6 @@ def _repo_venv_command(executable_name: str) -> str:
     return Path("groundtruth-kb", ".venv", bin_dir, exe_name).as_posix()
 
 
-def _prefer_windows_gui_python(command: str) -> str:
-    """Return sibling pythonw.exe for Windows python.exe commands when present."""
-    if os.name != "nt":
-        return command
-    last_backslash = command.rfind("\\")
-    last_slash = command.rfind("/")
-    split_at = max(last_backslash, last_slash)
-    executable_name = command[split_at + 1 :] if split_at >= 0 else command
-    if executable_name.lower() != "python.exe":
-        return command
-    candidate = f"{command[: split_at + 1]}pythonw.exe" if split_at >= 0 else "pythonw.exe"
-    return candidate if os.path.isfile(candidate) else command
-
-
 def _worker_pythonpath(inherited: str | None) -> str:
     """Prepend the importable GT-KB package source for dispatched workers."""
     inherited_parts = [part for part in (inherited or "").split(os.pathsep) if part]
@@ -199,6 +185,9 @@ QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
+PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
+PID_CREATE_TIME_META_KEY = "pid_create_time_epoch"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
 STORM_WATCHDOG_HEARTBEAT_SUBPATH = (".gtkb-state", "ops", "storm-watchdog-heartbeat.txt")
 _HEARTBEAT_STALE_SECONDS = 300
 DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
@@ -775,6 +764,46 @@ def _reset_recipient_state(
         _release_reset_guard(state_dir, token)
 
 
+def _pid_create_time_epoch(pid: int) -> float | None:
+    """Return the OS create-time epoch for ``pid`` when available."""
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_int <= 0:
+        return None
+    try:
+        import psutil  # noqa: PLC0415
+
+        return float(psutil.Process(pid_int).create_time())
+    except Exception:  # noqa: BLE001 - unavailable/vanished PIDs are not trusted
+        return None
+
+
+def _pid_create_time_matches(pid: int, expected_epoch: Any) -> bool:
+    try:
+        expected = float(expected_epoch)
+    except (TypeError, ValueError):
+        return False
+    actual = _pid_create_time_epoch(pid)
+    if actual is None:
+        return False
+    return abs(actual - expected) <= PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS
+
+
+def _read_pid_create_time_sidecar(runs_dir: Path, dispatch_id: str) -> float | None:
+    path = runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}"
+    try:
+        return float(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _dispatch_pid_provenance_matches(runs_dir: Path, dispatch_id: str, pid: int) -> bool:
+    expected = _read_pid_create_time_sidecar(runs_dir, dispatch_id)
+    return expected is not None and _pid_create_time_matches(pid, expected)
+
+
 def _reap_stale_dispatch_pid(prior_last_launch: Any, now: float) -> bool:
     """Reap the recipient's recorded dispatch-run process iff it is a
     definitely-hung straggler (WI-4805).
@@ -798,6 +827,8 @@ def _reap_stale_dispatch_pid(prior_last_launch: Any, now: float) -> bool:
     if (now - launch_ts) < RESET_STRAGGLER_AGE_SECONDS:
         return False
     if not _pid_alive(pid):
+        return False
+    if not _pid_create_time_matches(pid, prior_last_launch.get(PID_CREATE_TIME_META_KEY)):
         return False
     _terminate_pid_tree(pid)
     return True
@@ -1651,7 +1682,15 @@ def _rotate_jsonl_if_needed(
 
 def _dispatch_id_from_run_artifact(path: Path) -> str:
     name = path.name
-    for suffix in (".stdout.log", ".stderr.log", ".exit_code", ".pid", ".prompt.txt", ".input.json"):
+    for suffix in (
+        ".stdout.log",
+        ".stderr.log",
+        ".exit_code",
+        ".pid",
+        PID_CREATE_TIME_SUFFIX,
+        ".prompt.txt",
+        ".input.json",
+    ):
         if name.endswith(suffix):
             return name[: -len(suffix)]
     return path.stem
@@ -1669,7 +1708,7 @@ def _run_artifact_live(path: Path, runs_dir: Path) -> bool:
         pid = int(pid_file.read_text(encoding="utf-8").strip())
     except (OSError, TypeError, ValueError):
         return False
-    return _pid_alive(pid)
+    return _pid_alive(pid) and _dispatch_pid_provenance_matches(runs_dir, dispatch_id, pid)
 
 
 def _path_size(path: Path) -> int:
@@ -1903,6 +1942,8 @@ def _count_live_dispatched_processes(runs_dir: Path) -> int:
         return 0
     live = 0
     for pid_file in sorted(runs_dir.glob("*.pid")):
+        if pid_file.name == "daemon.pid":
+            continue
         dispatch_id = pid_file.name[: -len(".pid")]
         try:
             pid_text = pid_file.read_text(encoding="utf-8").strip()
@@ -1920,6 +1961,8 @@ def _count_live_dispatched_processes(runs_dir: Path) -> int:
             exited = False
         if exited or not _pid_alive(pid):
             _safe_unlink(pid_file)
+            continue
+        if not _dispatch_pid_provenance_matches(runs_dir, dispatch_id, pid):
             continue
         live += 1
     return live
@@ -1942,6 +1985,8 @@ def _count_live_dispatched_processes_for_role(runs_dir: Path, role_label: str) -
     role_token = f"-{role_label}-"
     live = 0
     for pid_file in sorted(runs_dir.glob("*.pid")):
+        if pid_file.name == "daemon.pid":
+            continue
         dispatch_id = pid_file.name[: -len(".pid")]
         if role_token not in dispatch_id:
             continue
@@ -1961,6 +2006,8 @@ def _count_live_dispatched_processes_for_role(runs_dir: Path, role_label: str) -
             exited = False
         if exited or not _pid_alive(pid):
             _safe_unlink(pid_file)
+            continue
+        if not _dispatch_pid_provenance_matches(runs_dir, dispatch_id, pid):
             continue
         live += 1
     return live
@@ -1992,6 +2039,8 @@ def reap_inflight_dispatched_workers(runs_dir: Path) -> int:
         return 0
     reaped = 0
     for pid_file in sorted(runs_dir.glob("*.pid")):
+        if pid_file.name == "daemon.pid":
+            continue
         dispatch_id = pid_file.name[: -len(".pid")]
         try:
             pid_text = pid_file.read_text(encoding="utf-8").strip()
@@ -2009,6 +2058,8 @@ def reap_inflight_dispatched_workers(runs_dir: Path) -> int:
         if exited:
             continue
         if not _pid_alive(pid):
+            continue
+        if not _dispatch_pid_provenance_matches(runs_dir, dispatch_id, pid):
             continue
         # Live worker with no exit_code — orphan; terminate and record.
         try:
@@ -2253,7 +2304,7 @@ def _post_dispatch_poll(
 ) -> None:
     """Spawn a durable subprocess to poll for dispatch verdict in background."""
     command = [
-        _prefer_windows_gui_python(sys.executable),
+        sys.executable,
         str(Path(__file__).resolve()),
         "--project-root",
         str(project_root),
@@ -3539,7 +3590,7 @@ def _spawn_harness(
     sig = _signature(selected)
     status_file_path = runs_dir / f"{dispatch_id}.exit_code"
     wrapped_command = [
-        _prefer_windows_gui_python(sys.executable),
+        sys.executable,
         str(project_root / "scripts" / "run_with_status.py"),
         "--stdout",
         str(stdout_path),
@@ -3590,11 +3641,19 @@ def _spawn_harness(
         except Exception as e:
             # Re-raise to be handled by the outer try-except block
             raise e
+        create_time_epoch = _pid_create_time_epoch(process.pid)
         meta.update({"launched": True, "pid": process.pid})
+        if create_time_epoch is not None:
+            meta[PID_CREATE_TIME_META_KEY] = create_time_epoch
         # WI-4472: live-process accounting sidecar. Written only for a
         # successful launch; consumed by _count_live_dispatched_processes.
         try:
             (runs_dir / f"{dispatch_id}.pid").write_text(str(process.pid), encoding="utf-8")
+            if create_time_epoch is not None:
+                (runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}").write_text(
+                    f"{create_time_epoch:.6f}",
+                    encoding="utf-8",
+                )
         except OSError:
             pass
     except (OSError, FileNotFoundError, subprocess.SubprocessError) as exc:

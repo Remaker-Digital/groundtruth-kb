@@ -72,6 +72,24 @@ def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
+def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    (root / "inside.txt").write_text("ok", encoding="utf-8")
+    (root / "escape.txt").write_text("outside by resolution", encoding="utf-8")
+
+    def fake_relative(project_root: Path, path: Path) -> str:
+        if path.name == "escape.txt":
+            raise ValueError("escaped root")
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+
+    monkeypatch.setattr(orh, "_relative_path", fake_relative)
+
+    result = orh.dispatch_tool_call("Glob", {"pattern": "*.txt"}, metadata(), root)
+
+    assert "inside.txt" in result.splitlines()
+    assert "escape.txt" not in result
+
+
 def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     root = make_root(tmp_path)
     prompt = orh.build_system_prompt("bridge-review", route(root))

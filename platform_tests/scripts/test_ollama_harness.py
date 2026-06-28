@@ -133,6 +133,24 @@ def test_tool_schemas_expose_only_canonical_tools():
         oh.build_tool_schemas(["Read", "Delete"])
 
 
+def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    (root / "inside.txt").write_text("ok", encoding="utf-8")
+    (root / "escape.txt").write_text("outside by resolution", encoding="utf-8")
+
+    def fake_relative(project_root: Path, path: Path) -> str:
+        if path.name == "escape.txt":
+            raise ValueError("escaped root")
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+
+    monkeypatch.setattr(oh, "_relative_path", fake_relative)
+
+    result = oh.dispatch_tool_call("Glob", {"pattern": "*.txt"}, metadata(), root)
+
+    assert "inside.txt" in result.splitlines()
+    assert "escape.txt" not in result
+
+
 def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     root = make_root(tmp_path)
     (root / "note.txt").write_text("hello from file", encoding="utf-8")

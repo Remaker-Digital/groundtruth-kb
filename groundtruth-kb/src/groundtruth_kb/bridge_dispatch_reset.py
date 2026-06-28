@@ -21,6 +21,8 @@ DRAIN_MARKER_FILENAME = "dispatch-drain.json"
 LEASES_DIR_NAME = "leases"
 PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
 DISPATCH_RUNS_DIR_NAME = "dispatch-runs"
+PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
 KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 DEFAULT_LEASE_TTL_SECONDS = 300
 COMPUTED_QUALITY_RELATIVE = Path(".gtkb-state") / "ops" / "dispatch-quality.json"
@@ -313,6 +315,66 @@ def _dispatch_run_pid_alive(pid: int) -> bool:
     return True
 
 
+def _dispatch_run_pid_create_time(pid: int) -> float | None:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_int <= 0:
+        return None
+    try:
+        import psutil  # noqa: PLC0415
+
+        return float(psutil.Process(pid_int).create_time())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _read_dispatch_run_pid(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _read_dispatch_run_create_time(path: Path) -> float | None:
+    try:
+        return float(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _dispatch_run_pid_provenance_matches(pid: int, expected_epoch: float | None) -> bool:
+    if expected_epoch is None:
+        return False
+    actual = _dispatch_run_pid_create_time(pid)
+    if actual is None:
+        return False
+    return abs(actual - expected_epoch) <= PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS
+
+
+def _dispatch_run_ids(runs_dir: Path) -> set[str]:
+    suffixes = (
+        ".pid",
+        ".exit_code",
+        ".stdout.log",
+        ".stderr.log",
+        ".prompt.txt",
+        ".input.json",
+        ".stdin.log",
+        PID_CREATE_TIME_SUFFIX,
+    )
+    dispatch_ids: set[str] = set()
+    for path in runs_dir.iterdir():
+        if path.name == "daemon.pid":
+            continue
+        for suffix in suffixes:
+            if path.name.endswith(suffix):
+                dispatch_ids.add(path.name[: -len(suffix)])
+                break
+    return dispatch_ids
+
+
 def _prune_stale_dispatch_runs(dispatch_dir: Path, *, dry_run: bool) -> int:
     """Prune stale/orphaned dispatch-runs sidecars so the live-worker count is
     accurate after a soft reset (WI-4861).
@@ -327,23 +389,24 @@ def _prune_stale_dispatch_runs(dispatch_dir: Path, *, dry_run: bool) -> int:
     if not runs_dir.is_dir():
         return 0
     pruned = 0
-    for pid_file in sorted(runs_dir.glob("*.pid")):
-        dispatch_id = pid_file.name[: -len(".pid")]
+    for dispatch_id in sorted(_dispatch_run_ids(runs_dir)):
+        pid_file = runs_dir / f"{dispatch_id}.pid"
         exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
         try:
             exited = exit_code_file.exists() and exit_code_file.stat().st_size > 0
         except OSError:
             exited = False
         alive = False
-        if not exited:
-            try:
-                pid = int(pid_file.read_text(encoding="utf-8").strip())
-            except (OSError, ValueError):
-                pid = -1
-            alive = _dispatch_run_pid_alive(pid)
+        if not exited and pid_file.is_file():
+            pid = _read_dispatch_run_pid(pid_file)
+            expected = _read_dispatch_run_create_time(runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}")
+            alive = (
+                pid is not None and _dispatch_run_pid_alive(pid) and _dispatch_run_pid_provenance_matches(pid, expected)
+            )
         if exited or not alive:
             for suffix in (
                 ".pid",
+                PID_CREATE_TIME_SUFFIX,
                 ".exit_code",
                 ".stdout.log",
                 ".stderr.log",

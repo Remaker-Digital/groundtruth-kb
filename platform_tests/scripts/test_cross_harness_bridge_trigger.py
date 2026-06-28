@@ -229,11 +229,7 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
         ]
     )
     _write_bridge_file(root, f"{doc}.md", proposal)
-    _write_bridge_file(
-        root,
-        f"{doc}-002.md",
-        "GO\nauthor_session_context_id: fixture-reviewer-session\n\nFixture GO.\n",
-    )
+    _write_bridge_file(root, f"{doc}-002.md", "GO\n\nauthor_session_context_id: fixture-go-session\n\nFixture GO.\n")
     return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n"
 
 
@@ -2378,6 +2374,7 @@ def test_reset_recipient_reaps_stale_alive_dispatch_pid(
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(trigger, "_pid_alive", lambda pid: True)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
     reaped: list[int] = []
     monkeypatch.setattr(trigger, "_terminate_pid_tree", lambda pid: reaped.append(pid))
     state = {
@@ -2389,6 +2386,7 @@ def test_reset_recipient_reaps_stale_alive_dispatch_pid(
                 "last_launch": {
                     "launched": True,
                     "pid": 4242,
+                    "pid_create_time_epoch": 123.0,
                     # Far past RESET_STRAGGLER_AGE_SECONDS (a definitely-hung straggler).
                     "launched_at": "2020-01-01T00:00:00+00:00",
                 },
@@ -2403,6 +2401,44 @@ def test_reset_recipient_reaps_stale_alive_dispatch_pid(
     assert reset_count == 1
     assert reap_count == 1
     assert reaped == [4242]
+
+
+def test_reset_recipient_refuses_pid_reuse_without_create_time_match(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4893: an alive stale PID is not reaped when create-time provenance
+    does not match the recorded dispatch launch."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(trigger, "_pid_alive", lambda pid: True)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 456.0)
+    reaped: list[int] = []
+    monkeypatch.setattr(trigger, "_terminate_pid_tree", lambda pid: reaped.append(pid))
+    state = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "failure_count": 1,
+                "last_launch": {
+                    "launched": True,
+                    "pid": 4242,
+                    "pid_create_time_epoch": 123.0,
+                    "launched_at": "2020-01-01T00:00:00+00:00",
+                },
+            }
+        },
+        "schema_version": 1,
+    }
+    trigger._write_dispatch_state(state_dir, state)
+
+    status, reset_count, reap_count = trigger._reset_recipient_state(state_dir, root, "loyal-opposition")
+
+    assert status == "reset"
+    assert reset_count == 1
+    assert reap_count == 0
+    assert reaped == []
 
 
 def test_reset_recipient_does_not_reap_fresh_or_dead_pid(
@@ -3124,6 +3160,7 @@ def test_spawn_harness_worker_env_includes_package_src(tmp_path: Path, monkeypat
     monkeypatch.setenv("PYTHONPATH", "C:/existing/pkg")
     monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
     monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
     monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
 
     meta = trigger._spawn_harness(
@@ -3137,94 +3174,42 @@ def test_spawn_harness_worker_env_includes_package_src(tmp_path: Path, monkeypat
     )
 
     assert meta["launched"] is True
+    assert meta["pid_create_time_epoch"] == 123.0
+    sidecar = tmp_path / "state" / "dispatch-runs" / "dispatch-env-test.create_time_epoch"
+    assert sidecar.read_text(encoding="utf-8") == "123.000000"
     env = captured["kwargs"]["env"]
     pythonpath = env["PYTHONPATH"].split(os.pathsep)
     assert pythonpath[0] == trigger._PACKAGE_SRC
     assert "C:/existing/pkg" in pythonpath
 
 
-def test_spawn_harness_uses_pythonw_for_run_with_status_on_windows(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_reap_inflight_dispatched_workers_requires_pid_create_time_match(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """WI-4893: daemon startup/shutdown reap cannot terminate PID-reused
+    processes whose create-time provenance is missing or mismatched."""
     trigger = _load_trigger()
-    python_exe = tmp_path / "venv" / "Scripts" / "python.exe"
-    pythonw_exe = tmp_path / "venv" / "Scripts" / "pythonw.exe"
-    pythonw_exe.parent.mkdir(parents=True)
-    pythonw_exe.write_text("", encoding="utf-8")
-    captured: dict[str, object] = {}
+    runs_dir = tmp_path / "dispatch-runs"
+    runs_dir.mkdir()
+    pid = 4242
+    (runs_dir / "dispatch-a.pid").write_text(str(pid), encoding="utf-8")
+    (runs_dir / "dispatch-a.create_time_epoch").write_text("123.0", encoding="utf-8")
+    (runs_dir / "daemon.pid").write_text(str(pid), encoding="utf-8")
+    monkeypatch.setattr(trigger, "_pid_alive", lambda observed: observed == pid)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda observed: 456.0)
+    reaped: list[int] = []
+    monkeypatch.setattr(trigger, "_terminate_pid_tree", lambda observed: reaped.append(observed))
 
-    class FakeProcess:
-        pid = 12345
+    assert trigger.reap_inflight_dispatched_workers(runs_dir) == 0
+    assert reaped == []
+    assert not (runs_dir / "dispatch-a.exit_code").exists()
 
-    def fake_popen(args, **kwargs):
-        captured["args"] = list(args)
-        captured["kwargs"] = kwargs
-        return FakeProcess()
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda observed: 123.0)
 
-    target = trigger.DispatchTarget(
-        needed_role_label="loyal-opposition",
-        harness_id="D",
-        command_handle="ollama",
-        canonical_mode="lo",
-        invocation_surfaces={"headless": {"argv": ["worker-cmd", "{{PROMPT}}"]}},
-    )
-    item = SimpleNamespace(
-        document_name="gtkb-headless-pythonw",
-        top_status="NEW",
-        top_file="bridge/gtkb-headless-pythonw-001.md",
-    )
-
-    monkeypatch.setattr(trigger.os, "name", "nt")
-    monkeypatch.setattr(trigger.sys, "executable", str(python_exe))
-    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
-    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
-    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
-
-    meta = trigger._spawn_harness(
-        target=target,
-        items=[item],
-        project_root=tmp_path,
-        state_dir=tmp_path / "state",
-        max_items=1,
-        dry_run=False,
-        dispatch_id="dispatch-pythonw-test",
-    )
-
-    assert meta["launched"] is True
-    assert captured["args"][0] == str(pythonw_exe)
-    assert captured["kwargs"]["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-
-
-def test_post_dispatch_poll_uses_pythonw_on_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    trigger = _load_trigger()
-    python_exe = tmp_path / "venv" / "Scripts" / "python.exe"
-    pythonw_exe = tmp_path / "venv" / "Scripts" / "pythonw.exe"
-    pythonw_exe.parent.mkdir(parents=True)
-    pythonw_exe.write_text("", encoding="utf-8")
-    captured: dict[str, object] = {}
-
-    class FakeProcess:
-        pid = 12345
-
-    def fake_popen(args, **kwargs):
-        captured["args"] = list(args)
-        captured["kwargs"] = kwargs
-        return FakeProcess()
-
-    monkeypatch.setattr(trigger.os, "name", "nt")
-    monkeypatch.setattr(trigger.sys, "executable", str(python_exe))
-    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
-
-    trigger._post_dispatch_poll(
-        dispatch_id="dispatch-pythonw-poll",
-        bridge_id="gtkb-headless-pythonw",
-        dispatch_ts=123.0,
-        project_root=tmp_path,
-        state_dir=tmp_path / "state",
-    )
-
-    assert captured["args"][0] == str(pythonw_exe)
-    assert captured["kwargs"]["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    assert trigger.reap_inflight_dispatched_workers(runs_dir) == 1
+    assert reaped == [pid]
+    assert (runs_dir / "dispatch-a.exit_code").read_text(encoding="utf-8") == "124\n"
 
 
 def test_harness_command_fails_closed_for_missing_or_malformed_surfaces(tmp_path: Path) -> None:
