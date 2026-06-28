@@ -48,7 +48,9 @@ $beat = Join-Path $opsDir 'storm-watchdog-heartbeat.txt'
 $now  = (Get-Date).ToString('o')
 
 $reapScript = Join-Path $root 'scripts\ops\storm_watchdog_reap.py'
-$pythonExe  = Join-Path $root 'groundtruth-kb\.venv\Scripts\python.exe'
+# pythonw.exe: GUI-subsystem interpreter; no console window when Task Scheduler
+# invokes this script every minute while Codex/harness processes are present.
+$pythonExe  = Join-Path $root 'groundtruth-kb\.venv\Scripts\pythonw.exe'
 
 $CODEX_THRESHOLD = 15
 $NONCODEX_THRESHOLD = 15

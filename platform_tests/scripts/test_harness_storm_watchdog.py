@@ -119,6 +119,14 @@ def test_watchdog_preserves_heartbeat_and_logrotate() -> None:
     assert "1MB" in text
 
 
+def test_watchdog_uses_headless_python_for_reap_decider() -> None:
+    """The scheduled watchdog runs every minute; the reap decider must use
+    pythonw.exe so a visible console is not allocated on each tick."""
+    text = _watchdog_text()
+    assert "pythonw.exe" in text
+    assert "storm_watchdog_reap.py" in text
+
+
 def test_watchdog_does_not_auto_assert_kill_switch() -> None:
     """WI-4780 / SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001 A.1: the watchdog
     MUST NOT auto-assert the global GTKB_NO_CROSS_HARNESS_TRIGGER kill-switch.
