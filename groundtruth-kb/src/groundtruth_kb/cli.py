@@ -5952,6 +5952,12 @@ def spec_list_cmd(
     default=None,
 )
 @click.option("--source-paths-json", default=None, help="JSON list of source path strings")
+@click.option(
+    "--application-scope",
+    type=click.Choice(["gtkb_platform", "agent_red_application"]),
+    default=None,
+    help="Optional application-scope marker for partitioned specs",
+)
 @click.option("--dry-run", is_flag=True, default=False, help="Validate and print the proposed packet without writing")
 @click.option("--json", "json_output", is_flag=True, default=False)
 @click.pass_context
@@ -5977,6 +5983,7 @@ def spec_record_cmd(
     affected_by_json: str | None,
     testability: str | None,
     source_paths_json: str | None,
+    application_scope: str | None,
     dry_run: bool,
     json_output: bool,
 ) -> None:
@@ -6004,6 +6011,7 @@ def spec_record_cmd(
         affected_by_json=affected_by_json,
         testability=testability,
         source_paths_json=source_paths_json,
+        application_scope=application_scope,
         dry_run=dry_run,
     )
     try:
@@ -6051,6 +6059,12 @@ def spec_record_cmd(
 @click.option("--constraints-json", default=None, help="JSON object of constraint metadata")
 @click.option("--affected-by-json", default=None, help="JSON list of spec IDs affecting this spec")
 @click.option("--source-paths-json", default=None, help="JSON list of source path strings")
+@click.option(
+    "--application-scope",
+    type=click.Choice(["gtkb_platform", "agent_red_application"]),
+    default=None,
+    help="Optional application-scope marker for the new spec version",
+)
 @click.option("--dry-run", is_flag=True, default=False, help="Validate and print the proposed packet without writing")
 @click.option("--json", "json_output", is_flag=True, default=False)
 @click.pass_context
@@ -6075,6 +6089,7 @@ def spec_update_cmd(
     constraints_json: str | None,
     affected_by_json: str | None,
     source_paths_json: str | None,
+    application_scope: str | None,
     dry_run: bool,
     json_output: bool,
 ) -> None:
@@ -6101,6 +6116,7 @@ def spec_update_cmd(
         constraints_json=constraints_json,
         affected_by_json=affected_by_json,
         source_paths_json=source_paths_json,
+        application_scope=application_scope,
         dry_run=dry_run,
     )
     try:

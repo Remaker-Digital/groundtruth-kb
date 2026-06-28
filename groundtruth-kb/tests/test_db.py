@@ -992,6 +992,71 @@ def test_update_spec_preserves_source_paths(tmp_path):
     assert spec["source_paths_parsed"] == ["src/auth.py"]
 
 
+def test_application_scope_migration_fresh_db(tmp_path):
+    """application_scope columns are created on a brand-new database."""
+    db = KnowledgeDB(tmp_path / "fresh.db")
+    spec_cols = {row[1] for row in db._conn.execute("PRAGMA table_info(specifications)")}
+    test_cols = {row[1] for row in db._conn.execute("PRAGMA table_info(tests)")}
+    db.close()
+    assert "application_scope" in spec_cols
+    assert "application_scope" in test_cols
+
+
+def test_application_scope_migration_idempotent(tmp_path):
+    """Opening an already-migrated database does not raise."""
+    db_path = tmp_path / "existing.db"
+    db1 = KnowledgeDB(db_path)
+    db1.close()
+    db2 = KnowledgeDB(db_path)
+    spec_cols = {row[1] for row in db2._conn.execute("PRAGMA table_info(specifications)")}
+    test_cols = {row[1] for row in db2._conn.execute("PRAGMA table_info(tests)")}
+    db2.close()
+    assert "application_scope" in spec_cols
+    assert "application_scope" in test_cols
+
+
+def test_spec_application_scope_insert_and_carry_forward(tmp_path):
+    """Specs store application_scope and preserve it on append-only update."""
+    db = KnowledgeDB(tmp_path / "test.db")
+    db.insert_spec(
+        id="SPEC-APP-SCOPE",
+        title="Agent Red app scope",
+        status="specified",
+        changed_by="test",
+        change_reason="initial",
+        source_paths=["applications/Agent_Red/app/main.py"],
+        application_scope="agent_red_application",
+    )
+    db.update_spec("SPEC-APP-SCOPE", changed_by="test", change_reason="title update", title="Updated")
+    spec = db.get_spec("SPEC-APP-SCOPE")
+    db.close()
+    assert spec is not None
+    assert spec["application_scope"] == "agent_red_application"
+    assert spec["source_paths_parsed"] == ["applications/Agent_Red/app/main.py"]
+
+
+def test_test_application_scope_insert_and_carry_forward(tmp_path):
+    """Tests store application_scope and preserve it on append-only update."""
+    db = KnowledgeDB(tmp_path / "test.db")
+    db.insert_test(
+        id="TEST-APP-SCOPE",
+        title="Agent Red app test",
+        spec_id="SPEC-APP-SCOPE",
+        test_type="unit",
+        test_file="applications/Agent_Red/tests/test_app.py",
+        expected_outcome="passes",
+        changed_by="test",
+        change_reason="initial",
+        application_scope="agent_red_application",
+    )
+    db.update_test("TEST-APP-SCOPE", changed_by="test", change_reason="result", last_result="pass")
+    test = db.get_test("TEST-APP-SCOPE")
+    db.close()
+    assert test is not None
+    assert test["application_scope"] == "agent_red_application"
+    assert test["test_file"] == "applications/Agent_Red/tests/test_app.py"
+
+
 class TestProjectAuthorizationSpecLinkage:
     """WI-3312: GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001.
 

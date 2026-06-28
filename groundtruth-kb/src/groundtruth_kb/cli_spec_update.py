@@ -51,6 +51,7 @@ class SpecUpdateRequest:
     constraints_json: str | None
     affected_by_json: str | None
     source_paths_json: str | None
+    application_scope: str | None
     dry_run: bool
 
 
@@ -195,6 +196,8 @@ def _merged_fields(
         fields["affected_by"] = affected_by
     if request.source_paths_json is not None:
         fields["source_paths"] = source_paths
+    if request.application_scope is not None:
+        fields["application_scope"] = request.application_scope
     return fields
 
 

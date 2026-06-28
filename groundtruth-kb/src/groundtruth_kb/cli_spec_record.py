@@ -58,6 +58,7 @@ class SpecRecordRequest:
     affected_by_json: str | None
     testability: str | None
     source_paths_json: str | None
+    application_scope: str | None
     dry_run: bool
 
 
@@ -261,6 +262,7 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
         affected_by=affected_by,
         testability=request.testability,
         source_paths=source_paths,
+        application_scope=request.application_scope,
     )
     if row is None:
         raise SpecRecordError(f"Unexpected error: inserted spec {request.spec_id} not found on readback.")

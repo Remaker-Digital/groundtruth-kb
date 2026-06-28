@@ -39,6 +39,19 @@ if TYPE_CHECKING:
 
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
+_VALID_APPLICATION_SCOPES = frozenset({"gtkb_platform", "agent_red_application"})
+
+
+def _validate_application_scope(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized not in _VALID_APPLICATION_SCOPES:
+        allowed = ", ".join(sorted(_VALID_APPLICATION_SCOPES))
+        raise ValueError(f"application_scope must be one of: {allowed}")
+    return normalized
 
 
 # ChromaDB optional dependency (ignore_missing_imports configured in pyproject.toml).
@@ -216,6 +229,7 @@ CREATE TABLE IF NOT EXISTS specifications (
     implementation_verified_at TEXT,
     retired_at TEXT,
     parent TEXT,
+    application_scope TEXT,
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -366,6 +380,7 @@ CREATE TABLE IF NOT EXISTS tests (
     expected_outcome TEXT NOT NULL,
     last_result TEXT,
     last_executed_at TEXT,
+    application_scope TEXT,
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
@@ -1440,6 +1455,20 @@ class KnowledgeDB:
             conn.commit()
             _log.debug("Applied migration: add source_paths column")
 
+        # Migration 4b: Add application_scope columns for platform/adopter partitioning.
+        added_application_scope_cols = []
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+        if "application_scope" not in cols:
+            conn.execute("ALTER TABLE specifications ADD COLUMN application_scope TEXT DEFAULT NULL")
+            added_application_scope_cols.append("specifications.application_scope")
+        test_cols = {row[1] for row in conn.execute("PRAGMA table_info(tests)").fetchall()}
+        if "application_scope" not in test_cols:
+            conn.execute("ALTER TABLE tests ADD COLUMN application_scope TEXT DEFAULT NULL")
+            added_application_scope_cols.append("tests.application_scope")
+        conn.commit()
+        if added_application_scope_cols:
+            _log.debug("Applied migration: application_scope columns %s", added_application_scope_cols)
+
         # Migration 5: lifecycle schema additions.
         cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
         lifecycle_columns = {
@@ -2104,6 +2133,7 @@ class KnowledgeDB:
         affected_by: list[str] | None = None,
         testability: str | None = None,
         source_paths: list[str] | None = None,
+        application_scope: str | None = None,
     ) -> dict[str, Any] | None:
         """Insert a new version of a specification.
 
@@ -2125,6 +2155,9 @@ class KnowledgeDB:
             source_paths: Optional list of relative file paths or glob patterns this spec
                   covers. JSON-encoded into the source_paths TEXT column. Used by the
                   spec-before-code governance hook.
+            application_scope: Optional application-scope marker. Valid values are
+                  'gtkb_platform' and 'agent_red_application'; NULL remains allowed
+                  for rows outside the partition-in-place migration.
         """
         type = self._auto_detect_spec_type(id, type)
 
@@ -2149,6 +2182,7 @@ class KnowledgeDB:
         _validate_constraints(constraints)
         _validate_affected_by(affected_by)
         _validate_provisional_until(provisional_until)
+        application_scope = _validate_application_scope(application_scope)
         # F1: Serialize JSON fields
         constraints_json = json.dumps(constraints) if constraints is not None else None
         affected_by_json = json.dumps(affected_by) if affected_by is not None else None
@@ -2172,11 +2206,11 @@ class KnowledgeDB:
         conn.execute(
             """INSERT INTO specifications
                (id, version, title, description, priority, scope, section,
-                handle, tags, status, assertions, type,
+               handle, tags, status, assertions, type,
                 authority, provisional_until, constraints, affected_by, testability,
-                source_paths,
+                source_paths, application_scope,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -2196,6 +2230,7 @@ class KnowledgeDB:
                 affected_by_json,
                 testability,
                 source_paths_json,
+                application_scope,
                 changed_by,
                 _now(),
                 change_reason,
@@ -2330,6 +2365,12 @@ class KnowledgeDB:
         else:
             source_paths_raw = current.get("source_paths")  # raw JSON string from _row_to_dict
 
+        if "application_scope" in fields:
+            application_scope = _validate_application_scope(fields["application_scope"])
+        else:
+            application_scope = current.get("application_scope")
+            application_scope = _validate_application_scope(application_scope)
+
         # Run governance gates before spec promotion
         if self._gate_registry is not None:
             spec_data = {
@@ -2347,11 +2388,11 @@ class KnowledgeDB:
         conn.execute(
             """INSERT INTO specifications
                (id, version, title, description, priority, scope, section,
-                handle, tags, status, assertions, type,
+               handle, tags, status, assertions, type,
                 authority, provisional_until, constraints, affected_by, testability,
-                source_paths,
+                source_paths, application_scope,
                 changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -2371,6 +2412,7 @@ class KnowledgeDB:
                 affected_by_raw,
                 testability,
                 source_paths_raw,
+                application_scope,
                 changed_by,
                 _now(),
                 change_reason,
@@ -3725,6 +3767,7 @@ class KnowledgeDB:
         description: str | None = None,
         last_result: str | None = None,
         last_executed_at: str | None = None,
+        application_scope: str | None = None,
     ) -> dict[str, Any] | None:
         """Insert a new version of a test artifact.
 
@@ -3734,6 +3777,7 @@ class KnowledgeDB:
             test_type: 'unit', 'integration', 'e2e', 'manual', or 'assertion'.
             expected_outcome: What constitutes PASS — stated in human-readable terms.
         """
+        application_scope = _validate_application_scope(application_scope)
         # Run governance gates on test pass
         if last_result == "pass" and self._gate_registry is not None:
             test_data = {"test_type": test_type, "test_file": test_file, "spec_id": spec_id}
@@ -3744,8 +3788,8 @@ class KnowledgeDB:
             """INSERT INTO tests
                (id, version, title, spec_id, test_type, test_file, test_class,
                 test_function, description, expected_outcome, last_result,
-                last_executed_at, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                last_executed_at, application_scope, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -3759,6 +3803,7 @@ class KnowledgeDB:
                 expected_outcome,
                 last_result,
                 last_executed_at,
+                application_scope,
                 changed_by,
                 _now(),
                 change_reason,
@@ -3808,6 +3853,9 @@ class KnowledgeDB:
         expected_outcome = fields.get("expected_outcome", current["expected_outcome"])
         last_result = fields.get("last_result", current["last_result"])
         last_executed_at = fields.get("last_executed_at", current["last_executed_at"])
+        application_scope = _validate_application_scope(
+            fields.get("application_scope", current.get("application_scope"))
+        )
         # Run governance gates on test pass
         if last_result == "pass" and self._gate_registry is not None:
             test_data = {"test_type": test_type, "test_file": test_file, "spec_id": spec_id}
@@ -3817,8 +3865,8 @@ class KnowledgeDB:
             """INSERT INTO tests
                (id, version, title, spec_id, test_type, test_file, test_class,
                 test_function, description, expected_outcome, last_result,
-                last_executed_at, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                last_executed_at, application_scope, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 id,
                 version,
@@ -3832,6 +3880,7 @@ class KnowledgeDB:
                 expected_outcome,
                 last_result,
                 last_executed_at,
+                application_scope,
                 changed_by,
                 _now(),
                 change_reason,

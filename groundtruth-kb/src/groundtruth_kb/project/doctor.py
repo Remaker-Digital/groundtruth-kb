@@ -593,6 +593,101 @@ def _check_db_schema(target: Path) -> ToolCheck:
         )
 
 
+def _check_application_scope_alignment(target: Path) -> ToolCheck:
+    """Validate explicit application_scope/path alignment for specs and tests."""
+    name = "Application scope alignment"
+    db_path = target / "groundtruth.db"
+    if not db_path.exists():
+        return ToolCheck(name=name, required=True, found=False, status="fail", message="groundtruth.db not found")
+    try:
+        from groundtruth_kb.project.application_scope import classify_application_scope, scope_path_violations
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        try:
+            spec_cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
+            test_cols = {row[1] for row in conn.execute("PRAGMA table_info(tests)").fetchall()}
+            missing = []
+            if "application_scope" not in spec_cols:
+                missing.append("specifications.application_scope")
+            if "application_scope" not in test_cols:
+                missing.append("tests.application_scope")
+            if missing:
+                return ToolCheck(
+                    name=name,
+                    required=True,
+                    found=True,
+                    status="fail",
+                    message=f"Missing application_scope column(s): {', '.join(missing)}",
+                )
+
+            violations: list[str] = []
+            ambiguous: list[str] = []
+            spec_rows = conn.execute(
+                "SELECT id, title, source_paths, application_scope FROM current_specifications ORDER BY id"
+            ).fetchall()
+            test_rows = conn.execute(
+                "SELECT id, title, test_file, application_scope FROM current_tests ORDER BY id"
+            ).fetchall()
+            for row in spec_rows:
+                paths: list[str] = []
+                if row["source_paths"]:
+                    try:
+                        raw_paths = json.loads(row["source_paths"])
+                    except json.JSONDecodeError:
+                        raw_paths = []
+                    if isinstance(raw_paths, list):
+                        paths = [path for path in raw_paths if isinstance(path, str)]
+                for violation in scope_path_violations(row["application_scope"], paths):
+                    violations.append(f"spec {row['id']}: {violation}")
+                classification = classify_application_scope(row["id"], row["title"], paths)
+                if classification.ambiguous and row["application_scope"] is None:
+                    ambiguous.append(f"spec {row['id']}: {', '.join(classification.reasons)}")
+            for row in test_rows:
+                paths = [row["test_file"]] if row["test_file"] else []
+                for violation in scope_path_violations(row["application_scope"], paths):
+                    violations.append(f"test {row['id']}: {violation}")
+                classification = classify_application_scope(row["id"], row["title"], paths)
+                if classification.ambiguous and row["application_scope"] is None:
+                    ambiguous.append(f"test {row['id']}: {', '.join(classification.reasons)}")
+        finally:
+            conn.close()
+
+        if violations:
+            sample = "; ".join(violations[:5])
+            return ToolCheck(
+                name=name,
+                required=True,
+                found=True,
+                status="fail",
+                message=f"{len(violations)} application-scope alignment violation(s): {sample}",
+            )
+        if ambiguous:
+            sample = "; ".join(ambiguous[:5])
+            return ToolCheck(
+                name=name,
+                required=False,
+                found=True,
+                status="warning",
+                message=f"{len(ambiguous)} ambiguous application-scope candidate(s): {sample}",
+            )
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status="pass",
+            message="Application-scope alignment OK",
+        )
+    except Exception as exc:  # intentional-catch: validation tool, error -> fail status
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"Application-scope alignment check failed: {exc}",
+        )
+
+
 def _check_core_spec_intake(target: Path) -> ToolCheck:
     """Doctor-style health surface for core-spec intake (SPEC-CORE-INTAKE-001).
 
@@ -6228,6 +6323,7 @@ def run_doctor(
     # Project-level checks
     checks.append(_check_groundtruth_toml(target))
     checks.append(_check_db_schema(target))
+    checks.append(_check_application_scope_alignment(target))
     checks.append(_check_core_spec_intake(target))
     checks.append(_check_hooks(target, profile))
     checks.append(_check_rules(target, profile))
