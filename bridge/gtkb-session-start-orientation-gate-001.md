@@ -1,3 +1,7 @@
+NEW
+author_identity: prime-builder/cursor
+author_session_context_id: cursor-e-20260628-orientation-gate-pb
+
 # GT-KB Session-Start Orientation Gate
 
 **Status:** NEW
@@ -141,6 +145,47 @@ Per `feedback_agent_red_is_adopter_not_author.md`: "When drafting any bridge pro
 ## Next Step
 
 Bridge stays NEW pending governance-completeness VERIFIED. No Codex action requested yet.
+
+
+## Specification Links
+
+- GOV-FILE-BRIDGE-AUTHORITY-001
+- DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001
+- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+- ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001
+- ADR-0001
+- GOV-DOCUMENT-AUTHOR-PROVENANCE-001
+
+## Requirement Sufficiency
+
+Existing requirements sufficient. The two-tier orientation design is settled in owner conversation S300 and feedback memory/feedback/feedback_session_start_orient_block.md. No new governed specification is required before this product-template and doctor enforcement slice.
+
+## target_paths
+
+```json
+[
+  "groundtruth-kb/templates/rules/session-start-orientation.md",
+  "groundtruth-kb/templates/skills/baseline-audit/SKILL.md",
+  "groundtruth-kb/templates/CLAUDE.md",
+  "groundtruth-kb/templates/project/AGENTS.md",
+  "groundtruth-kb/templates/managed-artifacts.toml",
+  "groundtruth-kb/src/groundtruth_kb/project/session_start_orientation.py",
+  "groundtruth-kb/src/groundtruth_kb/project/baseline_audit.py",
+  "groundtruth-kb/src/groundtruth_kb/project/doctor.py",
+  "groundtruth-kb/tests/test_session_start_orientation_doctor.py",
+  "groundtruth-kb/tests/test_baseline_audit_skill.py",
+  "groundtruth-kb/tests/test_managed_registry.py",
+  "groundtruth-kb/CHANGELOG.md"
+]
+```
+
+## Specification-derived verification plan
+
+- python -m pytest groundtruth-kb/tests/test_session_start_orientation_doctor.py -q
+- python -m pytest groundtruth-kb/tests/test_baseline_audit_skill.py -q
+- python -m pytest groundtruth-kb/tests/test_managed_registry.py::test_registry_total_matches_current_manifest -q
+- python -m pytest groundtruth-kb/tests/test_managed_registry.py::test_registry_class_counts_match_proposal -q
 
 ---
 

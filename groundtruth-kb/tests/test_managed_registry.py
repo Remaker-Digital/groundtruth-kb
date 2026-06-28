@@ -85,7 +85,7 @@ def test_registry_total_matches_current_manifest() -> None:
     # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
     # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
     # Retired dead-stub hook cleanup removed two hooks and two settings registrations.
-    assert len(records) == 62, f"expected 62 total registry records; got {len(records)}"
+    assert len(records) == 64, f"expected 64 total registry records; got {len(records)}"
 
 
 def test_registry_class_counts_match_proposal() -> None:
@@ -100,8 +100,8 @@ def test_registry_class_counts_match_proposal() -> None:
         counts[r.class_] = counts.get(r.class_, 0) + 1
     assert counts == {
         "hook": 18,
-        "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
-        "skill": 11,
+        "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
+        "skill": 12,
         "file": 4,  # GTKB-ISOLATION-017 Slice 3/4 records + WI-4225 template-only coverage record
         "settings-hook-registration": 14,
         "gitignore-pattern": 4,
@@ -243,18 +243,20 @@ def _file_target_paths(records: list[ManagedArtifact]) -> set[str]:
 
 
 def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
-    """local-only scaffold copies all 13 hooks plus the 4 initial local-only rules.
+    """local-only scaffold copies all 13 hooks plus the 5 initial local-only rules.
 
     Post-canonical-terminology-surface: local-only initial rules grew from 1
     (prime-builder) to 3 with the addition of ``canonical-terminology.md`` and
     ``canonical-terminology.toml``. Post-Slice-1 of GTKB-GOV-TERM-DISAMBIGUATION-
     MECHANICAL: 3 → 4 with the addition of ``canonical-terminology-policy.toml``.
+    Post gtkb-session-start-orientation-gate: 4 → 5 with
+    ``session-start-orientation.md``.
     """
     scaffolded = artifacts_for_scaffold("local-only")
     # 13 hooks
     hooks = [r for r in scaffolded if r.class_ == "hook"]
     assert len(hooks) == 13
-    # 4 rules (prime-builder + canonical-terminology surface + canonical-terminology-policy)
+    # 5 rules (prime-builder + canonical-terminology surface + session-start-orientation)
     rules = [r for r in scaffolded if r.class_ == "rule"]
     rule_paths = {r.target_path for r in rules if isinstance(r, FileArtifact)}
     assert rule_paths == {
@@ -262,9 +264,12 @@ def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
         ".claude/rules/canonical-terminology.md",
         ".claude/rules/canonical-terminology.toml",
         ".claude/rules/canonical-terminology-policy.toml",
+        ".claude/rules/session-start-orientation.md",
     }
-    # 0 skills, 0 settings, 0 gitignore-patterns
-    assert [r for r in scaffolded if r.class_ == "skill"] == []
+    # 1 skill (baseline-audit), 0 settings, 0 gitignore-patterns
+    skills = [r for r in scaffolded if r.class_ == "skill"]
+    assert len(skills) == 1
+    assert skills[0].id == "skill.baseline-audit.skill-md"
     assert [r for r in scaffolded if r.class_ == "settings-hook-registration"] == []
     assert [r for r in scaffolded if r.class_ == "gitignore-pattern"] == []
 
@@ -286,8 +291,8 @@ def test_scaffold_dual_agent_copies_everything() -> None:
         by_class[r.class_] = by_class.get(r.class_, 0) + 1
     assert by_class == {
         "hook": 18,
-        "rule": 11,  # +1: canonical-terminology-policy (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL)
-        "skill": 11,
+        "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
+        "skill": 12,
         "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
         "settings-hook-registration": 14,
         "gitignore-pattern": 4,
@@ -302,11 +307,12 @@ def test_scaffold_dual_agent_webapp_matches_dual_agent() -> None:
 
 
 def test_upgrade_local_only_manages_two_hooks() -> None:
-    """local-only upgrade manages 2 hooks plus 3 rules (prime-builder + canonical-terminology.{md,toml}).
+    """local-only upgrade manages 2 hooks plus 5 rules and 1 skill.
 
     Post-canonical-terminology-surface: local-only upgrade-managed rules grew
     from 1 to 3 because both new canonical-terminology records have
     ``managed_profiles`` covering all three profiles.
+    Post gtkb-session-start-orientation-gate: +1 rule, +1 skill.
     """
     managed = artifacts_for_upgrade("local-only")
     hooks = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "hook"}
@@ -320,9 +326,12 @@ def test_upgrade_local_only_manages_two_hooks() -> None:
         ".claude/rules/canonical-terminology.md",
         ".claude/rules/canonical-terminology.toml",
         ".claude/rules/canonical-terminology-policy.toml",
+        ".claude/rules/session-start-orientation.md",
     }
-    # No skills or settings or gitignore for local-only
-    assert [r for r in managed if r.class_ == "skill"] == []
+    # 1 skill (baseline-audit); no settings or gitignore for local-only
+    skills = [r for r in managed if r.class_ == "skill"]
+    assert len(skills) == 1
+    assert skills[0].id == "skill.baseline-audit.skill-md"
     assert [r for r in managed if r.class_ == "settings-hook-registration"] == []
     assert [r for r in managed if r.class_ == "gitignore-pattern"] == []
 
@@ -351,7 +360,9 @@ def test_upgrade_dual_agent_manages_full_set_including_gap_28_rules() -> None:
     assert ".claude/rules/canonical-terminology.toml" in managed_rule_paths
     # +1: canonical-terminology-policy added by Slice 1 of GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL
     assert ".claude/rules/canonical-terminology-policy.toml" in managed_rule_paths
-    assert len(managed_rule_paths) == 11
+    # +1: session-start-orientation (gtkb-session-start-orientation-gate)
+    assert ".claude/rules/session-start-orientation.md" in managed_rule_paths
+    assert len(managed_rule_paths) == 12
 
 
 # ---------------------------------------------------------------------------
@@ -594,18 +605,17 @@ def test_condition2_doctor_composite_uses_registry_ids() -> None:
 def test_load_managed_artifacts_unions_three_axes() -> None:
     """Loader returns records touching the profile in any lifecycle axis."""
     dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 61 records:
-    # 18 hooks + 11 rules + 11 skills + 3 files + 14 settings + 4 gitignore.
-    assert len(dual_agent) == 61
+    # dual-agent sees all 63 records:
+    # 18 hooks + 12 rules + 12 skills + 3 files + 14 settings + 4 gitignore.
+    assert len(dual_agent) == 63
 
     local_only = load_managed_artifacts("local-only")
-    # local-only sees all 13 ORIGINAL hooks + rule.prime-builder + 2
-    # canonical-terminology rules + 1 canonical-terminology-policy
-    # (Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL) + 3 file-class
-    # records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 20. The 5 new
-    # governance hooks are dual-agent-only, and the 3 new gitignore rows
+    # local-only sees all 13 ORIGINAL hooks + rule.prime-builder + 3
+    # canonical-terminology rules + session-start-orientation + baseline-audit skill
+    # + 3 file-class records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 22.
+    # The 5 new governance hooks are dual-agent-only, and the 3 new gitignore rows
     # are dual-agent-only.
-    assert len(local_only) == 20
+    assert len(local_only) == 22
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

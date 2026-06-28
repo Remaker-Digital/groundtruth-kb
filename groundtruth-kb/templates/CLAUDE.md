@@ -103,6 +103,11 @@ to check current status. Use `gt assert` to verify specifications against the co
 
 ### Starting a New Session
 
+After bridge obligations are clear, produce the mandatory **ORIENT block** once per session
+before other substantive work. Format, live-source rules, structured `UNKNOWN:<category>`
+tags, and `/baseline-audit` triggers are defined in
+`.claude/rules/session-start-orientation.md`.
+
 ```
 Continue work on {{PROJECT_NAME}}.
 Key files: CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md (if used)
@@ -112,9 +117,10 @@ Next: [describe task].
 ### Session Wrap-Up
 
 Before ending a session:
-1. Update MEMORY.md with what was done and what's next
-2. Run `gt assert` to confirm no regressions
-3. Commit with session ID in the message
+1. Produce a well-formed **ORIENT block** in the final owner-visible turn (see `.claude/rules/session-start-orientation.md`)
+2. Update MEMORY.md with what was done and what's next
+3. Run `gt assert` to confirm no regressions
+4. Commit with session ID in the message
 
 ### Protected Behaviors
 

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Session-start orientation gate (gtkb-session-start-orientation-gate)
+
+- **ORIENT block contract** in `templates/rules/session-start-orientation.md` with
+  exactly 7 live-sourced items and structured `UNKNOWN:<category>` tags.
+- **`/baseline-audit` skill** in `templates/skills/baseline-audit/SKILL.md` with
+  documented trigger phrases, 29-item checklist, and mandatory evidence-class tags
+  (`command_output`, `bridge_status`, `DA_row`, `CI_result`, `release_tag`,
+  `doc_inference`); runnable by Prime Builder and Loyal Opposition.
+- **Doctor check** `_check_session_wrap_had_orient()` validating the prior session
+  transcript for a well-formed ORIENT block (`session_start_orientation.py`).
+- **Managed-artifact registry rows** `rule.session-start-orientation` and
+  `skill.baseline-audit.skill-md`; template updates in `CLAUDE.md` and
+  `project/AGENTS.md`.
+- **Tests** in `tests/test_session_start_orientation_doctor.py` and
+  `tests/test_baseline_audit_skill.py`.
+
 ## [0.7.0-rc1] - 2026-05-03
 
 Release candidate 1. Tag and PyPI publication gated on Slice 8.5 CI-green

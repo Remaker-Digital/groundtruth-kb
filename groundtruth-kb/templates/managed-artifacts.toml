@@ -4,6 +4,8 @@
 #
 # 62 records = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings-hook-registrations + 4 gitignore-patterns.
 #
+# Session-start orientation gate (gtkb-session-start-orientation-gate): +1 rule, +1 skill => 64 records.
+#
 # Three independent lifecycle axes per record:
 #   - initial_profiles:          scaffold copies this artifact for these profiles
 #   - managed_profiles:          upgrade enforces drift/missing-file repair for these profiles
@@ -423,8 +425,21 @@ upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "Canonical-terminology disambiguation policy; product-managed because the per-term Tier A/B/C policy is framework-defined."
 
+[[artifacts]]
+class = "rule"
+id = "rule.session-start-orientation"
+template_path = "rules/session-start-orientation.md"
+target_path = ".claude/rules/session-start-orientation.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "Mandatory session-start ORIENT block format, live-source rules, structured UNKNOWN tags, and baseline-audit trigger contract."
+
 # =========================================================================
-# SKILLS (11 records)
+# SKILLS (12 records)
 # =========================================================================
 
 [[artifacts]]
@@ -452,6 +467,19 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "decision-capture helper module; product-managed because Deliberation Archive write contracts are framework-defined."
+
+[[artifacts]]
+class = "skill"
+id = "skill.baseline-audit.skill-md"
+template_path = "skills/baseline-audit/SKILL.md"
+target_path = ".claude/skills/baseline-audit/SKILL.md"
+initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
+doctor_required_profiles = []
+ownership = "gt-kb-managed"
+upgrade_policy = "overwrite"
+adopter_divergence_policy = "warn"
+notes = "Extended baseline audit skill with evidence-class enforcement; runnable by Prime Builder and Loyal Opposition."
 
 [[artifacts]]
 class = "skill"
