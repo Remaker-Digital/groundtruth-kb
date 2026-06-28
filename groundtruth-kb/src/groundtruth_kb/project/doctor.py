@@ -6086,6 +6086,79 @@ def _check_lapsed_go_implementation_claims(target: Path) -> ToolCheck:
     )
 
 
+def _work_tree_stray_age_hours(report: dict[str, Any]) -> list[float]:
+    ages: list[float] = []
+    for key in ("workspace_findings", "stash_findings", "worktree_findings"):
+        for finding in report.get(key, []):
+            if not isinstance(finding, dict) or finding.get("classification") != "stale":
+                continue
+            try:
+                ages.append(float(finding.get("age_hours", 0)))
+            except (TypeError, ValueError):
+                continue
+    return ages
+
+
+def _format_work_tree_stray_ages(ages: list[float]) -> str:
+    if not ages:
+        return "age_hours=none"
+    average = sum(ages) / len(ages)
+    return f"age_hours=min={min(ages):.1f} avg={average:.1f} max={max(ages):.1f}"
+
+
+def _check_work_tree_strays(target: Path) -> ToolCheck:
+    """Read-only WI-4356 doctor visibility for stale work-tree strays."""
+    check_name = "work-tree strays"
+    try:
+        from groundtruth_kb.hygiene.strays import run_strays, stale_count  # noqa: PLC0415
+    except Exception as exc:  # intentional-catch: doctor check must fail soft
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Work-tree strays: scan unavailable: {exc}",
+        )
+
+    try:
+        report = run_strays(target)
+    except Exception as exc:  # intentional-catch: git-state collection must fail soft
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Work-tree strays: scan unavailable: {exc}",
+        )
+
+    counts = report.get("counts", {})
+    workspace = int(counts.get("workspace_stale", 0))
+    stash = int(counts.get("stash_stale", 0))
+    worktree = int(counts.get("worktree_stale", 0))
+    stale = stale_count(report)
+    if stale == 0:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="Work-tree strays: no stale workspace, stash, or worktree findings",
+        )
+
+    ages = _format_work_tree_stray_ages(_work_tree_stray_age_hours(report))
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=(
+            f"Work-tree strays: {stale} stale "
+            f"(workspace={workspace}, stash={stash}, worktree={worktree}; {ages}); "
+            "run `gt hygiene strays` for read-only details"
+        ),
+    )
+
+
 def _check_obsolete_reference_purge(target: Path) -> ToolCheck:
     """Warn when an in-window retirement-class artifact lacks a paired purge WI.
 
@@ -6374,6 +6447,7 @@ def run_doctor(
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
         checks.append(_check_kill_switch_staleness(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
+        checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
         # (deterministic obsolete-reference-purge pairing check).
         checks.append(_check_obsolete_reference_purge(target))
