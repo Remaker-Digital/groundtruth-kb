@@ -43,6 +43,16 @@
         ]
       },
       {
+        "matcher": "Write|Edit|MultiEdit|Bash|PowerShell|Delete|Move|Copy",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit|Bash",
         "hooks": [
           {

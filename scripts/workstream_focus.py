@@ -246,6 +246,8 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_FILES = {
 VERSIONED_BRIDGE_PATH_RE = re.compile(r"^bridge/[^/]+-\d{3}\.md$")
 ADVISORY_BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*[\w-]*advisory\b", re.IGNORECASE | re.MULTILINE)
 SHELL_TOOL_NAMES = {"Bash", "shell_command", "functions.shell_command"}
+APPLY_PATCH_TOOL_NAMES = {"apply_patch", "functions.apply_patch"}
+APPLY_PATCH_PATH_RE = re.compile(r"^\*\*\* (?:Add File|Update File|Delete File): (?P<path>.+)$", re.MULTILINE)
 
 # Back-compat aliases (legacy classify_path still consumed by third-party callers).
 GTKB_INFRASTRUCTURE_PREFIXES = CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES
@@ -2025,7 +2027,24 @@ def paths_from_tool_input(tool_name: str, tool_input: dict[str, Any]) -> list[st
         command = str(tool_input.get("command") or "")
         if _command_looks_mutating(command):
             paths.extend(_path_mentions_from_command(command))
+    if tool_name in APPLY_PATCH_TOOL_NAMES:
+        paths.extend(_apply_patch_path_mentions(tool_input))
     return paths
+
+
+def _apply_patch_path_mentions(tool_input: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for key in ("patch", "input", "content", "payload"):
+        value = tool_input.get(key)
+        if isinstance(value, str) and "*** Begin Patch" in value:
+            candidates.append(value)
+    arguments = tool_input.get("arguments")
+    if isinstance(arguments, dict):
+        for key in ("patch", "input", "payload"):
+            value = arguments.get(key)
+            if isinstance(value, str) and "*** Begin Patch" in value:
+                candidates.append(value)
+    return [match.group("path").strip() for text in candidates for match in APPLY_PATCH_PATH_RE.finditer(text)]
 
 
 def _first_non_blank_line(text: str) -> str:

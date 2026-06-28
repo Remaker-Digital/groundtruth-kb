@@ -84,6 +84,17 @@
         ]
       },
       {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\workstream-focus.cmd",
+            "statusMessage": "Checking active workstream focus",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {

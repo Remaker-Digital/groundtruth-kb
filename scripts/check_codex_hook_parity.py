@@ -1203,9 +1203,13 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
     workstream_pre_tool_groups = _codex_workstream_hook_groups(codex_hooks, "PreToolUse")
     if not workstream_pre_tool_groups:
         errors.append(".codex/hooks.json does not register the workstream focus PreToolUse hook")
+    workstream_pre_tool_matchers = {group.get("matcher") for group in workstream_pre_tool_groups}
+    for matcher in ("Bash", "apply_patch"):
+        if matcher not in workstream_pre_tool_matchers:
+            errors.append(f"Codex workstream focus PreToolUse hook must cover matcher = {matcher!r}")
     for group in workstream_pre_tool_groups:
-        if group.get("matcher") != "Bash":
-            errors.append("Codex workstream focus PreToolUse hook must use matcher = 'Bash'")
+        if group.get("matcher") not in {"Bash", "apply_patch"}:
+            errors.append("Codex workstream focus PreToolUse hook must use matcher = 'Bash' or 'apply_patch'")
         for hook in group.get("hooks", []):
             command = hook.get("command", "")
             if not isinstance(command, str) or not (

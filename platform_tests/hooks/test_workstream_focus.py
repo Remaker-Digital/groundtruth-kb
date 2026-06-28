@@ -1194,6 +1194,53 @@ def test_bash_guard_blocks_mutating_gtkb_and_governance_commands(tmp_path, monke
     assert "work subject GT-KB" in gtkb_write_response["reason"]
 
 
+def test_apply_patch_guard_blocks_mutating_governance_file(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_APPLICATION, REPO_ROOT)
+
+    response = module.guard_tool_use(
+        {
+            "tool_name": "apply_patch",
+            "tool_input": {
+                "patch": """*** Begin Patch
+*** Update File: .claude/rules/new-rule.md
+@@
++text
+*** End Patch
+""",
+            },
+        },
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "GT-KB bridge/governance artifacts" in response["reason"]
+
+
+def test_apply_patch_guard_blocks_gtkb_subject_application_file(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    module.save_state(module.FOCUS_GTKB_INFRASTRUCTURE, REPO_ROOT)
+
+    response = module.guard_tool_use(
+        {
+            "tool_name": "apply_patch",
+            "tool_input": {
+                "patch": """*** Begin Patch
+*** Add File: src/example.py
++print("application")
+*** End Patch
+""",
+            },
+        },
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "application product artifacts" in response["reason"]
+
+
 # ---- GTKB-ISOLATION-015 Slice 1 §A / §C / §E regression coverage ----------
 
 

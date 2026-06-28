@@ -44,6 +44,13 @@ def _flatten_user_prompt_submit_commands(settings: dict) -> list[str]:
     return commands
 
 
+def _pretooluse_groups_with_command(settings: dict, command_fragment: str) -> list[dict]:
+    groups = settings.get("hooks", {}).get("PreToolUse", [])
+    return [
+        entry for entry in groups if any(command_fragment in hook.get("command", "") for hook in entry.get("hooks", []))
+    ]
+
+
 def test_claude_userpromptsubmit_includes_workstream_focus(claude_settings: dict) -> None:
     """T-LOSS-claude-userpromptsubmit-routes-init-keyword: workstream-focus is registered."""
     commands = _flatten_user_prompt_submit_commands(claude_settings)
@@ -85,6 +92,23 @@ def test_codex_userpromptsubmit_includes_workstream_focus(codex_hooks: dict) -> 
     # Walk the codex hooks structure looking for workstream-focus references.
     raw = json.dumps(codex_hooks)
     assert "workstream-focus" in raw, "Codex hooks.json must reference workstream-focus (cross-harness parity)"
+
+
+def test_claude_pretooluse_covers_write_capable_workstream_focus(claude_settings: dict) -> None:
+    groups = _pretooluse_groups_with_command(claude_settings, "workstream-focus.py")
+
+    assert any(entry.get("matcher") == "Write|Edit|MultiEdit|Bash|PowerShell|Delete|Move|Copy" for entry in groups), (
+        "Claude PreToolUse must invoke workstream-focus.py for write-capable tools"
+    )
+
+
+def test_codex_pretooluse_covers_bash_and_apply_patch_workstream_focus(codex_hooks: dict) -> None:
+    groups = _pretooluse_groups_with_command(codex_hooks, "workstream-focus.cmd")
+    matchers = {entry.get("matcher") for entry in groups}
+
+    assert {"Bash", "apply_patch"}.issubset(matchers), (
+        "Codex PreToolUse must invoke workstream-focus.cmd for Bash and apply_patch"
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -56,17 +56,20 @@ def _make_index(entries: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _write_bridge_files(bridge_dir: Path, entries: dict[str, str]) -> None:
+    bridge_dir.mkdir()
+    for name, status in entries.items():
+        (bridge_dir / f"{name}-001.md").write_text(f"{status}\n\nDocument: {name}\n", encoding="utf-8")
+
+
 def test_harvest_coverage_prefix_match(tmp_path: Path) -> None:
     """Coverage computation matches per-file source_refs via prefix, not exact."""
     from groundtruth_kb.reporting.harvest_coverage import (
         compute_active_bridge_thread_coverage,
     )
 
-    idx = tmp_path / "INDEX.md"
-    idx.write_text(
-        _make_index({"alpha-thread": "VERIFIED", "beta-thread": "VERIFIED"}),
-        encoding="utf-8",
-    )
+    bridge_dir = tmp_path / "bridge"
+    _write_bridge_files(bridge_dir, {"alpha-thread": "VERIFIED", "beta-thread": "VERIFIED"})
 
     db = _FakeDB(
         [
@@ -76,7 +79,7 @@ def test_harvest_coverage_prefix_match(tmp_path: Path) -> None:
         ]
     )
 
-    result = compute_active_bridge_thread_coverage(idx, db)
+    result = compute_active_bridge_thread_coverage(bridge_dir, db)
     assert result["denominator_threads"] == 2
     assert result["numerator_threads"] == 2
     assert result["coverage_pct"] == 100.0
@@ -89,15 +92,12 @@ def test_harvest_coverage_genuine_gap(tmp_path: Path) -> None:
         compute_active_bridge_thread_coverage,
     )
 
-    idx = tmp_path / "INDEX.md"
-    idx.write_text(
-        _make_index({"covered": "VERIFIED", "uncovered": "VERIFIED"}),
-        encoding="utf-8",
-    )
+    bridge_dir = tmp_path / "bridge"
+    _write_bridge_files(bridge_dir, {"covered": "VERIFIED", "uncovered": "VERIFIED"})
 
     db = _FakeDB([{"source_type": "bridge_thread", "source_ref": "bridge/covered-001.md"}])
 
-    result = compute_active_bridge_thread_coverage(idx, db)
+    result = compute_active_bridge_thread_coverage(bridge_dir, db)
     assert result["denominator_threads"] == 2
     assert result["numerator_threads"] == 1
     assert result["coverage_pct"] == 50.0

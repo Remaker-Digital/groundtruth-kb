@@ -1192,6 +1192,16 @@ def _json_file_contains_hook(path: Path, expected: str) -> bool:
 def _check_dispatcher_config_cli_only_guard(target: Path) -> ToolCheck:
     """WI-4767: dispatcher rules.toml must be mutated only through CLI transactions."""
     check_name = "Dispatcher config CLI-only guard"
+    platform_src = target / "groundtruth-kb" / "src" / "groundtruth_kb"
+    if not platform_src.is_dir():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="pass",
+            message="Dispatcher config CLI-only guard skipped outside the GT-KB platform workspace",
+        )
+
     findings: list[str] = []
 
     gate_path = target / "scripts" / "implementation_start_gate.py"
@@ -6147,6 +6157,15 @@ def _check_agent_red_app_root_minimization(target: Path) -> ToolCheck:
     """Run the Agent Red app-root minimization validator."""
     check_name = "Agent Red app-root minimization"
     app_root = target / "applications" / "Agent_Red"
+    if not app_root.exists() and not (target / "applications").exists():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="pass",
+            message="Agent Red app-root minimization skipped outside the GT-KB platform workspace",
+        )
+
     try:
         from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization  # noqa: PLC0415
 

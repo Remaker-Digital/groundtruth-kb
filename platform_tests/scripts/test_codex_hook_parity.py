@@ -135,6 +135,11 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["PreToolUse"]
     )
     assert any(
+        group.get("matcher") == "apply_patch"
+        and any("workstream-focus.cmd" in hook["command"] for hook in group["hooks"])
+        for group in codex_hooks["hooks"]["PreToolUse"]
+    )
+    assert any(
         group.get("matcher") == "Bash"
         and any("bridge-compliance-gate.cmd" in hook["command"] for hook in group["hooks"])
         for group in codex_hooks["hooks"]["PreToolUse"]
@@ -145,12 +150,12 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         for group in codex_hooks["hooks"]["PostToolUse"]
     )
     # Per bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations
-    # Codex GO at -004: Slice 3 registers a Codex `Stop` hook that invokes
-    # scripts/cross_harness_bridge_trigger.py with --stop-hook. The hook satisfies
-    # the OpenAI Codex Stop output contract by emitting `{}` JSON to stdout. The
-    # previous absence assertion is replaced with presence assertions scoped to
-    # bridge dispatch substrates. Codex Stop may invoke the cross-harness trigger
-    # and the single-harness activation manager; lifecycle wrap-up remains banned.
+    # Codex GO at -004: Slice 3 registers a Codex `Stop` hook that invokes the
+    # cross-harness bridge trigger through the no-space Windows wrapper with
+    # --stop-hook. The previous absence assertion is replaced with presence
+    # assertions scoped to bridge dispatch substrates. Codex Stop may invoke the
+    # cross-harness trigger and the single-harness activation manager; lifecycle
+    # wrap-up remains banned.
     assert "Stop" in codex_hooks["hooks"], (
         "Codex Stop hook must be registered (Slice 3 cross-harness trigger). "
         "Pre-Slice-3 baseline (`Stop` absent from `.codex/hooks.json`) is "
@@ -161,11 +166,11 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
     for group in codex_stop_hooks:
         assert group.get("matcher") in (None, ""), "Codex Stop entries must not declare a matcher (Codex hooks docs)"
     assert any(
-        "cross_harness_bridge_trigger.py" in hook.get("command", "") and "--stop-hook" in hook.get("command", "")
+        "bridge-dispatch-trigger.cmd" in hook.get("command", "") and "--stop-hook" in hook.get("command", "")
         for group in codex_stop_hooks
         for hook in group["hooks"]
     ), (
-        "Codex Stop must invoke cross_harness_bridge_trigger.py with --stop-hook "
+        "Codex Stop must invoke bridge-dispatch-trigger.cmd with --stop-hook "
         "(satisfies OpenAI Codex Stop JSON output contract by emitting `{}` on stdout)"
     )
     assert any(

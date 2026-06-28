@@ -26,8 +26,6 @@ from groundtruth_kb.project.scaffold import (  # noqa: E402
     validate_scaffold_minimum_and_no_leakage,
 )
 
-_KNOWN_SAME_USER_DOCTOR_PROBES = frozenset({"isolation:no-writable-product-paths"})
-
 
 @dataclass(frozen=True)
 class StepResult:
@@ -92,21 +90,9 @@ def _run_cli(target: Path, args: list[str]) -> StepResult:
 
 def _doctor_step(target: Path, profile: str) -> StepResult:
     report = run_doctor(target, profile)
-    failures = [
-        check
-        for check in report.checks
-        if check.required and check.status == "fail" and check.name not in _KNOWN_SAME_USER_DOCTOR_PROBES
-    ]
+    failures = [check for check in report.checks if check.required and check.status == "fail"]
     if not failures:
-        ignored = [
-            check.name
-            for check in report.checks
-            if check.required and check.status == "fail" and check.name in _KNOWN_SAME_USER_DOCTOR_PROBES
-        ]
-        suffix = f"; ignored same-user probes={ignored}" if ignored else ""
-        return StepResult(
-            "gt project doctor", True, f"overall={report.overall}; actionable required failures=0{suffix}"
-        )
+        return StepResult("gt project doctor", True, f"overall={report.overall}; actionable required failures=0")
     detail = "; ".join(f"{check.name}: {check.message}" for check in failures[:5])
     return StepResult("gt project doctor", False, detail)
 
