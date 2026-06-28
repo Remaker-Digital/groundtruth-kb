@@ -1,0 +1,197 @@
+schema_version: 1
+manifest_id: gtkb-declarative-agent-role-manifest
+authority_status: inventory_only
+description: >
+  Declarative inventory of GT-KB agent roles, harness bindings, approval/review
+  relationships, and known execution surfaces. This file is intentionally not
+  a role source of truth; it mirrors the current role/harness model so WI-4552
+  can evaluate Omnigent-style declarative agent definitions without migrating
+  live authority.
+
+source_of_truth_refs:
+  - MemBase harnesses table projected by groundtruth_kb.harness_projection
+  - harness-state harness registry projection generated from MemBase
+  - harness-state harness identities projection
+  - config/agent-control/harness-capability-registry.toml
+  - AGENTS.md durable operating role assignment
+  - .claude/rules/operating-role.md human-readable role contract
+
+canonical_reader_refs:
+  - groundtruth_kb.harness_projection.read_roles
+  - groundtruth_kb.harness_projection.read_identity
+  - groundtruth_kb.harness_projection.read_capabilities
+  - scripts/harness_projection_reader.py
+
+role_schema_anchors:
+  - GOV-HARNESS-ONBOARDING-CONTRACT-001
+  - GOV-HARNESS-ROLE-PORTABILITY-001
+  - GOV-SESSION-ROLE-AUTHORITY-001
+  - GOV-HARNESS-STATE-SOT-CONSOLIDATION-001
+  - DCL-HARNESS-STATE-SOT-READER-CONTRACT-001
+  - DCL-HARNESS-STATE-SOT-ASSERTION-001
+  - ADR-CODEX-HOOK-PARITY-FALLBACK-001
+  - ADR-CROSS-HARNESS-PARITY-001
+
+roles:
+  - role_id: prime-builder
+    title: Prime Builder
+    counterpart_role: loyal-opposition
+    prompt_surfaces:
+      - config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md
+      - .claude/rules/operating-role.md
+      - AGENTS.md
+    tool_surfaces:
+      - gtkb-bridge
+      - gtkb-propose
+      - gtkb-bridge-propose
+      - projects
+      - kb-work-item
+      - kb-spec
+    review_surfaces:
+      - bridge NEW and REVISED proposal files
+      - bridge NEW implementation reports awaiting verification
+      - project authorization packets
+      - implementation-start packets
+    harness_applicability:
+      - codex
+      - claude
+      - cursor
+    authority_notes:
+      - May author Prime Builder bridge statuses NEW and REVISED.
+      - Requires a live GO and implementation-start packet before protected source edits.
+      - Uses project authorization and work-intent claims for bounded implementation.
+
+  - role_id: loyal-opposition
+    title: Loyal Opposition
+    counterpart_role: prime-builder
+    prompt_surfaces:
+      - config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md
+      - .claude/rules/codex-review-operating-contract.md
+      - .claude/rules/codex-loyal-opposition-runbook.md
+      - AGENTS.md
+    tool_surfaces:
+      - gtkb-bridge
+      - gtkb-verify
+      - code-review-audit
+      - proposal-review
+      - dispatcher-control
+      - structural-hygiene-review
+    review_surfaces:
+      - bridge GO and NO-GO verdict files
+      - bridge VERIFIED and NO-GO verification files
+      - independent-progress-assessments/CODEX-INSIGHT-DROPBOX
+      - bridge dispatcher reports
+    harness_applicability:
+      - antigravity
+      - ollama
+      - openrouter
+      - cursor
+    authority_notes:
+      - May author Loyal Opposition bridge statuses GO, NO-GO, and VERIFIED.
+      - Reviews proposal scope, requirement sufficiency, target paths, and verification evidence.
+      - May repair bridge function under the standing bridge maintenance authority.
+
+harnesses:
+  - harness_id: A
+    harness_name: codex
+    harness_type: codex
+    status: active
+    roles:
+      - prime-builder
+    dispatch_mode: event_source
+    can_fire_events: true
+    can_receive_dispatch: true
+    invocation_surfaces:
+      - codex exec headless invocation from the harness registry projection
+      - Codex desktop interactive session
+    hook_surfaces:
+      - .codex/hooks.json
+      - .codex/gtkb-hooks
+    notes:
+      - Current interactive Prime Builder harness in this session.
+      - Windows hook parity is guarded by ADR-CODEX-HOOK-PARITY-FALLBACK-001.
+
+  - harness_id: B
+    harness_name: claude
+    harness_type: claude
+    status: suspended
+    roles:
+      - prime-builder
+    dispatch_mode: unavailable
+    can_fire_events: false
+    can_receive_dispatch: false
+    invocation_surfaces:
+      - claude headless invocation from the harness registry projection
+    hook_surfaces:
+      - .claude/hooks
+      - .claude/settings.json
+    notes:
+      - Registered historical Prime Builder-capable harness.
+      - Suspended harnesses remain inventoried but are not dispatch targets.
+
+  - harness_id: C
+    harness_name: antigravity
+    harness_type: antigravity
+    status: retired
+    roles:
+      - loyal-opposition
+    dispatch_mode: unavailable
+    can_fire_events: false
+    can_receive_dispatch: false
+    invocation_surfaces:
+      - Antigravity IDE interactive surface
+      - gemini headless invocation from the harness registry projection
+    hook_surfaces: []
+    notes:
+      - Retired Loyal Opposition harness retained for lifecycle history.
+      - Optimized startup rules apply only when the harness is active.
+
+  - harness_id: D
+    harness_name: ollama
+    harness_type: ollama
+    status: active
+    roles:
+      - loyal-opposition
+    dispatch_mode: dispatch_target
+    can_fire_events: false
+    can_receive_dispatch: true
+    invocation_surfaces:
+      - scripts/ollama_harness.py bridge-review headless invocation
+    hook_surfaces: []
+    notes:
+      - Low-cost Loyal Opposition dispatch target.
+      - Cannot fire event-driven bridge hooks.
+
+  - harness_id: E
+    harness_name: cursor
+    harness_type: cursor
+    status: active
+    roles:
+      - prime-builder
+    dispatch_mode: event_source
+    can_fire_events: true
+    can_receive_dispatch: true
+    invocation_surfaces:
+      - scripts/cursor_harness.py bridge-review headless invocation
+      - Cursor IDE interactive surface
+    hook_surfaces:
+      - cursor harness bridge-review adapter
+    notes:
+      - Active event source and dispatch receiver in the harness registry projection.
+      - Current durable role is Prime Builder even when a dispatch context acts as reviewer.
+
+  - harness_id: F
+    harness_name: openrouter
+    harness_type: openrouter
+    status: active
+    roles:
+      - loyal-opposition
+    dispatch_mode: dispatch_target
+    can_fire_events: false
+    can_receive_dispatch: true
+    invocation_surfaces:
+      - scripts/openrouter_harness.py bridge-review headless invocation
+    hook_surfaces: []
+    notes:
+      - Low-cost Loyal Opposition dispatch target.
+      - Cannot fire event-driven bridge hooks.
