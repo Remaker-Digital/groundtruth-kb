@@ -118,7 +118,7 @@ def test_secret_manifest_check_fails_when_generated_manifest_exists(tmp_path, mo
     gate = _load_gate_module()
     unsafe = tmp_path / "scripts" / "deploy" / "production-gateway-generated.yaml"
     unsafe.parent.mkdir(parents=True)
-    unsafe.write_text("secret: should-not-exist\n", encoding="utf-8")
+    unsafe.write_text("generated-placeholder: should-not-exist\n", encoding="utf-8")
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
 
     with pytest.raises(gate.GateFailure, match="Unsafe generated production manifest"):
@@ -380,6 +380,46 @@ def test_project_resource_registry_gate_fails_on_remote_drift(tmp_path, monkeypa
         gate._check_project_resource_registry()
 
 
+def test_agent_red_app_root_minimization_gate_passes(tmp_path, monkeypatch, capsys):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+
+    class Result:
+        ok = True
+        actual_entries = [object(), object()]
+
+        def first_error_message(self):
+            return "no errors"
+
+    def fake_validate(app_root, *, project_root, tracked_only):
+        assert app_root == tmp_path / "applications" / "Agent_Red"
+        assert project_root == tmp_path
+        assert tracked_only is True
+        return Result()
+
+    monkeypatch.setattr(gate, "_agent_red_app_root_minimization_helpers", lambda: fake_validate)
+
+    gate._check_agent_red_app_root_minimization()
+
+    assert "PASS Agent Red app-root minimization (2 top-level artifacts)" in capsys.readouterr().out
+
+
+def test_agent_red_app_root_minimization_gate_fails(monkeypatch):
+    gate = _load_gate_module()
+
+    class Result:
+        ok = False
+        actual_entries = []
+
+        def first_error_message(self):
+            return "unregistered_top_level_artifact: EXTRA.md has no registry entry"
+
+    monkeypatch.setattr(gate, "_agent_red_app_root_minimization_helpers", lambda: lambda *a, **kw: Result())
+
+    with pytest.raises(gate.GateFailure, match="EXTRA.md"):
+        gate._check_agent_red_app_root_minimization()
+
+
 def test_python_version_gate_requires_exact_minor():
     gate = _load_gate_module()
     actual = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -574,6 +614,7 @@ def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypa
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
+    monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory_drift", fake_inventory_drift)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
@@ -627,6 +668,7 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
+    monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
 

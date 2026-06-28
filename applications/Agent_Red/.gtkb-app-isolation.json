@@ -42,6 +42,49 @@
       "justification": "Workspace settings discovery from opened folder; per owner directive 2026-04-27 the VSCode workspace root for the Agent Red project is applications/Agent_Red/"
     },
     {
+      "name": "application.toml",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red application marker consumed by GT-KB application registration, slot diagnostics, and isolation doctor checks."
+    },
+    {
+      "name": "CHANGELOG.md",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red application changelog and release history."
+    },
+    {
+      "name": "CLAUDE.md",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Claude Code",
+      "justification": "CWD-rooted Agent Red session instructions for Claude Code when applications/Agent_Red/ is opened as the working directory."
+    },
+    {
+      "name": "CLAUDE-ARCHITECTURE.md",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red architecture reference documentation retained with the application lifecycle."
+    },
+    {
+      "name": "CLAUDE-REFERENCE.md",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red implementation reference documentation retained with the application lifecycle."
+    },
+    {
+      "name": "CLAUDE_ARCHIVE.md",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red historical Claude guidance retained as application-local archive material."
+    },
+    {
+      "name": "CONTRIBUTING.md",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red application contribution guidance."
+    },
+    {
       "name": "harness-state",
       "type": "DIR",
       "bucket": "A",
@@ -112,6 +155,37 @@
       "type": "DIR",
       "bucket": "A",
       "purpose": "Agent Red configuration (initially: Stripe pricing at config/stripe_product_ids.json deferred from 18.D); other Agent Red config arrives in subsequent slices. GT-KB platform configs in config/agent-control/ and config/governance/ STAY at GT-KB root per umbrella -008. Migrated in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
+    },
+    {
+      "name": "package-lock.json",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red JavaScript workspace dependency lockfile for application-local frontend tooling."
+    },
+    {
+      "name": "package.json",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red JavaScript workspace manifest for application-local frontend tooling."
+    },
+    {
+      "name": "scripts",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red application-local operational and development scripts."
+    },
+    {
+      "name": "SECURITY.md",
+      "type": "FILE",
+      "bucket": "A",
+      "purpose": "Agent Red application security policy and disclosure guidance."
+    },
+    {
+      "name": "shopify.app.toml",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Shopify CLI",
+      "justification": "Shopify CLI app configuration discovery at the Agent Red application root."
     }
   ],
   "validator_contract": {
@@ -124,7 +198,7 @@
       "Bucket=C and bucket=D are not allowed at app root",
       "Unmatched entries fail the gate"
     ],
-    "implementation_status": "pending sub-slice 5 (DCL runner + release-gate integration)"
+    "implementation_status": "implemented by WI-4655 / gtkb-ar-readiness-phase-1-2-app-root-minimization-validator"
   },
   "out_of_scope_for_sub_slice_1": [
     ".env.local handling (sub-slice 2; owner-action-only)",

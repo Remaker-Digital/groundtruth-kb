@@ -302,6 +302,27 @@ def _check_standing_backlog_health() -> None:
     print(f"PASS standing backlog health ({warn_count} warning findings)")
 
 
+def _agent_red_app_root_minimization_helpers():
+    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization  # noqa: PLC0415
+
+    return validate_app_root_minimization
+
+
+def _check_agent_red_app_root_minimization() -> None:
+    validate_app_root_minimization = _agent_red_app_root_minimization_helpers()
+    result = validate_app_root_minimization(
+        PROJECT_ROOT / "applications" / "Agent_Red",
+        project_root=PROJECT_ROOT,
+        tracked_only=True,
+    )
+    if not result.ok:
+        raise GateFailure("Agent Red app-root minimization: " + result.first_error_message())
+    print(f"PASS Agent Red app-root minimization ({len(result.actual_entries)} top-level artifacts)")
+
+
 def _check_isolation_program_backstop() -> None:
     script_path = PROJECT_ROOT / "scripts" / "isolation_program_backstop.py"
     if not script_path.is_file():
@@ -479,6 +500,7 @@ def main() -> int:
         _check_secret_ci_workflow_present()
         _check_project_resource_registry()
         _check_standing_backlog_health()
+        _check_agent_red_app_root_minimization()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check
