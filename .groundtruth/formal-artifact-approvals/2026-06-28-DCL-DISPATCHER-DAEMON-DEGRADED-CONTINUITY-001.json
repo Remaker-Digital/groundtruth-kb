@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "DCL-DISPATCHER-DAEMON-DEGRADED-CONTINUITY-001",
+  "artifact_type": "design_constraint",
+  "change_reason": "WI-4884 owner-approved daemon-resilience DCL recording per DELIB-20266354",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-20266354: Owner approved the exact six daemon-resilience formal artifacts for WI-4884 and authorized Prime Builder to record them in MemBase.",
+  "full_content": "## Constraint\n\nWhen automatic recovery exhausts retries for a component, the dispatcher daemon\nmust disable or circuit-break only the failing component, raise visible owner\nalert state, and continue dispatching across the healthy remainder of the fleet\nwhen doing so is safe.\n\nThe daemon must not silently halt the entire fleet for one component failure,\nand it must not silently continue without surfacing the degraded condition.\n\n## Applicability\n\nThis constraint applies to harness-specific provider outages, repeated worker\ncrashes, repeated timeout failures, daemon-supervisor failures, state recovery\nfailure, and any future component-level failure that can be isolated from the\nrest of the dispatch fleet.\n\n## Rationale\n\nThe owner selected \"alert + keep fleet degraded\" as the escalation policy.\nThat policy preserves owner visibility without making the owner part of the\nsteady-state recovery loop and prevents one unhealthy component from stopping\nall dispatch when healthy alternatives exist.\n\n## Required Behavior\n\n1. Component failure must be isolated to the narrowest safe component boundary.\n2. Healthy components remain eligible when dispatch can safely continue.\n3. Degraded state must be visible in daemon status and next-session reporting.\n4. A bridge ADVISORY entry or successor owner-visible alert must be created when\n   retries are exhausted and degraded state persists.\n5. Recovery from degraded state must be explicit and auditable.\n6. Degraded operation must still respect role eligibility, dispatch caps, and\n   project authorization.\n\n## Verification Expectations\n\n- A simulated failing LO harness causes that harness to be circuit-broken while\n  other LO harnesses remain eligible.\n- A simulated failing PB harness in a two-PB topology reroutes GO implementation\n  work to the other eligible PB when policy permits.\n- A simulated all-role-unavailable condition stops dispatch safely and surfaces\n  a visible owner alert.\n- Status output distinguishes healthy, degraded, and blocked.\n\n## Source Decisions\n\n- `DELIB-20266276` D4: alert plus keep fleet degraded.\n- `DELIB-20266276` D6: either PB by dispatcher ranking.\n- `SPEC-CENTRALIZED-DISPATCH-SERVICE-001`: one centralized dispatch service\n  resolves targets from the registry and records dispatch evidence.\n\n",
+  "full_content_sha256": "5bf0f23dcd94c24da2d02ff72cdc1d707bedb5f7a03c3bf881743d9046558c0d",
+  "presented_to_user": true,
+  "source_ref": "DCL-DISPATCHER-DAEMON-DEGRADED-CONTINUITY-001",
+  "transcript_captured": true
+}

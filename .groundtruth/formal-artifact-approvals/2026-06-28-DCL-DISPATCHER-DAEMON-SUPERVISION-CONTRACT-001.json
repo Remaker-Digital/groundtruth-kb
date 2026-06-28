@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "DCL-DISPATCHER-DAEMON-SUPERVISION-CONTRACT-001",
+  "artifact_type": "design_constraint",
+  "change_reason": "WI-4884 owner-approved daemon-resilience DCL recording per DELIB-20266354",
+  "changed_by": "gt-cli",
+  "explicit_change_request": "AUQ DELIB-20266354: Owner approved the exact six daemon-resilience formal artifacts for WI-4884 and authorized Prime Builder to record them in MemBase.",
+  "full_content": "## Constraint\n\nGT-KB must supervise the dispatcher daemon through a dedicated\nGTKB-DispatcherDaemon Windows scheduled task that runs an idempotent\nensure-alive operation approximately once per minute.\n\nThe scheduled task must be separate from storm-watchdog supervision. Its\nensure-alive operation must no-op when the daemon is healthy, restart when the\ndaemon is absent or stale, and rely on the daemon single-instance lock so the\nsupervisor cannot create duplicate daemon owners.\n\n## Applicability\n\nThis constraint applies to daemon supervision, daemon installation or repair\ncommands, daemon doctor checks, and release-readiness checks that claim the\ndispatcher daemon is supervised.\n\n## Rationale\n\nThe daemon itself needs an independent watcher. The storm watchdog and daemon\nsupervisor address different failure classes; coupling them creates a single\nbug domain where a watchdog defect can also remove daemon supervision. The\nowner selected a dedicated scheduled task because it mirrors a proven host-local\npattern while preserving daemon single-instance semantics.\n\n## Required Behavior\n\n1. The scheduled task identity is GTKB-DispatcherDaemon or an explicitly\n   documented successor approved through the bridge.\n2. The task interval is approximately one minute unless a later governed change\n   adjusts the SLA.\n3. The task invokes an idempotent ensure-alive entrypoint.\n4. The ensure-alive path must not dispatch work directly; it only ensures daemon\n   process ownership.\n5. The supervisor must log or surface restart attempts and failures.\n6. Repeated supervisor failures must produce owner-visible alert state rather\n   than silently degrading.\n\n## Verification Expectations\n\n- A dry-run or inspection command confirms the scheduled task definition.\n- A stopped-daemon test confirms ensure-alive restarts the daemon.\n- A healthy-daemon test confirms ensure-alive is a no-op.\n- A duplicate-start test confirms the scheduled task cannot bypass the\n  single-instance lock.\n\n## Source Decisions\n\n- `DELIB-20266276` D3: dedicated GTKB-DispatcherDaemon scheduled task.\n- `DELIB-20266084`: independent heartbeat lesson for daemon death detection.\n- `DCL-DISPATCHER-DAEMON-SINGLE-INSTANCE-INVARIANT-001`.\n\n",
+  "full_content_sha256": "d25379176c4a64e70d1217e5eccd32d8be105963c6c50f170c14fe811189bd51",
+  "presented_to_user": true,
+  "source_ref": "DCL-DISPATCHER-DAEMON-SUPERVISION-CONTRACT-001",
+  "transcript_captured": true
+}
