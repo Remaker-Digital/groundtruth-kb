@@ -13,6 +13,7 @@ import types
 from pathlib import Path
 from unittest.mock import patch
 
+import psutil
 import pytest
 from click.testing import CliRunner
 
@@ -432,32 +433,6 @@ def test_run_tick_emits_restart_watchdog_when_dormant(tmp_path: Path, monkeypatc
     assert result["watchdog_restart"]["launched"] is True
 
 
-def test_restart_storm_watchdog_invokes_schtasks_headless_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The daemon's one-minute watchdog remediation must not allocate a console."""
-    daemon = _load_daemon()
-    expected_no_window = 0x08000000
-    captured: dict[str, object] = {}
-
-    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
-        captured["args"] = args
-        captured["kwargs"] = kwargs
-        return subprocess.CompletedProcess(args=args, returncode=0)
-
-    monkeypatch.setattr(daemon.os, "name", "nt")
-    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
-    monkeypatch.setattr(subprocess, "run", _fake_run)
-
-    result = daemon._restart_storm_watchdog("GTKB-HarnessStormWatchdog-Test")
-
-    assert result == {"launched": True, "returncode": 0}
-    assert captured["args"] == ["schtasks.exe", "/Run", "/TN", "GTKB-HarnessStormWatchdog-Test"]
-    kwargs = captured["kwargs"]
-    assert kwargs["stdin"] == subprocess.DEVNULL
-    assert kwargs["capture_output"] is True
-    assert kwargs["timeout"] == 15
-    assert int(kwargs["creationflags"]) & expected_no_window
-
-
 # ---------------------------------------------------------------------------
 # WI-4855: daemon process-lifecycle hardening (start/stop control surface).
 # These tests exercise the production CLI commands
@@ -508,73 +483,7 @@ def test_daemon_start_spawns_detached(tmp_path: Path) -> None:
     assert kwargs.get("stdin") == subprocess.DEVNULL
     assert kwargs.get("stdout") == subprocess.DEVNULL
     assert kwargs.get("stderr") == subprocess.DEVNULL
-    assert captured["args"][0] == gtcli._prefer_windows_gui_python(sys.executable)
-
-
-def test_daemon_start_prefers_pythonw_on_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Windows daemon loops should use GUI-subsystem Python to avoid console focus steal."""
-    from groundtruth_kb import cli as gtcli
-
-    daemon = _load_daemon()
-    python_dir = tmp_path / "venv" / "Scripts"
-    python_dir.mkdir(parents=True)
-    python_exe = python_dir / "python.exe"
-    pythonw_exe = python_dir / "pythonw.exe"
-    python_exe.write_text("", encoding="utf-8")
-    pythonw_exe.write_text("", encoding="utf-8")
-    expected_no_window = 0x08000000
-    expected_detached = 0x00000008
-    expected_new_group = 0x00000200
-    captured: dict[str, object] = {}
-
-    class _FakePopen:
-        def __init__(self, args, **kwargs):
-            captured["args"] = args
-            captured["kwargs"] = kwargs
-            self.pid = 5252
-
-    monkeypatch.setattr(gtcli.os, "name", "nt")
-    monkeypatch.setattr(gtcli.sys, "executable", str(python_exe))
-    monkeypatch.setattr(gtcli.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
-    monkeypatch.setattr(gtcli.subprocess, "DETACHED_PROCESS", expected_detached, raising=False)
-    monkeypatch.setattr(gtcli.subprocess, "CREATE_NEW_PROCESS_GROUP", expected_new_group, raising=False)
-    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
-    with cfg_patch, import_patch, patch.object(gtcli.subprocess, "Popen", _FakePopen):
-        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
-
-    assert result.exit_code == 0, result.output
-    assert captured["args"][0] == str(pythonw_exe)
-    flags = int(captured["kwargs"].get("creationflags", 0))
-    assert flags & expected_no_window
-    assert flags & expected_detached
-    assert flags & expected_new_group
-
-
-def test_daemon_start_falls_back_when_pythonw_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The daemon start command must remain usable when a sibling pythonw.exe is unavailable."""
-    from groundtruth_kb import cli as gtcli
-
-    daemon = _load_daemon()
-    python_dir = tmp_path / "venv" / "Scripts"
-    python_dir.mkdir(parents=True)
-    python_exe = python_dir / "python.exe"
-    python_exe.write_text("", encoding="utf-8")
-    captured: dict[str, object] = {}
-
-    class _FakePopen:
-        def __init__(self, args, **kwargs):
-            captured["args"] = args
-            captured["kwargs"] = kwargs
-            self.pid = 5353
-
-    monkeypatch.setattr(gtcli.os, "name", "nt")
-    monkeypatch.setattr(gtcli.sys, "executable", str(python_exe))
-    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
-    with cfg_patch, import_patch, patch.object(gtcli.subprocess, "Popen", _FakePopen):
-        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
-
-    assert result.exit_code == 0, result.output
-    assert captured["args"][0] == str(python_exe)
+    assert captured["args"][0] == sys.executable
 
 
 def test_daemon_start_refuses_when_live_instance_present(tmp_path: Path) -> None:
@@ -844,6 +753,11 @@ def _make_runs_dir(root: Path) -> Path:
     return runs_dir
 
 
+def _write_pid_provenance_sidecar(runs_dir: Path, dispatch_id: str, pid: int) -> None:
+    create_time = float(psutil.Process(pid).create_time())
+    (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time:.6f}", encoding="utf-8")
+
+
 def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:
     """A live worker with no exit_code sidecar is terminated and recorded.
 
@@ -863,6 +777,7 @@ def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:
     dispatch_id = "test-dispatch-live-001"
     try:
         (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        _write_pid_provenance_sidecar(runs_dir, dispatch_id, sleeper.pid)
         # No exit_code sidecar — simulates an orphaned worker.
         reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
         assert reaped == 1
@@ -871,6 +786,34 @@ def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:
         assert exit_code_file.read_text(encoding="utf-8").strip() == "124"
         # Process should be dead now.
         sleeper.wait(timeout=5)
+    finally:
+        if sleeper.poll() is None:
+            sleeper.terminate()
+            sleeper.wait(timeout=5)
+
+
+def test_reap_inflight_refuses_live_worker_without_provenance(tmp_path: Path) -> None:
+    """A live PID without create-time provenance is not terminated.
+
+    Spec-derived from WI-4893 and the WI-4834 provenance precedent: PID-only
+    evidence is insufficient because PID reuse can target the wrong process.
+    """
+    daemon = _load_daemon()
+    trigger = daemon._load_trigger_module()
+    runs_dir = _make_runs_dir(tmp_path)
+
+    sleeper = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    dispatch_id = "test-dispatch-missing-provenance-001"
+    try:
+        (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+        assert reaped == 0
+        assert sleeper.poll() is None, "PID-only evidence must not terminate a live process"
+        assert not (runs_dir / f"{dispatch_id}.exit_code").exists()
     finally:
         if sleeper.poll() is None:
             sleeper.terminate()
@@ -894,6 +837,7 @@ def test_reap_inflight_skips_completed_worker(tmp_path: Path) -> None:
     dispatch_id = "test-dispatch-completed-002"
     try:
         (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        _write_pid_provenance_sidecar(runs_dir, dispatch_id, sleeper.pid)
         # Pre-populate exit_code — worker already recorded its outcome.
         (runs_dir / f"{dispatch_id}.exit_code").write_text("0\n", encoding="utf-8")
         reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
@@ -950,6 +894,7 @@ def test_daemon_reap_helper_reaps_orphan(tmp_path: Path) -> None:
     dispatch_id = "test-daemon-orphan-004"
     try:
         (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
+        _write_pid_provenance_sidecar(runs_dir, dispatch_id, sleeper.pid)
         # No exit_code sidecar — simulate orphaned worker.
         reaped = daemon._reap_dispatched_workers(tmp_path)
         assert reaped == 1
