@@ -21,6 +21,11 @@ from groundtruth_kb.bridge.proposal_autoload import (
     auto_target_paths_in_root_evidence,
     get_work_item_or_raise,
 )
+from groundtruth_kb.bridge.proposal_filing import (
+    FilingRequest,
+    ProposalFilingError,
+    file_implementation_proposal,
+)
 from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
@@ -330,6 +335,89 @@ def bridge_propose(
     click.echo(f"Wrote DRAFT: {output_path}")
     click.echo("This is a NON-DISPATCHABLE draft; it is not a filed bridge proposal.")
     click.echo("Fill the AI-judgment placeholders, then file through the bridge-propose helper.")
+
+
+@bridge_group.command("file-implementation-proposal")
+@click.option("--wi", "wi_id", required=True, help="Existing MemBase work item id.")
+@click.option("--slug", required=True, help="Bridge slug, lowercase kebab-case.")
+@click.option("--target-path", "target_paths", multiple=True, required=True, help="Repeatable target path.")
+@click.option("--project", "project_id", help="Project id to use when membership is missing or ambiguous.")
+@click.option("--owner-decision", help="DELIB id required when creating missing membership or PAUTH state.")
+@click.option("--add-spec", "add_specs", multiple=True, help="Repeatable spec id to add to generated links.")
+@click.option("--scope", "scope_lines", multiple=True, help="Repeatable proposed-scope bullet.")
+@click.option("--acceptance", "acceptance_criteria", multiple=True, help="Repeatable acceptance-criteria bullet.")
+@click.option("--verification", multiple=True, help="Repeatable SPEC_ID=verification text row.")
+@click.option("--summary", help="Override generated proposal summary.")
+@click.option(
+    "--create-missing-state",
+    is_flag=True,
+    help="Create missing project membership/PAUTH only when --owner-decision is supplied.",
+)
+@click.option("--dry-run", is_flag=True, help="Run candidate preflights and print content without writing.")
+@click.option("--json", "emit_json", is_flag=True, help="Emit JSON result metadata.")
+@click.pass_context
+def bridge_file_implementation_proposal(
+    ctx: click.Context,
+    wi_id: str,
+    slug: str,
+    target_paths: tuple[str, ...],
+    project_id: str | None,
+    owner_decision: str | None,
+    add_specs: tuple[str, ...],
+    scope_lines: tuple[str, ...],
+    acceptance_criteria: tuple[str, ...],
+    verification: tuple[str, ...],
+    summary: str | None,
+    create_missing_state: bool,
+    dry_run: bool,
+    emit_json: bool,
+) -> None:
+    """File a dispatchable NEW implementation proposal through governed bridge plumbing."""
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    request = FilingRequest(
+        wi_id=wi_id,
+        slug=slug,
+        target_paths=target_paths,
+        project_id=project_id,
+        owner_decision=owner_decision,
+        add_specs=add_specs,
+        scope_lines=scope_lines,
+        acceptance_criteria=acceptance_criteria,
+        verification=verification,
+        summary=summary,
+        create_missing_state=create_missing_state,
+        dry_run=dry_run,
+    )
+    try:
+        result = file_implementation_proposal(db, config.project_root, request)
+    except (ProposalFilingError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+
+    payload = {
+        "bridge_path": str(result.bridge_path) if result.bridge_path is not None else None,
+        "project_id": result.project_id,
+        "project_authorization_id": result.project_authorization_id,
+        "preflights": [
+            {
+                "name": preflight.name,
+                "returncode": preflight.returncode,
+            }
+            for preflight in result.preflight_results
+        ],
+    }
+    if emit_json:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    if dry_run:
+        click.echo(result.content.rstrip())
+        return
+    click.echo(f"Wrote NEW: {result.bridge_path}")
+    click.echo(f"Project Authorization: {result.project_authorization_id}")
+    for preflight in result.preflight_results:
+        click.echo(f"preflight {preflight.name}: exit {preflight.returncode}")
 
 
 @bridge_group.command("verify-embedded-evidence")
