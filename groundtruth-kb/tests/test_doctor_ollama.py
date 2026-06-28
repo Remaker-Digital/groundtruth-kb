@@ -414,7 +414,11 @@ def test_windows_autostart_missing_returns_warning(tmp_path: Path, monkeypatch: 
     monkeypatch.setattr(doctor_mod.sys, "platform", "win32")
     monkeypatch.setattr(doctor_mod.shutil, "which", lambda _name: "powershell.exe")
 
+    captured: dict[str, object] = {}
+
     def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        captured["kwargs"] = kwargs
         return doctor_mod.subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -428,3 +432,11 @@ def test_windows_autostart_missing_returns_warning(tmp_path: Path, monkeypatch: 
     assert result.status == "warning"
     assert "L5" in result.message
     assert "autostart not detected" in result.message
+    args = captured["args"]
+    kwargs = captured["kwargs"]
+    assert "-NonInteractive" in args
+    assert kwargs["stdin"] == doctor_mod.subprocess.DEVNULL
+    if doctor_mod.os.name == "nt":
+        assert kwargs["creationflags"] == getattr(doctor_mod.subprocess, "CREATE_NO_WINDOW", 0)
+    else:
+        assert "creationflags" not in kwargs

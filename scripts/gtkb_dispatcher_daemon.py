@@ -515,10 +515,16 @@ def _restart_storm_watchdog(task_name: str = WATCHDOG_TASK_NAME_DEFAULT) -> dict
     import subprocess  # noqa: PLC0415
 
     try:
+        run_kwargs: dict[str, object] = {
+            "stdin": subprocess.DEVNULL,
+            "capture_output": True,
+            "timeout": 15,
+        }
+        if os.name == "nt":
+            run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         proc = subprocess.run(
             ["schtasks.exe", "/Run", "/TN", task_name],
-            capture_output=True,
-            timeout=15,
+            **run_kwargs,
         )
         return {"launched": proc.returncode == 0, "returncode": proc.returncode}
     except Exception as exc:  # noqa: BLE001

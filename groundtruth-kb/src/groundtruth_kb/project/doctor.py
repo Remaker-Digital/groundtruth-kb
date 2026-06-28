@@ -171,13 +171,29 @@ $services = @(Get-Service | Where-Object {
     services = $services
 } | ConvertTo-Json -Compress
 """
+    run_kwargs: dict[str, Any] = {
+        "stdin": subprocess.DEVNULL,
+        "capture_output": True,
+        "text": True,
+        "timeout": 5,
+        "check": False,
+    }
+    if os.name == "nt":
+        run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
     try:
         result = subprocess.run(
-            [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                ps_script,
+            ],
+            **run_kwargs,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return f"L5: Ollama autostart probe failed: {exc}"
@@ -5091,6 +5107,27 @@ def _resolve_env_session_id() -> str | None:
     return None
 
 
+def _check_session_wrap_had_orient(target: Path) -> ToolCheck:
+    """Validate that the prior session ended with a well-formed ORIENT block.
+
+    gtkb-session-start-orientation-gate: mechanical enforcement that session-start
+    orientation discipline was not skipped under context pressure. WARN when
+    transcript access is unavailable; INFO on first-ever sessions; FAIL when a
+    prior transcript exists but lacks ORIENT evidence.
+    """
+    from groundtruth_kb.project.session_start_orientation import check_session_wrap_had_orient
+
+    check_name = "Prior-session ORIENT block"
+    status, message = check_session_wrap_had_orient(target)
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=status in {"pass", "warning", "fail"},
+        status=status,
+        message=message,
+    )
+
+
 def _check_session_role_marker_validity(target: Path) -> ToolCheck:
     """Structural validity of the ephemeral session-state role marker.
 
@@ -6195,6 +6232,7 @@ def run_doctor(
         # session-state role marker diagnostics (validity + best-effort staleness).
         checks.append(_check_session_role_marker_validity(target))
         checks.append(_check_session_role_marker_session_id_alignment(target))
+        checks.append(_check_session_wrap_had_orient(target))
         checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))

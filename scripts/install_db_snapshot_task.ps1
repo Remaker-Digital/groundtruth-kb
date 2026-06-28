@@ -31,7 +31,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$pythonExe = (Get-Command python -ErrorAction Stop).Source
+$projectPythonw = Join-Path $ProjectRoot "groundtruth-kb\.venv\Scripts\pythonw.exe"
+$pathPythonw = Get-Command pythonw.exe -ErrorAction SilentlyContinue
+if (Test-Path $projectPythonw) {
+    $pythonExe = $projectPythonw
+}
+elseif ($pathPythonw) {
+    $pythonExe = $pathPythonw.Source
+}
+else {
+    $pythonExe = (Get-Command python.exe -ErrorAction Stop).Source
+}
+
 $scriptBody = @"
 import sys, json, pathlib
 sys.path.insert(0, str(pathlib.Path(r'$ProjectRoot') / 'groundtruth-kb' / 'src'))
@@ -39,7 +50,8 @@ from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db_snapshot import create_snapshot
 cfg = GTConfig.load(config_path=pathlib.Path(r'$ProjectRoot') / 'groundtruth.toml')
 result = create_snapshot(cfg)
-print(json.dumps(result.to_json_dict(), indent=2))
+result_path = pathlib.Path(r'$ProjectRoot') / '.gtkb-state' / 'db-snapshot' / 'last-run.json'
+result_path.write_text(json.dumps(result.to_json_dict(), indent=2) + '\n', encoding='utf-8')
 "@
 
 # WI-4512: the launcher is an active runtime dependency (the scheduled task
@@ -62,6 +74,7 @@ $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -DontStopIfGoingOnBatteries `
     -AllowStartIfOnBatteries `
+    -Hidden `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
 
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue

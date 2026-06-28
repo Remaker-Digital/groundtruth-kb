@@ -102,3 +102,27 @@ def test_installer_ensures_launcher_dir() -> None:
     assert set_content_idx != -1, "Installer must write the launcher via Set-Content -Path $launcherScript."
 
     assert new_item_idx < set_content_idx, "Parent-directory creation must precede the Set-Content launcher write."
+
+
+def test_scheduled_task_prefers_pythonw_and_is_hidden() -> None:
+    """The registered task must use a GUI-subsystem Python and hidden settings."""
+    code = _installer_code()
+
+    assert "pythonw.exe" in code, "Scheduled task launcher must prefer pythonw.exe to avoid console allocation."
+    assert re.search(
+        r"Join-Path\s+\$ProjectRoot\s+[\"']groundtruth-kb\\\.venv\\Scripts\\pythonw\.exe[\"']",
+        code,
+    ), "Installer must prefer the project venv pythonw.exe before PATH fallback."
+    assert re.search(
+        r"New-ScheduledTaskSettingsSet[\s\S]*-Hidden[\s\S]*-ExecutionTimeLimit",
+        code,
+    ), "Scheduled task settings must include -Hidden."
+
+
+def test_pythonw_launcher_writes_last_run_file_instead_of_stdout() -> None:
+    """A pythonw.exe task must not depend on an attached stdout console."""
+    code = _installer_code()
+
+    assert "print(" not in code
+    assert "last-run.json" in code
+    assert "result_path.write_text" in code
