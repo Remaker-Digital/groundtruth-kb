@@ -83,6 +83,7 @@ if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
 from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS  # noqa: E402
+from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config  # noqa: E402
 from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
     dispatch_is_draining,
 )
@@ -184,6 +185,7 @@ DISPATCH_STATE_RESET_GUARD_FILENAME = "dispatch-state-reset.lock"
 QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
+DISPATCH_BUDGET_LEDGER_FILENAME = "dispatch-budget-ledger.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_META_KEY = "pid_create_time_epoch"
@@ -1053,6 +1055,147 @@ def _record_dispatch_suppression(state_dir: Path, payload: dict[str, Any]) -> No
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
     except OSError:
         pass
+
+
+def _dispatch_budget_user() -> str:
+    return (
+        os.environ.get("GTKB_DISPATCH_BUDGET_USER") or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown"
+    )
+
+
+def _read_dispatch_budget_ledger(state_dir: Path) -> list[dict[str, Any]]:
+    path = state_dir / DISPATCH_BUDGET_LEDGER_FILENAME
+    if not path.is_file():
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _dispatch_budget_daily_spend(state_dir: Path, *, user: str, day: str) -> float:
+    total = 0.0
+    for row in _read_dispatch_budget_ledger(state_dir):
+        if str(row.get("user") or "") != user:
+            continue
+        if str(row.get("day") or "") != day:
+            continue
+        try:
+            total += float(row.get("estimated_usd") or 0.0)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
+def _record_dispatch_budget_ledger(state_dir: Path, payload: dict[str, Any]) -> None:
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        with (state_dir / DISPATCH_BUDGET_LEDGER_FILENAME).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def _dispatch_budget_decision(
+    *,
+    target: DispatchTarget,
+    project_root: Path,
+    state_dir: Path,
+    dispatch_id: str,
+) -> dict[str, Any]:
+    config = load_bridge_dispatch_config(project_root)
+    budget = config.budget
+    if not budget.enabled:
+        return {"allowed": True, "enabled": False}
+
+    harness_budget = budget.harnesses.get(target.harness_id)
+    if harness_budget is None or not harness_budget.model:
+        if budget.unknown_model_policy == "fail_closed":
+            return {
+                "allowed": False,
+                "reason": "dispatch_budget_unknown_model",
+                "error_type": "dispatch_budget_gate",
+                "harness_id": target.harness_id,
+            }
+        return {"allowed": True, "enabled": True, "unpriced": True, "model": None}
+
+    if harness_budget.unpriced:
+        if budget.unpriced_model_policy == "fail_closed":
+            return {
+                "allowed": False,
+                "reason": "dispatch_budget_unpriced_model_blocked",
+                "error_type": "dispatch_budget_gate",
+                "harness_id": target.harness_id,
+                "model": harness_budget.model,
+            }
+        return {
+            "allowed": True,
+            "enabled": True,
+            "unpriced": True,
+            "model": harness_budget.model,
+            "estimated_usd": 0.0,
+        }
+
+    estimated = harness_budget.estimated_usd_per_dispatch
+    if estimated is None:
+        if budget.unknown_model_policy == "fail_closed":
+            return {
+                "allowed": False,
+                "reason": "dispatch_budget_unknown_priced_model",
+                "error_type": "dispatch_budget_gate",
+                "harness_id": target.harness_id,
+                "model": harness_budget.model,
+            }
+        return {"allowed": True, "enabled": True, "model": harness_budget.model}
+
+    decision: dict[str, Any] = {
+        "allowed": True,
+        "enabled": True,
+        "harness_id": target.harness_id,
+        "model": harness_budget.model,
+        "estimated_usd": estimated,
+        "user": _dispatch_budget_user(),
+        "day": dt.datetime.now(dt.UTC).date().isoformat(),
+    }
+    if budget.soft_session_usd is not None and estimated >= budget.soft_session_usd:
+        decision["soft_checkpoint_exceeded"] = True
+        decision["soft_session_usd"] = budget.soft_session_usd
+    if budget.per_session_usd is not None and estimated > budget.per_session_usd:
+        return {
+            **decision,
+            "allowed": False,
+            "reason": "dispatch_budget_session_cap_reached",
+            "error_type": "dispatch_budget_gate",
+            "per_session_usd": budget.per_session_usd,
+            "projected_usd": estimated,
+            "dispatch_id": dispatch_id,
+        }
+    if budget.per_user_daily_usd is not None:
+        used = _dispatch_budget_daily_spend(state_dir, user=decision["user"], day=decision["day"])
+        projected = used + estimated
+        if projected > budget.per_user_daily_usd:
+            return {
+                **decision,
+                "allowed": False,
+                "reason": "dispatch_budget_daily_cap_reached",
+                "error_type": "dispatch_budget_gate",
+                "per_user_daily_usd": budget.per_user_daily_usd,
+                "daily_used_usd": used,
+                "projected_usd": projected,
+                "dispatch_id": dispatch_id,
+            }
+        decision["daily_used_usd"] = used
+        decision["projected_usd"] = projected
+    return decision
 
 
 def _read_recent_text(path: Path, *, byte_limit: int = PRIOR_LAUNCH_LOG_READ_LIMIT_BYTES) -> str:
@@ -3441,6 +3584,23 @@ def _spawn_harness(
             "command_head": command[:2],
         }
 
+    budget_decision = _dispatch_budget_decision(
+        target=target,
+        project_root=project_root,
+        state_dir=state_dir,
+        dispatch_id=dispatch_id,
+    )
+    if not budget_decision["allowed"]:
+        meta = {
+            "dispatch_id": dispatch_id,
+            "recipient": recipient_key,
+            "launched": False,
+            "command_head": command[:2],
+            **{key: value for key, value in budget_decision.items() if key != "allowed"},
+        }
+        _record_dispatch_failure(state_dir, meta)
+        return meta
+
     # WI-4472: hard global concurrency cap. Count live dispatched processes
     # before issuing any authorization packet or spawning; fail-closed (skip
     # the dispatch, logged) when at/over the cap. This bounds the hung-but-
@@ -3647,6 +3807,22 @@ def _spawn_harness(
         meta.update({"launched": True, "pid": process.pid})
         if create_time_epoch is not None:
             meta[PID_CREATE_TIME_META_KEY] = create_time_epoch
+        if budget_decision.get("enabled") and budget_decision.get("estimated_usd") is not None:
+            _record_dispatch_budget_ledger(
+                state_dir,
+                {
+                    "ts": meta["launched_at"],
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient_key,
+                    "harness_id": target.harness_id,
+                    "role": target.needed_role_label,
+                    "model": budget_decision.get("model"),
+                    "estimated_usd": budget_decision.get("estimated_usd"),
+                    "user": budget_decision.get("user") or _dispatch_budget_user(),
+                    "day": budget_decision.get("day") or dt.datetime.now(dt.UTC).date().isoformat(),
+                    "soft_checkpoint_exceeded": bool(budget_decision.get("soft_checkpoint_exceeded")),
+                },
+            )
         # WI-4472: live-process accounting sidecar. Written only for a
         # successful launch; consumed by _count_live_dispatched_processes.
         try:

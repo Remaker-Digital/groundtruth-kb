@@ -65,6 +65,13 @@ RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
 # collapses all non-launch spawn results to last_result="launch_failed"; only the
 # reason field distinguishes saturation from failure.
 BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached", "per_role_concurrency_cap_reached"})
+DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS = frozenset(
+    {
+        "dispatch_budget_session_cap_reached",
+        "dispatch_budget_daily_cap_reached",
+    }
+)
+BENIGN_NONLAUNCH_LAUNCH_REASONS = BENIGN_NONLAUNCH_LAUNCH_REASONS | DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS
 RECENT_RUN_FAILURE_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
     ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
@@ -128,6 +135,116 @@ class HarnessDispatchConfig:
 
 
 @dataclass(frozen=True)
+class DispatchBudgetHarnessConfig:
+    """Per-harness dispatch budget metadata."""
+
+    harness_id: str
+    model: str | None = None
+    estimated_usd_per_dispatch: float | None = None
+    pricing: str = "priced"
+
+    @property
+    def unpriced(self) -> bool:
+        return self.pricing == "unpriced"
+
+    @classmethod
+    def from_mapping(cls, harness_id: str, raw: dict[str, Any]) -> DispatchBudgetHarnessConfig:
+        pricing = str(raw.get("pricing") or "").strip().lower()
+        if not pricing:
+            pricing = "unpriced" if _optional_bool(raw.get("unpriced")) is True else "priced"
+        if pricing not in {"priced", "unpriced"}:
+            pricing = "priced"
+        return cls(
+            harness_id=harness_id,
+            model=_optional_string(raw.get("model")),
+            estimated_usd_per_dispatch=_optional_nonnegative_float(
+                raw.get("estimated_usd_per_dispatch", raw.get("estimated_cost_usd"))
+            ),
+            pricing=pricing,
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "harness_id": self.harness_id,
+            "model": self.model,
+            "estimated_usd_per_dispatch": self.estimated_usd_per_dispatch,
+            "pricing": self.pricing,
+            "unpriced": self.unpriced,
+        }
+
+
+@dataclass(frozen=True)
+class DispatchBudgetConfig:
+    """Declarative dispatch cost budget gate."""
+
+    enabled: bool = False
+    per_session_usd: float | None = None
+    per_user_daily_usd: float | None = None
+    soft_session_usd: float | None = None
+    unknown_model_policy: str = "fail_closed"
+    unpriced_model_policy: str = "fail_open"
+    harnesses: dict[str, DispatchBudgetHarnessConfig] = field(default_factory=dict)
+    errors: tuple[str, ...] = ()
+
+    @classmethod
+    def from_mapping(cls, raw: Any) -> DispatchBudgetConfig:
+        if raw is None:
+            return cls()
+        if not isinstance(raw, dict):
+            return cls(errors=("budget section is not a table; budget gate disabled",))
+        errors: list[str] = []
+        enabled = _optional_bool(raw.get("enabled"))
+        if enabled is None:
+            enabled = False
+        per_session = _optional_nonnegative_float(raw.get("per_session_usd"))
+        per_user_daily = _optional_nonnegative_float(raw.get("per_user_daily_usd"))
+        soft_session = _optional_nonnegative_float(raw.get("soft_session_usd"))
+        for key, parsed in (
+            ("per_session_usd", per_session),
+            ("per_user_daily_usd", per_user_daily),
+            ("soft_session_usd", soft_session),
+        ):
+            if raw.get(key) is not None and parsed is None:
+                errors.append(f"{key} must be a non-negative number; ignoring value")
+        unknown_policy = _budget_policy(raw.get("unknown_model_policy"), default="fail_closed")
+        unpriced_policy = _budget_policy(raw.get("unpriced_model_policy"), default="fail_open")
+        harnesses_raw = raw.get("harnesses", {})
+        harnesses: dict[str, DispatchBudgetHarnessConfig] = {}
+        if isinstance(harnesses_raw, dict):
+            for harness_id, row in harnesses_raw.items():
+                if isinstance(row, dict):
+                    harnesses[str(harness_id)] = DispatchBudgetHarnessConfig.from_mapping(str(harness_id), row)
+                else:
+                    errors.append(f"budget.harnesses.{harness_id} is not a table; ignoring row")
+        elif harnesses_raw:
+            errors.append("budget.harnesses is not a table; ignoring harness budget rows")
+        if errors:
+            enabled = False
+        return cls(
+            enabled=enabled,
+            per_session_usd=per_session,
+            per_user_daily_usd=per_user_daily,
+            soft_session_usd=soft_session,
+            unknown_model_policy=unknown_policy,
+            unpriced_model_policy=unpriced_policy,
+            harnesses=harnesses,
+            errors=tuple(errors),
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "per_session_usd": self.per_session_usd,
+            "per_user_daily_usd": self.per_user_daily_usd,
+            "soft_session_usd": self.soft_session_usd,
+            "unknown_model_policy": self.unknown_model_policy,
+            "unpriced_model_policy": self.unpriced_model_policy,
+            "harnesses": {hid: cfg.to_json_dict() for hid, cfg in sorted(self.harnesses.items())},
+            "errors": list(self.errors),
+        }
+
+
+@dataclass(frozen=True)
 class BridgeDispatchConfig:
     """Parsed dispatcher configuration."""
 
@@ -136,6 +253,7 @@ class BridgeDispatchConfig:
     schema_version: int
     selection_order: tuple[str, ...] = DEFAULT_SELECTION_ORDER
     harnesses: dict[str, HarnessDispatchConfig] = field(default_factory=dict)
+    budget: DispatchBudgetConfig = field(default_factory=DispatchBudgetConfig)
     rules: tuple[DispatchRule, ...] = ()
     errors: tuple[str, ...] = ()
 
@@ -163,6 +281,7 @@ class BridgeDispatchConfig:
             "schema_version": self.schema_version,
             "selection_order": list(self.selection_order),
             "harnesses": {hid: cfg.to_json_dict() for hid, cfg in sorted(self.harnesses.items())},
+            "budget": self.budget.to_json_dict(),
             "rules": [rule.to_json_dict() for rule in self.rules],
             "errors": list(self.errors),
         }
@@ -220,12 +339,14 @@ def load_bridge_dispatch_config(project_root: Path) -> BridgeDispatchConfig:
 
     schema_version = _optional_int(raw.get("schema_version")) or 1
     selection_order = _string_tuple(raw.get("selection_order")) or DEFAULT_SELECTION_ORDER
+    budget = DispatchBudgetConfig.from_mapping(raw.get("budget", raw.get("dispatch_budget")))
     return BridgeDispatchConfig(
         path=path,
         exists=True,
         schema_version=schema_version,
         selection_order=selection_order,
         harnesses=harnesses,
+        budget=budget,
         rules=tuple(rules),
     )
 
@@ -302,6 +423,7 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
 
     if config.errors:
         findings.extend(f"config error: {error}" for error in config.errors)
+    findings.extend(f"dispatch budget config warning: {error}" for error in config.budget.errors)
     findings.extend(consistency_findings)
     findings.extend(cross_harness_trigger_disable_findings())
 
@@ -467,6 +589,13 @@ def format_bridge_dispatch_status(status: BridgeDispatchStatus) -> str:
                 availability=record.get("dispatch_availability"),
             )
         )
+    lines.append("")
+    budget = status.config.budget
+    lines.append(
+        f"Budget: enabled={budget.enabled}, "
+        f"per_session_usd={budget.per_session_usd}, "
+        f"per_user_daily_usd={budget.per_user_daily_usd}"
+    )
     lines.append("")
     lines.append("Selected candidates:")
     for role in DISPATCH_ROLES:
@@ -735,7 +864,16 @@ def _runtime_classification_for_recipient(recipient_key: str, row: dict[str, Any
         findings.append(
             f"dispatch runtime failure: {recipient_key} last_result={last_result} with pending_count={pending_count}"
         )
-    if last_result == "launch_failed" and launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS and has_pending_work:
+    if last_result == "launch_failed" and launch_reason in DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS and has_pending_work:
+        cap_value = last_launch.get("per_session_usd")
+        if cap_value is None:
+            cap_value = last_launch.get("per_user_daily_usd")
+        findings.append(
+            f"dispatch runtime warning: {recipient_key} budget gate held "
+            f"(projected_usd={last_launch.get('projected_usd')}, cap_usd={cap_value}, "
+            f"reason={launch_reason}) with pending_count={pending_count}"
+        )
+    elif last_result == "launch_failed" and launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS and has_pending_work:
         live = _int_value(last_launch.get("live_count", last_launch.get("per_role_live")), default=0)
         cap = _int_value(last_launch.get("cap", last_launch.get("per_role_cap")), default=0)
         findings.append(
@@ -983,6 +1121,13 @@ def _optional_bool(value: Any) -> bool | None:
     return None
 
 
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    parsed = str(value).strip()
+    return parsed or None
+
+
 def _optional_float(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
@@ -992,6 +1137,13 @@ def _optional_float(value: Any) -> float | None:
         except ValueError:
             return None
     return None
+
+
+def _optional_nonnegative_float(value: Any) -> float | None:
+    parsed = _optional_float(value)
+    if parsed is None or parsed < 0:
+        return None
+    return parsed
 
 
 def _optional_int(value: Any) -> int | None:
@@ -1025,3 +1177,8 @@ def _string_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple, set, frozenset)):
         return ()
     return tuple(str(item).strip() for item in value if str(item).strip())
+
+
+def _budget_policy(value: Any, *, default: str) -> str:
+    parsed = str(value or default).strip().lower().replace("-", "_")
+    return parsed if parsed in {"fail_open", "fail_closed"} else default

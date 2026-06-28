@@ -214,6 +214,62 @@ rules = []
     assert any("prime-builder" in finding for finding in status.health_findings)
 
 
+def test_dispatch_budget_config_parses_and_reports_without_changing_selection(tmp_path: Path) -> None:
+    _write_project(
+        tmp_path,
+        rules="""
+schema_version = 1
+selection_order = ["harness_id"]
+rules = []
+
+[budget]
+enabled = true
+per_session_usd = 0.25
+per_user_daily_usd = 1.50
+soft_session_usd = 0.10
+unknown_model_policy = "fail_closed"
+unpriced_model_policy = "fail_open"
+
+[budget.harnesses.A]
+model = "gpt-test"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.05
+""".lstrip(),
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "PASS"
+    assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
+    budget = status.config.to_json_dict()["budget"]
+    assert budget["enabled"] is True
+    assert budget["per_session_usd"] == 0.25
+    assert budget["per_user_daily_usd"] == 1.5
+    assert budget["harnesses"]["A"]["model"] == "gpt-test"
+    assert "Budget: enabled=True" in bridge_dispatch_config.format_bridge_dispatch_status(status)
+
+
+def test_dispatch_budget_invalid_config_disables_gate_with_warning(tmp_path: Path) -> None:
+    _write_project(
+        tmp_path,
+        rules="""
+schema_version = 1
+selection_order = ["harness_id"]
+rules = []
+
+[budget]
+enabled = true
+per_session_usd = "not-a-number"
+""".lstrip(),
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    assert status.config.budget.enabled is False
+    assert any("dispatch budget config warning" in finding for finding in status.health_findings)
+
+
 def test_context_from_bridge_text_extracts_rule_context() -> None:
     context = context_from_bridge_text(
         "loyal-opposition",

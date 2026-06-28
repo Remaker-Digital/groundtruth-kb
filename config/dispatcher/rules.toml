@@ -1,6 +1,44 @@
 schema_version = 1
 selection_order = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
 
+[budget]
+enabled = false
+per_session_usd = 0.0
+per_user_daily_usd = 0.0
+soft_session_usd = 0.0
+unknown_model_policy = "fail_closed"
+unpriced_model_policy = "fail_open"
+
+[budget.harnesses.A]
+model = "gpt-5-codex"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
+[budget.harnesses.B]
+model = "claude-code"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
+[budget.harnesses.C]
+model = "gemini-2.5-flash"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
+[budget.harnesses.D]
+model = "kimi-k2-7-code-cloud"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
+[budget.harnesses.E]
+model = "cursor-agent"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
+[budget.harnesses.F]
+model = "openrouter"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
 [harnesses.A]
 description = "Codex: high-quality dispatch target."
 can_receive_dispatch = true
