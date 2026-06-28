@@ -11,6 +11,7 @@ fail closed.
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -86,3 +87,109 @@ def test_resolve_agent_executable_does_not_fallback_to_cursor_gui(monkeypatch: p
 
     with pytest.raises(harness.CursorHarnessError, match="Cursor Agent CLI not found"):
         harness._resolve_agent_executable()
+
+
+def test_bridge_review_main_builds_prompt_mode_command(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    calls = []
+
+    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="GO\n", stderr="")
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    exit_code = harness.main(
+        [
+            "--prompt",
+            "review this bridge file",
+            "--skill",
+            "bridge-review",
+            "--output-format",
+            "text",
+            "--timeout",
+            "30",
+        ]
+    )
+
+    assert exit_code == 0
+    command, kwargs = calls[0]
+    assert command[0] == "C:/Tools/agent.exe"
+    assert command[1:5] == ["-p", "--trust", "--workspace", str(harness.PROJECT_ROOT)]
+    assert command[5:7] == ["--output-format", "text"]
+    assert "SKILL CONTRACT" in command[-1]
+    assert "review this bridge file" in command[-1]
+    assert kwargs["cwd"] == str(harness.PROJECT_ROOT)
+    assert kwargs["capture_output"] is True
+    assert kwargs["text"] is True
+    assert kwargs["timeout"] == 30.0
+    assert kwargs["env"]["GTKB_HARNESS_NAME"] == "cursor"
+    assert kwargs["env"]["GTKB_HARNESS_ID"] == "E"
+    assert capsys.readouterr().out == "GO\n"
+
+
+def test_bridge_review_zero_output_success_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+    monkeypatch.setattr(
+        harness.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout=" \n", stderr=""),
+    )
+
+    exit_code = harness.main(["--prompt", "review this", "--skill", "bridge-review"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert "produced no stdout" in captured.err
+    assert "bridge-review" in captured.err
+
+
+def test_verification_zero_output_success_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+    monkeypatch.setattr(
+        harness.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    exit_code = harness.main(["--prompt", "verify this", "--skill", "verification"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert "produced no stdout" in captured.err
+    assert "verification" in captured.err
+
+
+def test_non_bridge_zero_output_success_is_preserved(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+    monkeypatch.setattr(
+        harness.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    exit_code = harness.main(["--prompt", "ordinary prompt"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out == ""
+    assert captured.err == ""

@@ -85,6 +85,10 @@ def _build_command(prompt: str, project_root: Path, *, output_format: str) -> li
     return command
 
 
+def _requires_bridge_output(skill: str | None) -> bool:
+    return skill in LOYAL_OPPOSITION_BRIDGE_SKILLS
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Cursor Agent harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="Prompt to send to Cursor Agent.")
@@ -138,6 +142,12 @@ def main(argv: list[str] | None = None) -> int:
         if completed.stdout:
             sys.stdout.write(completed.stdout)
         return completed.returncode
+    if _requires_bridge_output(args.skill) and not (completed.stdout or "").strip():
+        print(
+            f"cursor_harness: Cursor Agent produced no stdout for Loyal Opposition bridge skill {args.skill!r}",
+            file=sys.stderr,
+        )
+        return 1
     sys.stdout.write(completed.stdout)
     return 0
 
