@@ -2048,6 +2048,99 @@ def hygiene_supersession_scan(
         raise SystemExit(2)
 
 
+@hygiene_group.command("strays")
+@click.option(
+    "--root",
+    type=click.Path(file_okay=False),
+    default=".",
+    show_default=True,
+    help="Repository root to scan.",
+)
+@click.option(
+    "--threshold-hours",
+    type=int,
+    default=12,
+    show_default=True,
+    help="Staleness threshold for workspace, stash, and orphaned worktree entries.",
+)
+@click.option(
+    "--active-workspace-path",
+    multiple=True,
+    help="Repo-relative workspace or worktree path held by an active session; repeatable.",
+)
+@click.option(
+    "--active-stash-ref",
+    multiple=True,
+    help="Stash ref held by an active session; repeatable.",
+)
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Optional output directory for strays.json and/or summary.md.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["human", "json", "both"]),
+    default="human",
+    show_default=True,
+    help="Output format for stdout or --output files.",
+)
+@click.option(
+    "--report-only/--fail-on-findings",
+    default=True,
+    show_default=True,
+    help="Exit-code policy: --report-only always exits 0; --fail-on-findings exits 2 when stale entries are found.",
+)
+@click.option("--now", default=None, hidden=True, help="Timezone-aware ISO timestamp for deterministic tests.")
+def hygiene_strays(
+    root: str,
+    threshold_hours: int,
+    active_workspace_path: tuple[str, ...],
+    active_stash_ref: tuple[str, ...],
+    output: str | None,
+    fmt: str,
+    report_only: bool,
+    now: str | None,
+) -> None:
+    """Run a read-only work-tree/stash/orphaned-worktree stray scan."""
+    from groundtruth_kb.hygiene.strays import (
+        StraysError,
+        format_human,
+        parse_now,
+        run_strays,
+        stale_count,
+        write_outputs,
+    )
+
+    root_path = Path(root).resolve()
+    try:
+        report = run_strays(
+            root_path,
+            now=parse_now(now),
+            threshold_hours=threshold_hours,
+            active_workspace_paths=active_workspace_path,
+            active_stash_refs=active_stash_ref,
+        )
+    except StraysError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    if output is not None:
+        written = write_outputs(report, Path(output), fmt)
+        click.echo("hygiene strays: " + ", ".join(str(path) for path in written))
+    elif fmt == "json":
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+    elif fmt == "both":
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        click.echo("")
+        click.echo(format_human(report), nl=False)
+    else:
+        click.echo(format_human(report), nl=False)
+    if not report_only and stale_count(report) > 0:
+        raise SystemExit(2)
+
+
 # ---------------------------------------------------------------------------
 # gt validate - deterministic validation services
 # ---------------------------------------------------------------------------
