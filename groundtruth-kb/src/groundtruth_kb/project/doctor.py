@@ -4141,7 +4141,7 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
     thresholds. The check is mechanism-agnostic — it surfaces dispatch
     freshness regardless of which mechanism updates the state file.
 
-    - ``< 4 min``  → OK
+    - ``< 4 min`` or empty queue with fresh state heartbeat → OK
     - ``4–10 min`` → WARN
     - ``> 10 min`` → ALARM
     - File absent  → not started (WARN)
@@ -4271,9 +4271,18 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
             top_age_sec_part = int(top_age_secs % 60)
             top_age_display = f"{top_age_min}m {top_age_sec_part}s ago"
 
+    top_state_is_fresh = top_updated_at is not None and not is_top_stale
+    is_empty_queue = pending_count == 0
+
     if age_secs < _BRIDGE_FRESH_SECS:
         status: Literal["pass", "fail", "warning", "info"] = "pass"
         message = f"{agent} bridge dispatch: OK (last update {age_display}, state: {state_display})"
+    elif is_empty_queue and top_state_is_fresh:
+        status = "pass"
+        message = (
+            f"{agent} bridge dispatch: OK (empty queue idle; recipient last update {age_display}, "
+            f"state: {state_display})"
+        )
     elif age_secs < _BRIDGE_WARN_SECS:
         status = "warning"
         message = (
@@ -6134,6 +6143,41 @@ def _check_db_snapshot_output_allowlist(target: Path) -> ToolCheck:
     )
 
 
+def _check_agent_red_app_root_minimization(target: Path) -> ToolCheck:
+    """Run the Agent Red app-root minimization validator."""
+    check_name = "Agent Red app-root minimization"
+    app_root = target / "applications" / "Agent_Red"
+    try:
+        from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization  # noqa: PLC0415
+
+        result = validate_app_root_minimization(app_root, project_root=target, tracked_only=True)
+    except Exception as exc:  # intentional-catch: diagnostic doctor check should report, not crash
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=app_root.exists(),
+            status="fail",
+            message=f"Agent Red app-root minimization validator failed to run: {exc}",
+        )
+
+    if result.ok:
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="pass",
+            message=f"Agent Red app-root minimization clean ({len(result.actual_entries)} top-level artifacts)",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=app_root.exists(),
+        status="fail",
+        message=f"Agent Red app-root minimization failed: {result.first_error_message()}",
+    )
+
+
 def run_doctor(
     target: Path,
     profile: str,
@@ -6273,6 +6317,7 @@ def run_doctor(
 
     _PRODUCT_ROOT = Path(__file__).resolve().parents[3]
     checks.extend(run_isolation_checks(target, profile, product_root=_PRODUCT_ROOT))
+    checks.append(_check_agent_red_app_root_minimization(target))
 
     # Auto-install pass
     if auto_install:

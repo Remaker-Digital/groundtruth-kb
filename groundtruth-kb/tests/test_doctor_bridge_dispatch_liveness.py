@@ -119,11 +119,13 @@ def test_run_doctor_reports_pass_for_both_agents_when_fresh(tmp_path: Path) -> N
 
 
 def test_run_doctor_reports_warning_when_4_to_10_min_old(tmp_path: Path) -> None:
-    """TP2: both per-agent bridge-dispatch checks WARN at 5 min stale via public surface."""
+    """TP2: pending work in both per-agent bridge-dispatch checks WARNs at 5 min stale."""
     _write_dispatch_state(
         tmp_path,
         prime_updated_at=_iso_seconds_ago(5 * 60 + 30),
         codex_updated_at=_iso_seconds_ago(5 * 60 + 30),
+        prime_pending_count=1,
+        codex_pending_count=1,
     )
     checks = _bridge_dispatch_checks(tmp_path)
     assert checks["Claude bridge dispatch"].status == "warning"
@@ -133,11 +135,13 @@ def test_run_doctor_reports_warning_when_4_to_10_min_old(tmp_path: Path) -> None
 
 
 def test_run_doctor_reports_fail_when_over_10_min_old(tmp_path: Path) -> None:
-    """TP3: both per-agent bridge-dispatch checks FAIL at 15 min stale via public surface."""
+    """TP3: pending work in both per-agent bridge-dispatch checks FAILs at 15 min stale."""
     _write_dispatch_state(
         tmp_path,
         prime_updated_at=_iso_seconds_ago(15 * 60),
         codex_updated_at=_iso_seconds_ago(15 * 60),
+        prime_pending_count=1,
+        codex_pending_count=1,
     )
     checks = _bridge_dispatch_checks(tmp_path)
     assert checks["Claude bridge dispatch"].status == "fail"
@@ -153,6 +157,22 @@ def test_run_doctor_reports_warning_when_state_file_absent(tmp_path: Path) -> No
     assert checks["Codex bridge dispatch"].status == "warning"
     assert "not started" in checks["Claude bridge dispatch"].message.lower()
     assert "not started" in checks["Codex bridge dispatch"].message.lower()
+
+
+def test_run_doctor_passes_stale_empty_queue_when_top_level_dispatch_state_is_fresh(tmp_path: Path) -> None:
+    """TP4b: stale empty recipient rows are non-failing when the dispatch-state heartbeat is fresh."""
+    _write_dispatch_state(
+        tmp_path,
+        prime_updated_at=_iso_seconds_ago(15 * 60),
+        codex_updated_at=_iso_seconds_ago(15 * 60),
+        prime_pending_count=0,
+        codex_pending_count=0,
+    )
+    checks = _bridge_dispatch_checks(tmp_path)
+    assert checks["Claude bridge dispatch"].status == "pass"
+    assert checks["Codex bridge dispatch"].status == "pass"
+    assert "empty queue idle" in checks["Claude bridge dispatch"].message
+    assert "empty queue idle" in checks["Codex bridge dispatch"].message
 
 
 def test_run_doctor_handles_utf8_bom_in_state_file_gracefully(tmp_path: Path) -> None:
@@ -191,6 +211,7 @@ def test_run_doctor_distinguishes_claude_from_codex_recipients_in_report(tmp_pat
         tmp_path,
         prime_updated_at=_iso_seconds_ago(60),
         codex_updated_at=_iso_seconds_ago(15 * 60),
+        codex_pending_count=1,
     )
     checks = _bridge_dispatch_checks(tmp_path)
     assert checks["Claude bridge dispatch"].status == "pass"
