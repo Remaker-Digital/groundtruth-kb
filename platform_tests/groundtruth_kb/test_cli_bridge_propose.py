@@ -6,9 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from click.testing import CliRunner
+import groundtruth_kb.db
 from groundtruth_kb.bridge import proposal_filing
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
+
+# Eagerly disable ChromaDB in unit test runtime to avoid hangs during semantic search queries
+groundtruth_kb.db.HAS_CHROMADB = False
 
 WI_ID = "WI-4567"
 PROJECT_ID = "PROJECT-GTKB-DETERMINISTIC-SERVICES-TEST"
