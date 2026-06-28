@@ -299,7 +299,7 @@
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\bridge-dispatch-trigger.cmd --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
             "statusMessage": "Checking cross-harness bridge dispatch",
             "timeout": 10
           }
@@ -316,7 +316,7 @@
           },
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\bridge-dispatch-trigger.cmd --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
             "statusMessage": "Checking cross-harness bridge dispatch",
             "timeout": 10
           }
@@ -328,7 +328,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
+            "command": "cmd /d /s /c E:\\GT-KB\\.codex\\gtkb-hooks\\bridge-dispatch-trigger.cmd --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
             "statusMessage": "Checking cross-harness bridge dispatch",
             "timeout": 10
           },

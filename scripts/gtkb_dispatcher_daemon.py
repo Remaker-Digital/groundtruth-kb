@@ -443,17 +443,47 @@ def _execute_live_spawns(
     for record in decision_records:
         target = record.get("_spawn_target")
         selected = record.get("_spawn_selected") or []
+
+        # Determine the recipient key to update liveness for
+        recipient = None
+        if target is not None:
+            recipient = target.dispatch_state_key
+        elif "recipient" in record:
+            recipient = record["recipient"]
+        elif "role" in record:
+            role = record["role"]
+            matching = [k for k in recipients_state if k.startswith(f"{role}:")]
+            if matching:
+                matching.sort(key=lambda k: str(recipients_state[k].get("updated_at") or ""), reverse=True)
+                recipient = matching[0]
+            else:
+                recipient = role
+
+        if recipient is not None:
+            prior = recipients_state.get(recipient)
+            recipient_state = dict(prior) if isinstance(prior, dict) else {}
+            recipient_state["updated_at"] = _now_iso()
+            recipients_state[recipient] = recipient_state
+        else:
+            recipient_state = None
+
         if target is None or not selected:
+            if recipient_state is not None:
+                recipient_state["last_result"] = record.get("reason") or "no_pending"
+                recipient_state["pending_count"] = 0
+                recipient_state["selected_count"] = 0
             continue
-        recipient = target.dispatch_state_key
+
         signature = record.get("signature")
-        prior = recipients_state.get(recipient, {})
-        if isinstance(prior, dict):
-            prior_sig = prior.get("last_dispatched_signature")
+        if recipient_state is not None:
+            prior_sig = recipient_state.get("last_dispatched_signature")
             if prior_sig is not None and prior_sig == signature:
                 record["spawned"] = False
                 record["spawn_reason"] = "unchanged"
                 spawn_results.append({"recipient": recipient, "launched": False, "reason": "unchanged"})
+                recipient_state["last_result"] = "unchanged"
+                recipient_state["pending_count"] = len(selected)
+                recipient_state["selected_count"] = 0
                 continue
 
         spawn_items = list(reversed(selected))
@@ -465,21 +495,19 @@ def _execute_live_spawns(
             max_items=max_items,
             dry_run=dry_run,
         )
-        recipient_state = recipients_state.get(recipient)
-        if not isinstance(recipient_state, dict):
-            recipient_state = {}
-        recipient_state["updated_at"] = _now_iso()
-        if result.get("launched"):
-            recipient_state["last_dispatched_signature"] = signature
-            recipient_state["signature"] = signature
-            record["spawned"] = True
-        else:
-            record["spawned"] = False
-            record["spawn_reason"] = result.get("reason")
-        recipient_state["last_result"] = result.get("reason") or (
-            "launched" if result.get("launched") else "not_launched"
-        )
-        recipients_state[recipient] = recipient_state
+        if recipient_state is not None:
+            if result.get("launched"):
+                recipient_state["last_dispatched_signature"] = signature
+                recipient_state["signature"] = signature
+                record["spawned"] = True
+            else:
+                record["spawned"] = False
+                record["spawn_reason"] = result.get("reason")
+            recipient_state["last_result"] = result.get("reason") or (
+                "launched" if result.get("launched") else "not_launched"
+            )
+            recipient_state["pending_count"] = len(selected)
+            recipient_state["selected_count"] = len(selected) if result.get("launched") else 0
         spawn_results.append(result)
 
     if not dry_run:

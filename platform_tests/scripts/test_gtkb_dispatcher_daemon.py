@@ -483,7 +483,8 @@ def test_daemon_start_spawns_detached(tmp_path: Path) -> None:
     assert kwargs.get("stdin") == subprocess.DEVNULL
     assert kwargs.get("stdout") == subprocess.DEVNULL
     assert kwargs.get("stderr") == subprocess.DEVNULL
-    assert captured["args"][0] == sys.executable
+    expected_exe = gtcli._prefer_windows_gui_python(sys.executable)
+    assert captured["args"][0] == expected_exe
 
 
 def test_daemon_start_refuses_when_live_instance_present(tmp_path: Path) -> None:

@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-27T17:18:58Z",
+  "generated_at": "2026-06-28T20:51:25Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -145,7 +145,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 3,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -190,7 +190,7 @@
     },
     "codex_hooks": {
       "classification": "public_safe",
-      "count": 27,
+      "count": 28,
       "items": [
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.py",
         ".codex/gtkb-hooks/bridge-compliance-gate-bash-adapter.py",
@@ -207,6 +207,7 @@
         ".codex/gtkb-hooks/bridge-compliance-audit.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd",
         ".codex/gtkb-hooks/bridge-compliance-gate.cmd",
+        ".codex/gtkb-hooks/bridge-dispatch-trigger.cmd",
         ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd",
         ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd",
         ".codex/gtkb-hooks/credential-scan.cmd",
