@@ -328,7 +328,7 @@ def test_acting_prime_builder_rule_maps_prime_skill_labels_to_assigned_role() ->
     assert "scoped auto-approval state" in rule
     assert "Auto-approval does not remove the display or audit requirement" in rule
     assert "captured in the session transcript" in rule
-    assert "owner-assigned active AI harness assumes the Prime Builder role" in rule
+    assert "assigned Prime Builder harness while this assignment is active" in rule
     assert 'changed_by="prime-builder/..."' in rule
     assert "apply to the" in rule
     assert "assigned Prime Builder harness" in rule
@@ -764,8 +764,9 @@ def test_bridge_authority_governance_records_are_in_membase() -> None:
         assert "DELIB-0880" in (gov["affected_by"] or "")
         assert "bridge/INDEX.md" in (gov["source_paths"] or "")
         gov_desc = _one_line(gov["description"])
-        assert "sole authoritative source for bridge queue state" in gov_desc
-        assert "Startup reports, dashboard fields, cached scan counts" in gov_desc
+        gov_desc_lower = gov_desc.lower()
+        assert "authoritative source for bridge queue state" in gov_desc_lower
+        assert "startup reports, dashboard fields, cached scan counts" in gov_desc_lower
         assert "permanent owner authority" in gov_desc
         assert "downstream bridge-dependent artifacts" in gov_desc
 

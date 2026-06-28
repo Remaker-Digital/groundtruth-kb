@@ -22,6 +22,7 @@ def _isolate_lifecycle_guard_env(tmp_path, monkeypatch) -> None:
     """Keep startup generator tests away from live harness input-gate state."""
 
     monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(tmp_path / "session-lifecycle-guard.json"))
+    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
 
 
 def _load_module(*, live_dashboard_probes: bool = False):
@@ -749,16 +750,29 @@ def test_harness_role_assignment_map_is_startup_source_of_truth(tmp_path, capsys
     state_root = tmp_path / "harness-state"
     codex_dir = state_root / "codex"
     codex_dir.mkdir(parents=True)
-    role_path = state_root / "role-assignments.json"
+    role_path = state_root / "harness-registry.json"
     guard_path = codex_dir / "session-lifecycle-guard.json"
     role_path.write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "harnesses": {
-                    "A": {"harness_type": "codex", "role": "loyal-opposition"},
-                    "B": {"harness_type": "claude", "role": "prime-builder"},
-                },
+                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "role": ["loyal-opposition"],
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": ["prime-builder"],
+                    },
+                ],
             }
         )
         + "\n",
@@ -766,6 +780,8 @@ def test_harness_role_assignment_map_is_startup_source_of_truth(tmp_path, capsys
     )
     monkeypatch.setitem(module.HARNESS_LIFECYCLE_GUARDS, "codex", guard_path)
     monkeypatch.setenv("GTKB_ROLE_ASSIGNMENTS_PATH", str(role_path))
+    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(role_path))
+    monkeypatch.setenv("GTKB_SESSION_ID", "test-harness-role-assignment-map")
     monkeypatch.delenv("GTKB_LIFECYCLE_GUARD_PATH", raising=False)
     monkeypatch.setattr(
         module,
@@ -823,7 +839,7 @@ def test_harness_local_authority_paths_resolve_in_root_for_codex_and_claude() ->
 
     # Constant-level invariant: the authority root resolves under PROJECT_ROOT.
     assert expected_root == module.GTKB_HARNESS_STATE_ROOT
-    for harness_name in ("codex", "claude"):
+    for harness_name in ("codex", "claude", "cursor"):
         assert module.HARNESS_LIFECYCLE_GUARDS[harness_name].is_relative_to(expected_root)
     assert module.DEFAULT_USER_STARTUP_PREFERENCES_PATH.is_relative_to(expected_root)
 
@@ -2366,6 +2382,52 @@ def test_top_priority_actions_come_from_standing_backlog() -> None:
     assert "GTKB-GOV-006" not in action_ids
 
 
+def test_cursor_harness_emit_resolves_default_lifecycle_guard(tmp_path):
+    """Regression guard for Cursor SessionStart KeyError before write_dashboard_and_report.
+
+    Degraded startup evidence (2026-06-24/27) showed exit 1 with
+    ``KeyError: 'cursor'`` in ``_default_lifecycle_guard_path`` when
+    ``--harness-name cursor`` was passed without an explicit guard override.
+    The hook arms the lifecycle guard before ``write_dashboard_and_report``; a
+    missing map entry crashed the service and emitted the degraded banner.
+    """
+    import subprocess
+
+    guard_path = REPO_ROOT / "harness-state" / "cursor" / "session-lifecycle-guard.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-startup-service-payload",
+            "--fast-hook",
+            "--skip-bridge-maintenance",
+            "--harness-name",
+            "cursor",
+            "--harness-id",
+            "E",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.returncode == 0, (
+        f"Cursor harness startup failed with exit {result.returncode}.\n"
+        f"stdout: {result.stdout[:500]}\nstderr: {result.stderr[:500]}"
+    )
+    assert "KeyError" not in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    assert "GroundTruth-KB Startup Service Degraded" not in payload["hookSpecificOutput"]["additionalContext"]
+    assert guard_path.is_file()
+
+
 def test_direct_script_execution_emits_startup_payload(tmp_path):
     """Regression guard for Phase 6 NO-GO -004 F2.
 
@@ -2459,6 +2521,24 @@ def test_render_current_project_state_labels_gtkb_headers() -> None:
     rendered = module._render_current_project_state(_minimal_model(current_focus="gtkb_infrastructure"))
     assert "GT-KB release blockers:" in rendered
     assert "GT-KB Testing/tool rollup:" in rendered
+
+
+def test_render_current_project_state_open_work_items_shows_raw_count() -> None:
+    module = _load_module()
+    model = _minimal_model()
+    model["metrics"]["membase"] = {"open_work_items": 15, "raw_open_work_items": 139}
+    rendered = module._render_current_project_state(model)
+    assert "open MemBase work items: 15 (subject-scoped; 139 across all subjects)" in rendered
+
+
+def test_render_wrapup_notice_open_work_items_shows_raw_count() -> None:
+    module = _load_module()
+    model = _minimal_model()
+    model["metrics"]["membase"] = {"open_work_items": 15, "raw_open_work_items": 139}
+    model["top_priority_actions"] = []
+    model["generated_at"] = "2026-06-25T00:00:00Z"
+    rendered = module.render_wrapup_notice(model, "http://example/dashboard")
+    assert "Open MemBase work items: 15 (subject-scoped; 139 across all subjects)" in rendered
 
 
 def test_render_current_project_state_hard_rejects_unlabeled_combined_green() -> None:
@@ -3187,6 +3267,74 @@ def test_recommender_5_index_parser_captures_only_latest_status_per_document(tmp
         "gtkb-multi-version": "VERIFIED",
         "gtkb-no-go-thread": "NO-GO",
     }
+
+
+def test_bridge_latest_status_reads_only_latest_status_file_per_document(tmp_path, monkeypatch) -> None:
+    """DCL-SESSION-STARTUP-TOKEN-BUDGET-001: avoid all-history bridge reads."""
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+
+    for version in range(1, 51):
+        status = "GO" if version == 50 else "NEW"
+        (bridge_dir / f"gtkb-large-thread-{version:03d}.md").write_text(
+            f"{status}\n\nSynthetic bridge file.\n",
+            encoding="utf-8",
+        )
+    for version in range(1, 41):
+        status = "NO-GO" if version == 40 else "NEW"
+        (bridge_dir / f"gtkb-second-thread-{version:03d}.md").write_text(
+            f"{status}\n\nSynthetic bridge file.\n",
+            encoding="utf-8",
+        )
+
+    read_names: list[str] = []
+    original_read_text = module._read_text
+
+    def _counting_read(path: Path) -> str:
+        read_names.append(path.name)
+        return original_read_text(path)
+
+    monkeypatch.setattr(module, "_read_text", _counting_read)
+
+    status_map = module._bridge_latest_status(tmp_path)
+
+    assert status_map == {
+        "gtkb-large-thread": "GO",
+        "gtkb-second-thread": "NO-GO",
+    }
+    assert sorted(read_names) == [
+        "gtkb-large-thread-050.md",
+        "gtkb-second-thread-040.md",
+    ]
+
+
+def test_bridge_latest_status_falls_back_from_non_status_latest_file(tmp_path, monkeypatch) -> None:
+    """Malformed latest files do not force an all-version scan."""
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    (bridge_dir / "gtkb-fallback-thread-001.md").write_text("NEW\n\nSynthetic bridge file.\n", encoding="utf-8")
+    (bridge_dir / "gtkb-fallback-thread-002.md").write_text("GO\n\nSynthetic bridge file.\n", encoding="utf-8")
+    (bridge_dir / "gtkb-fallback-thread-003.md").write_text(
+        "This file has no status token.\n",
+        encoding="utf-8",
+    )
+
+    read_names: list[str] = []
+    original_read_text = module._read_text
+
+    def _counting_read(path: Path) -> str:
+        read_names.append(path.name)
+        return original_read_text(path)
+
+    monkeypatch.setattr(module, "_read_text", _counting_read)
+
+    assert module._bridge_latest_status(tmp_path) == {"gtkb-fallback-thread": "GO"}
+    assert read_names == [
+        "gtkb-fallback-thread-003.md",
+        "gtkb-fallback-thread-002.md",
+    ]
 
 
 def test_recommender_6_live_regression_excludes_known_stale_priorities() -> None:

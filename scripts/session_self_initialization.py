@@ -1312,6 +1312,11 @@ def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
 
 _RESIDUAL_OVERRIDE_RE = re.compile(r"\*\*Status:\*\*\s+VERIFIED\s*\(residual:", re.IGNORECASE)
 _STALE_PRIORITY_RE = re.compile(r"\*\*Priority:\*\*\s+Stale\b", re.IGNORECASE)
+_BRIDGE_VERSION_FILE_RE = re.compile(r"^(?P<document>.+)-(?P<version>\d{3})\.md$")
+_BRIDGE_STATUS_LINE_RE = re.compile(
+    r"^#?\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
+    re.IGNORECASE,
+)
 
 
 def _work_item_id_to_bridge_document(wi_id: str) -> str:
@@ -1424,28 +1429,28 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
 
 def _bridge_entries_from_version_files(project_root: Path) -> list[dict[str, str]]:
     bridge_dir = project_root / "bridge"
-    latest_by_document: dict[str, tuple[int, str, str]] = {}
+    versions_by_document: dict[str, list[tuple[int, Path]]] = {}
     if not bridge_dir.is_dir():
         return []
     for path in bridge_dir.glob("*.md"):
-        match = re.match(r"^(?P<document>.+)-(?P<version>\d{3})\.md$", path.name)
+        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
         if not match:
             continue
         document = match.group("document")
         version = int(match.group("version"))
-        first_line = _read_text(path).splitlines()
-        if not first_line:
-            continue
-        status_match = re.match(
-            r"^#?\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
-            first_line[0].strip(),
-            re.IGNORECASE,
-        )
-        if not status_match:
-            continue
-        prior = latest_by_document.get(document)
-        if prior is None or version > prior[0]:
+        versions_by_document.setdefault(document, []).append((version, path))
+
+    latest_by_document: dict[str, tuple[int, str, str]] = {}
+    for document, versions in versions_by_document.items():
+        for version, path in sorted(versions, reverse=True):
+            first_line = _read_text(path).splitlines()
+            if not first_line:
+                continue
+            status_match = _BRIDGE_STATUS_LINE_RE.match(first_line[0].strip())
+            if not status_match:
+                continue
             latest_by_document[document] = (version, status_match.group(1).upper(), f"bridge/{path.name}")
+            break
     return [
         {"document": document, "status": status, "path": path}
         for document, (_version, status, path) in sorted(latest_by_document.items())
