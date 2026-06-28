@@ -486,7 +486,7 @@ def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):
     adapter_index = commands.index(
         [sys.executable, "scripts/generate_codex_skill_adapters.py", "--update-registry", "--check"]
     )
-    harness_parity_index = commands.index([sys.executable, "scripts/check_harness_parity.py", "--all", "--markdown"])
+    harness_parity_index = commands.index([sys.executable, "scripts/parity_discovery_diff.py"])
     pytest_index = next(
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
@@ -514,7 +514,7 @@ def test_python_gate_runs_environment_isolation_before_pytest(monkeypatch):
 
     env_index = commands.index([sys.executable, "scripts/check_environment_isolation.py"])
     parity_index = commands.index([sys.executable, "scripts/check_codex_hook_parity.py"])
-    harness_parity_index = commands.index([sys.executable, "scripts/check_harness_parity.py", "--all", "--markdown"])
+    harness_parity_index = commands.index([sys.executable, "scripts/parity_discovery_diff.py"])
     pytest_index = next(
         index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
     )
