@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import _env as env_loader
 from scripts import openrouter_harness as orh
 
 FIXTURE_MODEL_ID = "deepseek/fixture-model"
@@ -88,6 +89,17 @@ def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: 
 
     assert "inside.txt" in result.splitlines()
     assert "escape.txt" not in result
+
+
+def test_env_local_loader_falls_back_from_in_root_release_worktree(tmp_path: Path):
+    primary = tmp_path / "GT-KB"
+    worktree = primary / ".tmp" / "formal-release"
+    worktree.mkdir(parents=True)
+    (primary / "groundtruth.toml").write_text("[groundtruth]\n", encoding="utf-8")
+    primary_env = primary / ".env.local"
+    primary_env.write_text("OPENROUTER_API_KEY=test-key\n", encoding="utf-8")
+
+    assert env_loader._default_env_local_path(worktree) == primary_env.resolve()
 
 
 def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):

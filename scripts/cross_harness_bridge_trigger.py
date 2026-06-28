@@ -255,6 +255,7 @@ DISPATCH_AUTH_ENV_KEYS: tuple[str, ...] = (
     "CLAUDE_CODE_OAUTH_TOKEN",
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
+    "OPENROUTER_API_KEY",
 )
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
@@ -265,6 +266,7 @@ FATAL_WORKER_OUTPUT_MARKERS = (
     ("OpenRouter completions request failed", "provider_failure"),
     ("OpenRouter API returned error", "provider_failure"),
     ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
+    ("Cursor Agent CLI not found", "cursor_headless_cli_unavailable"),
     ("IneligibleTierError", "harness_unavailable_tier"),
     ("ineligible tier", "harness_unavailable_tier"),
     ("individuals tier", "harness_unavailable_tier"),

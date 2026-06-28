@@ -14,6 +14,7 @@ from groundtruth_kb.bridge_dispatch_rules import DispatchContext, DispatchRule
 
 DISPATCH_CONFIG_RELATIVE_PATH = Path("config") / "dispatcher" / "rules.toml"
 DISPATCH_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "dispatch-state.json"
+DISPATCH_RUNS_RELATIVE_PATH = DISPATCH_STATE_RELATIVE_PATH.parent / "dispatch-runs"
 CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 CROSS_HARNESS_TRIGGER_DISABLE_VALUE = "1"
 CROSS_HARNESS_TRIGGER_PERSISTENT_ENV_SCOPES = ("User", "Machine")
@@ -51,6 +52,7 @@ RUNTIME_FAILURE_CLASSES = {
     "provider_failure",
     "provider_failure_backoff_active",
     "provider_configuration_failure",
+    "cursor_headless_cli_unavailable",
     "subprocess_execution_failed",
     "work_intent_acquire_failed",
 }
@@ -63,6 +65,14 @@ RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
 # collapses all non-launch spawn results to last_result="launch_failed"; only the
 # reason field distinguishes saturation from failure.
 BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached", "per_role_concurrency_cap_reached"})
+RECENT_RUN_FAILURE_MARKERS = (
+    ("max-turn exhaustion", "max_turn_exhaustion"),
+    ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
+    ("Cursor Agent CLI not found", "cursor_headless_cli_unavailable"),
+    ("passed to Electron/Chromium", "cursor_headless_cli_unavailable"),
+)
+RECENT_RUN_TEXT_READ_LIMIT = 12_000
+RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", ".create_time_epoch")
 
 
 @dataclass(frozen=True)
@@ -498,28 +508,167 @@ def _runtime_dispatch_evaluation(
     findings = list(errors)
     classifications: list[dict[str, Any]] = []
     recipients = state.get("recipients")
-    if not isinstance(recipients, dict):
-        return findings, classifications
 
+    selected_keys = _selected_runtime_recipient_keys(selected_by_role)
+
+    seen: set[str] = set()
+    if isinstance(recipients, dict):
+        for recipient_key in sorted(selected_keys):
+            row = recipients.get(recipient_key)
+            if not isinstance(row, dict):
+                continue
+            classification = _runtime_classification_for_recipient(recipient_key, row)
+            classifications.append(classification)
+            for finding in classification["findings"]:
+                if finding not in seen:
+                    findings.append(finding)
+                    seen.add(finding)
+
+    recent_findings, recent_classifications = _runtime_recent_run_evaluation(root, selected_keys)
+    classifications.extend(recent_classifications)
+    for finding in recent_findings:
+        if finding not in seen:
+            findings.append(finding)
+            seen.add(finding)
+    return findings, classifications
+
+
+def _selected_runtime_recipient_keys(selected_by_role: dict[str, list[dict[str, Any]]]) -> set[str]:
     selected_keys: set[str] = set(DISPATCH_ROLES)
     for role, rows in selected_by_role.items():
         for row in rows:
             harness_id = str(row.get("id") or "").strip()
             if harness_id:
                 selected_keys.add(f"{role}:{harness_id}")
+    return selected_keys
 
-    seen: set[str] = set()
-    for recipient_key in sorted(selected_keys):
-        row = recipients.get(recipient_key)
-        if not isinstance(row, dict):
+
+def _runtime_recent_run_evaluation(
+    root: Path,
+    selected_keys: set[str],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    runs_dir = root / DISPATCH_RUNS_RELATIVE_PATH
+    if not runs_dir.exists():
+        return [], []
+    latest_by_recipient: dict[str, dict[str, Any]] = {}
+    for row in _recent_run_rows(runs_dir):
+        recipient = _recent_run_recipient(row["dispatch_id"], selected_keys)
+        if recipient is None:
             continue
-        classification = _runtime_classification_for_recipient(recipient_key, row)
-        classifications.append(classification)
-        for finding in classification["findings"]:
-            if finding not in seen:
-                findings.append(finding)
-                seen.add(finding)
+        current = latest_by_recipient.get(recipient)
+        if current is None or float(row.get("last_modified_epoch", 0.0)) > float(
+            current.get("last_modified_epoch", 0.0)
+        ):
+            latest_by_recipient[recipient] = row
+
+    findings: list[str] = []
+    classifications: list[dict[str, Any]] = []
+    for recipient, row in sorted(latest_by_recipient.items()):
+        failure_class = _recent_run_failure_class(row)
+        if failure_class is None:
+            continue
+        exit_code = row.get("exit_code")
+        dispatch_id = str(row.get("dispatch_id") or "")
+        finding = f"dispatch runtime failure: {recipient} latest_run={dispatch_id} failure_class={failure_class}"
+        if isinstance(exit_code, int) and not isinstance(exit_code, bool):
+            finding += f" exit_code={exit_code}"
+        findings.append(finding)
+        classifications.append(
+            {
+                "recipient": recipient,
+                "severity": "FAIL",
+                "source": "recent_run",
+                "dispatch_id": dispatch_id,
+                "exit_code": exit_code if isinstance(exit_code, int) and not isinstance(exit_code, bool) else None,
+                "failure_class": failure_class,
+                "findings": (finding,),
+            }
+        )
     return findings, classifications
+
+
+def _recent_run_rows(runs_dir: Path) -> list[dict[str, Any]]:
+    rows: dict[str, dict[str, Any]] = {}
+    try:
+        paths = list(runs_dir.iterdir())
+    except OSError:
+        return []
+    for path in paths:
+        dispatch_id = _recent_run_dispatch_id(path)
+        if dispatch_id is None:
+            continue
+        row = rows.setdefault(dispatch_id, {"dispatch_id": dispatch_id})
+        try:
+            modified = path.stat().st_mtime
+        except OSError:
+            modified = 0.0
+        row["last_modified_epoch"] = max(float(row.get("last_modified_epoch", 0.0)), modified)
+        if path.name.endswith(".stderr.log"):
+            row["stderr_path"] = path
+            row["stderr_bytes"] = _path_size(path)
+        elif path.name.endswith(".stdout.log"):
+            row["stdout_bytes"] = _path_size(path)
+        elif path.name.endswith(".exit_code"):
+            row["exit_code"] = _read_int(path)
+    return list(rows.values())
+
+
+def _recent_run_dispatch_id(path: Path) -> str | None:
+    name = path.name
+    for suffix in RECENT_RUN_SUFFIXES:
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return None
+
+
+def _recent_run_recipient(dispatch_id: str, selected_keys: set[str]) -> str | None:
+    for key in sorted((key for key in selected_keys if ":" in key), key=len, reverse=True):
+        role, harness_id = key.split(":", 1)
+        if f"-{role}-{harness_id}-" in dispatch_id:
+            return key
+    return None
+
+
+def _recent_run_failure_class(row: dict[str, Any]) -> str | None:
+    stderr_text = _read_bounded_text(row.get("stderr_path"))
+    for marker, failure_class in RECENT_RUN_FAILURE_MARKERS:
+        if marker in stderr_text:
+            return failure_class
+    exit_code = row.get("exit_code")
+    if isinstance(exit_code, int) and not isinstance(exit_code, bool) and exit_code != 0:
+        return "subprocess_execution_failed"
+    return None
+
+
+def _read_bounded_text(path_value: Any) -> str:
+    if not isinstance(path_value, Path):
+        return ""
+    try:
+        with path_value.open("r", encoding="utf-8", errors="ignore") as handle:
+            return handle.read(RECENT_RUN_TEXT_READ_LIMIT)
+    except OSError:
+        return ""
+
+
+def _path_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def _read_int(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _append_findings_once(findings: list[str], seen: set[str], new_findings: tuple[str, ...]) -> None:
+    for finding in new_findings:
+        if finding not in seen:
+            findings.append(finding)
+            seen.add(finding)
 
 
 def _load_dispatch_runtime_state(root: Path) -> tuple[dict[str, Any], tuple[str, ...]]:

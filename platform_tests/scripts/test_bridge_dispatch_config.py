@@ -176,7 +176,7 @@ def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
     rules = tomllib.loads((REPO_ROOT / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
     harness_b_rules = rules["harnesses"]["B"]
 
-    assert harness_b_rules["can_receive_dispatch"] is True
+    assert harness_b_rules["can_receive_dispatch"] is False
     assert "interactive-only" not in harness_b_rules["tags"]
 
     projection = read_roles(REPO_ROOT)
@@ -184,16 +184,13 @@ def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
 
     status_payload = collect_bridge_dispatch_status(REPO_ROOT).to_json_dict()
     harness_b_status = next(row for row in status_payload["harnesses"] if row["id"] == "B")
-    assert harness_b_status["can_receive_dispatch"] is True
+    assert harness_b_status["can_receive_dispatch"] is False
     assert harness_b_status["status"] == harness_b["status"]
-    if harness_b["status"] == "active":
-        candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
+    candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
+    if harness_b["status"] == "active" and harness_b_status["can_receive_dispatch"]:
         assert "B" in candidate_ids
     else:
-        assert any(
-            "harness B can_receive_dispatch" in finding and f"status={harness_b['status']}" in finding
-            for finding in status_payload["consistency_findings"]
-        )
+        assert "B" not in candidate_ids
 
 
 def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
@@ -341,6 +338,14 @@ def _write_dispatch_state(root: Path, recipients: dict[str, dict]) -> None:
         json.dumps({"recipients": recipients, "schema_version": 1, "updated_at": "2026-06-18T17:00:00Z"}),
         encoding="utf-8",
     )
+
+
+def _write_dispatch_run(root: Path, dispatch_id: str, *, exit_code: int, stderr: str) -> None:
+    runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.stdout.log").write_text("", encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.stderr.log").write_text(stderr, encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.exit_code").write_text(str(exit_code), encoding="utf-8")
 
 
 def _load_scan_helper():
@@ -530,6 +535,175 @@ def test_wi4789_exit_zero_no_verdict_warns_when_role_dispatchable(tmp_path: Path
 
     assert status.health_status == "WARN"
     assert any("last_launch.exit_failure_reason=no_verdict_produced" in f for f in status.health_findings)
+
+
+def test_wi4893_openrouter_missing_key_is_visible_in_status_and_report(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_result": "provider_configuration_failure",
+                "failure_class": "provider_configuration_failure",
+                "last_launch": {
+                    "exit_failure_reason": "provider_configuration_failure",
+                    "recipient": "loyal-opposition:F",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+    report = build_bridge_dispatch_report(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "provider_configuration_failure" in findings
+    assert report["summary"]["health_status"] == "WARN"
+    assert report["summary"]["runtime_failure_count"] >= 1
+
+
+def test_wi4893_cursor_headless_cli_unavailable_is_visible_in_status(tmp_path: Path) -> None:
+    _write_project(
+        tmp_path,
+        harnesses=[
+            *_default_harnesses(),
+            {
+                "id": "E",
+                "harness_name": "cursor",
+                "harness_type": "cursor",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "can_fire_events": False,
+                "can_receive_dispatch": True,
+                "event_driven_hooks": False,
+                "reviewer_precedence": 30,
+            },
+        ],
+    )
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:E": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_result": "cursor_headless_cli_unavailable",
+                "failure_class": "cursor_headless_cli_unavailable",
+                "last_launch": {
+                    "exit_failure_reason": "cursor_headless_cli_unavailable",
+                    "recipient": "loyal-opposition:E",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "cursor_headless_cli_unavailable" in findings
+
+
+def test_wi4893_recent_openrouter_run_failure_warns_when_recipient_state_is_compact(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "launched",
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-28T16-04-29Z-loyal-opposition-F-d34cfc",
+        exit_code=1,
+        stderr="openrouter_harness: OPENROUTER_API_KEY environment variable is not set.\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+    report = build_bridge_dispatch_report(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "latest_run=2026-06-28T16-04-29Z-loyal-opposition-F-d34cfc" in findings
+    assert "provider_configuration_failure" in findings
+    assert report["summary"]["health_status"] == "WARN"
+    assert report["summary"]["runtime_failure_count"] >= 1
+
+
+def test_wi4893_recent_cursor_gui_warning_warns_even_with_exit_zero(tmp_path: Path) -> None:
+    _write_project(
+        tmp_path,
+        harnesses=[
+            *_default_harnesses(),
+            {
+                "id": "E",
+                "harness_name": "cursor",
+                "harness_type": "cursor",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "can_fire_events": False,
+                "can_receive_dispatch": True,
+                "event_driven_hooks": False,
+                "reviewer_precedence": 30,
+            },
+        ],
+    )
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:E": {
+                "last_result": "launched",
+                "signature": "sig-e",
+                "last_dispatched_signature": "sig-e",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-28T16-04-02Z-loyal-opposition-E-0c494b",
+        exit_code=0,
+        stderr="Warning: 'p' is not in the list of known options, but still passed to Electron/Chromium.\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "latest_run=2026-06-28T16-04-02Z-loyal-opposition-E-0c494b" in findings
+    assert "cursor_headless_cli_unavailable" in findings
+
+
+def test_wi4893_recent_ollama_max_turn_run_failure_warns(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:D": {
+                "last_result": "launched",
+                "signature": "sig-d",
+                "last_dispatched_signature": "sig-d",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-28T15-13-47Z-loyal-opposition-D-7ea816",
+        exit_code=1,
+        stderr="ollama_harness: max-turn exhaustion before final assistant text\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "latest_run=2026-06-28T15-13-47Z-loyal-opposition-D-7ea816" in findings
+    assert "max_turn_exhaustion" in findings
 
 
 # WI-4718 — benign concurrency_cap_reached must not be misclassified as a runtime FAIL.

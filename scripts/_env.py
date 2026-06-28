@@ -59,6 +59,26 @@ def _parse_env_file(env_path: Path) -> dict[str, str]:
     return result
 
 
+def _default_env_local_path(project_root: Path = PROJECT_ROOT) -> Path:
+    """Return the authoritative env file for this checkout.
+
+    Normal checkouts use their own ``.env.local``. Release worktrees under the
+    in-root ``.tmp`` directory may omit credential files; in that case, read the
+    primary checkout's ``.env.local`` without copying secrets into the worktree.
+    """
+    root = project_root.resolve()
+    local = root / ".env.local"
+    if local.is_file():
+        return local
+    tmp_parent = root.parent
+    primary = tmp_parent.parent
+    if tmp_parent.name == ".tmp" and (primary / "groundtruth.toml").is_file():
+        primary_env = primary / ".env.local"
+        if primary_env.is_file():
+            return primary_env
+    return local
+
+
 def load_env_local(
     *,
     override: bool = False,
@@ -79,7 +99,7 @@ def load_env_local(
         they were applied to os.environ).
     """
     global _LOADED
-    path = env_file or (PROJECT_ROOT / ".env.local")
+    path = env_file or _default_env_local_path()
     values = _parse_env_file(path)
 
     if check_only:

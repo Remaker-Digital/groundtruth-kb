@@ -61,3 +61,28 @@ def test_skill_route_none_returns_none() -> None:
     """No skill route yields no system prompt."""
     harness = _load_harness()
     assert harness._skill_system_prompt(None) is None
+
+
+def test_resolve_agent_executable_uses_agent_not_cursor_gui(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(harness.shutil, "which", lambda name: "C:/Tools/agent.exe" if name == "agent" else None)
+
+    assert harness._resolve_agent_executable() == "C:/Tools/agent.exe"
+
+
+def test_resolve_agent_executable_rejects_cursor_gui_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")
+
+    with pytest.raises(harness.CursorHarnessError, match="Cursor GUI launcher"):
+        harness._resolve_agent_executable()
+
+
+def test_resolve_agent_executable_does_not_fallback_to_cursor_gui(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(harness.shutil, "which", lambda name: "C:/Tools/cursor.exe" if name == "cursor" else None)
+
+    with pytest.raises(harness.CursorHarnessError, match="Cursor Agent CLI not found"):
+        harness._resolve_agent_executable()

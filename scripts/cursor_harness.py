@@ -21,6 +21,7 @@ _SKILL_ROUTE_ALIASES = {
     "bridge-review": "proposal-review",
     "verification": "verify",
 }
+_CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
 
 
 class CursorHarnessError(RuntimeError):
@@ -28,13 +29,16 @@ class CursorHarnessError(RuntimeError):
 
 
 def _resolve_agent_executable() -> str:
-    for candidate in (
-        os.environ.get("CURSOR_AGENT_BIN"),
-        shutil.which("agent"),
-        shutil.which("cursor"),
-    ):
-        if not candidate:
-            continue
+    explicit = os.environ.get("CURSOR_AGENT_BIN")
+    if explicit:
+        if Path(explicit).name.lower() in _CURSOR_GUI_LAUNCHER_NAMES:
+            raise CursorHarnessError(
+                "Cursor Agent CLI not found. CURSOR_AGENT_BIN points at the Cursor GUI launcher; "
+                "set it to a headless `agent` executable instead."
+            )
+        return explicit
+    candidate = shutil.which("agent")
+    if candidate:
         return candidate
     raise CursorHarnessError(
         "Cursor Agent CLI not found. Install Cursor CLI and ensure `agent` is on PATH, or set CURSOR_AGENT_BIN."
@@ -67,8 +71,6 @@ def _build_prompt(user_prompt: str, skill: str | None) -> str:
 def _build_command(prompt: str, project_root: Path, *, output_format: str) -> list[str]:
     agent = _resolve_agent_executable()
     command = [agent]
-    if Path(agent).name.lower() in {"cursor", "cursor.cmd", "cursor.exe"}:
-        command.append("agent")
     command.extend(
         [
             "-p",
