@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 from collections import Counter, deque
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +16,8 @@ from groundtruth_kb.bridge_dispatch_config import DISPATCH_ROLES, collect_bridge
 STATE_DIR_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller"
 RUNS_RELATIVE_PATH = STATE_DIR_RELATIVE_PATH / "dispatch-runs"
 RUN_TIMESTAMP_RE = re.compile(r"^(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)")
+PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
 
 
 def build_bridge_dispatch_report(
@@ -26,6 +30,8 @@ def build_bridge_dispatch_report(
     root = project_root.resolve()
     status = collect_bridge_dispatch_status(root)
     status_payload = status.to_json_dict()
+    consistency_findings = tuple(getattr(status, "consistency_findings", ()))
+    runtime_classifications = tuple(getattr(status, "runtime_classifications", ()))
     now_utc = now or datetime.now(UTC)
 
     state, state_warnings = _read_json(root / STATE_DIR_RELATIVE_PATH / "dispatch-state.json")
@@ -89,6 +95,8 @@ def build_bridge_dispatch_report(
         "reliability": {
             "health_status": status.health_status,
             "findings": list(status.health_findings),
+            "consistency_findings": list(consistency_findings),
+            "runtime_classifications": list(runtime_classifications),
             "failure_taxonomy": failure_taxonomy,
             "circuit_breakers": circuit_breakers,
             "dispatch_failures_tail": dispatch_failures,
@@ -199,11 +207,18 @@ def _collect_recent_runs(root: Path, *, max_records: int, now: datetime) -> list
             row["stderr_bytes"] = path.stat().st_size
         elif path.name.endswith(".exit_code"):
             row["exit_code"] = _read_exit_code(path)
+        elif path.name.endswith(".pid"):
+            row["pid"] = _read_int(path)
+        elif path.name.endswith(PID_CREATE_TIME_SUFFIX):
+            row["pid_create_time_epoch"] = _read_float(path)
     for row in runs.values():
         started = _parse_dispatch_started_at(row["dispatch_id"])
         row["started_at"] = started.isoformat() if started is not None else None
-        if "exit_code" not in row:
+        if "exit_code" not in row and _recent_run_live(runs_dir, row):
             row["state"] = "live"
+            row["age_seconds"] = None if started is None else max(0.0, (now - started).total_seconds())
+        elif "exit_code" not in row:
+            row["state"] = "stale"
             row["age_seconds"] = None if started is None else max(0.0, (now - started).total_seconds())
         elif row["exit_code"] == 0:
             row["state"] = "exit_0"
@@ -219,10 +234,24 @@ def _collect_recent_runs(root: Path, *, max_records: int, now: datetime) -> list
 
 
 def _dispatch_id_from_run_file(path: Path) -> str | None:
-    for suffix in (".stdout.log", ".stderr.log", ".exit_code"):
+    for suffix in (".stdout.log", ".stderr.log", ".exit_code", ".pid", PID_CREATE_TIME_SUFFIX):
         if path.name.endswith(suffix):
             return path.name[: -len(suffix)]
     return None
+
+
+def _read_int(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _read_float(path: Path) -> float | None:
+    try:
+        return float(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
 
 
 def _read_exit_code(path: Path) -> int | None:
@@ -230,6 +259,77 @@ def _read_exit_code(path: Path) -> int | None:
         return int(path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return None
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid_int <= 0:
+        return False
+    try:
+        import psutil  # noqa: PLC0415
+
+        return bool(psutil.pid_exists(pid_int))
+    except Exception:  # noqa: BLE001
+        pass
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid_int}", "/NH"],
+                capture_output=True,
+                text=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return str(pid_int) in result.stdout
+    try:
+        os.kill(pid_int, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _pid_create_time_epoch(pid: int) -> float | None:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_int <= 0:
+        return None
+    try:
+        import psutil  # noqa: PLC0415
+
+        return float(psutil.Process(pid_int).create_time())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _pid_create_time_matches(pid: int, expected_epoch: Any) -> bool:
+    try:
+        expected = float(expected_epoch)
+    except (TypeError, ValueError):
+        return False
+    actual = _pid_create_time_epoch(pid)
+    if actual is None:
+        return False
+    return abs(actual - expected) <= PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS
+
+
+def _recent_run_live(runs_dir: Path, row: dict[str, Any]) -> bool:
+    pid = row.get("pid")
+    if not isinstance(pid, int) or isinstance(pid, bool):
+        return False
+    if not _pid_alive(pid):
+        return False
+    expected = row.get("pid_create_time_epoch")
+    if expected is None:
+        expected = _read_float(runs_dir / f"{row['dispatch_id']}{PID_CREATE_TIME_SUFFIX}")
+    return _pid_create_time_matches(pid, expected)
 
 
 def _parse_dispatch_started_at(dispatch_id: str) -> datetime | None:

@@ -934,6 +934,7 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
         return _FakeProcess()
 
     monkeypatch.setattr(_subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
     monkeypatch.setenv("GTKB_NO_CROSS_HARNESS_TRIGGER", "1")
 
     # Build a single-item synthetic actionable to exercise _spawn_harness
@@ -989,6 +990,34 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
         "GTKB_INHERITED_SESSION_ID must mirror dispatch_id for compatibility work-intent surfaces"
     )
     assert "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS" not in child_env
+    assert meta["pid_create_time_epoch"] == 123.0
+    assert (state_dir / "dispatch-runs" / f"{meta['dispatch_id']}.create_time_epoch").read_text(
+        encoding="utf-8"
+    ) == "123.000000"
+
+
+def test_live_dispatched_process_count_requires_pid_create_time_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    runs_dir = tmp_path / "state" / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+
+    (runs_dir / "daemon.pid").write_text("999", encoding="utf-8")
+    (runs_dir / "live.pid").write_text("123", encoding="utf-8")
+    (runs_dir / "live.create_time_epoch").write_text("456.000000", encoding="utf-8")
+    (runs_dir / "missing-sidecar.pid").write_text("124", encoding="utf-8")
+    (runs_dir / "stale.pid").write_text("125", encoding="utf-8")
+    (runs_dir / "stale.create_time_epoch").write_text("777.000000", encoding="utf-8")
+
+    monkeypatch.setattr(trigger, "_pid_alive", lambda _pid: True)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: {123: 456.0, 125: 111.0}.get(pid))
+
+    assert trigger._count_live_dispatched_processes(runs_dir) == 1
+    assert (runs_dir / "daemon.pid").is_file()
+    assert (runs_dir / "live.pid").is_file()
+    assert not (runs_dir / "missing-sidecar.pid").exists()
+    assert not (runs_dir / "stale.pid").exists()
 
 
 def test_prime_spawn_creates_dispatch_authorization_packet_and_env(

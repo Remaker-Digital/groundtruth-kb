@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
+import psutil
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
+for module_name in list(sys.modules):
+    if module_name == "groundtruth_kb" or module_name.startswith("groundtruth_kb."):
+        del sys.modules[module_name]
 
 from groundtruth_kb.cli import main  # noqa: E402
 
@@ -118,7 +123,11 @@ def _write_runtime(root: Path) -> None:
     (runs_dir / "2026-06-23T09-59-00Z-loyal-opposition-D-demo.stdout.log").write_text("", encoding="utf-8")
     (runs_dir / "2026-06-23T09-59-00Z-loyal-opposition-D-demo.stderr.log").write_text("", encoding="utf-8")
     (runs_dir / "2026-06-23T09-59-00Z-loyal-opposition-D-demo.exit_code").write_text("1", encoding="utf-8")
-    (runs_dir / "2026-06-23T10-00-00Z-prime-builder-A-live.stdout.log").write_text("", encoding="utf-8")
+    live_id = "2026-06-23T10-00-00Z-prime-builder-A-live"
+    (runs_dir / f"{live_id}.stdout.log").write_text("", encoding="utf-8")
+    (runs_dir / f"{live_id}.pid").write_text(str(os.getpid()), encoding="utf-8")
+    create_time = float(psutil.Process(os.getpid()).create_time())
+    (runs_dir / f"{live_id}.create_time_epoch").write_text(f"{create_time:.6f}", encoding="utf-8")
 
 
 def test_bridge_dispatch_report_json_exposes_required_sections_and_cause_taxonomy(tmp_path: Path) -> None:
@@ -180,3 +189,18 @@ def test_bridge_dispatch_report_human_output_is_compact(tmp_path: Path) -> None:
     assert "Bridge dispatch report:" in result.output
     assert "Selected candidates:" in result.output
     assert "Recent runs:" in result.output
+
+
+def test_bridge_dispatch_report_does_not_count_stdout_stderr_only_sidecars_as_live(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+    (runs_dir / "2026-06-23T10-01-00Z-loyal-opposition-D-ghost.stdout.log").write_text("", encoding="utf-8")
+    (runs_dir / "2026-06-23T10-01-00Z-loyal-opposition-D-ghost.stderr.log").write_text("", encoding="utf-8")
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["live_state"]["live_worker_count"] == 0
+    assert payload["history"]["recent_runs"][0]["state"] == "stale"
