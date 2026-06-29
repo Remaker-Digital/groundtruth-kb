@@ -1,0 +1,21 @@
+schema_version = 1
+registry_id = "harness-parity-phase-2-waivers"
+purpose = "Typed waiver registry for Harness Parity Phase 2 evaluator gaps."
+project = "PROJECT-HARNESS-PARITY-PHASE-2"
+work_item = "WI-4900"
+
+# No active waivers are recorded at creation time.
+#
+# Waiver records use this shape:
+#
+# [[waivers]]
+# id = "WAIVER-HARNESS-PARITY-EXAMPLE"
+# harness = "example-harness"
+# dimension = "headless_invocation"
+# reason_class = "vendor_limitation"
+# rationale = "The harness has no headless runtime surface."
+# owner_decision = "DELIB-..."
+# evidence = "path/or/command evidence"
+# review_trigger = "Revisit when the vendor adds headless support."
+# evaluator_behavior = "Treat as waived in reports; keep visible in waiver count."
+# status = "active"
