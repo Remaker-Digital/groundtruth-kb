@@ -289,6 +289,101 @@ def test_dispatch_edit_raises_on_missing_file(tmp_path: Path):
         )
 
 
+def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    (root / "note.txt").write_text("hello", encoding="utf-8")
+    ticks = [100.0, 100.0, 101.5]
+
+    def fake_monotonic() -> float:
+        return ticks.pop(0) if ticks else 101.5
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "id": "call_read",
+                                "function": {"name": "Read", "arguments": {"path": "note.txt"}},
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(orh.time, "monotonic", fake_monotonic)
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="session timeout exceeded"):
+        orh.run_tool_loop(
+            "loop",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            3,
+            root,
+            chat_func=chat,
+            timeout=10.0,
+            session_timeout=1.0,
+        )
+
+
+def test_tool_loop_caps_bash_timeout_to_remaining_session_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    ticks = [100.0, 101.0, 102.0, 103.0]
+    observed_timeouts: list[float] = []
+
+    def fake_monotonic() -> float:
+        return ticks.pop(0) if ticks else 103.0
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        if len(observed_timeouts) == 0 and len(payload["messages"]) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_bash",
+                                    "function": {
+                                        "name": "Bash",
+                                        "arguments": {"command": "echo ok", "timeout_seconds": 99},
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    def command_runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess[str]:
+        observed_timeouts.append(timeout)
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(orh.time, "monotonic", fake_monotonic)
+
+    assert (
+        orh.run_tool_loop(
+            "run",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            3,
+            root,
+            chat_func=chat,
+            command_runner=command_runner,
+            timeout=20.0,
+            session_timeout=5.0,
+        )
+        == "done"
+    )
+    assert observed_timeouts == [3.0]
+
+
 # --- WI-4817: bounded transient-failure retry for call_openrouter_chat ---
 
 

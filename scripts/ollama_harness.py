@@ -37,6 +37,7 @@ except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected 
 
 DEFAULT_ENDPOINT = "http://localhost:11434"
 DEFAULT_TIMEOUT_SECONDS = 240.0
+DEFAULT_SESSION_TIMEOUT_SECONDS = 540.0
 
 # WI-4817: bounded retry for transient cloud transport failures so a dispatched
 # LO worker survives a transient hiccup and still produces a verdict. Total
@@ -124,6 +125,19 @@ class GuardExecutionResult:
 GuardRunner = Callable[[Path, dict[str, Any], Mapping[str, str], float], GuardExecutionResult]
 ChatFunc = Callable[[str, dict[str, Any], float], dict[str, Any]]
 CommandRunner = Callable[[str, Path, Mapping[str, str], float], subprocess.CompletedProcess[str]]
+
+
+def _remaining_timeout(deadline: float, message: str) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise OllamaHarnessError(message)
+    return remaining
+
+
+def _sleep_with_budget(delay: float, deadline: float, message: str) -> None:
+    if _remaining_timeout(deadline, message) < delay:
+        raise OllamaHarnessError(message)
+    time.sleep(delay)
 
 
 def resolve_project_root(start: Path | None = None) -> Path:
@@ -413,6 +427,7 @@ def call_ollama_chat(
     endpoint: str, payload: dict[str, Any], timeout: float = DEFAULT_TIMEOUT_SECONDS
 ) -> dict[str, Any]:
     url = endpoint.rstrip("/") + "/api/chat"
+    deadline = time.monotonic() + timeout
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -422,12 +437,19 @@ def call_ollama_chat(
     last_error: Exception | None = None
     for attempt in range(1, CHAT_MAX_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+            with urllib.request.urlopen(
+                request,
+                timeout=_remaining_timeout(deadline, "Ollama chat request timed out"),
+            ) as response:  # noqa: S310
                 data = response.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             last_error = exc
             if exc.code in RETRYABLE_HTTP_STATUS and attempt < CHAT_MAX_ATTEMPTS:
-                time.sleep(CHAT_RETRY_BACKOFF_SECONDS[attempt - 1])
+                _sleep_with_budget(
+                    CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
+                    deadline,
+                    "Ollama chat request timed out before retry",
+                )
                 continue
             raise OllamaHarnessError(
                 f"Ollama chat request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
@@ -435,7 +457,11 @@ def call_ollama_chat(
         except urllib.error.URLError as exc:
             last_error = exc
             if attempt < CHAT_MAX_ATTEMPTS:
-                time.sleep(CHAT_RETRY_BACKOFF_SECONDS[attempt - 1])
+                _sleep_with_budget(
+                    CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
+                    deadline,
+                    "Ollama chat request timed out before retry",
+                )
                 continue
             raise OllamaHarnessError(f"Ollama chat request failed after {attempt} attempt(s): {exc}") from exc
         try:
@@ -895,9 +921,12 @@ def run_tool_loop(
     guard_runner: GuardRunner | None = None,
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
 ) -> str:
     if max_turns < 1:
         raise OllamaHarnessError("max_turns must be at least 1")
+    if session_timeout <= 0:
+        raise OllamaHarnessError("session_timeout must be positive")
     messages: list[dict[str, Any]] = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -905,9 +934,14 @@ def run_tool_loop(
     schemas = build_tool_schemas(model_route.allowed_tools)
     chat = chat_func or call_ollama_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
+    session_deadline = time.monotonic() + session_timeout
     for _turn in range(max_turns):
         payload = {"model": model_route.model_id, "messages": messages, "tools": schemas, "stream": False}
-        response = chat(endpoint, payload, timeout)
+        operation_timeout = min(
+            timeout,
+            _remaining_timeout(session_deadline, "session timeout exceeded before Ollama chat turn"),
+        )
+        response = chat(endpoint, payload, operation_timeout)
         message = _message_from_response(response)
         tool_calls = message.get("tool_calls") or response.get("tool_calls") or []
         if not tool_calls:
@@ -920,6 +954,13 @@ def run_tool_loop(
         messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": tool_calls})
         for index, call in enumerate(tool_calls):
             tool_name, arguments, call_id = _tool_call_parts(call, index)
+            if tool_name == "Bash":
+                arguments = dict(arguments)
+                requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+                arguments["timeout_seconds"] = min(
+                    requested_timeout,
+                    _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
+                )
             try:
                 result = dispatch_tool_call(
                     tool_name,
@@ -953,6 +994,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="Ollama endpoint; default is localhost.")
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
+    parser.add_argument(
+        "--session-timeout",
+        type=float,
+        default=DEFAULT_SESSION_TIMEOUT_SECONDS,
+        help="Maximum wall-clock seconds for the whole harness tool loop.",
+    )
     return parser
 
 
@@ -975,6 +1022,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             project_root,
             system_prompt=system_prompt,
             timeout=args.timeout,
+            session_timeout=args.session_timeout,
         )
     except OllamaHarnessError as exc:
         print(f"ollama_harness: {exc}", file=sys.stderr)
