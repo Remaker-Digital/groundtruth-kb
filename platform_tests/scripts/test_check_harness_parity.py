@@ -254,6 +254,33 @@ fallback = "Read the project skill."
     assert {extra.name for extra in report.extras} == {"untracked", "untracked-alias"}
 
 
+def test_unsupported_harness_surface_is_warn_not_missing(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.prompt-only"
+kind = "hook"
+canonical_name = "prompt-only"
+canonical_source = ".claude/hooks/prompt-only.py"
+required_for_roles = ["prime-builder"]
+parity_class = "required"
+
+[capabilities.codex]
+status = "unsupported"
+reason = "Codex has no matching prompt-only hook surface."
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="codex", role="prime-builder")
+
+    assert report.overall_status == "WARN"
+    assert report.counts == {"UNSUPPORTED": 1}
+    assert report.results[0].state == "UNSUPPORTED"
+    assert "no matching prompt-only hook" in report.results[0].note
+
+
 def test_repository_registry_covers_project_skills() -> None:
     module = _load_module()
 
@@ -262,6 +289,17 @@ def test_repository_registry_covers_project_skills() -> None:
     assert not report.errors
     assert not report.extras
     assert report.overall_status == "PASS"
+
+
+def test_repository_registry_has_no_unclassified_missing_rows() -> None:
+    module = _load_module()
+
+    report = module.check_harness_parity(REPO_ROOT, include_all=True)
+    missing = [result for result in report.results if result.state == "MISSING"]
+
+    assert not report.errors
+    assert not missing
+    assert report.overall_status != "FAIL"
 
 
 # WI-4317 / WI-4318 capability-floor mode tests (Child 1 foundation per

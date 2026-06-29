@@ -32,7 +32,6 @@ last_updated = "2026-06-27"
 # `::open` conformance case (a real Claude-vs-Codex asymmetry to resolve, not
 # waive).
 parity_schema_version = 1
-
 [[capabilities]]
 id = "skill.alternatives-investigation"
 kind = "skill"
@@ -57,6 +56,11 @@ surface = ".agent/skills/alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/alternatives-investigation/SKILL.md"
 source_sha256 = "66b0d8f36e70a0ce4a9ea8f4e32326e7a9c9f84519559cca708649ed8635c561"
+
+[capabilities.cursor]
+surface = ".cursor/skills/alternatives-investigation/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.arch-audit"
 kind = "skill"
@@ -81,6 +85,11 @@ surface = ".agent/skills/arch-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/arch-audit/SKILL.md"
 source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
+
+[capabilities.cursor]
+surface = ".cursor/skills/arch-audit/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.assertion-triage"
 kind = "skill"
@@ -105,6 +114,11 @@ surface = ".agent/skills/assertion-triage/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/assertion-triage/SKILL.md"
 source_sha256 = "f3a3201fe3b7f3afc7c265548fb98794557e965f8e461117645295c509f416c0"
+
+[capabilities.cursor]
+surface = ".cursor/skills/assertion-triage/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.bridge"
 kind = "skill"
@@ -129,6 +143,11 @@ surface = ".agent/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
 source_sha256 = "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
+
+[capabilities.cursor]
+surface = ".cursor/skills/bridge/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.bridge-config"
 kind = "skill"
@@ -153,6 +172,11 @@ surface = ".agent/skills/bridge-config/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-config/SKILL.md"
 source_sha256 = "9c674fade46e95b76bf877f059253ddac687aba75d54eb3c054399b6f83d58a3"
+
+[capabilities.cursor]
+surface = ".cursor/skills/bridge-config/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.dispatcher-control"
 kind = "skill"
@@ -177,6 +201,11 @@ surface = ".agent/skills/dispatcher-control/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/dispatcher-control/SKILL.md"
 source_sha256 = "2dc26c0578410bdc1a028dc360503b11d18d96a24c739917906873d0b21b0ed5"
+
+[capabilities.cursor]
+surface = ".cursor/skills/dispatcher-control/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.bridge-propose"
 kind = "skill"
@@ -201,6 +230,11 @@ surface = ".agent/skills/bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
+
+[capabilities.cursor]
+surface = ".cursor/skills/bridge-propose/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.bridge-reconciliation"
 kind = "skill"
@@ -225,6 +259,11 @@ surface = ".agent/skills/bridge-reconciliation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge-reconciliation/SKILL.md"
 source_sha256 = "cb755587a8e2b4ff2ea4b53339da606b12728e944cdbce84283de2ce57eabbcd"
+
+[capabilities.cursor]
+surface = ".cursor/skills/bridge-reconciliation/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.gtkb-propose"
 kind = "skill"
@@ -249,6 +288,11 @@ surface = ".agent/skills/gtkb-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
 source_sha256 = "c0f526b45d59eab1f8ad6b59dd4bb067054b27e53a4d754885e7f353dbc59590"
+
+[capabilities.cursor]
+surface = ".cursor/skills/gtkb-propose/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.check-deliberations"
 kind = "skill"
@@ -273,6 +317,11 @@ surface = ".agent/skills/check-deliberations/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/check-deliberations/SKILL.md"
 source_sha256 = "ea6f9f23c5d36c673e82d120bdab5868203f78ee073530bb72c3e16ac2efb59d"
+
+[capabilities.cursor]
+surface = ".cursor/skills/check-deliberations/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.code-review-audit"
 kind = "skill"
@@ -297,6 +346,11 @@ surface = ".agent/skills/code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/code-review-audit/SKILL.md"
 source_sha256 = "cc494032f13bd8c34e4024802a3de5510740ff5b734d0527003a63bbad139c0b"
+
+[capabilities.cursor]
+surface = ".cursor/skills/code-review-audit/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.lo-opportunity-radar"
 kind = "skill"
@@ -321,6 +375,11 @@ surface = ".agent/skills/lo-opportunity-radar/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
 source_sha256 = "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+
+[capabilities.cursor]
+surface = ".cursor/skills/lo-opportunity-radar/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.codex-report"
 kind = "skill"
@@ -345,6 +404,11 @@ surface = ".agent/skills/codex-report/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/codex-report/SKILL.md"
 source_sha256 = "912b6bc5c661ecbf42c2687ce61ae37617d482f249588fd0d9cca630a04e9825"
+
+[capabilities.cursor]
+surface = ".cursor/skills/codex-report/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.decision-capture"
 kind = "skill"
@@ -369,6 +433,11 @@ surface = ".agent/skills/decision-capture/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/decision-capture/SKILL.md"
 source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
+
+[capabilities.cursor]
+surface = ".cursor/skills/decision-capture/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.harness-parity-review"
 kind = "skill"
@@ -393,6 +462,11 @@ surface = ".agent/skills/harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
 source_sha256 = "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
+
+[capabilities.cursor]
+surface = ".cursor/skills/harness-parity-review/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-adr"
 kind = "skill"
@@ -417,6 +491,11 @@ surface = ".agent/skills/kb-adr/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-adr/SKILL.md"
 source_sha256 = "5313dca3d3c8c42ca3f69ccfd8b61eba716e3267a6ee19ce7454d79c76fc00d4"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-adr/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-assert"
 kind = "skill"
@@ -441,6 +520,11 @@ surface = ".agent/skills/kb-assert/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-assert/SKILL.md"
 source_sha256 = "41e992629bbc599f80464971f0135cea20870803082f4dab720dce8a642db4e2"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-assert/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-batch"
 kind = "skill"
@@ -465,6 +549,11 @@ surface = ".agent/skills/kb-batch/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-batch/SKILL.md"
 source_sha256 = "235090b9cedeb9b194b94f747b4fc4cbff5156b128493f2ab8aab0bebbd1542c"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-batch/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-promote"
 kind = "skill"
@@ -489,6 +578,11 @@ surface = ".agent/skills/kb-promote/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-promote/SKILL.md"
 source_sha256 = "d2e768c49b47519160b4042506c34d3c3faf3f90fd06aeb8ff2c59152db11dbd"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-promote/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-query"
 kind = "skill"
@@ -513,6 +607,11 @@ surface = ".agent/skills/kb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-query/SKILL.md"
 source_sha256 = "693cfda872edd966ca5f382b0435df0c8b9c62639b32be22ef56f65c92e84086"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-query/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-session-wrap"
 kind = "skill"
@@ -537,6 +636,11 @@ surface = ".agent/skills/kb-session-wrap/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-session-wrap/SKILL.md"
 source_sha256 = "eb2b6752e238357a449081afe47f77a486d92126dde72f7bc64377784a803c63"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-session-wrap/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-session-wrap-scan"
 kind = "skill"
@@ -561,6 +665,11 @@ surface = ".agent/skills/kb-session-wrap-scan/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-session-wrap-scan/SKILL.md"
 source_sha256 = "01093f939c5e621616ea45c5ca82b3a1d7b8afa986594b4a196b0b4378888df8"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-session-wrap-scan/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-spec"
 kind = "skill"
@@ -585,6 +694,11 @@ surface = ".agent/skills/kb-spec/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-spec/SKILL.md"
 source_sha256 = "77d84c4ee4960b9cfc119347c36080e92edb62613c4e6514148019a717ca5dda"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-spec/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.kb-work-item"
 kind = "skill"
@@ -609,6 +723,11 @@ surface = ".agent/skills/kb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/kb-work-item/SKILL.md"
 source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+
+[capabilities.cursor]
+surface = ".cursor/skills/kb-work-item/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.projects"
 kind = "skill"
@@ -633,6 +752,11 @@ surface = ".agent/skills/projects/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/projects/SKILL.md"
 source_sha256 = "0ca28e18fbb6331cb19c0c04a3c69b0b1ce3045d1afaa92a5dcbc91a6c95f155"
+
+[capabilities.cursor]
+surface = ".cursor/skills/projects/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.proposal-review"
 kind = "skill"
@@ -657,6 +781,11 @@ surface = ".agent/skills/proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/proposal-review/SKILL.md"
 source_sha256 = "2f199c8dc6d75752fe4b058afdcd938432f9cf68732eefb61768d9fecfc1509c"
+
+[capabilities.cursor]
+surface = ".cursor/skills/proposal-review/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.release-candidate-gate"
 kind = "skill"
@@ -681,6 +810,11 @@ surface = ".agent/skills/release-candidate-gate/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/release-candidate-gate/SKILL.md"
 source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
+
+[capabilities.cursor]
+surface = ".cursor/skills/release-candidate-gate/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.send-review"
 kind = "skill"
@@ -705,6 +839,11 @@ surface = ".agent/skills/send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/send-review/SKILL.md"
 source_sha256 = "ff37ea3c5c0b56a4c9608de0016c1af564764a3b64324833714b7e97d680975e"
+
+[capabilities.cursor]
+surface = ".cursor/skills/send-review/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.spec-intake"
 kind = "skill"
@@ -729,6 +868,11 @@ surface = ".agent/skills/spec-intake/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/spec-intake/SKILL.md"
 source_sha256 = "74b89d071fea590bc4ceedde8055c1014902820a1b80c3385fb9c1d76090d7f2"
+
+[capabilities.cursor]
+surface = ".cursor/skills/spec-intake/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.structural-hygiene-review"
 kind = "skill"
@@ -753,6 +897,11 @@ surface = ".agent/skills/structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/structural-hygiene-review/SKILL.md"
 source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
+
+[capabilities.cursor]
+surface = ".cursor/skills/structural-hygiene-review/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "hook.advisory-router-scan"
 kind = "hook"
@@ -775,6 +924,11 @@ status = "native"
 [capabilities.antigravity]
 surface = ".claude/hooks/advisory-router-scan.py"
 status = "native"
+
+[capabilities.cursor]
+surface = ".claude/hooks/advisory-router-scan.py"
+status = "fallback"
+fallback = "Cursor stop hook invokes the canonical advisory router script through .cursor/hooks.json."
 [[capabilities]]
 # Slice 5 of PROJECT-GTKB-CROSS-HARNESS-PARITY (first conformance case): unifies
 # the Claude and Codex ::open/::close topic-envelope routing adapters under one
@@ -799,6 +953,15 @@ status = "native"
 [capabilities.codex]
 surface = ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py"
 status = "native"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a native topic-envelope hook surface."
+
+[capabilities.cursor]
+surface = ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py"
+status = "fallback"
+fallback = "Cursor beforeSubmitPrompt invokes the shared topic-envelope and wrap-trigger dispatcher."
 [[capabilities]]
 id = "skill.gtkb-benchmarks"
 kind = "skill"
@@ -823,6 +986,11 @@ surface = ".agent/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
 source_sha256 = "f456f8bf39cbd93300befe37e35a9ef9da2efccd4fe55e06d51d2636d9c36262"
+
+[capabilities.cursor]
+surface = ".cursor/skills/gtkb-benchmarks/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.grill-me-for-clarification"
 kind = "skill"
@@ -847,6 +1015,11 @@ surface = ".agent/skills/grill-me-for-clarification/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/grill-me-for-clarification/SKILL.md"
 source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
+
+[capabilities.cursor]
+surface = ".cursor/skills/grill-me-for-clarification/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.gtkb-hygiene-investigation"
 kind = "skill"
@@ -871,6 +1044,11 @@ surface = ".agent/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
 source_sha256 = "58a49132e0384ae2d277ce7e3f88cd27a21a4cb324a84bbf580b1a888aac8a86"
+
+[capabilities.cursor]
+surface = ".cursor/skills/gtkb-hygiene-investigation/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.gtkb-hygiene-sweep"
 kind = "skill"
@@ -895,6 +1073,11 @@ surface = ".agent/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
 source_sha256 = "a836a16b551bca526c1b7457433aa704383544abb4b3823b10e9c2222396179f"
+
+[capabilities.cursor]
+surface = ".cursor/skills/gtkb-hygiene-sweep/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.gtkb-sweep-commit"
 kind = "skill"
@@ -919,6 +1102,11 @@ surface = ".agent/skills/gtkb-sweep-commit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
 source_sha256 = "25541a0b5ccd0ad04341535cef9d14b9aa32950089800513a0d3e3bf7c562ae2"
+
+[capabilities.cursor]
+surface = ".cursor/skills/gtkb-sweep-commit/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.loyal-opposition-hygiene-assessment"
 kind = "skill"
@@ -943,6 +1131,11 @@ surface = ".agent/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 source_sha256 = "c817927d765d25f1ba58c4bc6e8d3779c7c15177ae8d87ae13e0abcf1138a705"
+
+[capabilities.cursor]
+surface = ".cursor/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "skill.verify"
 kind = "skill"
@@ -971,6 +1164,10 @@ source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1
 # 4 Group-A unifications + 18 Group-B/C single-harness capabilities whose
 # absent-harness asymmetry is owner-waived below (owner_approval_ref DELIB-20266285).
 
+[capabilities.cursor]
+surface = ".cursor/skills/verify/SKILL.md"
+status = "fallback"
+fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
 id = "hook.directive-enforcement"
 kind = "hook"
@@ -989,6 +1186,14 @@ status = "native"
 surface = ".codex/gtkb-hooks/directive-enforcement.cmd"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a native directive-enforcement hook surface."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes .claude/hooks/directive-enforcement-claude-adapter.py through cursor_hook_adapter before shell execution."
 [[capabilities]]
 id = "hook.formal-artifact-approval"
 kind = "hook"
@@ -1007,6 +1212,14 @@ status = "native"
 surface = ".codex/gtkb-hooks/formal-artifact-approval.cmd"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a native formal-artifact approval hook surface."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes .claude/hooks/formal-artifact-approval-gate.py through cursor_hook_adapter."
 [[capabilities]]
 id = "hook.sot-read-discipline"
 kind = "hook"
@@ -1025,6 +1238,14 @@ status = "native"
 surface = ".codex/gtkb-hooks/sot-read-discipline-bash-adapter.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a native SoT-read-discipline hook surface."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes .claude/hooks/sot-read-discipline.py through cursor_hook_adapter."
 [[capabilities]]
 id = "hook.wi-id-collision-gate"
 kind = "hook"
@@ -1043,6 +1264,14 @@ status = "native"
 surface = ".codex/gtkb-hooks/wi-id-collision-gate.cmd"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a native bridge WI-ID collision hook surface."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes .claude/hooks/bridge-proposal-wi-id-collision-gate.py through cursor_hook_adapter."
 [[capabilities]]
 id = "hook.bridge-compliance-gate-apply-patch-adapter"
 kind = "hook"
@@ -1057,6 +1286,13 @@ applicability = "universal"
 surface = ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Codex apply_patch tool surface; the adapter is Codex-specific."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Codex apply_patch tool surface; the adapter is Codex-specific."
 [[capabilities]]
 id = "hook.codex-mcp-worker-guard"
 kind = "hook"
@@ -1071,6 +1307,13 @@ applicability = "universal"
 surface = ".codex/gtkb-hooks/codex-mcp-worker-guard.cmd"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Codex MCP worker surface; the guard is Codex-specific."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Codex MCP worker surface; the guard is Codex-specific."
 [[capabilities]]
 id = "hook.bridge-compliance-audit"
 kind = "hook"
@@ -1085,6 +1328,13 @@ applicability = "universal"
 surface = ".codex/gtkb-hooks/bridge-compliance-audit.cmd"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Codex apply_patch/Bash post-tool audit hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Codex apply_patch/Bash post-tool audit hook surface."
 [[capabilities]]
 id = "hook.assertion-check"
 kind = "hook"
@@ -1099,6 +1349,17 @@ applicability = "universal"
 surface = ".claude/hooks/assertion-check.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Claude-style SessionStart assertion surfacing hook; assertion visibility is handled outside this registered hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness has no Claude-style SessionStart assertion surfacing hook; assertion visibility is handled outside this registered hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Claude-style SessionStart assertion surfacing hook; assertion visibility is handled outside this registered hook surface."
 [[capabilities]]
 id = "hook.bridge-axis-2-surface"
 kind = "hook"
@@ -1113,6 +1374,17 @@ applicability = "universal"
 surface = ".claude/hooks/bridge-axis-2-surface.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Claude UserPromptSubmit AXIS-2 bridge-surfacing hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness has no Claude UserPromptSubmit AXIS-2 bridge-surfacing hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Claude UserPromptSubmit AXIS-2 bridge-surfacing hook surface."
 [[capabilities]]
 id = "hook.delib-search-gate"
 kind = "hook"
@@ -1127,6 +1399,17 @@ applicability = "universal"
 surface = ".claude/hooks/delib-search-gate.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Claude UserPromptSubmit deliberation-search gate surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness has no Claude UserPromptSubmit deliberation-search gate surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Claude UserPromptSubmit deliberation-search gate surface."
 [[capabilities]]
 id = "hook.delib-search-tracker"
 kind = "hook"
@@ -1141,6 +1424,17 @@ applicability = "universal"
 surface = ".claude/hooks/delib-search-tracker.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness has no Claude PostToolUse deliberation-search tracker surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness has no Claude PostToolUse deliberation-search tracker surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness has no Claude PostToolUse deliberation-search tracker surface."
 [[capabilities]]
 id = "hook.dispatch_blackbox_gate"
 kind = "hook"
@@ -1155,6 +1449,18 @@ applicability = "universal"
 surface = "scripts/dispatch_blackbox_gate.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks this exact Claude Write/Edit dispatch-blackbox hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks this exact Claude Write/Edit dispatch-blackbox hook surface."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes scripts/dispatch_blackbox_gate.py through cursor_hook_adapter for Write preToolUse."
 [[capabilities]]
 id = "hook.gov09-capture"
 kind = "hook"
@@ -1169,6 +1475,17 @@ applicability = "universal"
 surface = ".claude/hooks/gov09-capture.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit GOV-09 capture hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit GOV-09 capture hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit GOV-09 capture hook surface."
 [[capabilities]]
 id = "hook.intake-classifier"
 kind = "hook"
@@ -1183,6 +1500,17 @@ applicability = "universal"
 surface = ".claude/hooks/intake-classifier.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit intake-classifier hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit intake-classifier hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit intake-classifier hook surface."
 [[capabilities]]
 id = "hook.kb-not-markdown"
 kind = "hook"
@@ -1197,6 +1525,17 @@ applicability = "universal"
 surface = ".claude/hooks/kb-not-markdown.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude PreToolUse kb-not-markdown hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks the Claude PreToolUse kb-not-markdown hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness lacks the Claude PreToolUse kb-not-markdown hook surface."
 [[capabilities]]
 id = "hook.narrative-artifact-approval-gate"
 kind = "hook"
@@ -1211,6 +1550,18 @@ applicability = "universal"
 surface = ".claude/hooks/narrative-artifact-approval-gate.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude Write/Edit narrative-artifact approval hook surface; related governance is covered by harness-specific bridge/file gates where available."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks the Claude Write/Edit narrative-artifact approval hook surface; related governance is covered by harness-specific bridge/file gates where available."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes .claude/hooks/narrative-artifact-approval-gate.py through cursor_hook_adapter for Write preToolUse."
 [[capabilities]]
 id = "hook.owner-decision-capture"
 kind = "hook"
@@ -1225,6 +1576,17 @@ applicability = "universal"
 surface = ".claude/hooks/owner-decision-capture.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude PostToolUse owner-decision capture hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks the Claude PostToolUse owner-decision capture hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness lacks the Claude PostToolUse owner-decision capture hook surface."
 [[capabilities]]
 id = "hook.owner-decision-tracker"
 kind = "hook"
@@ -1239,6 +1601,17 @@ applicability = "universal"
 surface = ".claude/hooks/owner-decision-tracker.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit/Stop owner-decision tracker hook surface."
+
+[capabilities.codex]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit/Stop owner-decision tracker hook surface."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "This harness lacks the Claude UserPromptSubmit/Stop owner-decision tracker hook surface."
 [[capabilities]]
 id = "hook.scanner-safe-writer"
 kind = "hook"
@@ -1253,6 +1626,19 @@ applicability = "universal"
 surface = ".claude/hooks/scanner-safe-writer.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude scanner-safe-writer hook surface."
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/credential-scan.cmd"
+status = "fallback"
+fallback = "Codex credential-scan.cmd covers the Bash/apply_patch credential-safety surface."
+
+[capabilities.cursor]
+surface = "scripts/cursor_hook_adapter.py"
+status = "fallback"
+fallback = "Cursor routes credential-scan.py through cursor_hook_adapter on shell execution as the credential-safety fallback."
 [[capabilities]]
 id = "hook.session-start-governance"
 kind = "hook"
@@ -1267,6 +1653,18 @@ applicability = "universal"
 surface = ".claude/hooks/session-start-governance.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a native SessionStart governance hook surface."
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/session_start_dispatch.py"
+status = "native"
+
+[capabilities.cursor]
+surface = ".cursor/gtkb-hooks/session_start_dispatch.py"
+status = "fallback"
+fallback = "Cursor SessionStart delegates to the shared session_start_dispatch_core startup disclosure path."
 [[capabilities]]
 id = "hook.session_self_initialization"
 kind = "hook"
@@ -1281,6 +1679,19 @@ applicability = "universal"
 surface = "scripts/session_self_initialization.py"
 status = "native"
 
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks a direct session_self_initialization hook surface."
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/session_start_dispatch.py"
+status = "fallback"
+fallback = "Codex startup wrapper delegates to shared startup initialization behavior rather than registering session_self_initialization.py directly."
+
+[capabilities.cursor]
+surface = ".cursor/gtkb-hooks/session_start_dispatch.py"
+status = "fallback"
+fallback = "Cursor startup wrapper delegates to the shared startup initialization core."
 [[capabilities]]
 id = "hook.spec-before-code"
 kind = "hook"
@@ -1295,6 +1706,20 @@ applicability = "universal"
 surface = ".claude/hooks/spec-before-code.py"
 status = "native"
 
+
+[harnesses.cursor]
+# Harness-level capability floor declaration for Cursor Agent parity tracking.
+bridge_compliance_gate_respect = true
+root_boundary_respect = true
+author_metadata_env_var_setting = true
+destructive_gate_delegation = true
+advertised_tool_subset = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+tool_guard_adapter_fail_closed = true
+routing_schema_version = 1
+skill_adapter_generation_supported = true
+skill_adapter_generator = "scripts/_bootstrap_cursor_harness.py"
+skill_adapter_manifest = ".cursor/skills/MANIFEST.json"
+skill_adapter_drift_check_supported = true
 
 [harnesses.ollama]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3
@@ -1479,3 +1904,17 @@ reason_class = "harness-surface-difference"
 rationale = "Claude PreToolUse spec-before-code gate; Codex uses spec-classifier on UserPromptSubmit."
 owner_approval_ref = "DELIB-20266285"
 review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "This harness lacks the Claude PreToolUse spec-before-code hook surface."
+
+[capabilities.codex]
+surface = ".claude/hooks/spec-classifier.py"
+status = "fallback"
+fallback = "Codex UserPromptSubmit invokes spec-classifier as the practical specification-intake fallback."
+
+[capabilities.cursor]
+surface = ".claude/hooks/spec-classifier.py"
+status = "fallback"
+fallback = "Cursor beforeSubmitPrompt invokes spec-classifier as the practical specification-intake fallback."
