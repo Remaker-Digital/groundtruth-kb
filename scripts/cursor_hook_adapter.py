@@ -13,6 +13,10 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _windows_no_window_creationflags() -> int:
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+
+
 def _read_payload() -> dict[str, Any]:
     raw = sys.stdin.buffer.read()
     if not raw:
@@ -66,15 +70,19 @@ def main() -> int:
     env.setdefault("GTKB_HARNESS_NAME", "cursor")
     env.setdefault("GTKB_HARNESS_ID", "E")
 
-    completed = subprocess.run(
-        [sys.executable, str(target), *sys.argv[2:]],
-        input=json.dumps(adapted_in),
-        capture_output=True,
-        text=True,
-        cwd=str(PROJECT_ROOT),
-        env=env,
-        check=False,
-    )
+    run_kwargs: dict[str, Any] = {
+        "input": json.dumps(adapted_in),
+        "capture_output": True,
+        "text": True,
+        "cwd": str(PROJECT_ROOT),
+        "env": env,
+        "check": False,
+    }
+    creationflags = _windows_no_window_creationflags()
+    if creationflags:
+        run_kwargs["creationflags"] = creationflags
+
+    completed = subprocess.run([sys.executable, str(target), *sys.argv[2:]], **run_kwargs)
     if completed.stderr:
         sys.stderr.write(completed.stderr)
     stdout = completed.stdout.strip()
