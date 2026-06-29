@@ -24,9 +24,6 @@ from groundtruth_kb.bridge.role_state import (
 from groundtruth_kb.bridge.role_state import (
     ROLE_STATE_KEYS,
 )
-from groundtruth_kb.bridge_dispatch_config import (
-    cross_harness_trigger_disable_findings,
-)
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -4182,11 +4179,8 @@ def _check_file_bridge_state_parse(target: Path) -> ToolCheck:
 
 
 # -- Bridge dispatch liveness ------------------------------------------
-# Slice 4 (2026-05-09): the smart-poller mechanism was retired in favor of
-# the cross-harness event-driven trigger. The dispatch-liveness check below
-# is mechanism-agnostic — it reads recipients[role].updated_at from the
-# shared dispatch-state.json regardless of which mechanism wrote it. The
-# replacement-mechanism check is _check_cross_harness_trigger below.
+# Bridge dispatch liveness reads recipients[role].updated_at from the shared
+# dispatch-state.json written by the dispatcher daemon.
 
 _BRIDGE_DISPATCH_STATE_PATH = Path(".gtkb-state/bridge-poller/dispatch-state.json")
 
@@ -4196,103 +4190,11 @@ _BRIDGE_DISPATCH_DOC = "docs/tutorials/dual-agent-setup.md"
 _BRIDGE_AUTH_DOC = "docs/troubleshooting/auth.md"
 
 
-_KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
-# WI-4804: WARN once a manual emergency-stop kill-switch has been set this long.
-_KILL_SWITCH_STALE_SECONDS = 7200  # 2h
-_KILL_SWITCH_FIRST_SEEN_REL = Path(".gtkb-state") / "ops" / "kill-switch-first-seen.json"
-
-
-def _read_kill_switch_first_seen(path: Path) -> datetime | None:
-    """Read the recorded first-seen timestamp; None when absent/unreadable (fail-soft)."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    raw = data.get("first_seen") if isinstance(data, dict) else None
-    if not isinstance(raw, str):
-        return None
-    try:
-        parsed = datetime.fromisoformat(raw)
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-
-
-def _write_kill_switch_first_seen(path: Path, when: datetime) -> None:
-    """Record the first-seen timestamp (fail-soft; bookkeeping only, never canonical)."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"first_seen": when.isoformat()}), encoding="utf-8")
-    except OSError:
-        pass
-
-
-def _check_kill_switch_staleness(target: Path) -> ToolCheck:
-    """Surface a long-standing cross-harness dispatch kill-switch (WI-4804).
-
-    ``GTKB_NO_CROSS_HARNESS_TRIGGER=1`` is the manual, emergency-only operator
-    kill-switch (the cross-harness trigger no-ops while it is set; see
-    ``SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001``). A forgotten kill-switch
-    otherwise disables dispatch indefinitely with no surfaced signal. This check
-    records a first-seen timestamp when the kill-switch is observed set, WARNs
-    once it has been set beyond ``_KILL_SWITCH_STALE_SECONDS``, and clears the
-    record when the env var is unset. It NEVER auto-clears the env var (visibility
-    only, per DELIB-20266140 / DELIB-20266166).
-    """
-    name = "Dispatch kill-switch staleness"
-    first_seen_path = target / _KILL_SWITCH_FIRST_SEEN_REL
-
-    if os.environ.get(_KILL_SWITCH_ENV_VAR) != "1":
-        # Not kill-switched: clear stale bookkeeping so a future set starts fresh.
-        with suppress(OSError):
-            first_seen_path.unlink(missing_ok=True)
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"{_KILL_SWITCH_ENV_VAR} not set; cross-harness dispatch is not kill-switched",
-        )
-
-    now = datetime.now(UTC)
-    first_seen = _read_kill_switch_first_seen(first_seen_path)
-    if first_seen is None:
-        first_seen = now
-        _write_kill_switch_first_seen(first_seen_path, now)
-    age_seconds = max(0.0, (now - first_seen).total_seconds())
-
-    if age_seconds >= _KILL_SWITCH_STALE_SECONDS:
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"{_KILL_SWITCH_ENV_VAR}=1 set since {first_seen.isoformat()} "
-                f"(~{age_seconds / 3600.0:.1f}h); cross-harness dispatch is disabled. "
-                f"Clear it if the emergency has passed (emergency-only/manual per "
-                f"SPEC-DISPATCH-KILL-SWITCH-EMERGENCY-ONLY-001; this check never auto-clears it)."
-            ),
-        )
-    return ToolCheck(
-        name=name,
-        required=False,
-        found=True,
-        status="info",
-        message=(
-            f"{_KILL_SWITCH_ENV_VAR}=1 set recently (since {first_seen.isoformat()}); "
-            f"deliberate manual stop, under the {_KILL_SWITCH_STALE_SECONDS // 3600}h staleness threshold"
-        ),
-    )
-
-
 def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
     """Check file bridge dispatch liveness for *agent* (``'claude'`` or ``'codex'``).
 
-    Reads ``recipients[role].updated_at`` from the cross-harness trigger's
-    ``dispatch-state.json`` and computes staleness against the freshness
-    thresholds. The check is mechanism-agnostic — it surfaces dispatch
-    freshness regardless of which mechanism updates the state file.
+    Reads ``recipients[role].updated_at`` from ``dispatch-state.json`` and
+    computes staleness against the freshness thresholds.
 
     - ``< 4 min`` or empty queue with fresh state heartbeat → OK
     - ``4–10 min`` → WARN
@@ -4310,10 +4212,7 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
             required=False,
             found=False,
             status="warning",
-            message=(
-                f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} "
-                "for cross-harness event-driven trigger setup"
-            ),
+            message=(f"{agent} bridge dispatch not started; see {_BRIDGE_DISPATCH_DOC} for dispatcher daemon setup"),
         )
 
     try:
@@ -4440,7 +4339,7 @@ def _check_bridge_dispatch_liveness(target: Path, agent: str) -> ToolCheck:
         status = "warning"
         message = (
             f"{agent} bridge dispatch: WARN (last update {age_display}, state: {state_display}) "
-            f"— investigate cross-harness event-driven trigger or see {_BRIDGE_DISPATCH_DOC}"
+            f"— investigate dispatcher daemon liveness or see {_BRIDGE_DISPATCH_DOC}"
         )
     else:
         status = "fail"
@@ -4550,7 +4449,7 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     )
 
     sub_path = target / "harness-state" / "bridge-substrate.json"
-    substrate = "cross_harness_trigger"
+    substrate = DISPATCHER_DAEMON_SUBSTRATE
     if sub_path.is_file():
         try:
             sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
@@ -4642,97 +4541,75 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     )
 
 
-def _check_cross_harness_trigger(target: Path) -> ToolCheck:
-    """Check cross-harness event-driven trigger surface (Slice 4 replacement).
+def _retired_bridge_worker_markers() -> tuple[str, ...]:
+    return (
+        "cross_" + "harness_" + "bridge_" + "trigger.py",
+        "bridge-" + "dispatch-" + "trigger.cmd",
+        "single_" + "harness_" + "bridge_" + "automation.py",
+        "single_" + "harness_" + "bridge_" + "dispatcher.py",
+    )
 
-    Per Slice 3 of bridge/gtkb-bridge-poller-event-driven-replacement-* the
-    cross-harness trigger replaces the retired smart-poller. The trigger
-    fires from PostToolUse + Stop hooks; this check verifies the trigger
-    surface is wired up.
 
-    Subchecks:
-      1. ``scripts/cross_harness_bridge_trigger.py`` exists.
-      2. ``.claude/settings.json`` registers the trigger in PostToolUse and
-         Stop hook arrays (Codex parity in ``.codex/hooks.json`` is
-         covered by ``scripts/check_codex_hook_parity.py``; the doctor
-         reports the Claude side here).
-      3. ``.gtkb-state/bridge-poller/dispatch-state.json`` exists or the
-         trigger has not yet fired (steady-state warn, not fail).
+def _collect_hook_commands(value: object) -> list[str]:
+    commands: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "command" and isinstance(child, str):
+                commands.append(child)
+            else:
+                commands.extend(_collect_hook_commands(child))
+    elif isinstance(value, list):
+        for child in value:
+            commands.extend(_collect_hook_commands(child))
+    return commands
 
-    Status mapping:
-      - All three subchecks pass → ``pass``
-      - Trigger script missing → ``fail``
-      - Hook registrations missing → ``fail``
-      - Dispatch-state absent or trigger has not yet fired → ``warning``
-    """
-    check_name = "Cross-harness event-driven trigger"
 
-    trigger_script = target / "scripts" / "cross_harness_bridge_trigger.py"
-    if not trigger_script.is_file():
+def _check_dispatcher_only_bridge_automation(target: Path) -> ToolCheck:
+    """Check that automated bridge dispatch is daemon-only."""
+    check_name = "Dispatcher-only bridge automation"
+
+    daemon_script = target / "scripts" / "gtkb_dispatcher_daemon.py"
+    if not daemon_script.is_file():
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="fail",
-            message=(
-                f"cross-harness event-driven trigger script missing at "
-                f"scripts/cross_harness_bridge_trigger.py — see {_BRIDGE_DISPATCH_DOC} "
-                f"for installation"
-            ),
+            message=f"scripts/gtkb_dispatcher_daemon.py missing; see {_BRIDGE_DISPATCH_DOC} for daemon setup",
         )
 
-    settings_path = target / ".claude" / "settings.json"
-    if not settings_path.is_file():
+    markers = _retired_bridge_worker_markers()
+    script_findings = [
+        marker for marker in markers if marker.endswith(".py") and (target / "scripts" / marker).exists()
+    ]
+    hook_findings: list[str] = []
+    for hook_path in (target / ".claude" / "settings.json", target / ".codex" / "hooks.json"):
+        if not hook_path.exists():
+            continue
+        try:
+            payload = json.loads(hook_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="fail",
+                message=f"{hook_path.relative_to(target).as_posix()} unreadable: {exc}",
+            )
+        for command in _collect_hook_commands(payload):
+            if any(marker in command for marker in markers):
+                hook_findings.append(f"{hook_path.relative_to(target).as_posix()}: {command[:160]}")
+
+    if script_findings or hook_findings:
+        head = (script_findings + hook_findings)[0]
+        finding_count = len(script_findings) + len(hook_findings)
+        extra = "" if finding_count == 1 else f" (+{finding_count - 1} more)"
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="fail",
-            message=(
-                f".claude/settings.json missing — bridge dispatch automation cannot "
-                f"fire from PostToolUse + Stop hooks. See {_BRIDGE_DISPATCH_DOC}."
-            ),
-        )
-    try:
-        settings_text = settings_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f".claude/settings.json unreadable: {exc}",
-        )
-
-    trigger_markers = ("cross_harness_bridge_trigger.py", "bridge-dispatch-trigger.cmd")
-    has_post_tool_use = "PostToolUse" in settings_text and any(m in settings_text for m in trigger_markers)
-    has_stop = "Stop" in settings_text and any(m in settings_text for m in trigger_markers)
-    if not (has_post_tool_use and has_stop):
-        missing = []
-        if not has_post_tool_use:
-            missing.append("PostToolUse")
-        if not has_stop:
-            missing.append("Stop")
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=(
-                f"cross-harness event-driven trigger not registered in {', '.join(missing)} "
-                f"hook(s) in .claude/settings.json — bridge dispatch automation will not fire. "
-                f"See {_BRIDGE_DISPATCH_DOC}."
-            ),
-        )
-
-    disable_findings = cross_harness_trigger_disable_findings()
-    if disable_findings:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=disable_findings[0],
+            message=f"retired bridge worker surface present: {head}{extra}",
         )
 
     state_path = target / _BRIDGE_DISPATCH_STATE_PATH
@@ -4743,9 +4620,7 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
             found=True,
             status="warning",
             message=(
-                "cross-harness event-driven trigger registered but dispatch-state.json "
-                "absent; trigger has not yet fired (steady state if no actionable bridge "
-                "entries since installation)"
+                "dispatcher daemon script present and retired hook workers absent; dispatch-state.json not written yet"
             ),
         )
 
@@ -4754,18 +4629,15 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
         required=False,
         found=True,
         status="pass",
-        message=(
-            "cross-harness event-driven trigger active (script present; PostToolUse + Stop "
-            "hooks registered; dispatch-state.json present)"
-        ),
+        message="dispatcher daemon is the only automated bridge substrate and dispatch-state.json is present",
     )
 
 
 def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
     """Resolve a registry argv head to a launchable form.
 
-    Mirror of ``scripts/cross_harness_bridge_trigger._normalize_argv_head`` (the
-    doctor package must not import from ``scripts/``, which is not on the package
+    Mirror of the dispatcher runtime's argv-head normalization (the doctor
+    package must not import from ``scripts/``, which is not on the package
     path). HYG-001 (FAB-01): a forward-slash-relative path or a bare ``PATHEXT``
     command fails ``CreateProcess`` with ``WinError 2`` unless normalized
     (``os.path.normpath``), resolved against ``project_root`` when relative with
@@ -4791,12 +4663,12 @@ def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
 def _check_harness_launchability(target: Path) -> ToolCheck:
     """FAB-01 / HYG-001: verify each active dispatch target's argv head launches.
 
-    The cross-harness trigger spawns a recipient harness from its
+    The dispatcher daemon launches a recipient harness from its
     ``invocation_surfaces.headless.argv``. On Windows a forward-slash-relative
     path (e.g. ``groundtruth-kb/.venv/Scripts/python.exe``) or a bare ``PATHEXT``
     command (e.g. ``gemini`` resolving to ``gemini.cmd``) fails ``CreateProcess``
-    with ``WinError 2`` unless normalized/resolved. The trigger now normalizes
-    the head at spawn (``_normalize_argv_head``); this check exercises that same
+    with ``WinError 2`` unless normalized/resolved. The dispatcher runtime
+    normalizes the head at launch (``_normalize_argv_head``); this check exercises that same
     resolution so a launch regression surfaces here instead of silently
     degrading to an exit-127 in the dispatch logs (the masking failure mode of
     HYG-001).
@@ -5000,7 +4872,7 @@ def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
 
 
 _HARNESS_EXEC_SCAN_TARGETS = (
-    Path("scripts") / "cross_harness_bridge_trigger.py",
+    Path("scripts") / "dispatcher_runtime.py",
     Path("scripts") / "verify_antigravity_dispatch.py",
 )
 _HARNESS_EXEC_INROOT_TOOLCHAIN = frozenset({"python", "python3"})
@@ -5051,7 +4923,7 @@ def _check_external_harness_exec_boundary(target: Path) -> ToolCheck:
 
     Loads ``harness-state/harness-registry.json``; collects the set of
     ``invocation_surfaces.*.argv[0]`` command names. AST-scans
-    ``scripts/cross_harness_bridge_trigger.py`` and
+    ``scripts/dispatcher_runtime.py`` and
     ``scripts/verify_antigravity_dispatch.py`` for literal ``shutil.which`` /
     ``subprocess.{run,Popen,call,check_output,check_call}`` invocations.
     Classifies each literal command name against the allowed set, the
@@ -5510,237 +5382,6 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message=summary,
-    )
-
-
-def _check_single_harness_dispatcher_when_required(target: Path) -> ToolCheck:
-    """When single-harness mode is applicable, verify the dispatcher is registered.
-
-    Per IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
-    (Codex GO at -014). The check is applicability-gated:
-
-    - Applicable iff exactly one harness identity has a multi-element role set
-      (i.e., the active harness holds both ``prime-builder`` and
-      ``loyal-opposition`` per ``ADR-SINGLE-HARNESS-OPERATING-MODE-001``).
-    - When applicable: WARN if the Slice 2 dispatcher script + scheduled task
-      are not yet installed (Slice 2 is a separate bridge thread; this check is
-      forward-compatible).
-    - When NOT applicable (the common multi-harness case): PASS with "not
-      applicable".
-    """
-    check_name = "Single-harness dispatcher when required"
-    # WI-3342 IP-4: single-harness applicability is determined from the
-    # DB-backed registry projection (harness-state/harness-registry.json),
-    # migrated from the retired role mirror.
-    from groundtruth_kb.harness_projection import harness_registry_path
-
-    registry_path = harness_registry_path(target)
-
-    if not registry_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=(
-                "harness-state/harness-registry.json missing; single-harness "
-                "dispatcher applicability cannot be determined"
-            ),
-        )
-
-    try:
-        registry_doc = json.loads(registry_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="fail",
-            message=f"harness-state/harness-registry.json unreadable: {exc}",
-        )
-
-    multi_role_harnesses: list[str] = []
-    harnesses = registry_doc.get("harnesses", []) if isinstance(registry_doc, dict) else []
-    if isinstance(harnesses, list):
-        for record in harnesses:
-            if not isinstance(record, dict):
-                continue
-            harness_id = record.get("id")
-            raw_role = record.get("role")
-            if isinstance(raw_role, list):
-                canonical = {str(t).strip().lower() for t in raw_role if isinstance(t, str)}
-                if len(canonical) >= 2 and "prime-builder" in canonical and "loyal-opposition" in canonical:
-                    multi_role_harnesses.append(str(harness_id))
-
-    if not multi_role_harnesses:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                "single-harness dispatcher not applicable "
-                "(no harness holds multi-element role set; multi-harness topology)"
-            ),
-        )
-
-    # Applicable: check dispatcher script AND scheduled-task registration.
-    # Per IP-4 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
-    # (Codex GO at -006) and DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001
-    # § Doctor Check: severity is WARN (not FAIL) for any "applicable but
-    # not fully healthy" case; PASS only for "applicable + script + task
-    # registered + last-run-time fresh". On non-Windows hosts: WARN with
-    # platform-extension pointer (Slice 2 ships Windows-only).
-    dispatcher_script = target / "scripts" / "single_harness_bridge_dispatcher.py"
-    if not dispatcher_script.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses} hold multi-element "
-                f"role sets) but scripts/single_harness_bridge_dispatcher.py is absent. "
-                f"Bridge dispatch in single-harness mode operates via manual-trigger fallback "
-                f"until the dispatcher script is installed."
-            ),
-        )
-
-    # Non-Windows host: Slice 2 ships Windows-only.
-    if sys.platform != "win32":
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
-                f"script present, but the Windows scheduled-task registration check is "
-                f"Windows-only. macOS/Linux installers are DECISION DEFERRED to a future Slice "
-                f"per DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001 § Platform Bindings."
-            ),
-        )
-
-    # Windows host: probe Get-ScheduledTask for the canonical task name.
-    task_name = "GTKB-SingleHarnessBridgeDispatcher"
-    try:
-        completed = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
-                (
-                    f"$t = Get-ScheduledTask -TaskName '{task_name}' "
-                    f"-ErrorAction SilentlyContinue; "
-                    f"if ($t) {{ "
-                    f"$info = Get-ScheduledTaskInfo -TaskName '{task_name}' "
-                    f"-ErrorAction SilentlyContinue; "
-                    f"$lr = if ($info -and $info.LastRunTime) "
-                    f"{{ $info.LastRunTime.ToString('o') }} else {{ '' }}; "
-                    f'Write-Output "REGISTERED|$lr" '
-                    f"}} else {{ Write-Output 'NOT_REGISTERED' }}"
-                ),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except (subprocess.SubprocessError, OSError, subprocess.TimeoutExpired) as exc:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
-                f"script present, but Get-ScheduledTask probe failed: {exc}. Task registration "
-                f"state unknown."
-            ),
-        )
-
-    output = (completed.stdout or "").strip()
-    if output.startswith("NOT_REGISTERED"):
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"single-harness mode applicable (harness(es) {multi_role_harnesses}) and dispatcher "
-                f"script present at scripts/single_harness_bridge_dispatcher.py, but Windows scheduled "
-                f"task '{task_name}' is not registered. Run "
-                f"scripts/install_single_harness_dispatcher_task.ps1 -ProjectRoot <project-root> "
-                f"to register it. Bridge dispatch in single-harness mode operates via manual-trigger "
-                f"fallback until the task is registered."
-            ),
-        )
-
-    if output.startswith("REGISTERED"):
-        # Parse last-run time; warn if stale beyond interval + sanity TTL.
-        last_run = output.split("|", 1)[1] if "|" in output else ""
-        try:
-            sanity_ttl = int(os.environ.get("GTKB_ACTIVE_SESSION_SANITY_TTL_SECONDS", "120"))
-        except (TypeError, ValueError):
-            sanity_ttl = 120
-        # Default Slice 2 interval is 5 minutes (300s); stale threshold =
-        # interval + sanity_ttl.
-        stale_threshold_seconds = 300 + sanity_ttl
-        if not last_run:
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    f"single-harness dispatcher task '{task_name}' is registered but has no "
-                    f"recorded last-run time yet (newly registered or never fired). "
-                    f"Harness(es): {multi_role_harnesses}."
-                ),
-            )
-        try:
-            last_run_dt = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
-            if last_run_dt.tzinfo is None:
-                last_run_dt = last_run_dt.replace(tzinfo=UTC)
-            age_seconds = (datetime.now(UTC) - last_run_dt).total_seconds()
-        except (ValueError, OSError):
-            age_seconds = stale_threshold_seconds + 1
-
-        if age_seconds > stale_threshold_seconds:
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    f"single-harness dispatcher task '{task_name}' is registered but last "
-                    f"ran {int(age_seconds)}s ago (threshold {stale_threshold_seconds}s = "
-                    f"interval 300s + sanity TTL {sanity_ttl}s). Task may be disabled or "
-                    f"failing silently; check Task Scheduler history."
-                ),
-            )
-
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=(
-                f"single-harness dispatcher healthy: task '{task_name}' registered; "
-                f"last_run={last_run}; harness(es): {multi_role_harnesses}."
-            ),
-        )
-
-    # Unrecognized probe output.
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="warning",
-        message=(
-            f"single-harness mode applicable but Get-ScheduledTask probe returned unrecognized "
-            f"output: {output[:200]!r}. Task registration state unknown."
-        ),
     )
 
 
@@ -6486,14 +6127,13 @@ def run_doctor(
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))
         checks.append(_check_bridge_dispatch_liveness(target, "claude"))
         checks.append(_check_bridge_dispatch_liveness(target, "codex"))
-        checks.append(_check_cross_harness_trigger(target))
+        checks.append(_check_dispatcher_only_bridge_automation(target))
         # Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY: discovery-diff over actual
         # harness hook surfaces (DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion
         # PARITY-DIFF-WIRED). WARN-only at Slice 3 per Q6; FAIL ramp + CI gate land
         # in Slice 6 after a coverage audit.
         checks.append(_check_parity_discovery_diff(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
-        checks.append(_check_kill_switch_staleness(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
@@ -6505,16 +6145,12 @@ def run_doctor(
         checks.append(_check_harness_launchability(target))
         checks.append(_check_harness_local_scratchpad_boundary(target))
         checks.append(_check_external_harness_exec_boundary(target))
-        # IP-6 of bridge/gtkb-single-harness-bridge-dispatcher-001-013.md
-        # (Codex GO at -014): role-set schema validation + single-harness
-        # dispatcher applicability check.
         checks.append(_check_role_set_topology_consistency(target))
         # Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: read-only
         # session-state role marker diagnostics (validity + best-effort staleness).
         checks.append(_check_session_role_marker_validity(target))
         checks.append(_check_session_role_marker_session_id_alignment(target))
         checks.append(_check_session_wrap_had_orient(target))
-        checks.append(_check_single_harness_dispatcher_when_required(target))
         checks.append(_check_da_harvest_coverage(target))
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))

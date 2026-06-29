@@ -3,7 +3,7 @@
 
 Shared Stop-hook service registered in BOTH ``.claude/settings.json`` and
 ``.codex/hooks.json`` (the same cross-harness pattern as
-``scripts/cross_harness_bridge_trigger.py``). On turn-end it drains the dispatch
+``scripts/dispatcher_runtime.py``). On turn-end it drains the dispatch
 durability treadmill created by the PHASE-Y dispatcher-daemon go-live
 (``DELIB-20266272``): the dispatchable Loyal Opposition harness (Cursor-E)
 writes terminal ``VERIFIED`` verdicts but cannot commit them, and no dispatchable

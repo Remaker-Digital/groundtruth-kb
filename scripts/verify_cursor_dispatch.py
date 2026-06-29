@@ -25,6 +25,7 @@ CURSOR_DISPATCH_SKILL = "bridge-review"
 CURSOR_VERIFICATION_SKILL = "verification"
 DEFAULT_LIVE_PROMPT = "Reply with READY only."
 DEFAULT_TIMEOUT_SECONDS = 60.0
+DISPATCH_ROLES = frozenset({"loyal-opposition", "prime-builder"})
 
 
 class VerificationError(RuntimeError):
@@ -121,6 +122,48 @@ def _run_live_probe(
     }
 
 
+def _run_auth_probe(
+    agent_command: list[str],
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+    timeout: float = 10.0,
+) -> dict[str, Any]:
+    command = [*agent_command, "status", "--format", "json"]
+    active_runner = runner or subprocess.run
+    completed = active_runner(
+        command,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+        **_hidden_process_kwargs(),
+    )
+    stdout = completed.stdout or ""
+    stderr = completed.stderr or ""
+    authenticated = False
+    status = "unknown"
+    message = ""
+    try:
+        payload = json.loads(stdout) if stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+        message = "status output was not JSON"
+    if isinstance(payload, dict):
+        authenticated = bool(payload.get("isAuthenticated"))
+        status = str(payload.get("status") or status)
+        message = str(payload.get("message") or message)
+    return {
+        "authenticated": authenticated,
+        "command": command,
+        "message": message,
+        "returncode": completed.returncode,
+        "status": status,
+        "stderr_bytes": len(stderr.encode("utf-8")),
+        "stdout_bytes": len(stdout.encode("utf-8")),
+    }
+
+
 def evaluate_readiness(
     *,
     project_root: Path,
@@ -129,6 +172,7 @@ def evaluate_readiness(
     live_prompt: str = DEFAULT_LIVE_PROMPT,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     agent_resolver: Callable[[], list[str]] | None = None,
+    auth_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
     live_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
 ) -> dict[str, Any]:
     """Return fail-closed Cursor headless dispatch readiness evidence."""
@@ -165,9 +209,23 @@ def evaluate_readiness(
         agent_detail = str(exc)
     add_check("headless Cursor Agent CLI", agent_ok, agent_detail)
 
+    auth_probe: dict[str, Any] | None = None
+    auth_ok = False
+    if agent_ok:
+        try:
+            auth_probe = _run_auth_probe(agent_command, runner=auth_runner, timeout=min(timeout, 10.0))
+            auth_ok = bool(auth_probe["authenticated"])
+            auth_detail = f"status={auth_probe['status']}; message={auth_probe['message']}"
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired) as exc:
+            auth_probe = {"authenticated": False, "error": f"{type(exc).__name__}: {exc}"}
+            auth_detail = auth_probe["error"]
+    else:
+        auth_detail = "skipped because agent CLI is unavailable"
+    add_check("headless Cursor Agent authentication", auth_ok, auth_detail)
+
     live_probe: dict[str, Any] | None = None
     live_ok = True
-    if require_live and record_ok and argv_ok and shim_ok and agent_ok:
+    if require_live and record_ok and argv_ok and shim_ok and agent_ok and auth_ok:
         try:
             live_probe = _run_live_probe(
                 project_root=project_root,
@@ -184,16 +242,17 @@ def evaluate_readiness(
             detail = live_probe["error"]
         add_check("live bridge-review probe", live_ok, detail)
 
-    ready_for_activation = record_ok and argv_ok and shim_ok and agent_ok and live_ok
+    ready_for_activation = record_ok and argv_ok and shim_ok and agent_ok and auth_ok and live_ok
     role = _role_tokens(record)
     dispatchable_now = (
         ready_for_activation
         and record.get("status") == "active"
         and bool(record.get("can_receive_dispatch"))
-        and "loyal-opposition" in role
+        and bool(role & DISPATCH_ROLES)
     )
     return {
         "agent_command": agent_command,
+        "auth_probe": auth_probe,
         "checks": checks,
         "dispatchable_now": dispatchable_now,
         "first_failed_check": _first_failed_detail(checks),

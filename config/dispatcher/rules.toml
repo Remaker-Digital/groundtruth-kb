@@ -42,7 +42,7 @@ estimated_usd_per_dispatch = 0.0
 [harnesses.A]
 description = "Codex: high-quality dispatch target."
 can_receive_dispatch = true
-can_fire_events = true
+can_fire_events = false
 dispatch_cost = 60
 dispatch_quality = 90
 dispatch_availability = 90

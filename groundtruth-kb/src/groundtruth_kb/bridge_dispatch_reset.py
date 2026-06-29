@@ -23,7 +23,6 @@ PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
 DISPATCH_RUNS_DIR_NAME = "dispatch-runs"
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
-KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 DEFAULT_LEASE_TTL_SECONDS = 300
 COMPUTED_QUALITY_RELATIVE = Path(".gtkb-state") / "ops" / "dispatch-quality.json"
 
@@ -44,9 +43,9 @@ class DispatchStateDirs:
         root = project_root.resolve()
         primary = (state_dir or root / ".gtkb-state" / "bridge-poller").resolve()
         dirs: list[Path] = [primary]
-        trigger = (root / ".gtkb-state" / "cross-harness-trigger").resolve()
-        if trigger not in dirs and trigger.is_dir():
-            dirs.append(trigger)
+        legacy_dispatch = (root / ".gtkb-state" / "cross-harness-trigger").resolve()
+        if legacy_dispatch not in dirs and legacy_dispatch.is_dir():
+            dirs.append(legacy_dispatch)
         provenance = (root / ".gtkb-state" / "ops" / "dispatch-provenance").resolve()
         return cls(project_root=root, dispatch_dirs=tuple(dirs), provenance_dir=provenance)
 
@@ -204,6 +203,15 @@ def _clear_recipient_entry(entry: dict[str, Any]) -> bool:
         if entry.get(key) is not None:
             entry[key] = None
             changed = True
+    if "last_result" in entry and entry.get("last_result") not in ("no_pending", "substrate_mismatch_inert"):
+        entry["last_result"] = "no_pending"
+        changed = True
+    if entry.get("pending_count", 0) != 0:
+        entry["pending_count"] = 0
+        changed = True
+    if entry.get("selected_count", 0) != 0:
+        entry["selected_count"] = 0
+        changed = True
     if changed:
         entry["updated_at"] = _now_iso()
     return changed
@@ -280,9 +288,9 @@ def _clear_computed_quality_surfaces(state_dirs: DispatchStateDirs, *, dry_run: 
 def _dispatch_run_pid_alive(pid: int) -> bool:
     """Best-effort cross-platform liveness probe for a dispatched-worker PID (WI-4861).
 
-    Defined locally (not imported from ``cross_harness_bridge_trigger``) to
-    preserve the module dependency direction. Fails closed to not-alive on any
-    probe error so a malformed sidecar can never preserve a dead record.
+    Defined locally to preserve the module dependency direction. Fails closed
+    to not-alive on any probe error so a malformed sidecar can never preserve a
+    dead record.
     """
     try:
         pid_int = int(pid)

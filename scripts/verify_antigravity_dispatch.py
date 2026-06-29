@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -19,15 +21,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.cross_harness_bridge_trigger import DispatchTarget, _harness_command  # noqa: E402
+from scripts.dispatcher_runtime import DispatchTarget, _harness_command  # noqa: E402
 from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 DEFAULT_EVIDENCE_ROOT = PROJECT_ROOT / ".gtkb-state" / "antigravity-onboarding" / "dispatch-verification"
+DEFAULT_LIVE_PROMPT = "Reply READY only."
+DEFAULT_TIMEOUT_SECONDS = 60.0
+DISPATCH_ROLES = frozenset({"loyal-opposition", "prime-builder"})
 CREDENTIAL_PATTERNS = (
     re.compile(r"(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*([A-Za-z0-9._~+/=-]{8,})"),
     re.compile(r"\bAIza[0-9A-Za-z_-]{20,}\b"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
 )
+AGY_EXECUTABLE_NAMES = ("agy", "agy.exe", "agy.cmd", "agy.ps1")
 
 
 class VerificationError(RuntimeError):
@@ -79,37 +85,28 @@ def build_dispatch_command(project_root: Path, recipient: str, prompt: str) -> l
 
 
 def _resolve_executable_for_host(command: list[str]) -> list[str]:
-    """Return ``command`` with element 0 resolved via the host's ambient PATH.
+    """Return ``command`` with element 0 resolved for the current host.
 
-    Resolution relies ONLY on the launching context's ambient PATH, consistent
-    with the External Harness Executable Resolution Exception clause 2a in
-    ``.claude/rules/project-root-boundary.md`` (the same mechanism by which the
-    codex/claude harness CLIs are already dispatched). This helper performs no
-    PATH enrichment: it does not compute, guess, or inject any user-profile
-    executable directory. ``shutil.which`` is used because, on Windows, Python's
-    ``subprocess`` does not apply PATHEXT to bare command names (e.g., ``gemini``
-    would not find ``gemini.cmd``); ``shutil.which`` DOES apply PATHEXT and
-    returns the absolute path of the resolved executable.
-
-    If ambient resolution fails (the executable is not on the launching
-    context's PATH), the original ``command`` is returned unchanged so
-    ``subprocess`` raises its native ``FileNotFoundError`` rather than this
-    helper silently masking the failure with a user-profile guess. Providing
-    ``gemini`` on PATH is the launcher's responsibility per clause 2a; a future
-    ``.env.local``-configured override (clause 2b, ``GOV-ENV-LOCAL-AUTHORITY-001``)
-    is a named extension, not implemented here.
-
-    The registry-projected canonical argv (``argv.json`` evidence) is preserved
-    via the caller recording both the projected and resolved argv separately;
-    only the OS-launch boundary uses the resolved form.
+    ``shutil.which`` remains the first lookup so ambient PATH wins. On Windows,
+    the official Antigravity installer places ``agy.exe`` under
+    ``%LOCALAPPDATA%\agy\bin`` and the current long-lived process may not inherit
+    the updated user PATH, so this helper also checks that installer-owned path
+    for ``agy`` only. The registry-projected canonical argv is preserved in the
+    evidence payload; only the OS-launch boundary uses the resolved form.
     """
 
     if not command:
         return command
     resolved = shutil.which(command[0])
-    if resolved is None:
-        return command
-    return [resolved] + list(command[1:])
+    if resolved:
+        return [resolved] + list(command[1:])
+    if os.name == "nt" and Path(command[0]).name.lower() in AGY_EXECUTABLE_NAMES:
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidate = Path(local_app_data) / "agy" / "bin" / "agy.exe"
+            if candidate.is_file():
+                return [str(candidate)] + list(command[1:])
+    return command
 
 
 def _timestamp() -> str:
@@ -125,6 +122,161 @@ def _hidden_process_kwargs() -> dict[str, int]:
     if sys.platform.startswith("win"):
         return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
     return {}
+
+
+def _role_tokens(record: dict[str, Any]) -> set[str]:
+    raw = record.get("role")
+    if isinstance(raw, str):
+        return {raw}
+    if isinstance(raw, list):
+        return {item for item in raw if isinstance(item, str)}
+    return set()
+
+
+def _first_failed_detail(checks: list[dict[str, Any]]) -> str:
+    for check in checks:
+        if not check.get("passed"):
+            return f"{check.get('name')}: {check.get('detail') or 'failed'}"
+    return ""
+
+
+def _command_head_name(command: list[str]) -> str:
+    if not command:
+        return ""
+    return Path(command[0]).name.lower()
+
+
+def _is_agy_command(command: list[str]) -> bool:
+    return _command_head_name(command) in AGY_EXECUTABLE_NAMES
+
+
+def _is_legacy_gemini_command(command: list[str]) -> bool:
+    return "gemini" in _command_head_name(command)
+
+
+def _run_live_probe(
+    command: list[str],
+    *,
+    project_root: Path,
+    timeout: float,
+    runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    active_runner = runner or subprocess.run
+    completed = active_runner(
+        command,
+        cwd=project_root,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+        **_hidden_process_kwargs(),
+    )
+    stdout = sanitize_capture(completed.stdout or "")
+    stderr = sanitize_capture(completed.stderr or "")
+    return {
+        "command": command,
+        "ok": completed.returncode == 0 and bool(stdout.strip()),
+        "returncode": completed.returncode,
+        "stderr_bytes": len(stderr.encode("utf-8")),
+        "stdout_bytes": len(stdout.encode("utf-8")),
+    }
+
+
+def evaluate_readiness(
+    *,
+    project_root: Path,
+    recipient: str,
+    require_live: bool = False,
+    live_prompt: str = DEFAULT_LIVE_PROMPT,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    live_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    """Return fail-closed Antigravity dispatch readiness evidence."""
+
+    checks: list[dict[str, Any]] = []
+
+    def add_check(name: str, passed: bool, detail: str = "") -> None:
+        checks.append({"name": name, "passed": passed, "detail": detail})
+
+    record = load_harness_record(project_root, recipient)
+    record_ok = record.get("harness_name") == "antigravity" and record.get("harness_type") == "antigravity"
+    add_check(
+        "registry antigravity record",
+        record_ok,
+        f"name={record.get('harness_name')!r}; type={record.get('harness_type')!r}",
+    )
+
+    command: list[str] = []
+    command_ok = False
+    command_detail = ""
+    if record_ok:
+        try:
+            command = build_dispatch_command(project_root, recipient, live_prompt)
+            command_ok = bool(command)
+            if _is_legacy_gemini_command(command):
+                command_ok = False
+                command_detail = "registry still points at legacy Gemini CLI"
+            elif not _is_agy_command(command):
+                command_ok = False
+                command_detail = f"registry command is not agy: {command[0] if command else '<missing>'}"
+            else:
+                command_detail = " ".join(command)
+        except VerificationError as exc:
+            command_detail = str(exc)
+    add_check("registry agy headless argv", command_ok, command_detail)
+
+    resolved_command = _resolve_executable_for_host(command) if command else []
+    resolution_applied = bool(command and resolved_command and resolved_command[0] != command[0])
+    executable_ok = bool(resolved_command) and (
+        resolution_applied or shutil.which(resolved_command[0]) is not None or Path(resolved_command[0]).is_file()
+    )
+    add_check(
+        "headless Antigravity agy CLI",
+        executable_ok,
+        resolved_command[0] if resolved_command else "missing command",
+    )
+
+    live_probe: dict[str, Any] | None = None
+    live_ok = True
+    if require_live and command_ok and executable_ok:
+        try:
+            live_probe = _run_live_probe(
+                resolved_command,
+                project_root=project_root,
+                timeout=timeout,
+                runner=live_runner,
+            )
+            live_ok = bool(live_probe["ok"])
+            detail = f"returncode={live_probe['returncode']}; stdout_bytes={live_probe['stdout_bytes']}"
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired) as exc:
+            live_probe = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+            live_ok = False
+            detail = live_probe["error"]
+        add_check("live agy prompt probe", live_ok, detail)
+
+    roles = _role_tokens(record)
+    ready = record_ok and command_ok and executable_ok and live_ok
+    dispatchable_now = (
+        ready
+        and record.get("status") == "active"
+        and bool(record.get("can_receive_dispatch"))
+        and bool(roles & DISPATCH_ROLES)
+    )
+    return {
+        "checks": checks,
+        "command": command,
+        "dispatchable_now": dispatchable_now,
+        "first_failed_check": _first_failed_detail(checks),
+        "harness_id": recipient,
+        "live_probe": live_probe,
+        "ready": ready,
+        "recipient": recipient,
+        "resolved_command": resolved_command,
+        "role": sorted(roles),
+        "status": record.get("status"),
+        "can_receive_dispatch": bool(record.get("can_receive_dispatch")),
+    }
 
 
 def run_verification(
@@ -255,25 +407,36 @@ def run_verification(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recipient", required=True, help="Harness ID to verify, expected C for Antigravity.")
-    parser.add_argument("--prompt-fixture", required=True, type=Path)
-    parser.add_argument("--timeout", default=60.0, type=float)
+    parser.add_argument("--prompt-fixture", type=Path)
+    parser.add_argument("--live", action="store_true", help="Run a live non-mutating agy prompt probe.")
+    parser.add_argument("--prompt", default=DEFAULT_LIVE_PROMPT)
+    parser.add_argument("--timeout", default=DEFAULT_TIMEOUT_SECONDS, type=float)
     parser.add_argument("--project-root", default=PROJECT_ROOT, type=Path)
     parser.add_argument("--evidence-root", default=DEFAULT_EVIDENCE_ROOT, type=Path)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
     try:
-        result = run_verification(
-            project_root=args.project_root.resolve(),
-            recipient=args.recipient,
-            prompt_fixture=args.prompt_fixture,
-            timeout=args.timeout,
-            evidence_root=args.evidence_root
-            if args.evidence_root.is_absolute()
-            else args.project_root / args.evidence_root,
-        )
+        if args.live or args.prompt_fixture is None:
+            result = evaluate_readiness(
+                project_root=args.project_root.resolve(),
+                recipient=args.recipient,
+                require_live=args.live,
+                live_prompt=args.prompt,
+                timeout=args.timeout,
+            )
+        else:
+            result = run_verification(
+                project_root=args.project_root.resolve(),
+                recipient=args.recipient,
+                prompt_fixture=args.prompt_fixture,
+                timeout=args.timeout,
+                evidence_root=args.evidence_root
+                if args.evidence_root.is_absolute()
+                else args.project_root / args.evidence_root,
+            )
     except VerificationError as exc:
-        payload = {"error": str(exc), "recipient": args.recipient, "substrate_ok": False}
+        payload = {"error": str(exc), "recipient": args.recipient, "ready": False, "substrate_ok": False}
         if args.json:
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:
@@ -282,10 +445,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
+    elif "ready" in result:
+        print(f"ready={result['ready']}")
+        print(f"dispatchable_now={result['dispatchable_now']}")
+        print(f"first_failed_check={result['first_failed_check']}")
     else:
         print(f"evidence_dir={result['evidence_dir']}")
         print(f"returncode={result['returncode']}")
         print(f"substrate_ok={result['substrate_ok']}")
+    if "ready" in result:
+        return 0 if result["ready"] else 1
     return 0 if result["substrate_ok"] else 1
 
 

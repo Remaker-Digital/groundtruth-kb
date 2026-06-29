@@ -25,10 +25,10 @@ CAPABILITY_REGISTRY_PATH = Path("config") / "agent-control" / "harness-capabilit
 DISPATCHER_RULES_PATH = Path("config") / "dispatcher" / "rules.toml"
 
 NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS = {
-    "antigravity": ("scripts/cross_harness_bridge_trigger.py",),
-    "claude": ("scripts/cross_harness_bridge_trigger.py",),
+    "antigravity": ("scripts/dispatcher_runtime.py",),
+    "claude": ("scripts/dispatcher_runtime.py",),
     "codex": (
-        "scripts/cross_harness_bridge_trigger.py",
+        "scripts/dispatcher_runtime.py",
         ".codex/hooks.json",
         ".codex/gtkb-hooks/run_cmd_no_window.py",
     ),

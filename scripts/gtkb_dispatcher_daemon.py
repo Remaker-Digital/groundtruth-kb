@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""GT-KB dispatcher daemon — shadow by default; substrate-gated live (WI-4787/WI-4848).
+"""GT-KB dispatcher daemon — daemon-owned dispatch loop (WI-4787/WI-4848).
 
-Persistent always-on loop that owns the dispatch decision path. Default substrate
-stays shadow (records, never spawns). When ``bridge-substrate.json`` names the
-daemon substrate, live ticks reuse ``cross_harness_bridge_trigger._spawn_harness``.
+Persistent always-on loop that owns the dispatch decision path. Dispatcher
+runtime helpers live in ``scripts/dispatcher_runtime.py``; harness hooks are
+not an automation fallback.
 """
 
 from __future__ import annotations
@@ -30,10 +30,9 @@ if _PACKAGE_SRC.is_dir() and str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
 DAEMON_STATE_SUBDIR = (".gtkb-state", "dispatcher-daemon")
-TRIGGER_STATE_SUBDIR = (".gtkb-state", "cross-harness-trigger")
 BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 DAEMON_SUBSTRATE = "dispatcher_daemon"
-DEFAULT_SUBSTRATE = "cross_harness_trigger"
+DEFAULT_SUBSTRATE = "dispatcher_daemon"
 LOCK_FILENAME = "daemon.lock"
 HEARTBEAT_FILENAME = "heartbeat.txt"
 SHADOW_LOG_FILENAME = "shadow-decisions.jsonl"
@@ -123,10 +122,6 @@ def _daemon_state_dir(project_root: Path) -> Path:
     return project_root.joinpath(*DAEMON_STATE_SUBDIR)
 
 
-def _trigger_state_dir(project_root: Path) -> Path:
-    return project_root.joinpath(*TRIGGER_STATE_SUBDIR)
-
-
 def _bridge_poller_state_dir(project_root: Path) -> Path:
     return project_root.joinpath(*BRIDGE_POLLER_STATE_SUBDIR)
 
@@ -134,16 +129,16 @@ def _bridge_poller_state_dir(project_root: Path) -> Path:
 def _reap_dispatched_workers(project_root: Path) -> int:
     """Reap live dispatched workers that have no exit_code sidecar (WI-4857).
 
-    Delegates to the trigger module's ``reap_inflight_dispatched_workers`` so
+    Delegates to the runtime module's ``reap_inflight_dispatched_workers`` so
     the sidecar contract stays in one place.  Wraps the call to never raise so
     a reap failure cannot break daemon startup or shutdown.
 
-    Returns the count of workers reaped (0 when the trigger cannot be loaded).
+    Returns the count of workers reaped (0 when the runtime cannot be loaded).
     """
     try:
-        trigger = _load_trigger_module()
-        runs_dir = _bridge_poller_state_dir(project_root) / trigger.DISPATCH_RUNS_SUBDIR
-        return trigger.reap_inflight_dispatched_workers(runs_dir)
+        runtime = _load_dispatch_runtime()
+        runs_dir = _bridge_poller_state_dir(project_root) / runtime.DISPATCH_RUNS_SUBDIR
+        return runtime.reap_inflight_dispatched_workers(runs_dir)
     except Exception:
         return 0
 
@@ -168,14 +163,14 @@ def _public_decision(record: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in record.items() if not key.startswith("_")}
 
 
-def _load_trigger_module():
-    name = "_cross_harness_bridge_trigger_for_daemon"
+def _load_dispatch_runtime():
+    name = "_dispatcher_runtime_for_daemon"
     if name in sys.modules:
         return sys.modules[name]
-    trigger_path = _SCRIPTS_DIR / "cross_harness_bridge_trigger.py"
-    spec = importlib.util.spec_from_file_location(name, trigger_path)
+    runtime_path = _SCRIPTS_DIR / "dispatcher_runtime.py"
+    spec = importlib.util.spec_from_file_location(name, runtime_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"could not load cross-harness trigger from {trigger_path}")
+        raise ImportError(f"could not load dispatcher runtime from {runtime_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)
@@ -548,20 +543,20 @@ def compute_shadow_decisions(
     max_items: int = DEFAULT_MAX_ITEMS,
 ) -> list[dict[str, Any]]:
     """Compute per-role shadow dispatch decisions without spawning."""
-    trigger = _load_trigger_module()
-    index_text = trigger._read_bridge_state_live(project_root)
-    actionable_for_prime, actionable_for_codex = trigger._compute_actionable(index_text, project_root)
-    trigger_state_dir = _trigger_state_dir(project_root)
+    runtime = _load_dispatch_runtime()
+    index_text = runtime._read_bridge_state_live(project_root)
+    actionable_for_prime, actionable_for_codex = runtime._compute_actionable(index_text, project_root)
+    runtime_state_dir = _bridge_poller_state_dir(project_root)
     decisions: list[dict[str, Any]] = []
     for role_label, items in (
         ("prime-builder", actionable_for_prime),
         ("loyal-opposition", actionable_for_codex),
     ):
         try:
-            targets = trigger._resolve_dispatch_targets(
+            targets = runtime._resolve_dispatch_targets(
                 role_label,
                 project_root,
-                trigger_state_dir,
+                runtime_state_dir,
                 items=items,
             )
         except ValueError as exc:
@@ -582,24 +577,24 @@ def compute_shadow_decisions(
                     "timestamp": _now_iso(),
                     "role": role_label,
                     "reason": "no_active_target_for_role",
-                    "signature": trigger._signature(items),
+                    "signature": runtime._signature(items),
                     "shadow_mode": True,
                     "spawned": False,
                 }
             )
             continue
         poller_state_dir = _bridge_poller_state_dir(project_root)
-        dispatch_state = trigger._load_dispatch_state(poller_state_dir, project_root)
+        dispatch_state = runtime._load_dispatch_state(poller_state_dir, project_root)
         recipients_state = dispatch_state.get("recipients")
         if not isinstance(recipients_state, dict):
             recipients_state = {}
-        role_map = trigger._read_role_assignments(project_root)
+        role_map = runtime._read_role_assignments(project_root)
         harnesses = role_map.get("harnesses")
         if not isinstance(harnesses, dict):
             harnesses = {}
         remaining = list(items)
         for target in targets:
-            selected, signature = trigger._target_selected_signature(target, remaining, max_items)
+            selected, signature = runtime._target_selected_signature(target, remaining, max_items)
             h_info = harnesses.get(target.harness_id) or {}
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
             record: dict[str, Any] = {
@@ -613,7 +608,7 @@ def compute_shadow_decisions(
                 "spawned": False,
             }
             spawn_blocked_reason: str | None = None
-            if not trigger._is_dispatch_ready(
+            if not runtime._is_dispatch_ready(
                 target.harness_id,
                 h_info,
                 project_root,
@@ -625,7 +620,7 @@ def compute_shadow_decisions(
                 prior = recipients_state.get(target.dispatch_state_key)
                 if not isinstance(prior, dict):
                     prior = {}
-                backoff_skip = trigger._provider_failure_backoff_skip(
+                backoff_skip = runtime._provider_failure_backoff_skip(
                     prior=prior,
                     recipient=target.dispatch_state_key,
                     signature=signature,
@@ -641,7 +636,7 @@ def compute_shadow_decisions(
             decisions.append(record)
             if not selected:
                 break
-            remaining = trigger._without_selected_dispatch_items(remaining, selected)
+            remaining = runtime._without_selected_dispatch_items(remaining, selected)
             if not any(getattr(item, "dispatchable", True) for item in remaining):
                 break
     return decisions
@@ -654,10 +649,10 @@ def _execute_live_spawns(
     max_items: int,
     dry_run: bool,
 ) -> list[dict[str, Any]]:
-    """Spawn workers for daemon-substrate ticks via trigger _spawn_harness."""
-    trigger = _load_trigger_module()
+    """Spawn workers for daemon-substrate ticks via runtime _spawn_harness."""
+    runtime = _load_dispatch_runtime()
     state_dir = _bridge_poller_state_dir(project_root)
-    state = trigger._load_dispatch_state(state_dir, project_root)
+    state = runtime._load_dispatch_state(state_dir, project_root)
     recipients_state = state.get("recipients")
     if not isinstance(recipients_state, dict):
         recipients_state = {}
@@ -704,9 +699,9 @@ def _execute_live_spawns(
         acquired_work_intent_slugs: list[str] = []
 
         if getattr(target, "needed_role_label", None) == "prime-builder":
-            dispatch_id = trigger._new_dispatch_id(target.dispatch_state_key)
-            work_intent_session_id = trigger._work_intent_session_id(dispatch_id)
-            work_intent_filter = trigger._filter_prime_selected_by_work_intent(
+            dispatch_id = runtime._new_dispatch_id(target.dispatch_state_key)
+            work_intent_session_id = runtime._work_intent_session_id(dispatch_id)
+            work_intent_filter = runtime._filter_prime_selected_by_work_intent(
                 selected,
                 project_root=project_root,
                 state_dir=state_dir,
@@ -744,7 +739,7 @@ def _execute_live_spawns(
                 continue
 
             selected = list(work_intent_filter["selected"])
-            signature = trigger._signature(selected)
+            signature = runtime._signature(selected)
             record["signature"] = signature
             if not selected:
                 if recipient_state is not None:
@@ -785,7 +780,7 @@ def _execute_live_spawns(
         if getattr(target, "needed_role_label", None) == "prime-builder" and not dry_run:
             assert dispatch_id is not None
             assert work_intent_session_id is not None
-            acquire_result = trigger._acquire_prime_work_intent_batch(
+            acquire_result = runtime._acquire_prime_work_intent_batch(
                 selected,
                 project_root=project_root,
                 state_dir=state_dir,
@@ -820,7 +815,7 @@ def _execute_live_spawns(
             acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
 
         spawn_items = list(reversed(selected))
-        result = trigger._spawn_harness(
+        result = runtime._spawn_harness(
             target=target,
             items=spawn_items,
             project_root=project_root,
@@ -838,7 +833,7 @@ def _execute_live_spawns(
             and acquired_work_intent_slugs
             and not result.get("launched")
         ):
-            trigger._release_prime_work_intents(
+            runtime._release_prime_work_intents(
                 acquired_work_intent_slugs,
                 project_root=project_root,
                 session_id=work_intent_session_id or "",
@@ -860,7 +855,7 @@ def _execute_live_spawns(
 
     if not dry_run:
         state["updated_at"] = _now_iso()
-        trigger._write_dispatch_state(state_dir, state)
+        runtime._write_dispatch_state(state_dir, state)
     return spawn_results
 
 

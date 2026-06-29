@@ -16,6 +16,7 @@ import sys
 import tomllib
 import urllib.error
 import urllib.request
+import webbrowser
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,8 @@ if hasattr(sys.stderr, "reconfigure"):
 _PROJECT_ROOT_FOR_IMPORTS = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT_FOR_IMPORTS) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT_FOR_IMPORTS))
+
+from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 try:
     from scripts.workstream_focus import (
@@ -166,15 +169,15 @@ HARNESS_LIFECYCLE_GUARDS = {
     "openrouter": GTKB_HARNESS_STATE_ROOT / "openrouter" / "session-lifecycle-guard.json",
 }
 BRIDGE_DISPATCH_ROLE_TEXT = (
-    "cross-harness event-driven trigger registered as PostToolUse and Stop hooks "
+    "dispatcher daemon registered as PostToolUse and Stop hooks "
     "(.claude/settings.json, .codex/hooks.json, .cursor/hooks.json); fires on tool-use and Stop "
     "rather than on a fixed interval; manual TAFE/dispatcher bridge scans "
     "available as fallback; retired smart poller and OS poller remain archived"
 )
 BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Bridge automation has two complementary axes. "
-    "AXIS 1 (DISPATCHABLE WORK): the cross-harness event-driven trigger "
-    "(`scripts/cross_harness_bridge_trigger.py`) is the canonical mechanism for "
+    "AXIS 1 (DISPATCHABLE WORK): the dispatcher daemon "
+    "(`scripts/dispatcher_runtime.py`) is the canonical mechanism for "
     "self-contained work — reviews, verdicts, tests, work that a freshly-spawned "
     "counterpart harness can complete without further owner input. Registered as "
     "PostToolUse and Stop hooks. "
@@ -513,14 +516,7 @@ def _dashboard_reachability_probes(*, fast_hook: bool = False) -> list[dict[str,
 
 def _open_dashboard_url_in_system_browser(url: str) -> bool:
     try:
-        if sys.platform.startswith("win") and hasattr(os, "startfile"):
-            os.startfile(url)  # type: ignore[attr-defined]
-            return True
-        opener = shutil.which("xdg-open") or shutil.which("open")
-        if not opener:
-            return False
-        subprocess.Popen([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return True
+        return bool(webbrowser.open(url, new=2))
     except Exception:
         return False
 
@@ -1640,7 +1636,7 @@ def _harness_launchability_status(project_root: Path) -> dict[str, Any]:
 
     Reuses the doctor's ``_check_harness_launchability`` (FAB-01 / HYG-001) so a
     static dispatch-config defect (e.g. a hollow venv interpreter that would make
-    the cross-harness trigger spawn into a silent WinError-2 / exit-127) is
+    the dispatcher runtime spawn into a silent WinError-2 / exit-127) is
     visible at the next interactive SessionStart, not only on an explicit
     ``gt doctor`` run. Startup must continue even if the check raises.
     """
@@ -1792,6 +1788,7 @@ def _git_remote_origin(project_root: Path) -> dict[str, Any]:
             errors="replace",
             timeout=10,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"present": False, "host": None, "repository": None, "error": str(exc)}
@@ -1822,6 +1819,7 @@ def _command_output(command: list[str], cwd: Path, timeout: int = 10) -> dict[st
             errors="replace",
             timeout=timeout,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"ok": False, "stdout": "", "stderr": str(exc), "returncode": None}
@@ -2129,6 +2127,7 @@ def _gh_auth_status(project_root: Path) -> str:
             errors="replace",
             timeout=10,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return "unknown"
@@ -2198,6 +2197,7 @@ def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dic
                 errors="replace",
                 timeout=5,
                 check=False,
+                **no_window_subprocess_kwargs(),
             )
         except (OSError, subprocess.TimeoutExpired):
             agent_red_remote = None
@@ -2236,6 +2236,7 @@ def _latest_github_workflow_runs(project_root: Path, gh_auth_status: str) -> dic
             errors="replace",
             timeout=8,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
@@ -4455,13 +4456,13 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Startup mode: Loyal Opposition review and verification.",
             "- Default session purpose: process Prime Builder reviews and verifications on the file bridge.",
             "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
-            "- Bridge/dispatch distinction: the file bridge is the durable role handoff and review mechanism; the cross-harness event-driven trigger is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
+            "- Bridge/dispatch distinction: the file bridge is the durable role handoff and review mechanism; the dispatcher daemon is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined from TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
             "- Project-state startup rule: include a compact current-state report for every active MemBase project group using `current_project_work_item_memberships.project_id`; distinguish bridge queue state, git drift, release blockers, and Prime-actionable bridge responses.",
             "- Startup execution rule: execute live bridge verification before using this section in owner-facing chat; do not display this checklist as a substitute for performing the verification.",
-            "- Bridge dispatch startup rule: rely on the cross-harness event-driven trigger registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual TAFE/dispatcher bridge scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
+            "- Bridge dispatch startup rule: rely on the dispatcher daemon registered as PostToolUse and Stop hooks; do not restore the retired smart poller or OS poller. Manual TAFE/dispatcher bridge scans remain available as fallback when separate-harness or asynchronous monitoring is needed.",
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
@@ -4914,9 +4915,9 @@ def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> li
     """Retired stub — smart-poller startup-orient surface removed in Slice 4.
 
     The smart-poller mechanism was retired on 2026-05-09 in favor of the
-    cross-harness event-driven trigger (see Slice 4 of
+    dispatcher daemon (see Slice 4 of
     ``bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*``).
-    The cross-harness trigger does not surface a startup-orient section
+    The dispatcher runtime does not surface a startup-orient section
     — actionable bridge work is dispatched via PostToolUse + Stop hooks
     rather than read from notification artifacts at session start.
 
@@ -5123,7 +5124,7 @@ def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path
             f"- ALERT: {launchability.get('message') or 'one or more active dispatch targets are unlaunchable'}",
             (
                 "- A static dispatch-target config defect (e.g. a missing or hollow "
-                "interpreter) makes the cross-harness trigger spawn into a silent "
+                "interpreter) makes the dispatcher runtime spawn into a silent "
                 "WinError-2 / exit-127 and trips the per-recipient circuit breaker. "
                 "Repair the harness registry argv head, then re-run `gt project doctor` "
                 "to confirm launchability before relying on auto-dispatch."

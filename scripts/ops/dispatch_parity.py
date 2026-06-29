@@ -4,7 +4,7 @@
 
 The dispatcher cutover (WI-4848) requires the flip to live spawn to be gated on
 *shadow-decision parity evidence*: proof that the daemon's shadow dispatch
-decision matches what the live ``cross_harness_bridge_trigger`` would actually
+decision matches what the live ``dispatcher_runtime`` would actually
 dispatch for the same bridge state. This module produces that evidence.
 
 It is strictly read-only: it loads the trigger and daemon modules, computes both
@@ -16,7 +16,7 @@ dispatchability -- running it leaves the quiesced posture unchanged.
 Scope (slice 1): isolate the *selection* divergence. The daemon's
 ``compute_shadow_decisions`` feeds the full ``items`` list to
 ``_target_selected_signature`` per target, while the trigger's ``run_trigger``
-loop shrinks ``remaining_items`` after each target (cross_harness_bridge_trigger
+loop shrinks ``remaining_items`` after each target (dispatcher_runtime
 ~L4252-L4292). Identical for single-target roles; a real divergence class for
 multi-target roles. Both sides are resolved against the same state dir here so
 the comparison isolates that one variable; the live trigger's distinct
@@ -59,7 +59,7 @@ def _load_module(mod_name: str, path: Path):
 
 
 def _load_trigger():
-    return _load_module("_cross_harness_trigger_for_parity", _SCRIPTS_DIR / "cross_harness_bridge_trigger.py")
+    return _load_module("_dispatcher_runtime_for_parity", _SCRIPTS_DIR / "dispatcher_runtime.py")
 
 
 def _load_daemon():

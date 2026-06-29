@@ -117,10 +117,9 @@ BRIDGE_FUNCTION_EXACT = {
     ".claude/settings.json",
     ".codex/hooks.json",
     "scripts/bridge_claim_cli.py",
-    "scripts/cross_harness_bridge_trigger.py",
+    "scripts/dispatcher_runtime.py",
     "scripts/implementation_authorization.py",
     "scripts/implementation_start_gate.py",
-    "scripts/single_harness_bridge_dispatcher.py",
 }
 BRIDGE_FUNCTION_PREFIXES = (
     ".claude/hooks/",

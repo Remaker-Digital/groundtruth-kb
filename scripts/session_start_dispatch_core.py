@@ -55,7 +55,7 @@ STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0
 
 # IP-4: canonical init-keyword recognition (receiver side).
 # Per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001: regex matches the first-line
-# activator emitted by the cross-harness trigger; closed vocabulary {pb, lo}.
+# activator emitted by the dispatcher runtime; closed vocabulary {pb, lo}.
 _CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")
 _BRIDGE_DISPATCH_RUN_ID_ENV = "GTKB_BRIDGE_POLLER_RUN_ID"
 _BRIDGE_DISPATCH_KEYWORD_ENV = "GTKB_BRIDGE_DISPATCH_KEYWORD"
@@ -92,6 +92,7 @@ class StartupDecision(Enum):
 sys.path.insert(0, str(PROJECT_ROOT))
 from scripts.harness_identity import resolved_harness_id  # noqa: E402
 from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
+from scripts.windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402
 
 
 def _now_iso() -> str:
@@ -284,8 +285,8 @@ def _bridge_auto_dispatch_context() -> str | None:
             "",
             f"Dispatch id: {run_id}",
             "",
-            "This SessionStart was launched by the cross-harness event-driven trigger",
-            "(scripts/cross_harness_bridge_trigger.py) registered as PostToolUse and Stop",
+            "This SessionStart was launched by the dispatcher daemon",
+            "(scripts/dispatcher_runtime.py) registered as PostToolUse and Stop",
             "hooks. The retired smart poller (archive/smart-poller-2026-05-09/) is no",
             "longer the active dispatch substrate.",
             "Do not relay the normal fresh-session startup disclosure.",
@@ -301,9 +302,9 @@ def _bridge_auto_dispatch_context() -> str | None:
 def _read_first_prompt_line() -> str | None:
     """Return the canonical first-line keyword passed by the trigger.
 
-    The cross-harness trigger sets ``GTKB_BRIDGE_DISPATCH_KEYWORD`` on the
+    The dispatcher runtime sets ``GTKB_BRIDGE_DISPATCH_KEYWORD`` on the
     spawned harness's env (per IP-4 companion update to
-    ``scripts/cross_harness_bridge_trigger.py::_spawn_harness``). Claude Code's
+    ``scripts/dispatcher_runtime.py::_spawn_harness``). Claude Code's
     SessionStart hook stdin does not include user-prompt content, so the env
     var is the side channel for receiver-side keyword recognition.
     """
@@ -710,7 +711,7 @@ def main() -> int:
     # normal startup on a keyword alone — defense against owner-typed or
     # otherwise unverified keyword strings.
     command = [
-        sys.executable,
+        prefer_pythonw_executable(sys.executable),
         str(STARTUP_SERVICE),
         "--project-root",
         str(PROJECT_ROOT),
@@ -733,6 +734,7 @@ def main() -> int:
             timeout=_startup_service_timeout_seconds(),
             check=False,
             env=env,
+            **no_window_subprocess_kwargs(),
         )
         stdout_path.write_text(process.stdout, encoding="utf-8")
         stderr_path.write_text(process.stderr, encoding="utf-8")

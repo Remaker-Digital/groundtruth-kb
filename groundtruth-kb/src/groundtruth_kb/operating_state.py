@@ -246,16 +246,11 @@ def _probe_bridge(root: Path) -> tuple[str, str, str, dict[str, Any]]:
 
 
 def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
-    """Cross-harness event-driven trigger dispatch-state probe.
+    """Dispatcher-daemon dispatch-state probe."""
+    daemon_script = root / "scripts" / "gtkb_dispatcher_daemon.py"
 
-    Replaces the retired smart-poller probe (Slice 4, 2026-05-09). Reads
-    ``.gtkb-state/bridge-poller/dispatch-state.json`` written by
-    ``scripts/cross_harness_bridge_trigger.py`` on each trigger fire.
-    """
-    trigger_script = root / "scripts" / "cross_harness_bridge_trigger.py"
-
-    if not trigger_script.exists():
-        return "UNKNOWN", "cross-harness-trigger script not found", str(trigger_script), {}
+    if not daemon_script.exists():
+        return "UNKNOWN", "dispatcher daemon script not found", str(daemon_script), {}
     snapshot = collect_bridge_status(root).automation
     dispatch_state = snapshot.dispatch_state
     default_dispatch_state_path = str(root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json")
@@ -263,7 +258,7 @@ def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
     if not dispatch_state.get("exists"):
         return (
             "UNKNOWN",
-            "dispatch-state.json not yet written by the trigger",
+            "dispatch-state.json not yet written by the dispatcher daemon",
             dispatch_state_path,
             snapshot.to_json_dict(),
         )
@@ -271,21 +266,17 @@ def _probe_bridge_dispatch(root: Path) -> tuple[str, str, str, dict[str, Any]]:
         return "FAIL", "dispatch-state.json unreadable", dispatch_state_path, snapshot.to_json_dict()
 
     hook_values = snapshot.hook_registrations.values()
-    hooks_registered = all(
-        hook.get("cross_harness_trigger_registered") and hook.get("active_session_heartbeat_registered")
-        for hook in hook_values
-        if hook.get("exists")
-    )
-    status = "PASS" if hooks_registered else "WARN"
+    retired_workers_registered = any(hook.get("retired_bridge_worker_registered") for hook in hook_values)
+    status = "FAIL" if retired_workers_registered else "PASS"
     retired_count = len(snapshot.system_inventory.get("retired_systems", []))
     external_count = len(snapshot.system_inventory.get("external_thread_automations", []))
     detail = (
         f"{dispatch_state.get('recipient_count', 0)} dispatch recipient(s) tracked; "
-        f"cross-harness trigger registered; retired systems={retired_count}; "
+        f"dispatcher daemon is the only automated bridge substrate; retired systems={retired_count}; "
         f"external thread automations={external_count}"
     )
-    if not hooks_registered:
-        detail += "; hook registration incomplete"
+    if retired_workers_registered:
+        detail += "; retired bridge worker hook registration present"
     return status, detail, dispatch_state_path, snapshot.to_json_dict()
 
 

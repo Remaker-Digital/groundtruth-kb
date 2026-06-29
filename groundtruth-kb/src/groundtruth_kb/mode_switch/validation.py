@@ -224,86 +224,13 @@ def _probe_dispatcher_daemon_readiness(project_root: Path) -> dict[str, object]:
 def validate_bridge_substrate(project_root: Path, new_substrate: str, topology: str) -> ValidationResult:
     """Validate bridge substrate configuration against topology and registrations.
 
-    Substrates: 'cross_harness_trigger', 'single_harness_dispatcher', 'none'.
-    Rules:
-    1. 'single_harness_dispatcher' is valid ONLY if topology is 'single_harness'.
-    2. 'cross_harness_trigger' requires 'cross_harness_bridge_trigger.py' substring
-       registered in either .claude/settings.json or .codex/hooks.json (if those files exist and contain hooks).
-    3. 'single_harness_dispatcher' when on Windows probes GTKB-SingleHarnessBridgeDispatcher scheduled task.
+    Substrates: 'dispatcher_daemon' or 'none'. 'none' means manual owner
+    assignment only; it is not an automated fallback.
     """
     axis = "bridge_substrate"
-    allowed = {"cross_harness_trigger", "single_harness_dispatcher", "none", DISPATCHER_DAEMON_SUBSTRATE}
+    allowed = {"none", DISPATCHER_DAEMON_SUBSTRATE}
     if new_substrate not in allowed:
         return _fail(axis, f"unknown bridge substrate {new_substrate!r}")
-
-    if new_substrate == "single_harness_dispatcher" and topology != "single_harness":
-        return _fail(
-            axis,
-            f"bridge substrate {new_substrate!r} requires single_harness topology (current topology: {topology})",
-        )
-
-    # If new_substrate is 'cross_harness_trigger', probe registration.
-    if new_substrate == "cross_harness_trigger":
-        registered = False
-        settings_path = project_root / ".claude" / "settings.json"
-        codex_hooks_path = project_root / ".codex" / "hooks.json"
-
-        def _contains_bridge_trigger(value: object) -> bool:
-            if isinstance(value, dict):
-                command = value.get("command")
-                if isinstance(command, str) and "cross_harness_bridge_trigger.py" in command:
-                    return True
-                return any(_contains_bridge_trigger(child) for key, child in value.items() if key not in {"command"})
-            if isinstance(value, list):
-                return any(_contains_bridge_trigger(item) for item in value)
-            return False
-
-        # Check settings.json
-        if settings_path.is_file():
-            try:
-                data = json.loads(settings_path.read_text(encoding="utf-8"))
-                registered = _contains_bridge_trigger(data.get("hooks", {}))
-            except Exception:  # intentional-catch: quality gate waiver
-                pass
-
-        # Check codex hooks.json
-        if not registered and codex_hooks_path.is_file():
-            try:
-                data = json.loads(codex_hooks_path.read_text(encoding="utf-8"))
-                registered = _contains_bridge_trigger(data.get("hooks", {}))
-            except Exception:  # intentional-catch: quality gate waiver
-                pass
-
-        if not registered:
-            return _fail(
-                axis,
-                "cross_harness_trigger is not registered in .claude/settings.json or .codex/hooks.json",
-            )
-
-    # If new_substrate is 'single_harness_dispatcher', probe Windows Scheduled Task if on Windows.
-    if new_substrate == "single_harness_dispatcher":
-        import sys
-
-        if sys.platform == "win32":
-            import subprocess
-
-            try:
-                res = subprocess.run(
-                    ["powershell", "-Command", "Get-ScheduledTask -TaskName GTKB-SingleHarnessBridgeDispatcher"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if res.returncode != 0:
-                    return _fail(
-                        axis,
-                        "GTKB-SingleHarnessBridgeDispatcher scheduled task is not registered in Windows",
-                    )
-            except Exception as exc:  # intentional-catch: quality gate waiver
-                return _fail(
-                    axis,
-                    f"Failed to check GTKB-SingleHarnessBridgeDispatcher scheduled task: {exc}",
-                )
 
     if new_substrate == DISPATCHER_DAEMON_SUBSTRATE:
         probe = _probe_dispatcher_daemon_readiness(project_root)

@@ -119,9 +119,17 @@ def _write_go_thread(root: Path, stem: str) -> None:
     _write_bridge(root, stem, "GO", 2)
 
 
+def _set_manual_substrate(root: Path) -> None:
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": "none"}),
+        encoding="utf-8",
+    )
+
+
 def test_daemon_tick_computes_shadow_decision(tmp_path: Path) -> None:
     daemon = _load_daemon()
     root = _make_project(tmp_path)
+    _set_manual_substrate(root)
     _write_bridge(root, "pb-go-thread", "GO", 2)
     result = daemon.run_tick(root)
     assert result["decisions"]
@@ -137,6 +145,7 @@ def test_daemon_tick_computes_shadow_decision(tmp_path: Path) -> None:
 def test_daemon_shadow_mode_never_spawns(tmp_path: Path) -> None:
     daemon = _load_daemon()
     root = _make_project(tmp_path)
+    _set_manual_substrate(root)
     _write_bridge(root, "pb-go-thread", "GO", 2)
     with patch("subprocess.Popen") as popen:
         for _ in range(3):
@@ -185,7 +194,7 @@ def test_daemon_control_cli_status_reports_state(tmp_path: Path, monkeypatch: py
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["mode"] == "shadow"
+    assert payload["mode"] == "live"
     assert payload.get("heartbeat_at")
 
 
@@ -318,17 +327,14 @@ def test_status_mode_live_when_substrate_daemon(tmp_path: Path) -> None:
     assert status["active_substrate"] == "dispatcher_daemon"
 
 
-def test_status_mode_shadow_when_substrate_cross_harness(tmp_path: Path) -> None:
-    """mode=shadow when the active substrate is the cross-harness trigger
-    (WI-4856 fix 2)."""
+def test_status_mode_shadow_when_substrate_none(tmp_path: Path) -> None:
+    """mode=shadow when bridge automation is paused for manual assignment."""
     daemon = _load_daemon()
     root = _make_project(tmp_path)
-    (root / "harness-state" / "bridge-substrate.json").write_text(
-        json.dumps({"substrate": "cross_harness_trigger"}), encoding="utf-8"
-    )
+    _set_manual_substrate(root)
     status = daemon.collect_daemon_status(root)
     assert status["mode"] == "shadow"
-    assert status["active_substrate"] == "cross_harness_trigger"
+    assert status["active_substrate"] == "none"
 
 
 def test_run_tick_includes_health_monitoring(tmp_path: Path) -> None:
@@ -374,14 +380,14 @@ def test_shadow_decision_shrinks_remaining_items(tmp_path: Path, monkeypatch: py
     target_a = SimpleNamespace(dispatch_state_key="lo:A", harness_id="A", invocation_surfaces={})
     target_b = SimpleNamespace(dispatch_state_key="lo:B", harness_id="B", invocation_surfaces={})
 
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
 
     def _fake_resolve(role_label, project_root, state_dir, *, items=None):
         if role_label == "loyal-opposition":
             return [target_a, target_b]
         return []
 
-    monkeypatch.setattr(trigger, "_resolve_dispatch_targets", _fake_resolve)
+    monkeypatch.setattr(runtime, "_resolve_dispatch_targets", _fake_resolve)
 
     decisions = daemon.compute_shadow_decisions(root, max_items=1)
     lo_decisions = [d for d in decisions if d.get("role") == "loyal-opposition" and d.get("would_dispatch")]
@@ -393,16 +399,14 @@ def test_shadow_decision_shrinks_remaining_items(tmp_path: Path, monkeypatch: py
     assert not first_docs & second_docs, (first_docs, second_docs)
 
 
-def test_daemon_default_substrate_stays_shadow(tmp_path: Path) -> None:
+def test_daemon_default_substrate_is_live(tmp_path: Path) -> None:
     daemon = _load_daemon()
     root = _make_project(tmp_path)
-    _write_bridge(root, "pb-go-thread", "GO", 2)
-    with patch("subprocess.Popen") as popen:
-        result = daemon.run_tick(root)
-    assert result["mode"] == "shadow"
-    status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
-    assert status["mode"] == "shadow"
-    popen.assert_not_called()
+    result = daemon.run_tick(root, dry_run=True)
+    assert result["mode"] == "live"
+    status = daemon.collect_daemon_status(root)
+    assert status["mode"] == "live"
+    assert status["active_substrate"] == daemon.DAEMON_SUBSTRATE
 
 
 def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -414,15 +418,15 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
         encoding="utf-8",
     )
     _write_bridge(root, "pb-go-thread", "GO", 2)
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     calls: list[dict] = []
 
     def _fake_spawn(**kwargs):
         calls.append(kwargs)
         return {"launched": True, "recipient": kwargs["target"].dispatch_state_key}
 
-    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
-    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn)
     result = daemon.run_tick(root)
     assert result["mode"] == "live"
     status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
@@ -441,21 +445,21 @@ def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
         encoding="utf-8",
     )
     _write_bridge(root, "pb-go-thread", "GO", 2)
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     calls: list[dict] = []
 
     def _fake_spawn(**kwargs):
         calls.append(kwargs)
         return {"launched": True, "recipient": kwargs["target"].dispatch_state_key}
 
-    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
-    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn)
 
     first = daemon.run_tick(root)
     assert first["mode"] == "live"
     assert len(calls) == 1
     state_dir = daemon._bridge_poller_state_dir(root)
-    state_path = state_dir / trigger.DISPATCH_STATE_FILENAME
+    state_path = state_dir / runtime.DISPATCH_STATE_FILENAME
     state = json.loads(state_path.read_text(encoding="utf-8"))
     prime_state = state["recipients"]["prime-builder:A"]
     signature = prime_state["last_dispatched_signature"]
@@ -491,12 +495,12 @@ def test_daemon_live_skips_not_ready_target(tmp_path: Path, monkeypatch: pytest.
         encoding="utf-8",
     )
     _write_bridge(root, "pb-go-thread", "GO", 2)
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     spawn_calls: list[dict] = []
 
-    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: False)
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: False)
     monkeypatch.setattr(
-        trigger,
+        runtime,
         "_spawn_harness",
         lambda **kwargs: spawn_calls.append(kwargs) or {"launched": True},
     )
@@ -515,17 +519,17 @@ def test_daemon_live_honors_provider_backoff_skip(tmp_path: Path, monkeypatch: p
         encoding="utf-8",
     )
     _write_bridge(root, "pb-go-thread", "GO", 2)
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     spawn_calls: list[dict] = []
 
-    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
     monkeypatch.setattr(
-        trigger,
+        runtime,
         "_provider_failure_backoff_skip",
         lambda **kwargs: {"reason": "provider_failure_backoff_active"},
     )
     monkeypatch.setattr(
-        trigger,
+        runtime,
         "_spawn_harness",
         lambda **kwargs: spawn_calls.append(kwargs) or {"launched": True},
     )
@@ -542,7 +546,7 @@ _WATCHDOG_HEARTBEAT_TAIL = "codex=0 family=0 noncodex=0 threshold=15 noncodexThr
 
 
 def _write_stale_watchdog_heartbeat(root: Path) -> None:
-    """Write a watchdog heartbeat old enough to trigger dormancy detection.
+    """Write a watchdog heartbeat old enough to runtime dormancy detection.
 
     Uses the REAL storm-watchdog line format (leading ISO timestamp followed by
     space-separated population fields), so the daemon's heartbeat parse is
@@ -822,14 +826,14 @@ def test_daemon_stop_ignores_unverified_pid_and_clears_state(tmp_path: Path, mon
 # ---------------------------------------------------------------------------
 # WI-4845: daemon passes a per-role worker --lifetime override so headless
 # workers complete (LO ~1800s, PB ~5400s, env-configurable). The cap is
-# resolved by trigger.worker_lifetime_seconds and threaded into the spawn
-# command (run_with_status.py --lifetime) by trigger._spawn_harness, which the
+# resolved by runtime.worker_lifetime_seconds and threaded into the spawn
+# command (run_with_status.py --lifetime) by runtime._spawn_harness, which the
 # daemon's live-spawn path reuses.
 # ---------------------------------------------------------------------------
 
 
-def _spawn_target(trigger, role_label: str, mode: str):
-    return trigger.DispatchTarget(
+def _spawn_target(runtime, role_label: str, mode: str):
+    return runtime.DispatchTarget(
         needed_role_label=role_label,
         harness_id="D",
         command_handle="ollama",
@@ -838,7 +842,7 @@ def _spawn_target(trigger, role_label: str, mode: str):
     )
 
 
-def _capture_worker_command(trigger, target, tmp_path: Path, monkeypatch) -> list[str]:
+def _capture_worker_command(runtime, target, tmp_path: Path, monkeypatch) -> list[str]:
     """Invoke _spawn_harness with a fake Popen; return the worker command (the
     one wrapping run_with_status.py), robust against any secondary poll spawn."""
     calls: list[tuple] = []
@@ -850,17 +854,17 @@ def _capture_worker_command(trigger, target, tmp_path: Path, monkeypatch) -> lis
         calls.append(args)
         return _FakeProcess()
 
-    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
-    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(runtime, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(runtime, "_is_spawn_rate_limited", lambda runs_dir: False)
     # Prime (implementer) dispatches issue impl-auth packets for the GO item
     # (WI-4770). That is orthogonal to the lifetime feature under test, so pass
     # it for the synthetic item; LO review dispatches do not reach this gate.
     monkeypatch.setattr(
-        trigger,
+        runtime,
         "_issue_dispatch_authorization_for_selected",
         lambda *a, **k: {"ok": True, "reason": None, "context": {}},
     )
-    monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(runtime.subprocess, "Popen", _fake_popen)
 
     # Isolate each capture so a same-signature dedup from a prior spawn in the
     # same test cannot suppress this one.
@@ -874,7 +878,7 @@ def _capture_worker_command(trigger, target, tmp_path: Path, monkeypatch) -> lis
             "top_file": f"bridge/gtkb-wi4845-{role}-thread-002.md",
         },
     )()
-    trigger._spawn_harness(
+    runtime._spawn_harness(
         target=target,
         items=[item],
         project_root=tmp_path,
@@ -902,10 +906,10 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
     """WI-4844: daemon live mode must not pass already-claimed Prime work into a worker."""
     daemon = _load_daemon()
     root = _make_codex_prime_project(tmp_path)
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     registry = sys.modules["bridge_work_intent_registry"]
     state_dir = daemon._bridge_poller_state_dir(root)
-    target = trigger.DispatchTarget(
+    target = runtime.DispatchTarget(
         needed_role_label="prime-builder",
         harness_id="A",
         command_handle="codex",
@@ -933,7 +937,7 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
             "reason": "synthetic_launch_failed",
         }
 
-    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn_harness)
 
     result = daemon._execute_live_spawns(
         root,
@@ -941,7 +945,7 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
             {
                 "role": "prime-builder",
                 "recipient": target.dispatch_state_key,
-                "signature": trigger._signature(selected),
+                "signature": runtime._signature(selected),
                 "_spawn_target": target,
                 "_spawn_selected": selected,
             }
@@ -953,7 +957,7 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
     assert captured_documents == ["open-thread"]
     assert result[0]["work_intent_slugs"] == ["open-thread"]
     assert registry.current_holder("open-thread", project_root=root) is None
-    state = trigger._load_dispatch_state(state_dir, root)
+    state = runtime._load_dispatch_state(state_dir, root)
     recipient_state = state["recipients"][target.dispatch_state_key]
     assert recipient_state["work_intent_held_filtered_count"] == 1
     assert recipient_state["pending_count"] == 1
@@ -980,11 +984,11 @@ def test_daemon_live_skips_owner_hold_prime_no_go(
         f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
         encoding="utf-8",
     )
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     spawn_calls: list[dict] = []
 
-    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
-    monkeypatch.setattr(trigger, "_spawn_harness", lambda **kwargs: spawn_calls.append(kwargs))
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", lambda **kwargs: spawn_calls.append(kwargs))
 
     result = daemon.run_tick(root, max_items=2)
 
@@ -992,7 +996,7 @@ def test_daemon_live_skips_owner_hold_prime_no_go(
     assert spawn_calls == []
     decision = next(record for record in result["decisions"] if record["role"] == "prime-builder")
     assert decision["would_dispatch"] == []
-    state = trigger._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
     recipient_state = state["recipients"]["prime-builder:A"]
     assert recipient_state["last_result"] == "no_pending"
     assert recipient_state["pending_count"] == 0
@@ -1003,39 +1007,39 @@ def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pyte
     """The daemon live-spawn command carries the per-role --lifetime override:
     LO target -> 1800s, PB target -> 5400s (WI-4845 defaults)."""
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
-    monkeypatch.delenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
-    monkeypatch.delenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
+    runtime = daemon._load_dispatch_runtime()
+    monkeypatch.delenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
+    monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
 
-    lo_cmd = _capture_worker_command(trigger, _spawn_target(trigger, "loyal-opposition", "lo"), tmp_path, monkeypatch)
-    assert _lifetime_value(lo_cmd) == str(trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS) == "1800"
+    lo_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "loyal-opposition", "lo"), tmp_path, monkeypatch)
+    assert _lifetime_value(lo_cmd) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS) == "1800"
 
-    pb_cmd = _capture_worker_command(trigger, _spawn_target(trigger, "prime-builder", "pb"), tmp_path, monkeypatch)
-    assert _lifetime_value(pb_cmd) == str(trigger.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
+    pb_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "prime-builder", "pb"), tmp_path, monkeypatch)
+    assert _lifetime_value(pb_cmd) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
 
 
 def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     """GTKB_WORKER_LIFETIME_LO_SECONDS / _PB_SECONDS override the per-role
     defaults; invalid/non-positive falls back; other roles get no cap (WI-4845)."""
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
 
-    monkeypatch.delenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
-    monkeypatch.delenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
-    assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
-    assert trigger.worker_lifetime_seconds("prime-builder") == 5400
-    assert trigger.worker_lifetime_seconds("some-other-role") is None
-    assert trigger.worker_lifetime_seconds(None) is None
+    monkeypatch.delenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
+    monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert runtime.worker_lifetime_seconds("prime-builder") == 5400
+    assert runtime.worker_lifetime_seconds("some-other-role") is None
+    assert runtime.worker_lifetime_seconds(None) is None
 
-    monkeypatch.setenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, "2400")
-    monkeypatch.setenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, "7200")
-    assert trigger.worker_lifetime_seconds("loyal-opposition") == 2400
-    assert trigger.worker_lifetime_seconds("prime-builder") == 7200
+    monkeypatch.setenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, "2400")
+    monkeypatch.setenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, "7200")
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == 2400
+    assert runtime.worker_lifetime_seconds("prime-builder") == 7200
 
-    monkeypatch.setenv(trigger.LO_WORKER_LIFETIME_ENV_VAR, "0")
-    monkeypatch.setenv(trigger.PB_WORKER_LIFETIME_ENV_VAR, "not-an-int")
-    assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
-    assert trigger.worker_lifetime_seconds("prime-builder") == 5400
+    monkeypatch.setenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, "0")
+    monkeypatch.setenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, "not-an-int")
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert runtime.worker_lifetime_seconds("prime-builder") == 5400
 
 
 def test_run_tick_watchdog_restart_failsoft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1099,6 +1103,7 @@ def test_run_tick_shadow_mode_records_dormancy_without_restart(tmp_path: Path, m
     """
     daemon = _load_daemon()
     root = _make_project(tmp_path)
+    _set_manual_substrate(root)
     _write_stale_watchdog_heartbeat(root)
 
     called = {"restart": False}
@@ -1127,8 +1132,8 @@ def test_run_tick_shadow_mode_records_dormancy_without_restart(tmp_path: Path, m
 def _make_runs_dir(root: Path) -> Path:
     """Return the bridge-poller dispatch-runs directory (created on demand)."""
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
-    runs_dir = daemon._bridge_poller_state_dir(root) / trigger.DISPATCH_RUNS_SUBDIR
+    runtime = daemon._load_dispatch_runtime()
+    runs_dir = daemon._bridge_poller_state_dir(root) / runtime.DISPATCH_RUNS_SUBDIR
     runs_dir.mkdir(parents=True, exist_ok=True)
     return runs_dir
 
@@ -1161,7 +1166,7 @@ def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:
     terminate the process, write exit_code "124", and return count 1.
     """
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     runs_dir = _make_runs_dir(tmp_path)
 
     # Spawn a real long-lived sleeper so we have a live PID to reap.
@@ -1175,7 +1180,7 @@ def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:
         (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
         _write_pid_provenance_sidecar(runs_dir, dispatch_id, sleeper.pid)
         # No exit_code sidecar — simulates an orphaned worker.
-        reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+        reaped = runtime.reap_inflight_dispatched_workers(runs_dir)
         assert reaped == 1
         exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
         assert exit_code_file.exists(), "exit_code sidecar must be written"
@@ -1195,7 +1200,7 @@ def test_reap_inflight_refuses_live_worker_without_provenance(tmp_path: Path) ->
     evidence is insufficient because PID reuse can target the wrong process.
     """
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     runs_dir = _make_runs_dir(tmp_path)
 
     sleeper = subprocess.Popen(
@@ -1206,7 +1211,7 @@ def test_reap_inflight_refuses_live_worker_without_provenance(tmp_path: Path) ->
     dispatch_id = "test-dispatch-missing-provenance-001"
     try:
         (runs_dir / f"{dispatch_id}.pid").write_text(str(sleeper.pid) + "\n", encoding="utf-8")
-        reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+        reaped = runtime.reap_inflight_dispatched_workers(runs_dir)
         assert reaped == 0
         assert sleeper.poll() is None, "PID-only evidence must not terminate a live process"
         assert not (runs_dir / f"{dispatch_id}.exit_code").exists()
@@ -1222,7 +1227,7 @@ def test_reap_inflight_skips_completed_worker(tmp_path: Path) -> None:
     Spec-derived from WI-4857: already-exited workers must not be disturbed.
     """
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     runs_dir = _make_runs_dir(tmp_path)
 
     sleeper = subprocess.Popen(
@@ -1236,7 +1241,7 @@ def test_reap_inflight_skips_completed_worker(tmp_path: Path) -> None:
         _write_pid_provenance_sidecar(runs_dir, dispatch_id, sleeper.pid)
         # Pre-populate exit_code — worker already recorded its outcome.
         (runs_dir / f"{dispatch_id}.exit_code").write_text("0\n", encoding="utf-8")
-        reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+        reaped = runtime.reap_inflight_dispatched_workers(runs_dir)
         assert reaped == 0
         # Process must still be alive (we did not kill it).
         assert sleeper.poll() is None, "completed worker must not be killed"
@@ -1252,7 +1257,7 @@ def test_reap_inflight_skips_dead_pid(tmp_path: Path) -> None:
     skip and must not cause ``reap_inflight_dispatched_workers`` to raise.
     """
     daemon = _load_daemon()
-    trigger = daemon._load_trigger_module()
+    runtime = daemon._load_dispatch_runtime()
     runs_dir = _make_runs_dir(tmp_path)
 
     # Spawn and immediately wait so the PID is definitely dead.
@@ -1267,7 +1272,7 @@ def test_reap_inflight_skips_dead_pid(tmp_path: Path) -> None:
     dispatch_id = "test-dispatch-dead-003"
     (runs_dir / f"{dispatch_id}.pid").write_text(str(dead_pid) + "\n", encoding="utf-8")
     # No exit_code sidecar.
-    reaped = trigger.reap_inflight_dispatched_workers(runs_dir)
+    reaped = runtime.reap_inflight_dispatched_workers(runs_dir)
     assert reaped == 0
     exit_code_file = runs_dir / f"{dispatch_id}.exit_code"
     assert not exit_code_file.exists(), "no exit_code should be written for a dead PID"
@@ -1277,7 +1282,7 @@ def test_daemon_reap_helper_reaps_orphan(tmp_path: Path) -> None:
     """_reap_dispatched_workers terminates a live orphan under the bridge-poller dir.
 
     Spec-derived from WI-4857: the daemon-level wrapper resolves the correct
-    runs_dir path and delegates to the trigger helper successfully.
+    runs_dir path and delegates to the runtime helper successfully.
     """
     daemon = _load_daemon()
     runs_dir = _make_runs_dir(tmp_path)
