@@ -72,6 +72,18 @@ def test_resolve_agent_command_uses_standalone_agent(monkeypatch: pytest.MonkeyP
     assert harness._resolve_agent_command() == ["C:/Tools/agent.exe"]
 
 
+def test_resolve_agent_command_uses_cursor_agent_binary(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(
+        harness.shutil,
+        "which",
+        lambda name: "C:/Tools/cursor-agent.exe" if name == "cursor-agent" else None,
+    )
+
+    assert harness._resolve_agent_command() == ["C:/Tools/cursor-agent.exe"]
+
+
 def test_resolve_agent_command_accepts_cursor_agent_override(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")

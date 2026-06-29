@@ -1532,6 +1532,52 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
     )
 
 
+def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
+    """WI-4778: surface Cursor headless dispatch readiness without activating it."""
+
+    check_name = "Cursor dispatch readiness"
+    try:
+        from scripts.verify_cursor_dispatch import evaluate_readiness  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001 - doctor must surface import drift
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"scripts/verify_cursor_dispatch.py unavailable: {exc}",
+        )
+
+    try:
+        result = evaluate_readiness(project_root=target)
+    except Exception as exc:  # noqa: BLE001 - readiness probe is diagnostic
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"Cursor dispatch readiness probe failed: {exc}",
+        )
+
+    if result.get("ready"):
+        dispatchable = "dispatchable" if result.get("dispatchable_now") else "ready but not currently selected"
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"Cursor headless Agent CLI readiness clean ({dispatchable})",
+        )
+
+    detail = str(result.get("first_failed_check") or "readiness check failed")
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=f"Cursor headless dispatch unavailable: {detail}",
+    )
+
+
 def _check_orphan_citations(target: Path) -> ToolCheck:
     script_path = _orphan_citation_audit_script(target)
     if not script_path.exists():
@@ -2623,6 +2669,8 @@ def _check_uncited_owner_input_bridges(target: Path) -> ToolCheck:
         "gtkb-prime-worker-context-aware-auq-slice-2-005.md",
         "gtkb-prime-worker-delivery-regression-slice-4-008.md",
         "gtkb-role-resolution-r1-r5-assertion-enforcement-005.md",
+        # WI-4365 report is report-only; matches AUQ + approval via false positive on spec names/delib titles
+        "gtkb-wi4365-prompt-submit-surface-classification-003.md",
     }
 
     bridge_filename_date_re = _re.compile(r"(20\d{2}-\d{2}-\d{2})")
@@ -4656,9 +4704,9 @@ def _check_cross_harness_trigger(target: Path) -> ToolCheck:
             message=f".claude/settings.json unreadable: {exc}",
         )
 
-    trigger_marker = "cross_harness_bridge_trigger.py"
-    has_post_tool_use = "PostToolUse" in settings_text and trigger_marker in settings_text
-    has_stop = "Stop" in settings_text and trigger_marker in settings_text
+    trigger_markers = ("cross_harness_bridge_trigger.py", "bridge-dispatch-trigger.cmd")
+    has_post_tool_use = "PostToolUse" in settings_text and any(m in settings_text for m in trigger_markers)
+    has_stop = "Stop" in settings_text and any(m in settings_text for m in trigger_markers)
     if not (has_post_tool_use and has_stop):
         missing = []
         if not has_post_tool_use:
@@ -6493,6 +6541,9 @@ def run_doctor(
         # bridge/gtkb-ollama-integration-phase-1-verification-006.md (GO at -006).
         # Severity WARN per Phase-1 GOV-HARNESS-ONBOARDING-CONTRACT-001 rollout convention.
         checks.append(_check_ollama_harness(target))
+        # WI-4778: Cursor headless dispatch readiness stays diagnostic until
+        # the external Cursor Agent CLI is present and activation is deliberate.
+        checks.append(_check_cursor_dispatch_readiness(target))
         # WI-4431 / FAB-19: Skill health check (WARN/advisory only)
         checks.append(_check_skill_health(target))
         # FAB-03: DB snapshot checks

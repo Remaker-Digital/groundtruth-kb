@@ -22,6 +22,7 @@ _SKILL_ROUTE_ALIASES = {
     "verification": "verify",
 }
 _CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
+_STANDALONE_AGENT_NAMES = ("agent", "cursor-agent")
 _CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
 
 
@@ -65,9 +66,10 @@ def _resolve_agent_command() -> list[str]:
                 "a Cursor CLI that supports `cursor agent --print --output-format`."
             )
         return [explicit]
-    candidate = shutil.which("agent")
-    if candidate:
-        return [candidate]
+    for agent_name in _STANDALONE_AGENT_NAMES:
+        candidate = shutil.which(agent_name)
+        if candidate:
+            return [candidate]
     for cursor_name in ("cursor", "cursor.cmd", "cursor.exe"):
         cursor_candidate = shutil.which(cursor_name)
         if cursor_candidate and _cursor_supports_agent_subcommand(cursor_candidate):
