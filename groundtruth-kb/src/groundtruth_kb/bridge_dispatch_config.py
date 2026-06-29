@@ -79,7 +79,9 @@ RECENT_RUN_FAILURE_MARKERS = (
     ("passed to Electron/Chromium", "cursor_headless_cli_unavailable"),
 )
 RECENT_RUN_TEXT_READ_LIMIT = 12_000
-RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", ".create_time_epoch")
+PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
+RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", PID_CREATE_TIME_SUFFIX)
 
 
 @dataclass(frozen=True)
@@ -646,7 +648,11 @@ def _runtime_dispatch_evaluation(
             row = recipients.get(recipient_key)
             if not isinstance(row, dict):
                 continue
-            classification = _runtime_classification_for_recipient(recipient_key, row)
+            classification = _runtime_classification_for_recipient(
+                recipient_key,
+                row,
+                runs_dir=root / DISPATCH_RUNS_RELATIVE_PATH,
+            )
             classifications.append(classification)
             for finding in classification["findings"]:
                 if finding not in seen:
@@ -793,6 +799,81 @@ def _read_int(path: Path) -> int | None:
         return None
 
 
+def _read_float(path: Path) -> float | None:
+    try:
+        return float(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid_int <= 0:
+        return False
+    try:
+        import psutil  # noqa: PLC0415
+
+        return bool(psutil.pid_exists(pid_int))
+    except Exception:  # noqa: BLE001
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes  # noqa: PLC0415
+
+            process_query_limited_information = 0x1000
+            still_active = 259
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            handle = kernel32.OpenProcess(process_query_limited_information, False, pid_int)
+            if handle:
+                try:
+                    exit_code = ctypes.c_ulong()
+                    if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                        return exit_code.value == still_active
+                    return True
+                finally:
+                    kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        os.kill(pid_int, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _pid_create_time_epoch(pid: int) -> float | None:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_int <= 0:
+        return None
+    try:
+        import psutil  # noqa: PLC0415
+
+        return float(psutil.Process(pid_int).create_time())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _pid_create_time_matches(pid: int, expected_epoch: Any) -> bool:
+    try:
+        expected = float(expected_epoch)
+    except (TypeError, ValueError):
+        return False
+    actual = _pid_create_time_epoch(pid)
+    if actual is None:
+        return False
+    return abs(actual - expected) <= PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS
+
+
 def _append_findings_once(findings: list[str], seen: set[str], new_findings: tuple[str, ...]) -> None:
     for finding in new_findings:
         if finding not in seen:
@@ -817,7 +898,12 @@ def _runtime_findings_for_recipient(recipient_key: str, row: dict[str, Any]) -> 
     return list(_runtime_classification_for_recipient(recipient_key, row)["findings"])
 
 
-def _runtime_classification_for_recipient(recipient_key: str, row: dict[str, Any]) -> dict[str, Any]:
+def _runtime_classification_for_recipient(
+    recipient_key: str,
+    row: dict[str, Any],
+    *,
+    runs_dir: Path | None = None,
+) -> dict[str, Any]:
     findings: list[str] = []
     pending_count = _int_value(row.get("pending_count"), default=0)
     selected_count = _int_value(row.get("selected_count"), default=0)
@@ -827,7 +913,7 @@ def _runtime_classification_for_recipient(recipient_key: str, row: dict[str, Any
     last_launch = row.get("last_launch") if isinstance(row.get("last_launch"), dict) else {}
     launch_reason = str(last_launch.get("reason") or "").strip()
     launch_exit_failure = str(last_launch.get("exit_failure_reason") or "").strip()
-    stale_failure_reason = _stale_failure_evidence_reason(recipient_key, row, last_launch)
+    stale_failure_reason = _stale_failure_evidence_reason(recipient_key, row, last_launch, runs_dir=runs_dir)
     failure_evidence_present = any(
         (
             failure_class in RUNTIME_FAILURE_CLASSES,
@@ -963,14 +1049,50 @@ def _stale_failure_evidence_reason(
     recipient_key: str,
     row: dict[str, Any],
     last_launch: dict[str, Any],
+    *,
+    runs_dir: Path | None = None,
 ) -> str | None:
     if ":" not in recipient_key:
         return None
     expected = recipient_key.strip()
     evidence_recipients = _recipient_evidence_values(row, last_launch)
     if not evidence_recipients or expected in evidence_recipients:
-        return None
+        return _stale_dispatch_run_liveness_reason(runs_dir, last_launch)
     return "recipient evidence points to " + ", ".join(sorted(evidence_recipients))
+
+
+def _stale_dispatch_run_liveness_reason(runs_dir: Path | None, last_launch: dict[str, Any]) -> str | None:
+    if runs_dir is None:
+        return None
+    dispatch_id = str(last_launch.get("dispatch_id") or "").strip()
+    if not dispatch_id:
+        return None
+    pid_path = runs_dir / f"{dispatch_id}.pid"
+    status_path = runs_dir / f"{dispatch_id}.exit_code"
+    try:
+        exited = status_path.exists() and status_path.stat().st_size > 0
+    except OSError:
+        exited = False
+    if exited:
+        return f"recorded dispatch {dispatch_id} has exited"
+    launched = last_launch.get("launched") is True or "pid" in last_launch
+    if not launched and not pid_path.exists():
+        return None
+    pid = _read_int(pid_path)
+    if pid is None:
+        pid = _optional_int(last_launch.get("pid"))
+    if pid is None:
+        return f"recorded dispatch {dispatch_id} has no live worker pid"
+    if not _pid_alive(pid):
+        return f"recorded dispatch {dispatch_id} has no live worker"
+    expected = last_launch.get("pid_create_time_epoch")
+    if expected is None:
+        expected = _read_float(runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}")
+    if expected is None:
+        return f"recorded dispatch {dispatch_id} has no verified live worker provenance"
+    if not _pid_create_time_matches(pid, expected):
+        return f"recorded dispatch {dispatch_id} live worker provenance does not match"
+    return None
 
 
 def _recipient_evidence_values(row: dict[str, Any], last_launch: dict[str, Any]) -> set[str]:

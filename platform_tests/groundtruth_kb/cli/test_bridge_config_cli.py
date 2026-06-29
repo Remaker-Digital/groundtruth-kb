@@ -147,9 +147,9 @@ def test_bridge_dispatch_health_degrades_on_selected_runtime_failure(tmp_path: P
 
     result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["health_status"] == "FAIL"
+    assert payload["health_status"] == "WARN"
     findings = "\n".join(payload["findings"])
     assert "loyal-opposition:D circuit breaker is tripped" in findings
     assert "loyal-opposition:D last_result=provider_failure_backoff_active" in findings
@@ -181,3 +181,44 @@ def test_bridge_dispatch_health_ignores_nonselected_runtime_failure(tmp_path: Pa
     payload = json.loads(result.output)
     assert payload["health_status"] == "PASS"
     assert payload["findings"] == []
+
+
+def test_bridge_dispatch_health_warns_for_stale_selected_launch_failure(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    dispatch_id = "2026-06-21T15-00-00Z-prime-builder-A-stale"
+    _write_dispatch_state(
+        root,
+        {
+            "schema_version": 1,
+            "recipients": {
+                "prime-builder:A": {
+                    "last_result": "launch_failed",
+                    "last_launch": {
+                        "dispatch_id": dispatch_id,
+                        "launched": True,
+                        "pid": 999999,
+                        "recipient": "prime-builder:A",
+                    },
+                    "pending_count": 2,
+                    "selected_count": 1,
+                },
+            },
+        },
+    )
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["health_status"] == "WARN"
+    findings = "\n".join(payload["findings"])
+    assert "stale failure evidence ignored" in findings
+    assert f"recorded dispatch {dispatch_id} has no live worker" in findings
+    assert "dispatch runtime failure" not in findings
+
+    status = bridge_dispatch_config.collect_bridge_dispatch_status(root)
+    classification = status.runtime_classifications[0]
+    assert classification["recipient"] == "prime-builder:A"
+    assert classification["severity"] == "WARN"
+    assert classification["stale_failure_evidence"] is True
+    assert f"recorded dispatch {dispatch_id} has no live worker" == classification["stale_failure_reason"]
