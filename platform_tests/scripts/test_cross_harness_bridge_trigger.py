@@ -2240,6 +2240,63 @@ def test_cross_harness_trigger_noop_in_single_harness_topology_records_audit_evi
     assert "updated_at" in recipients["loyal-opposition"]
 
 
+def test_cross_harness_trigger_inactive_substrate_records_state_without_failure_spam(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4253: configured-inert substrate is state-only diagnostic evidence."""
+    root = _make_synthetic_project(tmp_path)
+    _write_index(root, _index_with_one_new(root))
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": "none"}),
+        encoding="utf-8",
+    )
+    state_dir = tmp_path / "state"
+    trigger = _load_trigger()
+
+    result = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=False)
+
+    assert result == {
+        "skipped": True,
+        "reason": "substrate_mismatch_inert",
+        "active_substrate": "none",
+    }
+    assert not (state_dir / "dispatch-failures.jsonl").exists()
+
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    recipients = state["recipients"]
+    for role_label in ("prime-builder", "loyal-opposition"):
+        rec = recipients[role_label]
+        assert rec["last_result"] == "substrate_mismatch_inert"
+        assert rec["pending_count"] == 0
+        assert rec["selected_count"] == 0
+        assert rec["active_substrate"] == "none"
+
+    # Historical failure rows may still exist from older builds; diagnose must
+    # tolerate malformed JSONL and classify substrate rows by reason, not as
+    # generic other/unknown failures.
+    (state_dir / "dispatch-failures.jsonl").write_text(
+        "not-json\n"
+        + json.dumps(
+            {
+                "reason": "substrate_mismatch_inert",
+                "recipient": "prime-builder",
+                "launched": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(trigger, "_resolve_project_root", lambda value=None: root)
+
+    output = trigger._emit_diagnose_summary(state_dir)
+
+    assert "inactive substrate (configured inert): 1" in output
+    assert "inert (active bridge substrate 'none'; cross-harness trigger disabled)" in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
+
+
 def test_diagnose_reports_current_role_recipient_keys_and_single_harness_as_inert(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

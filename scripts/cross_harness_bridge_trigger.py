@@ -3994,18 +3994,28 @@ def _record_substrate_mismatch_skip(state_dir: Path, active_substrate: str) -> N
         f"Cross-harness trigger inert because the active bridge substrate is configured as {active_substrate!r} "
         "in harness-state/bridge-substrate.json."
     )
+    state = _load_dispatch_state(state_dir)
+    recipients_state = state.get("recipients") if isinstance(state, dict) else {}
+    if not isinstance(recipients_state, dict):
+        recipients_state = {}
+    recipients_state = _migrate_recipients_state_keys(recipients_state)
     for role_label in ("prime-builder", "loyal-opposition"):
-        _record_dispatch_failure(
-            state_dir,
-            {
-                "ts": ts,
-                "dispatch_id": f"{ts}-{role_label}-substrate-mismatch",
-                "recipient": role_label,
-                "launched": False,
-                "reason": "substrate_mismatch_inert",
-                "error_message": error_message,
-            },
-        )
+        prior = recipients_state.get(role_label)
+        if not isinstance(prior, dict):
+            prior = {}
+        prior["last_result"] = "substrate_mismatch_inert"
+        prior["updated_at"] = ts
+        prior["pending_count"] = 0
+        prior["selected_count"] = 0
+        prior["active_substrate"] = active_substrate
+        prior["error_message"] = error_message
+        recipients_state[role_label] = prior
+    payload = {
+        "schema_version": 1,
+        "updated_at": ts,
+        "recipients": recipients_state,
+    }
+    _write_dispatch_state(state_dir, payload)
 
 
 def _is_single_harness_topology(project_root: Path) -> bool:
@@ -5223,6 +5233,9 @@ def _classify_failure_record(record: dict[str, Any]) -> str:
     Per ``bridge/gtkb-cross-harness-trigger-windows-rename-race-001-003.md``:
     failure distribution must NOT be collapsed to a single error type.
     """
+    reason = str(record.get("reason") or "")
+    if reason == "substrate_mismatch_inert":
+        return "inactive substrate (configured inert)"
     msg = str(record.get("error_message") or "")
     if "WinError 32" in msg:
         return "WinError 32 (sharing violation)"
@@ -5354,6 +5367,7 @@ def _dispatch_state_appears_idle(recipients: dict[str, Any]) -> bool:
         "no_actionable_change",
         "unchanged",
         "single_harness_topology_not_applicable",
+        "substrate_mismatch_inert",
     }
     for record in recipients.values():
         if not isinstance(record, dict):
@@ -5562,6 +5576,12 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
         elif last_result == "single_harness_topology_not_applicable":
             lines.append(
                 f"- {name}: inert (single-harness topology; cross-harness dispatch not applicable).{annotation}"
+            )
+        elif last_result == "substrate_mismatch_inert":
+            active_substrate = rec.get("active_substrate") or "unknown"
+            lines.append(
+                f"- {name}: inert (active bridge substrate {active_substrate!r}; "
+                f"cross-harness trigger disabled).{annotation}"
             )
         elif last_result == DOCUMENT_LEASE_HELD_RESULT:
             lines.append(f"- {name}: suppressed (document lease held).{annotation}")
