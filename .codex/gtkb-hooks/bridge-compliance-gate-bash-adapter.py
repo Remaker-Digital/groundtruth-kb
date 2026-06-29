@@ -27,6 +27,31 @@ BRIDGE_FILE_WRITE_PATTERNS = (
         re.IGNORECASE | re.DOTALL,
     ),
 )
+BRIDGE_FILE_REFERENCE_RE = re.compile(
+    r"(?:[A-Za-z]:)?(?:[\\/]|[\w .-]+[\\/])*bridge[\\/][A-Za-z0-9_.-]+(?:-\d{3}|\.lo-verdict)\.md",
+    re.IGNORECASE,
+)
+BRIDGE_FILE_REDIRECT_RE = re.compile(
+    r"(?:^|[\s;&|])(?:\d?>{1,2}|>{1,2})\s*['\"]?"
+    r"(?:[A-Za-z]:)?(?:[\\/]|[\w .-]+[\\/])*bridge[\\/][A-Za-z0-9_.-]+(?:-\d{3}|\.lo-verdict)\.md",
+    re.IGNORECASE,
+)
+UNSUPPORTED_BRIDGE_MUTATION_RE = re.compile(
+    r"\b(?:"
+    r"set-content|add-content|out-file|new-item|copy-item|move-item|rename-item|remove-item|clear-content|"
+    r"tee-object|sc|ac|ni|cp|mv|rm|ri|del|erase|copy|move|touch"
+    r")\b"
+    r"|\bsed\s+-i\b"
+    r"|\bperl\s+-pi\b"
+    r"|\bgit\s+(?:checkout|restore|apply)\b"
+    r"|\bpatch\b"
+    r"|write_bytes\s*\("
+    r"|open\s*\([^)]*['\"][wax][+b]?['\"]"
+    r"|shutil\.(?:copy|copy2|move)\s*\("
+    r"|os\.(?:remove|rename|replace|unlink)\s*\("
+    r"|\.(?:unlink|rename|replace|touch)\s*\(",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _no_window_subprocess_kwargs() -> dict[str, object]:
@@ -97,9 +122,28 @@ def extract_bridge_write(command: str) -> tuple[str, str] | None:
         path = match.group("path")
         body = match.groupdict().get("body") or ""
         return path, _unquote_literal(body.strip())
-    if re.search(r"bridge/[^\s\"']+(?:-\d{3}|\.lo-verdict)\.md", command):
-        _write_skipped("bridge file write content extraction failed", command)
     return None
+
+
+def unsupported_bridge_write_reason(command: str) -> str | None:
+    if not BRIDGE_FILE_REFERENCE_RE.search(command):
+        return None
+    if BRIDGE_FILE_REDIRECT_RE.search(command) or UNSUPPORTED_BRIDGE_MUTATION_RE.search(command):
+        return (
+            "Unsupported likely bridge artifact write in Codex Bash command. "
+            "Use guarded Write/Edit dispatch or the governed bridge writer/helper path "
+            "for numbered bridge files."
+        )
+    return None
+
+
+def deny_payload(reason: str) -> dict[str, Any]:
+    return {
+        "hookSpecificOutput": {
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
 
 
 def _write_skipped(reason: str, command: str) -> None:
@@ -126,6 +170,10 @@ def main() -> int:
     command = _bash_command(payload)
     extracted = extract_bridge_write(command)
     if extracted is None:
+        reason = unsupported_bridge_write_reason(command)
+        if reason:
+            print(json.dumps(deny_payload(reason), sort_keys=True))
+            return 0
         print("{}")
         return 0
     file_path, content = extracted
