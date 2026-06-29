@@ -12,9 +12,10 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ID = "PROJECT-HARNESS-PARITY-PHASE-2"
-WORK_ITEM_ID = "WI-4900"
+WORK_ITEM_ID = "WI-4899"
+EVALUATOR_WORK_ITEM_ID = "WI-4900"
 PROJECT_AUTHORIZATION = "PAUTH-PROJECT-HARNESS-PARITY-PHASE-2-IMPLEMENTATION-2026-06-29"
-BRIDGE_ID = "gtkb-harness-parity-phase-2-baseline-evaluator"
+BRIDGE_ID = "gtkb-harness-parity-phase-2-codex-baseline-matrix"
 
 DEFAULT_WAIVER_PATH = Path("config") / "harness-parity" / "phase2-waivers.toml"
 HARNESS_REGISTRY_PATH = Path("harness-state") / "harness-registry.json"
@@ -501,6 +502,7 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
         "metadata": {
             "project_id": PROJECT_ID,
             "work_item_id": WORK_ITEM_ID,
+            "evaluator_work_item_id": EVALUATOR_WORK_ITEM_ID,
             "project_authorization": PROJECT_AUTHORIZATION,
             "bridge_id": BRIDGE_ID,
             "project_root": str(root),
@@ -566,32 +568,44 @@ def build_candidate_work_items(cells: list[Cell]) -> list[CandidateWorkItem]:
 
 def format_markdown(report: dict[str, Any], *, include_supported: bool = False) -> str:
     metadata = report["metadata"]
+    candidate_by_cell = {
+        (candidate["harness"], candidate["dimension"]): candidate
+        for candidate in report.get("candidate_work_items", [])
+    }
     lines = [
-        "# Harness Parity Phase 2 Baseline",
+        "# Harness Parity Phase 2 Codex Baseline Matrix",
         "",
         f"- Overall status: {report['overall_status']}",
         f"- Project: {metadata['project_id']}",
         f"- Work item: {metadata['work_item_id']}",
+        f"- Evaluator source work item: {metadata['evaluator_work_item_id']}",
         f"- Project authorization: {metadata['project_authorization']}",
         f"- Bridge: {metadata['bridge_id']}",
         f"- Counts: {', '.join(f'{key}: {value}' for key, value in report['counts'].items()) or 'none'}",
         "",
         "## Findings",
         "",
-        "| Harness | Dimension | State | Release Blocking | Evidence | Details |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Harness | Dimension | State | Release Blocking | Evidence | Disposition | Details |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     rows = report["cells"] if include_supported else [cell for cell in report["cells"] if cell["status"] != "supported"]
     if rows:
         for cell in rows:
             evidence = "<br>".join(cell["evidence"])
             details = str(cell["details"]).replace("|", "\\|")
+            if cell.get("waiver_id"):
+                disposition = f"Waiver: {cell['waiver_id']}"
+            elif cell["status"] in FAILURE_STATES:
+                candidate = candidate_by_cell.get((cell["harness"], cell["dimension"]))
+                disposition = f"Candidate: {candidate['title']}" if candidate else "Registry correction required"
+            else:
+                disposition = "Supported"
             lines.append(
                 f"| {cell['harness']} | {cell['title']} | {cell['status']} | "
-                f"{cell['release_blocking']} | {evidence} | {details} |"
+                f"{cell['release_blocking']} | {evidence} | {disposition} | {details} |"
             )
     else:
-        lines.append("| all | all | supported | False | n/a | No unwaived gaps found. |")
+        lines.append("| all | all | supported | False | n/a | Supported | No unwaived gaps found. |")
 
     candidates = report.get("candidate_work_items", [])
     if candidates:

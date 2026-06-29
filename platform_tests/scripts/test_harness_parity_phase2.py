@@ -154,8 +154,21 @@ def test_cli_writes_json_and_markdown_outputs(tmp_path: Path) -> None:
     assert module.main(["--project-root", str(tmp_path), "--format", "json", "--output", str(json_output)]) == 0
     assert module.main(["--project-root", str(tmp_path), "--format", "markdown", "--output", str(markdown_output)]) == 0
 
-    assert json.loads(json_output.read_text(encoding="utf-8"))["metadata"]["work_item_id"] == "WI-4900"
-    assert "# Harness Parity Phase 2 Baseline" in markdown_output.read_text(encoding="utf-8")
+    payload = json.loads(json_output.read_text(encoding="utf-8"))
+    assert payload["metadata"]["work_item_id"] == "WI-4899"
+    assert payload["metadata"]["evaluator_work_item_id"] == "WI-4900"
+    assert "# Harness Parity Phase 2 Codex Baseline Matrix" in markdown_output.read_text(encoding="utf-8")
+
+
+def test_markdown_links_each_unwaived_gap_to_candidate(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(tmp_path)
+
+    report = module.evaluate(tmp_path)
+    markdown = module.format_markdown(report)
+
+    for candidate in report["candidate_work_items"]:
+        assert f"Candidate: {candidate['title']}" in markdown
 
 
 def test_strict_mode_fails_on_unwaived_release_blocking_gap(tmp_path: Path) -> None:

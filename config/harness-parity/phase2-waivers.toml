@@ -2,7 +2,7 @@ schema_version = 1
 registry_id = "harness-parity-phase-2-waivers"
 purpose = "Typed waiver registry for Harness Parity Phase 2 evaluator gaps."
 project = "PROJECT-HARNESS-PARITY-PHASE-2"
-work_item = "WI-4900"
+work_item = "WI-4899"
 
 # No active waivers are recorded at creation time.
 #
