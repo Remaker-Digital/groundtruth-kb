@@ -60,6 +60,14 @@ _SPEC_TO_TEST = (
     "## Spec-to-Test Mapping\n\n| Spec | Test |\n|------|------|\n| GOV-FILE-BRIDGE-AUTHORITY-001 | test_x |\n"
 )
 _COMMAND_EVIDENCE = "Executed: python -m pytest platform_tests/hooks/test_x.py\n"
+_COMMIT_FINALIZATION = (
+    "## Commit Finalization Evidence\n\n"
+    "- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`\n"
+    "- Same-transaction path set:\n"
+    "- `scripts/foo.py`\n"
+    "- `bridge/test-sample-thread-002.md`\n"
+    "- `bridge/test-sample-thread-003.md`\n"
+)
 _AUTHOR_METADATA = (
     "author_identity: Codex\n"
     "author_harness_id: A\n"
@@ -82,6 +90,8 @@ def _complete_verified_verdict() -> str:
         + _SPEC_TO_TEST
         + "\n"
         + _COMMAND_EVIDENCE
+        + "\n"
+        + _COMMIT_FINALIZATION
     )
 
 
@@ -104,7 +114,7 @@ def test_complete_verified_verdict_not_blocked(gate: ModuleType, tmp_path: Path)
     """A complete VERIFIED verdict is no longer hard-blocked by _deny_reason_for_content."""
     reason = gate._deny_reason_for_content(
         cwd_path=tmp_path,
-        file_path="bridge/gtkb-sample-thread-003.md",
+        file_path="bridge/test-sample-thread-003.md",
         content=_complete_verified_verdict(),
         run_pending_preflight=False,
     )
