@@ -387,6 +387,66 @@ def test_trigger_releases_inflight_lock_after_run(tmp_path: Path) -> None:
     assert trigger.trigger_inflight_active(state_dir) is False
 
 
+def test_migration_preserves_explicit_recipient_over_newer_unsuffixed_placeholder(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    _make_synthetic_project(root)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    state = {
+        "schema_version": 1,
+        "recipients": {
+            "loyal-opposition:A": {
+                "updated_at": "2026-06-29T07:44:22Z",
+                "last_result": "launched",
+                "last_dispatched_signature": "kept-signature",
+                "signature": "kept-signature",
+                "selected_count": 1,
+            },
+            "loyal-opposition": {
+                "updated_at": "2026-06-29T07:46:04Z",
+                "last_result": "substrate_mismatch_inert",
+                "pending_count": 0,
+                "selected_count": 0,
+            },
+        },
+    }
+    (state_dir / trigger.DISPATCH_STATE_FILENAME).write_text(json.dumps(state), encoding="utf-8")
+
+    migrated = trigger._load_dispatch_state(state_dir, root)["recipients"]
+
+    assert set(migrated) == {"loyal-opposition:A"}
+    assert migrated["loyal-opposition:A"]["last_result"] == "launched"
+    assert migrated["loyal-opposition:A"]["last_dispatched_signature"] == "kept-signature"
+
+
+def test_migration_still_promotes_unsuffixed_role_when_no_explicit_recipient(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    _make_synthetic_project(root)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    state = {
+        "schema_version": 1,
+        "recipients": {
+            "loyal-opposition": {
+                "updated_at": "2026-06-29T07:46:04Z",
+                "last_result": "substrate_mismatch_inert",
+                "pending_count": 0,
+                "selected_count": 0,
+            },
+        },
+    }
+    (state_dir / trigger.DISPATCH_STATE_FILENAME).write_text(json.dumps(state), encoding="utf-8")
+
+    migrated = trigger._load_dispatch_state(state_dir, root)["recipients"]
+
+    assert set(migrated) == {"loyal-opposition:A"}
+    assert migrated["loyal-opposition:A"]["last_result"] == "substrate_mismatch_inert"
+
+
 def test_fab10_dispatch_retry_knobs_prefer_gtkb_names(monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     monkeypatch.setenv("GTKB_DISPATCH_MAX_RETRIES", "7")
