@@ -71,7 +71,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 - **Execute:** After Codex GO, implement code, tests, and verify.
 - **Report:** Save post-implementation report as new version, publish it through the dispatcher-backed bridge path for verification.
 - **Verify:** an eligible Loyal Opposition target reviews report and adds VERIFIED or NO-GO version.
-- **Dispatch:** Bridge dispatch automation is the **cross-harness event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger fires on tool-use and Stop events. It dispatches latest `NEW` or `REVISED` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. The retired OS pollers and the retired smart poller are archived; do not re-enable without owner approval per `.claude/rules/bridge-essential.md` §"Re-Enabling Pollers".
+- **Dispatch:** Bridge dispatch automation is the **dispatcher daemon** at `scripts/gtkb_dispatcher_daemon.py`. It dispatches latest `NEW` or `REVISED` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. Retired hook-trigger and poller paths are archived; do not re-enable them.
 - **Retired bridge aggregate:** Do not recreate aggregate queue artifacts. Any helper that requires them is defective and must be repaired.
 
 ---
@@ -209,7 +209,7 @@ Next: [describe task].
 
 ### Session Start (Mandatory)
 
-Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatcher topology, dispatchability, selected targets, and health evidence. Use TAFE-backed bridge-state surfaces and status-bearing numbered bridge files for canonical bridge queue/actionability claims. Then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The cross-harness event-driven trigger (PostToolUse + Stop hooks per `.claude/rules/bridge-essential.md`) handles inter-session dispatch. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
+Use the `bridge-config` skill or `gt bridge dispatch status|health` for dispatcher topology, dispatchability, selected targets, and health evidence. Use TAFE-backed bridge-state surfaces and status-bearing numbered bridge files for canonical bridge queue/actionability claims. Then review the active MemBase backlog (`gt backlog list`). Full step-by-step and role-specific bridge handling: `config/agent-control/SESSION-STARTUP-INDEX.md` + the role overlays. The dispatcher daemon handles inter-session dispatch; manual owner assignment/scanning is the only fallback when the daemon is unhealthy. Implementable backlog items follow the standard bridge protocol (propose → GO → implement → report → VERIFIED → commit); items already authorized (project authorization or recorded owner decision) need no fresh approval. **Antigravity startup optimization**: For the Antigravity harness (ID C), skip loading non-essential rules/logs (exempt from Phase B steps 9-18a) and run startup services with `--fast-hook` and `--skip-bridge-maintenance` to omit non-local checks.
 
 ### Protected Behaviors & Removal Rule
 
@@ -259,3 +259,4 @@ In-scope decision classes (use `AskUserQuestion`, never prose): approvals, waive
 ---
 
 *© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. Last Updated: 2026-05-29 (Slice 3 of `gtkb-claude-md-scope-clarification`). Version: 67.0.0.*
+

@@ -54,6 +54,7 @@ behavior. Current host-local identities:
 - Codex: `A`
 - Claude Code: `B`
 - Antigravity: `C`
+- Cursor: `E`
 
 Startup resolves the harness ID from `harness-state/harness-identities.json`,
 then resolves the role by reading that harness ID entry in
@@ -133,9 +134,8 @@ The following workspace locations are strictly protected and require a bridge GO
 - Counterpart role: Loyal Opposition when counterpart review is active. The
   bridge is the role handoff and review mechanism. The retired OS poller and
   the retired smart poller (Slice 4 archive) remain disabled; bridge dispatch
-  is automated by the cross-harness event-driven trigger
-  (`scripts/cross_harness_bridge_trigger.py`) registered as PostToolUse and
-  Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
+  is automated by the dispatcher daemon
+  (`scripts/gtkb_dispatcher_daemon.py`).
 - Required analysis scope includes active harness prompts, instructions,
   permissions, hooks, and configuration behavior.
 - **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
@@ -260,7 +260,7 @@ The first owner message in a fresh session is routed through the init-keyword co
 
 When the active role is Prime Builder, the disclosure must include the role/governance stance, dashboard link, current project state, numbered session-focus choices, top priority actions, token-reduction options, and the file bridge scan count. Prime Builder must check the file bridge during startup even when no separate Loyal Opposition harness is currently running. Numbered session-focus choices are part of GT-KB Prime Builder startup only and are presented to the owner only by Prime Builder. After the disclosure, collect or confirm Mike's session focus before proceeding; if Mike supplies a concrete task after the startup disclosure, explicitly map it to one focus option or Custom Focus and proceed only when that mapping is unambiguous.
 
-When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan current TAFE/dispatcher bridge state and the versioned bridge file chain, then process actionable bridge reviews and verifications oldest-to-newest by default. Advisory mode is opt-in through an init keyword such as `init gtkb advisory`; only advisory mode reports the scan and asks Mike whether to switch to auto-process. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore the retired OS poller or the retired smart poller. Use the cross-harness event-driven trigger when its registrations and dispatch state are healthy; otherwise use manual scans or monitoring only when Prime Builder and Loyal Opposition are running in separate harnesses or asynchronous monitoring is otherwise needed.
+When the active role is Loyal Opposition, do not present the Prime Builder numbered session-focus choices. Loyal Opposition starts every fresh session prepared to review and verify work performed by Prime Builder, and processing Prime Builder reviews and verifications on the file bridge is the default purpose of any Loyal Opposition session. Its first task is to verify that the Prime Builder / Loyal Opposition file bridge is functioning. If the bridge is functioning, scan current TAFE/dispatcher bridge state and the versioned bridge file chain, then process actionable bridge reviews and verifications oldest-to-newest by default. Advisory mode is opt-in through an init keyword such as `init gtkb advisory`; only advisory mode reports the scan and asks Mike whether to switch to auto-process. If the bridge is not functioning, diagnose and repair the bridge before ordinary review work. Loyal Opposition has owner pre-approval to make any file or configuration changes required to restore bridge function. Do not restore retired poller or hook-triggered automation. Use the dispatcher daemon when its dispatch state is healthy; otherwise use manual owner assignment/scanning only.
 After bridge verification, Loyal Opposition startup must include a compact
 current-state report for the owner covering git state, live bridge queue
 counts, current Loyal Opposition actionability, Prime-actionable latest `GO`
@@ -331,3 +331,4 @@ item, and release blockers or release-target constraints when present.
   - `independent-progress-assessments/`
   - `.claude/rules/`
   - project root only when startup/loading requires it (for example, this file).
+
