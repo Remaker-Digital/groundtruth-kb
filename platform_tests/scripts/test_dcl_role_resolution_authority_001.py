@@ -19,7 +19,7 @@ declared machine-checkable assertions):
   a mismatched durable role.
 - R2 (registry fallback only)                     -> the durable registry role is
   consulted only when there is no valid marker hint.
-- R3 (dispatcher registry-authoritative) / assn 3 -> the cross-harness trigger
+- R3 (dispatcher registry-authoritative) / assn 3 -> the dispatcher daemon
   routes via the registry projection and never the interactive marker.
 - R4 (warn, do not override) / assertion 4        -> a mismatch is a warn/audit
   surface: the resolver never raises and the doctor topology check is advisory.
@@ -47,7 +47,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESOLVER_PATH = PROJECT_ROOT / "scripts" / "session_role_resolution.py"
-TRIGGER_PATH = PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+TRIGGER_PATH = PROJECT_ROOT / "scripts" / "dispatcher_runtime.py"
 CORE_PATH = PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py"
 DOCTOR_PATH = PROJECT_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "project" / "doctor.py"
 DB_PATH = PROJECT_ROOT / "groundtruth.db"
@@ -61,7 +61,7 @@ GATE_SET = (
     PROJECT_ROOT / "scripts" / "implementation_authorization.py",
     PROJECT_ROOT / "scripts" / "implementation_start_gate.py",
     PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py",
-    PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py",
+    PROJECT_ROOT / "scripts" / "dispatcher_runtime.py",
 )
 _REGISTRY_STATUS_PATTERNS = (
     re.compile(r"\bsuspended\b", re.IGNORECASE),
@@ -225,7 +225,7 @@ def test_r2_registry_is_fallback_only(tmp_path: Path) -> None:
 
 
 def test_r3_dispatcher_routes_via_registry_projection() -> None:
-    """R3 (structural): the cross-harness trigger routes via the registry
+    """R3 (structural): the dispatcher daemon routes via the registry
     projection and never consults the interactive session-role marker.
     """
     src = _read(TRIGGER_PATH)
@@ -346,3 +346,89 @@ def test_dcl_role_resolution_authority_001_spec_present() -> None:
     description = str(spec.get("description") or "")
     for rule in ("R1", "R2", "R3", "R4", "R5"):
         assert rule in description, f"{DCL_ID} description missing rule marker {rule!r}."
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-4781 — GOV-SESSION-ROLE-AUTHORITY-001 dispatcher-only section present
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_gov_session_role_authority_001_dispatcher_only() -> None:
+    """GOV-SESSION-ROLE-AUTHORITY-001 v3+ must contain the Dispatcher-Only
+    Registry Authority section per DELIB-20265878.
+
+    Regression guard: if a future spec update removes or renames this section,
+    this test will catch the regression before it propagates to enforcement gates
+    that rely on the dispatcher-only principle.
+    """
+    if not DB_PATH.is_file():
+        pytest.skip(f"MemBase not present at {DB_PATH}; spec-presence anchor not checkable in this environment.")
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(str(DB_PATH))
+    try:
+        spec = db.get_spec("GOV-SESSION-ROLE-AUTHORITY-001")
+    finally:
+        db.close()
+
+    assert spec is not None, "GOV-SESSION-ROLE-AUTHORITY-001 missing from MemBase."
+    assert int(spec.get("version", 0)) >= 3, (
+        f"GOV-SESSION-ROLE-AUTHORITY-001 must be at least v3 (WI-4781); found v{spec.get('version')}."
+    )
+    description = str(spec.get("description") or "")
+    assert "Dispatcher-Only Registry Authority" in description, (
+        "GOV-SESSION-ROLE-AUTHORITY-001 description missing '## Dispatcher-Only Registry Authority' "
+        "section (DELIB-20265878). Non-dispatcher enforcement gates must not use the registry role "
+        "as authority; this section is the canonical statement of that constraint."
+    )
+    assert "dispatcher-authoritative only" in description, (
+        "GOV-SESSION-ROLE-AUTHORITY-001 description missing 'dispatcher-authoritative only' language (DELIB-20265878)."
+    )
+    assert "MUST NOT use the registry role as an authority surface" in description, (
+        "GOV-SESSION-ROLE-AUTHORITY-001 description missing MUST NOT enforcement gate language."
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# WI-4781 — DCL-SESSION-ROLE-RESOLUTION-001 enforcement gate split (assertion 8)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_dcl_session_role_resolution_001_enforcement_gate_split() -> None:
+    """DCL-SESSION-ROLE-RESOLUTION-001 v4+ must contain assertion 8
+    (assertion_registry_not_authority_for_enforcement_gates) and the
+    Non-dispatcher enforcement gate row in the Resolution Table.
+
+    Authority: DCL-SESSION-ROLE-RESOLUTION-001 assertion 8 per WI-4781.
+    """
+    if not DB_PATH.is_file():
+        pytest.skip(f"MemBase not present at {DB_PATH}; spec-presence anchor not checkable in this environment.")
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(str(DB_PATH))
+    try:
+        spec = db.get_spec("DCL-SESSION-ROLE-RESOLUTION-001")
+    finally:
+        db.close()
+
+    assert spec is not None, "DCL-SESSION-ROLE-RESOLUTION-001 missing from MemBase."
+    assert int(spec.get("version", 0)) >= 4, (
+        f"DCL-SESSION-ROLE-RESOLUTION-001 must be at least v4 (WI-4781); found v{spec.get('version')}."
+    )
+    description = str(spec.get("description") or "")
+    assert "Non-dispatcher enforcement gate" in description, (
+        "DCL-SESSION-ROLE-RESOLUTION-001 description missing 'Non-dispatcher enforcement gate' "
+        "row in the Resolution Table (WI-4781)."
+    )
+    assert "assertion_registry_not_authority_for_enforcement_gates" in description, (
+        "DCL-SESSION-ROLE-RESOLUTION-001 description missing assertion 8 "
+        "'assertion_registry_not_authority_for_enforcement_gates' (WI-4781)."
+    )
+    # Verify the assertion is also in the structured assertions JSON.
+    raw_assertions = spec.get("assertions") or "[]"
+    assertions = json.loads(raw_assertions) if isinstance(raw_assertions, str) else raw_assertions
+    assertion_ids = [a.get("id", "") for a in assertions if isinstance(a, dict)]
+    assert "assertion_registry_not_authority_for_enforcement_gates" in assertion_ids, (
+        f"DCL-SESSION-ROLE-RESOLUTION-001 assertions JSON missing assertion 8 id "
+        f"'assertion_registry_not_authority_for_enforcement_gates'; found: {assertion_ids!r}."
+    )
