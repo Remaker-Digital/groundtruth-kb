@@ -416,6 +416,12 @@ def main(argv: list[str] | None = None) -> int:
         help="JSON file of process rows. Preferred over stdin on Windows PowerShell, "
         "which can raise an OSError flushing a piped stdin. Falls back to stdin when omitted.",
     )
+    parser.add_argument(
+        "--output-file",
+        type=Path,
+        default=None,
+        help="Write the decision JSON to this file instead of stdout; used by pythonw.exe callers.",
+    )
     args = parser.parse_args(argv)
 
     if args.processes_file is not None:
@@ -446,7 +452,14 @@ def main(argv: list[str] | None = None) -> int:
     # WI-4834: refresh the provenance ledger AFTER deciding, with the current
     # process set, so a just-died root's descendants stay attributable next tick.
     update_provenance(provenance_dir, processes, prior_provenance)
-    print(json.dumps({"reap": decision.reap, "protect": decision.protect, "reasons": decision.reasons}, sort_keys=True))
+    payload = json.dumps(
+        {"reap": decision.reap, "protect": decision.protect, "reasons": decision.reasons}, sort_keys=True
+    )
+    if args.output_file is not None:
+        args.output_file.parent.mkdir(parents=True, exist_ok=True)
+        args.output_file.write_text(payload, encoding="utf-8")
+    else:
+        print(payload)
     return 0
 
 

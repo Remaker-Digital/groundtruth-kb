@@ -252,3 +252,31 @@ def test_main_parses_bom_prefixed_processes_file(tmp_path, capsys) -> None:
     assert rc == 0
     decision = json.loads(capsys.readouterr().out)
     assert "reap" in decision and "protect" in decision and "reasons" in decision
+
+
+def test_main_writes_decision_to_output_file_without_stdout(tmp_path, capsys) -> None:
+    # pythonw.exe callers cannot depend on captured stdout. The optional
+    # output-file transport preserves the same schema while leaving the normal
+    # stdout CLI contract untouched when the flag is omitted.
+    rows = [{"pid": 100, "ppid": 1, "name": "codex.exe", "create_time_epoch": NOW - 500, "dispatched": True}]
+    proc_file = tmp_path / "candidates.json"
+    output_file = tmp_path / "decision.json"
+    proc_file.write_text(json.dumps(rows), encoding="utf-8")
+
+    rc = _M.main(
+        [
+            "--now",
+            str(NOW),
+            "--project-root",
+            str(tmp_path),
+            "--processes-file",
+            str(proc_file),
+            "--output-file",
+            str(output_file),
+        ]
+    )
+
+    assert rc == 0
+    assert capsys.readouterr().out == ""
+    decision = json.loads(output_file.read_text(encoding="utf-8"))
+    assert sorted(decision) == ["protect", "reap", "reasons"]

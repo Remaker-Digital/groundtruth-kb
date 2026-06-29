@@ -148,9 +148,29 @@ if ($candidates.Count -gt 0) {
             # all PowerShell versions; the decider also reads utf-8-sig as a
             # belt-and-suspenders.
             [System.IO.File]::WriteAllText($procFile, $procJson)
-            $decisionRaw = (& $pythonExe $reapScript --now $nowEpoch --project-root $root --provenance-dir '.gtkb-state/ops/dispatch-provenance' --processes-file $procFile 2>$null)
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($decisionRaw)) {
-                $failSafe = $true; $failReason = "decider exit=$LASTEXITCODE output-empty=$([string]::IsNullOrWhiteSpace($decisionRaw))"
+            $decisionFile = Join-Path $opsDir ('storm-watchdog-decision-' + [guid]::NewGuid().ToString('N') + '.json')
+            if (Test-Path $decisionFile) { Remove-Item $decisionFile -Force -ErrorAction SilentlyContinue }
+            $decider = Start-Process -FilePath $pythonExe -ArgumentList @(
+                $reapScript,
+                '--now',
+                $nowEpoch,
+                '--project-root',
+                $root,
+                '--provenance-dir',
+                '.gtkb-state/ops/dispatch-provenance',
+                '--processes-file',
+                $procFile,
+                '--output-file',
+                $decisionFile
+            ) -Wait -PassThru -WindowStyle Hidden
+            $deciderExitCode = $decider.ExitCode
+            $decisionRaw = ''
+            if (Test-Path $decisionFile) {
+                $decisionRaw = [System.IO.File]::ReadAllText($decisionFile)
+                Remove-Item $decisionFile -Force -ErrorAction SilentlyContinue
+            }
+            if ($deciderExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($decisionRaw)) {
+                $failSafe = $true; $failReason = "decider exit=$deciderExitCode output-file-empty=$([string]::IsNullOrWhiteSpace($decisionRaw))"
             }
             else {
                 $decision = $decisionRaw | ConvertFrom-Json

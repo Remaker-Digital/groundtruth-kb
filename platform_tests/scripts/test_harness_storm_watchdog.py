@@ -119,12 +119,19 @@ def test_watchdog_preserves_heartbeat_and_logrotate() -> None:
     assert "1MB" in text
 
 
-def test_watchdog_uses_headless_python_for_reap_decider() -> None:
-    """The scheduled watchdog runs every minute; the reap decider must use
-    pythonw.exe so a visible console is not allocated on each tick."""
+def test_watchdog_uses_headless_python_file_transport_for_reap_decider() -> None:
+    """The scheduled watchdog must not allocate a visible console or depend on
+    stdout capture from pythonw.exe."""
     text = _watchdog_text()
+
     assert "pythonw.exe" in text
     assert "storm_watchdog_reap.py" in text
+    assert "Start-Process -FilePath $pythonExe" in text
+    assert "-Wait -PassThru -WindowStyle Hidden" in text
+    assert "'--output-file'" in text
+    assert "$decisionFile" in text
+    assert "[System.IO.File]::ReadAllText($decisionFile)" in text
+    assert "decisionRaw = (& $pythonExe" not in text
 
 
 def test_watchdog_does_not_auto_assert_kill_switch() -> None:
