@@ -4,19 +4,98 @@ purpose = "Typed waiver registry for Harness Parity Phase 2 evaluator gaps."
 project = "PROJECT-HARNESS-PARITY-PHASE-2"
 work_item = "WI-4901"
 
-# No active waivers are recorded at creation time.
-#
-# Waiver records use this shape:
-#
-# [[waivers]]
-# id = "WAIVER-HARNESS-PARITY-EXAMPLE"
-# harness = "example-harness" # exact harness_name or "*"
-# dimension = "headless_invocation" # one evaluator dimension id or "*"
-# reason_class = "vendor_limitation" # impossible | vendor_limitation | deliberate_deferral | owner_accepted_risk
-# rationale = "The harness has no headless runtime surface."
-# owner_decision = "DELIB-..."
-# evidence = "path/or/command evidence"
-# review_trigger = "Revisit when the vendor adds headless support." # required unless expires is set
-# expires = "2026-12-31" # optional alternative to review_trigger
-# evaluator_behavior = "waive"
-# status = "active" # active | retired
+[[waivers]]
+id = "WAIVER-P2-ANTIGRAVITY-DISPATCHER-RECEIVE"
+harness = "antigravity"
+dimension = "dispatcher_receive"
+reason_class = "impossible"
+rationale = "Antigravity harness C is terminally retired in the canonical harness registry after the Gemini Code Assist eligibility failure; reactivation requires a new governed lifecycle or replacement-harness design."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; config/dispatcher/rules.toml; bridge/gtkb-wi4901-phase2-release-waiver-closure-003.md"
+review_trigger = "Revisit only when a governed Antigravity lifecycle replacement or reactivation proposal is approved."
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-ANTIGRAVITY-EVENT-SOURCE"
+harness = "antigravity"
+dimension = "event_source"
+reason_class = "impossible"
+rationale = "Antigravity harness C is terminally retired and has no active event-firing hook surface in the current dispatcher topology."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; bridge/gtkb-wi4901-phase2-release-waiver-closure-003.md"
+review_trigger = "Revisit only when a governed Antigravity lifecycle replacement or reactivation proposal is approved."
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-CLAUDE-DISPATCHER-RECEIVE"
+harness = "claude"
+dimension = "dispatcher_receive"
+reason_class = "deliberate_deferral"
+rationale = "Claude harness B is deliberately suspended during the owner-declared token outage window even though static CLI resolution is healthy."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; config/dispatcher/rules.toml; bridge/gtkb-wi4895-claude-token-outage-dispatch-topology-004.md"
+expires = "2026-07-01"
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-CLAUDE-EVENT-SOURCE"
+harness = "claude"
+dimension = "event_source"
+reason_class = "deliberate_deferral"
+rationale = "Claude harness B is suspended for the same token-outage window and is intentionally not an event source while suspended."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; bridge/gtkb-wi4895-claude-token-outage-dispatch-topology-004.md"
+expires = "2026-07-01"
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-CURSOR-DISPATCHER-RECEIVE"
+harness = "cursor"
+dimension = "dispatcher_receive"
+reason_class = "vendor_limitation"
+rationale = "Cursor is available interactively, but this host has no verified standalone Cursor Agent runtime or CURSOR_AGENT_BIN target for reliable headless dispatch."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; config/dispatcher/rules.toml; bridge/gtkb-wi4888-release-health-cursor-quarantine-budget-config-004.md"
+review_trigger = "Revisit when a working headless Cursor Agent CLI is installed and verified by the release-health probe."
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-CURSOR-EVENT-SOURCE"
+harness = "cursor"
+dimension = "event_source"
+reason_class = "vendor_limitation"
+rationale = "Cursor has no verified headless event-firing runtime on this host while the Cursor dispatch quarantine remains active."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; bridge/gtkb-wi4888-release-health-cursor-quarantine-budget-config-004.md"
+review_trigger = "Revisit when a working headless Cursor Agent CLI is installed and verified by the release-health probe."
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-OLLAMA-EVENT-SOURCE"
+harness = "ollama"
+dimension = "event_source"
+reason_class = "deliberate_deferral"
+rationale = "Ollama is a receive-only Loyal Opposition provider harness in Phase 2 and has no native event-firing hook surface."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; scripts/ollama_harness.py; bridge/gtkb-wi4901-phase2-release-waiver-closure-003.md"
+review_trigger = "Revisit if Ollama is promoted from receive-only provider harness to an event-source harness."
+evaluator_behavior = "waive"
+status = "active"
+
+[[waivers]]
+id = "WAIVER-P2-OPENROUTER-EVENT-SOURCE"
+harness = "openrouter"
+dimension = "event_source"
+reason_class = "deliberate_deferral"
+rationale = "OpenRouter is a receive-only Loyal Opposition provider harness in Phase 2 and has no native event-firing hook surface."
+owner_decision = "DELIB-20260629-HARNESS-PARITY-PHASE-2-OWNER-DIRECTIVE"
+evidence = "harness-state/harness-registry.json; scripts/openrouter_harness.py; bridge/gtkb-wi4901-phase2-release-waiver-closure-003.md"
+review_trigger = "Revisit if OpenRouter is promoted from receive-only provider harness to an event-source harness."
+evaluator_behavior = "waive"
+status = "active"
