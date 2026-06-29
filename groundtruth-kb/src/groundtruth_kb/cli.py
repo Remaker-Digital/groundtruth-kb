@@ -212,6 +212,47 @@ main.add_command(session_group)
 main.add_command(skills_group)
 
 
+@main.group("commit")
+def commit_group() -> None:
+    """Commit governance preflight commands."""
+
+
+@commit_group.command("preflight")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--python-bin", default=None, help="Python executable used for script checks.")
+@click.option("--powershell-bin", default=None, help="PowerShell executable used for staged PS1 parsing.")
+@click.pass_context
+def commit_preflight_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    python_bin: str | None,
+    powershell_bin: str | None,
+) -> None:
+    """Run staged commit governance checks with structured evidence."""
+    from groundtruth_kb.governance.commit_preflight import preflight_exit_code, run_commit_preflight
+
+    config = _resolve_config(ctx)
+    evidence = run_commit_preflight(
+        Path(config.project_root),
+        python_bin=python_bin,
+        powershell_bin=powershell_bin,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(preflight_exit_code(evidence))
+
+
 @main.group("admin")
 def admin_group() -> None:
     """Administrative project tooling."""
