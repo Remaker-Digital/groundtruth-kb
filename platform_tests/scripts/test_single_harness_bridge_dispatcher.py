@@ -523,6 +523,42 @@ def test_single_harness_dispatcher_filters_held_prime_items_before_spawn(
     assert summary["dispatch_state"]["recipients"]["prime-builder"]["work_intent_held_filtered_count"] == 1
 
 
+def test_single_harness_dispatcher_filters_owner_hold_prime_no_go_before_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    dispatcher = _load_dispatcher()
+    state_dir = tmp_path / "state"
+    doc = "owner-hold-thread"
+
+    (root / "bridge" / f"{doc}-001.md").write_text(
+        "NEW\n\nbridge_kind: implementation_proposal\n",
+        encoding="utf-8",
+    )
+    (root / "bridge" / f"{doc}-002.md").write_text(
+        "NO-GO\n\n## Required Revisions\n\n1. **Hold for Owner Decision:** wait for the topology decision.\n",
+        encoding="utf-8",
+    )
+    _write_index(
+        root,
+        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
+    )
+
+    def _forbid_spawn(**_kwargs):
+        raise AssertionError("owner-hold NO-GO must not spawn a Prime worker")
+
+    monkeypatch.setattr(dispatcher, "_spawn_worker", _forbid_spawn)
+
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    assert summary["results"]["prime-builder"]["reason"] == "no_pending_after_filter"
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert recipient_state["raw_pending_count"] == 1
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-SHD-S2-spawn-on-signature-change
 # ──────────────────────────────────────────────────────────────────────────

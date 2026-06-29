@@ -777,6 +777,42 @@ def test_run_trigger_filters_held_prime_items_before_spawn(
     assert summary["dispatch_state"]["recipients"]["prime-builder:B"]["work_intent_held_filtered_count"] == 1
 
 
+def test_run_trigger_filters_owner_hold_prime_no_go_before_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    doc = "owner-hold-thread"
+
+    _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
+    _write_bridge_file(
+        root,
+        f"{doc}-002.md",
+        "NO-GO\n\n## Required Revisions\n\n1. **Hold for Owner Decision:** wait for the topology decision.\n",
+    )
+    _write_index(
+        root,
+        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
+    )
+
+    def _forbid_spawn(**_kwargs: object) -> dict[str, object]:
+        raise AssertionError("owner-hold NO-GO must not spawn a Prime worker")
+
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    monkeypatch.setattr(trigger, "_spawn_harness", _forbid_spawn)
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    result = summary["results"]["prime-builder:B"]
+    assert result["reason"] == "no_pending_after_filter"
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder:B"]
+    assert recipient_state["raw_pending_count"] == 1
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
+
+
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:
     """T-2-signature-computation: signature deterministic per recipient
     given identical INDEX state.
