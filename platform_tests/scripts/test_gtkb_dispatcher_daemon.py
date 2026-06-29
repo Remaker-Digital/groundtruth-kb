@@ -76,6 +76,39 @@ def _make_project(root: Path) -> Path:
     return root
 
 
+def _make_codex_prime_project(root: Path) -> Path:
+    root = _make_project(root)
+    (root / "harness-state" / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["prime-builder"],
+                        "invocation_surfaces": _CODEX_INVOCATION,
+                    },
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "event_driven_hooks": True,
+                        "role": ["loyal-opposition"],
+                        "invocation_surfaces": _CLAUDE_INVOCATION,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return root
+
+
 def _write_bridge(root: Path, stem: str, status: str, version: int) -> None:
     body = f"{status}\n\n# {stem} v{version}\nauthor_session_context_id: fixture-author-session\n"
     (root / "bridge" / f"{stem}-{version:03d}.md").write_text(body, encoding="utf-8")
@@ -390,6 +423,55 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
     status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
     assert status["mode"] == "live"
     assert calls, "expected live tick to invoke _spawn_harness"
+
+
+def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    trigger = daemon._load_trigger_module()
+    calls: list[dict] = []
+
+    def _fake_spawn(**kwargs):
+        calls.append(kwargs)
+        return {"launched": True, "recipient": kwargs["target"].dispatch_state_key}
+
+    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
+
+    first = daemon.run_tick(root)
+    assert first["mode"] == "live"
+    assert len(calls) == 1
+    state_dir = daemon._bridge_poller_state_dir(root)
+    state_path = state_dir / trigger.DISPATCH_STATE_FILENAME
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    prime_state = state["recipients"]["prime-builder:A"]
+    signature = prime_state["last_dispatched_signature"]
+
+    state["recipients"]["prime-builder"] = {
+        "updated_at": "2026-06-29T07:46:04+00:00",
+        "last_result": "substrate_mismatch_inert",
+        "pending_count": 0,
+        "selected_count": 0,
+    }
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    calls.clear()
+    second = daemon.run_tick(root)
+
+    assert second["mode"] == "live"
+    assert calls == []
+    assert second["spawn_results"] == [{"recipient": "prime-builder:A", "launched": False, "reason": "unchanged"}]
+    repaired_state = json.loads(state_path.read_text(encoding="utf-8"))["recipients"]["prime-builder:A"]
+    assert repaired_state["last_dispatched_signature"] == signature
+    assert repaired_state["last_result"] == "unchanged"
 
 
 def test_daemon_live_skips_not_ready_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

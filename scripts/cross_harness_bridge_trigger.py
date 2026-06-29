@@ -459,6 +459,35 @@ LEGACY_TO_NEW_STATE_KEY = {
 }
 
 
+def _role_state_carries_retry_evidence(value: dict[str, Any]) -> bool:
+    launch = value.get("last_launch")
+    if isinstance(launch, dict):
+        if launch.get("stdout_path") or launch.get("stderr_path"):
+            return True
+        if launch.get("reason") in NON_LAUNCHED_FAILURE_REASONS:
+            return True
+        exit_code = launch.get("exit_code")
+        if isinstance(exit_code, int) and exit_code != 0:
+            return True
+        if launch.get("exit_failure_reason"):
+            return True
+    return bool(value.get("previous_launch_failed") or value.get("previous_launch_failed_logged_at"))
+
+
+def _merge_role_retry_evidence(existing: dict[str, Any], value: dict[str, Any]) -> None:
+    if "last_launch" in value:
+        existing["last_launch"] = value["last_launch"]
+    for key in (
+        "previous_launch_failed",
+        "previous_launch_failed_logged_at",
+        "last_failure_reason",
+        "failure_class",
+        "non_retryable_failure",
+    ):
+        if key in value:
+            existing[key] = value[key]
+
+
 def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:
     """Translate legacy state-keys to durable role labels on read, suffixing with active IDs.
 
@@ -486,8 +515,10 @@ def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Pat
             pass
 
     migrated: dict[str, Any] = {}
+    explicit_recipient_sources: dict[str, bool] = {}
     for key, value in recipients.items():
         base_key = LEGACY_TO_NEW_STATE_KEY.get(key, key)
+        source_is_explicit_recipient = ":" in base_key
         if ":" not in base_key:
             if base_key in active_by_role:
                 new_key = f"{base_key}:{active_by_role[base_key]}"
@@ -498,16 +529,30 @@ def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Pat
 
         if not isinstance(value, dict):
             migrated[new_key] = value
+            explicit_recipient_sources[new_key] = source_is_explicit_recipient
             continue
 
         if new_key in migrated and isinstance(migrated[new_key], dict):
             existing = migrated[new_key]
+            existing_is_explicit = explicit_recipient_sources.get(new_key, False)
+            if existing_is_explicit and not source_is_explicit_recipient:
+                if _role_state_carries_retry_evidence(value):
+                    _merge_role_retry_evidence(existing, value)
+                continue
+            if source_is_explicit_recipient and not existing_is_explicit:
+                migrated[new_key] = value
+                if _role_state_carries_retry_evidence(existing):
+                    _merge_role_retry_evidence(migrated[new_key], existing)
+                explicit_recipient_sources[new_key] = True
+                continue
             existing_ts = str(existing.get("updated_at") or "")
             value_ts = str(value.get("updated_at") or "")
             if value_ts > existing_ts:
                 migrated[new_key] = value
+                explicit_recipient_sources[new_key] = source_is_explicit_recipient
         else:
             migrated[new_key] = value
+            explicit_recipient_sources[new_key] = source_is_explicit_recipient
     return migrated
 
 
@@ -530,8 +575,8 @@ def _rename_with_retry(
     src: Path,
     dst: Path,
     *,
-    total_attempts: int = 5,
-    initial_backoff_s: float = 0.05,
+    total_attempts: int = 8,
+    initial_backoff_s: float = 0.02,
 ) -> None:
     """Atomic rename with backoff on transient Windows access errors.
 
@@ -550,9 +595,9 @@ def _rename_with_retry(
     class (caller deleted our temp) and is raised immediately for
     diagnosis rather than silently retrying.
 
-    Timing: ``total_attempts=5`` means up to 5 tries. Sleeps occur AFTER
-    attempts 1-4 only (4 sleeps before the 5th attempt's potential raise):
-    50ms / 100ms / 200ms / 400ms = ~750ms total worst-case sleep.
+    Timing: ``total_attempts=8`` means up to 8 tries. Sleeps occur AFTER
+    attempts 1-7 only (7 sleeps before the 8th attempt's potential raise):
+    20ms / 40ms / 80ms / 160ms / 320ms / 640ms / 1280ms = ~2.5s total worst-case sleep.
     """
     backoff = initial_backoff_s
     for attempt in range(1, total_attempts + 1):
