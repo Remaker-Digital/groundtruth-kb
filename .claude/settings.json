@@ -133,11 +133,6 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\" --startup-service \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --harness-name claude",
             "timeout": 60
-          },
-          {
-            "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/single_harness_bridge_automation.py\" --ensure --project-root \"$CLAUDE_PROJECT_DIR\"",
-            "timeout": 10
           }
         ]
       },
@@ -191,11 +186,6 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "cmd /d /s /c call \"%CLAUDE_PROJECT_DIR%\\.codex\\gtkb-hooks\\bridge-dispatch-trigger.cmd\" --state-dir \"%CLAUDE_PROJECT_DIR%\\.gtkb-state\\bridge-poller\"",
-            "timeout": 10
           }
         ]
       },
@@ -205,11 +195,6 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "cmd /d /s /c call \"%CLAUDE_PROJECT_DIR%\\.codex\\gtkb-hooks\\bridge-dispatch-trigger.cmd\" --state-dir \"%CLAUDE_PROJECT_DIR%\\.gtkb-state\\bridge-poller\"",
             "timeout": 10
           }
         ]
@@ -227,16 +212,6 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "cmd /d /s /c call \"%CLAUDE_PROJECT_DIR%\\.codex\\gtkb-hooks\\bridge-dispatch-trigger.cmd\" --state-dir \"%CLAUDE_PROJECT_DIR%\\.gtkb-state\\bridge-poller\" --stop-hook",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/single_harness_bridge_automation.py\" --ensure --dispatch-now --max-items 999 --project-root \"$CLAUDE_PROJECT_DIR\"",
-            "timeout": 10
           },
           {
             "type": "command",

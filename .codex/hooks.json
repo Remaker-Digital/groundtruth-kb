@@ -11,12 +11,6 @@
           },
           {
             "type": "command",
-            "command": "pythonw.exe E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --project-root E:\\GT-KB --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --max-items 999",
-            "statusMessage": "Ensuring single-harness bridge automation",
-            "timeout": 15
-          },
-          {
-            "type": "command",
             "command": "pythonw.exe E:\\GT-KB\\.codex\\gtkb-hooks\\session_start_dispatch.py",
             "statusMessage": "Preparing GT-KB startup orientation",
             "timeout": 60
@@ -151,12 +145,6 @@
           },
           {
             "type": "command",
-            "command": "pythonw.exe E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-            "statusMessage": "Cross-harness bridge trigger",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "pythonw.exe E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
             "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
             "timeout": 10
@@ -170,12 +158,6 @@
             "type": "command",
             "command": "pythonw.exe E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode tool-use --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
             "statusMessage": "Active-session heartbeat (refresh)",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw.exe E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
-            "statusMessage": "Cross-harness bridge trigger",
             "timeout": 5
           },
           {
@@ -198,12 +180,6 @@
           },
           {
             "type": "command",
-            "command": "pythonw.exe E:\\GT-KB\\scripts\\cross_harness_bridge_trigger.py --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --stop-hook",
-            "statusMessage": "Cross-harness bridge Stop reconciliation",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "pythonw.exe E:\\GT-KB\\scripts\\bridge_verified_backlog_reconciler.py --apply --quiet --project-root E:\\GT-KB",
             "statusMessage": "Reconciling VERIFIED bridge-backed backlog items",
             "timeout": 10
@@ -213,12 +189,6 @@
             "command": "pythonw.exe E:\\GT-KB\\scripts\\active_session_heartbeat.py --mode session-stop --role codex --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller",
             "statusMessage": "Active-session heartbeat (stop)",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "pythonw.exe E:\\GT-KB\\scripts\\single_harness_bridge_automation.py --ensure --dispatch-now --project-root E:\\GT-KB --state-dir E:\\GT-KB\\.gtkb-state\\bridge-poller --max-items 999",
-            "statusMessage": "Single-harness bridge dispatch",
-            "timeout": 15
           },
           {
             "type": "command",
