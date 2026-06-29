@@ -21,6 +21,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import UTC
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -28,6 +29,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+_REPO_ROOT = _SCRIPT_PATH.parents[1]
 
 # WI-3344: invocation_surfaces headless argv templates. {{PROMPT}} and
 # {{PROJECT_ROOT}} are the placeholder tokens _harness_command substitutes as
@@ -38,6 +40,42 @@ _CLAUDE_INVOCATION_SURFACES = {
 }
 
 
+def test_codex_hook_commands_do_not_use_foreground_console_launchers() -> None:
+    """WI-4893 residual: Codex hooks must not spawn console-subsystem wrappers.
+
+    The release-blocking Windows storm was reproduced as routine Codex hook
+    registrations launching foreground ``python`` and ``cmd`` commands. Hook
+    children must either be disabled by the WI-4896 breaker or routed through
+    no-window launchers so routine tool/use hooks do not allocate visible
+    console windows.
+    """
+    config_path = _REPO_ROOT / ".codex" / "config.toml"
+    config_text = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    if "hooks = false" in config_text:
+        return
+
+    hooks_path = _REPO_ROOT / ".codex" / "hooks.json"
+    hooks = json.loads(hooks_path.read_text(encoding="utf-8-sig"))
+    if hooks == {"hooks": {}}:
+        return
+
+    commands: list[str] = []
+    for entries in hooks.get("hooks", {}).values():
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                command = hook.get("command")
+                if isinstance(command, str):
+                    commands.append(command)
+
+    assert commands, "Codex hook configuration should contain registered commands or explicit breaker mode"
+    forbidden = ("python ", "cmd /d /s /c", "powershell.exe", "pwsh.exe")
+    offenders = [
+        command for command in commands if command.lower().startswith(forbidden) or "cmd /d /s /c" in command.lower()
+    ]
+    assert offenders == []
+    assert all("pythonw.exe" in command.lower() for command in commands)
+
+
 @pytest.fixture(autouse=True)
 def _no_cross_harness_trigger_disable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
@@ -45,6 +83,35 @@ def _no_cross_harness_trigger_disable(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _allowed_tool_set(raw: str) -> set[str]:
     return {part.strip() for part in raw.split() if part.strip()}
+
+
+def test_trigger_inflight_lock_blocks_concurrent_hook_invocations(tmp_path: Path) -> None:
+    """WI-4893: whole-trigger guard blocks concurrent hook-trigger passes."""
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+
+    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+
+    assert token is not None
+    assert trigger._try_acquire_trigger_inflight_lock(state_dir) is None
+    trigger._release_trigger_inflight_lock(state_dir, token)
+    second = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    assert second is not None
+    trigger._release_trigger_inflight_lock(state_dir, second)
+
+
+def test_trigger_inflight_lock_recovers_from_stale_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    lock_path = state_dir / trigger.TRIGGER_INFLIGHT_LOCK_FILENAME
+    lock_path.write_text(json.dumps({"token": "stale", "acquired_at_epoch": time.time() - 120}), encoding="utf-8")
+    monkeypatch.setattr(trigger, "TRIGGER_INFLIGHT_LOCK_STALE_SECONDS", 1.0)
+
+    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+
+    assert token is not None
+    trigger._release_trigger_inflight_lock(state_dir, token)
 
 
 def _frozen_pending_signature(items: list[object]) -> str:
@@ -267,6 +334,57 @@ def test_fab10_work_intent_claim_contract_uses_child_dispatch_id() -> None:
     assert trigger.WORK_INTENT_TRIGGER_TTL_SECONDS >= 600
     assert trigger._work_intent_session_id(dispatch_id) == dispatch_id
     assert ":" not in trigger._new_dispatch_id("prime-builder:A")
+
+
+def test_trigger_inflight_lock_blocks_concurrent_invocation(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    _make_synthetic_project(root)
+    state_dir = tmp_path / "state"
+
+    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    assert token
+    try:
+        result = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    finally:
+        trigger._release_trigger_inflight_lock(state_dir, token)
+
+    assert result == {"skipped": True, "reason": "trigger_inflight_active"}
+
+
+def test_trigger_inflight_lock_replaces_stale_lock(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    stale_payload = {
+        "schema_version": 1,
+        "token": "stale",
+        "pid": 999999,
+        "acquired_at": "2020-01-01T00:00:00Z",
+        "acquired_at_epoch": 1.0,
+    }
+    (state_dir / trigger.TRIGGER_INFLIGHT_LOCK_FILENAME).write_text(json.dumps(stale_payload), encoding="utf-8")
+
+    assert (
+        trigger.trigger_inflight_active(state_dir, now_epoch=trigger.TRIGGER_INFLIGHT_LOCK_STALE_SECONDS + 2) is False
+    )
+    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    assert token
+    trigger._release_trigger_inflight_lock(state_dir, token)
+
+
+def test_trigger_releases_inflight_lock_after_run(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    _make_synthetic_project(root)
+    state_dir = tmp_path / "state"
+
+    result = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert result["skipped"] is False
+    assert trigger.trigger_inflight_active(state_dir) is False
 
 
 def test_fab10_dispatch_retry_knobs_prefer_gtkb_names(monkeypatch: pytest.MonkeyPatch) -> None:

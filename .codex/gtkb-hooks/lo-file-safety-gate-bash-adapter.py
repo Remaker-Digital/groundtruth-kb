@@ -13,6 +13,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "lo-file-safety-gate.py"
 
 
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
+
+
 def main() -> int:
     try:
         payload = json.loads(sys.stdin.read() or "{}")
@@ -29,6 +36,7 @@ def main() -> int:
         cwd=str(PROJECT_ROOT),
         env=env,
         check=False,
+        **_no_window_subprocess_kwargs(),
     )
     if result.stdout:
         print(result.stdout, end="")

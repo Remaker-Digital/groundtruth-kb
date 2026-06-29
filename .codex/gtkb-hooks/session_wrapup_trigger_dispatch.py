@@ -57,6 +57,13 @@ ACCEPTED_TRIGGER_PHRASES = {
 }
 
 
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
+
+
 def _read_stdin() -> str:
     try:
         return sys.stdin.read()
@@ -224,6 +231,7 @@ def main() -> int:
         capture_output=True,
         text=True,
         check=False,
+        **_no_window_subprocess_kwargs(),
     )
     (OUT_DIR / "last-wrapup-trigger.json").write_text(result.stdout, encoding="utf-8")
     (OUT_DIR / "last-wrapup-trigger.err").write_text(result.stderr, encoding="utf-8")

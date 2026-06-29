@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -17,6 +18,13 @@ SKIPPED_DIAGNOSTIC = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "last-bridge-audit
 BRIDGE_VERSIONED_FILE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 BRIDGE_LO_VERDICT_FILE_RE = re.compile(r"^bridge/.+\.lo-verdict\.md$", re.IGNORECASE)
 _RETIRED_BRIDGE_AGGREGATE_FILE = ("bridge", "INDEX.md")
+
+
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
 
 
 @dataclass(frozen=True)
@@ -258,6 +266,7 @@ def _run_canonical(payload: dict[str, Any], write: BridgeWrite) -> tuple[int, st
         text=True,
         cwd=str(PROJECT_ROOT),
         check=False,
+        **_no_window_subprocess_kwargs(),
     )
     stdout = result.stdout or ""
     stderr = result.stderr or ""

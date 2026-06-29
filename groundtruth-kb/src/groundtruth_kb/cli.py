@@ -154,6 +154,13 @@ def _prefer_windows_gui_python(command: str) -> str:
     return candidate if os.path.isfile(candidate) else command
 
 
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
+
+
 def _open_db(config: GTConfig, *, check_same_thread: bool = True) -> KnowledgeDB:
     """Open a KnowledgeDB from resolved config, wiring governance gates."""
     registry = GateRegistry.from_config(
@@ -1002,19 +1009,48 @@ def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
     # its children are orphaned. terminate_pid_tree is best-effort and no-ops on
     # an already-dead pid.
     pid_path = state_dir / daemon.PID_FILENAME
-    terminated_pid = 0
     try:
         pid = int(pid_path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         pid = 0
-    if pid > 0:
-        terminate_pid_tree(pid)
-        terminated_pid = pid
-    with contextlib.suppress(OSError):
-        pid_path.unlink()
-    daemon.release_daemon_lock(state_dir)
-    if terminated_pid:
-        click.echo(f"Stopped dispatcher daemon (pid={terminated_pid} tree terminated, lock released).")
+    candidate_pids: list[int] = []
+    if pid > 0 and (
+        daemon.daemon_pid_provenance_verified(state_dir) or daemon.daemon_pid_matches_legacy_loop(state_dir, pid)
+    ):
+        candidate_pids.append(pid)
+    if hasattr(daemon, "matching_daemon_loop_pids"):
+        for loop_pid in daemon.matching_daemon_loop_pids(state_dir):
+            if loop_pid > 0 and loop_pid not in candidate_pids:
+                candidate_pids.append(loop_pid)
+
+    for candidate_pid in candidate_pids:
+        terminate_pid_tree(candidate_pid)
+        try:
+            expected_create_time = daemon._read_pid_create_time_sidecar(state_dir)
+            if expected_create_time is not None and daemon._pid_create_time_matches(
+                candidate_pid, expected_create_time
+            ):
+                import psutil  # noqa: PLC0415
+
+                proc = psutil.Process(candidate_pid)
+                for child in proc.children(recursive=True):
+                    with contextlib.suppress(Exception):
+                        child.kill()
+                with contextlib.suppress(Exception):
+                    proc.kill()
+        except Exception:  # noqa: BLE001 - stop remains best-effort
+            pass
+    if hasattr(daemon, "_clear_daemon_pid_record"):
+        daemon._clear_daemon_pid_record(state_dir)
+    else:
+        with contextlib.suppress(OSError):
+            pid_path.unlink()
+    daemon.release_daemon_lock(state_dir, force=True)
+    if candidate_pids:
+        joined = ", ".join(str(item) for item in candidate_pids)
+        click.echo(f"Stopped dispatcher daemon (pid(s)={joined} tree terminated, lock released).")
+    elif pid > 0:
+        click.echo("Stopped dispatcher daemon (unverified pid ignored, pid/lock state cleared).")
     else:
         click.echo("Stopped dispatcher daemon (no recorded pid; lock released).")
 
@@ -5856,6 +5892,7 @@ def project_classify_tree(
                 capture_output=True,
                 text=True,
                 timeout=5,
+                **_no_window_subprocess_kwargs(),
             )
             if r.returncode == 0:
                 return r.stdout.strip() or "unknown"

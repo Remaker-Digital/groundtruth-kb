@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -26,6 +27,13 @@ BRIDGE_FILE_WRITE_PATTERNS = (
         re.IGNORECASE | re.DOTALL,
     ),
 )
+
+
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
 
 
 def _load_payload() -> dict[str, Any]:
@@ -129,6 +137,7 @@ def main() -> int:
         text=True,
         cwd=str(PROJECT_ROOT),
         check=False,
+        **_no_window_subprocess_kwargs(),
     )
     if result.stdout:
         print(result.stdout, end="")

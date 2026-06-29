@@ -30,7 +30,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def _consume_stdin_if_present() -> None:
@@ -39,6 +39,13 @@ def _consume_stdin_if_present() -> None:
             _ = sys.stdin.read()
     except Exception:  # intentional-catch: best-effort stdin consumption
         pass
+
+
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
 
 
 def _pid_is_running(pid: int) -> bool:
@@ -186,15 +193,17 @@ def _start_detached(
         "--error-backoff-seconds",
         str(error_backoff_seconds),
     ]
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(project_dir),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        close_fds=True,
-        start_new_session=True,
-    )
+    popen_kwargs: dict[str, object] = {
+        "cwd": str(project_dir),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "close_fds": True,
+        "start_new_session": True,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    proc = subprocess.Popen(cmd, **cast(Any, popen_kwargs))
     return int(proc.pid)
 
 
@@ -222,6 +231,7 @@ def _run_once_wake(
         cwd=str(project_dir),
         capture_output=True,
         text=True,
+        **_no_window_subprocess_kwargs(),
     )
     return completed.returncode == 0, (completed.stdout or "").strip()
 
@@ -258,6 +268,7 @@ def _try_start_scheduled_task(agent: str) -> bool:
             ["schtasks.exe", "/Run", "/TN", task_name],
             capture_output=True,
             text=True,
+            **_no_window_subprocess_kwargs(),
         )
         return result.returncode == 0
     except Exception:  # intentional-catch: schtasks fallback, returns False
@@ -274,6 +285,7 @@ def _scheduled_task_exists(agent: str) -> bool:
             ["schtasks.exe", "/Query", "/TN", task_name],
             capture_output=True,
             text=True,
+            **_no_window_subprocess_kwargs(),
         )
         return result.returncode == 0
     except Exception:  # intentional-catch: schtasks query fallback, returns False

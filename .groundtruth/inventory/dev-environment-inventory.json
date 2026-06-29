@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-28T20:51:25Z",
+  "generated_at": "2026-06-29T04:44:49Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -29,8 +29,8 @@
         "path": ".codex/hooks.json",
         "present": true
       },
-      "hooks_enabled": true,
-      "session_start_configured": true
+      "hooks_enabled": false,
+      "session_start_configured": false
     },
     "identities": {
       "antigravity": {
@@ -498,7 +498,7 @@
         },
         "startup_support": {
           "evidence": ".codex/hooks.json SessionStart",
-          "status": "configured"
+          "status": "unknown"
         },
         "subagent_team_support": {
           "evidence": "harness runtime; not repo-configured",
@@ -652,7 +652,7 @@
         },
         "startup_support": {
           "evidence": ".codex/hooks.json SessionStart",
-          "status": "configured"
+          "status": "unknown"
         },
         "subagent_team_support": {
           "evidence": "harness runtime; not repo-configured",
@@ -712,7 +712,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.2"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -726,7 +726,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.3"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -740,7 +740,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.12"
+      "version": "0.15.5"
     }
   },
   "verification": {

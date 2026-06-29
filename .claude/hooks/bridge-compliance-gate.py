@@ -27,6 +27,14 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
+
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
+
+
 for _parent in Path(__file__).resolve().parents:
     if (_parent / "scripts" / "bridge_author_metadata.py").is_file():
         if str(_parent) not in sys.path:
@@ -142,6 +150,12 @@ APPLICABILITY_PREFLIGHT_HEADING_RE = re.compile(
     r"^#{1,6}\s*applicability\s+preflight\s*$",
     re.IGNORECASE,
 )
+COMMIT_FINALIZATION_HEADING_RE = re.compile(
+    r"^#{1,6}\s*commit\s+finalization\s+evidence\s*$",
+    re.IGNORECASE,
+)
+SAME_TRANSACTION_PATH_SET_RE = re.compile(r"\bsame-transaction\s+path\s+set\b", re.IGNORECASE)
+FINALIZATION_PATH_BULLET_RE = re.compile(r"(?m)^\s*[-*]\s+`[^`]+`\s*$")
 PREFLIGHT_PACKET_HASH_RE = re.compile(
     r"\bpacket_hash\s*:\s*`?sha256:[0-9a-f]{64}`?",
     re.IGNORECASE,
@@ -474,7 +488,13 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
         ["git", "rev-parse", "--git-common-dir"],
     ):
         try:
-            out = subprocess.check_output(args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL).strip()
+            out = subprocess.check_output(
+                args,
+                cwd=str(cwd_path),
+                text=True,
+                stderr=subprocess.DEVNULL,
+                **_no_window_subprocess_kwargs(),
+            ).strip()
         except (OSError, subprocess.SubprocessError):
             continue
         if not out:
@@ -972,6 +992,19 @@ def _has_spec_derived_verification(content: str) -> bool:
     )
 
 
+def _has_commit_finalization_evidence(content: str) -> bool:
+    lines = content.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if COMMIT_FINALIZATION_HEADING_RE.match(line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        return False
+    section = "\n".join(_collect_section_lines(lines, start))
+    return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) and FINALIZATION_PATH_BULLET_RE.search(section))
+
+
 def _proposal_claims_owner_approval(content: str) -> bool:
     """Return True when proposal content signals dependence on owner approval.
 
@@ -1336,6 +1369,7 @@ def _run_pending_applicability_preflight(
             errors="replace",
             timeout=10,
             check=False,
+            **_no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         print(f"[Governance] Bridge applicability preflight warning for {file_path}: {exc}", file=sys.stderr)
@@ -1402,6 +1436,7 @@ def _run_pending_clause_preflight(
             errors="replace",
             timeout=10,
             check=False,
+            **_no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         print(f"[Governance] ADR/DCL clause preflight warning for {file_path}: {exc}", file=sys.stderr)
@@ -1762,6 +1797,13 @@ def _deny_reason_for_content(
                 "a spec-to-test mapping, and executed test command evidence. "
                 "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
+            )
+        if first_line == "VERIFIED" and not _has_commit_finalization_evidence(content):
+            return (
+                "[Governance] VERIFIED bridge verdicts must include Commit Finalization Evidence "
+                "with a Same-transaction path set. Use the atomic VERIFIED finalization helper "
+                "instead of writing terminal VERIFIED bridge files directly. "
+                "(Hard-block per the Mandatory VERIFIED Commit-Finalization Gate.)"
             )
         if first_line in {"NO-GO", "VERIFIED"}:
             anchor_reason = _verdict_evidence_anchor_deny_reason(content, cwd_path)

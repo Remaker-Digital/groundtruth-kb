@@ -14,12 +14,20 @@ at bridge/gtkb-document-author-provenance-contract-004.md.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "document_author_provenance_gate.py"
+
+
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
 
 
 def main() -> int:
@@ -36,6 +44,7 @@ def main() -> int:
         capture_output=True,
         text=True,
         check=False,
+        **_no_window_subprocess_kwargs(),
     )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)

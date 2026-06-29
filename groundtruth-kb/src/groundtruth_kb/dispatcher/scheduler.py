@@ -18,6 +18,13 @@ def _now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
+
+
 _BRIDGE_FILE_STATUS_RE = re.compile(
     r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
     re.IGNORECASE,
@@ -67,6 +74,7 @@ def _working_tree_dirty(project_root: Path) -> bool:
             capture_output=True,
             text=True,
             check=False,
+            **_no_window_subprocess_kwargs(),
         )
     except OSError:
         return False
@@ -95,6 +103,7 @@ def _path_gate(project_root: Path, dotted: str) -> bool:
             text=True,
             timeout=5,
             check=False,
+            **_no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return False

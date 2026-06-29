@@ -1,10 +1,8 @@
 # Project-scoped Codex configuration for GroundTruth-KB.
 #
-# Codex hooks are enabled for this Windows workspace. Lifecycle hooks use
-# no-space launchers under E:\GT-KB\.codex\gtkb-hooks so project paths do
-# not break hook startup execution. Wrap-up is phrase-gated
-# through UserPromptSubmit so normal assistant completions do not look like
-# session boundaries.
+# WI-4896 containment: Codex hooks stay disabled in this Windows workspace until
+# release-runtime no-window validation proves enabled hooks cannot spawn visible
+# consoles.
 # DELIB-FAB15-REMEDIATION-20260610: interactive Codex sessions default to
 # approval_policy="on-request" with network disabled. Headless bridge-dispatch
 # workers cannot answer approvals and must apply their "never" posture at
@@ -12,7 +10,8 @@
 
 approval_policy = "on-request"
 [features]
-hooks = true
+hooks = false
+shell_snapshot = false
 
 [sandbox_workspace_write]
 network_access = false
