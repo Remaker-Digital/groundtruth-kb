@@ -2,7 +2,7 @@
 """Shared bridge review-independence comparator (WI-4829).
 
 Single-sources the self-review refusal semantics that were previously inlined only
-in the headless dispatch path (``scripts/cross_harness_bridge_trigger.py``
+in the headless dispatch path (``scripts/dispatcher_runtime.py``
 ``_self_review_refusal_reason``; ``groundtruth_kb/tafe_dispatch_policy.py``
 ``_review_independence_gate``). The same semantics now also gate verdict-write
 time (the bridge-compliance hook + the ``write_verdict`` finalization helper) and
@@ -127,6 +127,7 @@ def verdict_self_review_reason(
     """
     reviewer = parse_author_session_context_id(verdict_content)
     target_path = reviewed_artifact_path(verdict_content, bridge_id, project_root)
+
     if target_path is None:
         return AUTHOR_SESSION_CONTEXT_MISSING
     try:
@@ -134,6 +135,7 @@ def verdict_self_review_reason(
     except OSError:
         return AUTHOR_SESSION_CONTEXT_UNREADABLE
     target_author = parse_author_session_context_id(target_content)
+
     return self_review_reason(reviewer, target_author)
 
 

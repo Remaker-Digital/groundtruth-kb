@@ -345,6 +345,18 @@ def test_blocked_go_carries_begin_gate_reasons(helper, monkeypatch, tmp_path) ->
     assert reasons == ["missing spec links", "missing ## Requirement Sufficiency"]
 
 
+def test_prefix_named_go_still_runs_activatability(helper, monkeypatch, tmp_path) -> None:
+    def fail_packet(_project_root, _bridge_id):
+        raise helper.AuthorizationError("self-review refused")
+
+    monkeypatch.setattr(helper, "create_authorization_packet", fail_packet)
+
+    activatable, reasons = helper._go_activatable(tmp_path, "test-blocked")
+
+    assert activatable is False
+    assert reasons == ["self-review refused"]
+
+
 def test_dispatch_terminal_go_still_filtered_before_activatability(helper, monkeypatch, tmp_path) -> None:
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()

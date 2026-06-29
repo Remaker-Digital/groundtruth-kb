@@ -327,8 +327,9 @@ def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]
 
     The call is read-only: ``create_authorization_packet`` builds and validates
     the packet but does not persist it. Synthetic compatibility scans may name a
-    GO in inline index text without a real numbered file chain; those fixture-
-    only misses fail open so old scan-shape tests stay focused on role routing.
+    GO in inline index text without a real numbered file chain; those missing
+    file-chain cases fail open so old scan-shape tests stay focused on role
+    routing.
     """
     try:
         create_authorization_packet(project_root, bridge_id)

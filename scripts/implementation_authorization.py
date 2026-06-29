@@ -291,8 +291,8 @@ def _bridge_file_status(project_root: Path, rel_path: str) -> str:
     path = project_root / rel_path
     try:
         lines = path.read_text(encoding="utf-8-sig").splitlines()
-    except OSError as exc:
-        raise AuthorizationError(f"Bridge file is unreadable: {rel_path}") from exc
+    except (OSError, UnicodeError) as exc:
+        raise AuthorizationError(f"Bridge file is unreadable or has invalid encoding: {rel_path}") from exc
     for raw_line in lines:
         line = raw_line.strip()
         if not line:
@@ -1126,7 +1126,7 @@ def packet_hash(packet: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-def _go_self_review_error(proposal_content: str, go_path: Path) -> None:
+def _go_self_review_error(proposal_content: str, go_path: Path, bridge_id: str | None = None) -> None:
     """Refuse a self-review GO at impl-start (WI-4829 defense-in-depth backstop).
 
     Catches a ``GO`` whose ``author_session_context_id`` equals the reviewed
@@ -1137,9 +1137,6 @@ def _go_self_review_error(proposal_content: str, go_path: Path) -> None:
     artifacts carry author metadata via the governed writer, so the missing case is
     limited to legacy pre-provenance threads.
 
-    The comparator import is defensive: if the shared module is unavailable, this
-    check is skipped rather than breaking ``begin`` platform-wide (the
-    verdict-write-time gate remains the primary surface).
     """
     try:
         from bridge_review_independence import (
@@ -1151,11 +1148,15 @@ def _go_self_review_error(proposal_content: str, go_path: Path) -> None:
 
     try:
         go_content = go_path.read_text(encoding="utf-8-sig")
-    except OSError as exc:
-        raise AuthorizationError("GO verdict file is unreadable for the review-independence backstop") from exc
+    except (OSError, UnicodeError) as exc:
+        raise AuthorizationError(
+            "GO verdict file is unreadable or has invalid encoding for the review-independence backstop"
+        ) from exc
     go_author = parse_author_session_context_id(go_content)
     proposal_author = parse_author_session_context_id(proposal_content)
+
     reason = self_review_reason(go_author, proposal_author)
+
     if reason is not None:
         raise AuthorizationError(
             f"Self-review GO refused ({reason}): the GO verdict author session "
@@ -1176,10 +1177,10 @@ def create_authorization_packet(
     proposal_rel, go_rel = approved_files_for_go(entry)
     proposal_path = project_root / proposal_rel
     go_path = project_root / go_rel
-    if not proposal_path.is_file() or not go_path.is_file():
-        raise AuthorizationError("Approved proposal or GO file is missing on disk")
-
-    proposal = proposal_path.read_text(encoding="utf-8-sig")
+    try:
+        proposal = proposal_path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise AuthorizationError("Approved proposal file is unreadable or has invalid encoding") from exc
 
     # Accumulate all format-check failures in a single pass so authors see every
     # issue at once instead of discovering them serially. Per owner directive
@@ -1210,7 +1211,7 @@ def create_authorization_packet(
         errors.append(str(exc))
 
     try:
-        _go_self_review_error(proposal, go_path)
+        _go_self_review_error(proposal, go_path, bridge_id=bridge_id)
     except AuthorizationError as exc:
         errors.append(str(exc))
 
