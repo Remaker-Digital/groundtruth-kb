@@ -114,6 +114,11 @@ def _write_bridge(root: Path, stem: str, status: str, version: int) -> None:
     (root / "bridge" / f"{stem}-{version:03d}.md").write_text(body, encoding="utf-8")
 
 
+def _write_go_thread(root: Path, stem: str) -> None:
+    _write_bridge(root, stem, "NEW", 1)
+    _write_bridge(root, stem, "GO", 2)
+
+
 def test_daemon_tick_computes_shadow_decision(tmp_path: Path) -> None:
     daemon = _load_daemon()
     root = _make_project(tmp_path)
@@ -468,10 +473,14 @@ def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
 
     assert second["mode"] == "live"
     assert calls == []
-    assert second["spawn_results"] == [{"recipient": "prime-builder:A", "launched": False, "reason": "unchanged"}]
+    assert len(second["spawn_results"]) == 1
+    assert second["spawn_results"][0]["recipient"] == "prime-builder:A"
+    assert second["spawn_results"][0]["launched"] is False
+    assert second["spawn_results"][0]["reason"] == "work_intent_already_held"
     repaired_state = json.loads(state_path.read_text(encoding="utf-8"))["recipients"]["prime-builder:A"]
     assert repaired_state["last_dispatched_signature"] == signature
-    assert repaired_state["last_result"] == "unchanged"
+    assert repaired_state["last_result"] == "work_intent_already_held"
+    assert repaired_state["pending_count"] == 0
 
 
 def test_daemon_live_skips_not_ready_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -884,6 +893,71 @@ def _lifetime_value(command: list[str]) -> str | None:
     if "--lifetime" not in command:
         return None
     return command[command.index("--lifetime") + 1]
+
+
+def test_daemon_live_spawns_filter_prime_work_intent_claims(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4844: daemon live mode must not pass already-claimed Prime work into a worker."""
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    trigger = daemon._load_trigger_module()
+    registry = sys.modules["bridge_work_intent_registry"]
+    state_dir = daemon._bridge_poller_state_dir(root)
+    target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="pb",
+        invocation_surfaces=_CODEX_INVOCATION,
+    )
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-A-abc123"
+
+    for slug in ("held-thread", "open-thread"):
+        _write_go_thread(root, slug)
+    assert registry.acquire("held-thread", holder_session, project_root=root)
+
+    selected = [
+        types.SimpleNamespace(document_name="held-thread", top_status="GO", top_file="bridge/held-thread-002.md"),
+        types.SimpleNamespace(document_name="open-thread", top_status="GO", top_file="bridge/open-thread-002.md"),
+    ]
+    captured_documents: list[str] = []
+
+    def _fake_spawn_harness(**kwargs):
+        captured_documents.extend(item.document_name for item in kwargs["items"])
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": False,
+            "reason": "synthetic_launch_failed",
+        }
+
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
+
+    result = daemon._execute_live_spawns(
+        root,
+        [
+            {
+                "role": "prime-builder",
+                "recipient": target.dispatch_state_key,
+                "signature": trigger._signature(selected),
+                "_spawn_target": target,
+                "_spawn_selected": selected,
+            }
+        ],
+        max_items=2,
+        dry_run=False,
+    )
+
+    assert captured_documents == ["open-thread"]
+    assert result[0]["work_intent_slugs"] == ["open-thread"]
+    assert registry.current_holder("open-thread", project_root=root) is None
+    state = trigger._load_dispatch_state(state_dir, root)
+    recipient_state = state["recipients"][target.dispatch_state_key]
+    assert recipient_state["work_intent_held_filtered_count"] == 1
+    assert recipient_state["pending_count"] == 1
+    assert recipient_state["selected_count"] == 0
 
 
 def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

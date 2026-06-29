@@ -915,6 +915,7 @@ def run_dispatcher(
                                 dispatch_id=dispatch_id,
                                 session_id=work_intent_session_id,
                             )
+                            recipient_state["work_intent_held_filtered_count"] = work_intent_filter["held_count"]
                             if not work_intent_filter["ok"]:
                                 launches.append(
                                     {
@@ -988,12 +989,23 @@ def run_dispatcher(
                                 dispatched_for_target,
                             )
 
-                    # Aggregate results
+                    # Aggregate results.
                     any_launched = any(ln.get("launched") for ln in launches)
-                    recipient_state["last_result"] = "launched" if any_launched else "launch_failed"
+                    launch_reasons = {str(ln.get("reason") or "") for ln in launches}
+                    all_prime_work_intent_held = bool(launches) and launch_reasons == {"work_intent_already_held"}
+                    recipient_state["last_result"] = (
+                        "launched"
+                        if any_launched
+                        else "work_intent_already_held"
+                        if all_prime_work_intent_held
+                        else "launch_failed"
+                    )
                     recipient_state["last_launch"] = launches[0] if len(launches) == 1 else {"launches": launches}
-                    recipient_state["last_dispatched_signature"] = signature
-                    recipient_state["signature"] = signature
+                    if all_prime_work_intent_held:
+                        recipient_state["last_suppressed_signature"] = signature
+                    elif any_launched or dry_run:
+                        recipient_state["last_dispatched_signature"] = signature
+                        recipient_state["signature"] = signature
                     results[needed_role_label] = launches[0] if len(launches) == 1 else {"launches": launches}
 
             recipients_state[needed_role_label] = recipient_state

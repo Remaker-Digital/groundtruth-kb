@@ -458,6 +458,11 @@ def test_single_harness_dispatcher_honors_prime_work_intent_filter_project_guard
 
     assert summary["skipped"] is False
     assert summary["results"]["prime-builder"]["reason"] == "work_intent_already_held"
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert recipient_state["last_result"] == "work_intent_already_held"
+    assert recipient_state["last_suppressed_signature"]
+    assert recipient_state.get("last_dispatched_signature") is None
+    assert recipient_state.get("signature") is None
     suppressions_path = state_dir / "dispatch-suppressions.jsonl"
     records = [json.loads(line) for line in suppressions_path.read_text(encoding="utf-8").splitlines() if line]
     project_guard_records = [record for record in records if record["reason"] == "same_role_project_claim_active"]
@@ -465,6 +470,57 @@ def test_single_harness_dispatcher_honors_prime_work_intent_filter_project_guard
     assert project_guard_records[0]["document_name"] == "selected-thread"
     assert project_guard_records[0]["project_id"] == project_id
     assert project_guard_records[0]["holder_thread_slug"] == "held-thread"
+
+
+def test_single_harness_dispatcher_filters_held_prime_items_before_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _make_synthetic_project(tmp_path, single_harness=True)
+    dispatcher = _load_dispatcher()
+    dispatcher._load_trigger_module()
+    registry = sys.modules["bridge_work_intent_registry"]
+    state_dir = tmp_path / "state"
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+
+    _write_authorized_go_thread(root, "held-thread")
+    _write_authorized_go_thread(root, "open-thread")
+    _write_index(
+        root,
+        "\n".join(
+            [
+                "# bridge index",
+                "",
+                "Document: open-thread",
+                "GO: bridge/open-thread-002.md",
+                "NEW: bridge/open-thread.md",
+                "",
+                "Document: held-thread",
+                "GO: bridge/held-thread-002.md",
+                "NEW: bridge/held-thread.md",
+                "",
+            ]
+        ),
+    )
+    assert registry.acquire("held-thread", holder_session, project_root=root)
+    captured_documents: list[str] = []
+
+    def _record_spawn(**kwargs):
+        captured_documents.extend(item.document_name for item in kwargs["items"])
+        return {
+            "dispatch_id": kwargs["dispatch_id"],
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": False,
+            "reason": "dry_run",
+        }
+
+    monkeypatch.setattr(dispatcher, "_spawn_worker", _record_spawn)
+
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    assert summary["skipped"] is False
+    assert captured_documents == ["open-thread"]
+    assert summary["dispatch_state"]["recipients"]["prime-builder"]["work_intent_held_filtered_count"] == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────

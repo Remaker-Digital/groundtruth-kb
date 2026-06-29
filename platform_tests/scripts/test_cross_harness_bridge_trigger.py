@@ -727,6 +727,56 @@ def test_filter_prime_selected_stands_down_on_same_role_project_holder(tmp_path:
     assert _failure_records(state_dir) == []
 
 
+def test_run_trigger_filters_held_prime_items_before_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trigger = _load_trigger()
+    registry = sys.modules["bridge_work_intent_registry"]
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+
+    _write_authorized_go_thread(root, "held-thread")
+    _write_authorized_go_thread(root, "open-thread")
+    _write_index(
+        root,
+        "\n".join(
+            [
+                "# bridge index",
+                "",
+                "Document: open-thread",
+                "GO: bridge/open-thread-002.md",
+                "NEW: bridge/open-thread.md",
+                "",
+                "Document: held-thread",
+                "GO: bridge/held-thread-002.md",
+                "NEW: bridge/held-thread.md",
+                "",
+            ]
+        ),
+    )
+    assert registry.acquire("held-thread", holder_session, project_root=root)
+    captured_documents: list[str] = []
+
+    def _fake_spawn_harness(**kwargs: object) -> dict[str, object]:
+        captured_documents.extend(item.document_name for item in kwargs["items"])  # type: ignore[index]
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,  # type: ignore[index, union-attr]
+            "launched": False,
+            "reason": "dry_run",
+        }
+
+    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
+
+    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    assert captured_documents == ["open-thread"]
+    assert summary["dispatch_state"]["recipients"]["prime-builder:B"]["work_intent_held_filtered_count"] == 1
+
+
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:
     """T-2-signature-computation: signature deterministic per recipient
     given identical INDEX state.

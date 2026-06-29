@@ -699,6 +699,78 @@ def _execute_live_spawns(
             continue
 
         signature = record.get("signature")
+        dispatch_id: str | None = None
+        work_intent_session_id: str | None = None
+        acquired_work_intent_slugs: list[str] = []
+
+        if getattr(target, "needed_role_label", None) == "prime-builder":
+            dispatch_id = trigger._new_dispatch_id(target.dispatch_state_key)
+            work_intent_session_id = trigger._work_intent_session_id(dispatch_id)
+            work_intent_filter = trigger._filter_prime_selected_by_work_intent(
+                selected,
+                project_root=project_root,
+                state_dir=state_dir,
+                recipient=recipient or target.dispatch_state_key,
+                dispatch_id=dispatch_id,
+                session_id=work_intent_session_id,
+            )
+            if recipient_state is not None:
+                recipient_state["work_intent_held_filtered_count"] = work_intent_filter["held_count"]
+            record["work_intent_session_id"] = work_intent_session_id
+            if not work_intent_filter["ok"]:
+                reason = work_intent_filter["reason"]
+                if recipient_state is not None:
+                    recipient_state["last_result"] = reason
+                    recipient_state["pending_count"] = len(selected)
+                    recipient_state["selected_count"] = 0
+                    recipient_state["last_launch"] = {
+                        "dispatch_id": dispatch_id,
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": reason,
+                        "work_intent_session_id": work_intent_session_id,
+                    }
+                record["spawned"] = False
+                record["spawn_reason"] = reason
+                spawn_results.append(
+                    {
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": reason,
+                        "dispatch_id": dispatch_id,
+                        "work_intent_session_id": work_intent_session_id,
+                    }
+                )
+                continue
+
+            selected = list(work_intent_filter["selected"])
+            signature = trigger._signature(selected)
+            record["signature"] = signature
+            if not selected:
+                if recipient_state is not None:
+                    recipient_state["last_result"] = "work_intent_already_held"
+                    recipient_state["pending_count"] = 0
+                    recipient_state["selected_count"] = 0
+                    recipient_state["last_launch"] = {
+                        "dispatch_id": dispatch_id,
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": "work_intent_already_held",
+                        "work_intent_session_id": work_intent_session_id,
+                    }
+                record["spawned"] = False
+                record["spawn_reason"] = "work_intent_already_held"
+                spawn_results.append(
+                    {
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": "work_intent_already_held",
+                        "dispatch_id": dispatch_id,
+                        "work_intent_session_id": work_intent_session_id,
+                    }
+                )
+                continue
+
         if recipient_state is not None:
             prior_sig = recipient_state.get("last_dispatched_signature")
             if prior_sig is not None and prior_sig == signature:
@@ -710,6 +782,43 @@ def _execute_live_spawns(
                 recipient_state["selected_count"] = 0
                 continue
 
+        if getattr(target, "needed_role_label", None) == "prime-builder" and not dry_run:
+            assert dispatch_id is not None
+            assert work_intent_session_id is not None
+            acquire_result = trigger._acquire_prime_work_intent_batch(
+                selected,
+                project_root=project_root,
+                state_dir=state_dir,
+                recipient=recipient or target.dispatch_state_key,
+                dispatch_id=dispatch_id,
+                session_id=work_intent_session_id,
+            )
+            quarantined_slugs = list(acquire_result.get("quarantined_slugs") or [])
+            if recipient_state is not None:
+                recipient_state["quarantined_threads"] = quarantined_slugs
+            if not acquire_result["ok"]:
+                reason = acquire_result["reason"]
+                result = {
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": reason,
+                    "work_intent_session_id": work_intent_session_id,
+                    "failed_slug": acquire_result.get("failed_slug"),
+                    "released_slugs": acquire_result.get("acquired_slugs", []),
+                    "quarantined_slugs": quarantined_slugs,
+                }
+                if recipient_state is not None:
+                    recipient_state["last_result"] = reason
+                    recipient_state["last_launch"] = result
+                    recipient_state["pending_count"] = len(selected)
+                    recipient_state["selected_count"] = 0
+                record["spawned"] = False
+                record["spawn_reason"] = reason
+                spawn_results.append(result)
+                continue
+            acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
+
         spawn_items = list(reversed(selected))
         result = trigger._spawn_harness(
             target=target,
@@ -718,7 +827,22 @@ def _execute_live_spawns(
             state_dir=state_dir,
             max_items=max_items,
             dry_run=dry_run,
+            dispatch_id=dispatch_id,
         )
+        if work_intent_session_id is not None:
+            result["work_intent_session_id"] = work_intent_session_id
+        if acquired_work_intent_slugs:
+            result["work_intent_slugs"] = acquired_work_intent_slugs
+        if (
+            getattr(target, "needed_role_label", None) == "prime-builder"
+            and acquired_work_intent_slugs
+            and not result.get("launched")
+        ):
+            trigger._release_prime_work_intents(
+                acquired_work_intent_slugs,
+                project_root=project_root,
+                session_id=work_intent_session_id or "",
+            )
         if recipient_state is not None:
             if result.get("launched"):
                 recipient_state["last_dispatched_signature"] = signature
