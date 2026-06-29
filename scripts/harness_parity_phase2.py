@@ -14,8 +14,10 @@ from typing import Any
 PROJECT_ID = "PROJECT-HARNESS-PARITY-PHASE-2"
 WORK_ITEM_ID = "WI-4899"
 EVALUATOR_WORK_ITEM_ID = "WI-4900"
+WAIVER_REGISTRY_WORK_ITEM_ID = "WI-4901"
 PROJECT_AUTHORIZATION = "PAUTH-PROJECT-HARNESS-PARITY-PHASE-2-IMPLEMENTATION-2026-06-29"
 BRIDGE_ID = "gtkb-harness-parity-phase-2-codex-baseline-matrix"
+WAIVER_REGISTRY_BRIDGE_ID = "gtkb-wi4901-phase2-waiver-registry"
 
 DEFAULT_WAIVER_PATH = Path("config") / "harness-parity" / "phase2-waivers.toml"
 HARNESS_REGISTRY_PATH = Path("harness-state") / "harness-registry.json"
@@ -30,6 +32,8 @@ WAIVER_REASON_CLASSES = {
     "deliberate_deferral",
     "owner_accepted_risk",
 }
+WAIVER_STATUSES = {"active", "retired"}
+WAIVER_EVALUATOR_BEHAVIORS = {"waive"}
 
 
 @dataclass(frozen=True)
@@ -216,9 +220,41 @@ def _load_waivers(root: Path, waiver_path: Path) -> tuple[list[dict[str, Any]], 
         ]
 
     raw_waivers = data.get("waivers", [])
-    waivers = [item for item in raw_waivers if isinstance(item, dict)] if isinstance(raw_waivers, list) else []
+    if raw_waivers is None:
+        raw_waivers = []
+    if not isinstance(raw_waivers, list):
+        return [], [
+            Cell(
+                harness="*",
+                harness_id="*",
+                dimension="waiver_registry",
+                title="Typed waiver registry",
+                status="invalid_waiver",
+                release_blocking=True,
+                evidence=[_rel(root, full_path)],
+                details="Typed waiver registry field 'waivers' must be an array of tables.",
+            )
+        ]
+
+    waivers = [item for item in raw_waivers if isinstance(item, dict)]
     validation_cells: list[Cell] = []
-    for index, waiver in enumerate(waivers):
+    for index, raw_waiver in enumerate(raw_waivers):
+        if not isinstance(raw_waiver, dict):
+            validation_cells.append(
+                Cell(
+                    harness="*",
+                    harness_id="*",
+                    dimension="waiver_registry",
+                    title="Typed waiver registry",
+                    status="invalid_waiver",
+                    release_blocking=True,
+                    evidence=[f"{_rel(root, full_path)}::waivers[{index}]"],
+                    details="Waiver record must be a TOML table.",
+                    waiver_id=f"waiver[{index}]",
+                )
+            )
+            continue
+        waiver = raw_waiver
         errors = validate_waiver(waiver)
         if errors:
             validation_cells.append(
@@ -239,23 +275,47 @@ def _load_waivers(root: Path, waiver_path: Path) -> tuple[list[dict[str, Any]], 
 
 def validate_waiver(waiver: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    required = ("id", "harness", "dimension", "reason_class", "rationale", "owner_decision", "evidence")
+    required = (
+        "id",
+        "harness",
+        "dimension",
+        "reason_class",
+        "rationale",
+        "owner_decision",
+        "evidence",
+        "evaluator_behavior",
+        "status",
+    )
     for field in required:
         if not str(waiver.get(field) or "").strip():
             errors.append(f"missing required field {field!r}")
+    dimension = str(waiver.get("dimension") or "").strip()
+    valid_dimensions = {dimension.id for dimension in DIMENSIONS} | {"*"}
+    if dimension and dimension not in valid_dimensions:
+        errors.append(f"invalid dimension {dimension!r}")
     reason_class = str(waiver.get("reason_class") or "").strip()
     if reason_class and reason_class not in WAIVER_REASON_CLASSES:
         errors.append(f"invalid reason_class {reason_class!r}")
+    behavior = str(waiver.get("evaluator_behavior") or "").strip()
+    if behavior and behavior not in WAIVER_EVALUATOR_BEHAVIORS:
+        errors.append(f"invalid evaluator_behavior {behavior!r}")
     if not (str(waiver.get("review_trigger") or "").strip() or str(waiver.get("expires") or "").strip()):
         errors.append("missing review_trigger or expires")
-    if str(waiver.get("status") or "active").strip() not in {"active", "retired"}:
+    owner_decision = str(waiver.get("owner_decision") or "").strip()
+    if owner_decision and not owner_decision.startswith(
+        ("DELIB-", "bridge/", ".groundtruth/formal-artifact-approvals/")
+    ):
+        errors.append("owner_decision must cite a governed decision, bridge artifact, or approval packet")
+    if str(waiver.get("status") or "").strip() not in WAIVER_STATUSES:
         errors.append("status must be active or retired")
     return errors
 
 
 def _find_waiver(waivers: list[dict[str, Any]], harness: str, dimension: str) -> dict[str, Any] | None:
     for waiver in waivers:
-        if str(waiver.get("status") or "active").strip() != "active":
+        if validate_waiver(waiver):
+            continue
+        if str(waiver.get("status") or "").strip() != "active":
             continue
         waiver_harness = str(waiver.get("harness") or "").strip()
         waiver_dimension = str(waiver.get("dimension") or "").strip()
@@ -503,8 +563,10 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
             "project_id": PROJECT_ID,
             "work_item_id": WORK_ITEM_ID,
             "evaluator_work_item_id": EVALUATOR_WORK_ITEM_ID,
+            "waiver_registry_work_item_id": WAIVER_REGISTRY_WORK_ITEM_ID,
             "project_authorization": PROJECT_AUTHORIZATION,
             "bridge_id": BRIDGE_ID,
+            "waiver_registry_bridge_id": WAIVER_REGISTRY_BRIDGE_ID,
             "project_root": str(root),
             "waiver_path": _rel(root, waiver_path if waiver_path.is_absolute() else root / waiver_path),
             "read_only": True,
@@ -517,6 +579,17 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
             "unwaived_gap_count": len(unwaived_gaps),
             "unwaived_release_blocking_gap_count": len(unwaived_release_gaps),
             "waiver_count": len(waivers),
+            "active_waiver_count": sum(
+                1
+                for waiver in waivers
+                if not validate_waiver(waiver) and str(waiver.get("status") or "").strip() == "active"
+            ),
+            "retired_waiver_count": sum(
+                1
+                for waiver in waivers
+                if not validate_waiver(waiver) and str(waiver.get("status") or "").strip() == "retired"
+            ),
+            "invalid_waiver_count": len(waiver_validation),
         },
         "harnesses": [
             {
@@ -579,9 +652,17 @@ def format_markdown(report: dict[str, Any], *, include_supported: bool = False) 
         f"- Project: {metadata['project_id']}",
         f"- Work item: {metadata['work_item_id']}",
         f"- Evaluator source work item: {metadata['evaluator_work_item_id']}",
+        f"- Waiver registry work item: {metadata['waiver_registry_work_item_id']}",
         f"- Project authorization: {metadata['project_authorization']}",
         f"- Bridge: {metadata['bridge_id']}",
+        f"- Waiver registry bridge: {metadata['waiver_registry_bridge_id']}",
         f"- Counts: {', '.join(f'{key}: {value}' for key, value in report['counts'].items()) or 'none'}",
+        (
+            "- Waivers: "
+            f"active={report['summary']['active_waiver_count']}, "
+            f"retired={report['summary']['retired_waiver_count']}, "
+            f"invalid={report['summary']['invalid_waiver_count']}"
+        ),
         "",
         "## Findings",
         "",

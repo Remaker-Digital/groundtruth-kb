@@ -18,7 +18,7 @@ def _load_module():
     return module
 
 
-def _write_fixture(root: Path, *, with_waiver: bool = False) -> None:
+def _write_fixture(root: Path, *, with_waiver: bool = False, waiver_text: str | None = None) -> None:
     (root / "harness-state").mkdir(parents=True)
     (root / "config" / "dispatcher").mkdir(parents=True)
     (root / "config" / "agent-control").mkdir(parents=True)
@@ -91,8 +91,8 @@ skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
     (root / ".codex" / "hooks.json").write_text("{}", encoding="utf-8")
     (root / "scripts" / "check_codex_harness.py").write_text("# fixture\n", encoding="utf-8")
 
-    waiver = ""
-    if with_waiver:
+    waiver = waiver_text or ""
+    if with_waiver and waiver_text is None:
         waiver = """
 [[waivers]]
 id = "WAIVER-OPENROUTER-DISPATCH"
@@ -145,6 +145,103 @@ def test_active_typed_waiver_marks_matching_gap_waived(tmp_path: Path) -> None:
     assert waived[0]["waiver_id"] == "WAIVER-OPENROUTER-DISPATCH"
 
 
+def test_malformed_active_waiver_fails_closed_and_does_not_waive_gap(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(
+        tmp_path,
+        waiver_text="""
+[[waivers]]
+id = "WAIVER-OPENROUTER-DISPATCH"
+harness = "openrouter"
+dimension = "dispatcher_receive"
+reason_class = "unsupported_reason"
+rationale = "Fixture attempts to waive OpenRouter dispatch receive support."
+evidence = "fixture"
+review_trigger = "fixture review"
+evaluator_behavior = "waive"
+status = "active"
+""",
+    )
+
+    report = module.evaluate(tmp_path)
+
+    invalid = [cell for cell in report["cells"] if cell["status"] == "invalid_waiver"]
+    target = [
+        cell
+        for cell in report["cells"]
+        if cell["harness"] == "openrouter" and cell["dimension"] == "dispatcher_receive"
+    ]
+    assert invalid
+    assert "invalid reason_class" in invalid[0]["details"]
+    assert "missing required field 'owner_decision'" in invalid[0]["details"]
+    assert target[0]["status"] == "needs_adapter"
+    assert target[0]["waiver_id"] is None
+    assert report["summary"]["invalid_waiver_count"] == 1
+
+
+def test_retired_waiver_does_not_suppress_matching_gap(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(
+        tmp_path,
+        waiver_text="""
+[[waivers]]
+id = "WAIVER-OPENROUTER-DISPATCH"
+harness = "openrouter"
+dimension = "dispatcher_receive"
+reason_class = "deliberate_deferral"
+rationale = "Fixture retired waiver."
+owner_decision = "DELIB-TEST"
+evidence = "fixture"
+review_trigger = "fixture review"
+evaluator_behavior = "waive"
+status = "retired"
+""",
+    )
+
+    report = module.evaluate(tmp_path)
+
+    target = [
+        cell
+        for cell in report["cells"]
+        if cell["harness"] == "openrouter" and cell["dimension"] == "dispatcher_receive"
+    ]
+    assert target[0]["status"] == "needs_adapter"
+    assert target[0]["waiver_id"] is None
+    assert any(
+        item["harness"] == "openrouter" and item["dimension"] == "dispatcher_receive"
+        for item in report["candidate_work_items"]
+    )
+    assert report["summary"]["retired_waiver_count"] == 1
+
+
+def test_wildcard_waiver_marks_matching_dimension_gaps_waived(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(
+        tmp_path,
+        waiver_text="""
+[[waivers]]
+id = "WAIVER-NO-WINDOW-WILDCARD"
+harness = "*"
+dimension = "no_window_launch"
+reason_class = "owner_accepted_risk"
+rationale = "Fixture accepts no-window evidence gaps for this slice."
+owner_decision = "DELIB-TEST"
+evidence = "fixture"
+review_trigger = "fixture review"
+evaluator_behavior = "waive"
+status = "active"
+""",
+    )
+
+    report = module.evaluate(tmp_path)
+
+    no_window_cells = [cell for cell in report["cells"] if cell["dimension"] == "no_window_launch"]
+    assert no_window_cells
+    assert all(cell["status"] == "waived" for cell in no_window_cells)
+    assert all(cell["waiver_id"] == "WAIVER-NO-WINDOW-WILDCARD" for cell in no_window_cells)
+    assert report["summary"]["active_waiver_count"] == 1
+
+
 def test_cli_writes_json_and_markdown_outputs(tmp_path: Path) -> None:
     module = _load_module()
     _write_fixture(tmp_path)
@@ -157,7 +254,10 @@ def test_cli_writes_json_and_markdown_outputs(tmp_path: Path) -> None:
     payload = json.loads(json_output.read_text(encoding="utf-8"))
     assert payload["metadata"]["work_item_id"] == "WI-4899"
     assert payload["metadata"]["evaluator_work_item_id"] == "WI-4900"
-    assert "# Harness Parity Phase 2 Codex Baseline Matrix" in markdown_output.read_text(encoding="utf-8")
+    assert payload["metadata"]["waiver_registry_work_item_id"] == "WI-4901"
+    markdown = markdown_output.read_text(encoding="utf-8")
+    assert "# Harness Parity Phase 2 Codex Baseline Matrix" in markdown
+    assert "Waiver registry work item: WI-4901" in markdown
 
 
 def test_markdown_links_each_unwaived_gap_to_candidate(tmp_path: Path) -> None:
