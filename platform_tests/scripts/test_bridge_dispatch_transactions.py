@@ -39,6 +39,19 @@ _RULES_TOML = """\
 schema_version = 1
 selection_order = ["quality", "cost", "availability", "harness_id"]
 
+[budget]
+enabled = false
+per_session_usd = 0.0
+per_user_daily_usd = 0.0
+soft_session_usd = 0.0
+unknown_model_policy = "fail_closed"
+unpriced_model_policy = "fail_open"
+
+[budget.harnesses.D]
+model = "kimi-k2-7-code-cloud"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+
 [harnesses.D]
 description = "LO"
 can_receive_dispatch = false
@@ -95,9 +108,15 @@ def _rules_can_receive(root: Path, harness_id: str) -> bool | None:
     return rules.get("harnesses", {}).get(harness_id, {}).get("can_receive_dispatch")
 
 
+def _budget_harness(root: Path, harness_id: str) -> dict[str, object]:
+    rules = tomllib.loads((root / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
+    return rules.get("budget", {}).get("harnesses", {}).get(harness_id, {})
+
+
 def test_set_eligibility_regenerates_projection(tmp_path: Path) -> None:
     root = tmp_path / "project"
     _seed(root)
+    expected_budget = _budget_harness(root, "D")
     # Baseline: the rules.toml overlay disables D, so the static projection the
     # trigger reads is False.
     assert _projection_can_receive(root, "D") is False
@@ -113,11 +132,13 @@ def test_set_eligibility_regenerates_projection(tmp_path: Path) -> None:
     # rules.toml and the projection now agree — no drift, no false-green.
     assert _rules_can_receive(root, "D") is True
     assert _projection_can_receive(root, "D") == _rules_can_receive(root, "D")
+    assert _budget_harness(root, "D") == expected_budget
 
 
 def test_set_eligibility_disable_flips_projection_back(tmp_path: Path) -> None:
     root = tmp_path / "project"
     _seed(root)
+    expected_budget = _budget_harness(root, "D")
     set_eligibility(root, "D", can_receive_dispatch=True, can_fire_events=None)
     assert _projection_can_receive(root, "D") is True
 
@@ -126,6 +147,7 @@ def test_set_eligibility_disable_flips_projection_back(tmp_path: Path) -> None:
     assert result.status == "applied"
     assert _projection_can_receive(root, "D") is False
     assert _projection_can_receive(root, "D") == _rules_can_receive(root, "D")
+    assert _budget_harness(root, "D") == expected_budget
 
 
 def test_dry_run_does_not_regenerate_projection(tmp_path: Path) -> None:
@@ -133,12 +155,16 @@ def test_dry_run_does_not_regenerate_projection(tmp_path: Path) -> None:
     # never on dry_run.
     root = tmp_path / "project"
     _seed(root)
+    expected_budget = _budget_harness(root, "D")
     assert _projection_can_receive(root, "D") is False
 
     result = set_eligibility(root, "D", can_receive_dispatch=True, can_fire_events=None, dry_run=True)
 
     assert result.status == "dry_run"
     assert result.mutated is False
+    assert result.config is not None
+    assert result.config.get("budget", {}).get("harnesses", {}).get("D") == expected_budget
     assert "projection regenerated" not in result.message
     # The static projection is untouched by a dry run.
     assert _projection_can_receive(root, "D") is False
+    assert _budget_harness(root, "D") == expected_budget

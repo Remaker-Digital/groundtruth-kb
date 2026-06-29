@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-27T16:45:27Z",
+  "generated_at": "2026-06-29T06:12:00Z",
   "harnesses": [
     {
       "can_fire_events": true,
@@ -148,8 +148,8 @@
       "version": 19
     },
     {
-      "can_fire_events": true,
-      "can_receive_dispatch": true,
+      "can_fire_events": false,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,
@@ -158,7 +158,7 @@
       "dispatch_tags": [
         "prime-builder"
       ],
-      "event_driven_hooks": true,
+      "event_driven_hooks": false,
       "harness_name": "cursor",
       "harness_type": "cursor",
       "id": "E",

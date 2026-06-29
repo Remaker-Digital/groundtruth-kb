@@ -22,6 +22,27 @@ HARNESS_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 RULE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 
 TOP_LEVEL_ORDER = ("schema_version", "selection_order")
+BUDGET_FIELD_ORDER = (
+    "enabled",
+    "per_session_usd",
+    "per_user_daily_usd",
+    "soft_session_usd",
+    "unknown_model_policy",
+    "unpriced_model_policy",
+)
+BUDGET_HARNESS_FIELD_ORDER = (
+    "model",
+    "pricing",
+    "estimated_usd_per_dispatch",
+)
+BUDGET_FLOAT_FIELDS = frozenset(
+    {
+        "estimated_usd_per_dispatch",
+        "per_session_usd",
+        "per_user_daily_usd",
+        "soft_session_usd",
+    }
+)
 HARNESS_FIELD_ORDER = (
     "description",
     "can_receive_dispatch",
@@ -402,6 +423,7 @@ def _parse_config(data: bytes, path: Path) -> dict[str, Any]:
         raise DispatchConfigTransactionError(f"unable to parse {path}: {exc}") from exc
     if not isinstance(raw, dict):
         raise DispatchConfigTransactionError("top-level dispatcher config must be a TOML table")
+    _budget(raw)
     _harnesses(raw)
     _rules(raw)
     return raw
@@ -429,6 +451,24 @@ def _rules(raw: dict[str, Any]) -> list[dict[str, Any]]:
     for row in rules:
         _validate_rule_id(str(row.get("id") or ""))
     return rules
+
+
+def _budget(raw: dict[str, Any]) -> dict[str, Any] | None:
+    table = raw.get("budget")
+    if table is None:
+        return None
+    if not isinstance(table, dict):
+        raise DispatchConfigTransactionError("budget must be a TOML table")
+    harnesses = table.get("harnesses", {})
+    if harnesses is None:
+        return table
+    if not isinstance(harnesses, dict):
+        raise DispatchConfigTransactionError("budget.harnesses must be a TOML table")
+    for harness_id, row in harnesses.items():
+        _validate_harness_id(str(harness_id))
+        if not isinstance(row, dict):
+            raise DispatchConfigTransactionError(f"budget harness {harness_id!r} must be a TOML table")
+    return table
 
 
 def _require_harness(raw: dict[str, Any], harness_id: str) -> dict[str, Any]:
@@ -510,7 +550,7 @@ def _render_dispatch_config(raw: dict[str, Any]) -> str:
     for key in TOP_LEVEL_ORDER:
         if key in raw:
             lines.append(f"{key} = {_toml_value(raw[key])}")
-    for key in sorted(k for k in raw if k not in {*TOP_LEVEL_ORDER, "harnesses", "rules"}):
+    for key in sorted(k for k in raw if k not in {*TOP_LEVEL_ORDER, "budget", "harnesses", "rules"}):
         value = raw[key]
         if isinstance(value, dict):
             raise DispatchConfigTransactionError(f"unsupported top-level table: {key}")
@@ -518,6 +558,18 @@ def _render_dispatch_config(raw: dict[str, Any]) -> str:
     rules = _rules(raw)
     if not rules:
         lines.append("rules = []")
+    budget = _budget(raw)
+    if budget is not None:
+        lines.extend(["", "[budget]"])
+        budget_scalars = {key: value for key, value in budget.items() if key != "harnesses"}
+        lines.extend(_render_table(budget_scalars, BUDGET_FIELD_ORDER, float_fields=BUDGET_FLOAT_FIELDS))
+        harnesses = budget.get("harnesses", {})
+        if harnesses is not None:
+            for harness_id in sorted(harnesses):
+                lines.extend(["", f"[budget.harnesses.{harness_id}]"])
+                lines.extend(
+                    _render_table(harnesses[harness_id], BUDGET_HARNESS_FIELD_ORDER, float_fields=BUDGET_FLOAT_FIELDS)
+                )
     harnesses = _harnesses(raw)
     for harness_id in sorted(harnesses):
         lines.extend(["", f"[harnesses.{harness_id}]"])
@@ -528,20 +580,24 @@ def _render_dispatch_config(raw: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _render_table(raw: dict[str, Any], preferred_order: tuple[str, ...]) -> list[str]:
+def _render_table(
+    raw: dict[str, Any], preferred_order: tuple[str, ...], *, float_fields: frozenset[str] = frozenset()
+) -> list[str]:
     rendered: list[str] = []
     for key in preferred_order:
         if key in raw:
-            rendered.append(f"{key} = {_toml_value(raw[key])}")
+            rendered.append(f"{key} = {_toml_value(raw[key], force_float=key in float_fields)}")
     for key in sorted(k for k in raw if k not in preferred_order):
         value = raw[key]
         if isinstance(value, dict):
             raise DispatchConfigTransactionError(f"unsupported nested table field: {key}")
-        rendered.append(f"{key} = {_toml_value(value)}")
+        rendered.append(f"{key} = {_toml_value(value, force_float=key in float_fields)}")
     return rendered
 
 
-def _toml_value(value: Any) -> str:
+def _toml_value(value: Any, *, force_float: bool = False) -> str:
+    if force_float and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return repr(float(value))
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, int) and not isinstance(value, bool):
