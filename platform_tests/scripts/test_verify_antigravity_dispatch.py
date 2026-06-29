@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -89,12 +90,12 @@ def test_run_verification_writes_evidence_files(tmp_path, monkeypatch):
     def fake_run(*args, **kwargs):
         # Match new file-based capture: write to the file handles the script
         # passed in via stdout/stderr kwargs.
-        import os
-
         if os.name == "nt":
             assert args[0] == ["gemini", "--prompt=", "--approval-mode=yolo"]
+            assert kwargs["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         else:
             assert args[0] == ["gemini", "-p", "", "--approval-mode=yolo"]
+            assert "creationflags" not in kwargs
         if "stdout" in kwargs and hasattr(kwargs["stdout"], "write"):
             kwargs["stdout"].write("ok")
         if "stderr" in kwargs and hasattr(kwargs["stderr"], "write"):

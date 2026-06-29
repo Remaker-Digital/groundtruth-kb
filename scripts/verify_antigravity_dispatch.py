@@ -121,6 +121,12 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
+def _hidden_process_kwargs() -> dict[str, int]:
+    if sys.platform.startswith("win"):
+        return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+    return {}
+
+
 def run_verification(
     *,
     project_root: Path,
@@ -169,6 +175,7 @@ def run_verification(
                 stderr=se,
                 timeout=timeout,
                 check=False,
+                **_hidden_process_kwargs(),
             )
         elapsed = time.monotonic() - started
         stdout = sanitize_capture(stdout_path.read_text(encoding="utf-8", errors="replace"))
