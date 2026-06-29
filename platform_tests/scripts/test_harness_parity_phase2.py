@@ -242,6 +242,23 @@ status = "active"
     assert report["summary"]["active_waiver_count"] == 1
 
 
+def test_no_window_dimension_accepts_explicit_wrapper_evidence(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(tmp_path)
+    (tmp_path / "scripts" / "cross_harness_bridge_trigger.py").write_text(
+        "import subprocess\ncreationflags = subprocess.CREATE_NO_WINDOW\n",
+        encoding="utf-8",
+    )
+
+    report = module.evaluate(tmp_path)
+
+    target = [
+        cell for cell in report["cells"] if cell["harness"] == "codex" and cell["dimension"] == "no_window_launch"
+    ]
+    assert target[0]["status"] == "supported"
+    assert "scripts/cross_harness_bridge_trigger.py" in target[0]["evidence"]
+
+
 def test_cli_writes_json_and_markdown_outputs(tmp_path: Path) -> None:
     module = _load_module()
     _write_fixture(tmp_path)

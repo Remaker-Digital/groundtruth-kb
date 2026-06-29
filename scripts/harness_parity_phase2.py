@@ -24,6 +24,27 @@ HARNESS_REGISTRY_PATH = Path("harness-state") / "harness-registry.json"
 CAPABILITY_REGISTRY_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 DISPATCHER_RULES_PATH = Path("config") / "dispatcher" / "rules.toml"
 
+NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS = {
+    "antigravity": ("scripts/cross_harness_bridge_trigger.py",),
+    "claude": ("scripts/cross_harness_bridge_trigger.py",),
+    "codex": (
+        "scripts/cross_harness_bridge_trigger.py",
+        ".codex/hooks.json",
+        ".codex/gtkb-hooks/run_cmd_no_window.py",
+    ),
+    "cursor": ("scripts/cursor_harness.py",),
+    "ollama": ("scripts/ollama_harness.py",),
+    "openrouter": ("scripts/openrouter_harness.py",),
+}
+NO_WINDOW_EVIDENCE_TOKENS = (
+    "create_no_window",
+    "run_cmd_no_window",
+    "windowstyle hidden",
+    "windowstyle",
+    "no-window",
+    "no_window",
+)
+
 GAP_STATES = {"needs_adapter", "blocked", "impossible"}
 FAILURE_STATES = GAP_STATES | {"invalid_waiver"}
 WAIVER_REASON_CLASSES = {
@@ -469,7 +490,19 @@ def _provider_settings_status(harness: dict[str, Any], cap_registry: dict[str, A
     )
 
 
-def _no_window_status(harness: dict[str, Any]) -> tuple[str, list[str], str]:
+def _has_no_window_evidence(root: Path, rel_path: str) -> bool:
+    path = root / rel_path
+    if not path.is_file():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore").lower()
+    except OSError:
+        return False
+    return any(token in text for token in NO_WINDOW_EVIDENCE_TOKENS)
+
+
+def _no_window_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[str], str]:
+    name = str(harness.get("harness_name") or "")
     invocation = harness.get("invocation_surfaces", {})
     headless = invocation.get("headless", {}) if isinstance(invocation, dict) else {}
     argv = headless.get("argv", []) if isinstance(headless, dict) else []
@@ -479,6 +512,17 @@ def _no_window_status(harness: dict[str, Any]) -> tuple[str, list[str], str]:
     joined = " ".join(str(part).lower() for part in argv)
     if any(token in joined for token in ("hidden", "nowindow", "no-window", "windowstyle")):
         return "supported", evidence, "Invocation explicitly carries no-window evidence."
+    wrapper_evidence = [
+        rel_path
+        for rel_path in NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS.get(name, ())
+        if _has_no_window_evidence(root, rel_path)
+    ]
+    if wrapper_evidence:
+        return (
+            "supported",
+            [*evidence, *wrapper_evidence],
+            "Harness dispatch wrapper carries explicit Windows no-window evidence.",
+        )
     if str(harness.get("harness_type") or "") in {"codex", "claude"}:
         return "needs_adapter", evidence, "Native CLI invocation lacks explicit no-window evidence."
     return "needs_adapter", evidence, "Provider/adapter invocation lacks explicit no-window evidence."
@@ -547,7 +591,7 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
             ("bridge_write_path", *_bridge_write_path_status(root, harness)),
             ("readiness_probe", *_readiness_probe_status(root, harness)),
             ("provider_settings", *_provider_settings_status(harness, capability_registry)),
-            ("no_window_launch", *_no_window_status(harness)),
+            ("no_window_launch", *_no_window_status(root, harness)),
         ):
             cells.append(_cell(harness, dim_id, status_value, evidence, details))
 
