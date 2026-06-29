@@ -195,6 +195,65 @@ def test_finalize_fails_closed_on_untracked_predecessor_chain(claude_helper: Mod
     assert "seed bridge thread" not in (log.stdout or "")
 
 
+def test_finalize_rejects_include_set_missing_report_claim(claude_helper: ModuleType, tmp_path: Path) -> None:
+    repo = _init_finalize_repo(tmp_path, commit_predecessors=True)
+    _write(repo / "scripts" / "omitted.py", "VALUE = 3\n")
+    _write(
+        repo / "bridge" / "chain-fixture-003.md",
+        """NEW
+
+# Implementation report
+
+## Files Changed
+
+- `scripts/feature.py`
+- `scripts/omitted.py`
+""",
+    )
+    body = _verified_body_base().replace("validation-hardening-fixture", "chain-fixture")
+
+    with pytest.raises(claude_helper.VerifiedFinalizationError, match="omits path"):
+        claude_helper.finalize_verified_commit(
+            "chain-fixture",
+            body,
+            include_paths=["scripts/feature.py", "bridge/chain-fixture-003.md"],
+            commit_message="test: verified hardening fixture",
+            project_root=repo,
+            pre_populate=False,
+            db=False,
+            log_path=False,
+        )
+
+    assert not (repo / "bridge" / "chain-fixture-004.md").exists()
+
+
+def test_report_claim_include_check_allows_owner_by_reference_waiver(claude_helper: ModuleType, tmp_path: Path) -> None:
+    repo = _init_finalize_repo(tmp_path, commit_predecessors=True)
+    _write(
+        repo / "bridge" / "chain-fixture-003.md",
+        """NEW
+
+# Implementation report
+
+## Files Changed
+
+- `scripts/feature.py`
+- `scripts/omitted.py`
+
+## By-Reference Finalization Waiver
+
+Owner-approved by-reference waiver captured at `DELIB-TEST-BY-REFERENCE-WAIVER`.
+""",
+    )
+
+    claude_helper._assert_include_set_covers_report_claims(
+        slug="chain-fixture",
+        project_root=repo,
+        latest_report_rel_path="bridge/chain-fixture-003.md",
+        include_paths=["scripts/feature.py", "bridge/chain-fixture-003.md"],
+    )
+
+
 @pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
 def test_three_helper_copies_share_validation_behavior(harness_name: str, tmp_path: Path) -> None:
     helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_hardening")

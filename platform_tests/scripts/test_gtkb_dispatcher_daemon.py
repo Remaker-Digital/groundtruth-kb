@@ -173,15 +173,85 @@ def test_status_running_false_on_stale_lock_dead_daemon(tmp_path: Path) -> None:
 
 
 def test_status_running_true_when_pid_alive(tmp_path: Path) -> None:
-    """A live daemon PID reports running=True regardless of lock/heartbeat
-    (WI-4856 fix 1)."""
+    """A live daemon PID reports running=True when create-time provenance
+    matches (WI-4893 PID-reuse guard)."""
     daemon = _load_daemon()
     root = _make_project(tmp_path)
     state_dir = daemon.daemon_state_dir(root)
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / daemon.PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    _write_daemon_pid_provenance(daemon, state_dir, os.getpid())
     status = daemon.collect_daemon_status(root)
     assert status["running"] is True
+    assert status["pid_provenance_verified"] is True
+
+
+def test_status_running_false_when_daemon_pid_provenance_mismatches(tmp_path: Path) -> None:
+    """WI-4893: daemon status must not trust a reused PID."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / daemon.PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    (state_dir / daemon.PID_CREATE_TIME_FILENAME).write_text("1.000000", encoding="utf-8")
+
+    status = daemon.collect_daemon_status(root)
+
+    assert status["running"] is False
+    assert status["pid_provenance_verified"] is False
+
+
+def test_status_running_true_for_legacy_daemon_loop_without_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4893 residual: a pre-provenance daemon loop must block duplicate start.
+
+    The create-time sidecar is the preferred proof. During rolling hardening,
+    however, an already-running daemon may predate that sidecar. If its live
+    process command line is the dispatcher daemon loop for this project root,
+    status/start must treat it as alive to prevent a second loop from spawning.
+    """
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    pid = 4242
+    (state_dir / daemon.PID_FILENAME).write_text(f"{pid}\n", encoding="utf-8")
+    command = [
+        sys.executable,
+        str(root / "scripts" / "gtkb_dispatcher_daemon.py"),
+        "--loop",
+        "--project-root",
+        str(root),
+    ]
+
+    monkeypatch.setattr(daemon, "_pid_is_running", lambda candidate: candidate == pid)
+    monkeypatch.setattr(daemon, "_process_command_line", lambda candidate: command if candidate == pid else [])
+
+    status = daemon.collect_daemon_status(root)
+
+    assert daemon.daemon_process_alive(state_dir) is True
+    assert status["running"] is True
+    assert status["pid_provenance_verified"] is False
+
+
+def test_status_running_false_for_unrelated_pid_without_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4893 residual: PID-only evidence still must not trust unrelated processes."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    pid = 4242
+    (state_dir / daemon.PID_FILENAME).write_text(f"{pid}\n", encoding="utf-8")
+
+    monkeypatch.setattr(daemon, "_pid_is_running", lambda candidate: candidate == pid)
+    monkeypatch.setattr(daemon, "_process_command_line", lambda _candidate: [sys.executable, "-c", "pass"])
+    monkeypatch.setattr(daemon, "_matching_daemon_loop_pids", lambda _state_dir: [])
+
+    assert daemon.daemon_process_alive(state_dir) is False
+    assert daemon.collect_daemon_status(root)["running"] is False
 
 
 def test_status_running_true_when_lock_and_heartbeat_fresh(tmp_path: Path) -> None:
@@ -489,16 +559,17 @@ def test_daemon_start_spawns_detached(tmp_path: Path) -> None:
 
 def test_daemon_start_refuses_when_live_instance_present(tmp_path: Path) -> None:
     """Defect (2) single-instance: with a live (lock-cleared) daemon process
-    recorded in daemon.pid, a second ``start`` is refused via the real
-    process-liveness probe (no lock file is present)."""
+    recorded in daemon.pid with matching create-time provenance, a second
+    ``start`` is refused."""
     from groundtruth_kb import cli as gtcli
 
     daemon = _load_daemon()
     state_dir = daemon.daemon_state_dir(tmp_path)
     state_dir.mkdir(parents=True, exist_ok=True)
     # Record the current (alive) test-process pid. No lock file is present, so
-    # only process-liveness detection can catch the running instance.
+    # only PID + create-time liveness detection can catch the running instance.
     (state_dir / daemon.PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    _write_daemon_pid_provenance(daemon, state_dir, os.getpid())
 
     cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
     with cfg_patch, import_patch:
@@ -509,6 +580,81 @@ def test_daemon_start_refuses_when_live_instance_present(tmp_path: Path) -> None
     assert result.exit_code != 0
     assert "already running" in result.output
     assert "Started" not in result.output
+
+
+def test_daemon_start_allows_reused_pid_without_matching_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4893: a daemon.pid pointing at an unrelated live process must not
+    block daemon start when create-time provenance mismatches."""
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    state_dir = daemon.daemon_state_dir(tmp_path)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / daemon.PID_FILENAME).write_text("4242\n", encoding="utf-8")
+    (state_dir / daemon.PID_CREATE_TIME_FILENAME).write_text("123.000000", encoding="utf-8")
+    monkeypatch.setattr(daemon, "_pid_is_running", lambda pid: pid == 4242)
+    monkeypatch.setattr(daemon, "_pid_create_time_epoch", lambda pid: 456.0 if pid == 4242 else None)
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            self.pid = 4242
+
+    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+    with cfg_patch, import_patch, patch.object(gtcli.subprocess, "Popen", _FakePopen):
+        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_start_cmd, [], obj={})
+
+    assert result.exit_code == 0, result.output
+    assert "Started" in result.output
+    assert captured["args"]
+
+
+def test_daemon_stop_terminates_legacy_daemon_loop_without_sidecar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4893 residual: stop can clean up a pre-provenance daemon loop.
+
+    This is the containment path for the observed storm: a legacy daemon loop
+    had no create-time sidecar, so the stop command cleared state while leaving
+    the old loop alive. Command-line identity is sufficient to terminate the
+    daemon loop, but not unrelated PID reuse.
+    """
+    from groundtruth_kb import bridge_dispatch_reset
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    state_dir = daemon.daemon_state_dir(tmp_path)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    pid = 4242
+    (state_dir / daemon.PID_FILENAME).write_text(f"{pid}\n", encoding="utf-8")
+    (state_dir / daemon.LOCK_FILENAME).write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    command = [
+        sys.executable,
+        str(tmp_path / "scripts" / "gtkb_dispatcher_daemon.py"),
+        "--loop",
+        "--project-root",
+        str(tmp_path),
+    ]
+    terminated: list[int] = []
+
+    monkeypatch.setattr(daemon, "_pid_is_running", lambda candidate: candidate == pid)
+    monkeypatch.setattr(daemon, "_process_command_line", lambda candidate: command if candidate == pid else [])
+    monkeypatch.setattr(daemon, "_matching_daemon_loop_pids", lambda _state_dir: [])
+    monkeypatch.setattr(bridge_dispatch_reset, "terminate_pid_tree", lambda candidate: terminated.append(candidate))
+
+    cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+    with cfg_patch, import_patch:
+        result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_stop_cmd, [], obj={})
+
+    assert result.exit_code == 0, result.output
+    assert terminated == [pid]
+    assert "tree terminated" in result.output
+    assert not (state_dir / daemon.PID_FILENAME).exists()
+    assert not (state_dir / daemon.LOCK_FILENAME).exists()
 
 
 def test_daemon_stop_terminates_process_tree(tmp_path: Path) -> None:
@@ -524,7 +670,8 @@ def test_daemon_stop_terminates_process_tree(tmp_path: Path) -> None:
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
     try:
         (state_dir / daemon.PID_FILENAME).write_text(str(child.pid) + "\n", encoding="utf-8")
-        assert daemon.acquire_daemon_lock(state_dir) is True
+        _write_daemon_pid_provenance(daemon, state_dir, child.pid)
+        _write_daemon_lock_record(daemon, state_dir, os.getpid())
 
         cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
         with cfg_patch, import_patch:
@@ -537,7 +684,44 @@ def test_daemon_stop_terminates_process_tree(tmp_path: Path) -> None:
             time.sleep(0.2)
         assert daemon._pid_is_running(child.pid) is False
         assert not (state_dir / daemon.PID_FILENAME).exists()
+        assert not (state_dir / daemon.LOCK_FILENAME).exists()
         assert daemon.read_daemon_status(tmp_path).get("running") is not True
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=10)
+
+
+def test_daemon_stop_ignores_unverified_pid_and_clears_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-4893: stop must not terminate a PID-only daemon record.
+
+    PID reuse means daemon.pid without create-time provenance is stale evidence.
+    The command still clears the stale pid/lock files so operators can recover.
+    """
+    from groundtruth_kb import bridge_dispatch_reset
+    from groundtruth_kb import cli as gtcli
+
+    daemon = _load_daemon()
+    state_dir = daemon.daemon_state_dir(tmp_path)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+    terminated: list[int] = []
+    try:
+        (state_dir / daemon.PID_FILENAME).write_text(str(child.pid) + "\n", encoding="utf-8")
+        (state_dir / daemon.LOCK_FILENAME).write_text(json.dumps({"pid": child.pid}), encoding="utf-8")
+        monkeypatch.setattr(bridge_dispatch_reset, "terminate_pid_tree", lambda pid: terminated.append(pid))
+
+        cfg_patch, import_patch = _daemon_cli_patches(gtcli, daemon, tmp_path)
+        with cfg_patch, import_patch:
+            result = CliRunner().invoke(gtcli.bridge_dispatch_daemon_stop_cmd, [], obj={})
+
+        assert result.exit_code == 0, result.output
+        assert "unverified pid ignored" in result.output
+        assert terminated == []
+        assert child.poll() is None
+        assert not (state_dir / daemon.PID_FILENAME).exists()
+        assert not (state_dir / daemon.PID_CREATE_TIME_FILENAME).exists()
+        assert not (state_dir / daemon.LOCK_FILENAME).exists()
     finally:
         if child.poll() is None:
             child.kill()
@@ -757,6 +941,22 @@ def _make_runs_dir(root: Path) -> Path:
 def _write_pid_provenance_sidecar(runs_dir: Path, dispatch_id: str, pid: int) -> None:
     create_time = float(psutil.Process(pid).create_time())
     (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time:.6f}", encoding="utf-8")
+
+
+def _write_daemon_pid_provenance(daemon, state_dir: Path, pid: int) -> None:
+    create_time = float(psutil.Process(pid).create_time())
+    (state_dir / daemon.PID_CREATE_TIME_FILENAME).write_text(f"{create_time:.6f}", encoding="utf-8")
+
+
+def _write_daemon_lock_record(daemon, state_dir: Path, pid: int) -> None:
+    create_time = float(psutil.Process(pid).create_time())
+    payload = {
+        "pid": pid,
+        "pid_create_time_epoch": create_time,
+        "acquired_at": "2026-06-29T00:00:00Z",
+        "mode": "shadow",
+    }
+    (state_dir / daemon.LOCK_FILENAME).write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
 
 
 def test_reap_inflight_terminates_live_worker(tmp_path: Path) -> None:

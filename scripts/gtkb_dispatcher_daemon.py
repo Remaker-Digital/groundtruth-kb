@@ -39,6 +39,8 @@ HEARTBEAT_FILENAME = "heartbeat.txt"
 SHADOW_LOG_FILENAME = "shadow-decisions.jsonl"
 STATUS_FILENAME = "status.json"
 PID_FILENAME = "daemon.pid"
+PID_CREATE_TIME_FILENAME = "daemon.create_time_epoch"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
 # WI-4882: persistent rotating daemon activity/error log. The daemon previously
 # wrote only status.json + shadow-decisions.jsonl, so an unsupervised death left
 # no diagnostic trail. This log records loop start/exit, per-tick completion, and
@@ -225,51 +227,68 @@ def _resolve_project_root(explicit: Path | None) -> Path:
     raise SystemExit("Could not resolve GT-KB project root.")
 
 
-def acquire_daemon_lock(state_dir: Path) -> bool:
-    """Return True when this process holds the single-instance daemon lock."""
-    state_dir.mkdir(parents=True, exist_ok=True)
-    lock_path = state_dir / LOCK_FILENAME
+def _pid_create_time_epoch(pid: int) -> float | None:
+    """Return the OS create-time epoch for ``pid`` when available."""
     try:
-        sanity_ttl = int(os.environ.get(LOCK_SANITY_TTL_ENV_VAR, LOCK_SANITY_TTL_DEFAULT_SECONDS))
+        pid_int = int(pid)
     except (TypeError, ValueError):
-        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
-    if sanity_ttl <= 0:
-        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
-    if lock_path.is_file():
-        try:
-            age_seconds = time.time() - lock_path.stat().st_mtime
-        except OSError:
-            age_seconds = sanity_ttl + 1
-        if age_seconds <= sanity_ttl:
-            return False
-    payload = {"pid": os.getpid(), "acquired_at": _now_iso(), "mode": "shadow"}
+        return None
+    if pid_int <= 0:
+        return None
     try:
-        lock_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
-    except OSError:
+        import psutil  # noqa: PLC0415
+
+        return float(psutil.Process(pid_int).create_time())
+    except Exception:  # noqa: BLE001 - unavailable/vanished PIDs are not trusted
+        return None
+
+
+def _pid_create_time_matches(pid: int, expected_epoch: Any) -> bool:
+    try:
+        expected = float(expected_epoch)
+    except (TypeError, ValueError):
         return False
-    return True
+    actual = _pid_create_time_epoch(pid)
+    if actual is None:
+        return False
+    return abs(actual - expected) <= PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS
 
 
-acquire_lock = acquire_daemon_lock
-
-
-def release_daemon_lock(state_dir: Path) -> None:
-    lock_path = state_dir / LOCK_FILENAME
+def _read_pid_create_time_sidecar(state_dir: Path) -> float | None:
     try:
-        lock_path.unlink()
-    except FileNotFoundError:
-        pass
-    except OSError:
-        pass
+        return float((state_dir / PID_CREATE_TIME_FILENAME).read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
 
 
-release_lock = release_daemon_lock
+def _write_daemon_pid_record(state_dir: Path, pid: int) -> None:
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / PID_FILENAME).write_text(str(pid) + "\n", encoding="utf-8")
+    create_time = _pid_create_time_epoch(pid)
+    if create_time is not None:
+        (state_dir / PID_CREATE_TIME_FILENAME).write_text(f"{create_time:.6f}", encoding="utf-8")
+
+
+def _clear_daemon_pid_record(state_dir: Path) -> None:
+    for filename in (PID_FILENAME, PID_CREATE_TIME_FILENAME):
+        try:
+            (state_dir / filename).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
 
 
 def _pid_is_running(pid: int) -> bool:
     """Best-effort cross-platform liveness probe for a process id (WI-4855)."""
     if pid <= 0:
         return False
+    try:
+        import psutil  # noqa: PLC0415
+
+        return bool(psutil.pid_exists(pid))
+    except Exception:  # noqa: BLE001 - degrade to OS-native fallback
+        pass
     import subprocess  # noqa: PLC0415
 
     if os.name == "nt":
@@ -291,19 +310,224 @@ def _pid_is_running(pid: int) -> bool:
     return True
 
 
-def daemon_process_alive(state_dir: Path) -> bool:
-    """Return True when the PID recorded in daemon.pid is a live process.
+def _project_root_from_state_dir(state_dir: Path) -> Path:
+    """Resolve the project root implied by ``.gtkb-state/dispatcher-daemon``."""
+    if state_dir.name == DAEMON_STATE_SUBDIR[-1] and state_dir.parent.name == DAEMON_STATE_SUBDIR[0]:
+        return state_dir.parent.parent.resolve()
+    return state_dir.resolve().parent.parent
 
-    Single-instance enforcement (WI-4855 defect 2): detects a live-but-lockless
-    daemon so ``start`` refuses to spawn a second instance even when the lock is
-    stale or absent. Reads the PID file written by ``run_loop``.
+
+def _process_command_line(pid: int) -> list[str]:
+    """Return a process command line as argv tokens when the OS exposes it."""
+    try:
+        import psutil  # noqa: PLC0415
+
+        return [str(part) for part in psutil.Process(int(pid)).cmdline()]
+    except Exception:  # noqa: BLE001 - unavailable/vanished PIDs are not trusted
+        return []
+
+
+def _path_arg_matches(value: str, expected: Path) -> bool:
+    raw = str(value).strip().strip('"').strip("'")
+    if not raw:
+        return False
+    try:
+        return Path(raw).resolve() == expected.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return os.path.normcase(os.path.abspath(raw)) == os.path.normcase(str(expected.resolve()))
+
+
+def _is_daemon_loop_command(cmdline: list[str], project_root: Path) -> bool:
+    """Return True for a live dispatcher daemon loop command for this root.
+
+    This is a legacy-liveness fallback, not provenance. It exists so a daemon
+    that predates the create-time sidecar still blocks duplicate starts. The
+    PID-reuse safety invariant remains: unrelated live PIDs are never trusted.
     """
+    script_path = (project_root / "scripts" / "gtkb_dispatcher_daemon.py").resolve()
+    has_script = any(_path_arg_matches(part, script_path) for part in cmdline)
+    if not has_script:
+        return False
+    if "--loop" not in cmdline and "run" not in cmdline:
+        return False
+    if "--project-root" not in cmdline:
+        return True
+    try:
+        root_arg = cmdline[cmdline.index("--project-root") + 1]
+    except (IndexError, ValueError):
+        return False
+    return _path_arg_matches(root_arg, project_root)
+
+
+def _matching_daemon_loop_pids(state_dir: Path) -> list[int]:
+    """Return live daemon-loop PIDs for this project root by command identity."""
+    project_root = _project_root_from_state_dir(state_dir)
+    try:
+        import psutil  # noqa: PLC0415
+
+        matches: list[int] = []
+        for proc in psutil.process_iter(["pid", "cmdline"]):
+            try:
+                pid = int(proc.info.get("pid") or 0)
+                cmdline = [str(part) for part in (proc.info.get("cmdline") or [])]
+            except (TypeError, ValueError):
+                continue
+            if pid > 0 and _is_daemon_loop_command(cmdline, project_root):
+                matches.append(pid)
+        return sorted(set(matches))
+    except Exception:  # noqa: BLE001 - fail closed: no scan evidence
+        return []
+
+
+matching_daemon_loop_pids = _matching_daemon_loop_pids
+
+
+def daemon_pid_provenance_verified(state_dir: Path) -> bool:
+    """Return True only when daemon.pid matches live create-time provenance."""
     pid_path = state_dir / PID_FILENAME
     try:
         pid = int(pid_path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return False
-    return _pid_is_running(pid)
+    if not _pid_is_running(pid):
+        return False
+    expected = _read_pid_create_time_sidecar(state_dir)
+    if expected is None:
+        try:
+            lock_payload = json.loads((state_dir / LOCK_FILENAME).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        if lock_payload.get("pid") != pid:
+            return False
+        expected = lock_payload.get("pid_create_time_epoch")
+    return _pid_create_time_matches(pid, expected)
+
+
+def daemon_pid_matches_legacy_loop(state_dir: Path, pid: int) -> bool:
+    """Return True when an unprovenanced recorded PID is a daemon loop command."""
+    if pid <= 0 or not _pid_is_running(pid):
+        return False
+    return _is_daemon_loop_command(_process_command_line(pid), _project_root_from_state_dir(state_dir))
+
+
+def daemon_process_alive(state_dir: Path) -> bool:
+    """Return True when the PID recorded in daemon.pid is a live process.
+
+    Single-instance enforcement (WI-4855 defect 2): detects a live-but-lockless
+    daemon so ``start`` refuses to spawn a second instance even when the lock is
+    stale or absent. Reads the PID file and create-time provenance written by
+    ``run_loop``; PID-only evidence is not trusted because PID reuse can target
+    an unrelated process.
+    """
+    if daemon_pid_provenance_verified(state_dir):
+        return True
+    pid_path = state_dir / PID_FILENAME
+    try:
+        pid = int(pid_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        pid = 0
+    if daemon_pid_matches_legacy_loop(state_dir, pid):
+        return True
+    matches = _matching_daemon_loop_pids(state_dir)
+    excluded = {os.getpid(), os.getppid()}
+    return bool([p for p in matches if p not in excluded])
+
+
+def _lock_sanity_ttl_seconds() -> int:
+    try:
+        sanity_ttl = int(os.environ.get(LOCK_SANITY_TTL_ENV_VAR, LOCK_SANITY_TTL_DEFAULT_SECONDS))
+    except (TypeError, ValueError):
+        sanity_ttl = LOCK_SANITY_TTL_DEFAULT_SECONDS
+    return sanity_ttl if sanity_ttl > 0 else LOCK_SANITY_TTL_DEFAULT_SECONDS
+
+
+def _read_daemon_lock_payload(lock_path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _lock_owner_alive(payload: dict[str, Any] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    try:
+        pid = int(payload.get("pid"))
+    except (TypeError, ValueError):
+        return False
+    if not _pid_is_running(pid):
+        return False
+    expected = payload.get("pid_create_time_epoch")
+    if expected is None:
+        return True
+    return _pid_create_time_matches(pid, expected)
+
+
+def acquire_daemon_lock(state_dir: Path) -> bool:
+    """Return True when this process holds the single-instance daemon lock.
+
+    Uses an atomic create to prevent two concurrent daemon starts from both
+    deciding a missing/stale lock is claimable.
+    """
+    state_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = state_dir / LOCK_FILENAME
+    if daemon_process_alive(state_dir):
+        return False
+    sanity_ttl = _lock_sanity_ttl_seconds()
+    payload = {
+        "pid": os.getpid(),
+        "pid_create_time_epoch": _pid_create_time_epoch(os.getpid()),
+        "acquired_at": _now_iso(),
+        "mode": "shadow",
+    }
+    for attempt in range(2):
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            lock_payload = _read_daemon_lock_payload(lock_path)
+            try:
+                age_seconds = time.time() - lock_path.stat().st_mtime
+            except OSError:
+                age_seconds = sanity_ttl + 1
+            if age_seconds <= sanity_ttl or _lock_owner_alive(lock_payload):
+                return False
+            try:
+                lock_path.unlink()
+            except OSError:
+                return False
+            if attempt == 0:
+                continue
+            return False
+        except OSError:
+            return False
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True))
+        return True
+    return False
+
+
+acquire_lock = acquire_daemon_lock
+
+
+def release_daemon_lock(state_dir: Path, *, force: bool = False) -> None:
+    lock_path = state_dir / LOCK_FILENAME
+    if not force:
+        payload = _read_daemon_lock_payload(lock_path)
+        if not isinstance(payload, dict) or payload.get("pid") != os.getpid():
+            return
+        expected = payload.get("pid_create_time_epoch")
+        if expected is not None and not _pid_create_time_matches(os.getpid(), expected):
+            return
+    try:
+        lock_path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+release_lock = release_daemon_lock
 
 
 def write_heartbeat(state_dir: Path) -> None:
@@ -686,7 +910,7 @@ def run_loop(
     # WI-4857: holding the lock proves no prior daemon is alive — any live
     # dispatched worker at this point is an orphan from a crashed predecessor.
     _reap_dispatched_workers(project_root)
-    (state_dir / PID_FILENAME).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    _write_daemon_pid_record(state_dir, os.getpid())
     try:
         while True:
             try:
@@ -701,12 +925,7 @@ def run_loop(
         # WI-4857: reap in-flight workers before releasing the lock so a
         # graceful termination does not leave orphaned workers running.
         _reap_dispatched_workers(project_root)
-        try:
-            (state_dir / PID_FILENAME).unlink()
-        except FileNotFoundError:
-            pass
-        except OSError:
-            pass
+        _clear_daemon_pid_record(state_dir)
         release_daemon_lock(state_dir)
 
 
@@ -745,8 +964,10 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
     # not lock presence alone. A stale lock left by a dead daemon (PID gone,
     # heartbeat aged out) no longer reports running; a cleanly stopped daemon
     # (lock released) reports not-running even if the heartbeat file lingers.
+    pid_provenance_verified = daemon_pid_provenance_verified(state_dir)
     pid_alive = daemon_process_alive(state_dir)
     heartbeat_fresh = heartbeat_age is not None and heartbeat_age <= _heartbeat_stale_seconds()
+    status["pid_provenance_verified"] = pid_provenance_verified
     status["running"] = bool(pid_alive or (lock_present and heartbeat_fresh))
     log_path = state_dir / SHADOW_LOG_FILENAME
     if log_path.is_file():

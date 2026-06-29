@@ -141,6 +141,56 @@ def test_routine_paths_short_circuit_before_packet_reads(tmp_path: Path, monkeyp
     assert result["protected_paths"] == []
 
 
+def test_verified_bridge_file_without_finalization_evidence_blocks(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_file = tmp_path / "bridge" / "gtkb-example-004.md"
+    bridge_file.parent.mkdir()
+    bridge_file.write_text(
+        """VERIFIED
+
+# Verdict
+
+## Spec-to-Test Mapping
+
+| Specification | Test or Verification Command | Executed | Result |
+| --- | --- | --- | --- |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `pytest fixture` | yes | PASS |
+""",
+        encoding="utf-8",
+    )
+
+    result = module.evaluate(tmp_path, paths=["bridge/gtkb-example-004.md"])
+
+    assert result["status"] == "fail"
+    assert "Commit Finalization Evidence" in result["findings"][0]["reason"]
+
+
+def test_verified_bridge_file_with_finalization_evidence_passes(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_file = tmp_path / "bridge" / "gtkb-example-004.md"
+    bridge_file.parent.mkdir()
+    bridge_file.write_text(
+        """VERIFIED
+
+# Verdict
+
+## Commit Finalization Evidence
+
+- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
+- Same-transaction path set:
+- `scripts/foo.py`
+- `bridge/gtkb-example-003.md`
+- `bridge/gtkb-example-004.md`
+""",
+        encoding="utf-8",
+    )
+
+    result = module.evaluate(tmp_path, paths=["bridge/gtkb-example-004.md"])
+
+    assert result["status"] == "pass"
+    assert result["findings"] == []
+
+
 def test_corrupt_packet_blocks_protected_path_when_no_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load_module()
     monkeypatch.setattr(

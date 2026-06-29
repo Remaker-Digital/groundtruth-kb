@@ -47,6 +47,12 @@ MISSING_REQUIRED_SPECS_RE = re.compile(
 )
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w`])(?P<path>[A-Za-z]:[\\/][^\s`|<>'\"]+)")
 FENCED_CODE_BLOCK_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)(?:\n```|$)", re.DOTALL)
+TARGET_PATHS_DECL_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?`?target_paths`?\s*[:=]\s*(?P<value>\[[^\n]+\])")
+REPORT_PATH_TOKEN_RE = re.compile(
+    r"`(?P<code>[^`\n]+)`|(?P<plain>(?:\.?/?(?:scripts|groundtruth-kb|platform_tests|tests|config|"
+    r"\.claude|\.codex|\.cursor|\.github|\.githooks|bridge|applications)/[^\s`|<>'\"]+|"
+    r"pyproject\.toml|groundtruth\.toml|groundtruth\.db))"
+)
 EVIDENCE_SECTION_HEADINGS = (
     "Applicability Preflight",
     "Clause Applicability",
@@ -83,6 +89,15 @@ class VerifiedFinalizationResult:
             "verdict_path": self.verdict_path,
             "committed_paths": list(self.committed_paths),
         }
+
+
+def append_skills_applied_disclosure(body: str, skills: list[str] | None) -> str:
+    """Append the canonical Skills applied line when *skills* is not None (report-only)."""
+    if skills is None:
+        return body
+    from scripts.skill_disclosure import format_skills_applied
+
+    return body.rstrip() + "\n\n" + format_skills_applied(skills) + "\n"
 
 
 def seed_prior_deliberations(
@@ -269,6 +284,111 @@ def _unique_paths(project_root: Path, paths: list[str]) -> tuple[str, ...]:
     return tuple(unique)
 
 
+def _looks_like_claimed_repo_path(path_text: str) -> bool:
+    raw = path_text.strip().strip(".,;:)]}").strip()
+    if not raw or " " in raw:
+        return False
+    return bool(
+        raw.startswith(
+            (
+                "./scripts/",
+                "scripts/",
+                "./groundtruth-kb/",
+                "groundtruth-kb/",
+                "./platform_tests/",
+                "platform_tests/",
+                "./tests/",
+                "tests/",
+                "./config/",
+                "config/",
+                "./.claude/",
+                ".claude/",
+                "./.codex/",
+                ".codex/",
+                "./.cursor/",
+                ".cursor/",
+                "./.github/",
+                ".github/",
+                "./.githooks/",
+                ".githooks/",
+                "./bridge/",
+                "bridge/",
+                "./applications/",
+                "applications/",
+            )
+        )
+        or raw in {"pyproject.toml", "groundtruth.toml", "groundtruth.db"}
+    )
+
+
+def _claimed_paths_from_report(report_text: str, project_root: Path) -> tuple[str, ...]:
+    paths: list[str] = []
+    for match in TARGET_PATHS_DECL_RE.finditer(report_text):
+        try:
+            parsed = json.loads(match.group("value"))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, list):
+            paths.extend(str(item) for item in parsed if _looks_like_claimed_repo_path(str(item)))
+
+    for heading in (
+        "Files Changed",
+        "Changed Files",
+        "Implementation Files",
+        "Implementation Path Set",
+        "Implementation Report Path Set",
+    ):
+        section = _section_body(report_text, heading)
+        if not section:
+            continue
+        for match in REPORT_PATH_TOKEN_RE.finditer(section):
+            candidate = match.group("code") or match.group("plain") or ""
+            if _looks_like_claimed_repo_path(candidate):
+                paths.append(candidate)
+    return _unique_paths(project_root, paths)
+
+
+def _report_has_by_reference_finalization_waiver(report_text: str) -> bool:
+    waiver_sections = [
+        _section_body(report_text, "By-Reference Finalization Waiver"),
+        _section_body(report_text, "Finalization Waiver"),
+        _section_body(report_text, "Owner Decisions / Input"),
+    ]
+    text = "\n".join(section for section in waiver_sections if section).lower()
+    if not text:
+        return False
+    return "by-reference" in text and "waiver" in text and ("owner" in text or "delib-" in text)
+
+
+def _assert_include_set_covers_report_claims(
+    *,
+    slug: str,
+    project_root: Path,
+    latest_report_rel_path: str,
+    include_paths: list[str],
+) -> None:
+    report_path = project_root / latest_report_rel_path
+    try:
+        report_text = report_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VerifiedFinalizationError(
+            f"Could not read latest implementation report: {latest_report_rel_path}"
+        ) from exc
+    if _report_has_by_reference_finalization_waiver(report_text):
+        return
+    claimed = set(_claimed_paths_from_report(report_text, project_root))
+    if not claimed:
+        return
+    include_set = set(_unique_paths(project_root, include_paths))
+    missing = sorted(claimed - include_set)
+    if missing:
+        joined = ", ".join(missing)
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization include set omits path(s) claimed by latest implementation report "
+            f"for {slug!r}: {joined}"
+        )
+
+
 def _assert_predecessor_chain_committed(
     slug: str,
     project_root: Path,
@@ -448,6 +568,31 @@ def _auto_retire_completed_projects_after_verified(project_root: Path) -> tuple[
     return retired
 
 
+def _assert_verdict_review_independence(slug: str, body: str, project_root: Path) -> None:
+    """Fail closed if a verdict body is a self-review (WI-4829 write-time helper guard).
+
+    The verify helper writes verdicts via ``write_bridge_file`` (``write_bytes``),
+    which bypasses the bridge-compliance PreToolUse Write hook, so the same
+    self-review check is enforced here. A verdict whose ``author_session_context_id``
+    equals the reviewed artifact's (resolved via ``Responds to:``) is invalid under
+    the session-context review-independence rule. The comparator import is defensive
+    so an unavailable module never breaks finalization (the impl-start backstop
+    remains).
+    """
+    try:
+        from scripts.bridge_review_independence import verdict_self_review_reason
+    except ImportError:
+        return
+    reason = verdict_self_review_reason(body, slug, project_root)
+    if reason is not None:
+        raise VerifiedFinalizationError(
+            f"Self-review verdict refused ({reason}): the verdict author session must be present "
+            f"and distinct from the reviewed artifact's author session for {slug!r}. Review "
+            "independence is session-context based; file the verdict from a different session "
+            "context (WI-4829; GOV-DOCUMENT-AUTHOR-PROVENANCE-001)."
+        )
+
+
 def finalize_verified_commit(
     slug: str,
     body: str,
@@ -477,7 +622,13 @@ def finalize_verified_commit(
     if not commit_message.strip():
         raise VerifiedFinalizationError("VERIFIED finalization requires a non-empty commit message.")
 
-    next_version, _latest_report = _assert_verification_ready(slug, root)
+    next_version, latest_report = _assert_verification_ready(slug, root)
+    _assert_include_set_covers_report_claims(
+        slug=slug,
+        project_root=root,
+        latest_report_rel_path=latest_report,
+        include_paths=include_paths,
+    )
     verdict_rel_path = f"bridge/{slug}-{next_version:03d}.md"
     expected_paths = _unique_paths(root, [*include_paths, verdict_rel_path])
     if len(expected_paths) != len(include_paths) + 1:
@@ -505,6 +656,8 @@ def finalize_verified_commit(
         commit_message=commit_message,
         paths=expected_paths,
     )
+
+    _assert_verdict_review_independence(slug, body_to_write, root)
 
     # Determine which expected paths are actually dirty/modified/untracked
     # so we only expect those to be staged after `git add`.
@@ -593,12 +746,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--commit-message", help="Commit message for --finalize-verified.")
     parser.add_argument("--project-root", type=Path, help="Project root for --finalize-verified.")
+    parser.add_argument(
+        "--skills-applied",
+        action="append",
+        default=[],
+        help="Skill name for the Skills applied disclosure line (repeatable; report-only).",
+    )
     args = parser.parse_args(argv)
 
     if args.body_file is not None:
         body = args.body_file.read_text(encoding="utf-8")
     else:
         body = sys.stdin.read()
+
+    if args.skills_applied:
+        body = append_skills_applied_disclosure(body, args.skills_applied)
 
     log_path = False if args.no_log else DEFAULT_VERDICT_PREPOPULATION_LOG
     if args.finalize_verified:

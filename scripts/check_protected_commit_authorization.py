@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -29,6 +30,8 @@ from scripts.implementation_start_gate import (  # noqa: E402
 )
 
 BY_BRIDGE_PACKETS_REL = Path(".gtkb-state/implementation-authorizations/by-bridge")
+VERSIONED_BRIDGE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
+STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
 
 EXTRA_PROTECTED_EXACT = frozenset({"groundtruth.db"})
 EXTRA_PROTECTED_PREFIXES = (".githooks/",)
@@ -77,6 +80,68 @@ def _staged_paths(root: Path) -> list[str]:
     except (OSError, subprocess.CalledProcessError) as exc:
         raise GateError(f"could not read staged paths: {exc}") from exc
     return [_normalize_rel(line) for line in result.stdout.splitlines() if line.strip()]
+
+
+def _staged_or_worktree_text(root: Path, rel_path: str) -> str:
+    staged = subprocess.run(
+        ["git", "show", f":{rel_path}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if staged.returncode == 0:
+        return staged.stdout
+    try:
+        return (root / rel_path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise GateError(f"could not read {rel_path}: {exc}") from exc
+
+
+def _first_nonblank_line(text: str) -> str:
+    return next((line.strip() for line in text.splitlines() if line.strip()), "")
+
+
+def _section_body(text: str, heading: str) -> str:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.IGNORECASE | re.MULTILINE)
+    match = pattern.search(text)
+    if match is None:
+        return ""
+    start = match.end()
+    next_heading = re.search(r"^##\s+", text[start:], re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(text)
+    return text[start:end].strip()
+
+
+def _has_commit_finalization_evidence(text: str) -> bool:
+    section = _section_body(text, "Commit Finalization Evidence")
+    if not section:
+        return False
+    return "Same-transaction path set" in section and bool(re.search(r"(?m)^\s*-\s+`[^`]+`\s*$", section))
+
+
+def _verified_bridge_finalization_finding(root: Path, rel_path: str) -> dict[str, Any] | None:
+    if not VERSIONED_BRIDGE_RE.fullmatch(rel_path):
+        return None
+    if not (root / rel_path).exists():
+        return None
+    content = _staged_or_worktree_text(root, rel_path)
+    status = _first_nonblank_line(content)
+    if status and not STATUS_RE.fullmatch(status):
+        return {
+            "path": rel_path,
+            "reason": f"versioned bridge file has invalid status token {status!r}",
+        }
+    if status != "VERIFIED":
+        return None
+    if _has_commit_finalization_evidence(content):
+        return None
+    return {
+        "path": rel_path,
+        "reason": "terminal VERIFIED bridge file lacks Commit Finalization Evidence with a same-transaction path set",
+    }
 
 
 def _live_go_authorization(root: Path, rel_path: str) -> tuple[bool, str | None, list[str]]:
@@ -171,8 +236,11 @@ def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
     selected_paths = [_normalize_rel(path) for path in (paths if paths is not None else _staged_paths(root))]
     protected_paths = [path for path in selected_paths if is_protected_path(path)]
     skipped_unprotected = [path for path in selected_paths if path not in protected_paths]
+    bridge_findings = [
+        finding for path in selected_paths if (finding := _verified_bridge_finalization_finding(root, path)) is not None
+    ]
 
-    if not protected_paths:
+    if not protected_paths and not bridge_findings:
         return {
             "status": "pass",
             "findings": [],
@@ -181,7 +249,7 @@ def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
             "protected_paths": [],
         }
 
-    findings: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = list(bridge_findings)
     cleared: list[dict[str, Any]] = []
     for rel_path in protected_paths:
         result = _evaluate_protected_path(root, rel_path)

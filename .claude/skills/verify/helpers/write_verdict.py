@@ -47,6 +47,12 @@ MISSING_REQUIRED_SPECS_RE = re.compile(
 )
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w`])(?P<path>[A-Za-z]:[\\/][^\s`|<>'\"]+)")
 FENCED_CODE_BLOCK_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)(?:\n```|$)", re.DOTALL)
+TARGET_PATHS_DECL_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?`?target_paths`?\s*[:=]\s*(?P<value>\[[^\n]+\])")
+REPORT_PATH_TOKEN_RE = re.compile(
+    r"`(?P<code>[^`\n]+)`|(?P<plain>(?:\.?/?(?:scripts|groundtruth-kb|platform_tests|tests|config|"
+    r"\.claude|\.codex|\.cursor|\.github|\.githooks|bridge|applications)/[^\s`|<>'\"]+|"
+    r"pyproject\.toml|groundtruth\.toml|groundtruth\.db))"
+)
 EVIDENCE_SECTION_HEADINGS = (
     "Applicability Preflight",
     "Clause Applicability",
@@ -276,6 +282,111 @@ def _unique_paths(project_root: Path, paths: list[str]) -> tuple[str, ...]:
             unique.append(normalized)
             seen.add(normalized)
     return tuple(unique)
+
+
+def _looks_like_claimed_repo_path(path_text: str) -> bool:
+    raw = path_text.strip().strip(".,;:)]}").strip()
+    if not raw or " " in raw:
+        return False
+    return bool(
+        raw.startswith(
+            (
+                "./scripts/",
+                "scripts/",
+                "./groundtruth-kb/",
+                "groundtruth-kb/",
+                "./platform_tests/",
+                "platform_tests/",
+                "./tests/",
+                "tests/",
+                "./config/",
+                "config/",
+                "./.claude/",
+                ".claude/",
+                "./.codex/",
+                ".codex/",
+                "./.cursor/",
+                ".cursor/",
+                "./.github/",
+                ".github/",
+                "./.githooks/",
+                ".githooks/",
+                "./bridge/",
+                "bridge/",
+                "./applications/",
+                "applications/",
+            )
+        )
+        or raw in {"pyproject.toml", "groundtruth.toml", "groundtruth.db"}
+    )
+
+
+def _claimed_paths_from_report(report_text: str, project_root: Path) -> tuple[str, ...]:
+    paths: list[str] = []
+    for match in TARGET_PATHS_DECL_RE.finditer(report_text):
+        try:
+            parsed = json.loads(match.group("value"))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, list):
+            paths.extend(str(item) for item in parsed if _looks_like_claimed_repo_path(str(item)))
+
+    for heading in (
+        "Files Changed",
+        "Changed Files",
+        "Implementation Files",
+        "Implementation Path Set",
+        "Implementation Report Path Set",
+    ):
+        section = _section_body(report_text, heading)
+        if not section:
+            continue
+        for match in REPORT_PATH_TOKEN_RE.finditer(section):
+            candidate = match.group("code") or match.group("plain") or ""
+            if _looks_like_claimed_repo_path(candidate):
+                paths.append(candidate)
+    return _unique_paths(project_root, paths)
+
+
+def _report_has_by_reference_finalization_waiver(report_text: str) -> bool:
+    waiver_sections = [
+        _section_body(report_text, "By-Reference Finalization Waiver"),
+        _section_body(report_text, "Finalization Waiver"),
+        _section_body(report_text, "Owner Decisions / Input"),
+    ]
+    text = "\n".join(section for section in waiver_sections if section).lower()
+    if not text:
+        return False
+    return "by-reference" in text and "waiver" in text and ("owner" in text or "delib-" in text)
+
+
+def _assert_include_set_covers_report_claims(
+    *,
+    slug: str,
+    project_root: Path,
+    latest_report_rel_path: str,
+    include_paths: list[str],
+) -> None:
+    report_path = project_root / latest_report_rel_path
+    try:
+        report_text = report_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VerifiedFinalizationError(
+            f"Could not read latest implementation report: {latest_report_rel_path}"
+        ) from exc
+    if _report_has_by_reference_finalization_waiver(report_text):
+        return
+    claimed = set(_claimed_paths_from_report(report_text, project_root))
+    if not claimed:
+        return
+    include_set = set(_unique_paths(project_root, include_paths))
+    missing = sorted(claimed - include_set)
+    if missing:
+        joined = ", ".join(missing)
+        raise VerifiedFinalizationError(
+            "VERIFIED finalization include set omits path(s) claimed by latest implementation report "
+            f"for {slug!r}: {joined}"
+        )
 
 
 def _assert_predecessor_chain_committed(
@@ -511,7 +622,13 @@ def finalize_verified_commit(
     if not commit_message.strip():
         raise VerifiedFinalizationError("VERIFIED finalization requires a non-empty commit message.")
 
-    next_version, _latest_report = _assert_verification_ready(slug, root)
+    next_version, latest_report = _assert_verification_ready(slug, root)
+    _assert_include_set_covers_report_claims(
+        slug=slug,
+        project_root=root,
+        latest_report_rel_path=latest_report,
+        include_paths=include_paths,
+    )
     verdict_rel_path = f"bridge/{slug}-{next_version:03d}.md"
     expected_paths = _unique_paths(root, [*include_paths, verdict_rel_path])
     if len(expected_paths) != len(include_paths) + 1:
