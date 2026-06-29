@@ -143,6 +143,7 @@ def test_resolve_agent_command_rejects_cursor_override_without_agent(monkeypatch
 def test_resolve_agent_command_falls_back_to_cursor_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(harness, "_windows_cursor_agent_candidates", lambda: ())
 
     def fake_which(name: str) -> str | None:
         return "C:/Tools/cursor.cmd" if name == "cursor" else None
@@ -156,6 +157,7 @@ def test_resolve_agent_command_falls_back_to_cursor_agent(monkeypatch: pytest.Mo
 def test_resolve_agent_command_rejects_cursor_without_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(harness, "_windows_cursor_agent_candidates", lambda: ())
 
     def fake_which(name: str) -> str | None:
         return "C:/Tools/cursor.exe" if name == "cursor" else None
