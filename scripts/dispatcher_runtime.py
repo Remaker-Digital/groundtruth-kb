@@ -248,6 +248,7 @@ DISPATCH_AUTH_ENV_KEYS: tuple[str, ...] = (
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
     "OPENROUTER_API_KEY",
+    "CURSOR_API_KEY",
 )
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
