@@ -213,6 +213,17 @@ def _index_with_one_new(root: Path) -> str:
     return "# bridge index\n\nDocument: example-thread\nNEW: bridge/example-thread-001.md\n"
 
 
+def _index_with_new_threads(root: Path, docs: list[str]) -> str:
+    lines = ["# bridge index", ""]
+    for doc in docs:
+        (root / "bridge" / f"{doc}-001.md").write_text(
+            "NEW\n\nauthor_session_context_id: fixture-author-session\n",
+            encoding="utf-8",
+        )
+        lines.extend([f"Document: {doc}", f"NEW: bridge/{doc}-001.md", ""])
+    return "\n".join(lines)
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-SHD-S2-multi-harness-noop
 # ──────────────────────────────────────────────────────────────────────────
@@ -228,6 +239,206 @@ def test_dispatcher_runs_in_multi_harness_topology(tmp_path: Path) -> None:
     summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary["skipped"] is False
     assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
+
+
+def test_single_harness_dispatcher_partitions_multi_target_lo_batches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4739: same bridge document/version is not broadcast to multiple LO targets."""
+    root = _make_synthetic_project(tmp_path, single_harness=False)
+    harness_state = root / "harness-state"
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "claude": {"id": "B"},
+                    "codex": {"id": "A"},
+                    "ollama": {"id": "D"},
+                    "openrouter": {"id": "F"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    lo_surface = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
+    provider_surface = {"headless": {"argv": ["provider-harness", "{{PROMPT}}"], "max_items": 1}}
+    (root / "config" / "dispatcher").mkdir(parents=True)
+    (root / "config" / "dispatcher" / "rules.toml").write_text(
+        """
+schema_version = 1
+selection_order = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+
+[harnesses.A]
+dispatch_quality = 90
+dispatch_cost = 60
+dispatch_availability = 90
+
+[harnesses.D]
+dispatch_quality = 80
+dispatch_cost = 30
+dispatch_availability = 95
+
+[harnesses.F]
+dispatch_quality = 80
+dispatch_cost = 20
+dispatch_availability = 90
+
+[[rules]]
+id = "bridge-loyal-opposition-quality-first"
+required_roles = ["loyal-opposition"]
+statuses = ["NEW", "REVISED"]
+prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (harness_state / "role-assignments.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": {
+                    "B": {
+                        "role": ["prime-builder"],
+                        "harness_type": "claude",
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "invocation_surfaces": {
+                            "headless": {
+                                "argv": [
+                                    "claude",
+                                    "-p",
+                                    "{{PROMPT}}",
+                                    "--add-dir",
+                                    "{{PROJECT_ROOT}}",
+                                    "--output-format",
+                                    "json",
+                                ]
+                            }
+                        },
+                    },
+                    "A": {
+                        "role": ["loyal-opposition"],
+                        "harness_type": "codex",
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "reviewer_precedence": 10,
+                        "invocation_surfaces": lo_surface,
+                    },
+                    "D": {
+                        "role": ["loyal-opposition"],
+                        "harness_type": "ollama",
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "reviewer_precedence": 20,
+                        "invocation_surfaces": provider_surface,
+                    },
+                    "F": {
+                        "role": ["loyal-opposition"],
+                        "harness_type": "openrouter",
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "reviewer_precedence": 30,
+                        "invocation_surfaces": provider_surface,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (harness_state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [
+                    {
+                        "id": "B",
+                        "harness_name": "claude",
+                        "harness_type": "claude",
+                        "role": ["prime-builder"],
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "invocation_surfaces": {
+                            "headless": {
+                                "argv": [
+                                    "claude",
+                                    "-p",
+                                    "{{PROMPT}}",
+                                    "--add-dir",
+                                    "{{PROJECT_ROOT}}",
+                                    "--output-format",
+                                    "json",
+                                ]
+                            }
+                        },
+                    },
+                    {
+                        "id": "A",
+                        "harness_name": "codex",
+                        "harness_type": "codex",
+                        "role": ["loyal-opposition"],
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "reviewer_precedence": 10,
+                        "invocation_surfaces": lo_surface,
+                    },
+                    {
+                        "id": "D",
+                        "harness_name": "ollama",
+                        "harness_type": "ollama",
+                        "role": ["loyal-opposition"],
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "reviewer_precedence": 20,
+                        "invocation_surfaces": provider_surface,
+                    },
+                    {
+                        "id": "F",
+                        "harness_name": "openrouter",
+                        "harness_type": "openrouter",
+                        "role": ["loyal-opposition"],
+                        "status": "active",
+                        "can_receive_dispatch": True,
+                        "reviewer_precedence": 30,
+                        "invocation_surfaces": provider_surface,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_index(root, _index_with_new_threads(root, ["thread-newest", "thread-middle", "thread-oldest"]))
+    state_dir = tmp_path / "state"
+    dispatcher = _load_dispatcher()
+    dispatched_batches: list[dict[str, object]] = []
+
+    def _record_spawn(**kwargs):
+        trigger = kwargs["trigger"]
+        target = kwargs["target"]
+        selected = trigger._selected_oldest_first(kwargs["items"], kwargs["max_items"])
+        payload = {
+            "dispatch_id": kwargs["dispatch_id"],
+            "recipient": target.dispatch_state_key,
+            "launched": False,
+            "reason": "dry_run",
+            "selected_documents": [item.document_name for item in selected],
+        }
+        dispatched_batches.append(payload)
+        return payload
+
+    monkeypatch.setattr(dispatcher, "_spawn_worker", _record_spawn)
+
+    summary = dispatcher.run_dispatcher(project_root=root, state_dir=state_dir, max_items=1, dry_run=True)
+
+    assert summary["skipped"] is False
+    assert len(dispatched_batches) == 3
+    selected_documents = [
+        document
+        for batch in dispatched_batches
+        for document in batch["selected_documents"]  # type: ignore[index]
+    ]
+    assert set(selected_documents) == {"thread-oldest", "thread-middle", "thread-newest"}
+    assert len(selected_documents) == len(set(selected_documents))
 
 
 def test_single_harness_dispatcher_honors_prime_work_intent_filter_project_guard(tmp_path: Path) -> None:

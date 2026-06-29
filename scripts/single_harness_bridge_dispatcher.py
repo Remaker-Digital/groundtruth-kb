@@ -890,16 +890,25 @@ def run_dispatcher(
                     )
                     results[needed_role_label] = result
                 else:
-                    # Spawn workers for all resolved active targets
+                    # Spawn workers for resolved active targets, assigning each
+                    # target a distinct selected bridge batch. This preserves
+                    # useful parallelism across documents without broadcasting
+                    # the same status-bearing version to multiple writer paths.
                     launches = []
+                    remaining_for_targets = list(non_leased)
                     for target in targets:
                         dispatch_id = trigger._new_dispatch_id(target.dispatch_state_key)
                         work_intent_session_id = trigger._work_intent_session_id(dispatch_id)
-                        spawn_items = non_leased
+                        target_max_items = trigger._effective_max_items_for_target(target, max_items)
+                        target_selected = trigger._selected_oldest_first(remaining_for_targets, target_max_items)
+                        if not target_selected:
+                            break
+                        spawn_items = remaining_for_targets
+                        dispatched_for_target = target_selected
 
-                        if needed_role_label == "prime-builder" and selected:
+                        if needed_role_label == "prime-builder" and target_selected:
                             work_intent_filter = trigger._filter_prime_selected_by_work_intent(
-                                selected,
+                                target_selected,
                                 project_root=project_root,
                                 state_dir=state_dir,
                                 recipient=needed_role_label,
@@ -949,6 +958,7 @@ def run_dispatcher(
                                     )
                                     continue
                             spawn_items = dispatched_selected
+                            dispatched_for_target = dispatched_selected
 
                         launch = _spawn_worker(
                             target=target,
@@ -972,6 +982,11 @@ def run_dispatcher(
                                 state_dir=state_dir,
                             )
                         launches.append(launch)
+                        if dry_run or launch.get("launched"):
+                            remaining_for_targets = trigger._without_selected_dispatch_items(
+                                remaining_for_targets,
+                                dispatched_for_target,
+                            )
 
                     # Aggregate results
                     any_launched = any(ln.get("launched") for ln in launches)
