@@ -22,26 +22,59 @@ _SKILL_ROUTE_ALIASES = {
     "verification": "verify",
 }
 _CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
+_CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
 
 
 class CursorHarnessError(RuntimeError):
     """Raised for fail-closed Cursor harness errors."""
 
 
-def _resolve_agent_executable() -> str:
+def _windows_no_window_creationflags() -> int:
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+
+
+def _cursor_supports_agent_subcommand(cursor_executable: str) -> bool:
+    try:
+        run_kwargs = {
+            "capture_output": True,
+            "text": True,
+            "timeout": _CURSOR_AGENT_HELP_TIMEOUT_SECONDS,
+            "check": False,
+        }
+        creationflags = _windows_no_window_creationflags()
+        if creationflags:
+            run_kwargs["creationflags"] = creationflags
+        completed = subprocess.run([cursor_executable, "agent", "--help"], **run_kwargs)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    help_text = f"{completed.stdout or ''}\n{completed.stderr or ''}".lower()
+    return (
+        completed.returncode == 0 and "--output-format" in help_text and ("--print" in help_text or "-p" in help_text)
+    )
+
+
+def _resolve_agent_command() -> list[str]:
     explicit = os.environ.get("CURSOR_AGENT_BIN")
     if explicit:
         if Path(explicit).name.lower() in _CURSOR_GUI_LAUNCHER_NAMES:
+            if _cursor_supports_agent_subcommand(explicit):
+                return [explicit, "agent"]
             raise CursorHarnessError(
-                "Cursor Agent CLI not found. CURSOR_AGENT_BIN points at the Cursor GUI launcher; "
-                "set it to a headless `agent` executable instead."
+                "Cursor Agent CLI not found. CURSOR_AGENT_BIN points at a Cursor launcher without an "
+                "unambiguous headless `agent` subcommand; set it to a standalone `agent` executable or "
+                "a Cursor CLI that supports `cursor agent --print --output-format`."
             )
-        return explicit
+        return [explicit]
     candidate = shutil.which("agent")
     if candidate:
-        return candidate
+        return [candidate]
+    for cursor_name in ("cursor", "cursor.cmd", "cursor.exe"):
+        cursor_candidate = shutil.which(cursor_name)
+        if cursor_candidate and _cursor_supports_agent_subcommand(cursor_candidate):
+            return [cursor_candidate, "agent"]
     raise CursorHarnessError(
-        "Cursor Agent CLI not found. Install Cursor CLI and ensure `agent` is on PATH, or set CURSOR_AGENT_BIN."
+        "Cursor Agent CLI not found. Ensure standalone `agent` is on PATH, install a Cursor CLI that supports "
+        "`cursor agent --print --output-format`, or set CURSOR_AGENT_BIN."
     )
 
 
@@ -69,8 +102,7 @@ def _build_prompt(user_prompt: str, skill: str | None) -> str:
 
 
 def _build_command(prompt: str, project_root: Path, *, output_format: str) -> list[str]:
-    agent = _resolve_agent_executable()
-    command = [agent]
+    command = _resolve_agent_command()
     command.extend(
         [
             "-p",
@@ -121,15 +153,18 @@ def main(argv: list[str] | None = None) -> int:
         env = os.environ.copy()
         env.setdefault("GTKB_HARNESS_NAME", "cursor")
         env.setdefault("GTKB_HARNESS_ID", "E")
-        completed = subprocess.run(
-            command,
-            cwd=str(project_root),
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=args.timeout,
-            check=False,
-        )
+        run_kwargs = {
+            "cwd": str(project_root),
+            "env": env,
+            "capture_output": True,
+            "text": True,
+            "timeout": args.timeout,
+            "check": False,
+        }
+        creationflags = _windows_no_window_creationflags()
+        if creationflags:
+            run_kwargs["creationflags"] = creationflags
+        completed = subprocess.run(command, **run_kwargs)
     except CursorHarnessError as exc:
         print(f"cursor_harness: {exc}", file=sys.stderr)
         return 1

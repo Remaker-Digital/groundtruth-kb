@@ -64,29 +64,95 @@ def test_skill_route_none_returns_none() -> None:
     assert harness._skill_system_prompt(None) is None
 
 
-def test_resolve_agent_executable_uses_agent_not_cursor_gui(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_agent_command_uses_standalone_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
     monkeypatch.setattr(harness.shutil, "which", lambda name: "C:/Tools/agent.exe" if name == "agent" else None)
 
-    assert harness._resolve_agent_executable() == "C:/Tools/agent.exe"
+    assert harness._resolve_agent_command() == ["C:/Tools/agent.exe"]
 
 
-def test_resolve_agent_executable_rejects_cursor_gui_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_agent_command_accepts_cursor_agent_override(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")
+    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: True)
 
-    with pytest.raises(harness.CursorHarnessError, match="Cursor GUI launcher"):
-        harness._resolve_agent_executable()
+    assert harness._resolve_agent_command() == [
+        "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe",
+        "agent",
+    ]
 
 
-def test_resolve_agent_executable_does_not_fallback_to_cursor_gui(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cursor_agent_subcommand_support_requires_headless_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="Subcommands\n  agent        Start the Cursor agent in your terminal.\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness._cursor_supports_agent_subcommand("C:/Tools/cursor.cmd") is False
+    assert calls[0][0] == ["C:/Tools/cursor.cmd", "agent", "--help"]
+    assert calls[0][1]["creationflags"] if harness.os.name == "nt" else "creationflags" not in calls[0][1]
+
+
+def test_cursor_agent_subcommand_support_accepts_headless_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="Usage: agent [options]\n  -p, --print\n  --output-format <format>\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness._cursor_supports_agent_subcommand("C:/Tools/cursor.cmd") is True
+
+
+def test_resolve_agent_command_rejects_cursor_override_without_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")
+    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: False)
+
+    with pytest.raises(harness.CursorHarnessError, match="without an unambiguous headless `agent` subcommand"):
+        harness._resolve_agent_command()
+
+
+def test_resolve_agent_command_falls_back_to_cursor_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
-    monkeypatch.setattr(harness.shutil, "which", lambda name: "C:/Tools/cursor.exe" if name == "cursor" else None)
+
+    def fake_which(name: str) -> str | None:
+        return "C:/Tools/cursor.cmd" if name == "cursor" else None
+
+    monkeypatch.setattr(harness.shutil, "which", fake_which)
+    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: True)
+
+    assert harness._resolve_agent_command() == ["C:/Tools/cursor.cmd", "agent"]
+
+
+def test_resolve_agent_command_rejects_cursor_without_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+
+    def fake_which(name: str) -> str | None:
+        return "C:/Tools/cursor.exe" if name == "cursor" else None
+
+    monkeypatch.setattr(harness.shutil, "which", fake_which)
+    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: False)
 
     with pytest.raises(harness.CursorHarnessError, match="Cursor Agent CLI not found"):
-        harness._resolve_agent_executable()
+        harness._resolve_agent_command()
 
 
 def test_bridge_review_main_builds_prompt_mode_command(
@@ -95,7 +161,7 @@ def test_bridge_review_main_builds_prompt_mode_command(
     harness = _load_harness()
     calls = []
 
-    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/cursor.cmd", "agent"])
     monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
 
     def fake_run(command, **kwargs):
@@ -119,9 +185,9 @@ def test_bridge_review_main_builds_prompt_mode_command(
 
     assert exit_code == 0
     command, kwargs = calls[0]
-    assert command[0] == "C:/Tools/agent.exe"
-    assert command[1:5] == ["-p", "--trust", "--workspace", str(harness.PROJECT_ROOT)]
-    assert command[5:7] == ["--output-format", "text"]
+    assert command[:2] == ["C:/Tools/cursor.cmd", "agent"]
+    assert command[2:6] == ["-p", "--trust", "--workspace", str(harness.PROJECT_ROOT)]
+    assert command[6:8] == ["--output-format", "text"]
     assert "SKILL CONTRACT" in command[-1]
     assert "review this bridge file" in command[-1]
     assert kwargs["cwd"] == str(harness.PROJECT_ROOT)
@@ -133,11 +199,31 @@ def test_bridge_review_main_builds_prompt_mode_command(
     assert capsys.readouterr().out == "GO\n"
 
 
+def test_main_uses_no_window_creationflags_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    calls = []
+    expected_flag = 0x08000000
+
+    monkeypatch.setattr(harness.os, "name", "nt", raising=False)
+    monkeypatch.setattr(harness.subprocess, "CREATE_NO_WINDOW", expected_flag, raising=False)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/cursor.cmd", "agent"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness.main(["--prompt", "ordinary prompt"]) == 0
+    assert calls[0][1]["creationflags"] & expected_flag
+
+
 def test_bridge_review_zero_output_success_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     harness = _load_harness()
-    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
     monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
@@ -158,7 +244,7 @@ def test_verification_zero_output_success_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     harness = _load_harness()
-    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
     monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
@@ -179,7 +265,7 @@ def test_non_bridge_zero_output_success_is_preserved(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     harness = _load_harness()
-    monkeypatch.setattr(harness, "_resolve_agent_executable", lambda: "C:/Tools/agent.exe")
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
     monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
