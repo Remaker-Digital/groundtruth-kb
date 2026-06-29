@@ -22,6 +22,8 @@ REGISTRY_PATH = SCRIPTS_DIR / "bridge_work_intent_registry.py"
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def _load_module(path: Path, name: str):
@@ -77,12 +79,19 @@ def _write_registry(root: Path, roles: dict[str, str]) -> None:
     (harness_dir / "harness-registry.json").write_text(json.dumps(document), encoding="utf-8")
 
 
-def _write_marker(root: Path, role: str, session_id: str = "marker-session") -> None:
-    marker_dir = root / ".claude" / "session"
-    marker_dir.mkdir(parents=True, exist_ok=True)
-    (marker_dir / "active-session-role.json").write_text(
-        json.dumps({"role": role, "session_id": session_id}), encoding="utf-8"
+def _write_per_session_marker(root: Path, role: str, session_id: str) -> None:
+    from scripts.gtkb_session_id import per_session_role_marker_path
+
+    marker = per_session_role_marker_path(root, session_id)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(
+        json.dumps({"role": role, "session_id": session_id}),
+        encoding="utf-8",
     )
+
+
+def _write_marker(root: Path, role: str, session_id: str = "marker-session") -> None:
+    _write_per_session_marker(root, role, session_id)
 
 
 @pytest.fixture

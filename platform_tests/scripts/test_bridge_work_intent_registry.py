@@ -12,8 +12,9 @@ finds a valid per-session marker written from the same interactive context,
 under the canonical id."
 
 Every oracle is the production ``acquire()`` outcome (raise vs. acquired) plus
-the persisted claim record. The legacy single-file fallback path is covered by
-``platform_tests/scripts/test_work_intent_role_eligibility.py``.
+the persisted claim record. WI-4868 removed the legacy shared-marker fallback;
+``platform_tests/scripts/test_work_intent_role_eligibility.py`` covers the
+interactive eligibility path with per-session markers.
 """
 
 from __future__ import annotations
@@ -197,18 +198,21 @@ def test_per_session_marker_is_authority_over_legacy(tmp_path: Path, env) -> Non
     assert env.claim_status("go-thread", project_root=tmp_path) is None
 
 
-def test_legacy_fallback_when_no_per_session_marker(tmp_path: Path, env) -> None:
-    """Absent a per-session marker, the guard falls back to the legacy single-file
-    marker (preserved transition behavior)."""
+def test_legacy_shared_marker_is_ignored_without_per_session_marker(tmp_path: Path, env) -> None:
+    """WI-4868: the shared active-session-role.json slot must not authorize or
+    attribute acting_role for a session lacking a matching per-session marker."""
     _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
-    _write_index(tmp_path, {"go-thread": "GO"})
+    _write_index(tmp_path, {"go-thread": "GO", "draft-thread": "NEW"})
     session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
     _write_legacy_marker(tmp_path, "prime-builder", session_id=session_id)
 
-    assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
-    holder = env.current_holder("go-thread", project_root=tmp_path)
+    with pytest.raises(env.WorkIntentRegistryError, match="prime-builder harness"):
+        env.acquire("go-thread", session_id, project_root=tmp_path)
+
+    assert env.acquire("draft-thread", session_id, project_root=tmp_path) is True
+    holder = env.current_holder("draft-thread", project_root=tmp_path)
     assert holder is not None
-    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+    assert holder["acting_role"] is None
 
 
 def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, env) -> None:
@@ -324,7 +328,7 @@ def test_same_role_project_holder_returns_none_on_null_project_or_role(tmp_path:
 # bridge/gtkb-dispatch-malformed-status-token-quarantine-001.md (GO at -002).
 #
 # Cover the typed permanent-error class that lets the dispatch batch-acquire
-# surface (cross_harness_bridge_trigger._acquire_prime_work_intent_batch)
+# surface (dispatcher_runtime._acquire_prime_work_intent_batch)
 # distinguish a permanent per-file parse error (skip-and-continue) from
 # transient WorkIntentRegistryError (fail-fast).
 

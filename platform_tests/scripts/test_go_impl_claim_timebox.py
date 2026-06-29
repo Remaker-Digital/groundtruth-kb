@@ -21,8 +21,12 @@ AXIS2_PATH = PROJECT_ROOT / ".claude" / "hooks" / "bridge-axis-2-surface.py"
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 if str(PROJECT_ROOT / "groundtruth-kb" / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
+
+from scripts.gtkb_session_id import per_session_role_marker_path  # noqa: E402
 
 
 def _load_module(path: Path, name: str):
@@ -59,23 +63,18 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
     (bridge / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_prime_marker(root: Path) -> None:
-    """Write an owner-declared interactive Prime session-role marker into ``root``.
+def _write_prime_marker(root: Path, session_id: str) -> None:
+    """Write a per-session Prime marker for ``session_id`` into ``root``.
 
-    WI-4534 Slice A made ``go_implementation`` claims Prime-only. These timebox
-    tests exercise the deadline/extension/grace behavior of a *held* GO claim, so
-    each must present positive Prime evidence. The interactive marker
-    (``.claude/session/active-session-role.json`` with ``role == "prime-builder"``)
-    is read from ``project_root`` with no env-override path, making it the
-    hermetic eligibility source for a non-dispatch session id — see
-    ``bridge_work_intent_registry._interactive_marker_role`` and the F3/b case in
-    ``test_work_intent_role_eligibility``. Authority: GOV-SESSION-ROLE-AUTHORITY-001,
-    DCL-SESSION-ROLE-RESOLUTION-001, DELIB-20263205 (scope expansion).
+    WI-4868 removed the shared ``active-session-role.json`` fallback from
+    work-intent role attribution; timebox tests must present scoped Prime
+    evidence through the per-session marker keyed under the querying session id.
     """
-    marker_dir = root / ".claude" / "session"
-    marker_dir.mkdir(parents=True, exist_ok=True)
-    (marker_dir / "active-session-role.json").write_text(
-        json.dumps({"role": "prime-builder", "session_id": "marker-session"}), encoding="utf-8"
+    marker = per_session_role_marker_path(root, session_id)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(
+        json.dumps({"role": "prime-builder", "session_id": session_id}),
+        encoding="utf-8",
     )
 
 
@@ -92,7 +91,7 @@ def test_go_claim_records_deadline_and_non_go_keeps_draft_ttl(tmp_path: Path, mo
     base = datetime(2026, 6, 13, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(registry, "now_utc", lambda: base)
     _write_index(tmp_path, {"go-thread": "GO", "draft-thread": "NEW"})
-    _write_prime_marker(tmp_path)
+    _write_prime_marker(tmp_path, "session-a")
 
     assert registry.acquire("go-thread", "session-a", ttl_seconds=123, project_root=tmp_path)
     go_holder = registry.current_holder("go-thread", project_root=tmp_path)
@@ -114,7 +113,7 @@ def test_extend_adds_fixed_increment_and_refuses_past_total_hold_cap(tmp_path: P
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_marker(tmp_path, "session-a")
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     for extension_number, expected_deadline in enumerate(
@@ -137,7 +136,7 @@ def test_lapsed_go_claim_releases_for_takeover_after_grace(tmp_path: Path, monke
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_marker(tmp_path, "session-a")
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     now["value"] = base + timedelta(minutes=41)
@@ -145,6 +144,7 @@ def test_lapsed_go_claim_releases_for_takeover_after_grace(tmp_path: Path, monke
     assert [claim["thread_slug"] for claim in registry.lapsed_go_implementation_claims(project_root=tmp_path)] == [
         "go-thread"
     ]
+    _write_prime_marker(tmp_path, "session-b")
     assert registry.acquire("go-thread", "session-b", project_root=tmp_path)
     assert registry.current_holder("go-thread", project_root=tmp_path)["session_id"] == "session-b"
 
@@ -155,7 +155,7 @@ def test_report_latest_status_stops_lapsed_go_claim_detection(tmp_path: Path, mo
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_marker(tmp_path, "session-a")
 
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     _write_index(tmp_path, {"go-thread": "NEW"})
@@ -172,8 +172,8 @@ def test_cli_claim_extend_status_reports_go_implementation_fields(tmp_path: Path
     # os.environ and injected CODEX_THREAD_ID, which made the subprocess's
     # eligibility depend on the running harness's leaked session/registry env —
     # non-deterministic across Prime/LO verification environments.
-    _write_prime_marker(tmp_path)
     session_id = "interactive-prime-session"
+    _write_prime_marker(tmp_path, session_id)
     claim = subprocess.run(
         [
             sys.executable,
@@ -239,7 +239,7 @@ def test_doctor_warns_on_lapsed_go_implementation_claim(tmp_path: Path, monkeypa
     now = {"value": base}
     monkeypatch.setattr(registry, "now_utc", lambda: now["value"])
     _write_index(tmp_path, {"go-thread": "GO"})
-    _write_prime_marker(tmp_path)
+    _write_prime_marker(tmp_path, "session-a")
     assert registry.acquire("go-thread", "session-a", project_root=tmp_path)
     now["value"] = base + timedelta(minutes=41)
 

@@ -37,7 +37,7 @@ CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
 # WI-4534 Slice A: role-eligibility guard on go_implementation claim acquisition.
 # Cross-harness-trigger dispatch ids encode role + harness id as
 # ``<compact-ISO8601>-<role>-<harness_id>-<6hex>`` (see
-# ``cross_harness_bridge_trigger._new_dispatch_id``). The anchored regex captures
+# ``dispatcher_runtime._new_dispatch_id``). The anchored regex captures
 # the harness-id segment only; the role token is used solely to locate that
 # segment and is NEVER treated as authorization (authority is the durable
 # registry). Non-matching ids (interactive / raw-UUID) yield ``None``.
@@ -50,9 +50,6 @@ DISPATCH_SESSION_ID_RE: Final[re.Pattern[str]] = re.compile(
 # is READ-accepted as a Prime-eligible compatibility role per the Acting-Prime
 # Compatibility Contract.
 PRIME_ELIGIBLE_ROLES: Final[frozenset[str]] = frozenset({"prime-builder", "acting-prime-builder"})
-# Owner-declared interactive session-role marker (ephemeral; SessionStart-invalidated).
-# Matches scripts/session_role_resolution.py::_SESSION_ROLE_MARKER_NAME.
-SESSION_ROLE_MARKER_PARTS: Final[tuple[str, str, str]] = (".claude", "session", "active-session-role.json")
 
 
 class WorkIntentRegistryError(RuntimeError):
@@ -66,7 +63,7 @@ class MalformedBridgeStatusError(WorkIntentRegistryError):
     errors, contention). Subclass of :class:`WorkIntentRegistryError` so every
     existing ``except WorkIntentRegistryError`` call site stays
     backward-compatible. The dispatch batch-acquire surface in
-    ``scripts/cross_harness_bridge_trigger.py`` catches this distinct type to
+    ``scripts/dispatcher_runtime.py`` catches this distinct type to
     quarantine-and-continue rather than head-of-line-blocking the entire
     headless Prime-Builder dispatch lane on a single malformed bridge file
     (WI-4658).
@@ -207,8 +204,8 @@ def _version_from_path(rel_path: str, thread_slug: str) -> int | None:
 
 def _bridge_file_status(path: Path) -> str:
     try:
-        lines = path.read_text(encoding="utf-8-sig").splitlines()
-    except OSError as exc:
+        lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    except (OSError, ValueError) as exc:
         raise WorkIntentRegistryError(f"Bridge file is unreadable: {path}") from exc
     for raw_line in lines:
         line = raw_line.strip()
@@ -465,47 +462,32 @@ def _harness_projection_reader():  # pragma: no cover - import shim
 def _interactive_marker_role(project_root: Path | None, session_id: str | None = None) -> str | None:
     """Return the session-stated role from the owner-declared marker, or ``None``.
 
-    WI-4540 (bridge -004, R-B1 + additive transition): prefer the per-session
-    marker keyed under ``session_id`` (validating that the stored ``session_id``
-    matches the querying id — assertion 6), then fall back to the legacy shared
-    single-file marker ``.claude/session/active-session-role.json`` for the
-    additive transition window. A missing/unreadable/malformed marker yields
-    ``None`` (no positive Prime evidence). Keying the marker per session means a
-    peer session's SessionStart can no longer clobber THIS session's marker, so
-    the guard's interactive branch finds the marker written from the same
-    interactive context under the canonical id.
+    WI-4540 keyed the marker per session; WI-4868 removes the legacy shared
+    ``.claude/session/active-session-role.json`` fallback from work-intent claim
+    attribution. Only a per-session marker whose stored ``session_id`` matches
+    the querying id is positive evidence. A missing, unreadable, mismatched, or
+    malformed marker yields ``None`` so peer sessions cannot clobber claim role
+    metadata through the shared slot.
     """
-    # Per-session marker (WI-4540 authority) — only consulted when the querying
-    # id is known. The path is built by the single shared authority in
-    # scripts/gtkb_session_id.py so the read target cannot drift from the writer.
-    if session_id:
-        try:
-            from scripts.gtkb_session_id import per_session_role_marker_path
-        except ImportError:  # pragma: no cover - direct script execution path
-            from gtkb_session_id import per_session_role_marker_path  # type: ignore[no-redef]
-
-        per_session_path = per_session_role_marker_path(_root(project_root), session_id)
-        try:
-            per_session_body = json.loads(per_session_path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, OSError, json.JSONDecodeError):
-            per_session_body = None
-        if isinstance(per_session_body, dict):
-            marker_session_id = per_session_body.get("session_id")
-            role = per_session_body.get("role")
-            if isinstance(marker_session_id, str) and marker_session_id == session_id and isinstance(role, str):
-                return role
-            # A present-but-mismatched per-session marker is not positive Prime
-            # evidence for THIS session; fall through to the legacy marker.
-
-    marker_path = _root(project_root).joinpath(*SESSION_ROLE_MARKER_PARTS)
+    if not session_id:
+        return None
     try:
-        body = json.loads(marker_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        from scripts.gtkb_session_id import per_session_role_marker_path
+    except ImportError:  # pragma: no cover - direct script execution path
+        from gtkb_session_id import per_session_role_marker_path  # type: ignore[no-redef]
+
+    per_session_path = per_session_role_marker_path(_root(project_root), session_id)
+    try:
+        per_session_body = json.loads(per_session_path.read_text(encoding="utf-8", errors="replace"))
+    except (FileNotFoundError, OSError, ValueError):
         return None
-    if not isinstance(body, dict):
+    if not isinstance(per_session_body, dict):
         return None
-    role = body.get("role")
-    return role if isinstance(role, str) else None
+    marker_session_id = per_session_body.get("session_id")
+    role = per_session_body.get("role")
+    if isinstance(marker_session_id, str) and marker_session_id == session_id and isinstance(role, str):
+        return role
+    return None
 
 
 def _resolve_go_implementation_eligibility(session_id: str, *, project_root: Path | None) -> tuple[bool, str]:
