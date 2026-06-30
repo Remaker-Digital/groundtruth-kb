@@ -113,3 +113,81 @@ def test_benchmark_module_manifest_command_preserves_direct_entrypoint(capsys):
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["valid"] is True
+
+
+def test_benchmark_module_cadence_report_prints_json_without_writing(tmp_path, monkeypatch, capsys):
+    payload_path = tmp_path / "evidence.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "run_id": "RUN-CADENCE",
+                "evidence_records": [
+                    {
+                        "run_id": "RUN-CADENCE",
+                        "harness_id": "A",
+                        "benchmark_mode": "prime_builder",
+                        "provider": "codex",
+                        "model": "gpt-5-codex",
+                        "author_model_configuration": "codex desktop synthetic benchmark",
+                        "dispatch_envelope_id": "bench-env-test",
+                        "fixture_id": "fixture-a",
+                        "run_tier": "smoke",
+                        "started_at": "2026-06-30T08:00:00Z",
+                        "ended_at": "2026-06-30T08:00:01Z",
+                        "duration_ms": 1000,
+                        "input_tokens": 4,
+                        "output_tokens": 3,
+                        "estimated_cost": 0.01,
+                        "deterministic_score": 1.0,
+                        "adjudication_score": None,
+                        "outcome": "dry_run",
+                        "verdict": "unscored",
+                        "failure_class": "unscored",
+                        "required_source_citations": ["SPEC-1529"],
+                        "artifact_links": ["scripts/benchmarks/fixtures/example"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    exit_code = benchmark_cli.main(["cadence-report", "--input-json", str(payload_path), "--print-json"])
+
+    assert exit_code == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["run_id"] == "RUN-CADENCE"
+    assert report["tiers"][0]["record_count"] == 1
+    assert not (tmp_path / ".gtkb-state").exists()
+
+
+def test_benchmark_module_cadence_report_writes_json_and_markdown(tmp_path, capsys):
+    payload_path = tmp_path / "evidence.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "run_id": "RUN-WRITE",
+                "evidence_records": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = benchmark_cli.main(
+        [
+            "cadence-report",
+            "--input-json",
+            str(payload_path),
+            "--project-root",
+            str(tmp_path),
+            "--output-run-id",
+            "RUN-WRITE-OUT",
+        ]
+    )
+
+    assert exit_code == 0
+    paths = json.loads(capsys.readouterr().out)
+    assert paths["run_id"] == "RUN-WRITE-OUT"
+    assert (tmp_path / ".gtkb-state/benchmarks/RUN-WRITE-OUT/harness-quality-cadence-report.json").is_file()
+    assert (tmp_path / ".gtkb-state/benchmarks/RUN-WRITE-OUT/harness-quality-cadence-report.md").is_file()

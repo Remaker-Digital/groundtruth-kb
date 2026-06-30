@@ -6,6 +6,7 @@ Subcommands:
   report   Print a previously emitted run summary.
   compare  Diff two runs by idempotency_key and benchmark value.
   observatory  Build an advisory effectiveness report for an existing run.
+  cadence-report  Build an advisory harness-quality cadence report.
 
 Usage examples:
 
@@ -14,6 +15,7 @@ Usage examples:
   python -m scripts.benchmarks.cli report --run-id 20260514-040000
   python -m scripts.benchmarks.cli compare --baseline RUN_A --candidate RUN_B
   python -m scripts.benchmarks.cli observatory --run-id 20260514-040000
+  python -m scripts.benchmarks.cli cadence-report --input-json evidence.json --print-json
 """
 
 from __future__ import annotations
@@ -32,7 +34,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.benchmarks.common import write_run_outputs  # noqa: E402
+from scripts.benchmarks.common import benchmark_output_dir, write_run_outputs  # noqa: E402
 from scripts.benchmarks.effectiveness_observatory import (  # noqa: E402
     EffectivenessObservatoryError,
     build_effectiveness_payload,
@@ -43,6 +45,10 @@ from scripts.benchmarks.harness_quality_manifest import (  # noqa: E402
     HARNESS_QUALITY_MANIFEST,
     manifest_to_dict,
     validate_manifest,
+)
+from scripts.benchmarks.harness_quality_reporting import (  # noqa: E402
+    build_cadence_report,
+    render_markdown,
 )
 
 BENCHMARK_MODULES = [
@@ -196,6 +202,78 @@ def cmd_manifest(args):
     return 0 if payload["valid"] else 1
 
 
+def _load_json_path(path: str) -> dict[str, object]:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _load_run_payload(root: Path, run_id: str) -> dict[str, object]:
+    run_path = root / ".gtkb-state" / "benchmarks" / run_id / "run.json"
+    if not run_path.is_file():
+        raise FileNotFoundError(f"missing benchmark run payload: {run_path}")
+    return _load_json_path(str(run_path))
+
+
+def _cadence_input_payload(args, root: Path) -> dict[str, object]:
+    if bool(args.input_json) == bool(args.run_id):
+        raise ValueError("provide exactly one of --input-json or --run-id")
+    return _load_json_path(args.input_json) if args.input_json else _load_run_payload(root, args.run_id)
+
+
+def _cadence_optional_payload(path_value: str | None, run_id: str | None, root: Path) -> dict[str, object] | None:
+    if path_value and run_id:
+        raise ValueError("provide at most one previous payload source")
+    if path_value:
+        return _load_json_path(path_value)
+    if run_id:
+        return _load_run_payload(root, run_id)
+    return None
+
+
+def _write_cadence_outputs(report: dict[str, object], *, output_run_id: str, project_root: Path) -> dict[str, Path]:
+    out_dir = benchmark_output_dir(output_run_id, project_root=project_root)
+    json_path = out_dir / "harness-quality-cadence-report.json"
+    markdown_path = out_dir / "harness-quality-cadence-report.md"
+    json_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    markdown_path.write_text(render_markdown(report), encoding="utf-8")
+    return {"json_path": json_path, "markdown_path": markdown_path}
+
+
+def cmd_cadence_report(args):
+    root = Path(args.project_root).resolve() if args.project_root else _resolve_root()
+    try:
+        current_payload = _cadence_input_payload(args, root)
+        previous_payload = _cadence_optional_payload(args.previous_json, args.previous_run_id, root)
+        scoring_payload = _load_json_path(args.scoring_json) if args.scoring_json else None
+        telemetry_payload = _load_json_path(args.telemetry_json) if args.telemetry_json else None
+        report = build_cadence_report(
+            current_payload,
+            previous_payload=previous_payload,
+            scoring_payload=scoring_payload,
+            telemetry_payload=telemetry_payload,
+        )
+    except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if args.print_json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+
+    output_run_id = args.output_run_id or str(report["run_id"])
+    paths = _write_cadence_outputs(report, output_run_id=output_run_id, project_root=root)
+    print(
+        json.dumps(
+            {
+                "run_id": output_run_id,
+                "json_path": _path_for_output(paths["json_path"]),
+                "markdown_path": _path_for_output(paths["markdown_path"]),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="gtkb-benchmarks")
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -223,6 +301,17 @@ def build_parser():
     manifest = sp.add_parser("manifest", help="validate and print the harness-quality manifest")
     manifest.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     manifest.set_defaults(func=cmd_manifest)
+    cadence = sp.add_parser("cadence-report", help="build an advisory harness-quality cadence report")
+    cadence.add_argument("--run-id", help="Existing benchmark run id under .gtkb-state/benchmarks.")
+    cadence.add_argument("--input-json", help="Path to a JSON payload containing harness evidence records.")
+    cadence.add_argument("--previous-run-id", help="Optional prior benchmark run id for trend deltas.")
+    cadence.add_argument("--previous-json", help="Optional prior JSON payload for trend deltas.")
+    cadence.add_argument("--scoring-json", help="Optional scored-evidence payload to enrich records.")
+    cadence.add_argument("--telemetry-json", help="Optional telemetry-shaped payload to count alongside records.")
+    cadence.add_argument("--output-run-id", help="Output run directory id; defaults to the report run_id.")
+    cadence.add_argument("--project-root", help="Project root containing .gtkb-state/benchmarks.")
+    cadence.add_argument("--print-json", action="store_true", help="print the report instead of writing output files")
+    cadence.set_defaults(func=cmd_cadence_report)
     return p
 
 
