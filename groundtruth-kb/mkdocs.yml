@@ -92,6 +92,7 @@ nav:
       - Azure Readiness Taxonomy: reference/azure-readiness-taxonomy.md
   - Wiki:
       - Azure Enterprise Readiness: wiki/azure-enterprise-readiness.md
+      - Release Health: wiki/release-health.md
   - Troubleshooting:
       - Auth Troubleshooting: troubleshooting/auth.md
   - Examples:

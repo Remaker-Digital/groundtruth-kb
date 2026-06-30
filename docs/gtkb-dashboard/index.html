@@ -214,6 +214,13 @@
         <a class="btn" href="http://127.0.0.1:8766/">Open refresh control</a>
       </div>
     </section>
+    <section aria-labelledby="release-health-heading">
+      <h2 id="release-health-heading">Release Health</h2>
+      <p>Formal release readiness is non-green while git scope, bridge actionability, dispatcher health, clean-candidate tests, or README/wiki comparison still report blockers.</p>
+      <p>Live dispatcher and GitHub workflow probes are opt-in with <code>--probe-live</code> for release signoff.</p>
+      <pre><code>groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB
+groundtruth-kb/.venv/Scripts/python.exe scripts/update_wiki_pages.py compare --wiki-dir .tmp/groundtruth-kb.wiki</code></pre>
+    </section>
     <section aria-labelledby="setup-heading">
       <h2 id="setup-heading">Local Setup</h2>
       <p>First-time setup (PowerShell):</p>

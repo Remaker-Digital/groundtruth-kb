@@ -38,6 +38,7 @@ TERMINAL_STATUSES = frozenset({"VERIFIED"})
 AWAITING_PRIME_STATUSES = frozenset({"NO-GO", "GO"})
 AWAITING_LO_STATUSES = frozenset({"NEW", "REVISED"})
 AWAITING_PRIME_DIALOGUE_STATUSES = frozenset({"ADVISORY"})
+_TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 def _now_utc() -> datetime:
@@ -54,6 +55,8 @@ def _state_sha256(rows: list[dict[str, Any]]) -> str:
 
 
 def _git_committer_iso(path: Path, project_root: Path, *, reverse: bool = False) -> str | None:
+    if os.environ.get("GTKB_BRIDGE_SWIMLANE_USE_GIT_TIMESTAMPS", "").strip().lower() not in _TRUE_ENV_VALUES:
+        return None
     if "PYTEST_CURRENT_TEST" in os.environ and project_root.resolve() == _REPO_ROOT.resolve():
         return None
     rel = path.relative_to(project_root).as_posix() if path.is_absolute() else str(path)

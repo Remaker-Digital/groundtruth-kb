@@ -394,7 +394,6 @@ def build_dashboard() -> dict[str, Any]:
             ),
         ]
     )
-
     panels.extend(
         [
             _bar_gauge_panel(
@@ -570,16 +569,46 @@ def build_dashboard() -> dict[str, Any]:
     panels.append(_row(builder, "Release Readiness", 44, collapsed=False))
     panels.extend(
         [
+            _stat_panel(
+                builder,
+                "Release Health Findings",
+                _grid(0, 45, 8, 4),
+                _metric_query("release_health_findings"),
+            ),
+            _stat_panel(
+                builder,
+                "Dirty Worktree Paths",
+                _grid(8, 45, 8, 4),
+                _metric_query("dirty_worktree_paths"),
+            ),
+            _stat_panel(
+                builder,
+                "Dispatcher Health Findings",
+                _grid(16, 45, 8, 4),
+                _metric_query("dispatcher_health_findings"),
+            ),
+            _stat_panel(
+                builder,
+                "Bridge Actionability Findings",
+                _grid(0, 49, 8, 4),
+                _metric_query("bridge_actionability_findings"),
+            ),
+            _stat_panel(
+                builder,
+                "README / Wiki Drift",
+                _grid(8, 49, 8, 4),
+                _metric_query("readme_wiki_drift"),
+            ),
             _table_panel(
                 builder,
                 "Release Blockers",
-                _grid(0, 45, 12, 6),
+                _grid(0, 53, 12, 6),
                 "SELECT sort_order, blocker FROM release_blockers ORDER BY sort_order;",
             ),
             _pie_panel(
                 builder,
                 "Risk Severity Mix",
-                _grid(12, 45, 6, 6),
+                _grid(12, 53, 6, 6),
                 """
                 SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,
                        COUNT(*) AS value
@@ -591,7 +620,7 @@ def build_dashboard() -> dict[str, Any]:
             _pie_panel(
                 builder,
                 "Integration Status Mix",
-                _grid(18, 45, 6, 6),
+                _grid(18, 53, 6, 6),
                 """
                 SELECT upper(COALESCE(NULLIF(health, ''), 'unknown')) AS health,
                        COUNT(*) AS value
@@ -634,7 +663,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"console_url": "Open"},
         ),
     ]
-    panels.append(_row(builder, "Setup Details", 51, collapsed=True, panels=detail_panels))
+    panels.append(_row(builder, "Setup Details", 60, collapsed=True, panels=detail_panels))
 
     action_details = [
         _table_panel(
@@ -649,7 +678,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"shortcut_target": "Open"},
         )
     ]
-    panels.append(_row(builder, "Action Center Details", 52, collapsed=True, panels=action_details))
+    panels.append(_row(builder, "Action Center Details", 61, collapsed=True, panels=action_details))
 
     delivery_details = [
         _table_panel(
@@ -664,7 +693,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"url": "Open"},
         )
     ]
-    panels.append(_row(builder, "Delivery Timeline Details", 53, collapsed=True, panels=delivery_details))
+    panels.append(_row(builder, "Delivery Timeline Details", 62, collapsed=True, panels=delivery_details))
 
     kpi_details = [
         _table_panel(
@@ -686,7 +715,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         ),
     ]
-    panels.append(_row(builder, "KPI History Details", 54, collapsed=True, panels=kpi_details))
+    panels.append(_row(builder, "KPI History Details", 63, collapsed=True, panels=kpi_details))
 
     integration_details = [
         _table_panel(
@@ -700,7 +729,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         )
     ]
-    panels.append(_row(builder, "Integration Status Details", 55, collapsed=True, panels=integration_details))
+    panels.append(_row(builder, "Integration Status Details", 64, collapsed=True, panels=integration_details))
 
     freshness_details = [
         _table_panel(
@@ -723,7 +752,7 @@ def build_dashboard() -> dict[str, Any]:
             hidden_columns=(),
         ),
     ]
-    panels.append(_row(builder, "Data Freshness Details", 56, collapsed=True, panels=freshness_details))
+    panels.append(_row(builder, "Data Freshness Details", 65, collapsed=True, panels=freshness_details))
 
     # WI-4506: TAFE Observability panels (read-only visualization of the TAFE
     # state surfaces from groundtruth.db, projected into the dashboard SQLite
@@ -797,7 +826,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         ),
     ]
-    panels.append(_row(builder, "TAFE Observability", 57, collapsed=True, panels=tafe_details))
+    panels.append(_row(builder, "TAFE Observability", 66, collapsed=True, panels=tafe_details))
 
     return {
         "annotations": {

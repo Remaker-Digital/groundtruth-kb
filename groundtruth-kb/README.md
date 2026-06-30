@@ -77,6 +77,13 @@ gt dashboard start
 # Visit http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard
 ```
 
+The source repository also carries a release-health dashboard refresh used by
+the GT-KB release process:
+
+```powershell
+groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB
+```
+
 **Same-day prototype** (includes example data):
 
 ```powershell
@@ -114,7 +121,7 @@ discipline layer.
 
 ## Status
 
-This project is in early development (v0.6.1, developer-preview). The
+This project is in early development (`0.7.0rc1`, release candidate). The
 toolkit is extracted from a production system managing 2,000+
 specifications and 11,000+ tests. See
 [docs/known-limitations.md](docs/known-limitations.md) for current gaps.
@@ -174,6 +181,12 @@ The full taxonomy is in
 The wiki-ready summary lives at
 [docs/wiki/azure-enterprise-readiness.md](docs/wiki/azure-enterprise-readiness.md)
 and is mirrored to the GitHub Wiki.
+
+The release-health wiki source lives at
+[docs/wiki/release-health.md](docs/wiki/release-health.md). Source-to-wiki
+comparison is handled by `scripts/update_wiki_pages.py compare` from the
+repository root; wiki clones are publishing targets, not source-of-truth
+artifacts.
 
 ## Process Templates
 

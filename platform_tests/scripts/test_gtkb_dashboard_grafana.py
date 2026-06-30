@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import sqlite3
+import subprocess
 from pathlib import Path
 
+from scripts.gtkb_dashboard import refresh_dashboard_db
 from scripts.gtkb_dashboard.refresh_dashboard_db import refresh_database
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -130,9 +133,243 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
         assert conn.execute("SELECT COUNT(*) FROM kpi_snapshots").fetchone()[0] == 8
         assert conn.execute("SELECT COUNT(*) FROM setup_steps").fetchone()[0] >= 6
         assert conn.execute("SELECT COUNT(*) FROM required_tools").fetchone()[0] >= 8
-        assert conn.execute("SELECT COUNT(*) FROM third_party_services").fetchone()[0] >= 10
+        assert conn.execute("SELECT COUNT(*) FROM third_party_services").fetchone()[0] >= 8
         service_names = {row[0] for row in conn.execute("SELECT name FROM third_party_services")}
-        assert {"GitHub Actions", "Azure OpenAI", "Shopify Partners", "Stripe"} <= service_names
+        assert {
+            "GitHub Actions",
+            "Application deployment connector",
+            "Application security connector",
+            "Application observability connector",
+        } <= service_names
+
+
+def test_metric_count_status_helpers() -> None:
+    from scripts.gtkb_dashboard.refresh_dashboard_db import _metric_count_status
+
+    assert _metric_count_status(0) == "green"
+    assert _metric_count_status(2) == "red"
+    assert _metric_count_status("bad") == "yellow"
+
+
+def test_current_metric_statuses_green_when_sources_clean(tmp_path) -> None:
+    db_path = tmp_path / "gtkb-dashboard.sqlite"
+    model = _sample_model()
+    model["dashboard_intelligence"]["release_readiness"] = {"blockers": [], "blocker_count": 0}
+    model["dashboard_intelligence"]["quality_rollup"]["failing"] = 0
+    model["current_work_subject"] = "Agent Red"
+    history = [
+        {
+            "generated_at": "2026-04-21T12:00:00+00:00",
+            "backlog_active_items": 0,
+            "membase_open_work_items": 0,
+            "deliberation_archive_current_total": 0,
+            "pytest_file_count": 0,
+            "specification_current_total": 0,
+            "drift_changed_path_count": 0,
+            "regression_release_blocker_count": 0,
+            "contention_actionable_bridge_count": 0,
+        }
+    ]
+
+    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=history)
+
+    with sqlite3.connect(db_path) as conn:
+        statuses = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT metric_key, status FROM current_metrics WHERE metric_key IN (?, ?, ?)",
+                (
+                    "project_health_issues",
+                    "release_blockers",
+                    "ci_testing_failing",
+                ),
+            )
+        }
+        metadata = dict(conn.execute("SELECT key, value FROM dashboard_metadata"))
+
+    assert statuses == {
+        "project_health_issues": "green",
+        "release_blockers": "green",
+        "ci_testing_failing": "green",
+    }
+    assert "dashboard_subject_scope" in metadata
+    assert "Combined operations" in metadata["dashboard_subject_scope"]
+    assert "Agent Red" in metadata["dashboard_subject_scope"]
+    assert metadata.get("refresh_service_scope", "").startswith("loopback")
+
+
+def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> None:
+    db_path = tmp_path / "gtkb-dashboard.sqlite"
+    model = _sample_model()
+    model["dashboard_intelligence"]["release_readiness"] = {"blockers": [], "blocker_count": 0}
+    model["dashboard_intelligence"]["quality_rollup"]["failing"] = 0
+    model["dashboard_intelligence"]["release_health_findings"] = [
+        {"source": "dispatcher", "message": "dispatch health WARN", "severity": "red"},
+        {"source": "bridge", "message": "bridge has live in-flight work", "severity": "yellow"},
+        {"source": "readme-wiki", "message": "wiki page differs from source", "severity": "red"},
+    ]
+
+    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=[])
+
+    with sqlite3.connect(db_path) as conn:
+        metrics = {
+            row[0]: (row[1], row[2])
+            for row in conn.execute(
+                """
+                SELECT metric_key, value, status
+                FROM current_metrics
+                WHERE metric_key IN (
+                    'release_blockers',
+                    'release_health_findings',
+                    'dispatcher_health_findings',
+                    'bridge_actionability_findings',
+                    'readme_wiki_drift'
+                )
+                """
+            )
+        }
+        blockers = [row[0] for row in conn.execute("SELECT blocker FROM release_blockers ORDER BY sort_order")]
+
+    assert metrics == {
+        "release_blockers": (3, "red"),
+        "release_health_findings": (3, "red"),
+        "dispatcher_health_findings": (1, "red"),
+        "bridge_actionability_findings": (1, "yellow"),
+        "readme_wiki_drift": (1, "red"),
+    }
+    assert blockers == [
+        "[dispatcher] dispatch health WARN",
+        "[bridge] bridge has live in-flight work",
+        "[readme-wiki] wiki page differs from source",
+    ]
+
+
+def test_azure_reconciliation_is_explicit_opt_in(monkeypatch, tmp_path) -> None:
+    calls: list[tuple[object, list[str]]] = []
+
+    def fake_reconcile(conn: object, environments: list[str]) -> dict[str, int]:
+        calls.append((conn, environments))
+        return {"rows_checked": 0, "rows_matched": 0, "rows_drift": 0, "rows_unknown": 0}
+
+    monkeypatch.setattr(refresh_dashboard_db, "_reconcile_against_azure_revisions", fake_reconcile)
+    monkeypatch.delenv("GTKB_DASHBOARD_AZURE_RECONCILE", raising=False)
+
+    refresh_dashboard_db.refresh_database(
+        db_path=tmp_path / "default.sqlite",
+        project_root=REPO_ROOT,
+        model=_sample_model(),
+        history=[],
+    )
+    assert calls == []
+
+    monkeypatch.setenv("GTKB_DASHBOARD_AZURE_RECONCILE", "1")
+    refresh_dashboard_db.refresh_database(
+        db_path=tmp_path / "opt-in.sqlite",
+        project_root=REPO_ROOT,
+        model=_sample_model(),
+        history=[],
+    )
+    assert len(calls) == 1
+    assert calls[0][1] == ["staging", "production"]
+
+
+def test_refresh_database_uses_fast_startup_model_by_default(monkeypatch, tmp_path) -> None:
+    fast_hook_values: list[bool] = []
+
+    class FakeSessionModule:
+        def build_startup_model(self, project_root: Path, *, fast_hook: bool = False) -> dict:
+            fast_hook_values.append(fast_hook)
+            return _sample_model()
+
+        def _snapshot_from_model(self, model: dict) -> dict:
+            return {"generated_at": model["generated_at"]}
+
+    monkeypatch.setattr(refresh_dashboard_db, "_load_session_module", lambda: FakeSessionModule())
+    monkeypatch.setattr(refresh_dashboard_db, "_write_model_to_db", lambda *args, **kwargs: None)
+    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda project_root: None)
+    monkeypatch.setattr(refresh_dashboard_db, "_refresh_tafe_projection_safe", lambda db_path, project_root: None)
+
+    refresh_dashboard_db.refresh_database(db_path=tmp_path / "default.sqlite", project_root=REPO_ROOT)
+    refresh_dashboard_db.refresh_database(
+        db_path=tmp_path / "full.sqlite",
+        project_root=REPO_ROOT,
+        fast_startup_model=False,
+    )
+
+    assert fast_hook_values == [True, False]
+
+
+def test_direct_script_swimlane_writer_uses_absolute_import_fallback(tmp_path) -> None:
+    module_path = REPO_ROOT / "scripts" / "gtkb_dashboard" / "refresh_dashboard_db.py"
+    spec = importlib.util.spec_from_file_location("refresh_dashboard_db_direct_script", module_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "sample-thread-001.md").write_text("VERIFIED\n\n# Sample\n", encoding="utf-8")
+
+    module._write_bridge_swimlane_safe(tmp_path)
+
+    swimlane = tmp_path / "docs" / "gtkb-dashboard" / "bridge-swimlane.json"
+    assert swimlane.is_file()
+    data = json.loads(swimlane.read_text(encoding="utf-8"))
+    assert data["summary"]["thread_count"] == 1
+    assert data["threads"][0]["document"] == "sample-thread"
+
+
+def test_github_workflow_live_status_classifies_success(monkeypatch) -> None:
+    def fake_probe(project_root: Path, args: list[str], *, timeout: int = 20) -> subprocess.CompletedProcess[str]:
+        assert args[:3] == ["gh", "run", "list"]
+        assert "Remaker-Digital/groundtruth-kb" in args
+        assert "main" in args
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                [
+                    {
+                        "workflowName": "Python Tests",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "createdAt": "2026-06-30T16:00:00Z",
+                    }
+                ]
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(refresh_dashboard_db, "_run_release_probe", fake_probe)
+
+    status = refresh_dashboard_db._github_workflow_live_status(REPO_ROOT)
+
+    assert status["health"] == "green"
+    assert status["status"] == "passing"
+    assert "Python Tests" in status["latest_run_summary"]
+
+
+def test_github_workflow_live_status_classifies_unavailable(monkeypatch) -> None:
+    def fake_probe(project_root: Path, args: list[str], *, timeout: int = 20) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="gh auth required")
+
+    monkeypatch.setattr(refresh_dashboard_db, "_run_release_probe", fake_probe)
+
+    status = refresh_dashboard_db._github_workflow_live_status(REPO_ROOT)
+
+    assert status["health"] == "yellow"
+    assert status["status"] == "live_state_unavailable"
+    assert "gh auth required" in status["latest_run_summary"]
+
+
+def test_shortcuts_panel_uses_copy_path_link_title() -> None:
+    dashboard = _load_generated_dashboard()
+    flat = _walk_panels(dashboard["panels"])
+    shortcuts = next(p for p in flat if p.get("title") == "Shortcuts")
+    overrides = shortcuts["fieldConfig"]["overrides"]
+    target_override = next(o for o in overrides if o["matcher"]["options"] == "target")
+    link_title = target_override["properties"][0]["value"][0]["title"]
+    assert link_title == "Copy path"
 
 
 def test_grafana_provisioning_targets_sqlite_database() -> None:
@@ -206,7 +443,14 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "Step-by-Step Setup" in panel_titles
     assert "Required Tools, CLIs, and SDKs" in panel_titles
     assert "Third-Party Test Services" in panel_titles
+    assert "Release Health Findings" in panel_titles
+    assert "Dirty Worktree Paths" in panel_titles
+    assert "Dispatcher Health Findings" in panel_titles
+    assert "Bridge Actionability Findings" in panel_titles
+    assert "README / Wiki Drift" in panel_titles
     assert "start_local_dashboard.ps1" in readme_text
+    assert "scripts/update_wiki_pages.py compare" in readme_text
+    assert "--check" not in readme_text
     assert "docker compose" not in readme_text.lower()
     assert "gtkb dashboard install" in package_integration_text
     assert "gtkb dashboard start" in package_integration_text
