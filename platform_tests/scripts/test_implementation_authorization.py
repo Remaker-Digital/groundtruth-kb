@@ -58,6 +58,7 @@ def _write_proposal(
     version: int = 1,
     *,
     status: str = "NEW",
+    bridge_kind: str | None = None,
     target_paths: list[str] | None = None,
     verification_heading: str = "Verification Plan",
     verification_body: str = "Fixture verification plan: derived from the linked specs above.",
@@ -69,8 +70,10 @@ def _write_proposal(
     proposal_path = project_root / "bridge" / f"{slug}{suffix}.md"
     proposal_path.parent.mkdir(parents=True, exist_ok=True)
     target_paths_json = json.dumps(target_paths)
+    bridge_kind_line = f"bridge_kind: {bridge_kind}\n\n" if bridge_kind else ""
     body = (
         f"{status}\n\n"
+        f"{bridge_kind_line}"
         f"# Fixture proposal {slug} v{version}\n\n"
         f"target_paths: {target_paths_json}\n\n"
         f"## Specification Links\n\n"
@@ -1119,6 +1122,12 @@ def test_requirement_sufficiency_gap_takes_precedence(auth_module):
     assert auth_module.requirement_sufficiency_state(markdown) == "gap"
 
 
+def test_requirement_sufficiency_state_classifies_exact_gap_phrase(auth_module):
+    """WI-4304: the bridge-protocol gap-state phrase remains classified as gap."""
+    markdown = "## Requirement Sufficiency\n\nNew or revised requirement required before implementation.\n"
+    assert auth_module.requirement_sufficiency_state(markdown) == "gap"
+
+
 def test_requirement_sufficiency_future_scoped_gap_is_sufficient(auth_module):
     """Ensure that future-scoped gap sentences match as sufficient."""
     markdown = (
@@ -1349,6 +1358,81 @@ def test_owner_sufficiency_deliberation_does_not_override_explicit_gap(auth_modu
             slug,
             owner_sufficiency_deliberation_id=delib_id,
         )
+
+
+def test_governance_review_gap_authorizes_requirement_capture_submode(auth_module, tmp_path):
+    """WI-4304: governance_review proposals may carry the exact gap-state phrase."""
+    slug = "governance-review-gap"
+    proposal_path = _write_proposal(
+        tmp_path,
+        slug,
+        version=1,
+        bridge_kind="governance_review",
+        target_paths=["groundtruth.db"],
+    )
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "New or revised requirement required before implementation.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+
+    assert packet["requirement_sufficiency"] == "gap"
+    assert packet["authorization_submode"] == "governance_review_requirement_capture"
+    assert packet["target_path_globs"] == ["groundtruth.db"]
+
+
+def test_source_proposal_gap_still_blocks(auth_module, tmp_path):
+    """WI-4304: the governance_review lane does not weaken source implementation."""
+    slug = "source-gap"
+    proposal_path = _write_proposal(
+        tmp_path,
+        slug,
+        version=1,
+        bridge_kind="prime_proposal",
+        target_paths=["scripts/dummy.py"],
+    )
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "New or revised requirement required before implementation.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="new or revised requirements"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
+def test_governance_review_gap_rejects_source_targets(auth_module, tmp_path):
+    """WI-4304: governance-review gap packets cannot authorize source/test edits."""
+    slug = "governance-review-source-gap"
+    proposal_path = _write_proposal(
+        tmp_path,
+        slug,
+        version=1,
+        bridge_kind="governance_review",
+        target_paths=["scripts/dummy.py"],
+    )
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace(
+            "Existing requirements sufficient.",
+            "New or revised requirement required before implementation.",
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="cannot cover source/test/config targets"):
+        auth_module.create_authorization_packet(tmp_path, slug)
 
 
 def test_begin_cli_passes_owner_sufficiency_deliberation_id(auth_module, tmp_path, capsys):

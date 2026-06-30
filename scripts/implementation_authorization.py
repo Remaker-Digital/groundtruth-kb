@@ -84,7 +84,27 @@ TARGET_PATHS_RE = re.compile(
 PROJECT_AUTHORIZATION_KEYS = frozenset({"project authorization", "project authorization id"})
 PROJECT_KEYS = frozenset({"project", "project id"})
 WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
+BRIDGE_KIND_KEYS = frozenset({"bridge_kind"})
 PROJECT_RETIREMENT_RECONCILIATION_CLASS = "project_retirement_reconciliation"
+GOVERNANCE_REVIEW_BRIDGE_KIND = "governance_review"
+GOVERNANCE_REVIEW_REQUIREMENT_CAPTURE_SUBMODE = "governance_review_requirement_capture"
+GOVERNANCE_REVIEW_FORBIDDEN_TARGET_PATTERNS = (
+    ".claude/hooks/**",
+    ".codex/gtkb-hooks/**",
+    ".github/workflows/**",
+    "config/**",
+    "groundtruth-kb/src/**",
+    "groundtruth-kb/tests/**",
+    "platform_tests/**",
+    "scripts/**",
+    "tests/**",
+    ".dockerignore",
+    "docker-compose.yml",
+    "Dockerfile",
+    "Dockerfile.*",
+    "pyproject.toml",
+    "shopify.app.toml",
+)
 
 # HYG-046 (FAB-14): single canonical repo-path-token matcher. Previously duplicated
 # (and drifted — one copy carried 'memory/', the other did not) across
@@ -746,6 +766,21 @@ def extract_metadata_value(markdown: str, keys: set[str]) -> str | None:
     return None
 
 
+def proposal_bridge_kind(markdown: str) -> str:
+    value = extract_metadata_value(markdown, BRIDGE_KIND_KEYS)
+    return value.lower().replace("-", "_") if value else ""
+
+
+def governance_review_forbidden_targets(target_paths: list[str]) -> list[str]:
+    """Return source/test/config targets disallowed for governance-review gap packets."""
+    forbidden: list[str] = []
+    for raw_target in target_paths:
+        normalized = raw_target.replace("\\", "/").lstrip("./")
+        if any(fnmatch.fnmatch(normalized, pattern) for pattern in GOVERNANCE_REVIEW_FORBIDDEN_TARGET_PATTERNS):
+            forbidden.append(normalized)
+    return forbidden
+
+
 def _json_list(row: sqlite3.Row, field: str) -> list[str]:
     raw = row[field]
     if not raw:
@@ -1193,7 +1228,9 @@ def create_authorization_packet(
     target_paths: list[str] = []
     project_authorization: dict[str, Any] | None = None
     proposal_work_item_id = extract_metadata_value(proposal, WORK_ITEM_KEYS)
+    bridge_kind = proposal_bridge_kind(proposal)
     owner_sufficiency_evidence: dict[str, Any] | None = None
+    authorization_submode: str | None = None
 
     try:
         spec_links = extract_spec_links(proposal)
@@ -1220,7 +1257,17 @@ def create_authorization_packet(
 
     sufficiency = requirement_sufficiency_state(proposal)
     if sufficiency == "gap":
-        errors.append("Approved proposal says new or revised requirements are required before implementation")
+        if bridge_kind == GOVERNANCE_REVIEW_BRIDGE_KIND:
+            forbidden_targets = governance_review_forbidden_targets(target_paths)
+            if forbidden_targets:
+                errors.append(
+                    "Governance-review requirement-capture authorization cannot cover source/test/config targets: "
+                    + ", ".join(forbidden_targets)
+                )
+            else:
+                authorization_submode = GOVERNANCE_REVIEW_REQUIREMENT_CAPTURE_SUBMODE
+        else:
+            errors.append("Approved proposal says new or revised requirements are required before implementation")
     elif sufficiency in {"missing", "unrecognized"} and bridge_id not in BOOTSTRAP_BRIDGE_IDS:
         if owner_sufficiency_deliberation_id:
             try:
@@ -1263,6 +1310,8 @@ def create_authorization_packet(
         packet["project_authorization"] = project_authorization
     if owner_sufficiency_evidence is not None:
         packet["requirement_sufficiency_evidence"] = owner_sufficiency_evidence
+    if authorization_submode is not None:
+        packet["authorization_submode"] = authorization_submode
     packet["packet_hash"] = packet_hash(packet)
     return packet
 
