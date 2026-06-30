@@ -14,6 +14,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+try:
+    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
 BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
     {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}
 )
@@ -48,9 +53,14 @@ FIELD_ENV_NAMES: dict[str, tuple[str, ...]] = {
     "author_harness_id": ("GTKB_AUTHOR_HARNESS_ID", "GTKB_HARNESS_ID", "CODEX_HARNESS_ID", "CLAUDE_HARNESS_ID"),
     "author_session_context_id": (
         "GTKB_AUTHOR_SESSION_CONTEXT_ID",
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_SESSION_ID",
+        "CODEX_THREAD_ID",
         "GTKB_SESSION_ID",
         "CODEX_SESSION_ID",
-        "CLAUDE_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
     ),
     "author_model": ("GTKB_AUTHOR_MODEL", "GTKB_MODEL", "CODEX_MODEL", "CLAUDE_MODEL"),
     "author_model_version": (
@@ -123,6 +133,13 @@ PLACEHOLDER_VALUES: frozenset[str] = frozenset(
         "[tbd]",
     }
 )
+SYNTHETIC_SESSION_CONTEXT_IDS: frozenset[str] = frozenset(
+    {
+        "openrouter-harness-f",
+        "ollama-harness-d",
+    }
+)
+SYNTHETIC_SESSION_CONTEXT_RE = re.compile(r"^(?:openrouter|ollama)-harness-[a-z]$", re.IGNORECASE)
 
 
 class BridgeAuthorMetadataError(RuntimeError):
@@ -147,6 +164,15 @@ def metadata_value_is_valid(value: object) -> bool:
         return False
     text = str(value).strip().strip("`")
     return text.lower() not in PLACEHOLDER_VALUES
+
+
+def is_synthetic_session_context_id(value: object) -> bool:
+    """Return true for static bridge session placeholders, not real session ids."""
+    if not metadata_value_is_valid(value):
+        return False
+    text = str(value).strip().strip("`")
+    lowered = text.lower()
+    return lowered in SYNTHETIC_SESSION_CONTEXT_IDS or SYNTHETIC_SESSION_CONTEXT_RE.fullmatch(text) is not None
 
 
 def _field_value(data: Mapping[str, Any], field: str) -> str | None:
@@ -231,6 +257,25 @@ def _metadata_from_env(env: Mapping[str, str]) -> dict[str, str]:
                 values[field] = str(value).strip().strip("`")
                 break
     return values
+
+
+def _runtime_session_context_id(environ: Mapping[str, str]) -> str:
+    explicit = str(environ.get("GTKB_AUTHOR_SESSION_CONTEXT_ID") or "").strip()
+    if metadata_value_is_valid(explicit):
+        return explicit.strip("`")
+    resolved = resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
+    if metadata_value_is_valid(resolved):
+        return resolved.strip("`")
+    return ""
+
+
+def _replace_author_metadata_value(content: str, field: str, value: str) -> str:
+    pattern = re.compile(rf"^(?P<key>{re.escape(field)}):\s*(?P<value>.*?)\s*$", re.IGNORECASE | re.MULTILINE)
+
+    def replacement(match: re.Match[str]) -> str:
+        return f"{match.group('key')}: {value}"
+
+    return pattern.sub(replacement, content, count=1)
 
 
 def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
@@ -352,79 +397,16 @@ def load_author_metadata(
     environ = env or os.environ
     merged: dict[str, Any] = {}
 
-    # Pre-populate defaults for interactive sessions if not in env (WI-4885)
+    # Pre-populate only a stable session id for interactive sessions when it can
+    # be resolved from the runtime envelope. Model identity must come from the
+    # filing runtime, not from hardcoded guesses (WI-4885/WI-4939).
     interactive_defaults = {}
     harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
-    if not harness_name:
-        try:
-            import psutil
-
-            p = psutil.Process(os.getpid())
-            for proc in p.parents():
-                try:
-                    exe_path = proc.exe().lower()
-                    if "antigravity" in exe_path:
-                        harness_name = "antigravity"
-                        break
-                    elif "cursor" in exe_path:
-                        harness_name = "cursor"
-                        break
-                    elif "claude" in exe_path:
-                        harness_name = "claude"
-                        break
-                    elif "codex" in exe_path:
-                        harness_name = "codex"
-                        break
-                except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
-                    continue
-        except Exception:
-            pass
-
-        # Validate that the detected harness exists in this project's registry to avoid breaking tests (WI-4885)
-        if harness_name:
-            from scripts.harness_identity import load_harness_identities
-
-            try:
-                proj_identities = load_harness_identities(root).get("harnesses", {})
-                if harness_name not in proj_identities:
-                    harness_name = ""
-            except Exception:
-                harness_name = ""
 
     if harness_name:
-        import uuid
-
-        # Generate a unique session context ID for this interactive run
-        session_id = str(uuid.uuid4())
-
-        if harness_name == "antigravity":
-            interactive_defaults = {
-                "author_session_context_id": session_id,
-                "author_model": "Gemini 1.5 Pro",
-                "author_model_version": "gemini-1.5-pro",
-                "author_model_configuration": "Antigravity IDE interactive session",
-            }
-        elif harness_name == "cursor":
-            interactive_defaults = {
-                "author_session_context_id": session_id,
-                "author_model": "Cursor Agent",
-                "author_model_version": "cursor-agent",
-                "author_model_configuration": "Cursor IDE interactive session",
-            }
-        elif harness_name == "claude":
-            interactive_defaults = {
-                "author_session_context_id": session_id,
-                "author_model": "Claude 3.5 Sonnet",
-                "author_model_version": "claude-3-5-sonnet",
-                "author_model_configuration": "Claude Code interactive session",
-            }
-        elif harness_name == "codex":
-            interactive_defaults = {
-                "author_session_context_id": session_id,
-                "author_model": "GPT-5 Codex",
-                "author_model_version": "gpt-5-codex",
-                "author_model_configuration": "Codex Desktop interactive session",
-            }
+        session_id = _runtime_session_context_id(environ)
+        if session_id:
+            interactive_defaults = {"author_session_context_id": session_id}
 
     env_copy = dict(environ)
     if harness_name and ENV_VAR_HARNESS_NAME not in env_copy:
@@ -469,6 +451,10 @@ def ensure_author_metadata(
     if existing:
         gaps = author_metadata_gaps(existing)
         if not gaps:
+            session_context_id = existing.get("author_session_context_id")
+            runtime_session_id = _runtime_session_context_id(env or os.environ)
+            if is_synthetic_session_context_id(session_context_id) and runtime_session_id:
+                return _replace_author_metadata_value(content, "author_session_context_id", runtime_session_id)
             return content
         raise BridgeAuthorMetadataError(
             "bridge artifact contains partial or invalid author metadata: " + ", ".join(gaps)
