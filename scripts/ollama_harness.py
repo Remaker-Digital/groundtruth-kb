@@ -464,6 +464,16 @@ def call_ollama_chat(
                 )
                 continue
             raise OllamaHarnessError(f"Ollama chat request failed after {attempt} attempt(s): {exc}") from exc
+        except TimeoutError as exc:
+            last_error = exc
+            if attempt < CHAT_MAX_ATTEMPTS:
+                _sleep_with_budget(
+                    CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
+                    deadline,
+                    "Ollama chat request timed out before retry",
+                )
+                continue
+            raise OllamaHarnessError(f"Ollama chat request timed out after {attempt} attempt(s): {exc}") from exc
         try:
             parsed = json.loads(data)
         except json.JSONDecodeError as exc:

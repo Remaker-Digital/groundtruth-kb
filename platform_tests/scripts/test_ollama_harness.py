@@ -781,6 +781,15 @@ def test_wi4817_ollama_bounded_exhaustion(monkeypatch: pytest.MonkeyPatch):
     assert len(calls) == oh.CHAT_MAX_ATTEMPTS
 
 
+def test_wi4933_ollama_bare_timeout_is_classified(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    behaviors = [TimeoutError("timed out")] * (oh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_ollama_urlopen(monkeypatch, behaviors, calls)
+    with pytest.raises(oh.OllamaHarnessError, match="timed out"):
+        oh.call_ollama_chat("http://ollama.test", {"model": "m"})
+    assert len(calls) == oh.CHAT_MAX_ATTEMPTS
+
+
 def test_wi4817_ollama_fail_fast_on_non_transient(monkeypatch: pytest.MonkeyPatch):
     calls: list[str] = []
     _patch_ollama_urlopen(monkeypatch, [_ollama_http_error(401)], calls)
