@@ -14,8 +14,72 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402
 
-DEFAULT_TIMEOUT_SECONDS = 4.0
+DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_STDIN_TIMEOUT_SECONDS = 0.2
+BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "user-prompt-submit": (
+        ("cmd", ".codex/gtkb-hooks/workstream-focus.cmd"),
+        ("py", ".codex/gtkb-hooks/session_wrapup_trigger_dispatch.py"),
+        ("py", ".claude/hooks/spec-classifier.py"),
+        ("py", ".codex/gtkb-hooks/glossary-expansion.py"),
+        ("py", ".codex/gtkb-hooks/project-completion-surface.py"),
+    ),
+    "pretooluse-bash": (
+        ("cmd", ".codex/gtkb-hooks/workstream-focus.cmd"),
+        ("cmd", ".codex/gtkb-hooks/destructive-gate.cmd"),
+        ("cmd", ".codex/gtkb-hooks/credential-scan.cmd"),
+        ("cmd", ".codex/gtkb-hooks/formal-artifact-approval.cmd"),
+        ("cmd", ".codex/gtkb-hooks/bridge-compliance-gate.cmd"),
+        ("cmd", ".codex/gtkb-hooks/implementation-start-gate.cmd"),
+        ("cmd", ".codex/gtkb-hooks/directive-enforcement.cmd"),
+        ("cmd", ".codex/gtkb-hooks/lo-file-safety-gate.cmd"),
+        ("cmd", ".codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd"),
+        ("cmd", ".codex/gtkb-hooks/wi-id-collision-gate.cmd"),
+        ("py", ".codex/gtkb-hooks/sot-read-discipline-bash-adapter.py"),
+    ),
+    "pretooluse-apply-patch": (
+        ("cmd", ".codex/gtkb-hooks/workstream-focus.cmd"),
+        ("cmd", ".codex/gtkb-hooks/implementation-start-gate.cmd"),
+        ("cmd", ".codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd"),
+        ("py", ".codex/gtkb-hooks/document_author_provenance_gate.py"),
+    ),
+    "posttooluse-bash": (
+        ("cmd", ".codex/gtkb-hooks/bridge-compliance-audit.cmd"),
+        ("py", ".claude/hooks/spec-event-surfacer.py"),
+        (
+            "py",
+            "scripts/bridge_verified_backlog_reconciler.py",
+            "--apply",
+            "--quiet",
+            "--project-root",
+            "{PROJECT_ROOT}",
+        ),
+    ),
+    "posttooluse-apply-patch": (
+        ("py", ".claude/hooks/spec-event-surfacer.py"),
+        (
+            "py",
+            "scripts/bridge_verified_backlog_reconciler.py",
+            "--apply",
+            "--quiet",
+            "--project-root",
+            "{PROJECT_ROOT}",
+        ),
+    ),
+    "stop": (
+        (
+            "py",
+            "scripts/bridge_verified_backlog_reconciler.py",
+            "--apply",
+            "--quiet",
+            "--project-root",
+            "{PROJECT_ROOT}",
+        ),
+        ("py", ".claude/hooks/advisory-router-scan.py"),
+        ("py", "scripts/advisory_grilling_gate_lint.py", "--stop-hook"),
+        ("py", "scripts/auto_finalize_sweep.py"),
+    ),
+}
 
 
 def _child_timeout_seconds() -> float:
@@ -90,10 +154,48 @@ def _run_child(command: list[str], payload: bytes) -> tuple[int, bytes, bytes]:
     return int(process.returncode), stdout or b"", stderr or b""
 
 
+def _batch_command(entry: tuple[str, ...]) -> list[str]:
+    kind, raw_path, *raw_args = entry
+    path = PROJECT_ROOT / raw_path
+    args = [str(PROJECT_ROOT) if arg == "{PROJECT_ROOT}" else arg for arg in raw_args]
+    if kind == "py":
+        return [prefer_pythonw_executable(sys.executable), str(path), *args]
+    if kind == "cmd":
+        return [str(path), *args]
+    raise ValueError(f"unknown batch entry kind: {kind}")
+
+
+def _run_batch(batch_name: str, payload: bytes) -> tuple[int, bytes, bytes]:
+    entries = BATCHES.get(batch_name)
+    if entries is None:
+        known = ", ".join(sorted(BATCHES))
+        return 2, b"", f"unknown hook batch {batch_name!r}; known batches: {known}\n".encode()
+    stdout_parts: list[bytes] = []
+    stderr_parts: list[bytes] = []
+    for entry in entries:
+        returncode, stdout, stderr = _run_child(_batch_command(entry), payload)
+        stdout_parts.append(stdout)
+        stderr_parts.append(stderr)
+        if returncode != 0:
+            return returncode, b"".join(stdout_parts), b"".join(stderr_parts)
+    return 0, b"".join(stdout_parts), b"".join(stderr_parts)
+
+
 def main(argv: list[str]) -> int:
     if not argv:
-        print("usage: run_py_no_window.py <hook.py> [args...]", file=sys.stderr)
+        print("usage: run_py_no_window.py <hook.py> [args...] | --batch <name>", file=sys.stderr)
         return 2
+    if argv[0] == "--batch":
+        if len(argv) != 2:
+            print("usage: run_py_no_window.py --batch <name>", file=sys.stderr)
+            return 2
+        hook_payload = _read_hook_payload()
+        returncode, stdout, stderr = _run_batch(argv[1], hook_payload)
+        if stdout:
+            sys.stdout.buffer.write(stdout)
+        if stderr:
+            sys.stderr.buffer.write(stderr)
+        return returncode
     script = Path(argv[0])
     if script.suffix.lower() != ".py":
         print(f"refusing non-.py hook target: {script}", file=sys.stderr)
