@@ -150,6 +150,9 @@ def test_router_stages_bridge_advisory_candidates_creates_no_work_items(
     assert events[0]["source_key"] == "gtkb-application-boundary-advisory"
     assert events[0]["proposed_title"] == "Route bridge ADVISORY: gtkb-application-boundary-advisory"
     assert events[0]["source_spec_id"] == "GOV-STANDING-BACKLOG-001"
+    assert events[0]["related_bridge_threads"] is None
+    assert events[0]["related_bridge_threads_role"] is None
+    assert events[0]["provenance_bridge_thread"] == "gtkb-application-boundary-advisory"
 
 
 def test_router_idempotent_on_rerun(router, fake_project: Path, db_factory) -> None:

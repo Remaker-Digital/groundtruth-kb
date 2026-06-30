@@ -103,6 +103,7 @@ class Advisory:
     priority: str  # "high", "medium", "low"
     advisory_date: date | None = None
     related_bridge_threads: str | None = None
+    provenance_bridge_thread: str | None = None
     severity_token: str | None = None  # raw P0..P4 string when found, else None
 
     def proposed_wi_title(self) -> str:
@@ -389,7 +390,7 @@ def collect_bridge_advisories(project_root: Path, *, since: date | None) -> list
                 description=description or f"Bridge advisory document {doc_id} at {latest_path}.",
                 priority=priority,
                 advisory_date=adv_date,
-                related_bridge_threads=doc_id,
+                provenance_bridge_thread=doc_id,
                 severity_token=severity,
             )
         )
@@ -490,6 +491,8 @@ def stage_advisory_candidate(store_path: Path, advisory: Advisory) -> dict[str, 
         "priority": advisory.priority,
         "severity_token": advisory.severity_token,
         "related_bridge_threads": advisory.related_bridge_threads,
+        "related_bridge_threads_role": "implementation" if advisory.related_bridge_threads else None,
+        "provenance_bridge_thread": advisory.provenance_bridge_thread,
         "advisory_date": advisory.advisory_date.isoformat() if advisory.advisory_date else None,
         "origin": ORIGIN,
         "component": WORK_ITEM_COMPONENT,

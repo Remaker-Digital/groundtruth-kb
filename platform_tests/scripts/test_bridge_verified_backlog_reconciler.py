@@ -299,6 +299,39 @@ def test_contextual_verified_bridge_reference_without_parent_evidence_is_skipped
         db.close()
 
 
+def test_related_deliberation_bridge_provenance_is_not_an_implementation_link(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"thread-a": "VERIFIED"})
+    db = _db(tmp_path)
+    try:
+        db.insert_work_item(
+            "WI-0016",
+            "WI-0016 title",
+            "hygiene",
+            "backlog",
+            "open",
+            "test",
+            "seed bridge advisory provenance",
+            stage="backlogged",
+            related_deliberation_ids="thread-a",
+            related_bridge_threads=None,
+        )
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0016")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidate_count"] == 0
+    finally:
+        db.close()
+
+
 def test_repair_overbroad_resolution_reopens_previous_nonterminal_version(tmp_path: Path) -> None:
     module = _load_module()
     _write_index(tmp_path, {"thread-a": "VERIFIED"})
@@ -505,14 +538,17 @@ def test_classify_work_item_without_derived_links_is_byte_identical(tmp_path: Pa
 def test_claude_and_codex_hooks_register_reconciler_command() -> None:
     claude = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     codex = json.loads((REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+    codex_runner = (REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py").read_text(encoding="utf-8")
 
     claude_text = json.dumps(claude)
     codex_text = json.dumps(codex)
 
     assert "scripts/bridge_verified_backlog_reconciler.py" in claude_text
-    assert "bridge_verified_backlog_reconciler.py" in codex_text
+    assert "--batch stop" in codex_text
+    assert "scripts/bridge_verified_backlog_reconciler.py" in codex_runner
     assert "--apply --quiet" in claude_text
-    assert "--apply --quiet" in codex_text
+    assert '"--apply"' in codex_runner
+    assert '"--quiet"' in codex_runner
 
 
 # --- WI-4704: umbrella auto-closure + parent-evidence relaxation -------------

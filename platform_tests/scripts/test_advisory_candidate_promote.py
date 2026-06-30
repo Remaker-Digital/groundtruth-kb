@@ -31,20 +31,26 @@ def _append_candidate(
     status: str = "staged",
     title: str | None = None,
     priority: str = "high",
+    source: str = "dropbox",
+    related_bridge_threads: str | None = None,
+    related_bridge_threads_role: str | None = None,
+    provenance_bridge_thread: str | None = None,
 ) -> None:
     store = _store_path(project_root)
     store.parent.mkdir(parents=True, exist_ok=True)
     record = {
         "event": status,
         "status": status,
-        "source": "dropbox",
+        "source": source,
         "source_key": source_key,
         "relative_path": f"independent-progress-assessments/CODEX-INSIGHT-DROPBOX/{source_key}",
         "proposed_title": title or f"Route LO advisory: {source_key}",
         "description": f"Description for {source_key}",
         "priority": priority,
         "severity_token": "P1",
-        "related_bridge_threads": None,
+        "related_bridge_threads": related_bridge_threads,
+        "related_bridge_threads_role": related_bridge_threads_role,
+        "provenance_bridge_thread": provenance_bridge_thread,
         "advisory_date": "2026-06-11",
         "origin": "hygiene",
         "component": "backlog",
@@ -181,6 +187,35 @@ def test_apply_promotes_with_auq_and_hash_evidence(tmp_path: Path) -> None:
     current = promote._latest_candidates_with_order(tmp_path)[0]
     assert current["status"] == "promoted"
     assert current["promoted_work_item_id"] == row["id"]
+
+
+def test_apply_bridge_advisory_preserves_provenance_without_related_bridge_link(tmp_path: Path) -> None:
+    source_key = "gtkb-bridge-advisory"
+    _append_candidate(
+        tmp_path,
+        source_key,
+        source="bridge",
+        related_bridge_threads=source_key,
+        related_bridge_threads_role="provenance",
+        provenance_bridge_thread=source_key,
+    )
+    batch = _approved_batch(tmp_path / "batch.json", [source_key], auq_id="AUQ-STAGE3-BRIDGE-PROVENANCE")
+
+    result = promote.apply_batch(
+        batch_file=batch,
+        project_root=tmp_path,
+        db_path=tmp_path / "groundtruth.db",
+        changed_by="test",
+    )
+
+    assert result["promoted_count"] == 1
+    row = _work_item_rows(tmp_path / "groundtruth.db")[0]
+    assert row["related_deliberation_ids"] == source_key
+    assert row["related_bridge_threads"] is None
+    current = promote._latest_candidates_with_order(tmp_path)[0]
+    assert current["status"] == "promoted"
+    assert current["provenance_bridge_thread"] == source_key
+    assert current["related_bridge_threads_role"] == "provenance"
 
 
 def test_refine_promotes_subset(tmp_path: Path) -> None:
