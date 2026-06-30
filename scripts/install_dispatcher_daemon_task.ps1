@@ -102,4 +102,6 @@ Register-ScheduledTask -TaskName $TaskName `
     -RunLevel Limited `
     -Description "GroundTruth-KB dispatcher daemon supervisor (WI-4882; DELIB-20266276 D3). Idempotent ensure-alive keep-live." | Out-Null
 
-Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes Execute=$PythonExe ScriptPath=$scriptPath"
+Enable-ScheduledTask -TaskName $TaskName | Out-Null
+
+Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes Execute=$PythonExe ScriptPath=$scriptPath Enabled=True"

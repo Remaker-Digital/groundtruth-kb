@@ -4541,6 +4541,69 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     )
 
 
+def _check_dispatcher_daemon_supervisor_task(target: Path) -> ToolCheck:
+    """Warn when dispatcher_daemon substrate lacks a healthy Windows supervisor (WI-4937)."""
+    check_name = "Dispatcher daemon supervisor task"
+    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
+
+    if os.name != "nt":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="supervisor task check is Windows-only; skipped on this host",
+        )
+
+    sub_path = target / "harness-state" / "bridge-substrate.json"
+    substrate = DISPATCHER_DAEMON_SUBSTRATE
+    if sub_path.is_file():
+        try:
+            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            if isinstance(sub_doc, dict):
+                raw = sub_doc.get("substrate")
+                if isinstance(raw, str) and raw.strip():
+                    substrate = raw.strip()
+        except (OSError, json.JSONDecodeError):
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message="harness-state/bridge-substrate.json is unreadable; supervisor check skipped",
+            )
+
+    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"substrate is {substrate!r}; supervisor task not required",
+        )
+
+    from groundtruth_kb.dispatcher_supervisor import collect_supervisor_status
+
+    status = collect_supervisor_status(target)
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="GTKB-DispatcherDaemon supervisor is registered, enabled, and headless",
+        )
+    findings = status.get("findings") or []
+    detail = "; ".join(str(item) for item in findings) or "supervisor unhealthy"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=bool(status.get("registered")),
+        status="warning",
+        message=(f"{detail}. Install/enable with: gt bridge dispatch daemon supervisor install"),
+    )
+
+
 def _retired_bridge_worker_markers() -> tuple[str, ...]:
     return (
         "cross_" + "harness_" + "bridge_" + "trigger.py",
@@ -6134,6 +6197,7 @@ def run_doctor(
         # in Slice 6 after a coverage audit.
         checks.append(_check_parity_discovery_diff(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
+        checks.append(_check_dispatcher_daemon_supervisor_task(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001

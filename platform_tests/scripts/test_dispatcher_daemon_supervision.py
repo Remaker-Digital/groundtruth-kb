@@ -253,3 +253,12 @@ def test_install_task_dry_run_renders_command(tmp_path):
     assert proc.returncode == 0, proc.stderr
     assert "WOULD REGISTER TaskName=GTKB-DispatcherDaemon-Test-pytest" in proc.stdout
     assert "ensure_dispatcher_daemon.py" in proc.stdout
+
+
+def test_collect_supervisor_status_non_windows(tmp_path, monkeypatch):
+    from groundtruth_kb.dispatcher_supervisor import collect_supervisor_status
+
+    monkeypatch.setattr("groundtruth_kb.dispatcher_supervisor.os.name", "posix")
+    status = collect_supervisor_status(tmp_path)
+    assert status["supported"] is False
+    assert status["healthy"] is False
