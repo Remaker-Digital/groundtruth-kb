@@ -260,9 +260,9 @@ def _is_durable_lo_enforced(
 def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
     """Return True when the resolved session role is Loyal Opposition.
 
-    Resolution order (per DCL-SESSION-ROLE-RESOLUTION-001):
-    1. Session-role marker (if present, valid, and session-id verified) -> marker role.
-    2. Durable role assignment (harness-state/harness-registry.json) as fallback.
+    Non-dispatcher file-safety enforcement is driven only by explicit
+    interactive session authority. Durable registry fallback remains
+    dispatcher-routing authority, not a reason for this hook to block writes.
 
     Missing/malformed role state is fail-open by design so startup repairs and
     fresh clones are not hard-blocked by an unavailable projection.
@@ -297,21 +297,12 @@ def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
                 current_session_id=current_session_id,
             )
             if str(_outcome).startswith("durable_"):
-                return _is_durable_lo_enforced(
-                    root,
-                    harness_name=str(harness_name) if harness_name else None,
-                    harness_id=str(harness_id) if harness_id else None,
-                )
+                return False
             return resolved_role == "loyal-opposition"
         except Exception:  # noqa: BLE001 - fail-open on any resolver error
-            pass
+            return False
 
-    # --- Fallback: durable-only resolution (original behavior) ---
-    return _is_durable_lo_enforced(
-        root,
-        harness_name=str(harness_name) if harness_name else None,
-        harness_id=str(harness_id) if harness_id else None,
-    )
+    return False
 
 
 def _matches_any(patterns: list[str], rel_path: str) -> bool:

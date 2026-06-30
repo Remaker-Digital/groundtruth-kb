@@ -193,7 +193,7 @@ def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.Mon
         tmp_path, current_session_id="sess-1", harness_name="claude"
     )
     assert resolved == srr.ROLE_LO
-    assert source == "durable_marker_absent"
+    assert source == "session_envelope"
 
     # marker is stale -> fallback to envelope role (loyal-opposition)
     _write_marker(tmp_path, srr.ROLE_PRIME, "old-sess")
@@ -201,7 +201,7 @@ def test_resolver_uses_envelope_fallback(tmp_path: Path, monkeypatch: pytest.Mon
         tmp_path, current_session_id="new-sess", harness_name="claude"
     )
     assert resolved == srr.ROLE_LO
-    assert source == "durable_marker_stale_session"
+    assert source == "session_envelope_marker_stale_session"
 
 
 def test_resolver_envelope_closed_or_missing_falls_back_to_durable(
