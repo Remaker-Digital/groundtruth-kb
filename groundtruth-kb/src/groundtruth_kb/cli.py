@@ -253,6 +253,84 @@ def commit_preflight_cmd(
     ctx.exit(preflight_exit_code(evidence))
 
 
+@main.group("push")
+def push_group() -> None:
+    """Push governance preflight and readiness commands."""
+
+
+@push_group.command("preflight")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--python-bin", default=None, help="Python executable used for secret range scans.")
+@click.pass_context
+def push_preflight_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    python_bin: str | None,
+) -> None:
+    """Run pre-push redacted secret range scans from Git pre-push stdin."""
+    from groundtruth_kb.governance.push_preflight import preflight_exit_code, run_push_preflight
+
+    config = _resolve_config(ctx)
+    evidence = run_push_preflight(
+        Path(config.project_root),
+        sys.stdin.read(),
+        python_bin=python_bin,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(preflight_exit_code(evidence))
+
+
+@push_group.command("readiness")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--remote", default="origin", show_default=True, help="Git remote name to check.")
+@click.option("--hostname", default="github.com", show_default=True, help="GitHub hostname for gh auth status.")
+@click.option("--timeout-seconds", default=15, show_default=True, type=int, help="Per-command timeout.")
+@click.pass_context
+def push_readiness_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    remote: str,
+    hostname: str,
+    timeout_seconds: int,
+) -> None:
+    """Run a read-only non-interactive push readiness diagnostic."""
+    from groundtruth_kb.governance.push_readiness import readiness_exit_code, run_push_readiness
+
+    config = _resolve_config(ctx)
+    evidence = run_push_readiness(
+        Path(config.project_root),
+        remote=remote,
+        hostname=hostname,
+        timeout_seconds=timeout_seconds,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(readiness_exit_code(evidence))
+
+
 @main.group("admin")
 def admin_group() -> None:
     """Administrative project tooling."""
@@ -7692,7 +7770,7 @@ def mode_set_role(ctx: click.Context, harness: str, role: str, reason: str, defe
     "--substrate",
     "substrate",
     required=True,
-    type=click.Choice(["cross_harness_trigger", "single_harness_dispatcher", "none", "dispatcher_daemon"]),
+    type=click.Choice(["dispatcher_daemon", "none"]),
     help="Bridge dispatch substrate to assign",
 )
 @click.option("--reason", "reason", default="manual substrate-switch via gt mode set-bridge-substrate")
