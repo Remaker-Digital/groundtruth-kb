@@ -84,6 +84,80 @@ def test_resolve_agent_command_uses_cursor_agent_binary(monkeypatch: pytest.Monk
     assert harness._resolve_agent_command() == ["C:/Tools/cursor-agent.exe"]
 
 
+def test_resolve_agent_command_keeps_standalone_path_before_direct_cursor_agent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    harness = _load_harness()
+    version = tmp_path / "cursor-agent" / "versions" / "2026.06.26-7079533"
+    version.mkdir(parents=True)
+    (version / "node.exe").write_text("", encoding="utf-8")
+    (version / "index.js").write_text("", encoding="utf-8")
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(harness.os, "name", "nt", raising=False)
+    monkeypatch.setattr(harness.shutil, "which", lambda name: "C:/Tools/agent.exe" if name == "agent" else None)
+
+    assert harness._resolve_agent_command() == ["C:/Tools/agent.exe"]
+
+
+def test_resolve_agent_command_prefers_direct_cursor_agent_before_windows_wrappers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    harness = _load_harness()
+    root = tmp_path / "cursor-agent"
+    version = root / "versions" / "2026.06.26-7079533"
+    version.mkdir(parents=True)
+    node = version / "node.exe"
+    index = version / "index.js"
+    node.write_text("", encoding="utf-8")
+    index.write_text("", encoding="utf-8")
+    (root / "agent.CMD").write_text("@echo off\n", encoding="utf-8")
+    (root / "agent.ps1").write_text("Write-Output agent\n", encoding="utf-8")
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(harness.os, "name", "nt", raising=False)
+    monkeypatch.setattr(harness.shutil, "which", lambda _name: None)
+
+    assert harness._resolve_agent_command() == [str(node), str(index)]
+
+
+def test_resolve_agent_command_prefers_direct_cursor_agent_before_path_wrapper(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    harness = _load_harness()
+    root = tmp_path / "cursor-agent"
+    version = root / "versions" / "2026.06.26-7079533"
+    version.mkdir(parents=True)
+    node = version / "node.exe"
+    index = version / "index.js"
+    node.write_text("", encoding="utf-8")
+    index.write_text("", encoding="utf-8")
+    path_wrapper = root / "agent.CMD"
+    path_wrapper.write_text("@echo off\n", encoding="utf-8")
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(harness.os, "name", "nt", raising=False)
+    monkeypatch.setattr(harness.shutil, "which", lambda name: str(path_wrapper) if name == "agent" else None)
+
+    assert harness._resolve_agent_command() == [str(node), str(index)]
+
+
+def test_resolve_agent_command_falls_back_to_windows_wrapper_without_direct_cursor_agent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    harness = _load_harness()
+    root = tmp_path / "cursor-agent"
+    (root / "versions" / "2026.06.26-7079533").mkdir(parents=True)
+    wrapper = root / "agent.cmd"
+    wrapper.write_text("@echo off\n", encoding="utf-8")
+    monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(harness.os, "name", "nt", raising=False)
+    monkeypatch.setattr(harness.shutil, "which", lambda _name: None)
+
+    assert harness._resolve_agent_command() == [str(wrapper)]
+
+
 def test_resolve_agent_command_accepts_cursor_agent_override(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")
@@ -143,6 +217,7 @@ def test_resolve_agent_command_rejects_cursor_override_without_agent(monkeypatch
 def test_resolve_agent_command_falls_back_to_cursor_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(harness, "_windows_cursor_agent_direct_commands", lambda: ())
     monkeypatch.setattr(harness, "_windows_cursor_agent_candidates", lambda: ())
 
     def fake_which(name: str) -> str | None:
@@ -157,6 +232,7 @@ def test_resolve_agent_command_falls_back_to_cursor_agent(monkeypatch: pytest.Mo
 def test_resolve_agent_command_rejects_cursor_without_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
+    monkeypatch.setattr(harness, "_windows_cursor_agent_direct_commands", lambda: ())
     monkeypatch.setattr(harness, "_windows_cursor_agent_candidates", lambda: ())
 
     def fake_which(name: str) -> str | None:

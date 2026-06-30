@@ -32,6 +32,7 @@ _SKILL_ROUTE_ALIASES = {
 _CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
 _STANDALONE_AGENT_NAMES = ("agent", "cursor-agent")
 _CURSOR_AGENT_PROCESS_NAMES = {"agent", "agent.exe", "cursor-agent", "cursor-agent.exe"}
+_WINDOWS_SHELL_WRAPPER_SUFFIXES = {".bat", ".cmd", ".ps1"}
 _CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
 _CURSOR_AUTH_ENV_KEYS = ("CURSOR_API_KEY",)
 _PROVENANCE_DIR = Path(".gtkb-state") / "ops" / "dispatch-provenance"
@@ -66,6 +67,10 @@ def _cursor_supports_agent_subcommand(cursor_executable: str) -> bool:
     )
 
 
+def _is_windows_shell_wrapper(path: str | Path) -> bool:
+    return Path(path).suffix.lower() in _WINDOWS_SHELL_WRAPPER_SUFFIXES
+
+
 def _windows_cursor_agent_candidates() -> tuple[Path, ...]:
     if os.name != "nt":
         return ()
@@ -85,6 +90,36 @@ def _windows_cursor_agent_candidates() -> tuple[Path, ...]:
     )
 
 
+def _windows_cursor_agent_direct_commands() -> tuple[list[str], ...]:
+    if os.name != "nt":
+        return ()
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return ()
+    versions_root = Path(local_app_data) / "cursor-agent" / "versions"
+    if not versions_root.is_dir():
+        return ()
+    candidates: list[tuple[float, str, Path, Path]] = []
+    try:
+        version_dirs = tuple(versions_root.iterdir())
+    except OSError:
+        return ()
+    for version_dir in version_dirs:
+        if not version_dir.is_dir():
+            continue
+        node = version_dir / "node.exe"
+        index = version_dir / "index.js"
+        if not (node.is_file() and index.is_file()):
+            continue
+        try:
+            modified_at = version_dir.stat().st_mtime
+        except OSError:
+            modified_at = 0.0
+        candidates.append((modified_at, version_dir.name, node, index))
+    candidates.sort(reverse=True)
+    return tuple([str(node), str(index)] for _modified_at, _name, node, index in candidates)
+
+
 def _resolve_agent_command() -> list[str]:
     explicit = os.environ.get("CURSOR_AGENT_BIN")
     if explicit:
@@ -97,10 +132,18 @@ def _resolve_agent_command() -> list[str]:
                 "a Cursor CLI that supports `cursor agent --print --output-format`."
             )
         return [explicit]
+    wrapper_fallbacks: list[str] = []
     for agent_name in _STANDALONE_AGENT_NAMES:
         candidate = shutil.which(agent_name)
         if candidate:
+            if _is_windows_shell_wrapper(candidate):
+                wrapper_fallbacks.append(candidate)
+                continue
             return [candidate]
+    for command in _windows_cursor_agent_direct_commands():
+        return command
+    if wrapper_fallbacks:
+        return [wrapper_fallbacks[0]]
     for candidate in _windows_cursor_agent_candidates():
         if candidate.is_file():
             return [str(candidate)]
