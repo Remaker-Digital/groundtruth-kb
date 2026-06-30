@@ -4818,6 +4818,89 @@ def policy_check(
 
 
 # ---------------------------------------------------------------------------
+# gt owner-approval
+# ---------------------------------------------------------------------------
+
+
+@main.group("owner-approval")
+def owner_approval_group() -> None:
+    """Render mobile-friendly owner-approval bundles (presentation-only Slice 1)."""
+
+
+@owner_approval_group.command("render")
+@click.option(
+    "--input",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Approval packet JSON fixture path.",
+)
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory for generated index.html and packet.json.",
+)
+@click.option(
+    "--workspace-root",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Workspace root for evidence-path validation (defaults to cwd).",
+)
+@click.pass_context
+def owner_approval_render(
+    ctx: click.Context,
+    input_file: Path,
+    output_dir: Path,
+    workspace_root: Path | None,
+) -> None:
+    """Render a deterministic owner-approval bundle from a JSON packet fixture."""
+    from groundtruth_kb.owner_approval_surface import (
+        OwnerApprovalSurfaceError,
+        load_approval_packet,
+        render_approval_bundle,
+    )
+
+    root = workspace_root or Path.cwd()
+    try:
+        packet = load_approval_packet(input_file)
+        paths = render_approval_bundle(packet, output_dir, workspace_root=root)
+    except (OwnerApprovalSurfaceError, json.JSONDecodeError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Rendered owner-approval bundle to {output_dir.resolve()}")
+    click.echo(f"  html: {paths['html']}")
+    click.echo(f"  json: {paths['json']}")
+
+
+@owner_approval_group.command("preview")
+@click.option(
+    "--bundle-dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Directory containing a rendered owner-approval bundle.",
+)
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    show_default=True,
+    help="Host to bind (use explicit non-loopback for LAN).",
+)
+@click.option("--port", default=8767, show_default=True, type=int, help="Port for the preview server.")
+def owner_approval_preview(bundle_dir: Path, host: str, port: int) -> None:
+    """Serve a rendered owner-approval bundle locally (GET-only; no write-back)."""
+    from groundtruth_kb.owner_approval_surface import OwnerApprovalSurfaceError, run_preview_server
+
+    try:
+        click.echo(f"Owner-approval preview at http://{host}:{port}/ (Slice 1 non-authoritative)")
+        run_preview_server(bundle_dir, host=host, port=port)
+    except OwnerApprovalSurfaceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except KeyboardInterrupt:
+        click.echo("\nPreview server stopped.")
+
+
+# ---------------------------------------------------------------------------
 # gt history
 # ---------------------------------------------------------------------------
 
