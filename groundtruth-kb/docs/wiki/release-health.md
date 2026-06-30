@@ -19,11 +19,20 @@ health view combines these evidence classes:
 | Dispatcher daemon health | `gt bridge dispatch health/status/daemon status --json` | WARN or FAIL states block a clean release-health claim. |
 | CI and workflow runs | GitHub Actions for `Remaker-Digital/groundtruth-kb` on `main` | Recent failures, unavailable live state, and absent workflows are distinct states. |
 | README/wiki drift | `scripts/update_wiki_pages.py compare` | Published wiki pages must match in-root source docs before release signoff. |
+| Deferred work expiry | Dashboard model records with `status` / `state` / `outcome` = `deferred` | Every deferral needs an expiry, time limit, or resume trigger; indefinite deferral is WARN. |
 | Governed release gate | `scripts/release_candidate_gate.py` | A release candidate needs governed local evidence or an explicit owner-approved deferral. |
 
 Azure Container Apps reconciliation is not part of the default GT-KB release
 gate. It is an optional adopter diagnostic and only runs when
 `GTKB_DASHBOARD_AZURE_RECONCILE=1` is set for the dashboard refresh process.
+The application must also provide `GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP` and
+`GTKB_DASHBOARD_AZURE_RESOURCE_GROUP`; GT-KB does not ship deployment-provider
+resource names as platform defaults.
+
+Application deployment, security, throughput/latency, defects, and
+infrastructure summaries are provider-neutral dashboard display contracts. The
+default rows are mock data so tests can verify the dashboard surface; live
+values belong to the active application's connector.
 
 ## Dashboard Semantics
 
@@ -91,6 +100,7 @@ A clean release-health claim requires all of the following:
 - the worktree is clean except for intentionally staged release artifacts;
 - bridge state has no unresolved release-scope Prime or Loyal Opposition work;
 - dispatcher daemon/control-surface health is not WARN or FAIL;
+- deferred release-scope items have an expiry, time limit, or resume trigger;
 - required `main` workflow evidence is passing or explicitly deferred; and
 - README and wiki source comparisons are current.
 

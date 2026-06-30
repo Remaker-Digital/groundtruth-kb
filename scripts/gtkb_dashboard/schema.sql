@@ -182,3 +182,13 @@ CREATE TABLE IF NOT EXISTS third_party_services (
     console_url TEXT NOT NULL DEFAULT '',
     health_signal TEXT NOT NULL DEFAULT 'configuration required'
 );
+
+CREATE TABLE IF NOT EXISTS application_deployment_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sort_order INTEGER NOT NULL,
+    surface TEXT NOT NULL,
+    signal TEXT NOT NULL,
+    mock_value TEXT NOT NULL,
+    status TEXT NOT NULL,
+    source_contract TEXT NOT NULL
+);

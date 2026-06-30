@@ -71,7 +71,7 @@ gt project doctor             # health checks across the platform
 | **Deliberation Archive** | The design-reasoning tier: a searchable archive of decisions, reviews, and rejected alternatives that answers *why*. Implemented as the `deliberations` table with semantic indexing. |
 | **File bridge protocol** | The dual-agent coordination surface (Prime Builder ↔ Loyal Opposition), versioned markdown under `bridge/`. After WI-4510 Phase-3 cutover, dispatcher/TAFE bridge state is canonical; retired bridge-index artifacts are not live queue authority. See [file-bridge-protocol.md](.claude/rules/file-bridge-protocol.md). |
 | **`gt` CLI** | The platform command surface — `gt project init`, `gt summary`, `gt assert`, `gt backlog`, `gt deliberations`, `gt project doctor`, `gt project upgrade`. |
-| **Dashboard** | KPI surface for governance, release-readiness, drift, and bridge state. Optional Grafana integration; core surfaces are always available via the CLI. |
+| **Dashboard** | KPI surface for governance, release-readiness, drift, bridge state, and provider-neutral application-deployment signals. Optional Grafana integration; core surfaces are always available via the CLI. |
 
 ---
 
@@ -94,6 +94,10 @@ gt project doctor             # health checks across the platform
 ## Project status
 
 GT-KB is at **`0.7.0-rc1`** (release candidate). The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`](groundtruth-kb/src/groundtruth_kb/__init__.py); release-readiness is gated by [`scripts/release_candidate_gate.py`](scripts/release_candidate_gate.py), the file bridge, dispatcher health, clean-candidate test evidence, and the dashboard release-health metrics. The release branch is `main`; README badges and published wiki pages should be compared against `main` before a formal release announcement.
+
+Dashboard application-deployment panels use mock, provider-neutral rows by default. Live container, topology, security, throughput/latency, defect, and infrastructure health data is supplied by the active application for its chosen deployment environment.
+
+Deferred release-scope work must have an expiry, time limit, or resume trigger. Indefinite deferral is treated as a release-health warning, not a quiet parking lot.
 
 Local dashboard refresh:
 

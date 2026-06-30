@@ -134,13 +134,23 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
         assert conn.execute("SELECT COUNT(*) FROM setup_steps").fetchone()[0] >= 6
         assert conn.execute("SELECT COUNT(*) FROM required_tools").fetchone()[0] >= 8
         assert conn.execute("SELECT COUNT(*) FROM third_party_services").fetchone()[0] >= 8
+        assert conn.execute("SELECT COUNT(*) FROM application_deployment_signals").fetchone()[0] == 6
         service_names = {row[0] for row in conn.execute("SELECT name FROM third_party_services")}
+        deployment_surfaces = {row[0] for row in conn.execute("SELECT surface FROM application_deployment_signals")}
         assert {
             "GitHub Actions",
             "Application deployment connector",
             "Application security connector",
             "Application observability connector",
         } <= service_names
+        assert {
+            "Deployment topology",
+            "Containers",
+            "Security",
+            "Throughput and latency",
+            "Defects",
+            "Infrastructure health",
+        } == deployment_surfaces
 
 
 def test_metric_count_status_helpers() -> None:
@@ -156,7 +166,7 @@ def test_current_metric_statuses_green_when_sources_clean(tmp_path) -> None:
     model = _sample_model()
     model["dashboard_intelligence"]["release_readiness"] = {"blockers": [], "blocker_count": 0}
     model["dashboard_intelligence"]["quality_rollup"]["failing"] = 0
-    model["current_work_subject"] = "Agent Red"
+    model["current_work_subject"] = "Demo Application"
     history = [
         {
             "generated_at": "2026-04-21T12:00:00+00:00",
@@ -194,7 +204,7 @@ def test_current_metric_statuses_green_when_sources_clean(tmp_path) -> None:
     }
     assert "dashboard_subject_scope" in metadata
     assert "Combined operations" in metadata["dashboard_subject_scope"]
-    assert "Agent Red" in metadata["dashboard_subject_scope"]
+    assert "Demo Application" in metadata["dashboard_subject_scope"]
     assert metadata.get("refresh_service_scope", "").startswith("loopback")
 
 
@@ -244,6 +254,40 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
     ]
 
 
+def test_deferred_records_without_expiry_surface_release_health_warn(tmp_path) -> None:
+    db_path = tmp_path / "gtkb-dashboard.sqlite"
+    model = _sample_model()
+    model["dashboard_intelligence"]["release_readiness"] = {"blockers": [], "blocker_count": 0}
+    model["dashboard_intelligence"]["quality_rollup"]["failing"] = 0
+    model["dashboard_intelligence"]["deferred_items"] = [
+        {"id": "INTAKE-NO-EXPIRY", "status": "deferred"},
+        {"id": "INTAKE-BOUNDED", "status": "deferred", "resume_trigger": "after release branch cut"},
+    ]
+
+    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=[])
+
+    with sqlite3.connect(db_path) as conn:
+        metrics = {
+            row[0]: (row[1], row[2])
+            for row in conn.execute(
+                """
+                SELECT metric_key, value, status
+                FROM current_metrics
+                WHERE metric_key IN ('release_blockers', 'release_health_findings')
+                """
+            )
+        }
+        blockers = [row[0] for row in conn.execute("SELECT blocker FROM release_blockers ORDER BY sort_order")]
+
+    assert metrics == {
+        "release_blockers": (1, "yellow"),
+        "release_health_findings": (1, "yellow"),
+    }
+    assert blockers == [
+        "[deferral-expiry] 1 deferred record(s) lack an expiry, time limit, or resume trigger: INTAKE-NO-EXPIRY"
+    ]
+
+
 def test_azure_reconciliation_is_explicit_opt_in(monkeypatch, tmp_path) -> None:
     calls: list[tuple[object, list[str]]] = []
 
@@ -271,6 +315,25 @@ def test_azure_reconciliation_is_explicit_opt_in(monkeypatch, tmp_path) -> None:
     )
     assert len(calls) == 1
     assert calls[0][1] == ["staging", "production"]
+
+
+def test_azure_reconciliation_requires_application_supplied_container_app_map(monkeypatch) -> None:
+    monkeypatch.delenv("GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP", raising=False)
+
+    assert refresh_dashboard_db._azure_container_app_map(["staging", "production"]) == {}
+
+    monkeypatch.setenv(
+        "GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP",
+        json.dumps({"staging": "demo-staging", "production": "demo-production", "dev": "ignored"}),
+    )
+
+    assert refresh_dashboard_db._azure_container_app_map(["staging", "production"]) == {
+        "production": "demo-production",
+        "staging": "demo-staging",
+    }
+    source_text = (REPO_ROOT / "scripts" / "gtkb_dashboard" / "refresh_dashboard_db.py").read_text(encoding="utf-8")
+    assert "agent-red-api-gateway" not in source_text
+    assert "agent-red-staging" not in source_text
 
 
 def test_refresh_database_uses_fast_startup_model_by_default(monkeypatch, tmp_path) -> None:
@@ -393,13 +456,9 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "frser-sqlite-datasource" in datasource_text
     assert "$GTKB_DASHBOARD_SQLITE_PATH" in datasource_text
     assert "$GTKB_DASHBOARD_DASHBOARDS_PATH" in dashboard_provider_text
-    # Drift cleanup: the generator hard-codes "agent-red-gtkb" in
-    # build_dashboard(); the previously committed JSON had "gtkb", a stale
-    # artifact from before the generator change. The idempotent WI-4506 regen
-    # surfaced the drift; updating the assertion to match the SoT (the
-    # generator) is in scope of WI-4506's target_paths (this test file is
-    # listed) and is a one-line drift cleanup, not a scope expansion.
-    assert dashboard_json["uid"] == "agent-red-gtkb"
+    assert dashboard_json["uid"] == "groundtruth-kb-dashboard"
+    assert dashboard_json["title"] == "GT-KB Operations Dashboard"
+    assert dashboard_json["tags"] == ["gt-kb", "operations", "sqlite"]
     assert dashboard_json["links"] == []
     assert [panel["title"] for panel in dashboard_json["panels"][:10]] == [
         "GT-KB Dashboard",
@@ -443,6 +502,9 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "Step-by-Step Setup" in panel_titles
     assert "Required Tools, CLIs, and SDKs" in panel_titles
     assert "Third-Party Test Services" in panel_titles
+    assert "Application Deployment" in panel_titles
+    assert "Application Deployment Health" in panel_titles
+    assert "Application Deployment Signals" in panel_titles
     assert "Release Health Findings" in panel_titles
     assert "Dirty Worktree Paths" in panel_titles
     assert "Dispatcher Health Findings" in panel_titles

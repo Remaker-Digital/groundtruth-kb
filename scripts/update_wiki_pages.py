@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "groundtruth-kb" / "docs" / "wiki"
 DEFAULT_WIKI_DIR = PROJECT_ROOT / ".tmp" / "groundtruth-kb.wiki"
 WIKI_REPOSITORY_URL = "https://github.com/Remaker-Digital/groundtruth-kb.wiki.git"
+WIKI_SOURCE_ALLOWLIST = frozenset({"Home.md", "release-health.md"})
 
 
 def _sha256_text(text: str) -> str:
@@ -37,7 +38,7 @@ def wiki_page_name(source_path: Path) -> str:
 
 
 def source_pages(source_dir: Path) -> list[Path]:
-    return sorted(path for path in source_dir.glob("*.md") if path.is_file())
+    return sorted(path for path in source_dir.glob("*.md") if path.is_file() and path.name in WIKI_SOURCE_ALLOWLIST)
 
 
 def _read_text(path: Path) -> str:

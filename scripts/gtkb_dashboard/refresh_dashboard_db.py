@@ -55,6 +55,26 @@ _TAFE_PROJECTION_TIMEOUT_SECONDS = 20
 _GITHUB_WORKFLOW_REPOSITORY = "Remaker-Digital/groundtruth-kb"
 _GITHUB_WORKFLOW_BRANCH = "main"
 _TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
+_AZURE_CONTAINER_APP_MAP_ENV = "GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP"
+_AZURE_RESOURCE_GROUP_ENV = "GTKB_DASHBOARD_AZURE_RESOURCE_GROUP"
+_DEFERRAL_STATUS_KEYS = ("status", "state", "outcome", "resolution_status", "lifecycle_state")
+_DEFERRAL_BOUNDARY_KEYS = (
+    "expires_at",
+    "expiry",
+    "expiry_at",
+    "expiration",
+    "expiration_at",
+    "defer_until",
+    "deferred_until",
+    "review_after",
+    "review_at",
+    "resume_at",
+    "resume_trigger",
+    "resume_condition",
+    "expiry_condition",
+    "time_limit",
+    "trigger",
+)
 
 
 class IncidentIngestError(RuntimeError):
@@ -184,7 +204,7 @@ REQUIRED_TOOLS = [
     {
         "name": "Azure CLI",
         "category": "Cloud CLI",
-        "purpose": "Supports opt-in Azure resource inspection, deployment reconciliation, and environment checks.",
+        "purpose": "Supports optional adopter-owned Azure resource inspection and deployment reconciliation.",
         "check_command": "az version",
         "install_reference": "https://learn.microsoft.com/cli/azure/install-azure-cli",
         "status": "optional",
@@ -801,6 +821,7 @@ def _write_model_to_db(
     release_health_findings = _release_health_findings(
         project_root,
         intelligence,
+        model=model,
         probe_live=probe_live_release_health,
     )
 
@@ -1279,6 +1300,26 @@ def _azure_reconciliation_enabled() -> bool:
     return os.environ.get("GTKB_DASHBOARD_AZURE_RECONCILE", "").strip().lower() in _TRUE_ENV_VALUES
 
 
+def _azure_container_app_map(environments: list[str]) -> dict[str, str]:
+    """Return an application-supplied environment -> container-app map.
+
+    GT-KB owns only the dashboard contract. The active application owns the
+    concrete deployment environment and supplies this mapping when it opts into
+    Azure reconciliation.
+    """
+    raw = os.environ.get(_AZURE_CONTAINER_APP_MAP_ENV, "").strip()
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    allowed = set(environments)
+    return {str(env): str(app).strip() for env, app in payload.items() if str(env) in allowed and str(app).strip()}
+
+
 def _reconcile_against_azure_revisions(
     conn: sqlite3.Connection,
     environments: list[str],
@@ -1309,17 +1350,21 @@ def _reconcile_against_azure_revisions(
     if not environments:
         return counts
 
+    container_apps = _azure_container_app_map(environments)
+    resource_group = os.environ.get(_AZURE_RESOURCE_GROUP_ENV, "").strip()
+    if not container_apps or not resource_group:
+        print(
+            "[refresh_dashboard_db] WARNING: Azure reconciliation skipped; "
+            f"application-owned {_AZURE_CONTAINER_APP_MAP_ENV} and {_AZURE_RESOURCE_GROUP_ENV} are required.",
+            file=sys.stderr,
+        )
+        return counts
+
     azure_revisions: dict[str, list[dict[str, Any]]] = {}
     az_failure_logged = False
     for env in environments:
         try:
-            # Map env to gateway container app name. Hardcoded here to avoid
-            # importing scripts/lib/scaling_targets.py from the dashboard module
-            # (separate concern); keep the mapping explicit.
-            container_app = {
-                "production": "agent-red-api-gateway",
-                "staging": "agent-red-staging",
-            }.get(env)
+            container_app = container_apps.get(env)
             if container_app is None:
                 continue
             result = subprocess.run(
@@ -1331,7 +1376,7 @@ def _reconcile_against_azure_revisions(
                     "--name",
                     container_app,
                     "--resource-group",
-                    "Agent-Red",
+                    resource_group,
                     "-o",
                     "json",
                 ],
@@ -1673,6 +1718,60 @@ def _explicit_release_health_findings(intelligence: dict[str, Any]) -> list[dict
     return [_normalize_release_finding(item) for item in raw_findings]
 
 
+def _has_deferral_boundary(record: dict[str, Any]) -> bool:
+    for key in _DEFERRAL_BOUNDARY_KEYS:
+        if str(record.get(key) or "").strip():
+            return True
+    nested = record.get("deferral")
+    if isinstance(nested, dict):
+        return _has_deferral_boundary(nested)
+    return False
+
+
+def _is_deferred_record(record: dict[str, Any]) -> bool:
+    return any(str(record.get(key) or "").strip().lower() == "deferred" for key in _DEFERRAL_STATUS_KEYS)
+
+
+def _deferred_records_missing_expiry(value: Any, *, path: str = "$", out: list[str] | None = None) -> list[str]:
+    missing = [] if out is None else out
+    if isinstance(value, dict):
+        if _is_deferred_record(value) and not _has_deferral_boundary(value):
+            identifier = (
+                value.get("id")
+                or value.get("work_item_id")
+                or value.get("spec_id")
+                or value.get("document")
+                or value.get("title")
+                or path
+            )
+            missing.append(str(identifier))
+        for key, nested in value.items():
+            if key == "raw_model_json":
+                continue
+            _deferred_records_missing_expiry(nested, path=f"{path}.{key}", out=missing)
+    elif isinstance(value, list):
+        for idx, nested in enumerate(value):
+            _deferred_records_missing_expiry(nested, path=f"{path}[{idx}]", out=missing)
+    return missing
+
+
+def _deferral_expiry_findings(model: dict[str, Any] | None) -> list[dict[str, str]]:
+    if not model:
+        return []
+    missing = _deferred_records_missing_expiry(model)
+    if not missing:
+        return []
+    examples = ", ".join(missing[:5])
+    suffix = f": {examples}" if examples else ""
+    return [
+        {
+            "source": "deferral-expiry",
+            "message": (f"{len(missing)} deferred record(s) lack an expiry, time limit, or resume trigger{suffix}"),
+            "severity": "yellow",
+        }
+    ]
+
+
 def _run_release_probe(
     project_root: Path, args: list[str], *, timeout: int = 20
 ) -> subprocess.CompletedProcess[str] | None:
@@ -1927,9 +2026,11 @@ def _release_health_findings(
     project_root: Path,
     intelligence: dict[str, Any],
     *,
+    model: dict[str, Any] | None = None,
     probe_live: bool,
 ) -> list[dict[str, str]]:
     findings = _explicit_release_health_findings(intelligence)
+    findings.extend(_deferral_expiry_findings(model))
     if probe_live:
         findings.extend(_live_release_health_findings(project_root))
     deduped: list[dict[str, str]] = []
@@ -1961,6 +2062,15 @@ def _finding_count(findings: list[dict[str, str]], *sources: str) -> int:
     return sum(1 for finding in findings if finding.get("source") in wanted)
 
 
+def _finding_status(findings: list[dict[str, str]]) -> str:
+    if not findings:
+        return "green"
+    severities = {str(finding.get("severity") or "").strip().lower() for finding in findings}
+    if severities & {"red", "fail", "failed", "failure", "blocker", "critical"}:
+        return "red"
+    return "yellow"
+
+
 def _current_metric_rows(
     metrics: dict[str, Any],
     intelligence: dict[str, Any],
@@ -1973,6 +2083,17 @@ def _current_metric_rows(
     release_blockers = max(
         _num(release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0))),
         len(release_blocker_messages),
+    )
+    explicit_release_blockers = bool(release.get("blockers")) or _num(
+        release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0))
+    )
+    release_health_status = _finding_status(release_health_findings)
+    release_blocker_status = (
+        "green"
+        if release_blockers == 0
+        else "red"
+        if explicit_release_blockers or release_health_status == "red"
+        else "yellow"
     )
     project_health = _num(quality.get("failing", 0)) + _num(release_blockers)
     ci_failing = quality.get("failing", 0)
@@ -1992,15 +2113,15 @@ def _current_metric_rows(
         (
             "release_blockers",
             "Release Blockers",
-            release.get("blocker_count", metrics.get("regression", {}).get("release_blocker_count", 0)),
-            "red",
+            release_blockers,
+            release_blocker_status,
             "Visible release blocker count.",
         ),
         (
             "release_health_findings",
             "Release Health Findings",
             len(release_health_findings),
-            _metric_count_status(len(release_health_findings)),
+            release_health_status,
             "Live release-health findings from git, bridge, dispatcher, README/wiki, and supplied model evidence.",
         ),
         (

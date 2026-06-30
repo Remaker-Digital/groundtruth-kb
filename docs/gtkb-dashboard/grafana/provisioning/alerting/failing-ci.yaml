@@ -10,11 +10,11 @@ apiVersion: 1
 
 groups:
   - orgId: 1
-    name: agent-red-ci-health
+    name: gtkb-ci-health
     folder: GroundTruth-KB
     interval: 1m
     rules:
-      - uid: agent-red-failing-ci
+      - uid: gtkb-failing-ci
         title: CI / Testing Failing
         condition: B
         for: 0s

@@ -11,7 +11,7 @@ post-install side effect. The package should provide:
   service, starts local Grafana, and opens `http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard`.
 - `gtkb dashboard stop`: stops the local Grafana and refresh-service processes started by GT-KB.
 
-The Agent Red implementation currently proves the required behavior with these repo-local scripts:
+The current source repository proves the required behavior with these repo-local scripts:
 
 - `scripts/gtkb_dashboard/install_local_grafana.ps1`
 - `scripts/gtkb_dashboard/start_local_dashboard.ps1`

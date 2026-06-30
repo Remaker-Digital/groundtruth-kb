@@ -512,13 +512,46 @@ def build_dashboard() -> dict[str, Any]:
         )
     )
 
-    panels.append(_row(builder, "GT-KB Install and Setup", 29, collapsed=False))
+    panels.append(_row(builder, "Application Deployment", 29, collapsed=False))
+    panels.extend(
+        [
+            _bar_gauge_panel(
+                builder,
+                "Application Deployment Health",
+                _grid(0, 30, 8, 6),
+                """
+                SELECT surface AS metric,
+                       CASE lower(status)
+                           WHEN 'red' THEN 2
+                           WHEN 'yellow' THEN 1
+                           ELSE 0
+                       END AS value
+                FROM application_deployment_signals
+                ORDER BY sort_order;
+                """,
+                max_value=2,
+                mappings=_status_mappings(),
+            ),
+            _table_panel(
+                builder,
+                "Application Deployment Signals",
+                _grid(8, 30, 16, 6),
+                """
+                SELECT sort_order, surface, signal, mock_value, upper(status) AS status, source_contract
+                FROM application_deployment_signals
+                ORDER BY sort_order;
+                """,
+            ),
+        ]
+    )
+
+    panels.append(_row(builder, "GT-KB Install and Setup", 36, collapsed=False))
     panels.extend(
         [
             _bar_gauge_panel(
                 builder,
                 "Setup Coverage",
-                _grid(0, 30, 8, 6),
+                _grid(0, 37, 8, 6),
                 """
                 SELECT section AS metric, COUNT(*) AS value
                 FROM setup_steps
@@ -529,7 +562,7 @@ def build_dashboard() -> dict[str, Any]:
             _bar_gauge_panel(
                 builder,
                 "Required Tool Categories",
-                _grid(8, 30, 8, 6),
+                _grid(8, 37, 8, 6),
                 """
                 SELECT category AS metric, COUNT(*) AS value
                 FROM required_tools
@@ -540,7 +573,7 @@ def build_dashboard() -> dict[str, Any]:
             _bar_gauge_panel(
                 builder,
                 "Third-Party Service Categories",
-                _grid(16, 30, 8, 6),
+                _grid(16, 37, 8, 6),
                 """
                 SELECT category AS metric, COUNT(*) AS value
                 FROM third_party_services
@@ -551,12 +584,12 @@ def build_dashboard() -> dict[str, Any]:
         ]
     )
 
-    panels.append(_row(builder, "Delivery Timeline", 36, collapsed=False))
+    panels.append(_row(builder, "Delivery Timeline", 43, collapsed=False))
     panels.append(
         _bar_gauge_panel(
             builder,
             "Delivery Timeline Summary",
-            _grid(0, 37, 24, 7),
+            _grid(0, 44, 24, 7),
             """
             SELECT label || ' - ' || latest_result AS metric,
                    event_count AS value
@@ -566,49 +599,49 @@ def build_dashboard() -> dict[str, Any]:
         )
     )
 
-    panels.append(_row(builder, "Release Readiness", 44, collapsed=False))
+    panels.append(_row(builder, "Release Readiness", 51, collapsed=False))
     panels.extend(
         [
             _stat_panel(
                 builder,
                 "Release Health Findings",
-                _grid(0, 45, 8, 4),
+                _grid(0, 52, 8, 4),
                 _metric_query("release_health_findings"),
             ),
             _stat_panel(
                 builder,
                 "Dirty Worktree Paths",
-                _grid(8, 45, 8, 4),
+                _grid(8, 52, 8, 4),
                 _metric_query("dirty_worktree_paths"),
             ),
             _stat_panel(
                 builder,
                 "Dispatcher Health Findings",
-                _grid(16, 45, 8, 4),
+                _grid(16, 52, 8, 4),
                 _metric_query("dispatcher_health_findings"),
             ),
             _stat_panel(
                 builder,
                 "Bridge Actionability Findings",
-                _grid(0, 49, 8, 4),
+                _grid(0, 56, 8, 4),
                 _metric_query("bridge_actionability_findings"),
             ),
             _stat_panel(
                 builder,
                 "README / Wiki Drift",
-                _grid(8, 49, 8, 4),
+                _grid(8, 56, 8, 4),
                 _metric_query("readme_wiki_drift"),
             ),
             _table_panel(
                 builder,
                 "Release Blockers",
-                _grid(0, 53, 12, 6),
+                _grid(0, 60, 12, 6),
                 "SELECT sort_order, blocker FROM release_blockers ORDER BY sort_order;",
             ),
             _pie_panel(
                 builder,
                 "Risk Severity Mix",
-                _grid(12, 53, 6, 6),
+                _grid(12, 60, 6, 6),
                 """
                 SELECT upper(COALESCE(NULLIF(severity, ''), 'unknown')) AS severity,
                        COUNT(*) AS value
@@ -620,7 +653,7 @@ def build_dashboard() -> dict[str, Any]:
             _pie_panel(
                 builder,
                 "Integration Status Mix",
-                _grid(18, 53, 6, 6),
+                _grid(18, 60, 6, 6),
                 """
                 SELECT upper(COALESCE(NULLIF(health, ''), 'unknown')) AS health,
                        COUNT(*) AS value
@@ -663,7 +696,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"console_url": "Open"},
         ),
     ]
-    panels.append(_row(builder, "Setup Details", 60, collapsed=True, panels=detail_panels))
+    panels.append(_row(builder, "Setup Details", 67, collapsed=True, panels=detail_panels))
 
     action_details = [
         _table_panel(
@@ -678,7 +711,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"shortcut_target": "Open"},
         )
     ]
-    panels.append(_row(builder, "Action Center Details", 61, collapsed=True, panels=action_details))
+    panels.append(_row(builder, "Action Center Details", 68, collapsed=True, panels=action_details))
 
     delivery_details = [
         _table_panel(
@@ -693,7 +726,7 @@ def build_dashboard() -> dict[str, Any]:
             links={"url": "Open"},
         )
     ]
-    panels.append(_row(builder, "Delivery Timeline Details", 62, collapsed=True, panels=delivery_details))
+    panels.append(_row(builder, "Delivery Timeline Details", 69, collapsed=True, panels=delivery_details))
 
     kpi_details = [
         _table_panel(
@@ -715,7 +748,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         ),
     ]
-    panels.append(_row(builder, "KPI History Details", 63, collapsed=True, panels=kpi_details))
+    panels.append(_row(builder, "KPI History Details", 70, collapsed=True, panels=kpi_details))
 
     integration_details = [
         _table_panel(
@@ -729,7 +762,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         )
     ]
-    panels.append(_row(builder, "Integration Status Details", 64, collapsed=True, panels=integration_details))
+    panels.append(_row(builder, "Integration Status Details", 71, collapsed=True, panels=integration_details))
 
     freshness_details = [
         _table_panel(
@@ -752,7 +785,7 @@ def build_dashboard() -> dict[str, Any]:
             hidden_columns=(),
         ),
     ]
-    panels.append(_row(builder, "Data Freshness Details", 65, collapsed=True, panels=freshness_details))
+    panels.append(_row(builder, "Data Freshness Details", 72, collapsed=True, panels=freshness_details))
 
     # WI-4506: TAFE Observability panels (read-only visualization of the TAFE
     # state surfaces from groundtruth.db, projected into the dashboard SQLite
@@ -826,7 +859,7 @@ def build_dashboard() -> dict[str, Any]:
             """,
         ),
     ]
-    panels.append(_row(builder, "TAFE Observability", 66, collapsed=True, panels=tafe_details))
+    panels.append(_row(builder, "TAFE Observability", 73, collapsed=True, panels=tafe_details))
 
     return {
         "annotations": {
@@ -849,14 +882,14 @@ def build_dashboard() -> dict[str, Any]:
         "panels": panels,
         "refresh": "5m",
         "schemaVersion": 41,
-        "tags": ["gt-kb", "agent-red", "sqlite"],
+        "tags": ["gt-kb", "operations", "sqlite"],
         "templating": {"list": []},
         "time": {"from": "now-30d", "to": "now"},
         "timepicker": {},
         "timezone": "browser",
-        "title": "Agent Red GT-KB Dashboard",
-        "uid": "agent-red-gtkb",
-        "version": 4,
+        "title": "GT-KB Operations Dashboard",
+        "uid": "groundtruth-kb-dashboard",
+        "version": 5,
         "weekStart": "",
     }
 

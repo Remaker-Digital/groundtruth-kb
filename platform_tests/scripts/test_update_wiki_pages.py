@@ -40,8 +40,8 @@ def test_compare_pages_distinguishes_current_missing_and_different(tmp_path: Pat
     rows = {row["wiki_page"]: row for row in module.compare_pages(source_dir, wiki_dir)}
 
     assert rows["Release-Health.md"]["status"] == "current"
-    assert rows["Azure-Enterprise-Readiness.md"]["status"] == "different"
     assert rows["Home.md"]["status"] == "missing"
+    assert "Azure-Enterprise-Readiness.md" not in rows
 
 
 def test_update_pages_copies_from_source_without_pushing(tmp_path: Path) -> None:
@@ -73,6 +73,17 @@ def test_script_no_longer_targets_agent_red_temp_wiki() -> None:
     assert "groundtruth-kb.wiki" in text
 
 
+def test_source_pages_only_includes_intentional_release_wiki_sources(tmp_path: Path) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
+    source_dir.mkdir(parents=True)
+    (source_dir / "release-health.md").write_text("# Release Health\n", encoding="utf-8")
+    (source_dir / "azure-enterprise-readiness.md").write_text("# Azure draft\n", encoding="utf-8")
+    (source_dir / "scratch.md").write_text("# Scratch\n", encoding="utf-8")
+
+    assert [path.name for path in module.source_pages(source_dir)] == ["release-health.md"]
+
+
 def test_readmes_reference_main_branch_and_release_health_source() -> None:
     root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     package_readme = (REPO_ROOT / "groundtruth-kb" / "README.md").read_text(encoding="utf-8")
@@ -82,3 +93,4 @@ def test_readmes_reference_main_branch_and_release_health_source() -> None:
     assert "groundtruth-kb/docs/wiki/release-health.md" in root_readme
     assert "docs/wiki/release-health.md" in package_readme
     assert "scripts/update_wiki_pages.py compare" in package_readme
+    assert "Agent Red" not in package_readme
