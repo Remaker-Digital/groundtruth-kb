@@ -23,6 +23,14 @@ import click
 
 from groundtruth_kb import __version__
 from groundtruth_kb._logging import configure_cli_logging
+from groundtruth_kb.backlog.query import (
+    BacklogListQuery,
+    BacklogQueryError,
+    ProjectListQuery,
+    SortKey,
+    filter_projects,
+    filter_work_items,
+)
 from groundtruth_kb.bootstrap import (
     DesktopBootstrapOptions,
     bootstrap_desktop_project,
@@ -596,6 +604,62 @@ def bridge_benchmark_manifest_cmd(ctx: click.Context, json_output: bool) -> None
         for error in payload["validation_errors"]:
             click.echo(f"manifest validation error: {error}", err=True)
     ctx.exit(0 if payload["valid"] else 1)
+
+
+def _load_bridge_metadata_audit(project_root: Path) -> Any:
+    import importlib.util
+    import sys
+
+    script_path = project_root / "scripts" / "bridge_metadata_audit.py"
+    if not script_path.is_file():
+        raise click.ClickException(f"Bridge metadata audit helper not found: {script_path}")
+    spec = importlib.util.spec_from_file_location("bridge_metadata_audit", script_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load bridge metadata audit helper: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_group.group("audit")
+def bridge_audit_group() -> None:
+    """Read-only bridge artifact audits."""
+
+
+@bridge_audit_group.command("metadata")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--write-report", type=click.Path(path_type=Path), default=None, help="Write markdown report.")
+@click.option(
+    "--grandfather-report",
+    is_flag=True,
+    help="Write append-only grandfather audit JSON under .gtkb-state/.",
+)
+@click.pass_context
+def bridge_audit_metadata_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    write_report: Path | None,
+    grandfather_report: bool,
+) -> None:
+    """Scan latest bridge artifacts for author-metadata compliance (read-only)."""
+    config = _resolve_config(ctx)
+    audit_module = _load_bridge_metadata_audit(config.project_root)
+    report = audit_module.audit_bridge_metadata(config.project_root)
+    if grandfather_report:
+        out_path = audit_module.write_grandfather_report(config.project_root, report)
+        if json_output:
+            payload = report.to_dict()
+            payload["grandfather_report_path"] = str(out_path)
+            click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            click.echo(out_path)
+    elif json_output:
+        click.echo(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(audit_module.render_markdown_report(report))
+    if write_report is not None:
+        write_report.write_text(audit_module.render_markdown_report(report), encoding="utf-8")
 
 
 @bridge_group.command("config")
@@ -3359,7 +3423,44 @@ def core_specs_next_question_cmd(
 @click.option("--stage", "stages", multiple=True, help="Limit to one stage; repeatable.")
 @click.option("--origin", "origins", multiple=True, help="Limit to one origin; repeatable.")
 @click.option("--component", "components", multiple=True, help="Limit to one component; repeatable.")
+@click.option(
+    "--approval-state",
+    "approval_states",
+    multiple=True,
+    help="Limit to one approval_state; repeatable.",
+)
 @click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
+@click.option(
+    "--field",
+    "exact_specs",
+    multiple=True,
+    help="Exact field filter as field:value; repeatable for any surfaced work_items field.",
+)
+@click.option(
+    "--match",
+    "match_specs",
+    multiple=True,
+    help="Field-specific glob match as field:pattern; repeatable.",
+)
+@click.option(
+    "--range",
+    "range_specs",
+    multiple=True,
+    help="Inclusive field range as field:min..max; repeatable.",
+)
+@click.option(
+    "--member-of",
+    "member_of_project_ids",
+    multiple=True,
+    help="Limit to work items with active membership in a project id; repeatable.",
+)
+@click.option(
+    "--sort",
+    "sort_fields",
+    multiple=True,
+    help="Sort key field name; repeatable for compound sort.",
+)
+@click.option("--sort-desc", is_flag=True, help="Apply descending order to all --sort keys.")
 @click.option("--limit", type=click.IntRange(min=1), default=None, help="Return at most N rows.")
 @click.pass_context
 def backlog_list(
@@ -3374,7 +3475,14 @@ def backlog_list(
     stages: tuple[str, ...],
     origins: tuple[str, ...],
     components: tuple[str, ...],
+    approval_states: tuple[str, ...],
     contains_terms: tuple[str, ...],
+    exact_specs: tuple[str, ...],
+    match_specs: tuple[str, ...],
+    range_specs: tuple[str, ...],
+    member_of_project_ids: tuple[str, ...],
+    sort_fields: tuple[str, ...],
+    sort_desc: bool,
     limit: int | None,
 ) -> None:
     """List unified backlog items from MemBase work_items."""
@@ -3383,22 +3491,45 @@ def backlog_list(
     try:
         include_terminal = include_verified or bool(work_item_ids) or bool(resolution_statuses)
         items = db.list_work_items() if include_terminal else db.get_open_work_items()
+        membership_ids: dict[str, set[str]] = {}
+        if member_of_project_ids:
+            for project_id in member_of_project_ids:
+                membership_ids[project_id] = {
+                    str(row.get("work_item_id") or "")
+                    for row in db.list_project_work_items(project_id)
+                    if str(row.get("membership_status") or "").strip().lower() == "active"
+                }
     finally:
         db.close()
-    items = [
-        item
-        for item in items
-        if _matches_any_exact(item, "id", work_item_ids)
-        and _matches_exact(item, "project_name", project_name)
-        and _matches_exact(item, "subproject_name", subproject_name)
-        and _matches_any_exact(item, "priority", priorities)
-        and _matches_any_exact(item, "resolution_status", resolution_statuses)
-        and _matches_any_exact(item, "stage", stages)
-        and _matches_any_exact(item, "origin", origins)
-        and _matches_any_exact(item, "component", components)
-        and _matches_contains(item, _WORK_ITEM_CONTAINS_FIELDS, contains_terms)
-    ]
-    items = _apply_limit(items, limit)
+
+    query = BacklogListQuery(
+        include_terminal=include_terminal,
+        work_item_ids=work_item_ids,
+        project_name=project_name,
+        subproject_name=subproject_name,
+        priorities=priorities,
+        resolution_statuses=resolution_statuses,
+        stages=stages,
+        origins=origins,
+        components=components,
+        approval_states=approval_states,
+        contains_terms=contains_terms,
+        exact_specs=exact_specs,
+        match_specs=match_specs,
+        range_specs=range_specs,
+        member_of_project_ids=member_of_project_ids,
+        sort_keys=tuple(SortKey(field=field_name, descending=sort_desc) for field_name in sort_fields),
+        limit=limit,
+    )
+    try:
+        items = filter_work_items(
+            items,
+            query,
+            contains_fields=_WORK_ITEM_CONTAINS_FIELDS,
+            project_membership_ids=membership_ids,
+        )
+    except BacklogQueryError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     if json_output:
         click.echo(json.dumps(items, indent=2, sort_keys=True))
@@ -3866,6 +3997,25 @@ def _project_service(ctx: click.Context) -> tuple[KnowledgeDB, ProjectLifecycleS
 @click.option("--id", "project_ids", multiple=True, help="Limit to an explicit project id; repeatable.")
 @click.option("--status", default=None, help="Limit to a project status.")
 @click.option("--contains", "contains_terms", multiple=True, help="Case-insensitive text filter; repeatable.")
+@click.option(
+    "--field",
+    "exact_specs",
+    multiple=True,
+    help="Exact field filter as field:value; repeatable for any surfaced project field.",
+)
+@click.option(
+    "--match",
+    "match_specs",
+    multiple=True,
+    help="Field-specific glob match as field:pattern; repeatable.",
+)
+@click.option(
+    "--sort",
+    "sort_fields",
+    multiple=True,
+    help="Sort key field name; repeatable for compound sort.",
+)
+@click.option("--sort-desc", is_flag=True, help="Apply descending order to all --sort keys.")
 @click.option("--limit", type=click.IntRange(min=1), default=None, help="Return at most N rows.")
 @click.pass_context
 def projects_list(
@@ -3875,6 +4025,10 @@ def projects_list(
     project_ids: tuple[str, ...],
     status: str | None,
     contains_terms: tuple[str, ...],
+    exact_specs: tuple[str, ...],
+    match_specs: tuple[str, ...],
+    sort_fields: tuple[str, ...],
+    sort_desc: bool,
     limit: int | None,
 ) -> None:
     """List first-class project records."""
@@ -3884,13 +4038,21 @@ def projects_list(
         projects = service.list_projects(include_terminal=include_terminal, status=status)
     finally:
         db.close()
-    projects = [
-        project
-        for project in projects
-        if _matches_any_exact(project, "id", project_ids)
-        and _matches_contains(project, _PROJECT_CONTAINS_FIELDS, contains_terms)
-    ]
-    projects = _apply_limit(projects, limit)
+
+    query = ProjectListQuery(
+        include_terminal=include_terminal,
+        project_ids=project_ids,
+        status=status,
+        contains_terms=contains_terms,
+        exact_specs=exact_specs,
+        match_specs=match_specs,
+        sort_keys=tuple(SortKey(field=field_name, descending=sort_desc) for field_name in sort_fields),
+        limit=limit,
+    )
+    try:
+        projects = filter_projects(projects, query, contains_fields=_PROJECT_CONTAINS_FIELDS)
+    except BacklogQueryError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     if json_output:
         click.echo(json.dumps(projects, indent=2, sort_keys=True))
