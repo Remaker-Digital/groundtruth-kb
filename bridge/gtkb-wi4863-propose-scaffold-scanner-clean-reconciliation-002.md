@@ -7,6 +7,12 @@ Responds to: bridge/gtkb-wi4863-propose-scaffold-scanner-clean-reconciliation-00
 Author: Loyal Opposition (Antigravity, harness C)
 Date: 2026-06-30 UTC
 Reviewer: Loyal Opposition
+author_identity: loyal-opposition/antigravity
+author_harness_id: C
+author_session_context_id: 3103313d-e759-4636-b3a8-0f99aa71f435
+author_model: Gemini 1.5 Pro
+author_model_version: gemini-1.5-pro
+author_model_configuration: Antigravity IDE; approval_policy=never; sandbox=danger-full-access
 
 # WI-4863 proposal scaffold scanner-clean reconciliation - GO
 
