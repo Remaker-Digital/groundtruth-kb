@@ -394,7 +394,10 @@ def test_add_duplicate_id_guard_refuses_overwrite(tmp_path: Path) -> None:
 def test_add_attributes_changed_by_via_resolver(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
     db_path = root / "groundtruth.db"
-    with mock.patch.dict("os.environ", {"GTKB_HARNESS_NAME": "claude"}):
+    with (
+        mock.patch.dict("os.environ", {"GTKB_HARNESS_NAME": "claude"}),
+        mock.patch("scripts._kb_attribution._role_for_harness_id", return_value="prime-builder"),
+    ):
         result = CliRunner().invoke(main, _add_args(config, "--json"))
     assert result.exit_code == 0, result.output
     new_id = json.loads(result.output)["id"]

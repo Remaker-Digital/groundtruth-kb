@@ -20,6 +20,50 @@ This skill does not redefine those terms. Projects organize known work in the
 MemBase backlog; they do not replace `current_work_items` or create a separate
 backlog source of truth.
 
+**CLI-only backlog/project access:** agents MUST read and mutate backlog and
+project state through the governed `gt backlog` and `gt projects` CLI surfaces
+(or skills that invoke those commands). Do not open `groundtruth.db` with
+SQLite, import `KnowledgeDB` for routine backlog browsing, or fetch the full
+backlog and post-filter locally. Use CLI filters instead.
+
+## Backlog Query Surface
+
+Use `gt backlog list` for governed backlog reads. Prefer `--json` when another
+tool needs structured output.
+
+Exact-value filters (repeatable where noted):
+
+```powershell
+gt backlog list --json
+gt backlog list --id WI-1234 --json
+gt backlog list --project GTKB-X --priority P1 --stage open --json
+gt backlog list --approval-state bridge_authorized --approval-state implementation_authorized --json
+gt backlog list --origin defect --component backlog --resolution-status open --json
+```
+
+Field-specific pattern and range filters:
+
+```powershell
+gt backlog list --field source_owner_directive:DELIB-123 --json
+gt backlog list --field related_bridge_threads:gtkb-thread-slug --json
+gt backlog list --match title:*scanner* --json
+gt backlog list --match id:WI-48* --json
+gt backlog list --range priority:P1..P2 --json
+gt backlog list --range implementation_order:1..10 --json
+```
+
+Project-membership and sort controls:
+
+```powershell
+gt backlog list --member-of PROJECT-GTKB-DISPATCHER-RELIABILITY --json
+gt backlog list --sort priority --sort id --json
+gt backlog list --sort implementation_order --sort-desc --json
+gt backlog list --contains dispatcher --limit 20 --json
+```
+
+Use `gt backlog show <WI-ID> --json` for one item. Use `gt backlog status`
+for project-level backlog summaries.
+
 ## Commands
 
 Use plural `gt projects` for MemBase project lifecycle work. Keep singular
@@ -30,6 +74,8 @@ Read operations:
 ```powershell
 gt projects list
 gt projects list --json
+gt projects list --field source_project_name:"Backlog Triage and Hygiene" --json
+gt projects list --match name:*DISPATCHER* --sort rank --json
 gt projects show <PROJECT-ID>
 gt projects show <PROJECT-ID> --json
 gt projects authorizations <PROJECT-ID>
@@ -54,6 +100,9 @@ Use `--json` when another tool or agent needs machine-readable output.
 ## Safety Rules
 
 - Do not write directly to `groundtruth.db` for routine project lifecycle work.
+- Do not open `groundtruth.db` with SQLite or read the backlog through
+  `KnowledgeDB` for routine agent workflows; use `gt backlog list` /
+  `gt backlog show` with CLI filters.
 - Do not create new project or backlog authority tables.
 - Do not use `gt projects link-bridge` to edit or recreate the retired
   aggregate queue artifact. This command records a project artifact link with
@@ -76,6 +125,7 @@ proposal, normally:
 ```powershell
 python -m pytest platform_tests/scripts/test_projects_cli.py -q
 python -m pytest platform_tests/scripts/test_project_authorization.py -q
+python -m pytest platform_tests/scripts/test_cli_backlog_list.py -q
 python scripts/generate_codex_skill_adapters.py --check --update-registry
 python -m pytest platform_tests/scripts/test_projects_skill_adapter.py -q
 python -m pytest platform_tests/scripts/test_check_harness_parity.py -q
