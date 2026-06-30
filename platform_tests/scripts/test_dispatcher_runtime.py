@@ -3671,6 +3671,66 @@ def test_spawn_harness_forwards_openrouter_key_from_env_local_allowlist(
     assert "UNRELATED_SECRET" not in env
 
 
+def test_spawn_harness_forwards_ollama_key_from_env_local_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-ollama-key-forwarding",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-ollama-key-forwarding-001.md",
+        },
+    )()
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.setattr(
+        trigger,
+        "load_env_local",
+        lambda *, check_only=False: {
+            "OLLAMA_API_KEY": "ollama-secret",
+            "UNRELATED_SECRET": "must-not-forward",
+        },
+    )
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-ollama-env",
+    )
+
+    assert meta["launched"] is True
+    env = captured["kwargs"]["env"]
+    assert env["OLLAMA_API_KEY"] == "ollama-secret"
+    assert "UNRELATED_SECRET" not in env
+
+
 def test_reap_inflight_dispatched_workers_requires_pid_create_time_match(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
