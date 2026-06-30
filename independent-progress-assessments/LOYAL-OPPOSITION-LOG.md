@@ -841,7 +841,22 @@ Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for th
 |------|---------|-------------------|------------------|--------|
 | Technical | Overloaded `related_bridge_threads` field stores both surfaced-during provenance and implementation links, causing reconciler noise. | `bridge/gtkb-wi4869-related-bridge-provenance-separation-001.md`. | Separate provenance context from implementation-linkage, keeping provenance in metadata/change reasons or dedicated fields. | Resolved |
 
+---
 
+### 2026-06-30 - WI-4939 bridge author metadata hardening Proposal Review
 
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the metadata hardening proposal: `gtkb-wi4939-bridge-author-metadata-hardening-001.md`.
 
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Headless LO harnesses (F/D) and the metadata loader still emit static `author_session_context_id` placeholders. | `bridge/gtkb-wi4939-bridge-author-metadata-hardening-001.md`. | Harden the loader and harness env injection so dispatch-run session IDs win and static slugs are rejected. Approved at version -002. | Resolved |
 
+---
+
+### 2026-06-30 - WI-4938 bridge author metadata audit scanner Proposal Review
+
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the read-only audit scanner proposal: `gtkb-wi4938-bridge-author-metadata-audit-scanner-001.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Bridge verdicts and proposals across harnesses carry inconsistent or corrupt author metadata. | `bridge/gtkb-wi4938-bridge-author-metadata-audit-scanner-001.md`. | Deliver a read-only deterministic audit scanner as the regression baseline and repair-queue input before write-time hardening. Approved at version -002. | Resolved |
