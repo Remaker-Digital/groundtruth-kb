@@ -255,6 +255,36 @@ When the canonical migration completes, the migration-target URL becomes the sol
 
 **Source:** `GOV-AGENT-RED-GTKB-CONFORMANCE-001`; `DELIB-0834`; owner directive 2026-05-04 (tooling-reference narrowing); owner-decision capture S347 (2026-05-24, reference-adopter framing restoration); dual-repo clarification per S333 audit FINDING-P1-002 (downgraded to P3) and `bridge/gtkb-governance-hygiene-bundle-001.md` Change E.
 
+### activity envelope
+
+**Canonical alias:** activity envelope (replaces retired **topic envelope** term in
+narrative surfaces; spec IDs `SPEC-TOPIC-*` persist append-only).
+
+**Definition:** The inner-tier envelope opened by `::open <activity>` and closed by
+`::close` or `::close <activity>`. It is keyed by **activity TYPE** (closed vocabulary
+`{ops, deliberation, build, test, spec, project}`), not by free-form subject text.
+At most one activity envelope is open at a time (single-active invariant). Opening an
+activity envelope triggers injection of that activity's context-load bundle (disposition
+profile terminology/skills and routing context) per
+`DCL-ACTIVITY-DISPOSITION-PROFILE-001` and `DCL-ACTIVITY-ENVELOPE-INTERCEPTION-001`.
+
+**Lineage (retired terms):** work envelope → topic envelope → **activity envelope**.
+Retired terms remain historical only; new narrative MUST use **activity envelope**.
+
+**Three-axis disambiguation (do not conflate):**
+
+| Axis | Mechanism | Example |
+|------|-----------|---------|
+| **Activity TYPE** | Closed `::open <activity>` keyword | `::open build` |
+| **TARGET / subject** | Optional payload on typed open (per-type specs) | project/spec target fields |
+| **AREA / scope** | `::init` subject token `{gtkb, application}` | `::init gtkb pb` |
+
+**Source:** `DELIB-20260637`; `DELIB-20265287`; `SPEC-TOPIC-ENVELOPE-ROUTER-001`;
+WI-4482.
+
+**Implementation pointer:** `.claude/session/envelope.json` `topics` array;
+`groundtruth_kb.session.envelope`; `groundtruth_kb.session.topic_router`.
+
 ### adopter
 
 **Definition:** A downstream consumer of GT-KB. An adopter is an
@@ -820,6 +850,19 @@ interactive role persists through the per-session marker/envelope authority.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-stated-role).*
 
+### session envelope
+
+**Definition:** The outer runtime envelope for an interactive or dispatched GT-KB
+session, opened by an init-keyword family explicit hint (typically `::init gtkb …` or
+`::init application …`) and closed by the wrap-keyword family (`::wrap`). It contains
+zero or more nested activity envelopes. Conforms to the three-part anatomy
+(invocation, intent_hint, payload) per `ADR-ENVELOPE-META-MODEL-001`.
+
+**Source:** `ADR-ENVELOPE-META-MODEL-001`; `DCL-SESSION-ENVELOPE-DURABILITY-001`.
+
+**Implementation pointer:** `.claude/session/envelope.json`; archive under
+`.claude/session/archive/`.
+
 ### smart poller
 
 **Definition:** The (now-retired) bridge-poller automation that scanned
@@ -912,11 +955,19 @@ re-enabled as a substitute for the smart poller.
 
 ### canonical init keyword
 
-**Canonical alias:** init-keyword; "::init gtkb <mode>".
+**Canonical alias:** init-keyword; `::init …` family member of **explicit hint**.
 
-**Definition:** The canonical first-line activator syntax for machine-emitted GroundTruth-KB session prompts, formalized as `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001`. Regex `^::init gtkb (pb|lo)$`; first-line-only; closed vocabulary `{pb, lo}` (pb = Prime Builder, lo = Loyal Opposition); no synonyms; strict parse. The keyword tells a receiving harness which durable role's auto-process content to render at SessionStart and is the single source of truth for cross-harness dispatch and future single-harness dispatchers.
+**Definition:** The canonical first-line activator syntax for GroundTruth-KB session
+envelopes. Regex: `^::init (gtkb|application)( (pb|lo))?$`. First-line-only. Subject
+vocabulary `{gtkb, application}` is **mandatory**; role vocabulary `{pb, lo}` is
+**optional** (pb = Prime Builder, lo = Loyal Opposition). Six valid forms. No synonyms;
+strict parse. When the role token is present it may establish the session-stated role;
+when absent the durable harness role from `harness-state/harness-registry.json` applies
+without writing `.claude/session/active-session-role.json`.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-init-keyword).*
+**Source:** `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` v3; `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`; `DCL-SESSION-ROLE-RESOLUTION-001`.
+
+**Implementation pointer:** SessionStart hooks; `scripts/session_self_initialization.py`; cross-harness dispatch emitters.
 
 ### doctor
 
@@ -947,6 +998,39 @@ into the Deliberation Archive table in MemBase plus the ChromaDB semantic
 index. Runs as part of session wrap.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#deliberation-harvest).*
+
+### explicit hint
+
+**Canonical alias:** explicit-hint; `::` first-line token family.
+
+**Definition:** An inline, first-line-only, `::`-prefixed token that steers the
+current session's stance (role, scope, activity, wrap/lifecycle, or routing) through
+harness hooks and priority directives. Explicit hints are a **context-management /
+progressive-disclosure** mechanism — not skills and not free-form prose commands.
+Grammar is strict: the token MUST occupy the entire first non-blank line; vocabulary
+is closed per hint family; parse failures are rejected or ignored conservatively per
+family spec.
+
+**Member families (non-exhaustive closed sets per family spec):**
+
+- **Init-keyword family** — `::init (gtkb|application)( (pb|lo))?$` per
+  `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` v3.
+- **Wrap-keyword family** — `::wrap` per `SPEC-CANONICAL-WRAP-KEYWORD-SYNTAX-001`.
+- **Activity open/close family** — `::open <activity>` and `::close` or
+  `::close <activity>` over the closed activity vocabulary
+  `{ops, deliberation, build, test, spec, project}` per
+  `SPEC-TOPIC-ENVELOPE-ROUTER-001` / `DCL-TOPIC-ENVELOPE-ROUTING-001`.
+
+**Authority limits:** Explicit hints MUST NOT bypass bridge GO gates, durable or
+session-stated role authority, owner-approval gates (`AskUserQuestion` evidence),
+work-subject boundaries, or project authorization requirements.
+
+**Source:** `DELIB-20260612-EXPLICIT-HINT-LAYER-DECISION-SET`;
+`DELIB-20260621-EXPLICIT-HINT-CONTEXT-LOAD-REFRAME`; WI-4482;
+`bridge/gtkb-wi4482-explicit-hint-context-management-umbrella-001.md`.
+
+**Implementation pointer:** `.claude/hooks/*` init/ wrap/ topic-router surfaces;
+`groundtruth_kb.session.topic_router`; `config/agent-control/activity-disposition-profiles.toml`.
 
 ### formal-artifact-approval packet
 
