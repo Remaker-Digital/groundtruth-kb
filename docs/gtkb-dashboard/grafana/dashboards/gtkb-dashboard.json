@@ -1418,7 +1418,7 @@
     {
       "id": 17,
       "type": "row",
-      "title": "GT-KB Install and Setup",
+      "title": "Application Deployment",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1431,10 +1431,203 @@
     {
       "id": 18,
       "type": "bargauge",
-      "title": "Setup Coverage",
+      "title": "Application Deployment Health",
       "gridPos": {
         "x": 0,
         "y": 30,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT surface AS metric,\n                       CASE lower(status)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT surface AS metric,\n                       CASE lower(status)\n                           WHEN 'red' THEN 2\n                           WHEN 'yellow' THEN 1\n                           ELSE 0\n                       END AS value\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 34,
+        "minVizHeight": 18,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short",
+          "max": 2,
+          "min": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "text": "Watch",
+                  "color": "yellow"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "2": {
+                  "text": "Act",
+                  "color": "red"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "type": "table",
+      "title": "Application Deployment Signals",
+      "gridPos": {
+        "x": 8,
+        "y": 30,
+        "w": 16,
+        "h": 6
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "gtkb-dashboard-sqlite"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "gtkb-dashboard-sqlite"
+          },
+          "format": "table",
+          "queryText": "SELECT sort_order, surface, signal, mock_value, upper(status) AS status, source_contract\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "queryType": "table",
+          "rawQueryText": "SELECT sort_order, surface, signal, mock_value, upper(status) AS status, source_contract\n                FROM application_deployment_signals\n                ORDER BY sort_order;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "generated_at",
+            "started_at",
+            "completed_at"
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "sort_order",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sort_order"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "GT-KB Install and Setup",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "bargauge",
+      "title": "Setup Coverage",
+      "gridPos": {
+        "x": 0,
+        "y": 37,
         "w": 8,
         "h": 6
       },
@@ -1506,12 +1699,12 @@
       }
     },
     {
-      "id": 19,
+      "id": 22,
       "type": "bargauge",
       "title": "Required Tool Categories",
       "gridPos": {
         "x": 8,
-        "y": 30,
+        "y": 37,
         "w": 8,
         "h": 6
       },
@@ -1583,12 +1776,12 @@
       }
     },
     {
-      "id": 20,
+      "id": 23,
       "type": "bargauge",
       "title": "Third-Party Service Categories",
       "gridPos": {
         "x": 16,
-        "y": 30,
+        "y": 37,
         "w": 8,
         "h": 6
       },
@@ -1660,25 +1853,25 @@
       }
     },
     {
-      "id": 21,
+      "id": 24,
       "type": "row",
       "title": "Delivery Timeline",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 43,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 22,
+      "id": 25,
       "type": "bargauge",
       "title": "Delivery Timeline Summary",
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 44,
         "w": 24,
         "h": 7
       },
@@ -1750,25 +1943,25 @@
       }
     },
     {
-      "id": 23,
+      "id": 26,
       "type": "row",
       "title": "Release Readiness",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 44,
+        "y": 51,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 24,
+      "id": 27,
       "type": "stat",
       "title": "Release Health Findings",
       "gridPos": {
         "x": 0,
-        "y": 45,
+        "y": 52,
         "w": 8,
         "h": 4
       },
@@ -1881,12 +2074,12 @@
       "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
     },
     {
-      "id": 25,
+      "id": 28,
       "type": "stat",
       "title": "Dirty Worktree Paths",
       "gridPos": {
         "x": 8,
-        "y": 45,
+        "y": 52,
         "w": 8,
         "h": 4
       },
@@ -1999,12 +2192,12 @@
       "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
     },
     {
-      "id": 26,
+      "id": 29,
       "type": "stat",
       "title": "Dispatcher Health Findings",
       "gridPos": {
         "x": 16,
-        "y": 45,
+        "y": 52,
         "w": 8,
         "h": 4
       },
@@ -2117,12 +2310,12 @@
       "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
     },
     {
-      "id": 27,
+      "id": 30,
       "type": "stat",
       "title": "Bridge Actionability Findings",
       "gridPos": {
         "x": 0,
-        "y": 49,
+        "y": 56,
         "w": 8,
         "h": 4
       },
@@ -2235,12 +2428,12 @@
       "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
     },
     {
-      "id": 28,
+      "id": 31,
       "type": "stat",
       "title": "README / Wiki Drift",
       "gridPos": {
         "x": 8,
-        "y": 49,
+        "y": 56,
         "w": 8,
         "h": 4
       },
@@ -2353,12 +2546,12 @@
       "description": "Freshness: minutes since the most recent `refresh_runs.completed_at` (falls back to `started_at`). Secondary value `Refreshed (m ago)` comes from target `F`."
     },
     {
-      "id": 29,
+      "id": 32,
       "type": "table",
       "title": "Release Blockers",
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 60,
         "w": 12,
         "h": 6
       },
@@ -2425,12 +2618,12 @@
       }
     },
     {
-      "id": 30,
+      "id": 33,
       "type": "piechart",
       "title": "Risk Severity Mix",
       "gridPos": {
         "x": 12,
-        "y": 53,
+        "y": 60,
         "w": 6,
         "h": 6
       },
@@ -2497,12 +2690,12 @@
       }
     },
     {
-      "id": 31,
+      "id": 34,
       "type": "piechart",
       "title": "Integration Status Mix",
       "gridPos": {
         "x": 18,
-        "y": 53,
+        "y": 60,
         "w": 6,
         "h": 6
       },
@@ -2569,19 +2762,19 @@
       }
     },
     {
-      "id": 35,
+      "id": 38,
       "type": "row",
       "title": "Setup Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 60,
+        "y": 67,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 32,
+          "id": 35,
           "type": "table",
           "title": "Step-by-Step Setup",
           "gridPos": {
@@ -2671,7 +2864,7 @@
           }
         },
         {
-          "id": 33,
+          "id": 36,
           "type": "table",
           "title": "Required Tools, CLIs, and SDKs",
           "gridPos": {
@@ -2761,7 +2954,7 @@
           }
         },
         {
-          "id": 34,
+          "id": 37,
           "type": "table",
           "title": "Third-Party Test Services",
           "gridPos": {
@@ -2853,19 +3046,19 @@
       ]
     },
     {
-      "id": 37,
+      "id": 40,
       "type": "row",
       "title": "Action Center Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 61,
+        "y": 68,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 36,
+          "id": 39,
           "type": "table",
           "title": "All Actions",
           "gridPos": {
@@ -2957,19 +3150,19 @@
       ]
     },
     {
-      "id": 39,
+      "id": 42,
       "type": "row",
       "title": "Delivery Timeline Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 62,
+        "y": 69,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 38,
+          "id": 41,
           "type": "table",
           "title": "Delivery Timeline Details",
           "gridPos": {
@@ -3061,19 +3254,19 @@
       ]
     },
     {
-      "id": 42,
+      "id": 45,
       "type": "row",
       "title": "KPI History Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 63,
+        "y": 70,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 40,
+          "id": 43,
           "type": "table",
           "title": "Current Metrics",
           "gridPos": {
@@ -3132,7 +3325,7 @@
           }
         },
         {
-          "id": 41,
+          "id": 44,
           "type": "timeseries",
           "title": "KPI Snapshots",
           "gridPos": {
@@ -3197,19 +3390,19 @@
       ]
     },
     {
-      "id": 44,
+      "id": 47,
       "type": "row",
       "title": "Integration Status Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 71,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 43,
+          "id": 46,
           "type": "table",
           "title": "Testing Service Integrations",
           "gridPos": {
@@ -3283,19 +3476,19 @@
       ]
     },
     {
-      "id": 47,
+      "id": 50,
       "type": "row",
       "title": "Data Freshness Details",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 65,
+        "y": 72,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 45,
+          "id": 48,
           "type": "table",
           "title": "Data Freshness",
           "gridPos": {
@@ -3354,7 +3547,7 @@
           }
         },
         {
-          "id": 46,
+          "id": 49,
           "type": "table",
           "title": "Refresh Runs",
           "gridPos": {
@@ -3415,19 +3608,19 @@
       ]
     },
     {
-      "id": 53,
+      "id": 56,
       "type": "row",
       "title": "TAFE Observability",
       "collapsed": true,
       "gridPos": {
         "x": 0,
-        "y": 66,
+        "y": 73,
         "w": 24,
         "h": 1
       },
       "panels": [
         {
-          "id": 48,
+          "id": 51,
           "type": "piechart",
           "title": "Stage Attempt Outcomes (TAFE)",
           "gridPos": {
@@ -3499,7 +3692,7 @@
           }
         },
         {
-          "id": 49,
+          "id": 52,
           "type": "piechart",
           "title": "Failure Class Distribution (TAFE)",
           "gridPos": {
@@ -3571,7 +3764,7 @@
           }
         },
         {
-          "id": 50,
+          "id": 53,
           "type": "table",
           "title": "Active Flow Instances (TAFE)",
           "gridPos": {
@@ -3630,7 +3823,7 @@
           }
         },
         {
-          "id": 51,
+          "id": 54,
           "type": "table",
           "title": "Active Stage Leases (TAFE)",
           "gridPos": {
@@ -3689,7 +3882,7 @@
           }
         },
         {
-          "id": 52,
+          "id": 55,
           "type": "bargauge",
           "title": "Capability Snapshot Readiness by Role (TAFE)",
           "gridPos": {
@@ -3772,7 +3965,7 @@
   "schemaVersion": 41,
   "tags": [
     "gt-kb",
-    "agent-red",
+    "operations",
     "sqlite"
   ],
   "templating": {
@@ -3784,8 +3977,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Agent Red GT-KB Dashboard",
-  "uid": "agent-red-gtkb",
-  "version": 4,
+  "title": "GT-KB Operations Dashboard",
+  "uid": "groundtruth-kb-dashboard",
+  "version": 5,
   "weekStart": ""
 }

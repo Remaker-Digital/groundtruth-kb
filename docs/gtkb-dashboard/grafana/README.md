@@ -40,6 +40,11 @@ release readiness row surfaces:
 - `bridge_actionability_findings`
 - `readme_wiki_drift`
 
+Application deployment, security, throughput/latency, defect, and
+infrastructure summaries are provider-neutral dashboard contracts. GT-KB ships
+mock rows for those panels; the active application owns any live connector to
+Azure, Kubernetes, containers, VMs, or another deployment environment.
+
 Run a bounded one-off release-health refresh from the repository root with:
 
 ```powershell
@@ -62,6 +67,8 @@ adopter check:
 
 ```powershell
 $env:GTKB_DASHBOARD_AZURE_RECONCILE = "1"
+$env:GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP = '{"staging":"<app-staging>","production":"<app-production>"}'
+$env:GTKB_DASHBOARD_AZURE_RESOURCE_GROUP = "<application-resource-group>"
 ```
 
 Stop the local dashboard:
