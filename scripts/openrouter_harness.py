@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
@@ -137,6 +138,29 @@ def _sleep_with_budget(delay: float, deadline: float, message: str) -> None:
     if _remaining_timeout(deadline, message) < delay:
         raise OpenRouterHarnessError(message)
     time.sleep(delay)
+
+
+def _retry_after_delay_seconds(exc: urllib.error.HTTPError) -> float | None:
+    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+    if not retry_after:
+        return None
+    try:
+        return max(0.0, float(retry_after))
+    except ValueError:
+        pass
+    try:
+        retry_at = parsedate_to_datetime(retry_after)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, retry_at.timestamp() - time.time())
+
+
+def _http_retry_delay_seconds(exc: urllib.error.HTTPError, attempt: int) -> float:
+    if exc.code == 429:
+        retry_after = _retry_after_delay_seconds(exc)
+        if retry_after is not None:
+            return retry_after
+    return CHAT_RETRY_BACKOFF_SECONDS[attempt - 1]
 
 
 def resolve_project_root(start: Path | None = None) -> Path:
@@ -399,11 +423,18 @@ def call_openrouter_chat(
             last_error = exc
             if exc.code in RETRYABLE_HTTP_STATUS and attempt < CHAT_MAX_ATTEMPTS:
                 _sleep_with_budget(
-                    CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
+                    _http_retry_delay_seconds(exc, attempt),
                     deadline,
                     "OpenRouter completions request timed out before retry",
                 )
                 continue
+            if exc.code == 429:
+                retry_after = _retry_after_delay_seconds(exc)
+                retry_after_suffix = f"; retry_after_seconds={retry_after:g}" if retry_after is not None else ""
+                raise OpenRouterHarnessError(
+                    "OpenRouter rate limited (HTTP 429 provider backpressure) "
+                    f"after {attempt} attempt(s){retry_after_suffix}: {exc}"
+                ) from exc
             raise OpenRouterHarnessError(
                 f"OpenRouter completions request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
             ) from exc

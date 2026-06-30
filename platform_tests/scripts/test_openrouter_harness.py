@@ -401,8 +401,8 @@ class _RetryResponse:
         return self._body.encode("utf-8")
 
 
-def _openrouter_http_error(code: int) -> orh.urllib.error.HTTPError:
-    return orh.urllib.error.HTTPError("https://openrouter.test/chat/completions", code, "err", None, None)
+def _openrouter_http_error(code: int, headers: dict[str, str] | None = None) -> orh.urllib.error.HTTPError:
+    return orh.urllib.error.HTTPError("https://openrouter.test/chat/completions", code, "err", headers or {}, None)
 
 
 def _patch_openrouter_urlopen(monkeypatch: pytest.MonkeyPatch, behaviors: list, calls: list) -> None:
@@ -424,6 +424,38 @@ def test_wi4817_openrouter_retry_then_success(monkeypatch: pytest.MonkeyPatch):
     result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
     assert result["choices"][0]["message"]["content"] == "ok"
     assert len(calls) == 2
+
+
+def test_wi4933_openrouter_429_retry_honors_retry_after(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    sleeps: list[float] = []
+    body = orh.json.dumps({"choices": [{"message": {"content": "ok"}}]})
+
+    def fake_urlopen(request, timeout: float):
+        calls.append(request.full_url)
+        if len(calls) == 1:
+            raise _openrouter_http_error(429, {"Retry-After": "3.5"})
+        return _RetryResponse(body)
+
+    monkeypatch.setattr(orh.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(orh.time, "sleep", sleeps.append)
+
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert result["choices"][0]["message"]["content"] == "ok"
+    assert len(calls) == 2
+    assert sleeps == [3.5]
+
+
+def test_wi4933_openrouter_429_exhaustion_reports_backpressure(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    behaviors = [_openrouter_http_error(429)] * (orh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_openrouter_urlopen(monkeypatch, behaviors, calls)
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="rate limited .*provider backpressure"):
+        orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert len(calls) == orh.CHAT_MAX_ATTEMPTS
 
 
 def test_wi4817_openrouter_bounded_exhaustion(monkeypatch: pytest.MonkeyPatch):

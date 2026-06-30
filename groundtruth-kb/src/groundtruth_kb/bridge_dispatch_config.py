@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import tomllib
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -15,9 +14,6 @@ from groundtruth_kb.bridge_dispatch_rules import DispatchContext, DispatchRule
 DISPATCH_CONFIG_RELATIVE_PATH = Path("config") / "dispatcher" / "rules.toml"
 DISPATCH_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "dispatch-state.json"
 DISPATCH_RUNS_RELATIVE_PATH = DISPATCH_STATE_RELATIVE_PATH.parent / "dispatch-runs"
-CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
-CROSS_HARNESS_TRIGGER_DISABLE_VALUE = "1"
-CROSS_HARNESS_TRIGGER_PERSISTENT_ENV_SCOPES = ("User", "Machine")
 
 ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
@@ -33,15 +29,20 @@ RUNTIME_FAILURE_RESULTS = {
     "launch_failed",
     "no_active_target_for_role",
     "no_ready_target_for_role",
-    "provider_failure_backoff_active",
     "provider_failure",
-    "retry_delay_enforced",
-    "spawn_rate_limited",
     "target_unlaunchable",
     "work_intent_acquire_failed",
     "max_turn_exhaustion",
     "no_verdict_produced",
 }
+RUNTIME_BACKPRESSURE_RESULTS = frozenset(
+    {
+        "provider_failure_backoff_active",
+        "provider_rate_limited",
+        "retry_delay_enforced",
+        "spawn_rate_limited",
+    }
+)
 RUNTIME_FAILURE_CLASSES = {
     "guard_denial",
     "guard_denied_write",
@@ -50,18 +51,19 @@ RUNTIME_FAILURE_CLASSES = {
     "no_verdict_produced",
     "process_terminated_abruptly",
     "provider_failure",
-    "provider_failure_backoff_active",
     "provider_configuration_failure",
     "cursor_headless_cli_unavailable",
     "subprocess_execution_failed",
     "work_intent_acquire_failed",
 }
+RUNTIME_BACKPRESSURE_CLASSES = frozenset({"provider_failure_backoff_active", "provider_rate_limited"})
 RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
     "previous_launch_failed",
     "subprocess_execution_failed",
 }
+RUNTIME_BACKPRESSURE_LAUNCH_REASONS = RUNTIME_BACKPRESSURE_RESULTS | RUNTIME_BACKPRESSURE_CLASSES
 # WI-4718/WI-4768: non-launch outcomes ('launch_failed') whose last_launch.reason
-# indicates benign backpressure rather than a dispatcher failure. The trigger
+# indicates benign backpressure rather than a dispatcher failure. The runtime
 # collapses all non-launch spawn results to last_result="launch_failed"; only the
 # reason field distinguishes saturation from failure.
 BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached", "per_role_concurrency_cap_reached"})
@@ -73,6 +75,8 @@ DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS = frozenset(
 )
 BENIGN_NONLAUNCH_LAUNCH_REASONS = BENIGN_NONLAUNCH_LAUNCH_REASONS | DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS
 RECENT_RUN_FAILURE_MARKERS = (
+    ("provider_rate_limited", "provider_rate_limited"),
+    ("HTTP 429", "provider_rate_limited"),
     ("max-turn exhaustion", "max_turn_exhaustion"),
     ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
     ("Cursor Agent CLI not found", "cursor_headless_cli_unavailable"),
@@ -82,19 +86,6 @@ RECENT_RUN_TEXT_READ_LIMIT = 12_000
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", PID_CREATE_TIME_SUFFIX)
-
-
-@dataclass(frozen=True)
-class CrossHarnessTriggerDisableScope:
-    """Observed state for one cross-harness trigger kill-switch scope."""
-
-    scope: str
-    value: str | None = None
-    error: str | None = None
-
-    @property
-    def active(self) -> bool:
-        return self.value == CROSS_HARNESS_TRIGGER_DISABLE_VALUE
 
 
 @dataclass(frozen=True)
@@ -427,14 +418,6 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         findings.extend(f"config error: {error}" for error in config.errors)
     findings.extend(f"dispatch budget config warning: {error}" for error in config.budget.errors)
     findings.extend(consistency_findings)
-    findings.extend(cross_harness_trigger_disable_findings())
-
-    active_event_sources = [
-        record for record in records if _record_status(record) == "active" and record.get("can_fire_events") is True
-    ]
-    if not active_event_sources:
-        findings.append("no active event-firing harness is available; scheduled wake fallback may be required")
-
     for role in DISPATCH_ROLES:
         context = DispatchContext(required_role=role)
         selected = select_dispatch_candidates(list(records), config, context)
@@ -472,71 +455,6 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         health_findings=tuple(findings),
         consistency_findings=tuple(consistency_findings),
         runtime_classifications=tuple(runtime_classifications),
-    )
-
-
-def collect_cross_harness_trigger_disable_scopes(
-    *,
-    process_environ: Mapping[str, str] | None = None,
-    persistent_reader: Callable[[str, str], str | None] | None = None,
-) -> tuple[CrossHarnessTriggerDisableScope, ...]:
-    """Return process and persistent Windows kill-switch observations.
-
-    Persistent scope probing is read-only and fail-soft. It reports active
-    ``GTKB_NO_CROSS_HARNESS_TRIGGER=1`` values when readable, and otherwise
-    leaves dispatch behavior unchanged.
-    """
-    env = os.environ if process_environ is None else process_environ
-    reader = persistent_reader or _read_windows_persistent_env_var
-    scopes = [
-        CrossHarnessTriggerDisableScope(
-            scope="Process",
-            value=env.get(CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR),
-        )
-    ]
-    for scope in CROSS_HARNESS_TRIGGER_PERSISTENT_ENV_SCOPES:
-        try:
-            value = reader(CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, scope)
-        except Exception as exc:  # noqa: BLE001 - health reporting must fail soft
-            scopes.append(CrossHarnessTriggerDisableScope(scope=scope, error=str(exc)))
-        else:
-            scopes.append(CrossHarnessTriggerDisableScope(scope=scope, value=value))
-    return tuple(scopes)
-
-
-def active_cross_harness_trigger_disable_scopes(
-    *,
-    process_environ: Mapping[str, str] | None = None,
-    persistent_reader: Callable[[str, str], str | None] | None = None,
-) -> tuple[CrossHarnessTriggerDisableScope, ...]:
-    return tuple(
-        scope
-        for scope in collect_cross_harness_trigger_disable_scopes(
-            process_environ=process_environ,
-            persistent_reader=persistent_reader,
-        )
-        if scope.active
-    )
-
-
-def cross_harness_trigger_disable_findings(
-    *,
-    process_environ: Mapping[str, str] | None = None,
-    persistent_reader: Callable[[str, str], str | None] | None = None,
-) -> tuple[str, ...]:
-    """Human-readable dispatch health finding for an active kill-switch."""
-    active_scopes = active_cross_harness_trigger_disable_scopes(
-        process_environ=process_environ,
-        persistent_reader=persistent_reader,
-    )
-    if not active_scopes:
-        return ()
-    scope_names = ", ".join(scope.scope for scope in active_scopes)
-    noun = "scope" if len(active_scopes) == 1 else "scopes"
-    return (
-        "cross-harness trigger warning: "
-        f"{CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR}=1 active in {scope_names} {noun}; "
-        "current or newly spawned hook invocations will no-op until the operator clears the kill-switch",
     )
 
 
@@ -643,11 +561,13 @@ def _runtime_dispatch_evaluation(
     selected_keys = _selected_runtime_recipient_keys(selected_by_role)
 
     seen: set[str] = set()
+    current_rows: dict[str, dict[str, Any]] = {}
     if isinstance(recipients, dict):
         for recipient_key in sorted(selected_keys):
             row = recipients.get(recipient_key)
             if not isinstance(row, dict):
                 continue
+            current_rows[recipient_key] = row
             classification = _runtime_classification_for_recipient(
                 recipient_key,
                 row,
@@ -659,7 +579,7 @@ def _runtime_dispatch_evaluation(
                     findings.append(finding)
                     seen.add(finding)
 
-    recent_findings, recent_classifications = _runtime_recent_run_evaluation(root, selected_keys)
+    recent_findings, recent_classifications = _runtime_recent_run_evaluation(root, selected_keys, current_rows)
     classifications.extend(recent_classifications)
     for finding in recent_findings:
         if finding not in seen:
@@ -681,6 +601,7 @@ def _selected_runtime_recipient_keys(selected_by_role: dict[str, list[dict[str, 
 def _runtime_recent_run_evaluation(
     root: Path,
     selected_keys: set[str],
+    current_rows: dict[str, dict[str, Any]],
 ) -> tuple[list[str], list[dict[str, Any]]]:
     runs_dir = root / DISPATCH_RUNS_RELATIVE_PATH
     if not runs_dir.exists():
@@ -699,19 +620,25 @@ def _runtime_recent_run_evaluation(
     findings: list[str] = []
     classifications: list[dict[str, Any]] = []
     for recipient, row in sorted(latest_by_recipient.items()):
+        current_row = current_rows.get(recipient)
+        if current_row is not None and _optional_int(current_row.get("pending_count")) == 0:
+            continue
         failure_class = _recent_run_failure_class(row)
         if failure_class is None:
             continue
         exit_code = row.get("exit_code")
         dispatch_id = str(row.get("dispatch_id") or "")
-        finding = f"dispatch runtime failure: {recipient} latest_run={dispatch_id} failure_class={failure_class}"
+        is_backpressure = failure_class in RUNTIME_BACKPRESSURE_CLASSES
+        severity = "WARN" if is_backpressure else "FAIL"
+        finding_kind = "warning" if is_backpressure else "failure"
+        finding = f"dispatch runtime {finding_kind}: {recipient} latest_run={dispatch_id} failure_class={failure_class}"
         if isinstance(exit_code, int) and not isinstance(exit_code, bool):
             finding += f" exit_code={exit_code}"
         findings.append(finding)
         classifications.append(
             {
                 "recipient": recipient,
-                "severity": "FAIL",
+                "severity": severity,
                 "source": "recent_run",
                 "dispatch_id": dispatch_id,
                 "exit_code": exit_code if isinstance(exit_code, int) and not isinstance(exit_code, bool) else None,
@@ -913,13 +840,19 @@ def _runtime_classification_for_recipient(
     last_launch = row.get("last_launch") if isinstance(row.get("last_launch"), dict) else {}
     launch_reason = str(last_launch.get("reason") or "").strip()
     launch_exit_failure = str(last_launch.get("exit_failure_reason") or "").strip()
+    live_inflight_dispatch_count = _recipient_live_dispatch_count(runs_dir, recipient_key)
+    has_visible_backpressure = has_pending_work or live_inflight_dispatch_count > 0
     stale_failure_reason = _stale_failure_evidence_reason(recipient_key, row, last_launch, runs_dir=runs_dir)
     failure_evidence_present = any(
         (
             failure_class in RUNTIME_FAILURE_CLASSES,
+            failure_class in RUNTIME_BACKPRESSURE_CLASSES,
             last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith("_dispatch_not_ready"),
+            last_result in RUNTIME_BACKPRESSURE_RESULTS,
             launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS,
+            launch_reason in RUNTIME_BACKPRESSURE_LAUNCH_REASONS,
             launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES,
+            launch_exit_failure in RUNTIME_BACKPRESSURE_RESULTS | RUNTIME_BACKPRESSURE_CLASSES,
             row.get("circuit_breaker_tripped") is True,
         )
     )
@@ -939,16 +872,24 @@ def _runtime_classification_for_recipient(
     last_result_is_runtime_failure = last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith(
         "_dispatch_not_ready"
     )
-    # WI-4718: 'launch_failed' is the generic non-launch token written by the trigger
-    # for ANY non-launch outcome; the specific cause is last_launch.reason. Defer to
-    # it so benign backpressure is not misreported as a runtime failure. A genuine
-    # launch reason (in RUNTIME_FAILURE_LAUNCH_REASONS, e.g. spawn_rate_limited) or
-    # an absent reason still flags via the unchanged paths below.
-    if last_result == "launch_failed" and launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS:
+    # WI-4718: 'launch_failed' is the generic non-launch token written by the
+    # dispatcher runtime for ANY non-launch outcome; the specific cause is
+    # last_launch.reason. Defer to it so benign backpressure is not misreported
+    # as a runtime failure. Backpressure reasons stay visible as warnings, while
+    # genuine failure reasons or an absent reason still flag below.
+    if last_result == "launch_failed" and (
+        launch_reason in BENIGN_NONLAUNCH_LAUNCH_REASONS or launch_reason in RUNTIME_BACKPRESSURE_LAUNCH_REASONS
+    ):
         last_result_is_runtime_failure = False
     if last_result_is_runtime_failure and has_pending_work and not ignore_failure_fields:
         findings.append(
             f"dispatch runtime failure: {recipient_key} last_result={last_result} with pending_count={pending_count}"
+        )
+    if last_result in RUNTIME_BACKPRESSURE_RESULTS and has_visible_backpressure and not ignore_failure_fields:
+        findings.append(
+            "dispatch runtime warning: "
+            f"{recipient_key} backpressure last_result={last_result} "
+            f"with pending_count={pending_count}, live_inflight={live_inflight_dispatch_count}"
         )
     if last_result == "launch_failed" and launch_reason in DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS and has_pending_work:
         cap_value = last_launch.get("per_session_usd")
@@ -971,10 +912,22 @@ def _runtime_classification_for_recipient(
             "dispatch runtime failure: "
             f"{recipient_key} failure_class={failure_class} with pending_count={pending_count}"
         )
+    if failure_class in RUNTIME_BACKPRESSURE_CLASSES and has_visible_backpressure and not ignore_failure_fields:
+        findings.append(
+            "dispatch runtime warning: "
+            f"{recipient_key} backpressure failure_class={failure_class} "
+            f"with pending_count={pending_count}, live_inflight={live_inflight_dispatch_count}"
+        )
     if launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS and has_pending_work and not ignore_failure_fields:
         findings.append(
             "dispatch runtime failure: "
             f"{recipient_key} last_launch.reason={launch_reason} with pending_count={pending_count}"
+        )
+    if launch_reason in RUNTIME_BACKPRESSURE_LAUNCH_REASONS and has_visible_backpressure and not ignore_failure_fields:
+        findings.append(
+            "dispatch runtime warning: "
+            f"{recipient_key} backpressure last_launch.reason={launch_reason} "
+            f"with pending_count={pending_count}, live_inflight={live_inflight_dispatch_count}"
         )
     if (
         launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES
@@ -985,6 +938,16 @@ def _runtime_classification_for_recipient(
             "dispatch runtime failure: "
             f"{recipient_key} last_launch.exit_failure_reason={launch_exit_failure} "
             f"with pending_count={pending_count}"
+        )
+    if (
+        launch_exit_failure in RUNTIME_BACKPRESSURE_RESULTS | RUNTIME_BACKPRESSURE_CLASSES
+        and has_visible_backpressure
+        and not ignore_failure_fields
+    ):
+        findings.append(
+            "dispatch runtime warning: "
+            f"{recipient_key} backpressure last_launch.exit_failure_reason={launch_exit_failure} "
+            f"with pending_count={pending_count}, live_inflight={live_inflight_dispatch_count}"
         )
     if launch_reason == "work_intent_acquire_failed" and has_pending_work and not ignore_failure_fields:
         findings.append(
@@ -1006,7 +969,14 @@ def _runtime_classification_for_recipient(
                     f"{recipient_key} skipped fallback {candidate_recipient} reason={reason}{suffix} "
                     f"with pending_count={pending_count}"
                 )
-    if last_result == "unchanged" and has_pending_work:
+            elif reason in RUNTIME_BACKPRESSURE_RESULTS:
+                suffix = f", failure_class={failure_label}" if failure_label else ""
+                findings.append(
+                    "dispatch runtime warning: "
+                    f"{recipient_key} skipped fallback {candidate_recipient} backpressure reason={reason}{suffix} "
+                    f"with pending_count={pending_count}"
+                )
+    if last_result == "unchanged" and has_pending_work and live_inflight_dispatch_count == 0:
         findings.append(
             f"dispatch runtime warning: {recipient_key} last_result=unchanged with pending_count={pending_count}"
         )
@@ -1039,10 +1009,45 @@ def _runtime_classification_for_recipient(
         "failure_class": failure_class or None,
         "last_launch_reason": launch_reason or None,
         "last_launch_exit_failure_reason": launch_exit_failure or None,
+        "live_inflight_dispatch_count": live_inflight_dispatch_count,
         "stale_failure_evidence": bool(stale_failure_reason),
         "stale_failure_reason": stale_failure_reason,
         "findings": tuple(findings),
     }
+
+
+def _recipient_live_dispatch_count(runs_dir: Path | None, recipient_key: str) -> int:
+    if runs_dir is None or ":" not in recipient_key:
+        return 0
+    role_label, harness_id = recipient_key.split(":", 1)
+    role_label = role_label.strip()
+    harness_id = harness_id.strip()
+    if not role_label or not harness_id:
+        return 0
+    dispatch_id_token = f"-{role_label}-{harness_id}-"
+    live = 0
+    try:
+        pid_files = list(runs_dir.glob("*.pid"))
+    except OSError:
+        return 0
+    for pid_path in pid_files:
+        dispatch_id = pid_path.name[: -len(".pid")]
+        if dispatch_id_token not in dispatch_id:
+            continue
+        status_path = runs_dir / f"{dispatch_id}.exit_code"
+        try:
+            if status_path.exists() and status_path.stat().st_size > 0:
+                continue
+        except OSError:
+            continue
+        pid = _read_int(pid_path)
+        if pid is None or not _pid_alive(pid):
+            continue
+        expected = _read_float(runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}")
+        if expected is None or not _pid_create_time_matches(pid, expected):
+            continue
+        live += 1
+    return live
 
 
 def _stale_failure_evidence_reason(

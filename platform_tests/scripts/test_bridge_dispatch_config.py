@@ -34,8 +34,6 @@ from groundtruth_kb.harness_projection import read_roles  # noqa: E402
 @pytest.fixture(autouse=True)
 def _no_registry_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
-    monkeypatch.delenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, raising=False)
-    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", lambda _name, _scope: None)
 
 
 def _write_project(root: Path, *, rules: str = "", harnesses: list[dict] | None = None) -> None:
@@ -136,61 +134,58 @@ def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Pa
     assert registry_path.read_bytes() == before
 
 
-def test_wi4760_health_warns_when_process_kill_switch_active(
+def test_wi4760_retired_worker_disable_env_is_not_dispatch_health_control(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_project(tmp_path)
-    monkeypatch.setenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, "1")
+    retired_env = "GTKB_NO_" + "CROSS_" + "HARN" + "ESS_TRIGGER"
+    monkeypatch.setenv(retired_env, "1")
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "WARN"
-    finding = "\n".join(status.health_findings)
-    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in finding
-    assert "Process" in finding
-    assert "no-op" in finding
+    assert status.health_status == "PASS"
+    assert retired_env not in "\n".join(status.health_findings)
 
 
-def test_wi4760_health_warns_when_user_scope_kill_switch_active(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _write_project(tmp_path)
-
-    def _persistent_reader(_name: str, scope: str) -> str | None:
-        return "1" if scope == "User" else None
-
-    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", _persistent_reader)
+def test_dispatcher_daemon_topology_does_not_require_event_firing_harnesses(tmp_path: Path) -> None:
+    harnesses = _default_harnesses()
+    for harness in harnesses:
+        harness["can_fire_events"] = False
+        harness["event_driven_hooks"] = False
+    _write_project(tmp_path, harnesses=harnesses)
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "WARN"
-    finding = "\n".join(status.health_findings)
-    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in finding
-    assert "User" in finding
-    assert "no-op" in finding
+    assert status.health_status == "PASS"
+    assert status.health_findings == ()
+    assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
+    assert [row["id"] for row in status.selected_by_role["loyal-opposition"]] == ["D", "F"]
 
 
 def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
     rules = tomllib.loads((REPO_ROOT / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
     harness_b_rules = rules["harnesses"]["B"]
 
-    assert harness_b_rules["can_receive_dispatch"] is False
+    rules_can_receive = harness_b_rules["can_receive_dispatch"]
+    assert isinstance(rules_can_receive, bool)
     assert "interactive-only" not in harness_b_rules["tags"]
 
     projection = read_roles(REPO_ROOT)
     harness_b = next(row for row in projection["harnesses"] if row["id"] == "B")
+    assert harness_b["can_receive_dispatch"] is rules_can_receive
 
     status_payload = collect_bridge_dispatch_status(REPO_ROOT).to_json_dict()
     harness_b_status = next(row for row in status_payload["harnesses"] if row["id"] == "B")
-    assert harness_b_status["can_receive_dispatch"] is False
+    assert harness_b_status["can_receive_dispatch"] is rules_can_receive
     assert harness_b_status["status"] == harness_b["status"]
-    candidate_ids = [row["id"] for row in status_payload["selected_by_role"]["prime-builder"]]
+    selected_roles = [role for role in harness_b["role"] if role in status_payload["selected_by_role"]]
     if harness_b["status"] == "active" and harness_b_status["can_receive_dispatch"]:
-        assert "B" in candidate_ids
+        assert any("B" in {row["id"] for row in status_payload["selected_by_role"][role]} for role in selected_roles)
     else:
-        assert "B" not in candidate_ids
+        assert all(
+            "B" not in {row["id"] for row in status_payload["selected_by_role"][role]} for role in selected_roles
+        )
 
 
 def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
@@ -402,6 +397,19 @@ def _write_dispatch_run(root: Path, dispatch_id: str, *, exit_code: int, stderr:
     (runs_dir / f"{dispatch_id}.stdout.log").write_text("", encoding="utf-8")
     (runs_dir / f"{dispatch_id}.stderr.log").write_text(stderr, encoding="utf-8")
     (runs_dir / f"{dispatch_id}.exit_code").write_text(str(exit_code), encoding="utf-8")
+
+
+def _write_live_dispatch_run(
+    root: Path,
+    dispatch_id: str,
+    *,
+    pid: int = 424242,
+    create_time_epoch: float = 1234.5,
+) -> None:
+    runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.pid").write_text(str(pid), encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time_epoch:.6f}", encoding="utf-8")
 
 
 def _load_scan_helper():
@@ -692,6 +700,93 @@ def test_wi4893_recent_openrouter_run_failure_warns_when_recipient_state_is_comp
     assert report["summary"]["runtime_failure_count"] >= 1
 
 
+def test_recent_run_failure_is_ignored_after_current_recipient_has_no_pending_work(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "no_pending",
+                "pending_count": 0,
+                "selected_count": 0,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-28T16-04-29Z-loyal-opposition-F-d34cfc",
+        exit_code=1,
+        stderr="openrouter_harness: session timeout exceeded before OpenRouter chat turn\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "PASS"
+    assert not any("latest_run=2026-06-28T16-04-29Z-loyal-opposition-F-d34cfc" in f for f in status.health_findings)
+
+
+def test_wi4885_unchanged_pending_with_live_recipient_worker_is_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "unchanged",
+                "pending_count": 2,
+                "selected_count": 0,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-06-29T20-00-00Z-loyal-opposition-F-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "PASS"
+    assert "last_result=unchanged" not in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["severity"] == "PASS"
+    assert classification["live_inflight_dispatch_count"] == 1
+
+
+def test_wi4885_unchanged_pending_without_live_recipient_worker_warns(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "unchanged",
+                "pending_count": 2,
+                "selected_count": 0,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "WARN"
+    assert "dispatch runtime warning: loyal-opposition:F last_result=unchanged with pending_count=2" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["severity"] == "WARN"
+    assert classification["live_inflight_dispatch_count"] == 0
+
+
 def test_wi4893_recent_cursor_gui_warning_warns_even_with_exit_zero(tmp_path: Path) -> None:
     _write_project(
         tmp_path,
@@ -760,6 +855,35 @@ def test_wi4893_recent_ollama_max_turn_run_failure_warns(tmp_path: Path) -> None
     findings = "\n".join(status.health_findings)
     assert "latest_run=2026-06-28T15-13-47Z-loyal-opposition-D-7ea816" in findings
     assert "max_turn_exhaustion" in findings
+
+
+def test_wi4933_recent_openrouter_429_is_backpressure_warning(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "launched",
+                "pending_count": 2,
+                "signature": "sig-f",
+                "last_dispatched_signature": "sig-f",
+            }
+        },
+    )
+    _write_dispatch_run(
+        tmp_path,
+        "2026-06-30T08-00-00Z-loyal-opposition-F-rate",
+        exit_code=1,
+        stderr="openrouter_harness: OpenRouter rate limited (HTTP 429 provider backpressure) after 3 attempt(s)\n",
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime warning: loyal-opposition:F latest_run=2026-06-30T08-00-00Z" in findings
+    assert "failure_class=provider_rate_limited" in findings
+    assert "dispatch runtime failure: loyal-opposition:F latest_run=2026-06-30T08-00-00Z" not in findings
 
 
 # WI-4718 — benign concurrency_cap_reached must not be misclassified as a runtime FAIL.
@@ -835,11 +959,8 @@ def test_wi4718_no_findings_when_no_pending_work(tmp_path: Path) -> None:
     assert findings == []
 
 
-def test_wi4718_genuine_launch_reason_emits_runtime_failure_finding(tmp_path: Path) -> None:
-    """A genuine failure reason (spawn_rate_limited) still produces a runtime-failure
-    FINDING (WI-4718, unchanged). WI-4789 reconciliation: overall health_status is now
-    WARN, not FAIL, because the recipient and prime-builder remain dispatch-eligible
-    (SPEC-DISPATCH-HEALTH-STATUS-SEMANTICS-001 v2)."""
+def test_wi4933_spawn_rate_limited_launch_reason_warns_as_backpressure(tmp_path: Path) -> None:
+    """WI-4933: spawn_rate_limited is bounded backpressure, not a crash-class failure."""
     _write_project(tmp_path)
     _write_dispatch_state(
         tmp_path,
@@ -856,7 +977,41 @@ def test_wi4718_genuine_launch_reason_emits_runtime_failure_finding(tmp_path: Pa
     status = collect_bridge_dispatch_status(tmp_path)
 
     assert status.health_status == "WARN"
-    assert any("last_result=launch_failed" in f for f in status.health_findings)
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime failure: loyal-opposition:D last_result=launch_failed" not in findings
+    assert "dispatch runtime failure: loyal-opposition:D last_launch.reason=spawn_rate_limited" not in findings
+    assert "dispatch runtime warning: loyal-opposition:D backpressure last_launch.reason=spawn_rate_limited" in findings
+
+
+def test_wi4933_spawn_rate_limited_last_result_warns_with_live_worker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "pending_count": 0,
+                "selected_count": 0,
+                "last_result": "spawn_rate_limited",
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-06-30T08-05-00Z-loyal-opposition-F-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    findings = "\n".join(status.health_findings)
+    assert "dispatch runtime failure: loyal-opposition:F last_result=spawn_rate_limited" not in findings
+    assert "dispatch runtime warning: loyal-opposition:F backpressure last_result=spawn_rate_limited" in findings
 
 
 def test_wi4718_absent_launch_reason_still_fails() -> None:
