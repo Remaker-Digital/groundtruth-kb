@@ -1,5 +1,5 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for scripts/cursor_harness.py Loyal Opposition skill-route resolution (WI-4872).
+"""Tests for scripts/cursor_harness.py Loyal Opposition skill-route resolution.
 
 The harness-registry Cursor invocation surfaces pass the canonical LO route keys
 'bridge-review' / 'verification', which have no SKILL.md. These tests assert the
@@ -29,11 +29,12 @@ def _load_harness():
 
 
 def test_skill_route_alias_bridge_review_resolves() -> None:
-    """WI-4872: 'bridge-review' aliases to the real proposal-review skill contract."""
+    """WI-4933: 'bridge-review' aliases to the bridge protocol contract."""
     harness = _load_harness()
     content = harness._skill_system_prompt("bridge-review")
     assert content is not None
-    assert "proposal-review" in content
+    assert "name: gtkb-bridge" in content
+    assert "Operate the bridge protocol" in content
 
 
 def test_skill_route_alias_verification_resolves() -> None:

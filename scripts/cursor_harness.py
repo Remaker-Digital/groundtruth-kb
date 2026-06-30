@@ -21,12 +21,13 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution fallba
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TIMEOUT_SECONDS = 600.0
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
-# WI-4872: the harness-registry Cursor invocation surfaces pass the canonical
+# WI-4933: the harness-registry Cursor invocation surfaces pass canonical
 # Loyal Opposition route keys ('bridge-review', 'verification'), but no SKILL.md
-# exists under those names; resolve them to the real skill directories so headless
-# LO dispatch loads a contract instead of failing closed.
+# exists under those names. Resolve them to the real skill directories so
+# headless LO dispatch loads the bridge/verification contracts instead of
+# failing closed or loading a generic review memo contract.
 _SKILL_ROUTE_ALIASES = {
-    "bridge-review": "proposal-review",
+    "bridge-review": "bridge",
     "verification": "verify",
 }
 _CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
