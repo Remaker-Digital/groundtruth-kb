@@ -609,6 +609,35 @@ def test_process_pending_exit_codes_keeps_work_intent_on_success(tmp_path: Path)
     assert not registry.acquire(slug, "other-session", ttl_seconds=300, project_root=root)
 
 
+def test_process_pending_exit_codes_backfills_processed_completion_anchor(tmp_path: Path) -> None:
+    """WI-4934: legacy processed exits gain a retry-delay completion anchor."""
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    root.mkdir()
+    state_dir = tmp_path / "state"
+    did = "2026-06-30T10-20-39Z-loyal-opposition-D-b7f0b9"
+    runs = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs.mkdir(parents=True)
+    status_file = runs / f"{did}.exit_code"
+    status_file.write_text("1", encoding="utf-8")
+    launch = {
+        "launched": True,
+        "dispatch_id": did,
+        "needed_role_label": "loyal-opposition",
+        "exit_code": 1,
+        "exit_code_processed": True,
+        "signature": "sig-fixture",
+    }
+    recipients_state = {"loyal-opposition:D": {"last_launch": launch, "failure_count": 1}}
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    last_launch = recipients_state["loyal-opposition:D"]["last_launch"]
+    assert last_launch["completed_at"] == trigger._path_mtime_iso(status_file)
+    assert last_launch["exit_processed_at"] == last_launch["completed_at"]
+    assert recipients_state["loyal-opposition:D"]["failure_count"] == 1
+
+
 def test_application_subject_suppresses_prime_dispatch_before_acquire_or_spawn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4122,6 +4151,93 @@ def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
         and record.get("matched_markers", [{}])[0].get("label") == "max_turn_exhaustion"
         for record in failures
     )
+
+
+def test_long_running_ollama_timeout_backs_off_from_completion_time(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4934: a slow timeout backs off when processed, not when launched."""
+    from datetime import datetime, timedelta
+
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"], "max_items": 1}},
+                reviewer_precedence=10,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=20,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
+
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    dispatch_id = "prior-ollama-timeout"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stderr_path.write_text("ollama_harness: session timeout exceeded before Ollama chat turn\n", encoding="utf-8")
+
+    state_path = state_dir / "dispatch-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    d_state = state["recipients"]["loyal-opposition:D"]
+    signature = d_state["last_dispatched_signature"]
+    launch = {
+        "dispatch_id": dispatch_id,
+        "recipient": "loyal-opposition:D",
+        "launched": True,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=900)).isoformat(),
+        "stderr_path": str(stderr_path),
+        "signature": signature,
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+    }
+    for key in ("loyal-opposition:D", "loyal-opposition"):
+        state["recipients"][key]["last_result"] = "launched"
+        state["recipients"][key]["last_launch"] = dict(launch)
+    state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+    fallback = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = fallback["results"]["loyal-opposition"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "loyal-opposition:D",
+            "needed_role_label": "loyal-opposition",
+            "harness_id": "D",
+            "command_handle": "ollama",
+            "reviewer_precedence": 10,
+            "reason": "provider_failure_backoff_active",
+            "failure_class": "worker_timeout",
+            "backoff_source": "circuit_breaker_active",
+        }
+    ]
+    d_after = fallback["dispatch_state"]["recipients"]["loyal-opposition:D"]
+    assert d_after["last_launch"]["completed_at"]
+    assert d_after["last_launch"]["exit_processed_at"]
 
 
 def test_lo_provider_failure_backoff_retries_preferred_after_retry_window(

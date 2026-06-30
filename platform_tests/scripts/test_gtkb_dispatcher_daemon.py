@@ -432,6 +432,10 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
     status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
     assert status["mode"] == "live"
     assert calls, "expected live tick to invoke _spawn_harness"
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    launch = state["recipients"]["prime-builder:B"]["last_launch"]
+    assert launch["launched"] is True
+    assert launch["recipient"] == "prime-builder:B"
 
 
 def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
@@ -537,6 +541,114 @@ def test_daemon_live_honors_provider_backoff_skip(tmp_path: Path, monkeypatch: p
     assert result["mode"] == "live"
     assert not spawn_calls
     assert any(d.get("reason") == "provider_failure_backoff_active" for d in result["decisions"])
+
+
+def test_daemon_reconciles_nonzero_exit_and_falls_back_to_next_lo(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A completed nonzero same-signature LO run must not strand the item as unchanged."""
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    _write_bridge(root, "lo-fail-thread", "NEW", 1)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    index_text = runtime._read_bridge_state_live(root)
+    _, lo_items = runtime._compute_actionable(index_text, root)
+
+    target_a = types.SimpleNamespace(
+        dispatch_state_key="loyal-opposition:A",
+        harness_id="A",
+        needed_role_label="loyal-opposition",
+        invocation_surfaces={},
+    )
+    target_c = types.SimpleNamespace(
+        dispatch_state_key="loyal-opposition:C",
+        harness_id="C",
+        needed_role_label="loyal-opposition",
+        invocation_surfaces={},
+    )
+    selected, signature = runtime._target_selected_signature(target_a, lo_items, 1)
+    assert [item.document_name for item in selected] == ["lo-fail-thread"]
+
+    dispatch_id = "failed-lo-run"
+    runs_dir = state_dir / runtime.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    launched_at = daemon._now_iso()
+    runtime._write_dispatch_state(
+        state_dir,
+        {
+            "schema_version": 1,
+            "updated_at": launched_at,
+            "recipients": {
+                target_a.dispatch_state_key: {
+                    "updated_at": launched_at,
+                    "last_result": "launched",
+                    "pending_count": 1,
+                    "selected_count": 1,
+                    "last_dispatched_signature": signature,
+                    "signature": signature,
+                    "last_launch": {
+                        "dispatch_id": dispatch_id,
+                        "recipient": target_a.dispatch_state_key,
+                        "launched": True,
+                        "launched_at": launched_at,
+                        "needed_role_label": "loyal-opposition",
+                        "selected_documents": ["lo-fail-thread"],
+                        "signature": signature,
+                        "status_file_path": str(runs_dir / f"{dispatch_id}.exit_code"),
+                    },
+                }
+            },
+        },
+    )
+
+    spawn_calls: list[dict] = []
+
+    def _fake_resolve(role_label, *args, **kwargs):
+        if role_label == "loyal-opposition":
+            return [target_a, target_c]
+        return []
+
+    monkeypatch.setattr(runtime, "_resolve_dispatch_targets", _fake_resolve)
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_harness",
+        lambda **kwargs: (
+            spawn_calls.append(kwargs)
+            or {
+                "dispatch_id": "fallback-lo-run",
+                "recipient": kwargs["target"].dispatch_state_key,
+                "launched": True,
+            }
+        ),
+    )
+    monkeypatch.setattr(daemon, "_restart_storm_watchdog", lambda: {"launched": False, "returncode": 0})
+
+    result = daemon.run_tick(root, max_items=1)
+
+    assert result["mode"] == "live"
+    assert spawn_calls
+    assert spawn_calls[0]["target"].dispatch_state_key == target_c.dispatch_state_key
+    lo_decisions = [record for record in result["decisions"] if record["role"] == "loyal-opposition"]
+    assert lo_decisions[0]["recipient"] == target_a.dispatch_state_key
+    assert lo_decisions[0]["reason"] == "provider_failure_backoff_active"
+    assert lo_decisions[1]["recipient"] == target_c.dispatch_state_key
+    assert lo_decisions[1]["spawned"] is True
+
+    state = runtime._load_dispatch_state(state_dir, root)
+    failed_state = state["recipients"][target_a.dispatch_state_key]
+    assert failed_state["last_dispatched_signature"] is None
+    assert failed_state["failure_count"] == 1
+    assert failed_state["last_result"] == "provider_failure_backoff_active"
+    fallback_state = state["recipients"][target_c.dispatch_state_key]
+    assert fallback_state["last_launch"]["dispatch_id"] == "fallback-lo-run"
 
 
 # --- WI-4852: watchdog dormancy detection and fail-soft restart ---------------

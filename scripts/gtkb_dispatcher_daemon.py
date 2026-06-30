@@ -547,6 +547,21 @@ def compute_shadow_decisions(
     index_text = runtime._read_bridge_state_live(project_root)
     actionable_for_prime, actionable_for_codex = runtime._compute_actionable(index_text, project_root)
     runtime_state_dir = _bridge_poller_state_dir(project_root)
+    dispatch_state = runtime._load_dispatch_state(runtime_state_dir, project_root)
+    recipients_state = dispatch_state.get("recipients")
+    if not isinstance(recipients_state, dict):
+        recipients_state = {}
+        dispatch_state["recipients"] = recipients_state
+    before_reconcile = json.dumps(recipients_state, sort_keys=True, default=str)
+    runtime._process_pending_exit_codes(recipients_state, runtime_state_dir, project_root)
+    after_reconcile = json.dumps(recipients_state, sort_keys=True, default=str)
+    if after_reconcile != before_reconcile:
+        dispatch_state["updated_at"] = _now_iso()
+        runtime._write_dispatch_state(runtime_state_dir, dispatch_state)
+    role_map = runtime._read_role_assignments(project_root)
+    harnesses = role_map.get("harnesses")
+    if not isinstance(harnesses, dict):
+        harnesses = {}
     decisions: list[dict[str, Any]] = []
     for role_label, items in (
         ("prime-builder", actionable_for_prime),
@@ -583,15 +598,7 @@ def compute_shadow_decisions(
                 }
             )
             continue
-        poller_state_dir = _bridge_poller_state_dir(project_root)
-        dispatch_state = runtime._load_dispatch_state(poller_state_dir, project_root)
-        recipients_state = dispatch_state.get("recipients")
-        if not isinstance(recipients_state, dict):
-            recipients_state = {}
-        role_map = runtime._read_role_assignments(project_root)
-        harnesses = role_map.get("harnesses")
-        if not isinstance(harnesses, dict):
-            harnesses = {}
+        poller_state_dir = runtime_state_dir
         remaining = list(items)
         for target in targets:
             selected, signature = runtime._target_selected_signature(target, remaining, max_items)
@@ -636,9 +643,10 @@ def compute_shadow_decisions(
             decisions.append(record)
             if not selected:
                 break
-            remaining = runtime._without_selected_dispatch_items(remaining, selected)
-            if not any(getattr(item, "dispatchable", True) for item in remaining):
-                break
+            if "_spawn_target" in record:
+                remaining = runtime._without_selected_dispatch_items(remaining, selected)
+                if not any(getattr(item, "dispatchable", True) for item in remaining):
+                    break
     return decisions
 
 
@@ -839,6 +847,7 @@ def _execute_live_spawns(
                 session_id=work_intent_session_id or "",
             )
         if recipient_state is not None:
+            recipient_state["last_launch"] = result
             if result.get("launched"):
                 recipient_state["last_dispatched_signature"] = signature
                 recipient_state["signature"] = signature

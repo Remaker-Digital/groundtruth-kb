@@ -271,6 +271,7 @@ DISPATCH_AUTH_ENV_KEYS: tuple[str, ...] = (
 )
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
+    ("session timeout exceeded before Ollama chat turn", "worker_timeout"),
     ("Invalid authentication credentials", "auth_failure"),
     ("API Error: 401", "auth_failure"),
     ("Ollama chat request failed", "provider_failure"),
@@ -293,6 +294,7 @@ FAST_TRIP_FAILURE_CLASSES = frozenset(
         "provider_configuration_failure",
         "guard_denied_write",
         "guard_denial",
+        "worker_timeout",
     }
 )
 NON_RETRYABLE_WORKER_FAILURE_CLASSES = frozenset({"harness_unavailable_tier"})
@@ -4154,16 +4156,23 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         if not isinstance(last_launch, dict) or not last_launch.get("launched"):
             continue
 
-        # If already processed, skip
-        if last_launch.get("exit_code_processed"):
-            continue
-
         dispatch_id = last_launch.get("dispatch_id")
         if not dispatch_id:
             continue
 
         runs_dir = state_dir / DISPATCH_RUNS_SUBDIR
         status_file = runs_dir / f"{dispatch_id}.exit_code"
+        # Already-processed launches from before WI-4934 may lack a completion
+        # timestamp. Backfill from the exit sidecar mtime so retry delay starts
+        # at observed completion, not at original launch.
+        if last_launch.get("exit_code_processed"):
+            if not (last_launch.get("completed_at") or last_launch.get("exit_processed_at")):
+                processed_at = _path_mtime_iso(status_file)
+                if processed_at is not None:
+                    last_launch["exit_processed_at"] = processed_at
+                    last_launch.setdefault("completed_at", processed_at)
+            continue
+
         if not status_file.is_file():
             pid = last_launch.get("pid")
             if pid and not _pid_alive(pid):
@@ -4180,8 +4189,11 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         # Process the exit code
         launch_signature = last_launch.get("signature")
         # Mark exit code as processed in the state
+        processed_at = _now_iso()
         last_launch["exit_code"] = exit_code
         last_launch["exit_code_processed"] = True
+        last_launch["exit_processed_at"] = processed_at
+        last_launch.setdefault("completed_at", processed_at)
 
         max_retries = _dispatch_max_retries()
 
@@ -4339,14 +4351,20 @@ def _prior_failed_launch_signature(prior: dict[str, Any]) -> Any:
 
 def _retry_delay_active_for_prior(prior: dict[str, Any], retry_delay_seconds: int) -> bool:
     prior_last_launch = prior.get("last_launch")
-    prior_launched_at = prior_last_launch.get("launched_at") if isinstance(prior_last_launch, dict) else None
-    if not prior_launched_at:
+    retry_anchor = None
+    if isinstance(prior_last_launch, dict):
+        retry_anchor = (
+            prior_last_launch.get("completed_at")
+            or prior_last_launch.get("exit_processed_at")
+            or prior_last_launch.get("launched_at")
+        )
+    if not retry_anchor:
         return False
     try:
-        launched_time = dt.datetime.fromisoformat(str(prior_launched_at).replace("Z", "+00:00"))
+        anchor_time = dt.datetime.fromisoformat(str(retry_anchor).replace("Z", "+00:00"))
     except ValueError:
         return False
-    return (dt.datetime.now(dt.UTC) - launched_time).total_seconds() < retry_delay_seconds
+    return (dt.datetime.now(dt.UTC) - anchor_time).total_seconds() < retry_delay_seconds
 
 
 def _provider_failure_backoff_skip(
