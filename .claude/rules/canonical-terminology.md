@@ -1,8 +1,10 @@
 # Canonical Terminology — GroundTruth-KB
 
 This file is the scaffolded glossary of canonical vocabulary for projects built
-on GroundTruth KB. It is loaded alongside CLAUDE.md and AGENTS.md at session
-start so fresh agent sessions immediately know the project's vocabulary.
+on GroundTruth KB. Base session startup loads only the **core primer subset**
+(see `required_primer_terms` in `canonical-terminology.toml`); activity-specific
+terms load when an agent opens the corresponding activity envelope with
+`::open <activity>` (SPEC-INTAKE-46594e).
 
 **Status:** scaffolded — customize the project-specific rows (marked
 `GroundTruth-KB` or in the per-project section) but DO NOT remove the
@@ -825,19 +827,19 @@ the legacy bridge index periodically and dispatched the appropriate harness
 when a recipient's actionable queue signature changed. The smart poller was
 monitoring/dispatch infrastructure only. Historical references saying
 aggregate queue artifacts were canonical describe pre-cutover behavior. Bridge
-dispatch is now governed by the `cross-harness event-driven trigger` and the dispatcher
+dispatch is now governed by the `dispatcher daemon` and the dispatcher
 configuration/status/health CLI (see entry below).
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
 
-### cross-harness event-driven trigger
+### dispatcher daemon
 
-**Canonical alias:** bridge dispatch trigger; cross-harness trigger.
+**Canonical alias:** bridge dispatch trigger; dispatcher daemon.
 
 **Definition:** The current canonical bridge-dispatch automation, replacing
 the retired smart poller. Implemented as
-`scripts/cross_harness_bridge_trigger.py` and registered as PostToolUse +
-Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger
+`scripts/gtkb_dispatcher_daemon.py` and registered as PostToolUse +
+Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The daemon
 fires on tool-use and Stop events and inspects dispatcher/TAFE bridge state to
 dispatch the appropriate counterpart harness when actionable work changes.
 Aggregate queue artifacts must not be cited as canonical dispatcher topology,
@@ -868,14 +870,14 @@ single-harness install.
 harness is installed and holds a multi-element role set
 ``["prime-builder", "loyal-opposition"]``. The single harness absorbs both
 Prime Builder and Loyal Opposition responsibilities; bridge dispatch is
-provided by the single-harness bridge dispatcher (per
+provided by the retired scheduled bridge worker (per
 ``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001``) rather than the cross-harness
 event-driven trigger. Single-harness operating mode is first-class architecture,
 not a degradation of the multi-harness topology.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-operating-mode).*
 
-### single-harness bridge dispatcher
+### retired scheduled bridge worker
 
 **Canonical alias:** single-harness dispatcher; dispatcher (in single-harness
 topology context).
@@ -885,7 +887,7 @@ operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
 the dispatcher routine on a fixed interval. The dispatcher reads
 dispatcher/TAFE bridge state, computes a per-role actionable signature using
-the same kind-aware-routing path as the cross-harness event-driven trigger, and
+the same kind-aware-routing path as the dispatcher daemon, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and

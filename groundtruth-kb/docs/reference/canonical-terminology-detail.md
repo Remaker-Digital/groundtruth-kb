@@ -3,6 +3,10 @@
 **Status:** on-demand detail companion to the always-loaded glossary at
 `.claude/rules/canonical-terminology.md`. **NOT auto-loaded at session start.**
 
+Base startup loads the bounded core primer subset only; activity-specific
+terminology definitions are injected on `::open <activity>` from this glossary
+via the activity disposition profiles (SPEC-INTAKE-46594e).
+
 Produced by FAB-21 HYG-025 (startup load-cost reduction; owner strategy
 "balanced stub-in-core", AskUserQuestion 2026-06-11). The always-loaded core
 keeps every term's heading + definition (and the 23 doctor-required primer
@@ -712,10 +716,10 @@ the legacy bridge index aggregate periodically and dispatched the appropriate
 harness when a recipient's actionable queue signature changed. The smart poller was
 monitoring/dispatch infrastructure only; TAFE/dispatcher bridge state became the
 canonical workflow state after the 2026-06-15 cutover. Bridge dispatch is now governed by the
-`cross-harness event-driven trigger` (see entry below).
+`dispatcher daemon` (see entry below).
 
 **Not to be confused with:** the retired `OS poller` class (halted
-2026-04-25 per owner directive); the `cross-harness event-driven trigger`
+2026-04-25 per owner directive); the `dispatcher daemon`
 (the current canonical automation path).
 
 **Source:** `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001` v2 (mechanism-agnostic
@@ -735,20 +739,20 @@ retirement decision); bridge thread
 `groundtruth-kb/scripts/bridge_poller_runner.py`. Doctor's
 `_check_smart_bridge_poller` removed in Slice 4 D4.
 
-### cross-harness event-driven trigger
+### dispatcher daemon
 
-**Canonical alias:** bridge dispatch trigger; cross-harness trigger.
+**Canonical alias:** bridge dispatch trigger; dispatcher daemon.
 
 **Definition:** The current canonical bridge-dispatch automation, replacing
 the retired smart poller. Implemented as
-`scripts/cross_harness_bridge_trigger.py` and registered as PostToolUse +
-Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The trigger
+`scripts/gtkb_dispatcher_daemon.py` and registered as PostToolUse +
+Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The daemon
 fires on tool-use and Stop events: when bridge state is updated by
-a tool call or the agent ends a turn, the trigger inspects TAFE/dispatcher
+a tool call or the agent ends a turn, the daemon inspects TAFE/dispatcher
 state and dispatches the appropriate counterpart harness if a recipient's
-actionable queue signature has changed. The trigger reuses the smart
+actionable queue signature has changed. The daemon reuses the smart
 poller's actionable-signature scheme byte-identically per
-`platform_tests/scripts/test_cross_harness_bridge_trigger.py` so the audit-trail
+`platform_tests/scripts/test_gtkb_dispatcher_daemon.py` so the audit-trail
 invariants are preserved.
 
 **Not to be confused with:** retired `smart poller` (interval-driven
@@ -758,7 +762,7 @@ trigger dispatches into it).
 
 **Source:** Slice 3 closure
 `bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`
-(VERIFIED) — hook registrations; Slice 4
+(VERIFIED) — daemon configuration; Slice 4
 `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`
 — smart-poller substrate retirement; `ADR-SMART-POLLER-OWNER-OUT-OF-LOOP-001`
 v2 (mechanism-agnostic supersede); `DCL-SMART-POLLER-AUTO-TRIGGER-001` v2
@@ -766,11 +770,11 @@ v2 (mechanism-agnostic supersede); `DCL-SMART-POLLER-AUTO-TRIGGER-001` v2
 change); `DELIB-S337-CODEX-HOOKS-WINDOWS-RETEST-2026-05-08` (empirical
 event-driven trigger foundation).
 
-**Implementation pointer:** `scripts/cross_harness_bridge_trigger.py`
+**Implementation pointer:** `scripts/gtkb_dispatcher_daemon.py`
 (entrypoint); `.claude/settings.json` (Claude Code-side hook
 registration); `.codex/hooks.json` (Codex-side parity registration);
 `.gtkb-state/bridge-poller/dispatch-state.json` (per-recipient dispatch
-state); `_check_cross_harness_trigger` and `_check_bridge_dispatch_liveness`
+state); `_check_dispatcher_daemon` and `_check_bridge_dispatch_liveness`
 in `groundtruth-kb/src/groundtruth_kb/project/doctor.py` (health checks).
 
 ### role set
@@ -809,7 +813,7 @@ single-harness install.
 harness is installed and holds a multi-element role set
 ``["prime-builder", "loyal-opposition"]``. The single harness absorbs both
 Prime Builder and Loyal Opposition responsibilities; bridge dispatch is
-provided by the single-harness bridge dispatcher (per
+provided by the retired scheduled bridge worker (per
 ``SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001``) rather than the cross-harness
 event-driven trigger. Single-harness operating mode is first-class architecture,
 not a degradation of the multi-harness topology.
@@ -830,10 +834,10 @@ prepare capable harnesses for either role regardless of topology);
 the active harness's role-set cardinality in
 ``harness-state/harness-registry.json``. Multi-element role set ->
 single-harness mode applicable. Doctor check
-``_check_single_harness_dispatcher_when_required`` warns when applicable but
+``_check_dispatcher_daemon_when_required`` warns when applicable but
 the scheduled task is absent.
 
-### single-harness bridge dispatcher
+### retired scheduled bridge worker
 
 **Canonical alias:** single-harness dispatcher; dispatcher (in single-harness
 topology context).
@@ -843,13 +847,13 @@ operating mode. A host-platform scheduled task (Windows Task Scheduler /
 launchd / cron per ``DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001``) wakes
 the dispatcher routine on a fixed interval. The dispatcher reads live
 TAFE/dispatcher bridge state, computes a per-role actionable signature using the same
-kind-aware-routing path as the cross-harness event-driven trigger, and
+kind-aware-routing path as the dispatcher daemon, and
 spawns subprocess workers for each role whose actionable signature has
 changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 ``GTKB_BRIDGE_DISPATCH_KEYWORD`` env vars.
 
-**Not to be confused with:** ``cross-harness event-driven trigger`` (the
+**Not to be confused with:** ``dispatcher daemon`` (the
 multi-harness dispatch substrate; the two substrates are mutually exclusive
 at runtime); retired ``smart poller`` (archived Slice 4 retirement
 2026-05-09); retired ``OS poller`` class (halted 2026-04-25).
@@ -863,7 +867,7 @@ dispatcher); ``bridge/gtkb-single-harness-bridge-dispatcher-001-013.md``
 **Implementation pointer:** Slice 1 lands the governance scaffolding +
 role-set runtime migration; Slice 2 lands the dispatcher script + scheduled
 task setup (separate bridge thread; tracked as open follow-on). State path:
-``.gtkb-state/bridge-poller/`` shared with the cross-harness trigger.
+``.gtkb-state/bridge-poller/`` shared with the dispatcher daemon.
 Failures log: ``.gtkb-state/bridge-poller/dispatch-failures.jsonl``.
 
 ### OS poller
@@ -878,7 +882,7 @@ interval regardless of bridge activity — and must not be re-enabled as a
 substitute for the smart poller.
 
 **Not to be confused with:** retired `smart poller` (Slice 4 archive);
-`cross-harness event-driven trigger` (current canonical automation path).
+`dispatcher daemon` (current canonical automation path).
 
 **Source:** `DELIB-S319-SMART-POLLER-POLICY-CLARIFICATION` (covers
 OLD-poller halt context).
@@ -898,7 +902,7 @@ explicit owner approval and the cost/benefit analysis required by
 
 **Source:** `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` (syntax); `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001` (emitter authority + receiver enforcement); `bridge/gtkb-canonical-init-keyword-syntax-001-007.md` (Codex GO at -008); `DCL-CONCEPT-ON-CONTACT-001` (load-bearing concept added on first contact).
 
-**Implementation pointer:** Emitted by `scripts/cross_harness_bridge_trigger.py` in `_dispatch_prompt` (canonical keyword derived from durable role per `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`). Recognized by `.claude/hooks/session_start_dispatch.py` and `.codex/gtkb-hooks/session_start_dispatch.py` SessionStart hooks. Receiver performs set-membership check against own durable role; mismatch produces silent drop with audit log at `.gtkb-state/bridge-poller/dispatch-failures.jsonl`.
+**Implementation pointer:** Emitted by `scripts/gtkb_dispatcher_daemon.py` in `_dispatch_prompt` (canonical keyword derived from durable role per `DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001`). Recognized by `.claude/hooks/session_start_dispatch.py` and `.codex/gtkb-hooks/session_start_dispatch.py` SessionStart hooks. Receiver performs set-membership check against own durable role; mismatch produces silent drop with audit log at `.gtkb-state/bridge-poller/dispatch-failures.jsonl`.
 
 ### doctor
 
@@ -917,7 +921,7 @@ release-candidate gate (`scripts/release_candidate_gate.py`).
 spec-derivation-gate alignment).
 
 **Implementation pointer:** `groundtruth-kb/` doctor implementation.
-Specific checks: `_check_cross_harness_trigger`,
+Specific checks: `_check_dispatcher_daemon`,
 `_check_bridge_dispatch_liveness`, scaffold drift, KB integrity, etc.
 
 ### release manifest
@@ -1144,7 +1148,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 **Canonical alias:** advisory-to-action latency; advisory turnaround time.
 
-**Not to be confused with:** dispatch latency (cross-harness trigger spawn timing); review latency (NEW/REVISED to GO/NO-GO duration).
+**Not to be confused with:** dispatch latency (dispatcher daemon spawn timing); review latency (NEW/REVISED to GO/NO-GO duration).
 
 **Source:** `bridge/gtkb-self-diagnostic-leak-closure-slice-2-benchmark-suite-009.md` IP-2 (Benchmark 5); `.claude/rules/peer-solution-advisory-loop.md` (the advisory-handling procedure measured).
 
@@ -1178,7 +1182,7 @@ tool-calling shim) and `.api-harness/routing.toml` (static routing).
 **Canonical alias:** ollama harness.
 
 **Not to be confused with:** the upstream Ollama platform CLI/server; the Ollama
-Python SDK; cross-harness dispatch (the trigger that spawns counterpart
+Python SDK; cross-harness dispatch (the daemon that spawns counterpart
 harnesses).
 
 **Source:** `ADR-OLLAMA-HARNESS-ADOPTION-001`; `DELIB-20260663`;
@@ -1216,7 +1220,7 @@ within a single harness's model pool. In Phase 1 this is expressed via
 `[routing.skills]` overrides reserved for Phase 2+).
 
 **Not to be confused with:** cross-harness dispatch
-(`cross_harness_bridge_trigger.py`, which routes work between harnesses);
+(`gtkb_dispatcher_daemon.py`, which routes work between harnesses);
 destructive-action routing (the destructive-gate path).
 
 **Source:** `ADR-OLLAMA-HARNESS-ADOPTION-001`; `DELIB-20260663` (AUQ#2).

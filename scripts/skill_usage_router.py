@@ -179,6 +179,44 @@ def _match_scenario(
     return (None, None)
 
 
+def suggest_for_activity(
+    activity: str | None,
+    *,
+    profiles: dict[str, Any] | None = None,
+) -> SkillSuggestion:
+    """Return activity-envelope skill recommendations from disposition profiles.
+
+    Per ``SPEC-INTAKE-46594e``, skill bodies are not loaded at base startup; the
+    profile ``skills`` list for the opened activity is surfaced when
+    ``::open <activity>`` is accepted.
+    """
+    if not activity:
+        return SkillSuggestion(scenario=None)
+    if profiles is None:
+        try:
+            from groundtruth_kb.activity.profiles import load_activity_profiles
+
+            profiles = load_activity_profiles()
+        except Exception:  # noqa: BLE001 - advisory surface must not raise for missing config
+            return SkillSuggestion(scenario=None)
+    profile = profiles.get(activity)
+    if profile is None:
+        return SkillSuggestion(scenario=None)
+    skills = list(getattr(profile, "skills", []) or [])
+    if not skills:
+        return SkillSuggestion(scenario=None)
+    return SkillSuggestion(
+        scenario=f"activity:{activity}",
+        required=[],
+        recommended=skills,
+        rationale=(
+            f"Activity envelope {activity!r}: recommended skills from the disposition profile "
+            "(SPEC-INTAKE-46594e / DCL-ACTIVITY-DISPOSITION-PROFILE-001)."
+        ),
+        matched_by="activity_envelope",
+    )
+
+
 def suggest(
     *,
     scenario: str | None = None,
@@ -188,6 +226,7 @@ def suggest(
     bridge_kind: str | None = None,
     target_files: list[str] | tuple[str, ...] | None = None,
     report_type: str | None = None,
+    activity: str | None = None,
     table: dict[str, dict[str, Any]] | None = None,
 ) -> SkillSuggestion:
     """Return a skill suggestion for the given signals (SPEC R1/R4/R5).
@@ -203,6 +242,9 @@ def suggest(
 
     matched_by: str | None
     key: str | None
+    if activity and scenario is None:
+        return suggest_for_activity(activity)
+
     if scenario is not None:
         key = scenario if scenario in table else None
         matched_by = "scenario" if key is not None else None

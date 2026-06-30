@@ -27,8 +27,12 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 2. **Role overlay** — load the role-specific overlay:
    `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or
    `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`.
-3. **Canonical terminology** — load `.claude/rules/canonical-terminology.md`
-   before interpreting owner terms or proposing specifications.
+3. **Canonical terminology** — load the **core GT-KB primer subset** from
+   `.claude/rules/canonical-terminology.md` at base startup (bounded by
+   `required_primer_terms` in `canonical-terminology.toml`). Activity-specific
+   terminology and skill recommendations load only when an agent opens the
+   corresponding activity envelope with `::open <activity>` per
+   `SPEC-INTAKE-46594e` and `DCL-ACTIVITY-DISPOSITION-PROFILE-001`.
 4. **File bridge** — read current TAFE/dispatcher bridge state and the
    status-bearing versioned files under `bridge/`; generated or cached startup
    counts are not live authority. The retired aggregate queue artifact must

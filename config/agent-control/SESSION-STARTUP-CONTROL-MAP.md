@@ -43,7 +43,7 @@ session start.
 |---|---|---|---|
 | Platform rules & behavior | `CLAUDE.md` | active | Top-level platform guidance; GOV-01 ≤300-line cap. |
 | Loyal Opposition / cross-harness rules | `AGENTS.md` | active | Codex-side startup contract; durable-role disclosure. |
-| Canonical glossary | `.claude/rules/canonical-terminology.md` | active | Loaded explicitly in both roles (F1, VERIFIED); DA read-surface. |
+| Canonical glossary | `.claude/rules/canonical-terminology.md` | active | Base startup loads the core primer subset only; full corpus and activity-specific terms load on `::open <activity>` (SPEC-INTAKE-46594e). |
 | Durable operating-role guidance | `.claude/rules/operating-role.md` | active | Human-readable role-resolution guidance; not the role record. |
 | File-bridge protocol | `.claude/rules/file-bridge-protocol.md` | active | Bridge statuses, gates, claim/preflight contract. |
 | Deliberation protocol | `.claude/rules/deliberation-protocol.md` | active | When to search/archive deliberations. |

@@ -74,3 +74,24 @@ def test_index_references_overlays_and_control_map() -> None:
 def test_protected_narrative_references_index() -> None:
     assert "SESSION-STARTUP-INDEX.md" in _read(_CLAUDE_MD), "CLAUDE.md must reference the startup index"
     assert "SESSION-STARTUP-INDEX.md" in _read(_AGENTS_MD), "AGENTS.md must reference the startup index"
+
+
+def test_index_declares_progressive_terminology_disclosure() -> None:
+    text = _read(_INDEX)
+    assert "core GT-KB primer subset" in text
+    assert "::open <activity>" in text
+    assert "SPEC-INTAKE-46594e" in text
+
+
+def test_core_startup_glossary_is_bounded_subset() -> None:
+    from scripts.startup_glossary_load import clear_glossary_cache, load_glossary_for_startup
+
+    clear_glossary_cache()
+    glossary = load_glossary_for_startup(_ROOT)
+    assert glossary.get("scope") == "core_startup"
+    full_count = int(glossary.get("full_term_count") or 0)
+    core_count = int(glossary.get("term_count") or 0)
+    assert full_count > 0
+    assert core_count > 0
+    assert core_count < full_count
+    assert core_count <= len(glossary.get("core_term_labels") or [])

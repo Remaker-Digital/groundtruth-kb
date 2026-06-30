@@ -114,6 +114,79 @@ def _format_direction(direction: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _load_glossary_module(project_root: Path):
+    root_text = str(project_root)
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
+    from scripts import startup_glossary_load  # noqa: PLC0415
+
+    return startup_glossary_load
+
+
+def _truncate_definition(value: str, limit: int = 180) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 3].rstrip()}..."
+
+
+def _render_activity_terminology(project_root: Path, profile) -> str:
+    try:
+        glossary = _load_glossary_module(project_root)
+        resolved = glossary.resolve_glossary_terms(project_root, list(profile.terminology))
+    except Exception as exc:  # noqa: BLE001 - terminology context must not block routing.
+        return "\n".join(
+            [
+                "## Activity Terminology",
+                "",
+                "- status: unavailable",
+                f"- reason: {exc}",
+            ]
+        )
+    lines = [
+        "## Activity Terminology",
+        "",
+        f"- source: `{glossary.GLOSSARY_RELATIVE_PATH}`",
+        f"- activity: {profile.name}",
+    ]
+    for label in profile.terminology:
+        entry = resolved.get(label)
+        if not isinstance(entry, dict):
+            lines.append(f"- **{label}**: (see canonical glossary)")
+            continue
+        definition = _truncate_definition(str(entry.get("definition") or ""))
+        if definition:
+            lines.append(f"- **{label}**: {definition}")
+        else:
+            lines.append(f"- **{label}**: (see canonical glossary)")
+    return "\n".join(lines)
+
+
+def _render_activity_skill_advisory(topic_type: str) -> str:
+    try:
+        from scripts.skill_usage_router import suggest_for_activity
+    except Exception as exc:  # noqa: BLE001 - advisory surface must not block routing.
+        return "\n".join(
+            [
+                "## Activity Skill Advisory",
+                "",
+                "- status: unavailable",
+                f"- reason: {exc}",
+            ]
+        )
+    suggestion = suggest_for_activity(topic_type)
+    if suggestion.is_empty:
+        return ""
+    lines = [
+        "## Activity Skill Advisory",
+        "",
+        f"- scenario: {suggestion.scenario}",
+        f"- recommended: {_format_sequence(suggestion.recommended)}",
+        f"- rationale: {suggestion.rationale}",
+    ]
+    return "\n".join(lines)
+
+
 def _render_activity_profile(result: dict[str, object]) -> str:
     if result.get("action") != "open":
         return ""
@@ -151,7 +224,16 @@ def _render_activity_profile(result: dict[str, object]) -> str:
     ]
     lines.extend(_format_history_state(profile.history_state))
     lines.extend(_format_direction(profile.direction))
-    return "\n".join(lines)
+    project_root = _project_root_from_result(result)
+    extra_sections: list[str] = []
+    if project_root is not None:
+        extra_sections.append(_render_activity_terminology(project_root, profile))
+    extra_sections.append(_render_activity_skill_advisory(profile.name))
+    profile_block = "\n".join(lines)
+    rendered_extra = "\n\n".join(section for section in extra_sections if section)
+    if rendered_extra:
+        return f"{profile_block}\n\n{rendered_extra}"
+    return profile_block
 
 
 def _project_root_from_result(result: dict[str, object]) -> Path | None:

@@ -237,6 +237,9 @@ def test_render_topic_context_injects_activity_profile_for_open(tmp_path: Path) 
     assert "- headless_eligibility: headless_eligible" in context
     assert "- skills: bridge, bridge-propose, verify, kb-work-item, kb-spec" in context
     assert "- terminology: implementation proposal, implementation report, work item" in context
+    assert "## Activity Terminology" in context
+    assert "## Activity Skill Advisory" in context
+    assert "- scenario: activity:build" in context
     assert "- history_state.sources: GO'd bridge proposals, active PAUTH authorizations" in context
     assert "- direction.stance: implement-within-scope" in context
     assert "- direction.guardrails: no implementation without a GO'd bridge proposal" in context
@@ -328,3 +331,35 @@ def test_render_topic_context_profile_loader_failure_is_non_blocking(monkeypatch
     assert "## Activity Disposition Profile" in context
     assert "- status: unavailable" in context
     assert "- reason: profile config unavailable" in context
+
+
+def test_render_topic_context_injects_activity_terminology_definitions(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+    glossary_dir = tmp_path / ".claude" / "rules"
+    glossary_dir.mkdir(parents=True)
+    (glossary_dir / "canonical-terminology.md").write_text(
+        "\n".join(
+            [
+                "### implementation proposal",
+                "",
+                "**Definition:** Pre-implementation bridge artifact requesting LO review.",
+                "",
+                "### work item",
+                "",
+                "**Definition:** A tracked unit of implementation work in MemBase.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    open_session(tmp_path, harness_name="codex")
+    command = parse_topic_command("::open build")
+    assert command is not None
+
+    result = handle_topic_command(tmp_path, command, harness_name="codex")
+    context = render_topic_context(result)
+
+    assert "## Activity Terminology" in context
+    assert "**implementation proposal**: Pre-implementation bridge artifact requesting LO review." in context
+    assert "**work item**: A tracked unit of implementation work in MemBase." in context
+    assert "**deliberation**" not in context

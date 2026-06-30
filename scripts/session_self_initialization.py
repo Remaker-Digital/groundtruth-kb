@@ -1585,8 +1585,6 @@ def _dev_environment_inventory_status(project_root: Path) -> dict[str, Any]:
 
 def _harness_parity_status(project_root: Path, *, harness_name: str | None, role_profile: str) -> dict[str, Any]:
     harness_scope = _normalize_harness_name(harness_name) or "all"
-    if harness_scope not in {"claude", "codex"}:
-        harness_scope = "all"
     try:
         from scripts.check_harness_parity import check_harness_parity  # noqa: PLC0415
 
@@ -1601,20 +1599,30 @@ def _harness_parity_status(project_root: Path, *, harness_name: str | None, role
             "status": "unavailable",
             "harness_scope": harness_scope,
             "role_scope": role_profile,
+            "scope_kind": "assigned_harness" if harness_scope != "all" else "fleet",
+            "evidence_type": "phase-1 catalog parity",
+            "operational_readiness": "not evaluated; run phase-2 readiness and hook discovery diff",
             "counts": {},
             "verification_command": "python scripts/check_harness_parity.py --all --markdown",
+            "phase2_command": "python scripts/harness_parity_phase2.py --project-root . --format markdown",
+            "discovery_diff_command": "python scripts/parity_discovery_diff.py --project-root . --markdown",
             "error": str(exc),
         }
     return {
         "status": report.overall_status.lower(),
         "harness_scope": harness_scope,
         "role_scope": role_profile,
+        "scope_kind": "assigned_harness" if harness_scope != "all" else "fleet",
+        "evidence_type": "phase-1 catalog parity",
+        "operational_readiness": "not evaluated; run phase-2 readiness and hook discovery diff",
         "counts": report.counts,
         "verification_command": (
             f"python scripts/check_harness_parity.py --harness {harness_scope} --role {role_profile} --markdown"
             if harness_scope != "all"
             else "python scripts/check_harness_parity.py --all --markdown"
         ),
+        "phase2_command": "python scripts/harness_parity_phase2.py --project-root . --format markdown",
+        "discovery_diff_command": "python scripts/parity_discovery_diff.py --project-root . --markdown",
     }
 
 
@@ -1623,7 +1631,9 @@ def _harness_parity_compact_text(status: dict[str, Any]) -> str:
     count_text = ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "no counts"
     text = (
         f"{status.get('status', 'unknown')} "
-        f"(harness={status.get('harness_scope', 'unknown')}, "
+        f"({status.get('evidence_type', 'phase-1 catalog parity')}; "
+        f"operational_readiness={status.get('operational_readiness', 'not evaluated')}; "
+        f"harness={status.get('harness_scope', 'unknown')}, "
         f"role={status.get('role_scope', 'unknown')}, {count_text})"
     )
     if status.get("error"):
@@ -5038,7 +5048,13 @@ def _render_startup_glossary_section(project_root: Path, *, max_terms: int = 8) 
         )
         return "\n".join(lines)
 
-    lines.append(f"- Source: `{source}`")
+    full_count = int(glossary.get("full_term_count") or 0)
+    lines.append(f"- Source: `{source}` (core startup subset; activity-specific terms load on `::open <activity>`)")
+    if full_count and full_count > len(term_order):
+        lines.append(
+            f"- Progressive disclosure: {len(term_order)} core term(s) at startup; "
+            f"{full_count - len(term_order)} additional term(s) available via activity envelopes."
+        )
     for name in [str(item) for item in term_order[:max_terms]]:
         entry = terms.get(name)
         if not isinstance(entry, dict):

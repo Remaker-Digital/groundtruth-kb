@@ -836,3 +836,43 @@ def parity_check(
             )
 
     return findings
+
+
+def core_startup_primer_labels(*, project_root: Path | None = None) -> tuple[str, ...]:
+    """Return the bounded core startup primer labels (S327 / ADR-0001).
+
+    Delegates to ``scripts.startup_glossary_load._load_core_startup_term_names`` when
+    the GT-KB checkout layout is available; otherwise returns the shared dual-agent
+    fallback list.
+    """
+    root = project_root or Path(__file__).resolve().parents[3]
+    try:
+        from scripts.startup_glossary_load import _load_core_startup_term_names
+
+        return tuple(_load_core_startup_term_names(root))
+    except Exception:  # noqa: BLE001 - advisory helper; fall back to static primer list
+        return (
+            "MemBase",
+            "Deliberation Archive",
+            "MEMORY.md",
+            "Prime Builder",
+            "Loyal Opposition",
+            "GT-KB",
+            "GroundTruth-KB",
+            "GTKB",
+            "platform",
+            "application",
+            "hosted application",
+            "Agent Red",
+            "adopter",
+            "project",
+            "work item",
+            "backlog",
+            "specification",
+            "requirement",
+            "implementation proposal",
+            "implementation report",
+            "verification",
+            "dashboard",
+            "bridge",
+        )

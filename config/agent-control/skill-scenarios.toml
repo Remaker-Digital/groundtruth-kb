@@ -6,6 +6,11 @@
 # (R2). Skill names are advisory suggestions; the router never reads or mutates
 # skill CONTENT (R8).
 #
+# Activity-envelope skill recommendations are sourced from
+# config/agent-control/activity-disposition-profiles.toml via
+# scripts/skill_usage_router.suggest_for_activity (SPEC-INTAKE-46594e); they
+# are surfaced on ::open <activity>, not at base startup.
+#
 # Source: INSIGHTS-2026-05-15-14-35-skill-usage-advisory (Opportunity #1 / F3
 # consistent-use table); owner grilling DELIB-20265895; SPEC-SKILL-USAGE-ROUTER-001.
 

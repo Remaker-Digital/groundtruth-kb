@@ -3,6 +3,9 @@
 The session envelope is the per-harness outer container for a GT-KB session.
 It is intentionally local-file based so prompt-time hooks and CLIs can inspect
 and update it without depending on MemBase availability.
+
+Activity-specific terminology and skill advisories are not part of the base
+envelope; they load when ``::open <activity>`` is accepted (SPEC-INTAKE-46594e).
 """
 
 from __future__ import annotations

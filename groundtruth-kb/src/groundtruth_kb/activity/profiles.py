@@ -5,6 +5,9 @@ TOML config at ``config/agent-control/activity-disposition-profiles.toml``.
 The loader validates against the DCL schema (assertions A1–A3) and raises
 ``ActivityProfileError`` fail-closed on any violation.
 
+Per ``SPEC-INTAKE-46594e``, profile ``terminology`` and ``skills`` fields are
+the operative activity-envelope context contract surfaced on ``::open``.
+
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
 All rights reserved. Licensed under AGPL-3.0-or-later.
 """
