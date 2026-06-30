@@ -351,7 +351,87 @@ def load_author_metadata(
     root = project_root or Path.cwd()
     environ = env or os.environ
     merged: dict[str, Any] = {}
-    merged.update(_resolve_durable_identity_fields(root, env=environ))
+
+    # Pre-populate defaults for interactive sessions if not in env (WI-4885)
+    interactive_defaults = {}
+    harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+    if not harness_name:
+        try:
+            import psutil
+
+            p = psutil.Process(os.getpid())
+            for proc in p.parents():
+                try:
+                    exe_path = proc.exe().lower()
+                    if "antigravity" in exe_path:
+                        harness_name = "antigravity"
+                        break
+                    elif "cursor" in exe_path:
+                        harness_name = "cursor"
+                        break
+                    elif "claude" in exe_path:
+                        harness_name = "claude"
+                        break
+                    elif "codex" in exe_path:
+                        harness_name = "codex"
+                        break
+                except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
+                    continue
+        except Exception:
+            pass
+
+        # Validate that the detected harness exists in this project's registry to avoid breaking tests (WI-4885)
+        if harness_name:
+            from scripts.harness_identity import load_harness_identities
+
+            try:
+                proj_identities = load_harness_identities(root).get("harnesses", {})
+                if harness_name not in proj_identities:
+                    harness_name = ""
+            except Exception:
+                harness_name = ""
+
+    if harness_name:
+        import uuid
+
+        # Generate a unique session context ID for this interactive run
+        session_id = str(uuid.uuid4())
+
+        if harness_name == "antigravity":
+            interactive_defaults = {
+                "author_session_context_id": session_id,
+                "author_model": "Gemini 1.5 Pro",
+                "author_model_version": "gemini-1.5-pro",
+                "author_model_configuration": "Antigravity IDE interactive session",
+            }
+        elif harness_name == "cursor":
+            interactive_defaults = {
+                "author_session_context_id": session_id,
+                "author_model": "Cursor Agent",
+                "author_model_version": "cursor-agent",
+                "author_model_configuration": "Cursor IDE interactive session",
+            }
+        elif harness_name == "claude":
+            interactive_defaults = {
+                "author_session_context_id": session_id,
+                "author_model": "Claude 3.5 Sonnet",
+                "author_model_version": "claude-3-5-sonnet",
+                "author_model_configuration": "Claude Code interactive session",
+            }
+        elif harness_name == "codex":
+            interactive_defaults = {
+                "author_session_context_id": session_id,
+                "author_model": "GPT-5 Codex",
+                "author_model_version": "gpt-5-codex",
+                "author_model_configuration": "Codex Desktop interactive session",
+            }
+
+    env_copy = dict(environ)
+    if harness_name and ENV_VAR_HARNESS_NAME not in env_copy:
+        env_copy[ENV_VAR_HARNESS_NAME] = harness_name
+
+    merged.update(interactive_defaults)
+    merged.update(_resolve_durable_identity_fields(root, env=env_copy))
     merged.update(_metadata_from_env(environ))
     if explicit:
         merged.update(normalize_author_metadata(explicit))
