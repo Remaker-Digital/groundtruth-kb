@@ -656,7 +656,7 @@ Loyal Opposition (Antigravity/lo role) audited the session startup disclosure lo
 
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
-| Operations | Harnesses B and C are suspended in registry but marked `can_receive_dispatch = true` in `rules.toml`. | `rules.toml` vs `harness-registry.json` status; `gt bridge status` warnings. | Reconcile the drift by setting `can_receive_dispatch = false` for harnesses B and C in `rules.toml` using `gt bridge dispatch config set-eligibility`. | Open |
+| Operations | Harnesses B and C are suspended in registry but marked `can_receive_dispatch = true` in `rules.toml`. | `rules.toml` vs `harness-registry.json` status; `gt bridge status` warnings. | Reconcile the drift by setting `can_receive_dispatch = false` for harnesses B and C in `rules.toml` using `gt bridge dispatch config set-eligibility`. | Resolved |
 | Governance | The Loyal Opposition startup disclosure correctly suppresses focus choices and routes default tasks. | `scripts/session_self_initialization.py` implementation vs `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`. | None; audit successfully completed with PASS. | Resolved |
 
 ---
@@ -668,11 +668,178 @@ Loyal Opposition (Cursor harness E, `::init gtkb lo`) auto-processed bridge revi
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Bridge | VERIFIED finalization commits landed for WI-3217, WI-3218, WI-3212, and per-role concurrency cap (WI-CA9165). | Commits `7a9b2d69`, `3c41ba45`, `c70c50a8`, `7cf4bf11`; independent pytest reruns. | None; threads terminal for LO. | Resolved |
-| Bridge | GO verdicts for WI-4789, WI-4649, WI-3327, WI-4795 authored but uncommitted on disk. | `bridge/gtkb-wi4789-*-002.md`, `gtkb-stale-git-worktree-*-005.md`, etc. | Prime Builder implement + commit GO chains. | Open |
-| Bridge | `gtkb-reconcile-included-work-item-ids-semantics` blocked on owner semantics choice. | GO `-021` blocker record; `DELIB-2547`. | Owner AUQ: additive vs restrictive vs defense-in-depth. | Open |
-| Operations | Dispatch health FAIL; no eligible targets; `GTKB_NO_CROSS_HARNESS_TRIGGER=1` active. | `gt bridge dispatch status`; all harnesses `dispatchable=False`. | Clear kill-switch when desired; implement WI-4789; reconcile rules.toml drift. | Open |
+| Bridge | GO verdicts for WI-4789, WI-4649, WI-3327, WI-4795 authored but uncommitted on disk. | `bridge/gtkb-wi4789-*-002.md`, `gtkb-stale-git-worktree-*-005.md`, etc. | Prime Builder implement + commit GO chains. | Resolved |
+| Bridge | `gtkb-reconcile-included-work-item-ids-semantics` blocked on owner semantics choice. | GO `-021` blocker record; `DELIB-2547`. | Owner AUQ: additive vs restrictive vs defense-in-depth. | Resolved |
+| Operations | Dispatch health FAIL; no eligible targets; `GTKB_NO_CROSS_HARNESS_TRIGGER=1` active. | `gt bridge dispatch status`; all harnesses `dispatchable=False`. | Clear kill-switch when desired; implement WI-4789; reconcile rules.toml drift. | Resolved |
 | Process | Uncommitted GO files + broad dirty worktree may block impl-start / foreign-file gates. | `git status`; temp `.temp_verdict_*` files. | PB hygiene sweep before unrelated commits. | Open |
 
+---
+
+### 2026-06-27 - Platform Test Suite Breakages Post INDEX-Removal Migration
+
+Loyal Opposition (Antigravity/lo role) identified extensive platform test suite failures following the TAFE-authority and INDEX-removal migration (209 failed, 18 errors, 4069 passed). Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-27-02-24-platform-test-suite-breakages.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Testing | Test suite is broken with 209 failures due to AttributeError on retired `INDEX_PATH`, desynced worker timeouts, stale `bridge/INDEX.md` paths, and memory file size ceiling violations. | Pytest logs; `scripts/run_spec_derived_tests.py`; `platform_tests/scripts/test_run_spec_derived_tests.py`. | Remove `INDEX_PATH` mocks from tests, update timeout assertions, change blocked path tests to active surfaces, and trim `MEMORY.md`. | Open |
+
+---
+
+### 2026-06-27 - Antigravity Harness Capability Assessment
+
+Loyal Opposition (Antigravity/lo role) evaluated the capability of the `antigravity` harness (ID: C) to assume the `prime-builder` role. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-27-16-15-antigravity-harness-capability-assessment.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance / Harness | Antigravity is permanently ineligible for headless bridge dispatch due to Google EOL `IneligibleTierError` on `gemini-cli`. Additionally, it lacks local hook wrappers in `harness-capability-registry.toml` (e.g., `sot-read-discipline` and `owner-decision-tracker` hooks). Restoring it durably to `prime-builder` is a severe regression, but interactive pair programming under manual self-enforcement remains feasible. | `rules.toml` vs `harness-registry.json` status; `harness-capability-registry.toml` missing blocks; `sot-artifacts.toml` owner-only boundaries. | Keep Antigravity retired from headless dispatch queues. Restrict active role mutations to explicit owner commands. Rely on manual self-enforcement for interactive session overrides. | Resolved |
+
+---
+
+### 2026-06-28 - Doctor Checks on Adopter Projects and Encoding Robustness
+
+Loyal Opposition (Antigravity/lo role) identified diagnostic test suite and doctor tool failures when running on adopter targets or encountering non-UTF-8 text. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-28-03-45-doctor-adopter-packaging-blocker.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `test_doctor_runs_in_temp_adopter` fails because adopter projects lack the required platform-specific scripts checked by `_check_dispatcher_config_cli_only_guard`. | AssertionError in `test_clean_adopter_packaging.py`; `_check_dispatcher_config_cli_only_guard` assumes scripts existence. | Skip the check when `config/dispatcher/rules.toml` is absent. | Open |
+| Technical | The doctor tool crashes with `UnicodeDecodeError` when scanning untracked bridge files with Windows-1252 bytes. | `UnicodeDecodeError` in `_check_untracked_terminal_verified_verdicts` reading target files containing cp1252 characters. | Use `errors="replace"` in `read_text` inside `_check_untracked_terminal_verified_verdicts`. | Open |
+
+---
+
+### 2026-06-28 - Empty Queue and Doctor Diagnostic Findings
+
+Loyal Opposition (Antigravity/lo role) verified that the bridge is functional with zero actionable items in the queue. Audited `gt project doctor` output and identified durability risks from untracked verified files and false-positive dispatch alarms. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-28-05-15-lo-empty-queue-doctor-audit.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Three terminal `VERIFIED` bridge files are untracked in git, posing a durability risk. | `git status`; `gt project doctor` warning. | Run `git add` and commit the files: `bridge/gtkb-mass-release-candidate-blocker-repair-004.md`, `bridge/gtkb-wi4894-storm-watchdog-pythonw-output-repair-004.md`, `bridge/gtkb-wi4896-startup-console-residual-006.md`. | Resolved |
+| Technical | The doctor triggers false-positive dispatch `ALARM` flags when the queue is inactive. | `gt project doctor` output; `dispatch-state.json`. | Modify `_check_bridge_dispatch_liveness` to bypass or scale the staleness check when the queue has remained empty. | Open |
+| Registry | Three glossary updates are pending synchronization into the MemBase terminology registry. | `gt canonical-terms seed --dry-run`. | Run `gt canonical-terms seed --apply` to synchronize the registry. | Resolved |
+| Technical | Hook scripts `assertion-check.py` and `spec-event-surfacer.py` differ from their template sources. | `gt project doctor` warning. | Reconcile drifts or update templates. | Open |
+
+---
+
+### 2026-06-29 - Backlog Reconciler Blockers & TAFE Lifecycle Gaps
+
+Loyal Opposition (Antigravity/lo role) completed an audit and evaluation of the 18 work items currently blocked under the `linked_bridge_not_verified` classification in the backlog reconciler. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-29-08-15-reconciler-linked-bridge-not-verified.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Terminal `WITHDRAWN` threads permanently deadlock the associated work item (`WI-4674`, `WI-4508`) from auto-closure. | `bridge_verified_backlog_reconciler.py` dry-run; withdrawal files under `bridge/`. | Update the reconciler satisfaction logic to treat `WITHDRAWN` as non-blocking if at least one sibling thread is `VERIFIED`. | Open |
+| Technical | Scoping/umbrella threads mismatch their implementation child slices due to suffix (`-mechanism-scoping`) or abbreviation (`typed-artifact-flow-engine` vs `tafe`) discrepancies. | `bridge_verified_backlog_reconciler.py` prefix-matching logic; `WI-4356` and `WI-4508`. | Enhance prefix-matching to strip planning suffixes and support abbreviation synonyms. | Open |
+| Technical | Advisory routing work items (`WI-4436`, `WI-4411`, etc.) remain open indefinitely because `ADVISORY` is not treated as satisfying the task. | `bridge_verified_backlog_reconciler.py` satisfaction predicate. | Allow the reconciler to resolve work items if their only linked thread has status `ADVISORY`. | Open |
+
+---
+
+### 2026-06-29 - File Bridge and Dispatcher Circuit Breaker Verification
+
+Loyal Opposition (Antigravity/lo role) verified that the file bridge is functioning correctly with 1 actionable item in the LO queue. Inspected the dispatcher status, confirmed that the prime-builder (Codex) harness is blocked by a tripped circuit breaker, and reviewed the Cursor headless hooks parity proposal.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Operations | The Codex (prime-builder:A) dispatcher is blocked by a tripped circuit breaker (exit code 4294967295). | `gt bridge status`; `dispatch-state.json`. | Diagnose codex.exe execution environment or credentials when Prime Builder resumes. | Open |
+| Bridge | The file bridge has 1 actionable NEW entry for Loyal Opposition: `gtkb-wi4925-cursor-headless-hooks-parity-001.md`. | `scan_bridge.py` output; `gt status`. | Reviewed the proposal and issued a GO verdict in `bridge/gtkb-wi4925-cursor-headless-hooks-parity-002.md`. | Resolved |
+
+---
+
+### 2026-06-30 - Empty Queue Audit & Log Reconciliation
+
+Loyal Opposition (Antigravity/lo role) verified that the bridge is functional with zero actionable items in the queue. Checked the status of untracked files and reconciled open findings in the Loyal Opposition log. Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-06-30-02-15-lo-empty-queue-status-audit.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Bridge | The file bridge queue has 0 actionable items for Loyal Opposition. Stale untracked predecessor drafts are bypassed. | manual scan; `scripts/lo_bridge_scan.py` run; version tracking checks. | Keep version tracking check clean and filter out predecessor drafts. | Resolved |
+| Operations | Outstanding open log findings for harnesses eligibility, GO verdicts, and untracked terminal files were verified resolved. | Git history; rules.toml configurations; MemBase database checks. | Reconciled and updated log entries to match the clean workspace state. | Resolved |
+
+---
+
+### 2026-06-30 - WI-4934 Daemon LO Failover and Completion-Time Retry Anchor Verification
+
+Loyal Opposition (Antigravity/lo role) verified and committed the post-implementation report and verification verdict for WI-4934. The dispatcher daemon now reconciles exit codes before the shadow/dedupe check, allowing fallthrough to secondary LO targets (E/F) instead of stranding files behind `unchanged`. Retry timing was also corrected to anchor off worker completion time rather than launch time.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Stranded LO queue work due to failed/timed-out primary recipients. | `bridge/gtkb-wi4934-daemon-lo-failover-after-nonzero-003.md`; daemon tick and runtime tests. | Implemented exit reconciliation, target fallthrough, and completion-based retry delay window. Verified 167/167 tests passed. | Resolved |
+
+---
+
+### 2026-06-30 - WI-4933 Ollama Routing Timeout Bounds Proposal Review
+
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the pre-implementation proposal: `gtkb-wi4933-ollama-routing-timeout-bounds-001.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Timeout inconsistency between CLI and config. | `bridge/gtkb-wi4933-ollama-routing-timeout-bounds-001.md`, `scripts/ollama_harness.py`. | Binding `timeout_seconds` from routing TOML and deriving bounded default session timeouts avoids silent hangs. Approved at version -002. | Resolved |
+
+---
+
+### 2026-06-30 - WI-4782 Session Role Authority Audit Proposal Review
+
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the pre-implementation proposal: `gtkb-wi4782-session-role-authority-audit-001.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Terminology and authority leaks regarding non-dispatcher role enforcement. | `bridge/gtkb-wi4782-session-role-authority-audit-001.md`. | Run a deterministic repository-root-contained audit to catalog registry-as-authority-beyond-dispatcher and durable-role terminology. Approved at version -002. | Resolved |
+
+---
+
+### 2026-06-30 - Topology and Dispatcher Configuration Alignment
+
+Loyal Opposition (Antigravity/lo role) updated the dispatcher configuration (`rules.toml`) to align with the active role partition constraints and the owner's request.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Operations | Mismatch and disabled dispatch eligibilities in `rules.toml`. | `rules.toml` configuration; owner directives. | Updated tag alignments (A+E as PB, B+C+D+F as LO) and set `can_receive_dispatch=true` for all candidate targets. | Resolved |
+
+---
+
+### 2026-06-30 - WI-4935 Reconcile Stale Failover Dispatch State Proposal Review
+
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the pre-implementation proposal: `gtkb-wi4935-dispatch-failover-stale-state-reconciliation-001.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Stale failover recipient state after terminal bridge outcomes. | `bridge/gtkb-wi4935-dispatch-failover-stale-state-reconciliation-001.md`. | Reconcile stale pending state for terminal documents and align diagnose liveness with canonical health. Approved at version -002. | Resolved |
+
+---
+
+### 2026-06-30 - WI-4356 Slice D Work Tree Hygiene Governance Spec Proposal Review
+
+Loyal Opposition (Antigravity/lo role) evaluated and issued a `NO-GO` verdict for the blocker-record revision proposal: `gtkb-work-tree-hygiene-slice-d-governance-spec-005.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Implementation is blocked due to the missing exact-content formal-artifact approval packet for `GOV-WORK-TREE-HYGIENE-001`. | `bridge/gtkb-work-tree-hygiene-slice-d-governance-spec-005.md`. | Collect owner approval via `AskUserQuestion` for the exact content of `GOV-WORK-TREE-HYGIENE-001` in an interactive session, mint the approval packet, and proceed with the MemBase insert. Rejected at version -006. | Open |
+
+---
+
+### 2026-06-30 - WI-4553 Phone/Web Owner Approval Surface Verification
+
+Loyal Opposition (Antigravity/lo role) evaluated the post-implementation report and issued a `NO-GO` verdict for `gtkb-wi4553-phone-web-owner-approval-surface-003.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report has failing verification commands: pytest injection escaping failure, click options line too long in `cli.py`, and ruff format style drift in `cli.py` and test. | pytest traceback; ruff check and format check outputs; `bridge/gtkb-wi4553-phone-web-owner-approval-surface-003.md`. | Fix the script injection test assertion, break line 4883 in `cli.py`, format both files, and submit a revised report (Version 005). Rejected at version -004. | Open |
+
+---
+
+### 2026-06-30 - WI-4873 obsolete cross-harness fixture reconciliation Proposal Review
+
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the metadata reconciliation proposal: `gtkb-wi4873-cross-harness-fixture-obsolete-reconciliation-001.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Backlog tracks a stale test fixture file `platform_tests/scripts/test_cross_harness_bridge_trigger.py` that is already absent. | Git history and test discovery confirm the test was purged in commit `ab2f782bc885287f833800dbf88e9dcbd56e5001`. | Reconcile Knowledge DB to resolve WI-4873 as superseded by the prior trigger purge. | Resolved |
+
+---
+
+### 2026-06-30 - WI-4869 related bridge provenance separation Proposal Review
+
+Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for the backlog hygiene proposal: `gtkb-wi4869-related-bridge-provenance-separation-001.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Overloaded `related_bridge_threads` field stores both surfaced-during provenance and implementation links, causing reconciler noise. | `bridge/gtkb-wi4869-related-bridge-provenance-separation-001.md`. | Separate provenance context from implementation-linkage, keeping provenance in metadata/change reasons or dedicated fields. | Resolved |
 
 
 
