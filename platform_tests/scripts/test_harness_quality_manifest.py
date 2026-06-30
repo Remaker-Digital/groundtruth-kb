@@ -54,6 +54,7 @@ def test_evidence_schema_has_required_fields() -> None:
         "benchmark_mode",
         "provider",
         "model",
+        "author_model_configuration",
         "dispatch_envelope_id",
         "fixture_id",
         "run_tier",
@@ -72,6 +73,24 @@ def test_evidence_schema_has_required_fields() -> None:
         "artifact_links",
     ):
         assert required in fields
+
+
+def test_failure_classes_are_closed_and_duplicate_free() -> None:
+    expected = {
+        "claim-accuracy",
+        "spec-linkage",
+        "root-boundary",
+        "scope",
+        "target-paths-missing",
+        "preflight-fail",
+        "test-verification-gap",
+        "unscored",
+    }
+
+    assert set(manifest.FAILURE_CLASSES) == expected
+    assert len(manifest.FAILURE_CLASSES) == len(set(manifest.FAILURE_CLASSES))
+    assert all(isinstance(item, str) and item for item in manifest.FAILURE_CLASSES)
+    assert manifest.HARNESS_QUALITY_MANIFEST.failure_classes == manifest.FAILURE_CLASSES
 
 
 def test_challenge_families_are_gtkb_native_and_scored() -> None:
@@ -132,9 +151,25 @@ def test_validation_rejects_missing_decision_field_and_duplicate_family() -> Non
     assert any("duplicate challenge_families ids" in error for error in errors)
 
 
+def test_validation_rejects_missing_model_configuration_and_duplicate_failure_class() -> None:
+    bad_manifest = replace(
+        manifest.HARNESS_QUALITY_MANIFEST,
+        evidence_fields=tuple(
+            field for field in manifest.REQUIRED_EVIDENCE_FIELDS if field != "author_model_configuration"
+        ),
+        failure_classes=manifest.FAILURE_CLASSES + ("claim-accuracy",),
+    )
+
+    errors = manifest.validate_manifest(bad_manifest)
+
+    assert any("author_model_configuration" in error for error in errors)
+    assert any("duplicate failure classes" in error for error in errors)
+
+
 def test_manifest_serializes_to_dict_after_validation() -> None:
     payload = manifest.manifest_to_dict()
 
     assert payload["owner_decision_ids"] == manifest.OWNER_DECISION_IDS
     assert payload["modes"][0]["id"] == "prime_builder"
+    assert payload["failure_classes"] == manifest.FAILURE_CLASSES
     assert payload["challenge_families"]

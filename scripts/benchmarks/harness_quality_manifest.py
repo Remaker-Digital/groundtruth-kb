@@ -29,6 +29,7 @@ REQUIRED_EVIDENCE_FIELDS: tuple[str, ...] = (
     "benchmark_mode",
     "provider",
     "model",
+    "author_model_configuration",
     "dispatch_envelope_id",
     "fixture_id",
     "run_tier",
@@ -45,6 +46,17 @@ REQUIRED_EVIDENCE_FIELDS: tuple[str, ...] = (
     "failure_class",
     "required_source_citations",
     "artifact_links",
+)
+
+FAILURE_CLASSES: tuple[str, ...] = (
+    "claim-accuracy",
+    "spec-linkage",
+    "root-boundary",
+    "scope",
+    "target-paths-missing",
+    "preflight-fail",
+    "test-verification-gap",
+    "unscored",
 )
 
 SAFETY_INVARIANT_IDS: tuple[str, ...] = (
@@ -116,6 +128,7 @@ class HarnessQualityManifest:
     tiers: tuple[RunTier, ...]
     challenge_families: tuple[ChallengeFamily, ...]
     evidence_fields: tuple[str, ...]
+    failure_classes: tuple[str, ...]
     safety_invariants: tuple[SafetyInvariant, ...]
     dispatcher_bridge_cli_requirements: tuple[str, ...]
 
@@ -306,6 +319,7 @@ HARNESS_QUALITY_MANIFEST = HarnessQualityManifest(
     tiers=RUN_TIERS,
     challenge_families=CHALLENGE_FAMILIES,
     evidence_fields=REQUIRED_EVIDENCE_FIELDS,
+    failure_classes=FAILURE_CLASSES,
     safety_invariants=SAFETY_INVARIANTS,
     dispatcher_bridge_cli_requirements=DISPATCHER_BRIDGE_CLI_REQUIREMENTS,
 )
@@ -350,6 +364,19 @@ def validate_manifest(manifest: HarnessQualityManifest = HARNESS_QUALITY_MANIFES
     missing_fields = set(REQUIRED_EVIDENCE_FIELDS) - set(manifest.evidence_fields)
     if missing_fields:
         errors.append(f"missing evidence fields: {sorted(missing_fields)}")
+
+    failure_classes = manifest.failure_classes
+    blank_failure_classes = [item for item in failure_classes if not isinstance(item, str) or not item.strip()]
+    if not failure_classes:
+        errors.append("missing failure classes")
+    if blank_failure_classes:
+        errors.append("failure classes must be non-empty strings")
+    duplicate_failure_classes = sorted(item for item in set(failure_classes) if failure_classes.count(item) > 1)
+    if duplicate_failure_classes:
+        errors.append(f"duplicate failure classes: {duplicate_failure_classes}")
+    missing_failure_classes = set(FAILURE_CLASSES) - set(failure_classes)
+    if missing_failure_classes:
+        errors.append(f"missing failure classes: {sorted(missing_failure_classes)}")
 
     missing_invariants = set(SAFETY_INVARIANT_IDS) - {invariant.id for invariant in manifest.safety_invariants}
     if missing_invariants:
@@ -399,6 +426,7 @@ __all__ = [
     "BENCHMARK_MODES",
     "CHALLENGE_FAMILIES",
     "DISPATCHER_BRIDGE_CLI_REQUIREMENTS",
+    "FAILURE_CLASSES",
     "HARNESS_QUALITY_MANIFEST",
     "OWNER_DECISION_IDS",
     "REQUIRED_EVIDENCE_FIELDS",
