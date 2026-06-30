@@ -103,7 +103,7 @@
       "canonical_name": "harness-parity-review",
       "capability_id": "skill.harness-parity-review",
       "source_relative_path": ".claude/skills/harness-parity-review/SKILL.md",
-      "source_sha256": "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
+      "source_sha256": "46d1ad941076a347c5d29cdd638c269a0fe0552064dbe977633f4452588659aa"
     },
     {
       "adapter_relative_path": ".agent/skills/kb-adr/SKILL.md",

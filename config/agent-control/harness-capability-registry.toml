@@ -441,13 +441,13 @@ status = "native"
 surface = ".codex/skills/harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
-source_sha256 = "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
+source_sha256 = "46d1ad941076a347c5d29cdd638c269a0fe0552064dbe977633f4452588659aa"
 
 [capabilities.antigravity]
 surface = ".agent/skills/harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
-source_sha256 = "9868556c7f76998cb5ccfb6613b9170b18ba172a9c3f512e023c4bd36c787c5d"
+source_sha256 = "46d1ad941076a347c5d29cdd638c269a0fe0552064dbe977633f4452588659aa"
 [capabilities.cursor]
 surface = ".cursor/skills/harness-parity-review/SKILL.md"
 status = "fallback"

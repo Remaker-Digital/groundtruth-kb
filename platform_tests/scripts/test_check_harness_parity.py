@@ -281,6 +281,196 @@ reason = "Codex has no matching prompt-only hook surface."
     assert "no matching prompt-only hook" in report.results[0].note
 
 
+def test_role_scope_defaults_to_assigned_harness_population(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["prime-builder"],
+                "version": 1,
+            },
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            },
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.review"
+kind = "skill"
+canonical_name = "review"
+canonical_source = ".claude/skills/review/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.codex]
+status = "unsupported"
+reason = "test"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "test"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, role="prime-builder")
+
+    assert report.selected_harnesses == ["codex"]
+    assert {result.harness for result in report.results} == {"codex"}
+
+
+def test_explicit_harness_overrides_assigned_role_scope_for_diagnostics(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["prime-builder"],
+                "version": 1,
+            },
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            },
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.review"
+kind = "skill"
+canonical_name = "review"
+canonical_source = ".claude/skills/review/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.codex]
+status = "unsupported"
+reason = "test"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "test"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="antigravity", role="prime-builder")
+
+    assert report.selected_harnesses == ["antigravity"]
+    assert {result.harness for result in report.results} == {"antigravity"}
+
+
+def test_api_skill_manifest_does_not_synthesize_hook_support(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "D",
+                "harness_name": "ollama",
+                "harness_type": "ollama",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            }
+        ],
+    )
+    hook_path = tmp_path / ".claude" / "hooks" / "prompt-only.py"
+    hook_path.parent.mkdir(parents=True, exist_ok=True)
+    hook_path.write_text("print('hook')\n", encoding="utf-8")
+    manifest_path = tmp_path / ".api-harness" / "skills" / "MANIFEST.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps({"adapters": []}), encoding="utf-8")
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.prompt-only"
+kind = "hook"
+canonical_name = "prompt-only"
+canonical_source = ".claude/hooks/prompt-only.py"
+required_for_roles = ["loyal-opposition"]
+parity_class = "shared"
+
+[harnesses.ollama]
+skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="ollama", role="loyal-opposition")
+
+    assert report.results[0].state == "UNSUPPORTED"
+    assert "Skill adapter manifests do not prove hook registration" in report.results[0].note
+
+
+def test_typed_parity_waiver_classifies_missing_surface_as_unsupported(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "B",
+                "harness_name": "claude",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["prime-builder"],
+                "version": 1,
+            }
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.codex-only"
+kind = "hook"
+canonical_name = "codex-only"
+canonical_source = ".codex/gtkb-hooks/codex-only.cmd"
+required_for_roles = ["prime-builder"]
+parity_class = "shared"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/codex-only.cmd"
+status = "native"
+
+[[parity_waivers]]
+capability_id = "hook.codex-only"
+harness = "claude"
+reason_class = "harness-surface-difference"
+rationale = "Codex-only hook surface."
+owner_approval_ref = "DELIB-TEST"
+review_trigger = "test"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, harness="claude", role="prime-builder")
+
+    assert report.results[0].state == "UNSUPPORTED"
+    assert report.results[0].configured_status == "waived:harness-surface-difference"
+    assert "DELIB-TEST" in report.results[0].note
+
+
 def test_repository_registry_covers_project_skills() -> None:
     module = _load_module()
 
@@ -288,7 +478,8 @@ def test_repository_registry_covers_project_skills() -> None:
 
     assert not report.errors
     assert not report.extras
-    assert report.overall_status == "PASS"
+    assert not [result for result in report.results if result.state == "MISSING"]
+    assert report.overall_status != "FAIL"
 
 
 def test_repository_registry_has_no_unclassified_missing_rows() -> None:
