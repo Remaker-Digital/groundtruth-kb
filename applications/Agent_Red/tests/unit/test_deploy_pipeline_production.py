@@ -47,9 +47,7 @@ DEPLOY_CONFIG = PROJECT_ROOT / "scripts" / "deploy_config.py"
 # probe behaves identically to the actual pipeline runtime path on all platforms.
 _az_available = False
 try:
-    _az_check = subprocess.run(
-        "az account show", capture_output=True, timeout=10, shell=True
-    )
+    _az_check = subprocess.run("az account show", capture_output=True, timeout=10, shell=True)
     _az_available = _az_check.returncode == 0
 except (subprocess.TimeoutExpired, OSError):
     pass
@@ -63,6 +61,7 @@ _skip_no_az = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_deploy_config():
     """Import deploy_config module."""
@@ -84,8 +83,8 @@ def _load_deploy_pipeline():
     the guard is False and stdout is left untouched.
     """
     from unittest.mock import patch as _patch
-    for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"),
-              str(PROJECT_ROOT / "tools" / "knowledge-db")]:
+
+    for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "scripts"), str(PROJECT_ROOT / "tools" / "knowledge-db")]:
         if p not in sys.path:
             sys.path.insert(0, p)
     with _patch.object(sys, "platform", "linux"):
@@ -99,8 +98,7 @@ def _current_version() -> str:
     """Return the current PRODUCT_VERSION as a v-prefixed string for CLI tests."""
     try:
         spec = importlib.util.spec_from_file_location(
-            "api_versioning",
-            PROJECT_ROOT / "src" / "multi_tenant" / "api_versioning.py"
+            "api_versioning", PROJECT_ROOT / "src" / "multi_tenant" / "api_versioning.py"
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
@@ -126,6 +124,7 @@ def _smoke_pass_api_call(fqdn, path, api_key=None, timeout=10):
 # CPD-001: CLI requires --version
 # ---------------------------------------------------------------------------
 
+
 class TestCPD001CliRequiresVersion:
     """The deploy pipeline CLI must require a --version argument."""
 
@@ -133,7 +132,9 @@ class TestCPD001CliRequiresVersion:
         """deploy_pipeline.py --env staging (no --version) exits non-zero."""
         result = subprocess.run(
             [sys.executable, str(DEPLOY_PIPELINE), "--env", "staging"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             cwd=str(PROJECT_ROOT),
         )
         assert result.returncode != 0
@@ -144,6 +145,7 @@ class TestCPD001CliRequiresVersion:
 # CPD-002: Production without approval → fail before deploy
 # ---------------------------------------------------------------------------
 
+
 class TestCPD002ProductionApprovalGate:
     """Production path must fail before any build/deploy work without approval."""
 
@@ -151,10 +153,12 @@ class TestCPD002ProductionApprovalGate:
         """--env production without DEPLOY_APPROVED or --approved exits non-zero."""
         env = {**os.environ, "DEPLOY_APPROVED": ""}
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "production", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
-            cwd=str(PROJECT_ROOT), env=env,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "production", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(PROJECT_ROOT),
+            env=env,
         )
         assert result.returncode != 0
         assert "approval" in result.stdout.lower() or "GOV-16" in result.stdout
@@ -163,10 +167,12 @@ class TestCPD002ProductionApprovalGate:
         """DEPLOY_APPROVED=1 passes the approval gate."""
         env = {**os.environ, "DEPLOY_APPROVED": "1"}
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "production", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
-            cwd=str(PROJECT_ROOT), env=env,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "production", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(PROJECT_ROOT),
+            env=env,
         )
         # Should pass the approval gate (may still fail on other checks)
         assert "Owner approval: CONFIRMED" in result.stdout
@@ -174,10 +180,19 @@ class TestCPD002ProductionApprovalGate:
     def test_production_allowed_with_flag(self):
         """--approved flag passes the approval gate."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "production", "--version", _current_version(),
-             "--dry-run", "--approved"],
-            capture_output=True, text=True, timeout=30,
+            [
+                sys.executable,
+                str(DEPLOY_PIPELINE),
+                "--env",
+                "production",
+                "--version",
+                _current_version(),
+                "--dry-run",
+                "--approved",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
         assert "Owner approval: CONFIRMED" in result.stdout
@@ -187,6 +202,7 @@ class TestCPD002ProductionApprovalGate:
 # CPD-003: No interactive prompts
 # ---------------------------------------------------------------------------
 
+
 class TestCPD003NoInteractivePrompts:
     """The canonical production path must not contain interactive prompts."""
 
@@ -194,12 +210,10 @@ class TestCPD003NoInteractivePrompts:
         """deploy_pipeline.py source must not call input() or raw_input()."""
         source = DEPLOY_PIPELINE.read_text(encoding="utf-8")
         # Match standalone input() calls, not 'tool_input' or 'input_placeholder'
-        input_calls = re.findall(r'\binput\s*\(', source)
+        input_calls = re.findall(r"\binput\s*\(", source)
         # Filter out false positives (e.g., tool_input, input_placeholder)
         real_input_calls = [c for c in input_calls if c.strip() == "input("]
-        assert len(real_input_calls) == 0, (
-            "deploy_pipeline.py contains input() calls — must be non-interactive"
-        )
+        assert len(real_input_calls) == 0, "deploy_pipeline.py contains input() calls — must be non-interactive"
 
     def test_no_input_calls_in_deploy_config(self):
         """deploy_config.py must not call input()."""
@@ -211,18 +225,26 @@ class TestCPD003NoInteractivePrompts:
 # CPD-004: Config consistency
 # ---------------------------------------------------------------------------
 
+
 class TestCPD004ConfigConsistency:
     """deploy_pipeline.py and upgrade_verification.py must share config source."""
 
     def test_both_import_from_deploy_config(self):
         """Both scripts import ENVIRONMENTS from deploy_config, not local dicts."""
         dp_source = DEPLOY_PIPELINE.read_text(encoding="utf-8")
-        uv_source = (PROJECT_ROOT / "scripts" / "upgrade_verification.py").read_text(encoding="utf-8")
+        upgrade_verification = PROJECT_ROOT / "scripts" / "upgrade_verification.py"
+        if not upgrade_verification.exists():
+            upgrade_verification = PROJECT_ROOT.parent.parent / "scripts" / "upgrade_verification.py"
+        uv_source = upgrade_verification.read_text(encoding="utf-8")
 
-        assert "from scripts.deploy_config import ENVIRONMENTS" in dp_source or \
-               "from deploy_config import ENVIRONMENTS" in dp_source
-        assert "from scripts.deploy_config import ENVIRONMENTS" in uv_source or \
-               "from deploy_config import ENVIRONMENTS" in uv_source
+        assert (
+            "from scripts.deploy_config import ENVIRONMENTS" in dp_source
+            or "from deploy_config import ENVIRONMENTS" in dp_source
+        )
+        assert (
+            "from scripts.deploy_config import ENVIRONMENTS" in uv_source
+            or "from deploy_config import ENVIRONMENTS" in uv_source
+        )
 
     def test_production_tenant_id_from_env_var(self):
         """Production tenant_id reads from env var, not hardcoded."""
@@ -236,6 +258,7 @@ class TestCPD004ConfigConsistency:
 # ---------------------------------------------------------------------------
 # CPD-005: Rollback image capture — behavioral
 # ---------------------------------------------------------------------------
+
 
 class TestCPD005RollbackCapture:
     """Rollback image capture must invoke az CLI and return the image tag."""
@@ -276,6 +299,7 @@ class TestCPD005RollbackCapture:
 # CPD-006: Smoke failure triggers rollback — behavioral (mocked phase_11)
 # ---------------------------------------------------------------------------
 
+
 class TestCPD006RollbackOnSmokeFailure:
     """Production smoke failure must trigger automatic rollback."""
 
@@ -294,10 +318,12 @@ class TestCPD006RollbackOnSmokeFailure:
         )
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
-        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time, \
-             patch("scripts.deploy_config.rollback_to_image", return_value=True):
+        with (
+            patch.object(dp, "api_call", side_effect=_smoke_fail_api_call),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+            patch("scripts.deploy_config.rollback_to_image", return_value=True),
+        ):
             mock_time.time.side_effect = [0.0, 0.0, 1.0]
             mock_time.sleep.return_value = None
             result = dp.phase_11_production_verification(args)
@@ -311,9 +337,11 @@ class TestCPD006RollbackOnSmokeFailure:
         args = self._make_args(rollback_image=None, snapshot_files=["fake_snapshot.json"])
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
-        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time:
+        with (
+            patch.object(dp, "api_call", side_effect=_smoke_fail_api_call),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+        ):
             mock_time.time.side_effect = [0.0, 1.0]
             mock_time.sleep.return_value = None
             result = dp.phase_11_production_verification(args)
@@ -324,10 +352,19 @@ class TestCPD006RollbackOnSmokeFailure:
     def test_production_dry_run_does_not_trigger_rollback(self):
         """Dry-run path skips phase_11 body — AUTOMATIC ROLLBACK must not appear."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "production", "--version", _current_version(),
-             "--dry-run", "--approved"],
-            capture_output=True, text=True, timeout=30,
+            [
+                sys.executable,
+                str(DEPLOY_PIPELINE),
+                "--env",
+                "production",
+                "--version",
+                _current_version(),
+                "--dry-run",
+                "--approved",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
         assert "AUTOMATIC ROLLBACK" not in result.stdout
@@ -336,6 +373,7 @@ class TestCPD006RollbackOnSmokeFailure:
 # ---------------------------------------------------------------------------
 # CPD-007: Rollback failure explicitly reported — behavioral (mocked phase_11)
 # ---------------------------------------------------------------------------
+
 
 class TestCPD007RollbackFailureReported:
     """Rollback failure must be captured in args and reflected in structured output."""
@@ -352,10 +390,12 @@ class TestCPD007RollbackFailureReported:
         args = self._make_smoke_fail_args()
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
-        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time, \
-             patch("scripts.deploy_config.rollback_to_image", return_value=False):
+        with (
+            patch.object(dp, "api_call", side_effect=_smoke_fail_api_call),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+            patch("scripts.deploy_config.rollback_to_image", return_value=False),
+        ):
             mock_time.time.side_effect = [0.0, 0.0, 1.0]
             mock_time.sleep.return_value = None
             dp.phase_11_production_verification(args)
@@ -370,16 +410,19 @@ class TestCPD007RollbackFailureReported:
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
         call_count = {"n": 0}
+
         def api_call_stub(fqdn, path, api_key=None, timeout=10):
             call_count["n"] += 1
-            if call_count["n"] < 3:   # calls 1+2 are smoke (/health + /tenants/lookup) — fail
+            if call_count["n"] < 3:  # calls 1+2 are smoke (/health + /tenants/lookup) — fail
                 return (503, {}, {})
-            return (200, {}, {})       # call 3 is the rollback health check — pass
+            return (200, {}, {})  # call 3 is the rollback health check — pass
 
-        with patch.object(dp, "api_call", side_effect=api_call_stub), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time, \
-             patch("scripts.deploy_config.rollback_to_image", return_value=True):
+        with (
+            patch.object(dp, "api_call", side_effect=api_call_stub),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+            patch("scripts.deploy_config.rollback_to_image", return_value=True),
+        ):
             mock_time.time.side_effect = [0.0, 0.0, 1.0]
             mock_time.sleep.return_value = None
             dp.phase_11_production_verification(args)
@@ -393,10 +436,12 @@ class TestCPD007RollbackFailureReported:
         args = self._make_smoke_fail_args()
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
-        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time, \
-             patch("scripts.deploy_config.rollback_to_image", return_value=True):
+        with (
+            patch.object(dp, "api_call", side_effect=_smoke_fail_api_call),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+            patch("scripts.deploy_config.rollback_to_image", return_value=True),
+        ):
             mock_time.time.side_effect = [0.0, 0.0, 1.0]
             mock_time.sleep.return_value = None
             dp.phase_11_production_verification(args)
@@ -408,16 +453,18 @@ class TestCPD007RollbackFailureReported:
     def test_deploy_result_json_includes_rollback_fields_on_dry_run(self):
         """Dry-run run writes JSON result file containing rollback_attempted, rollback_succeeded, rollback_image."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "staging", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "staging", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
         assert result.returncode == 0
         # Find the most-recently written deploy-result JSON
         result_files = sorted(
             (PROJECT_ROOT / "logs").glob("deploy-result-staging-*.json"),
-            key=lambda p: p.stat().st_mtime, reverse=True,
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
         )
         assert result_files, "No deploy-result JSON written by dry-run"
         data = json.loads(result_files[0].read_text())
@@ -429,6 +476,7 @@ class TestCPD007RollbackFailureReported:
 # CPD-008: Dry-run exits 0 AND prints DRY RUN banner
 # ---------------------------------------------------------------------------
 
+
 class TestCPD008DryRunPath:
     """--dry-run must exit 0 AND print DRY RUN in stdout with no deploy side effects."""
 
@@ -436,22 +484,22 @@ class TestCPD008DryRunPath:
     def test_dry_run_exits_zero_and_prints_banner_on_staging(self):
         """Staging dry-run: exit code 0 AND stdout contains 'DRY RUN'."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "staging", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "staging", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
-        assert result.returncode == 0, (
-            f"Staging dry-run exited {result.returncode}. stdout: {result.stdout[-500:]}"
-        )
+        assert result.returncode == 0, f"Staging dry-run exited {result.returncode}. stdout: {result.stdout[-500:]}"
         assert "DRY RUN" in result.stdout, "DRY RUN banner missing from stdout"
 
     def test_dry_run_does_not_invoke_az_or_docker(self):
         """Staging dry-run stdout must not contain az/docker deploy invocation lines."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "staging", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "staging", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
         # No real deploy commands should be emitted in dry-run
@@ -466,6 +514,7 @@ MOCK_RUNNER = PROJECT_ROOT / "tests" / "unit" / "helpers" / "run_mocked_pipeline
 # CPD-009: Success path — dry-run CLI + mocked phase_11 behavioral + CLI subprocess
 # ---------------------------------------------------------------------------
 
+
 class TestCPD009SuccessPath:
     """Production verification must return PASS and not set rollback when all checks pass."""
 
@@ -473,30 +522,37 @@ class TestCPD009SuccessPath:
     def test_production_approved_dry_run_passes_approval_gate(self):
         """--env production --approved --dry-run exits 0 and confirms approval."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "production", "--version", _current_version(),
-             "--dry-run", "--approved"],
-            capture_output=True, text=True, timeout=30,
+            [
+                sys.executable,
+                str(DEPLOY_PIPELINE),
+                "--env",
+                "production",
+                "--version",
+                _current_version(),
+                "--dry-run",
+                "--approved",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
         assert "Owner approval: CONFIRMED" in result.stdout
         assert result.returncode == 0, (
-            f"Approved production dry-run exited {result.returncode}. "
-            f"stdout: {result.stdout[-500:]}"
+            f"Approved production dry-run exited {result.returncode}. stdout: {result.stdout[-500:]}"
         )
 
     @_skip_no_az
     def test_staging_dry_run_exits_zero(self):
         """Staging dry-run exits 0 — all phases return PASS in dry-run."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "staging", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "staging", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
-        assert result.returncode == 0, (
-            f"Staging dry-run exited {result.returncode}. stdout: {result.stdout[-500:]}"
-        )
+        assert result.returncode == 0, f"Staging dry-run exited {result.returncode}. stdout: {result.stdout[-500:]}"
 
     def test_phase_11_returns_pass_when_all_checks_succeed(self):
         """phase_11 returns PASS PhaseResult when phase-c and all smoke checks pass."""
@@ -506,9 +562,11 @@ class TestCPD009SuccessPath:
         args._snapshot_files = ["fake_snapshot.json"]
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
-        with patch.object(dp, "api_call", side_effect=_smoke_pass_api_call), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time:
+        with (
+            patch.object(dp, "api_call", side_effect=_smoke_pass_api_call),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+        ):
             mock_time.time.side_effect = [0.0, 1.0]
             mock_time.sleep.return_value = None
             result = dp.phase_11_production_verification(args)
@@ -527,23 +585,31 @@ class TestCPD009SuccessPath:
         touching Azure, ACR, or live HTTP.
         """
         result = subprocess.run(
-            [sys.executable, str(MOCK_RUNNER), "success",
-             "--env", "staging", "--version", _current_version(), "--approved"],
-            capture_output=True, text=True, timeout=60,
+            [
+                sys.executable,
+                str(MOCK_RUNNER),
+                "success",
+                "--env",
+                "staging",
+                "--version",
+                _current_version(),
+                "--approved",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
             cwd=str(PROJECT_ROOT),
         )
         assert result.returncode == 0, (
-            f"Mocked success path exited {result.returncode} (expected 0). "
-            f"stdout: {result.stdout[-800:]}"
+            f"Mocked success path exited {result.returncode} (expected 0). stdout: {result.stdout[-800:]}"
         )
-        assert "RESULT: SUCCESS" in result.stdout, (
-            f"Expected SUCCESS banner in output. stdout: {result.stdout[-800:]}"
-        )
+        assert "RESULT: SUCCESS" in result.stdout, f"Expected SUCCESS banner in output. stdout: {result.stdout[-800:]}"
 
 
 # ---------------------------------------------------------------------------
 # CPD-010: Smoke-failure path — phase_11 exits FAIL, rollback recorded (mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestCPD010MockedSmokeFailurePath:
     """When production smoke fails, phase_11 returns FAIL and records rollback state."""
@@ -553,10 +619,9 @@ class TestCPD010MockedSmokeFailurePath:
         dp = _load_deploy_pipeline()
         args = argparse.Namespace(dry_run=False, version=_current_version(), env="production")
         args._rollback_image = None
-        args._snapshot_files = []    # no snapshot
+        args._snapshot_files = []  # no snapshot
 
-        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), \
-             patch.object(dp, "time") as mock_time:
+        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), patch.object(dp, "time") as mock_time:
             mock_time.time.side_effect = [0.0, 1.0]
             mock_time.sleep.return_value = None
             result = dp.phase_11_production_verification(args)
@@ -572,10 +637,12 @@ class TestCPD010MockedSmokeFailurePath:
         args._snapshot_files = ["fake_snapshot.json"]
         stream_mock = MagicMock(returncode=0, stdout="(41 pass, 0 fail)")
 
-        with patch.object(dp, "api_call", side_effect=_smoke_fail_api_call), \
-             patch.object(dp, "_stream", return_value=stream_mock), \
-             patch.object(dp, "time") as mock_time, \
-             patch("scripts.deploy_config.rollback_to_image", return_value=False):
+        with (
+            patch.object(dp, "api_call", side_effect=_smoke_fail_api_call),
+            patch.object(dp, "_stream", return_value=stream_mock),
+            patch.object(dp, "time") as mock_time,
+            patch("scripts.deploy_config.rollback_to_image", return_value=False),
+        ):
             mock_time.time.side_effect = [0.0, 0.0, 1.0]
             mock_time.sleep.return_value = None
             result = dp.phase_11_production_verification(args)
@@ -587,10 +654,12 @@ class TestCPD010MockedSmokeFailurePath:
         """Pipeline exits non-zero before starting deploy when approval is missing."""
         env = {**os.environ, "DEPLOY_APPROVED": ""}
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "production", "--version", _current_version()],
-            capture_output=True, text=True, timeout=30,
-            cwd=str(PROJECT_ROOT), env=env,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "production", "--version", _current_version()],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(PROJECT_ROOT),
+            env=env,
         )
         assert result.returncode != 0
         assert "Phase" not in result.stdout or "FAIL" in result.stdout
@@ -606,35 +675,44 @@ class TestCPD010MockedSmokeFailurePath:
         exit code and rollback path are correctly wired end-to-end.
         """
         result = subprocess.run(
-            [sys.executable, str(MOCK_RUNNER), "smoke_failure",
-             "--env", "production", "--version", _current_version(), "--approved"],
-            capture_output=True, text=True, timeout=60,
+            [
+                sys.executable,
+                str(MOCK_RUNNER),
+                "smoke_failure",
+                "--env",
+                "production",
+                "--version",
+                _current_version(),
+                "--approved",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
             cwd=str(PROJECT_ROOT),
         )
         assert result.returncode == 1, (
-            f"Mocked smoke-failure path exited {result.returncode} (expected 1). "
-            f"stdout: {result.stdout[-800:]}"
+            f"Mocked smoke-failure path exited {result.returncode} (expected 1). stdout: {result.stdout[-800:]}"
         )
         assert "AUTOMATIC ROLLBACK INITIATED" in result.stdout, (
             f"Rollback message not found in output. stdout: {result.stdout[-800:]}"
         )
-        assert "RESULT: FAILURE" in result.stdout, (
-            f"Expected FAILURE banner in output. stdout: {result.stdout[-800:]}"
-        )
+        assert "RESULT: FAILURE" in result.stdout, f"Expected FAILURE banner in output. stdout: {result.stdout[-800:]}"
 
     @_skip_no_az
     def test_deploy_result_json_includes_required_fields_on_staging_dry_run(self):
         """Staging dry-run writes JSON with version, environment, status, duration_seconds."""
         result = subprocess.run(
-            [sys.executable, str(DEPLOY_PIPELINE),
-             "--env", "staging", "--version", _current_version(), "--dry-run"],
-            capture_output=True, text=True, timeout=30,
+            [sys.executable, str(DEPLOY_PIPELINE), "--env", "staging", "--version", _current_version(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(PROJECT_ROOT),
         )
         assert result.returncode == 0
         result_files = sorted(
             (PROJECT_ROOT / "logs").glob("deploy-result-staging-*.json"),
-            key=lambda p: p.stat().st_mtime, reverse=True,
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
         )
         assert result_files, "No deploy-result JSON written"
         data = json.loads(result_files[0].read_text())
