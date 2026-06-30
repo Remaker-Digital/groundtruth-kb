@@ -1070,11 +1070,145 @@ def bridge_dispatch_daemon_status_cmd(ctx: click.Context, json_output: bool) -> 
         )
 
 
+@bridge_dispatch_daemon_group.group("supervisor")
+def bridge_dispatch_daemon_supervisor_group() -> None:
+    """Windows GTKB-DispatcherDaemon scheduled-task supervisor (WI-4937)."""
+
+
+def _emit_supervisor_status(ctx: click.Context, *, task_name: str, json_output: bool) -> None:
+    from groundtruth_kb.dispatcher_supervisor import collect_supervisor_status
+
+    config = _resolve_config(ctx)
+    payload = collect_supervisor_status(config.project_root, task_name=task_name)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Supervisor platform: {payload.get('platform')}")
+    click.echo(f"Task: {payload.get('task_name')}")
+    click.echo(f"Registered: {payload.get('registered')}")
+    click.echo(f"State: {payload.get('state')}")
+    click.echo(f"Healthy: {payload.get('healthy')}")
+    findings = payload.get("findings") or []
+    for item in findings:
+        click.echo(f"Finding: {item}")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("status")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_status_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Report Windows dispatcher supervisor scheduled-task health."""
+    _emit_supervisor_status(ctx, task_name=task_name, json_output=json_output)
+
+
+@bridge_dispatch_daemon_supervisor_group.command("install")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--interval-minutes", type=int, default=1, show_default=True)
+@click.option("--daemon-tick-seconds", type=int, default=30, show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_install_cmd(
+    ctx: click.Context,
+    task_name: str,
+    interval_minutes: int,
+    daemon_tick_seconds: int,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Register and enable the headless dispatcher supervisor task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, install_supervisor
+
+    config = _resolve_config(ctx)
+    try:
+        result = install_supervisor(
+            config.project_root,
+            task_name=task_name,
+            interval_minutes=interval_minutes,
+            daemon_tick_seconds=daemon_tick_seconds,
+            dry_run=dry_run,
+        )
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Supervisor install complete (dry_run={dry_run}).")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("enable")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_enable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Enable the dispatcher supervisor scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, enable_supervisor
+
+    try:
+        result = enable_supervisor(task_name=task_name)
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Enabled supervisor task {task_name}.")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("disable")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_disable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Disable the dispatcher supervisor scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, disable_supervisor
+
+    try:
+        result = disable_supervisor(task_name=task_name)
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Disabled supervisor task {task_name}.")
+
+
+@bridge_dispatch_daemon_supervisor_group.command("uninstall")
+@click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_supervisor_uninstall_cmd(
+    ctx: click.Context, task_name: str, dry_run: bool, json_output: bool
+) -> None:
+    """Unregister the dispatcher supervisor scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, uninstall_supervisor
+
+    config = _resolve_config(ctx)
+    try:
+        result = uninstall_supervisor(
+            config.project_root,
+            task_name=task_name,
+            dry_run=dry_run,
+        )
+    except DispatcherSupervisorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Supervisor uninstall complete (dry_run={dry_run}).")
+
+
 @bridge_dispatch_daemon_group.command("start")
 @click.option("--interval", type=int, default=30, show_default=True, help="Tick interval in seconds.")
 @click.pass_context
 def bridge_dispatch_daemon_start_cmd(ctx: click.Context, interval: int) -> None:
-    """Start the shadow dispatcher daemon in the background."""
+    """Start the dispatcher daemon detached (diagnostic fallback).
+
+    Production hosts should use ``gt bridge dispatch daemon supervisor install``
+    so the headless scheduled-task supervisor keeps the daemon alive across IDE
+    and terminal closure. This command does not install or enable supervision.
+    """
     config = _resolve_config(ctx)
     daemon = _import_dispatcher_daemon_module(config.project_root)
     state_dir = daemon.daemon_state_dir(config.project_root)
@@ -1142,6 +1276,13 @@ def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
             if loop_pid > 0 and loop_pid not in candidate_pids:
                 candidate_pids.append(loop_pid)
 
+    reaped_workers = 0
+    if hasattr(daemon, "_reap_dispatched_workers"):
+        try:
+            reaped_workers = int(daemon._reap_dispatched_workers(config.project_root) or 0)
+        except Exception:  # noqa: BLE001 - stop remains best-effort
+            reaped_workers = 0
+
     for candidate_pid in candidate_pids:
         terminate_pid_tree(candidate_pid)
         try:
@@ -1165,13 +1306,14 @@ def bridge_dispatch_daemon_stop_cmd(ctx: click.Context) -> None:
         with contextlib.suppress(OSError):
             pid_path.unlink()
     daemon.release_daemon_lock(state_dir, force=True)
+    reap_note = f"; reaped dispatched workers={reaped_workers}" if reaped_workers else ""
     if candidate_pids:
         joined = ", ".join(str(item) for item in candidate_pids)
-        click.echo(f"Stopped dispatcher daemon (pid(s)={joined} tree terminated, lock released).")
+        click.echo(f"Stopped dispatcher daemon (pid(s)={joined} tree terminated, lock released{reap_note}).")
     elif pid > 0:
-        click.echo("Stopped dispatcher daemon (unverified pid ignored, pid/lock state cleared).")
+        click.echo(f"Stopped dispatcher daemon (unverified pid ignored, pid/lock state cleared{reap_note}).")
     else:
-        click.echo("Stopped dispatcher daemon (no recorded pid; lock released).")
+        click.echo(f"Stopped dispatcher daemon (no recorded pid; lock released{reap_note}).")
 
 
 def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):

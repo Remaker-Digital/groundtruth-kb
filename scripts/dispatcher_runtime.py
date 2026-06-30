@@ -4531,15 +4531,19 @@ def _provider_failure_backoff_skip(
     signature: str,
     state_dir: Path,
 ) -> dict[str, Any] | None:
-    """Return skip evidence when a target has failed this same selected batch."""
+    """Return skip evidence when a target is still inside provider-failure backoff."""
     if not prior:
         return None
 
     failed_launch_signature = _prior_failed_launch_signature(prior)
     same_failed_batch = failed_launch_signature == signature
     previous_failure = _detect_previous_launch_failure(prior, recipient=recipient, signature=signature)
+    failure_class = (
+        _failure_class_from_previous(previous_failure)
+        if previous_failure is not None
+        else str(prior.get("failure_class") or prior.get("last_failure_reason") or "provider_failure")
+    )
     if previous_failure is not None:
-        failure_class = _failure_class_from_previous(previous_failure)
         if failure_class in NON_RETRYABLE_WORKER_FAILURE_CLASSES or prior.get("non_retryable_failure"):
             # WI-4662: throttle the durable previous_launch_failed re-log; stamp
             # the prior state in place so the cooldown persists across cycles and
@@ -4554,18 +4558,12 @@ def _provider_failure_backoff_skip(
                 "previous_launch_failed": previous_failure,
             }
 
-    if not same_failed_batch:
-        return None
-
-    if previous_failure is not None:
+    if previous_failure is not None and same_failed_batch:
         # WI-4662: throttle the durable previous_launch_failed re-log (cooldown
         # stamped in place on prior; persists via _seed_provider_failure_skip_state).
         if _should_relog_previous_launch_failure(prior):
             _record_dispatch_failure(state_dir, previous_failure)
             prior["previous_launch_failed_logged_at"] = _now_iso()
-        failure_class = _failure_class_from_previous(previous_failure)
-    else:
-        failure_class = str(prior.get("last_failure_reason") or "provider_failure")
 
     if prior.get("non_retryable_failure"):
         return {
@@ -4586,12 +4584,18 @@ def _provider_failure_backoff_skip(
     retry_delay_seconds = _dispatch_retry_delay_seconds()
     if prior.get("circuit_breaker_tripped"):
         if not _circuit_breaker_half_open_allowed(prior, retry_delay_seconds):
+            if previous_failure is not None and not same_failed_batch and _should_relog_previous_launch_failure(prior):
+                _record_dispatch_failure(state_dir, previous_failure)
+                prior["previous_launch_failed_logged_at"] = _now_iso()
             return {
                 "reason": "provider_failure_backoff_active",
                 "failure_class": failure_class,
                 "backoff_source": "circuit_breaker_active",
                 **({"previous_launch_failed": previous_failure} if previous_failure is not None else {}),
             }
+        return None
+
+    if not same_failed_batch:
         return None
 
     if _retry_delay_active_for_prior(prior, retry_delay_seconds):

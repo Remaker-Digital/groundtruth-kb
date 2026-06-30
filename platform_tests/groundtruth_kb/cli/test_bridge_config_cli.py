@@ -89,6 +89,80 @@ def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> 
     assert [row["id"] for row in payload["selected_by_role"]["loyal-opposition"]] == ["D"]
 
 
+def test_bridge_dispatch_daemon_stop_reaps_workers_before_daemon_tree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _project(tmp_path)
+    state_dir = root / ".gtkb-state" / "dispatcher-daemon"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    pid = 4242
+    (state_dir / "daemon.pid").write_text(f"{pid}\n", encoding="utf-8")
+    (state_dir / "daemon.lock").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    events: list[str] = []
+
+    class _FakeDaemon:
+        PID_FILENAME = "daemon.pid"
+        PID_CREATE_TIME_FILENAME = "daemon.create_time_epoch"
+        LOCK_FILENAME = "daemon.lock"
+
+        @staticmethod
+        def daemon_state_dir(_project_root: Path) -> Path:
+            return state_dir
+
+        @staticmethod
+        def daemon_pid_provenance_verified(_state_dir: Path) -> bool:
+            return True
+
+        @staticmethod
+        def daemon_pid_matches_legacy_loop(_state_dir: Path, _pid: int) -> bool:
+            return False
+
+        @staticmethod
+        def matching_daemon_loop_pids(_state_dir: Path) -> list[int]:
+            return []
+
+        @staticmethod
+        def _reap_dispatched_workers(_project_root: Path) -> int:
+            events.append("reap")
+            return 2
+
+        @staticmethod
+        def _read_pid_create_time_sidecar(_state_dir: Path) -> None:
+            return None
+
+        @staticmethod
+        def _clear_daemon_pid_record(_state_dir: Path) -> None:
+            for name in ("daemon.pid", "daemon.create_time_epoch"):
+                try:
+                    (_state_dir / name).unlink()
+                except FileNotFoundError:
+                    pass
+
+        @staticmethod
+        def release_daemon_lock(_state_dir: Path, *, force: bool = False) -> None:
+            assert force is True
+            try:
+                (_state_dir / "daemon.lock").unlink()
+            except FileNotFoundError:
+                pass
+
+    import groundtruth_kb.bridge_dispatch_reset as bridge_dispatch_reset
+    import groundtruth_kb.cli as gtcli
+
+    monkeypatch.setattr(gtcli, "_import_dispatcher_daemon_module", lambda _project_root: _FakeDaemon)
+    monkeypatch.setattr(bridge_dispatch_reset, "terminate_pid_tree", lambda _pid: events.append("terminate"))
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "daemon", "stop"])
+
+    assert result.exit_code == 0, result.output
+    assert events == ["reap", "terminate"]
+    assert "tree terminated" in result.output
+    assert "reaped dispatched workers=2" in result.output
+    assert not (state_dir / "daemon.pid").exists()
+    assert not (state_dir / "daemon.lock").exists()
+
+
 def test_bridge_dispatch_health_cli_ignores_retired_worker_disable_env(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
