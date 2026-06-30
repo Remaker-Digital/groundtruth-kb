@@ -38,6 +38,7 @@ except ImportError:  # pragma: no cover - Python <3.11 fallback is not expected 
 DEFAULT_ENDPOINT = "http://localhost:11434"
 DEFAULT_TIMEOUT_SECONDS = 240.0
 DEFAULT_SESSION_TIMEOUT_SECONDS = 540.0
+ROUTING_SESSION_TIMEOUT_GRACE_SECONDS = 60.0
 
 # WI-4817: bounded retry for transient cloud transport failures so a dispatched
 # LO worker survives a transient hiccup and still produces a verdict. Total
@@ -104,6 +105,7 @@ class RoutingConfig:
     models: dict[str, ModelRoute]
     default_model: str
     skill_routes: dict[str, str]
+    timeout_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -168,6 +170,25 @@ def _as_non_empty_string(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not value:
         raise OllamaHarnessError(f"{field} must be a non-empty string")
     return value
+
+
+def _as_optional_positive_float(value: Any, *, field: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise OllamaHarnessError(f"{field} must be a positive number")
+    if isinstance(value, (int, float)):
+        parsed = float(value)
+    elif isinstance(value, str):
+        try:
+            parsed = float(value)
+        except ValueError as exc:
+            raise OllamaHarnessError(f"{field} must be a positive number") from exc
+    else:
+        raise OllamaHarnessError(f"{field} must be a positive number")
+    if parsed <= 0:
+        raise OllamaHarnessError(f"{field} must be a positive number")
+    return parsed
 
 
 def infer_model_version(model_id: str) -> str:
@@ -286,6 +307,10 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
         models=models,
         default_model=default_model,
         skill_routes=_parse_skill_routes(routing, models),
+        timeout_seconds=_as_optional_positive_float(
+            routing.get("timeout_seconds"),
+            field="routing.ollama.timeout_seconds",
+        ),
     )
     if advertised_model_ids is not None:
         validate_advertised_models(config, advertised_model_ids)
@@ -1013,14 +1038,45 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _flag_was_supplied(argv: Sequence[str], flag: str) -> bool:
+    prefix = f"{flag}="
+    return any(item == flag or item.startswith(prefix) for item in argv)
+
+
+def derive_session_timeout_from_route_timeout(timeout_seconds: float) -> float:
+    return timeout_seconds + ROUTING_SESSION_TIMEOUT_GRACE_SECONDS
+
+
+def resolve_runtime_timeouts(
+    args: argparse.Namespace,
+    config: RoutingConfig,
+    argv: Sequence[str],
+) -> tuple[float, float]:
+    timeout_explicit = _flag_was_supplied(argv, "--timeout")
+    session_timeout_explicit = _flag_was_supplied(argv, "--session-timeout")
+
+    if config.timeout_seconds is None or timeout_explicit:
+        operation_timeout = float(args.timeout)
+        session_timeout = float(args.session_timeout)
+    else:
+        operation_timeout = config.timeout_seconds
+        session_timeout = derive_session_timeout_from_route_timeout(config.timeout_seconds)
+
+    if session_timeout_explicit:
+        session_timeout = float(args.session_timeout)
+    return operation_timeout, session_timeout
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ensure_utf8_output_streams()
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_arg_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw_argv)
     project_root = resolve_project_root(Path.cwd())
     try:
         config = load_routing_config(project_root)
-        advertised_model_ids = call_ollama_tags(args.endpoint, args.timeout)
+        operation_timeout, session_timeout = resolve_runtime_timeouts(args, config, raw_argv)
+        advertised_model_ids = call_ollama_tags(args.endpoint, operation_timeout)
         validate_advertised_models(config, advertised_model_ids)
         model_route = resolve_model(config, args.model, skill=args.skill)
         system_prompt = build_system_prompt(args.skill, model_route)
@@ -1031,8 +1087,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.max_turns,
             project_root,
             system_prompt=system_prompt,
-            timeout=args.timeout,
-            session_timeout=args.session_timeout,
+            timeout=operation_timeout,
+            session_timeout=session_timeout,
         )
     except OllamaHarnessError as exc:
         print(f"ollama_harness: {exc}", file=sys.stderr)
