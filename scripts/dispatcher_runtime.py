@@ -358,6 +358,7 @@ _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
     "counterpart_active_session_present": "document_lease_held",
     "launched": "dispatched",
     "launch_failed": "dispatched",
+    "verdict_reconciled": "dispatched",
     "ollama_dispatch_not_ready": "dispatch_blocked",
     "unchanged": "no_change",
     "no_pending_after_filter": "selected_batch_skipped",
@@ -472,6 +473,8 @@ LEGACY_TO_NEW_STATE_KEY = {
 def _role_state_carries_retry_evidence(value: dict[str, Any]) -> bool:
     launch = value.get("last_launch")
     if isinstance(launch, dict):
+        if _is_reconciled_post_verdict_exit(launch):
+            return False
         if launch.get("stdout_path") or launch.get("stderr_path"):
             return True
         if launch.get("reason") in NON_LAUNCHED_FAILURE_REASONS:
@@ -1408,6 +1411,8 @@ def _detect_previous_launch_failure(
     """Return failure evidence when prior worker logs show a fatal marker."""
     launch = prior.get("last_launch")
     if not isinstance(launch, dict):
+        return None
+    if _is_reconciled_post_verdict_exit(launch):
         return None
 
     launch_reason = str(launch.get("reason") or "")
@@ -2573,7 +2578,7 @@ def _find_dispatch_verdict(
         if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
             try:
                 mtime = file.stat().st_mtime
-                if mtime >= dispatch_ts:
+                if mtime >= dispatch_ts and _status_from_bridge_file(file) in _DISPATCH_VERDICT_STATUSES:
                     candidate_files.append((file, mtime))
             except OSError:
                 continue
@@ -2692,6 +2697,7 @@ _BRIDGE_STATUS_LINE_RE = re.compile(
     r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED)\b",
     re.IGNORECASE,
 )
+_DISPATCH_VERDICT_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
 
 
 def _status_from_bridge_file(path: Path) -> str | None:
@@ -2705,6 +2711,10 @@ def _status_from_bridge_file(path: Path) -> str | None:
         match = _BRIDGE_STATUS_LINE_RE.match(line.strip())
         return match.group(1).upper() if match else None
     return None
+
+
+def _is_reconciled_post_verdict_exit(launch: dict[str, Any]) -> bool:
+    return bool(launch.get("exit_reconciled_after_verdict") and launch.get("verdict_path"))
 
 
 def _render_bridge_state_text(project_root: Path) -> str:
@@ -4202,12 +4212,13 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         failure_reason: str | None = None
         failure_error_type: str | None = None
         failure_extra: dict[str, Any] = {}
+        post_verdict_exit_reconciled = False
         if matched_markers:
             failure_reason = matched_markers[0]["label"]
             failure_error_type = "fatal_worker_output_marker"
             failure_extra.update(inspected_paths)
             failure_extra["matched_markers"] = matched_markers
-        elif exit_code == 0 and last_launch.get("needed_role_label") == "loyal-opposition":
+        elif last_launch.get("needed_role_label") == "loyal-opposition":
             dispatch_ts = _launch_ts(last_launch)
             bridge_id = _primary_bridge_id_for_launch(last_launch)
             verdict_path, verdict_latency = (
@@ -4218,12 +4229,16 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             if verdict_path:
                 last_launch["verdict_path"] = verdict_path
                 last_launch["verdict_latency_seconds"] = verdict_latency
-            else:
+                if exit_code != 0:
+                    last_launch["exit_reconciled_after_verdict"] = True
+                    last_launch["post_verdict_exit_code"] = exit_code
+                    post_verdict_exit_reconciled = True
+            elif exit_code == 0:
                 failure_reason = "no_verdict_produced"
                 failure_error_type = "missing_bridge_verdict"
                 failure_extra["bridge_id"] = bridge_id
 
-        if exit_code == 0 and failure_reason is None:
+        if (exit_code == 0 or post_verdict_exit_reconciled) and failure_reason is None:
             # Success: keep signature state aligned for every recipient role.
             if launch_signature:
                 recipient_state["last_dispatched_signature"] = launch_signature
@@ -4236,6 +4251,10 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             recipient_state.pop("circuit_breaker_tripped_at", None)
             recipient_state.pop("circuit_breaker_half_open", None)
             recipient_state.pop("last_failure_reason", None)
+            recipient_state.pop("failure_class", None)
+            recipient_state.pop("non_retryable_failure", None)
+            if post_verdict_exit_reconciled:
+                recipient_state["last_result"] = "verdict_reconciled"
             # WI-4662: a recovered target re-logs immediately if it fails again,
             # so clear the previous_launch_failed cooldown stamp + annotation.
             recipient_state.pop("previous_launch_failed_logged_at", None)
@@ -5585,6 +5604,8 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
             lines.append(f"- {name}: suppressed ({reason}).{annotation}")
         elif sig == last_dispatched and sig:
             lines.append(f"- {name}: dispatched (signature matches last_dispatched).{annotation}")
+        elif last_result == "verdict_reconciled":
+            lines.append(f"- {name}: dispatched (post-verdict worker exit reconciled).{annotation}")
         elif last_result == "unchanged":
             lines.append(f"- {name}: idempotent (signature unchanged from last successful dispatch).{annotation}")
         else:

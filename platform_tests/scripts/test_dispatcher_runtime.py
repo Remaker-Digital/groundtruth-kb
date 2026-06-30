@@ -4497,6 +4497,196 @@ def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
     assert any(record.get("reason") == "no_verdict_produced" for record in failures)
 
 
+def test_find_dispatch_verdict_ignores_non_verdict_statuses(tmp_path: Path) -> None:
+    """WI-4933: only status-bearing LO verdict files reconcile dispatch exits."""
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    dispatch_ts = time.time() - 10
+
+    new_file = bridge_dir / "example-thread-002.md"
+    new_file.write_text("NEW\n\n# Post-implementation report\n", encoding="utf-8")
+    os.utime(new_file, (dispatch_ts + 1, dispatch_ts + 1))
+
+    assert trigger._find_dispatch_verdict(
+        dispatch_ts=dispatch_ts,
+        bridge_id="example-thread",
+        project_root=root,
+    ) == (None, None)
+
+    go_file = bridge_dir / "example-thread-003.md"
+    go_file.write_text("GO\n\n# Review verdict\n", encoding="utf-8")
+    os.utime(go_file, (dispatch_ts + 2, dispatch_ts + 2))
+
+    verdict_path, latency = trigger._find_dispatch_verdict(
+        dispatch_ts=dispatch_ts,
+        bridge_id="example-thread",
+        project_root=root,
+    )
+
+    assert verdict_path == "bridge/example-thread-003.md"
+    assert latency == pytest.approx(2.0)
+
+
+def test_lo_nonzero_exit_with_post_launch_verdict_reconciles_success(tmp_path: Path) -> None:
+    """WI-4933: an LO worker that files a verdict then exits nonzero is recovered."""
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-F-ab61d4"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    verdict_file = bridge_dir / "example-thread-002.md"
+    verdict_file.write_text("VERIFIED\n\n# Verification verdict\n", encoding="utf-8")
+
+    launch = {
+        "dispatch_id": dispatch_id,
+        "recipient": "loyal-opposition:F",
+        "launched": True,
+        "pid": 12345,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        "signature": "sig-fixture",
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["example-thread"],
+        "primary_bridge_id": "example-thread",
+    }
+    recipients_state = {
+        "loyal-opposition:F": {
+            "last_launch": launch,
+            "failure_count": 2,
+            "circuit_breaker_tripped": True,
+            "last_failure_reason": "provider_rate_limited",
+            "failure_class": "provider_rate_limited",
+            "previous_launch_failed": {"reason": "previous_launch_failed"},
+            "previous_launch_failed_logged_at": "2026-06-30T13:40:00Z",
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:F"]
+    last_launch = state["last_launch"]
+    assert last_launch["exit_code"] == 1
+    assert last_launch["exit_reconciled_after_verdict"] is True
+    assert last_launch["post_verdict_exit_code"] == 1
+    assert last_launch["verdict_path"] == "bridge/example-thread-002.md"
+    assert state["failure_count"] == 0
+    assert state["circuit_breaker_tripped"] is False
+    assert state["last_result"] == "verdict_reconciled"
+    assert state["last_dispatched_signature"] == "sig-fixture"
+    assert "last_failure_reason" not in state
+    assert "failure_class" not in state
+    assert "previous_launch_failed" not in state
+    assert "previous_launch_failed_logged_at" not in state
+    assert _failure_records(state_dir) == []
+    assert (
+        trigger._detect_previous_launch_failure(
+            state,
+            recipient="loyal-opposition:F",
+            signature="sig-fixture",
+        )
+        is None
+    )
+
+
+def test_lo_nonzero_exit_without_verdict_remains_subprocess_failure(tmp_path: Path) -> None:
+    """WI-4933: nonzero LO exits without a verdict remain subprocess failures."""
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    (root / "bridge").mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-F-no-verdict"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    recipients_state = {
+        "loyal-opposition:F": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "recipient": "loyal-opposition:F",
+                "launched": True,
+                "pid": 12345,
+                "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+                "signature": "sig-fixture",
+                "needed_role_label": "loyal-opposition",
+                "selected_documents": ["example-thread"],
+                "primary_bridge_id": "example-thread",
+            },
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:F"]
+    last_launch = state["last_launch"]
+    assert "exit_reconciled_after_verdict" not in last_launch
+    assert "verdict_path" not in last_launch
+    assert state["failure_count"] == 1
+    assert state["last_failure_reason"] == "subprocess_execution_failed"
+    assert state["failure_class"] == "subprocess_execution_failed"
+    failures = _failure_records(state_dir)
+    assert failures[0]["reason"] == "subprocess_execution_failed"
+    assert failures[0]["error_type"] == "subprocess_execution_failed"
+
+
+def test_lo_nonzero_exit_with_fatal_marker_does_not_reconcile_verdict(tmp_path: Path) -> None:
+    """WI-4933: fatal worker-output markers still fail closed before reconciliation."""
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-F-fatal"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stderr_path.write_text("Ollama harness: max-turn exhaustion before final assistant text\n", encoding="utf-8")
+    (bridge_dir / "example-thread-002.md").write_text("GO\n\n# Review verdict\n", encoding="utf-8")
+
+    recipients_state = {
+        "loyal-opposition:F": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "recipient": "loyal-opposition:F",
+                "launched": True,
+                "pid": 12345,
+                "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+                "stderr_path": str(stderr_path),
+                "signature": "sig-fixture",
+                "needed_role_label": "loyal-opposition",
+                "selected_documents": ["example-thread"],
+                "primary_bridge_id": "example-thread",
+            },
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:F"]
+    last_launch = state["last_launch"]
+    assert "exit_reconciled_after_verdict" not in last_launch
+    assert "verdict_path" not in last_launch
+    assert state["failure_count"] == 1
+    assert state["last_failure_reason"] == "max_turn_exhaustion"
+    assert state["failure_class"] == "max_turn_exhaustion"
+    failures = _failure_records(state_dir)
+    assert failures[0]["error_type"] == "fatal_worker_output_marker"
+    assert failures[0]["matched_markers"][0]["label"] == "max_turn_exhaustion"
+
+
 def test_wi4578_non_launched_failure_is_previous_launch_failure() -> None:
     """A failed pre-spawn launch must not collapse to unchanged on the next cycle."""
     trigger = _load_trigger()
