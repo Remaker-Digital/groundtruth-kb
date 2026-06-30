@@ -359,6 +359,7 @@ _LAST_RESULT_TO_DIAGNOSTIC_CLASSIFICATION = {
     "launched": "dispatched",
     "launch_failed": "dispatched",
     "verdict_reconciled": "dispatched",
+    "terminal_bridge_reconciled": "dispatched",
     "ollama_dispatch_not_ready": "dispatch_blocked",
     "unchanged": "no_change",
     "no_pending_after_filter": "selected_batch_skipped",
@@ -2694,10 +2695,11 @@ def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
 
 
 _BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED|RETIRED|SUPERSEDED)\b",
     re.IGNORECASE,
 )
 _DISPATCH_VERDICT_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+_TERMINAL_DISPATCH_BRIDGE_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "RETIRED", "SUPERSEDED"})
 
 
 def _status_from_bridge_file(path: Path) -> str | None:
@@ -2711,6 +2713,141 @@ def _status_from_bridge_file(path: Path) -> str | None:
         match = _BRIDGE_STATUS_LINE_RE.match(line.strip())
         return match.group(1).upper() if match else None
     return None
+
+
+def _latest_bridge_status_for_document(project_root: Path | None, bridge_id: str) -> str | None:
+    if project_root is None:
+        return None
+    bridge_id = bridge_id.strip()
+    if not bridge_id:
+        return None
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return None
+
+    candidate_files = list(bridge_dir.glob(f"{bridge_id}-*.md"))
+    if not bridge_id.startswith("gtkb-"):
+        candidate_files.extend(bridge_dir.glob(f"gtkb-{bridge_id}-*.md"))
+    if not candidate_files:
+        return None
+    candidate_files = sorted({path for path in candidate_files if path.is_file()}, key=lambda path: path.name)
+    for path in reversed(candidate_files):
+        status = _status_from_bridge_file(path)
+        if status is not None:
+            return status
+    return None
+
+
+def _bridge_ids_from_recipient_state(recipient_state: dict[str, Any]) -> list[str]:
+    ids: list[str] = []
+
+    def _add(value: Any) -> None:
+        if isinstance(value, str) and value.strip():
+            slug = value.strip()
+            if slug not in ids:
+                ids.append(slug)
+
+    def _add_from_mapping(mapping: dict[str, Any]) -> None:
+        _add(mapping.get("primary_bridge_id"))
+        _add(mapping.get("bridge_id"))
+        for key in ("selected_documents", "document_names"):
+            raw = mapping.get(key)
+            if isinstance(raw, list):
+                for item in raw:
+                    _add(item)
+
+    _add_from_mapping(recipient_state)
+    last_launch = recipient_state.get("last_launch")
+    if isinstance(last_launch, dict):
+        _add_from_mapping(last_launch)
+    return ids
+
+
+def _nonnegative_int_value(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(parsed, 0)
+
+
+def _terminal_bridge_reconciliation_reason(project_root: Path | None, recipient_state: dict[str, Any]) -> str | None:
+    bridge_ids = _bridge_ids_from_recipient_state(recipient_state)
+    if not bridge_ids:
+        return None
+    statuses = {bridge_id: _latest_bridge_status_for_document(project_root, bridge_id) for bridge_id in bridge_ids}
+    if not statuses or any(status is None for status in statuses.values()):
+        return None
+    if not all(status in _TERMINAL_DISPATCH_BRIDGE_STATUSES for status in statuses.values() if status is not None):
+        return None
+    rendered = ", ".join(f"{bridge_id}={status}" for bridge_id, status in sorted(statuses.items()))
+    return f"referenced bridge document terminal ({rendered})"
+
+
+def _recipient_state_has_visible_residue(recipient_state: dict[str, Any]) -> bool:
+    pending_count = _nonnegative_int_value(recipient_state.get("pending_count"))
+    selected_count = _nonnegative_int_value(recipient_state.get("selected_count"))
+    if pending_count > 0 or selected_count > 0:
+        return True
+    last_launch = recipient_state.get("last_launch") if isinstance(recipient_state.get("last_launch"), dict) else {}
+    return bool(
+        recipient_state.get("failure_class")
+        or recipient_state.get("last_failure_reason")
+        or recipient_state.get("failure_count")
+        or recipient_state.get("circuit_breaker_tripped")
+        or last_launch.get("exit_failure_reason")
+    )
+
+
+def _reconcile_terminal_bridge_recipient_state(
+    recipients_state: dict[str, Any],
+    project_root: Path,
+) -> list[str]:
+    """Clear stale dispatch residue for recipients whose selected bridge docs are terminal."""
+    reconciled: list[str] = []
+    for recipient, raw_state in list(recipients_state.items()):
+        if not isinstance(raw_state, dict):
+            continue
+        reason = _terminal_bridge_reconciliation_reason(project_root, raw_state)
+        if reason is None or not _recipient_state_has_visible_residue(raw_state):
+            continue
+
+        last_launch = raw_state.get("last_launch") if isinstance(raw_state.get("last_launch"), dict) else None
+        launch_signature = last_launch.get("signature") if isinstance(last_launch, dict) else None
+        prior_signature = raw_state.get("last_dispatched_signature") or raw_state.get("signature") or launch_signature
+
+        raw_state["last_result"] = "terminal_bridge_reconciled"
+        raw_state["pending_count"] = 0
+        raw_state["selected_count"] = 0
+        raw_state["raw_pending_count"] = 0
+        raw_state["failure_count"] = 0
+        raw_state["circuit_breaker_tripped"] = False
+        raw_state["updated_at"] = _now_iso()
+        raw_state["terminal_bridge_reconciliation_reason"] = reason
+        raw_state["terminal_bridge_reconciled_documents"] = _bridge_ids_from_recipient_state(raw_state)
+        if prior_signature:
+            raw_state["last_dispatched_signature"] = prior_signature
+            raw_state["signature"] = prior_signature
+        raw_state["last_suppressed_signature"] = None
+
+        for key in (
+            "backoff_source",
+            "circuit_breaker_half_open",
+            "circuit_breaker_tripped_at",
+            "failure_class",
+            "fallback_skipped_candidates",
+            "last_failure_reason",
+            "non_retryable_failure",
+            "previous_launch_failed",
+            "previous_launch_failed_logged_at",
+        ):
+            raw_state.pop(key, None)
+        if isinstance(last_launch, dict):
+            last_launch["terminal_bridge_reconciled"] = True
+            last_launch["terminal_bridge_reconciled_at"] = raw_state["updated_at"]
+            last_launch["terminal_bridge_reconciliation_reason"] = reason
+        reconciled.append(recipient)
+    return reconciled
 
 
 def _is_reconciled_post_verdict_exit(launch: dict[str, Any]) -> bool:
@@ -4598,6 +4735,7 @@ def run_dispatch_cycle(
             recipients_state = {}
         recipients_state = _migrate_recipients_state_keys(recipients_state, project_root)
         _process_pending_exit_codes(recipients_state, state_dir, project_root)
+        _reconcile_terminal_bridge_recipient_state(recipients_state, project_root)
 
         # IP-3b: resolve dispatch targets from the durable role record. The
         # mapping from actionable-classification to needed-role is fixed:
@@ -5606,6 +5744,15 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
             lines.append(f"- {name}: dispatched (signature matches last_dispatched).{annotation}")
         elif last_result == "verdict_reconciled":
             lines.append(f"- {name}: dispatched (post-verdict worker exit reconciled).{annotation}")
+        elif last_result == "terminal_bridge_reconciled":
+            reason = rec.get("terminal_bridge_reconciliation_reason") or "referenced bridge document is terminal"
+            lines.append(f"- {name}: idle (terminal bridge residue reconciled: {reason}).{annotation}")
+        elif (
+            project_root is not None
+            and _recipient_state_has_visible_residue(rec)
+            and (reason := _terminal_bridge_reconciliation_reason(project_root, rec)) is not None
+        ):
+            lines.append(f"- {name}: idle (terminal bridge residue pending reconciliation: {reason}).{annotation}")
         elif last_result == "unchanged":
             lines.append(f"- {name}: idempotent (signature unchanged from last successful dispatch).{annotation}")
         else:

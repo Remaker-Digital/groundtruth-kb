@@ -1076,6 +1076,61 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
     assert recipient_state["selected_count"] == 0
 
 
+def test_daemon_execute_live_spawns_reconciles_terminal_bridge_residue(tmp_path: Path) -> None:
+    """WI-4935: daemon-owned state writes clear stale failover rows for terminal docs."""
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    _write_bridge(root, "done-thread", "NEW", 1)
+    _write_bridge(root, "done-thread", "VERIFIED", 2)
+    (root / "bridge" / "INDEX.md").write_text(
+        "# bridge index\n\nDocument: done-thread\nVERIFIED: bridge/done-thread-002.md\nNEW: bridge/done-thread-001.md\n",
+        encoding="utf-8",
+    )
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "dispatch-state.json").write_text(
+        json.dumps(
+            {
+                "recipients": {
+                    "loyal-opposition:B": {
+                        "last_result": "subprocess_execution_failed",
+                        "failure_class": "subprocess_execution_failed",
+                        "failure_count": 2,
+                        "circuit_breaker_tripped": True,
+                        "pending_count": 1,
+                        "selected_count": 1,
+                        "last_launch": {
+                            "dispatch_id": "prior-claude",
+                            "recipient": "loyal-opposition:B",
+                            "launched": True,
+                            "primary_bridge_id": "done-thread",
+                            "selected_documents": ["done-thread"],
+                            "signature": "stale-signature",
+                            "exit_failure_reason": "subprocess_execution_failed",
+                        },
+                    }
+                },
+                "schema_version": 1,
+                "updated_at": "2026-06-30T09:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = daemon._execute_live_spawns(root, [], max_items=2, dry_run=False)
+
+    assert result == []
+    state = runtime._load_dispatch_state(state_dir, root)
+    recipient_state = state["recipients"]["loyal-opposition:B"]
+    assert recipient_state["last_result"] == "terminal_bridge_reconciled"
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
+    assert recipient_state["failure_count"] == 0
+    assert recipient_state["circuit_breaker_tripped"] is False
+    assert "failure_class" not in recipient_state
+
+
 def test_daemon_live_skips_owner_hold_prime_no_go(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

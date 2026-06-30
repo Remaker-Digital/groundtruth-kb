@@ -90,6 +90,7 @@ RECENT_RUN_TEXT_READ_LIMIT = 12_000
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", PID_CREATE_TIME_SUFFIX)
+TERMINAL_DISPATCH_BRIDGE_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "RETIRED", "SUPERSEDED"})
 
 
 @dataclass(frozen=True)
@@ -567,6 +568,7 @@ def _runtime_dispatch_evaluation(
     seen: set[str] = set()
     current_rows: dict[str, dict[str, Any]] = {}
     if isinstance(recipients, dict):
+        selected_keys.update(_terminal_bridge_stale_recipient_keys(root, recipients))
         for recipient_key in sorted(selected_keys):
             row = recipients.get(recipient_key)
             if not isinstance(row, dict):
@@ -575,6 +577,7 @@ def _runtime_dispatch_evaluation(
             classification = _runtime_classification_for_recipient(
                 recipient_key,
                 row,
+                project_root=root,
                 runs_dir=root / DISPATCH_RUNS_RELATIVE_PATH,
             )
             classifications.append(classification)
@@ -837,6 +840,7 @@ def _runtime_classification_for_recipient(
     recipient_key: str,
     row: dict[str, Any],
     *,
+    project_root: Path | None = None,
     runs_dir: Path | None = None,
 ) -> dict[str, Any]:
     findings: list[str] = []
@@ -850,7 +854,13 @@ def _runtime_classification_for_recipient(
     launch_exit_failure = str(last_launch.get("exit_failure_reason") or "").strip()
     live_inflight_dispatch_count = _recipient_live_dispatch_count(runs_dir, recipient_key)
     has_visible_backpressure = has_pending_work or live_inflight_dispatch_count > 0
-    stale_failure_reason = _stale_failure_evidence_reason(recipient_key, row, last_launch, runs_dir=runs_dir)
+    stale_failure_reason = _stale_failure_evidence_reason(
+        recipient_key,
+        row,
+        last_launch,
+        project_root=project_root,
+        runs_dir=runs_dir,
+    )
     failure_evidence_present = any(
         (
             failure_class in RUNTIME_FAILURE_CLASSES,
@@ -1063,8 +1073,12 @@ def _stale_failure_evidence_reason(
     row: dict[str, Any],
     last_launch: dict[str, Any],
     *,
+    project_root: Path | None = None,
     runs_dir: Path | None = None,
 ) -> str | None:
+    terminal_reason = _terminal_bridge_reconciliation_reason(project_root, row)
+    if terminal_reason is not None:
+        return terminal_reason
     if ":" not in recipient_key:
         return None
     expected = recipient_key.strip()
@@ -1072,6 +1086,95 @@ def _stale_failure_evidence_reason(
     if not evidence_recipients or expected in evidence_recipients:
         return _stale_dispatch_run_liveness_reason(runs_dir, last_launch)
     return "recipient evidence points to " + ", ".join(sorted(evidence_recipients))
+
+
+def _terminal_bridge_stale_recipient_keys(root: Path, recipients: dict[str, Any]) -> set[str]:
+    keys: set[str] = set()
+    for recipient_key, row in recipients.items():
+        if not isinstance(recipient_key, str) or ":" not in recipient_key or not isinstance(row, dict):
+            continue
+        if not _recipient_state_has_visible_residue(row):
+            continue
+        if _terminal_bridge_reconciliation_reason(root, row) is not None:
+            keys.add(recipient_key)
+    return keys
+
+
+def _recipient_state_has_visible_residue(row: dict[str, Any]) -> bool:
+    pending_count = _int_value(row.get("pending_count"), default=0)
+    selected_count = _int_value(row.get("selected_count"), default=0)
+    return pending_count > 0 or selected_count > 0
+
+
+def _terminal_bridge_reconciliation_reason(project_root: Path | None, row: dict[str, Any]) -> str | None:
+    bridge_ids = _bridge_ids_from_runtime_row(row)
+    if project_root is None or not bridge_ids:
+        return None
+    statuses = {bridge_id: _latest_bridge_status_for_document(project_root, bridge_id) for bridge_id in bridge_ids}
+    if not statuses or any(status is None for status in statuses.values()):
+        return None
+    if not all(status in TERMINAL_DISPATCH_BRIDGE_STATUSES for status in statuses.values() if status is not None):
+        return None
+    rendered = ", ".join(f"{bridge_id}={status}" for bridge_id, status in sorted(statuses.items()))
+    return f"referenced bridge document terminal ({rendered})"
+
+
+def _bridge_ids_from_runtime_row(row: dict[str, Any]) -> list[str]:
+    ids: list[str] = []
+
+    def _add(value: Any) -> None:
+        if isinstance(value, str) and value.strip():
+            slug = value.strip()
+            if slug not in ids:
+                ids.append(slug)
+
+    def _add_from_mapping(mapping: dict[str, Any]) -> None:
+        _add(mapping.get("primary_bridge_id"))
+        _add(mapping.get("bridge_id"))
+        for key in ("selected_documents", "document_names"):
+            raw = mapping.get(key)
+            if isinstance(raw, list):
+                for item in raw:
+                    _add(item)
+
+    _add_from_mapping(row)
+    last_launch = row.get("last_launch")
+    if isinstance(last_launch, dict):
+        _add_from_mapping(last_launch)
+    return ids
+
+
+def _latest_bridge_status_for_document(project_root: Path, bridge_id: str) -> str | None:
+    bridge_id = bridge_id.strip()
+    if not bridge_id:
+        return None
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return None
+    candidates = list(bridge_dir.glob(f"{bridge_id}-*.md"))
+    if not bridge_id.startswith("gtkb-"):
+        candidates.extend(bridge_dir.glob(f"gtkb-{bridge_id}-*.md"))
+    if not candidates:
+        return None
+    for path in sorted({path for path in candidates if path.is_file()}, key=lambda item: item.name, reverse=True):
+        status = _status_from_bridge_file(path)
+        if status is not None:
+            return status
+    return None
+
+
+def _status_from_bridge_file(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        token = stripped.split(maxsplit=1)[0].strip("#>*-`").upper()
+        return token
+    return None
 
 
 def _stale_dispatch_run_liveness_reason(runs_dir: Path | None, last_launch: dict[str, Any]) -> str | None:

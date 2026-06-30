@@ -322,6 +322,13 @@ def _index_with_one_go(root: Path, doc: str = "example-thread") -> str:
     return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n"
 
 
+def _index_with_one_verified(root: Path, doc: str = "verified-thread") -> str:
+    """Build an INDEX whose top status is terminal VERIFIED."""
+    _write_bridge_file(root, f"{doc}-001.md", "NEW\n\nauthor_session_context_id: fixture-author-session\n")
+    _write_bridge_file(root, f"{doc}-002.md", "VERIFIED\n\n# Verified fixture\n")
+    return f"# bridge index\n\nDocument: {doc}\nVERIFIED: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n"
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-2-signature-computation
 # ──────────────────────────────────────────────────────────────────────────
@@ -2552,6 +2559,106 @@ def test_diagnose_treats_work_intent_already_held_as_healthy_suppression(
     assert "- prime-builder:A: suppressed (work intent already held)." in output
     assert "HEALTHY" in output
     assert "DEGRADED" not in output
+
+
+def test_diagnose_treats_terminal_bridge_residue_as_healthy_history(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4935: historical failures for VERIFIED bridge docs are not live degradation."""
+    root = _make_synthetic_project(tmp_path)
+    _write_index(root, _index_with_one_verified(root, "done-thread"))
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "loyal-opposition:F": {
+                "last_result": "subprocess_execution_failed",
+                "failure_class": "subprocess_execution_failed",
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_launch": {
+                    "dispatch_id": "prior-openrouter",
+                    "recipient": "loyal-opposition:F",
+                    "launched": True,
+                    "primary_bridge_id": "done-thread",
+                    "selected_documents": ["done-thread"],
+                    "signature": "stale-signature",
+                    "exit_failure_reason": "subprocess_execution_failed",
+                },
+            }
+        },
+        "schema_version": 1,
+        "updated_at": "2026-06-30T09:00:00+00:00",
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_resolve_project_root", lambda value=None: root)
+
+    output = trigger._emit_diagnose_summary(state_dir)
+
+    assert "terminal bridge residue pending reconciliation" in output
+    assert "done-thread=VERIFIED" in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
+
+
+def test_dispatch_cycle_clears_terminal_bridge_failover_residue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4935: a dispatcher tick clears stale pending/failure fields for terminal docs."""
+    root = _make_synthetic_project(tmp_path)
+    _write_index(root, _index_with_one_verified(root, "done-thread"))
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "dispatch-state.json").write_text(
+        json.dumps(
+            {
+                "recipients": {
+                    "loyal-opposition:F": {
+                        "last_result": "subprocess_execution_failed",
+                        "failure_class": "subprocess_execution_failed",
+                        "last_failure_reason": "subprocess_execution_failed",
+                        "failure_count": 3,
+                        "circuit_breaker_tripped": True,
+                        "pending_count": 1,
+                        "selected_count": 1,
+                        "last_launch": {
+                            "dispatch_id": "prior-openrouter",
+                            "recipient": "loyal-opposition:F",
+                            "launched": True,
+                            "primary_bridge_id": "done-thread",
+                            "selected_documents": ["done-thread"],
+                            "signature": "stale-signature",
+                            "exit_failure_reason": "subprocess_execution_failed",
+                        },
+                    }
+                },
+                "schema_version": 1,
+                "updated_at": "2026-06-30T09:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    rec = state["recipients"]["loyal-opposition:F"]
+    assert rec["last_result"] == "terminal_bridge_reconciled"
+    assert rec["pending_count"] == 0
+    assert rec["selected_count"] == 0
+    assert rec["failure_count"] == 0
+    assert rec["circuit_breaker_tripped"] is False
+    assert rec["signature"] == "stale-signature"
+    assert rec["last_dispatched_signature"] == "stale-signature"
+    assert "failure_class" not in rec
+    assert "last_failure_reason" not in rec
 
 
 def test_diagnose_treats_unrecorded_dispatchable_harness_as_not_evaluated(

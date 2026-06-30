@@ -665,6 +665,8 @@ def _execute_live_spawns(
     if not isinstance(recipients_state, dict):
         recipients_state = {}
         state["recipients"] = recipients_state
+    if hasattr(runtime, "_reconcile_terminal_bridge_recipient_state"):
+        runtime._reconcile_terminal_bridge_recipient_state(recipients_state, project_root)
 
     spawn_results: list[dict[str, Any]] = []
     for record in decision_records:
