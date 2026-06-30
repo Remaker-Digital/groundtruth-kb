@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -128,7 +129,7 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
     assert result["status"] == "completed"
     with sqlite3.connect(db_path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM refresh_runs WHERE status = 'completed'").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM health_cards").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM health_cards").fetchone()[0] >= 2
         assert conn.execute("SELECT COUNT(*) FROM action_center").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM kpi_snapshots").fetchone()[0] == 8
         assert conn.execute("SELECT COUNT(*) FROM setup_steps").fetchone()[0] >= 6
@@ -213,6 +214,10 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
     model = _sample_model()
     model["dashboard_intelligence"]["release_readiness"] = {"blockers": [], "blocker_count": 0}
     model["dashboard_intelligence"]["quality_rollup"]["failing"] = 0
+    model["dashboard_intelligence"]["health"] = [
+        {"label": "Project Health", "value": "0 issues", "status": "green", "tooltip": "stale"},
+        {"label": "Release Readiness", "value": "0 blockers", "status": "green", "tooltip": "stale"},
+    ]
     model["dashboard_intelligence"]["release_health_findings"] = [
         {"source": "dispatcher", "message": "dispatch health WARN", "severity": "red"},
         {"source": "bridge", "message": "bridge has live in-flight work", "severity": "yellow"},
@@ -239,6 +244,16 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
             )
         }
         blockers = [row[0] for row in conn.execute("SELECT blocker FROM release_blockers ORDER BY sort_order")]
+        health_cards = {
+            row[0]: (row[1], row[2])
+            for row in conn.execute(
+                "SELECT label, value, status FROM health_cards WHERE label IN (?, ?)",
+                (
+                    "Project Health",
+                    "Release Readiness",
+                ),
+            )
+        }
 
     assert metrics == {
         "release_blockers": (3, "red"),
@@ -252,6 +267,36 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
         "[bridge] bridge has live in-flight work",
         "[readme-wiki] wiki page differs from source",
     ]
+    assert health_cards == {
+        "Project Health": ("3 issues", "red"),
+        "Release Readiness": ("3 blockers", "red"),
+    }
+
+
+def test_live_dirty_worktree_count_overrides_startup_model_count() -> None:
+    rows = {
+        row[0]: row
+        for row in refresh_dashboard_db._current_metric_rows(
+            {"drift": {"changed_path_count": 8}, "regression": {"release_blocker_count": 0}, "contention": {}},
+            {"release_readiness": {"blockers": [], "blocker_count": 0}, "quality_rollup": {"failing": 0}},
+            [
+                {
+                    "source": "git",
+                    "message": "Live git dirty worktree path count: 305",
+                    "severity": "red",
+                    "metric_key": "dirty_worktree_paths",
+                    "metric_value": 305,
+                    "release_visible": False,
+                }
+            ],
+        )
+    }
+
+    dirty = rows["dirty_worktree_paths"]
+
+    assert dirty[2] == 305
+    assert dirty[3] == "red"
+    assert "live git status" in dirty[4]
 
 
 def test_deferred_records_without_expiry_surface_release_health_warn(tmp_path) -> None:
@@ -423,6 +468,98 @@ def test_github_workflow_live_status_classifies_unavailable(monkeypatch) -> None
     assert status["health"] == "yellow"
     assert status["status"] == "live_state_unavailable"
     assert "gh auth required" in status["latest_run_summary"]
+
+
+def test_probe_live_restores_github_cli_auth_env_after_startup_model(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "gtkb-dashboard.sqlite"
+    original_gh_config = str(tmp_path / "host-gh-config")
+    captured_env: dict[str, str | None] = {}
+
+    class FakeSessionModule:
+        def build_startup_model(self, project_root: Path, *, fast_hook: bool = False) -> dict:
+            os.environ["XDG_CONFIG_HOME"] = str(tmp_path / "startup-temp-config")
+            os.environ["GH_CONFIG_DIR"] = str(tmp_path / "startup-gh-config")
+            return _sample_model()
+
+        def _snapshot_from_model(self, model: dict) -> dict:
+            return {"generated_at": model["generated_at"]}
+
+    def fake_github_status(project_root: Path) -> dict:
+        captured_env["XDG_CONFIG_HOME"] = os.environ.get("XDG_CONFIG_HOME")
+        captured_env["GH_CONFIG_DIR"] = os.environ.get("GH_CONFIG_DIR")
+        return {
+            "order": 1,
+            "display_name": "GitHub Actions",
+            "health": "green",
+            "status": "passing",
+            "latest_run_summary": "Python Tests: status=completed conclusion=success",
+            "gate_role": "release gate",
+            "remediation": "No action required.",
+        }
+
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("GH_CONFIG_DIR", original_gh_config)
+    monkeypatch.setattr(refresh_dashboard_db, "_load_session_module", lambda: FakeSessionModule())
+    monkeypatch.setattr(refresh_dashboard_db, "_live_release_health_findings", lambda project_root: [])
+    monkeypatch.setattr(refresh_dashboard_db, "_github_workflow_live_status", fake_github_status)
+    monkeypatch.setattr(
+        refresh_dashboard_db,
+        "_dispatcher_supervisor_live_status",
+        lambda project_root: {
+            "order": 2,
+            "display_name": "Dispatcher Daemon Supervisor",
+            "health": "green",
+            "status": "healthy_headless",
+            "latest_run_summary": "healthy",
+            "gate_role": "release infrastructure",
+            "remediation": "No action required.",
+        },
+    )
+    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda project_root: None)
+    monkeypatch.setattr(refresh_dashboard_db, "_refresh_tafe_projection_safe", lambda db_path, project_root: None)
+
+    refresh_dashboard_db.refresh_database(db_path=db_path, project_root=REPO_ROOT, probe_live=True)
+
+    with sqlite3.connect(db_path) as conn:
+        github_status = conn.execute("SELECT status FROM integration_status WHERE key = 'github'").fetchone()[0]
+
+    assert captured_env == {"XDG_CONFIG_HOME": None, "GH_CONFIG_DIR": original_gh_config}
+    assert github_status == "passing"
+
+
+def test_probe_live_adds_headless_dispatcher_supervisor_status(monkeypatch) -> None:
+    monkeypatch.setattr(
+        refresh_dashboard_db,
+        "_github_workflow_live_status",
+        lambda project_root: {
+            "order": 1,
+            "display_name": "GitHub Actions",
+            "health": "green",
+            "status": "passing",
+            "latest_run_summary": "passing",
+            "gate_role": "release gate",
+            "remediation": "No action required.",
+        },
+    )
+    monkeypatch.setattr(
+        refresh_dashboard_db,
+        "_run_release_json_probe",
+        lambda project_root, args, timeout=20: {
+            "healthy": True,
+            "registered": True,
+            "enabled": True,
+            "hidden": True,
+            "uses_pythonw": True,
+        },
+    )
+
+    rows = refresh_dashboard_db._integration_status_rows({}, REPO_ROOT, probe_live_workflows=True)
+    by_key = {row[1]: row for row in rows}
+    supervisor = by_key["dispatcher_supervisor"]
+
+    assert supervisor[3] == "green"
+    assert supervisor[4] == "healthy_headless"
+    assert "hidden=True" in supervisor[5]
 
 
 def test_shortcuts_panel_uses_copy_path_link_title() -> None:

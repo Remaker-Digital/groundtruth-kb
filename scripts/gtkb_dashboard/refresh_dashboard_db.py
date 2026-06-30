@@ -57,6 +57,7 @@ _GITHUB_WORKFLOW_BRANCH = "main"
 _TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 _AZURE_CONTAINER_APP_MAP_ENV = "GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP"
 _AZURE_RESOURCE_GROUP_ENV = "GTKB_DASHBOARD_AZURE_RESOURCE_GROUP"
+_EXTERNAL_CLI_AUTH_ENV_KEYS = ("GH_CONFIG_DIR", "XDG_CONFIG_HOME")
 _DEFERRAL_STATUS_KEYS = ("status", "state", "outcome", "resolution_status", "lifecycle_state")
 _DEFERRAL_BOUNDARY_KEYS = (
     "expires_at",
@@ -720,7 +721,11 @@ def refresh_database(
         session_module = None
         if model is None:
             session_module = _load_session_module()
-            model = session_module.build_startup_model(project_root, fast_hook=fast_startup_model)
+            external_cli_auth_env = _snapshot_external_cli_auth_env()
+            try:
+                model = session_module.build_startup_model(project_root, fast_hook=fast_startup_model)
+            finally:
+                _restore_external_cli_auth_env(external_cli_auth_env)
         if history is None:
             if session_module is None:
                 session_module = _load_session_module()
@@ -849,6 +854,9 @@ def _write_model_to_db(
             "generated_at": model.get("generated_at", ""),
             "role": model.get("role", {}).get("assumed_role", ""),
             "scope_note": model.get("dashboard_requirements", {}).get("scope_note", ""),
+            "dashboard_subject_scope": _dashboard_subject_scope_label(model),
+            "dashboard_subject_badge": "GT-KB platform + active adopter",
+            "refresh_service_scope": "loopback/local-only (127.0.0.1)",
             "raw_model_json": json.dumps(model, sort_keys=True),
         }
         conn.executemany(
@@ -866,7 +874,9 @@ def _write_model_to_db(
                     item.get("status", ""),
                     item.get("tooltip", ""),
                 )
-                for idx, item in enumerate(intelligence.get("health", []), start=1)
+                for idx, item in enumerate(
+                    _reconciled_health_cards(metrics, intelligence, release_health_findings), start=1
+                )
             ],
         )
 
@@ -1804,6 +1814,18 @@ def _run_release_json_probe(project_root: Path, args: list[str], *, timeout: int
         return {"_probe_error": f"invalid JSON from {' '.join(args)}: {exc}"}
 
 
+def _snapshot_external_cli_auth_env() -> dict[str, str | None]:
+    return {key: os.environ.get(key) for key in _EXTERNAL_CLI_AUTH_ENV_KEYS}
+
+
+def _restore_external_cli_auth_env(snapshot: dict[str, str | None]) -> None:
+    for key, value in snapshot.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
 def _github_workflow_live_status(project_root: Path) -> dict[str, Any]:
     workflow_dir = project_root / ".github" / "workflows"
     workflow_files = (
@@ -1904,6 +1926,57 @@ def _github_workflow_live_status(project_root: Path) -> dict[str, Any]:
     }
 
 
+def _dispatcher_supervisor_live_status(project_root: Path) -> dict[str, Any]:
+    base = {
+        "order": 2,
+        "display_name": "Dispatcher Daemon Supervisor",
+        "gate_role": "release infrastructure",
+    }
+    status = _run_release_json_probe(
+        project_root,
+        ["gt", "bridge", "dispatch", "daemon", "supervisor", "status", "--json"],
+        timeout=20,
+    )
+    if not status:
+        return {
+            **base,
+            "health": "yellow",
+            "status": "live_state_unavailable",
+            "latest_run_summary": "Supervisor status probe did not return.",
+            "remediation": "Rerun the dispatcher supervisor status probe before release signoff.",
+        }
+    probe_error = status.get("_probe_error")
+    if probe_error:
+        return {
+            **base,
+            "health": "yellow",
+            "status": "live_state_unavailable",
+            "latest_run_summary": str(probe_error),
+            "remediation": "Repair the dispatcher supervisor status probe before release signoff.",
+        }
+    registered = bool(status.get("registered"))
+    enabled = bool(status.get("enabled"))
+    hidden = bool(status.get("hidden"))
+    uses_pythonw = bool(status.get("uses_pythonw"))
+    healthy = bool(status.get("healthy"))
+    summary = f"registered={registered} enabled={enabled} hidden={hidden} uses_pythonw={uses_pythonw} healthy={healthy}"
+    if healthy and registered and enabled and hidden and uses_pythonw:
+        return {
+            **base,
+            "health": "green",
+            "status": "healthy_headless",
+            "latest_run_summary": summary,
+            "remediation": "No supervisor action required; route/runtime WARNs are tracked separately.",
+        }
+    return {
+        **base,
+        "health": "red",
+        "status": "unhealthy_or_visible",
+        "latest_run_summary": summary,
+        "remediation": "Register and enable the dispatcher supervisor as a hidden pythonw-backed task.",
+    }
+
+
 def _integration_status_rows(
     integrations: dict[str, Any],
     project_root: Path,
@@ -1915,6 +1988,10 @@ def _integration_status_rows(
         merged[key] = dict(details) if isinstance(details, dict) else {"display_name": str(details)}
     if probe_live_workflows:
         merged["github"] = {**merged.get("github", {}), **_github_workflow_live_status(project_root)}
+        merged["dispatcher_supervisor"] = {
+            **merged.get("dispatcher_supervisor", {}),
+            **_dispatcher_supervisor_live_status(project_root),
+        }
     return [
         (
             int(details.get("order", idx)),
@@ -1930,12 +2007,22 @@ def _integration_status_rows(
     ]
 
 
-def _live_release_health_findings(project_root: Path) -> list[dict[str, str]]:
-    findings: list[dict[str, str]] = []
+def _live_release_health_findings(project_root: Path) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
 
     git_status = _run_release_probe(project_root, ["git", "status", "--short", "--branch"], timeout=15)
     if git_status and git_status.returncode == 0:
         dirty_paths = [line for line in git_status.stdout.splitlines() if line and not line.startswith("## ")]
+        findings.append(
+            {
+                "source": "git",
+                "message": f"Live git dirty worktree path count: {len(dirty_paths)}",
+                "severity": "green" if not dirty_paths else "red",
+                "metric_key": "dirty_worktree_paths",
+                "metric_value": len(dirty_paths),
+                "release_visible": False,
+            }
+        )
         if dirty_paths:
             findings.append(
                 {
@@ -1999,6 +2086,30 @@ def _live_release_health_findings(project_root: Path) -> list[dict[str, str]]:
                     }
                 )
 
+    supervisor_status = _run_release_json_probe(
+        project_root, ["gt", "bridge", "dispatch", "daemon", "supervisor", "status", "--json"], timeout=20
+    )
+    if supervisor_status:
+        probe_error = supervisor_status.get("_probe_error")
+        if probe_error:
+            findings.append({"source": "dispatcher-supervisor", "message": probe_error, "severity": "yellow"})
+        else:
+            supervisor_unhealthy = not (
+                bool(supervisor_status.get("healthy"))
+                and bool(supervisor_status.get("registered"))
+                and bool(supervisor_status.get("enabled"))
+                and bool(supervisor_status.get("hidden"))
+                and bool(supervisor_status.get("uses_pythonw"))
+            )
+            if supervisor_unhealthy:
+                findings.append(
+                    {
+                        "source": "dispatcher-supervisor",
+                        "message": "Dispatcher daemon supervisor is not healthy, enabled, and headless.",
+                        "severity": "red",
+                    }
+                )
+
     dispatch_status = _run_release_json_probe(
         project_root, ["gt", "bridge", "dispatch", "status", "--json"], timeout=30
     )
@@ -2028,7 +2139,7 @@ def _release_health_findings(
     *,
     model: dict[str, Any] | None = None,
     probe_live: bool,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     findings = _explicit_release_health_findings(intelligence)
     findings.extend(_deferral_expiry_findings(model))
     if probe_live:
@@ -2046,7 +2157,7 @@ def _release_health_findings(
 
 def _release_blocker_messages(release: dict[str, Any], findings: list[dict[str, str]]) -> list[str]:
     messages: list[str] = [str(blocker) for blocker in release.get("blockers", []) if str(blocker).strip()]
-    messages.extend(f"[{item['source']}] {item['message']}" for item in findings)
+    messages.extend(f"[{item['source']}] {item['message']}" for item in _visible_release_findings(findings))
     deduped: list[str] = []
     seen: set[str] = set()
     for message in messages:
@@ -2057,26 +2168,95 @@ def _release_blocker_messages(release: dict[str, Any], findings: list[dict[str, 
     return deduped
 
 
-def _finding_count(findings: list[dict[str, str]], *sources: str) -> int:
+def _visible_release_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [finding for finding in findings if finding.get("release_visible", True)]
+
+
+def _finding_count(findings: list[dict[str, Any]], *sources: str) -> int:
     wanted = set(sources)
-    return sum(1 for finding in findings if finding.get("source") in wanted)
+    return sum(1 for finding in _visible_release_findings(findings) if finding.get("source") in wanted)
 
 
-def _finding_status(findings: list[dict[str, str]]) -> str:
-    if not findings:
+def _finding_status(findings: list[dict[str, Any]]) -> str:
+    visible_findings = _visible_release_findings(findings)
+    if not visible_findings:
         return "green"
-    severities = {str(finding.get("severity") or "").strip().lower() for finding in findings}
+    severities = {str(finding.get("severity") or "").strip().lower() for finding in visible_findings}
     if severities & {"red", "fail", "failed", "failure", "blocker", "critical"}:
         return "red"
     return "yellow"
 
 
+def _finding_metric_value(findings: list[dict[str, Any]], metric_key: str) -> int | None:
+    for finding in findings:
+        if finding.get("metric_key") == metric_key:
+            return _num(finding.get("metric_value"))
+    return None
+
+
+def _status_rank(status: str) -> int:
+    return {"green": 0, "yellow": 1, "red": 2}.get(str(status).strip().lower(), 1)
+
+
+def _format_count(value: Any, singular: str, plural: str) -> str:
+    count = _num(value)
+    return f"{count} {singular if count == 1 else plural}"
+
+
+def _reconciled_health_cards(
+    metrics: dict[str, Any],
+    intelligence: dict[str, Any],
+    release_health_findings: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    cards = [dict(item) for item in intelligence.get("health", []) if isinstance(item, dict)]
+    metric_rows = {
+        row[0]: {"label": row[1], "value": row[2], "status": row[3], "description": row[4]}
+        for row in _current_metric_rows(metrics, intelligence, release_health_findings)
+    }
+
+    def upsert(label: str, metric_key: str, singular: str, plural: str, tooltip: str) -> None:
+        metric = metric_rows.get(metric_key)
+        if not metric:
+            return
+        replacement = {
+            "label": label,
+            "value": _format_count(metric["value"], singular, plural),
+            "status": metric["status"],
+            "tooltip": tooltip,
+        }
+        for card in cards:
+            if str(card.get("label") or "").strip().lower() == label.lower():
+                card.update(replacement)
+                return
+        cards.append(replacement)
+
+    upsert(
+        "Project Health",
+        "project_health_issues",
+        "issue",
+        "issues",
+        "Failing checks plus visible release blockers.",
+    )
+    upsert(
+        "Release Readiness",
+        "release_blockers",
+        "blocker",
+        "blockers",
+        "Visible release blockers from release readiness and live release-health findings.",
+    )
+    cards.sort(
+        key=lambda card: (_status_rank(str(card.get("status") or "")), str(card.get("label") or "")), reverse=True
+    )
+    return cards
+
+
 def _current_metric_rows(
     metrics: dict[str, Any],
     intelligence: dict[str, Any],
-    release_health_findings: list[dict[str, str]] | None = None,
+    release_health_findings: list[dict[str, Any]] | None = None,
 ) -> list[tuple[Any, ...]]:
     release_health_findings = release_health_findings or []
+    visible_findings = _visible_release_findings(release_health_findings)
     release = intelligence.get("release_readiness", {})
     quality = intelligence.get("quality_rollup", {})
     release_blocker_messages = _release_blocker_messages(release, release_health_findings)
@@ -2098,16 +2278,26 @@ def _current_metric_rows(
     project_health = _num(quality.get("failing", 0)) + _num(release_blockers)
     ci_failing = quality.get("failing", 0)
     bridge_actionable = metrics.get("contention", {}).get("actionable_count", 0)
-    dirty_paths = metrics.get("drift", {}).get("changed_path_count", 0)
-    dispatcher_findings = _finding_count(release_health_findings, "dispatcher", "dispatcher-daemon")
+    live_dirty_paths = _finding_metric_value(release_health_findings, "dirty_worktree_paths")
+    dirty_paths = (
+        live_dirty_paths if live_dirty_paths is not None else metrics.get("drift", {}).get("changed_path_count", 0)
+    )
+    dirty_path_description = (
+        "Changed paths from live git status; release prep must classify dirty paths before push."
+        if live_dirty_paths is not None
+        else "Changed paths from the current dashboard model; release prep must classify dirty paths before push."
+    )
+    dispatcher_findings = _finding_count(
+        release_health_findings, "dispatcher", "dispatcher-daemon", "dispatcher-supervisor"
+    )
     bridge_findings = _finding_count(release_health_findings, "bridge")
     docs_drift_findings = _finding_count(release_health_findings, "readme", "wiki", "docs", "readme-wiki")
     return [
         (
             "project_health_issues",
             "Project Health Issues",
-            _num(quality.get("failing", 0)) + _num(release.get("blocker_count", 0)),
-            "red",
+            project_health,
+            _metric_count_status(project_health),
             "Failing checks plus release blockers.",
         ),
         (
@@ -2120,7 +2310,7 @@ def _current_metric_rows(
         (
             "release_health_findings",
             "Release Health Findings",
-            len(release_health_findings),
+            len(visible_findings),
             release_health_status,
             "Live release-health findings from git, bridge, dispatcher, README/wiki, and supplied model evidence.",
         ),
@@ -2129,7 +2319,7 @@ def _current_metric_rows(
             "Dirty Worktree Paths",
             dirty_paths,
             _metric_count_status(dirty_paths),
-            "Changed paths from the current dashboard model; release prep must classify dirty paths before push.",
+            dirty_path_description,
         ),
         (
             "dispatcher_health_findings",
@@ -2155,22 +2345,22 @@ def _current_metric_rows(
         (
             "ci_testing_failing",
             "CI / Testing Failing",
-            quality.get("failing", 0),
-            "red",
+            ci_failing,
+            _metric_count_status(ci_failing),
             "Failing integration/tool checks.",
         ),
         (
             "security_scan_posture",
             "Security Scan Posture",
             quality.get("ready_or_passing", 0),
-            "green",
+            "green" if _num(quality.get("failing", 0)) == 0 else "yellow",
             "Ready or passing checks.",
         ),
         (
             "governance_bridge_items",
             "Governance Bridge Items",
-            metrics.get("contention", {}).get("actionable_count", 0),
-            "green",
+            bridge_actionable,
+            "green" if _num(bridge_actionable) == 0 else "yellow",
             "Actionable bridge/contention entries.",
         ),
         ("data_freshness", "Data Freshness", 1, "green", "Live probe freshness status."),
