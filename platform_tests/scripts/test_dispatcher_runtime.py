@@ -85,33 +85,33 @@ def _allowed_tool_set(raw: str) -> set[str]:
     return {part.strip() for part in raw.split() if part.strip()}
 
 
-def test_trigger_inflight_lock_blocks_concurrent_hook_invocations(tmp_path: Path) -> None:
-    """WI-4893: whole-trigger guard blocks concurrent hook-trigger passes."""
+def test_runtime_inflight_lock_blocks_concurrent_hook_invocations(tmp_path: Path) -> None:
+    """WI-4893: whole-runtime guard blocks concurrent dispatch passes."""
     trigger = _load_trigger()
     state_dir = tmp_path / "state"
 
-    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    token = trigger._try_acquire_runtime_inflight_lock(state_dir)
 
     assert token is not None
-    assert trigger._try_acquire_trigger_inflight_lock(state_dir) is None
-    trigger._release_trigger_inflight_lock(state_dir, token)
-    second = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    assert trigger._try_acquire_runtime_inflight_lock(state_dir) is None
+    trigger._release_runtime_inflight_lock(state_dir, token)
+    second = trigger._try_acquire_runtime_inflight_lock(state_dir)
     assert second is not None
-    trigger._release_trigger_inflight_lock(state_dir, second)
+    trigger._release_runtime_inflight_lock(state_dir, second)
 
 
-def test_trigger_inflight_lock_recovers_from_stale_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runtime_inflight_lock_recovers_from_stale_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    lock_path = state_dir / trigger.TRIGGER_INFLIGHT_LOCK_FILENAME
+    lock_path = state_dir / trigger.RUNTIME_INFLIGHT_LOCK_FILENAME
     lock_path.write_text(json.dumps({"token": "stale", "acquired_at_epoch": time.time() - 120}), encoding="utf-8")
-    monkeypatch.setattr(trigger, "TRIGGER_INFLIGHT_LOCK_STALE_SECONDS", 1.0)
+    monkeypatch.setattr(trigger, "RUNTIME_INFLIGHT_LOCK_STALE_SECONDS", 1.0)
 
-    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    token = trigger._try_acquire_runtime_inflight_lock(state_dir)
 
     assert token is not None
-    trigger._release_trigger_inflight_lock(state_dir, token)
+    trigger._release_runtime_inflight_lock(state_dir, token)
 
 
 def _frozen_pending_signature(items: list[object]) -> str:
@@ -336,24 +336,24 @@ def test_fab10_work_intent_claim_contract_uses_child_dispatch_id() -> None:
     assert ":" not in trigger._new_dispatch_id("prime-builder:A")
 
 
-def test_trigger_inflight_lock_blocks_concurrent_invocation(tmp_path: Path) -> None:
+def test_runtime_inflight_lock_blocks_concurrent_invocation(tmp_path: Path) -> None:
     trigger = _load_trigger()
     root = tmp_path / "project"
     root.mkdir()
     _make_synthetic_project(root)
     state_dir = tmp_path / "state"
 
-    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    token = trigger._try_acquire_runtime_inflight_lock(state_dir)
     assert token
     try:
-        result = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+        result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     finally:
-        trigger._release_trigger_inflight_lock(state_dir, token)
+        trigger._release_runtime_inflight_lock(state_dir, token)
 
-    assert result == {"skipped": True, "reason": "trigger_inflight_active"}
+    assert result == {"skipped": True, "reason": "runtime_inflight_active"}
 
 
-def test_trigger_inflight_lock_replaces_stale_lock(tmp_path: Path) -> None:
+def test_runtime_inflight_lock_replaces_stale_lock(tmp_path: Path) -> None:
     trigger = _load_trigger()
     state_dir = tmp_path / "state"
     state_dir.mkdir()
@@ -364,14 +364,14 @@ def test_trigger_inflight_lock_replaces_stale_lock(tmp_path: Path) -> None:
         "acquired_at": "2020-01-01T00:00:00Z",
         "acquired_at_epoch": 1.0,
     }
-    (state_dir / trigger.TRIGGER_INFLIGHT_LOCK_FILENAME).write_text(json.dumps(stale_payload), encoding="utf-8")
+    (state_dir / trigger.RUNTIME_INFLIGHT_LOCK_FILENAME).write_text(json.dumps(stale_payload), encoding="utf-8")
 
     assert (
-        trigger.trigger_inflight_active(state_dir, now_epoch=trigger.TRIGGER_INFLIGHT_LOCK_STALE_SECONDS + 2) is False
+        trigger.runtime_inflight_active(state_dir, now_epoch=trigger.RUNTIME_INFLIGHT_LOCK_STALE_SECONDS + 2) is False
     )
-    token = trigger._try_acquire_trigger_inflight_lock(state_dir)
+    token = trigger._try_acquire_runtime_inflight_lock(state_dir)
     assert token
-    trigger._release_trigger_inflight_lock(state_dir, token)
+    trigger._release_runtime_inflight_lock(state_dir, token)
 
 
 def test_trigger_releases_inflight_lock_after_run(tmp_path: Path) -> None:
@@ -381,10 +381,10 @@ def test_trigger_releases_inflight_lock_after_run(tmp_path: Path) -> None:
     _make_synthetic_project(root)
     state_dir = tmp_path / "state"
 
-    result = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert result["skipped"] is False
-    assert trigger.trigger_inflight_active(state_dir) is False
+    assert trigger.runtime_inflight_active(state_dir) is False
 
 
 def test_migration_preserves_explicit_recipient_over_newer_unsuffixed_placeholder(tmp_path: Path) -> None:
@@ -515,7 +515,7 @@ def test_fab10_prime_work_intent_held_logging_dedupes_per_holder_and_slug(tmp_pa
 # WI-4803: release the dispatched Prime worker's work-intent claim on
 # subprocess failure (the launch path only releases on launch failure, so a
 # launched-then-failed worker leaks its claim until TTL). Tests target
-# _process_pending_exit_codes directly, NOT the run_trigger integration path
+# _process_pending_exit_codes directly, NOT the run_dispatch_cycle integration path
 # (which carries pre-existing failures tracked as WI-4712).
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -633,7 +633,7 @@ def test_application_subject_suppresses_prime_dispatch_before_acquire_or_spawn(
     monkeypatch.setattr(trigger, "_release_prime_work_intents", _forbidden_release)
     monkeypatch.setattr(trigger, "_spawn_harness", _forbidden_spawn)
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=False)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
 
     result = summary["results"]["prime-builder"]
     assert result["reason"] == trigger.WORK_SUBJECT_APPLICATION_SUSPENDED_REASON
@@ -661,7 +661,7 @@ def test_gtkb_subject_allows_cross_harness_dispatch_negative_control(
 
     trigger = _load_trigger()
     monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
     recipient_state = summary["dispatch_state"]["recipients"]["loyal-opposition:A"]
@@ -727,7 +727,7 @@ def test_filter_prime_selected_stands_down_on_same_role_project_holder(tmp_path:
     assert _failure_records(state_dir) == []
 
 
-def test_run_trigger_filters_held_prime_items_before_spawn(
+def test_run_dispatch_cycle_filters_held_prime_items_before_spawn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -771,13 +771,13 @@ def test_run_trigger_filters_held_prime_items_before_spawn(
     monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
     monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     assert captured_documents == ["open-thread"]
     assert summary["dispatch_state"]["recipients"]["prime-builder:B"]["work_intent_held_filtered_count"] == 1
 
 
-def test_run_trigger_filters_owner_hold_prime_no_go_before_spawn(
+def test_run_dispatch_cycle_filters_owner_hold_prime_no_go_before_spawn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -803,7 +803,7 @@ def test_run_trigger_filters_owner_hold_prime_no_go_before_spawn(
     monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
     monkeypatch.setattr(trigger, "_spawn_harness", _forbid_spawn)
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     result = summary["results"]["prime-builder:B"]
     assert result["reason"] == "no_pending_after_filter"
@@ -826,8 +826,8 @@ def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) ->
     state_dir_a = tmp_path / "state-a"
     state_dir_b = tmp_path / "state-b"
 
-    summary_a = trigger.run_trigger(project_root=root, state_dir=state_dir_a, dry_run=True)
-    summary_b = trigger.run_trigger(project_root=root, state_dir=state_dir_b, dry_run=True)
+    summary_a = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir_a, dry_run=True)
+    summary_b = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir_b, dry_run=True)
 
     sig_a = summary_a["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     sig_b = summary_b["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
@@ -855,12 +855,12 @@ def test_uncommitted_index_edit_triggers_dispatch(tmp_path: Path) -> None:
     # Empty INDEX → no dispatch.
     _write_index(root, "# empty\n")
     trigger = _load_trigger()
-    summary_empty = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary_empty = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary_empty["results"]["loyal-opposition"]["reason"] == "no_pending"
 
     # Add a NEW entry (uncommitted edit) → dispatch fires.
     _write_index(root, _index_with_one_new(root))
-    summary_new = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary_new = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # dry_run=True → "launched" stays False, but reason is "dry_run" not "no_pending"
     # which proves the dispatch path was entered.
     assert summary_new["results"]["loyal-opposition"]["reason"] == "dry_run"
@@ -885,10 +885,10 @@ def test_unchanged_signature_does_not_replay(tmp_path: Path) -> None:
 
     trigger = _load_trigger()
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
-    second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
 
 
@@ -899,7 +899,7 @@ def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> 
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     stderr_path = state_dir / "dispatch-runs" / "failed-worker.stderr.log"
@@ -916,7 +916,7 @@ def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> 
     }
     state_path.write_text(json.dumps(state), encoding="utf-8")
 
-    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    retried = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert retried["results"]["loyal-opposition"]["reason"] == "dry_run"
     retried_state = retried["dispatch_state"]["recipients"]["loyal-opposition"]
@@ -947,7 +947,7 @@ def test_retry_delay_clears_after_launch_window_elapses(tmp_path: Path) -> None:
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     now = datetime.now(UTC)
@@ -977,7 +977,7 @@ def test_retry_delay_clears_after_launch_window_elapses(tmp_path: Path) -> None:
         lo_state["updated_at"] = (now - timedelta(seconds=5)).isoformat()
     state_path.write_text(json.dumps(state), encoding="utf-8")
 
-    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    retried = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     reason = retried["results"]["loyal-opposition"]["reason"]
     assert reason != "retry_delay_enforced", (
@@ -998,7 +998,7 @@ def test_retry_delay_enforced_within_launch_window(tmp_path: Path) -> None:
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     now = datetime.now(UTC)
@@ -1021,7 +1021,7 @@ def test_retry_delay_enforced_within_launch_window(tmp_path: Path) -> None:
         lo_state["updated_at"] = (now - timedelta(seconds=5)).isoformat()
     state_path.write_text(json.dumps(state), encoding="utf-8")
 
-    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    retried = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert retried["results"]["loyal-opposition"]["reason"] == "retry_delay_enforced"
 
@@ -1040,7 +1040,7 @@ def test_failed_launch_exit_processing_clears_dispatch_dedupe_signals(tmp_path: 
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     dispatch_id = "prior-failed-launch"
@@ -1066,7 +1066,7 @@ def test_failed_launch_exit_processing_clears_dispatch_dedupe_signals(tmp_path: 
         state["recipients"][key]["last_launch"] = dict(launch)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
-    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    retried = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert retried["results"]["loyal-opposition"]["reason"] == "retry_delay_enforced"
     retried_state = retried["dispatch_state"]["recipients"]["loyal-opposition:A"]
@@ -1095,14 +1095,14 @@ def test_dispatch_state_idempotent_writes_on_unchanged_signature(tmp_path: Path)
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     state_path = state_dir / "dispatch-state.json"
     initial_state = json.loads(state_path.read_text(encoding="utf-8"))
     initial_sig = initial_state["recipients"]["loyal-opposition"]["signature"]
 
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     final_state = json.loads(state_path.read_text(encoding="utf-8"))
     final_sig = final_state["recipients"]["loyal-opposition"]["signature"]
@@ -1125,14 +1125,14 @@ def test_dispatch_fires_on_signature_change(tmp_path: Path) -> None:
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # First fire: codex actionable, prime not.
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
     assert first["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
     # Promote NEW → GO (top of stack).
     _write_index(root, _index_with_one_go(root))
-    second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # Second fire: prime actionable (GO), codex not.
     assert second["results"]["prime-builder"]["reason"] == "dry_run"
     assert second["results"]["loyal-opposition"]["reason"] in {"no_pending", "no_pending_after_filter"}
@@ -1163,7 +1163,7 @@ def test_manual_disable_env_var_no_ops(tmp_path: Path, monkeypatch: pytest.Monke
 
     monkeypatch.setenv("GTKB_DISPATCHER_DAEMON_DISABLED", "1")
     trigger = _load_trigger()
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary == {"skipped": True, "reason": "loop_prevention_env_var"}
     # And no dispatch-state file was written.
     assert not (state_dir / "dispatch-state.json").exists()
@@ -1174,25 +1174,13 @@ def test_manual_disable_env_var_no_ops(tmp_path: Path, monkeypatch: pytest.Monke
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_main_returns_zero_even_on_internal_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """T-2-fire-and-forget: ``main()`` always returns 0.
-
-    Even if the underlying detection raises, the script must not propagate
-    a non-zero exit code (hooks must not stall tool use). The error is logged
-    to stderr / dispatch-failures.jsonl instead.
-    """
+def test_main_rejects_dispatch_entrypoint_without_dispatch(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """dispatcher_runtime.py is daemon-owned, not a hook dispatch entrypoint."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-
-    def _boom(*_args, **_kwargs):
-        raise RuntimeError("simulated detection failure")
-
-    monkeypatch.setattr(trigger, "_compute_actionable", _boom)
     rc = trigger.main(
         [
             "--project-root",
@@ -1202,9 +1190,10 @@ def test_main_returns_zero_even_on_internal_failure(
             "--dry-run",
         ]
     )
-    assert rc == 0
+    assert rc == 2
     captured = capsys.readouterr()
-    assert "dispatcher daemon error" in captured.err
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1233,7 +1222,7 @@ def test_dispatch_state_schema_matches_smart_poller_signature_scheme(tmp_path: P
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
@@ -1299,7 +1288,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     _write_index(root, _index_with_three_new(root))
 
     trigger = _load_trigger()
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
@@ -1370,7 +1359,7 @@ def test_ollama_lo_dispatch_caps_selected_batch_to_one(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda _root: {"ready": True})
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     assert trigger.DEFAULT_MAX_ITEMS == 2
     rec = summary["dispatch_state"]["recipients"]["loyal-opposition"]
@@ -1486,7 +1475,7 @@ def test_spawn_gate_skips_unlaunchable_harness_with_distinct_failure(
 
     monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn)
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=False)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
 
     # (a) the unlaunchable target was NOT spawned.
     assert spawn_calls == []
@@ -1531,7 +1520,7 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
 
     # Parent has the env var set (e.g., a debug-stopped operator session) —
     # the dispatch path must STILL refuse to propagate it to the child.
-    # But the parent's run_trigger short-circuits when the env var is set
+    # But the parent's run_dispatch_cycle short-circuits when the env var is set
     # in its own environment, so we simulate the dispatch path differently:
     # call _spawn_harness directly with monkeypatched Popen.
     captured_envs: list[dict] = []
@@ -1549,7 +1538,7 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
     monkeypatch.setenv("GTKB_DISPATCHER_DAEMON_DISABLED", "1")
 
     # Build a single-item synthetic actionable to exercise _spawn_harness
-    # without going through run_trigger (which would short-circuit).
+    # without going through run_dispatch_cycle (which would short-circuit).
     from types import SimpleNamespace
 
     fake_item = SimpleNamespace(
@@ -2024,18 +2013,18 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
     trigger = _load_trigger()
 
     # Step 1: NEW present → Codex dispatched.
-    s1 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s1 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s1["results"]["loyal-opposition"]["reason"] == "dry_run"
     assert s1["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
     codex_sig_after_step1 = s1["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
 
     # Step 2: same INDEX → no relaunch (signature dedup is the loop prevention).
-    s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s2 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s2["results"]["loyal-opposition"]["reason"] == "unchanged"
 
     # Step 3: simulate Codex writing GO. INDEX top is now GO (Prime-actionable).
     _write_index(root, _index_with_one_go(root))
-    s3 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s3 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # Reciprocal dispatch: Prime is now actionable; trigger fires.
     assert s3["results"]["prime-builder"]["reason"] == "dry_run", (
         "After Codex writes GO, Prime's signature must change and fire dispatch"
@@ -2053,14 +2042,8 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_stop_hook_emits_exactly_braces_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """T-3-stop-hook-output-contract: ``--stop-hook`` mode MUST emit exactly
-    ``{}`` (parseable JSON object, no extra text) on stdout and exit 0.
-
-    Required by the OpenAI Codex Stop hook contract per Codex `-002` F2 +
-    Codex GO at `-004` "GO Conditions For Later Verification" line 167.
-    Also valid for Claude Stop hook registrations.
-    """
+def test_stop_hook_flag_is_not_a_dispatch_entrypoint(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Legacy hook flags must not reactivate dispatcher_runtime.py as a hook path."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
@@ -2076,25 +2059,16 @@ def test_stop_hook_emits_exactly_braces_json(tmp_path: Path, capsys: pytest.Capt
             "--dry-run",
         ]
     )
-    assert rc == 0
-
+    assert rc == 2
     captured = capsys.readouterr()
-    # Stdout MUST be exactly "{}\n" (no extra summary text — Codex contract).
-    assert captured.out == "{}\n", f"Expected stdout exactly '{{}}\\n' for --stop-hook; got: {captured.out!r}"
-    # Stdout MUST parse as a JSON object.
-    parsed = json.loads(captured.out)
-    assert parsed == {}, "Stop-hook stdout must parse to an empty dict"
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
 
 
-def test_stop_hook_overrides_verbose(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """T-3-stop-hook-output-contract (verbose interaction): when both
-    --stop-hook and --verbose are passed, --stop-hook MUST win to preserve
-    the JSON contract.
-
-    Without this guard a misconfigured hook command (--verbose accidentally
-    set in the same registration) would emit pretty-printed summary text
-    that violates the Codex Stop contract.
-    """
+def test_stop_hook_verbose_still_rejects_dispatch_entrypoint(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verbose legacy hook invocation is still inert."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
@@ -2111,35 +2085,25 @@ def test_stop_hook_overrides_verbose(tmp_path: Path, capsys: pytest.CaptureFixtu
             "--dry-run",
         ]
     )
-    assert rc == 0
+    assert rc == 2
     captured = capsys.readouterr()
-    assert captured.out == "{}\n"
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
 
 
-def test_stop_hook_runs_reconciliation_bounded_no_dispatch_on_unchanged(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """T-3-stop-reconciliation-bounded: with --stop-hook on unchanged INDEX,
-    the trigger MUST run reconciliation (read INDEX, compute signature,
-    check dispatch-state) and exit 0 with `{}` stdout, but NOT dispatch.
-
-    Bounded-by-signature-dedup contract: if a prior PostToolUse fire already
-    recorded the current signature, Stop reconciliation sees match and exits
-    "unchanged" — no spawn.
-    """
+def test_stop_hook_does_not_mutate_existing_dispatch_state(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Legacy Stop invocation must not perform reconciliation or dispatch."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
 
     trigger = _load_trigger()
-    # Prime the dispatch-state by firing default mode first.
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     state_path = state_dir / "dispatch-state.json"
     assert state_path.exists()
-    sig_before = json.loads(state_path.read_text(encoding="utf-8"))["recipients"]["loyal-opposition"]["signature"]
+    state_before = json.loads(state_path.read_text(encoding="utf-8"))
 
-    # Now invoke --stop-hook on the SAME index state.
-    capsys.readouterr()  # drain
+    capsys.readouterr()
     rc = trigger.main(
         [
             "--project-root",
@@ -2150,41 +2114,27 @@ def test_stop_hook_runs_reconciliation_bounded_no_dispatch_on_unchanged(
             "--dry-run",
         ]
     )
-    assert rc == 0
+    assert rc == 2
     captured = capsys.readouterr()
-    assert captured.out == "{}\n"
-
-    # Signature unchanged; last_result records "unchanged".
-    state_after = json.loads(state_path.read_text(encoding="utf-8"))
-    sig_after = state_after["recipients"]["loyal-opposition"]["signature"]
-    assert sig_after == sig_before
-    assert state_after["recipients"]["loyal-opposition"]["last_result"] == "unchanged"
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
+    assert json.loads(state_path.read_text(encoding="utf-8")) == state_before
 
 
-def test_stop_hook_fail_soft_dispatches_on_changed_signature(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """T-3-stop-reconciliation-fail-soft: if PostToolUse missed an INDEX
-    change (e.g., a tool that doesn't fire PostToolUse), the Stop hook
-    MUST detect the changed signature and dispatch.
-
-    This is the fail-soft safety net per parent thread `-002` F2 Codex
-    wording. The trigger still emits `{}` to satisfy the Codex contract,
-    but internally the dispatch path is entered (dry_run mode in test).
-    """
+def test_stop_hook_does_not_dispatch_on_changed_signature(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Changed bridge state must not make legacy Stop invocation dispatch."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
 
-    # Prime dispatch-state with NO INDEX (signature for empty list).
     _write_index(root, "# empty\n")
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+    state_path = state_dir / "dispatch-state.json"
+    state_before = json.loads(state_path.read_text(encoding="utf-8"))
 
-    # Simulate PostToolUse missing the change: edit INDEX without firing
-    # default trigger; only Stop fires.
     _write_index(root, _index_with_one_new(root))
 
-    capsys.readouterr()  # drain
+    capsys.readouterr()
     rc = trigger.main(
         [
             "--project-root",
@@ -2195,37 +2145,17 @@ def test_stop_hook_fail_soft_dispatches_on_changed_signature(
             "--dry-run",
         ]
     )
-    assert rc == 0
+    assert rc == 2
     captured = capsys.readouterr()
-    assert captured.out == "{}\n"
-
-    # Internal dispatch state shows the dispatch path was entered: last_launch
-    # carries the dry-run meta. In dry_run mode, launched=False so last_result
-    # records "launch_failed" (existing convention) — the load-bearing assertion
-    # is that the launch path was attempted (last_launch present + reason
-    # "dry_run"), proving the Stop hook detected the signature change rather
-    # than no-op'ing on "unchanged".
-    state_path = state_dir / "dispatch-state.json"
-    state = json.loads(state_path.read_text(encoding="utf-8"))
-    rec = state["recipients"]["loyal-opposition"]
-    assert rec["last_result"] != "unchanged", "Stop hook must detect changed signature even when PostToolUse missed it"
-    assert "last_launch" in rec
-    assert rec["last_launch"]["reason"] == "dry_run"
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
+    assert json.loads(state_path.read_text(encoding="utf-8")) == state_before
 
 
-def test_stop_hook_main_returns_zero_even_on_internal_failure(
+def test_stop_hook_inert_path_does_not_enter_detection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """T-3-stop-hook-output-contract (failure path): even when reconciliation
-    fails internally, --stop-hook MUST exit 0 (fire-and-forget) AND emit
-    valid Stop-contract output. The catch-all in main() suppresses the error
-    to stderr; stdout stays JSON-valid.
-
-    Note: when reconciliation fails BEFORE the print path, stdout is empty.
-    Codex docs treat exit 0 + empty stdout as success too, so this is still
-    a valid Stop contract — but the test pins the exit code, not the exact
-    stdout, because the print is gated on successful run_trigger.
-    """
+    """Legacy Stop invocation must not call dispatcher detection."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
@@ -2246,10 +2176,10 @@ def test_stop_hook_main_returns_zero_even_on_internal_failure(
             "--dry-run",
         ]
     )
-    assert rc == 0
-    # Error logged to stderr (fire-and-forget).
+    assert rc == 2
     captured = capsys.readouterr()
-    assert "dispatcher daemon error" in captured.err
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
 
 
 def _repo_root() -> Path:
@@ -2285,8 +2215,10 @@ def test_stop_reconciliation_preserves_existing_output_contract(
     _write_index(root, _index_with_one_new(root))
 
     rc = _load_trigger().main(["--project-root", str(root), "--state-dir", str(state_dir), "--stop-hook", "--dry-run"])
-    assert rc == 0
-    assert json.loads(capsys.readouterr().out) == {}
+    assert rc == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "dispatcher_runtime.py is a daemon-owned helper library" in captured.err
 
 
 def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path) -> None:
@@ -2304,7 +2236,7 @@ def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path)
     trigger = _load_trigger()
 
     # Compute what the trigger's signature WOULD be for this INDEX state.
-    s = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     expected_sig = s["dispatch_state"]["recipients"]["loyal-opposition"]["signature"]
     assert s["results"]["loyal-opposition"]["reason"] == "dry_run"
 
@@ -2334,7 +2266,7 @@ def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path)
     )
 
     # Trigger fires; sees matching signature; does NOT dispatch.
-    s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s2 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s2["results"]["loyal-opposition"]["reason"] == "unchanged", (
         "trigger must respect a pre-existing matching signature in the shared state file"
     )
@@ -2345,39 +2277,19 @@ def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path)
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def test_dispatcher_runtime_noop_in_single_harness_topology_records_audit_evidence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """IP-8 of bridge/gtkb-single-harness-bridge-dispatcher-slice-2-005.md
-    (Codex GO at -006), F1 closure of -004:
-
-    In single-harness topology (one harness ID with multi-element role-set),
-    the dispatcher daemon MUST:
-
-    1. Return ``{"skipped": True, "reason": "single_harness_topology_not_applicable"}``.
-    2. NOT spawn any subprocess.
-    3. Write per-role audit-log entries to dispatch-failures.jsonl with the
-       SPEC-cited reason — preserving the SPEC's
-       "resolution fails with an audit-log entry" invariant per
-       SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001 § Coexistence.
-    4. Write per-recipient dispatch-state.json records with
-       last_result="single_harness_topology_not_applicable" — preserving
-       the audit-log-via-dispatch-state evidence path for --diagnose and
-       doctor consumers.
-    """
-    # Build synthetic project with SINGLE-harness role-set (multi-element).
+def test_multi_role_harness_can_receive_lo_dispatch_when_registered_active(tmp_path: Path) -> None:
+    """A multi-role active harness remains dispatchable through the daemon path."""
     (tmp_path / "groundtruth.toml").write_text(
-        '[project]\nproject_name = "TestSingleHarness"\nprofile = "dual-agent"\n',
+        '[project]\nproject_name = "TestMultiRoleHarness"\nprofile = "dual-agent"\n',
         encoding="utf-8",
     )
     (tmp_path / "bridge").mkdir(exist_ok=True)
     harness_state = tmp_path / "harness-state"
     harness_state.mkdir(exist_ok=True)
-    # WI-3342 IP-4: the trigger's topology check (_is_single_harness_topology
-    # via _read_role_assignments) resolves the role map from the DB-backed
-    # registry projection harness-state/harness-registry.json, whose
-    # ``harnesses`` field is a LIST of unified records. Single-harness topology
-    # is one harness ID with a multi-element role-set.
+    (harness_state / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"claude": {"id": "B"}}}),
+        encoding="utf-8",
+    )
     (harness_state / "harness-registry.json").write_text(
         json.dumps(
             {
@@ -2390,7 +2302,9 @@ def test_dispatcher_runtime_noop_in_single_harness_topology_records_audit_eviden
                         "harness_type": "claude",
                         "status": "active",
                         "event_driven_hooks": True,
+                        "can_receive_dispatch": True,
                         "role": ["prime-builder", "loyal-opposition"],
+                        "invocation_surfaces": _CLAUDE_INVOCATION_SURFACES,
                     }
                 ],
             }
@@ -2400,48 +2314,16 @@ def test_dispatcher_runtime_noop_in_single_harness_topology_records_audit_eviden
     _write_index(tmp_path, _index_with_one_new(tmp_path))
     state_dir = tmp_path / "state"
 
-    # Patch subprocess.Popen to assert it's never called.
-    import subprocess as _subprocess
-
-    popen_calls: list = []
-
-    def _fail_popen(*args, **kwargs):
-        popen_calls.append((args, kwargs))
-        raise AssertionError("subprocess.Popen must NOT be invoked in single-harness topology")
-
-    monkeypatch.setattr(_subprocess, "Popen", _fail_popen)
-
     trigger = _load_trigger()
-    result = trigger.run_trigger(project_root=tmp_path, state_dir=state_dir, dry_run=False)
+    result = trigger.run_dispatch_cycle(project_root=tmp_path, state_dir=state_dir, dry_run=True)
 
-    # (1) Return value.
-    assert result == {"skipped": True, "reason": "single_harness_topology_not_applicable"}
-
-    # (2) No subprocess spawned.
-    assert popen_calls == [], "Popen was invoked in single-harness topology"
-
-    # (3) Per-role audit-log entries in dispatch-failures.jsonl.
-    failures_path = state_dir / "dispatch-failures.jsonl"
-    assert failures_path.is_file(), "dispatch-failures.jsonl missing"
-    lines = [line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    records = [json.loads(line) for line in lines]
-    assert len(records) == 2, f"expected 2 audit entries, got {len(records)}: {records}"
-    by_role = {rec["recipient"]: rec for rec in records}
-    assert "prime-builder" in by_role and "loyal-opposition" in by_role
-    for rec in by_role.values():
-        assert rec["reason"] == "single_harness_topology_not_applicable"
-        assert rec["launched"] is False
-        assert "SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001" in rec["error_message"]
-
-    # (4) Per-recipient dispatch-state.json records.
-    state_path = state_dir / "dispatch-state.json"
-    assert state_path.is_file(), "dispatch-state.json missing"
-    state = json.loads(state_path.read_text(encoding="utf-8"))
-    recipients = state.get("recipients", {})
-    assert recipients["prime-builder"]["last_result"] == "single_harness_topology_not_applicable"
-    assert recipients["loyal-opposition"]["last_result"] == "single_harness_topology_not_applicable"
-    assert "updated_at" in recipients["prime-builder"]
-    assert "updated_at" in recipients["loyal-opposition"]
+    assert result["skipped"] is False
+    lo_result = result["results"]["loyal-opposition:B"]
+    assert lo_result["reason"] == "dry_run"
+    assert lo_result["selected_candidate"]["harness_id"] == "B"
+    recipients = result["dispatch_state"]["recipients"]
+    assert recipients["loyal-opposition:B"]["last_result"] == "launch_failed"
+    assert recipients["loyal-opposition:B"]["selected_candidate"]["harness_id"] == "B"
 
 
 def test_dispatcher_runtime_inactive_substrate_records_state_without_failure_spam(
@@ -2458,7 +2340,7 @@ def test_dispatcher_runtime_inactive_substrate_records_state_without_failure_spa
     state_dir = tmp_path / "state"
     trigger = _load_trigger()
 
-    result = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=False)
+    result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
 
     assert result == {
         "skipped": True,
@@ -2496,7 +2378,7 @@ def test_dispatcher_runtime_inactive_substrate_records_state_without_failure_spa
     output = trigger._emit_diagnose_summary(state_dir)
 
     assert "inactive substrate (configured inert): 1" in output
-    assert "inert (active bridge substrate 'none'; dispatcher daemon disabled)" in output
+    assert "inert (active bridge substrate 'none'; dispatcher engine disabled)" in output
     assert "HEALTHY" in output
     assert "DEGRADED" not in output
 
@@ -2595,6 +2477,100 @@ def test_diagnose_ignores_active_non_dispatchable_harness_without_state(
 
     assert "- prime-builder: last_result=no_pending" in output
     assert "prime-builder:B" not in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
+
+
+def test_diagnose_treats_work_intent_already_held_as_healthy_suppression(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4931: work-intent contention is expected suppression, not liveness degradation."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "prime-builder:A": {
+                "last_result": "work_intent_already_held",
+                "pending_count": 1,
+                "selected_count": 0,
+                "updated_at": "2026-06-30T09:00:00+00:00",
+            },
+        },
+        "schema_version": 1,
+        "updated_at": "2026-06-30T09:00:00+00:00",
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_resolve_project_root", lambda value=None: tmp_path)
+    monkeypatch.setattr(
+        trigger,
+        "_read_role_assignments",
+        lambda *a, **k: {
+            "harnesses": {
+                "A": {
+                    "status": "active",
+                    "role": ["prime-builder"],
+                    "can_receive_dispatch": True,
+                },
+            }
+        },
+    )
+
+    output = trigger._emit_diagnose_summary(state_dir)
+
+    assert "- prime-builder:A: suppressed (work intent already held)." in output
+    assert "HEALTHY" in output
+    assert "DEGRADED" not in output
+
+
+def test_diagnose_treats_unrecorded_dispatchable_harness_as_not_evaluated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4931: unselected active recipients need not have state for the current tick."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "prime-builder:A": {
+                "last_result": "no_pending",
+                "pending_count": 0,
+                "selected_count": 0,
+                "updated_at": "2026-06-30T09:00:00+00:00",
+            },
+        },
+        "schema_version": 1,
+        "updated_at": "2026-06-30T09:00:00+00:00",
+    }
+    (state_dir / "dispatch-state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_resolve_project_root", lambda value=None: tmp_path)
+    monkeypatch.setattr(
+        trigger,
+        "_read_role_assignments",
+        lambda *a, **k: {
+            "harnesses": {
+                "A": {
+                    "status": "active",
+                    "role": ["prime-builder"],
+                    "can_receive_dispatch": True,
+                },
+                "B": {
+                    "status": "active",
+                    "role": ["prime-builder"],
+                    "can_receive_dispatch": True,
+                },
+            }
+        },
+    )
+
+    output = trigger._emit_diagnose_summary(state_dir)
+
+    assert "- prime-builder: (not evaluated; no state recorded) (harness B)" in output
+    assert "- prime-builder:B: not evaluated (no state recorded for this tick)." in output
     assert "HEALTHY" in output
     assert "DEGRADED" not in output
 
@@ -2974,12 +2950,12 @@ def test_diagnostic_emitted_per_invocation(tmp_path: Path) -> None:
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
 
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     first = _read_diagnostics(state_dir)
     assert len(first) == 2, "one diagnostic record per recipient (prime-builder + loyal-opposition)"
     assert {r["recipient"] for r in first} == {"prime-builder", "loyal-opposition"}
 
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     second = _read_diagnostics(state_dir)
     assert len(second) == 4, "instrumentation fires on every invocation"
 
@@ -3000,7 +2976,7 @@ def test_diagnostic_classifies_document_lease_held(tmp_path: Path) -> None:
     assert handle is not None
 
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
     assert len(lo) == 1
@@ -3023,7 +2999,7 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
     assert handle is not None
 
     trigger = _load_trigger()
-    held = trigger.run_trigger(
+    held = trigger.run_dispatch_cycle(
         project_root=root,
         state_dir=state_dir,
         dry_run=True,
@@ -3036,7 +3012,7 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
     assert state["recipients"]["loyal-opposition"].get("last_dispatched_signature") is None
 
     release_lease(handle)
-    retried = trigger.run_trigger(
+    retried = trigger.run_dispatch_cycle(
         project_root=root,
         state_dir=state_dir,
         dry_run=True,
@@ -3061,7 +3037,7 @@ def test_diagnostic_classifies_dispatched(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
     assert len(lo) == 1
@@ -3077,8 +3053,8 @@ def test_diagnostic_classifies_no_change(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
     assert len(lo) == 2
@@ -3095,7 +3071,7 @@ def test_diagnostic_classifies_selected_batch(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=0, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=0, dry_run=True)
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
     assert len(lo) == 1
@@ -3111,7 +3087,7 @@ def test_diagnostic_jsonl_parseable(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
-    trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     path = state_dir / "trigger-diagnostic.jsonl"
     assert path.is_file()
@@ -3152,17 +3128,17 @@ def test_dispatch_decision_unchanged_with_instrumentation(tmp_path: Path) -> Non
     trigger = _load_trigger()
 
     # NEW present -> loyal-opposition dispatched, prime-builder idle.
-    s1 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s1 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s1["results"]["loyal-opposition"]["reason"] == "dry_run"
     assert s1["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
     # Re-fire on unchanged INDEX -> dedup holds.
-    s2 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s2 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s2["results"]["loyal-opposition"]["reason"] == "unchanged"
 
     # Promote NEW -> GO -> prime-builder dispatched, loyal-opposition idle.
     _write_index(root, _index_with_one_go(root))
-    s3 = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    s3 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s3["results"]["prime-builder"]["reason"] == "dry_run"
     assert s3["results"]["loyal-opposition"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
@@ -3182,12 +3158,12 @@ def test_unchanged_signature_preserves_last_launch_metadata(tmp_path: Path) -> N
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
     state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
     first_launch = state["recipients"]["loyal-opposition"]["last_launch"]
 
-    second = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
     state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
 
@@ -3201,7 +3177,7 @@ def test_unchanged_signature_with_previous_fatal_worker_log_retries(tmp_path: Pa
     _write_index(root, _index_with_one_new(root))
     trigger = _load_trigger()
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     runs_dir = state_dir / "dispatch-runs"
@@ -3228,7 +3204,7 @@ def test_unchanged_signature_with_previous_fatal_worker_log_retries(tmp_path: Pa
     }
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
-    retried = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    retried = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert retried["results"]["loyal-opposition"]["reason"] == "dry_run"
 
     previous_failures = [rec for rec in _failure_records(state_dir) if rec.get("reason") == "previous_launch_failed"]
@@ -3611,6 +3587,124 @@ def test_spawn_harness_worker_env_includes_package_src(tmp_path: Path, monkeypat
     assert "C:/existing/pkg" in pythonpath
 
 
+def test_spawn_harness_uses_no_window_python_for_status_wrapper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["worker-cmd", "{{PROMPT}}"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-no-window-wrapper",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-no-window-wrapper-001.md",
+        },
+    )()
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(trigger, "prefer_pythonw_executable", lambda executable: "pythonw.exe")
+    monkeypatch.setattr(trigger, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-no-window-wrapper",
+    )
+
+    assert meta["launched"] is True
+    wrapped = captured["args"][0]
+    assert wrapped[0] == "pythonw.exe"
+    assert wrapped[1].endswith("scripts\\run_with_status.py") or wrapped[1].endswith("scripts/run_with_status.py")
+    creationflags = captured["kwargs"]["creationflags"]
+    assert creationflags & 0x08000000
+    assert creationflags & 0x00000200
+
+
+def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="C",
+        command_handle="antigravity",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--model", "gemini-2.5-flash"]}},
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-antigravity-stdin-prompt",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-antigravity-stdin-prompt-001.md",
+        },
+    )()
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(trigger, "_normalize_argv_head", lambda head, project_root: head)
+    monkeypatch.setattr(trigger, "prefer_pythonw_executable", lambda executable: "pythonw.exe")
+    monkeypatch.setattr(trigger, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-antigravity-stdin",
+    )
+
+    assert meta["launched"] is True
+    wrapped = captured["args"][0]
+    assert "--stdin" in wrapped
+    stdin_path = Path(wrapped[wrapped.index("--stdin") + 1])
+    prompt = stdin_path.read_text(encoding="utf-8")
+    assert "gtkb-antigravity-stdin-prompt" in prompt
+    status_index = next(index for index, value in enumerate(wrapped) if str(value).endswith(".exit_code"))
+    child_argv = wrapped[status_index + 1 :]
+    assert child_argv == ["gemini", "--model", "gemini-2.5-flash"]
+    assert prompt not in child_argv
+
+
 def test_spawn_harness_forwards_openrouter_key_from_env_local_allowlist(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3827,7 +3921,7 @@ def _write_registry(root: Path, records: list[dict]) -> None:
 
     Both _read_role_assignments and _read_harness_identities resolve from this
     projection (WI-3342 IP-4), so a single registry file fully drives
-    _resolve_dispatch_target and _is_single_harness_topology.
+    _resolve_dispatch_target and dispatch-target ranking.
     """
     harness_state = root / "harness-state"
     harness_state.mkdir(parents=True, exist_ok=True)
@@ -3923,7 +4017,7 @@ def test_ollama_loyal_opposition_dispatch_caps_selected_batch_to_one(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda project_root: {"ready": True})
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     assert trigger.DEFAULT_MAX_ITEMS == 2
     assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
@@ -3968,7 +4062,7 @@ def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
 
     runs_dir = state_dir / "dispatch-runs"
@@ -4002,7 +4096,7 @@ def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
         state["recipients"][key]["last_launch"] = dict(launch)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
-    fallback = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    fallback = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = fallback["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
@@ -4065,7 +4159,7 @@ def test_lo_provider_failure_backoff_retries_preferred_after_retry_window(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
 
     runs_dir = state_dir / "dispatch-runs"
@@ -4096,7 +4190,7 @@ def test_lo_provider_failure_backoff_retries_preferred_after_retry_window(
         state["recipients"][key]["last_launch"] = dict(launch)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
-    retry = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    retry = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = retry["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
@@ -4139,7 +4233,7 @@ def test_lo_gemini_ineligible_tier_demotes_candidate_with_cleared_signature(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "C"
 
     runs_dir = state_dir / "dispatch-runs"
@@ -4172,7 +4266,7 @@ def test_lo_gemini_ineligible_tier_demotes_candidate_with_cleared_signature(
         state["recipients"][key]["last_launch"] = dict(launch)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
-    fallback = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    fallback = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = fallback["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
@@ -4232,7 +4326,7 @@ def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    first = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert first["results"]["loyal-opposition"]["selected_candidate"]["harness_id"] == "D"
 
     runs_dir = state_dir / "dispatch-runs"
@@ -4266,7 +4360,7 @@ def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
         state["recipients"][key]["last_launch"] = dict(launch)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
-    fallback = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    fallback = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = fallback["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
@@ -4346,14 +4440,14 @@ def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = summary["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
     assert result["selected_candidate"]["harness_id"] == "D"
     assert result["selected_candidate"]["reviewer_precedence"] == 10
-    assert "loyal-opposition:A" not in summary["results"]
-    assert "loyal-opposition:F" not in summary["results"]
+    assert summary["results"]["loyal-opposition:A"]["reason"] == "no_pending"
+    assert summary["results"]["loyal-opposition:F"]["reason"] == "no_pending"
 
 
 def test_lo_quality_first_spillover_dispatches_distinct_batches(
@@ -4435,7 +4529,7 @@ prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"
     monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     assert "results" in summary, summary
     assert summary["results"]["loyal-opposition"].get("selected_candidate"), summary["results"]
@@ -4486,7 +4580,7 @@ def test_lo_ordered_fallback_skips_not_ready_preferred_target(
 
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", _readiness)
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = summary["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
@@ -4504,7 +4598,7 @@ def test_lo_ordered_fallback_skips_not_ready_preferred_target(
     state = summary["dispatch_state"]["recipients"]
     assert state["loyal-opposition"]["selected_candidate"]["harness_id"] == "A"
     assert state["loyal-opposition:D"]["last_result"] == "ollama_dispatch_not_ready"
-    assert "loyal-opposition:F" not in summary["results"]
+    assert summary["results"]["loyal-opposition:F"]["reason"] == "no_pending"
 
 
 def test_lo_ordered_fallback_allows_same_harness_author_different_session(
@@ -4550,7 +4644,7 @@ def test_lo_ordered_fallback_allows_same_harness_author_different_session(
 
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", _readiness)
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = summary["results"]["loyal-opposition"]
     assert result["reason"] == "dry_run"
@@ -4596,7 +4690,7 @@ def test_lo_ordered_fallback_all_candidates_unavailable_records_no_ready(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": False})
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = summary["results"]["loyal-opposition"]
     assert result["reason"] == "no_ready_target_for_role"
@@ -4645,7 +4739,7 @@ def test_prime_builder_multi_active_selects_dispatchable_candidate(
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     result = summary["results"]["prime-builder"]
     assert result["reason"] == "dry_run"
@@ -4784,20 +4878,20 @@ def test_resolve_unknown_status_treated_as_inactive(tmp_path: Path) -> None:
     assert trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state") is None
 
 
-def test_is_single_harness_topology_requires_active(tmp_path: Path) -> None:
-    """Assertion 7: single-harness topology requires the harness status==active."""
+def test_resolve_multi_role_harness_requires_active_and_event_capable(tmp_path: Path) -> None:
+    """Multi-role dispatch target resolution still requires active receive-capable records."""
     trigger = _load_trigger()
     _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"], "active")])
-    assert trigger._is_single_harness_topology(tmp_path) is True
+    assert trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state") is not None
     _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"], "inactive")])
-    assert trigger._is_single_harness_topology(tmp_path) is False
+    assert trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state") is None
     _write_registry(tmp_path, [_rec("B", "claude", ["prime-builder", "loyal-opposition"])])  # no status
-    assert trigger._is_single_harness_topology(tmp_path) is False
+    assert trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state") is None
     _write_registry(
         tmp_path,
         [_rec("C", "antigravity", ["prime-builder", "loyal-opposition"], "active", event_driven_hooks=False)],
     )
-    assert trigger._is_single_harness_topology(tmp_path) is False
+    assert trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state") is None
 
 
 def test_resolve_acting_prime_builder_matches_prime(tmp_path: Path) -> None:

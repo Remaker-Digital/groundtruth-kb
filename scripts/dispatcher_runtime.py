@@ -95,6 +95,22 @@ def _worker_pythonpath(inherited: str | None) -> str:
     return os.pathsep.join([_PACKAGE_SRC, *[part for part in inherited_parts if part != _PACKAGE_SRC]])
 
 
+def _run_with_status_wrapper_executable() -> str:
+    """Return the Python executable used for the status-wrapper process."""
+    return prefer_pythonw_executable(sys.executable)
+
+
+def _run_with_status_wrapper_popen_kwargs() -> dict[str, object]:
+    """Return Popen kwargs for the outer status-wrapper process."""
+    kwargs = dict(no_window_subprocess_kwargs())
+    if os.name == "nt":
+        creationflags = int(kwargs.get("creationflags", 0))
+        creationflags |= getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+        kwargs["creationflags"] = creationflags
+    return kwargs
+
+
 def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, Any] | None:
     """Return work-subject suppression metadata when application subject is active.
 
@@ -130,6 +146,7 @@ from bridge_work_intent_registry import (  # noqa: E402, I001
     release as release_work_intent,
     same_role_project_holder,
 )
+from windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402, I001
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     create_authorization_packet,
@@ -163,6 +180,7 @@ except Exception:  # noqa: BLE001 - telemetry import must never break dispatch
 # Prime-actionable signature) flows through naturally because the new
 # signature differs from the prior recorded value.
 LOOP_PREVENTION_ENV_VAR = "GTKB_NO_dispatcher_daemon"
+DISPATCHER_DAEMON_DISABLED_ENV_VAR = "GTKB_DISPATCHER_DAEMON_DISABLED"
 
 # Canonical default state path. Slice 4 may decide to reuse the smart-poller
 # state path instead; path is parameterized so tests don't encode it.
@@ -3127,6 +3145,39 @@ def _harness_command(target: DispatchTarget, prompt: str, project_root: Path) ->
     return command
 
 
+def _dispatch_target_uses_stdin_prompt(target: DispatchTarget) -> bool:
+    """Return True when the dispatch prompt should be transported via stdin."""
+    surfaces = target.invocation_surfaces
+    headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+    if isinstance(headless, dict):
+        if headless.get("stdin") is True:
+            return True
+        if str(headless.get("prompt_transport") or "").strip().lower() == "stdin":
+            return True
+    return target.command_handle == "antigravity"
+
+
+def _command_without_prompt_payload(command: list[str], prompt: str) -> list[str]:
+    """Remove the dispatch prompt payload from argv after stdin handoff is selected."""
+    cleaned: list[str] = []
+    index = 0
+    prompt_value_flags = {"-p", "--prompt"}
+    while index < len(command):
+        current = command[index]
+        if current in prompt_value_flags and index + 1 < len(command) and command[index + 1] == prompt:
+            index += 2
+            continue
+        if current == prompt:
+            index += 1
+            continue
+        if current.startswith("--prompt=") and current[len("--prompt=") :] == prompt:
+            index += 1
+            continue
+        cleaned.append(current)
+        index += 1
+    return cleaned if cleaned else command[:1]
+
+
 # ---------------------------------------------------------------------------
 # IP-3a: Routing data model and durable-record-driven dispatch resolution.
 #
@@ -3727,6 +3778,10 @@ def _spawn_harness(
         _record_dispatch_failure(state_dir, meta)
         return meta
 
+    prompt_via_stdin = _dispatch_target_uses_stdin_prompt(target)
+    if prompt_via_stdin:
+        command = _command_without_prompt_payload(command, prompt)
+
     if dry_run:
         return {
             "dispatch_id": dispatch_id,
@@ -3887,31 +3942,28 @@ def _spawn_harness(
     # is the SessionStart-time companion that the hook reads as the
     # first-line signal per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
     env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = f"::init gtkb {target.canonical_mode}"
-    # Per Codex F2 on -008: do NOT set GTKB_NO_dispatcher_daemon on the
+    # Per Codex F2 on -008: do NOT set trigger/daemon-disable sentinels on the
     # child harness env. The signature-state file provides loop prevention
-    # (unchanged signature → no spawn); blanket env var would also suppress
+    # (unchanged signature -> no spawn); blanket env vars would also suppress
     # the legitimate reciprocal dispatch when the dispatched harness writes
     # a new bridge response that flips the counterpart's signature.
-    # Explicitly strip in case the parent has it set:
+    # Explicitly strip in case the parent has either set:
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
-    if os.name == "nt":
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-    else:
-        creationflags = 0
+    env.pop(DISPATCHER_DAEMON_DISABLED_ENV_VAR, None)
+    wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()
 
     selected = _selected_oldest_first(items, max_items)
     sig = _signature(selected)
     status_file_path = runs_dir / f"{dispatch_id}.exit_code"
     wrapped_command = [
-        sys.executable,
+        _run_with_status_wrapper_executable(),
         str(project_root / "scripts" / "run_with_status.py"),
         "--stdout",
         str(stdout_path),
         "--stderr",
         str(stderr_path),
     ]
-    if target.command_handle == "antigravity":
+    if prompt_via_stdin:
         stdin_path = runs_dir / f"{dispatch_id}.stdin.log"
         try:
             stdin_path.write_text(prompt, encoding="utf-8")
@@ -3950,7 +4002,7 @@ def _spawn_harness(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
-                creationflags=creationflags,
+                **wrapper_popen_kwargs,
             )
         except Exception as e:
             # Re-raise to be handled by the outer try-except block
@@ -4219,7 +4271,7 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
 
             # WI-4803: release the dispatched Prime worker's leaked work-intent
             # claim now that the failure exit has been observed. The launch path
-            # (`run_trigger`) releases the claim only when the spawn fails to
+            # (`run_dispatch_cycle`) releases the claim only when the spawn fails to
             # LAUNCH (`not launch.get("launched")`); a launched worker that later
             # exits non-zero / abruptly (4294967295) / over-lifetime (124) is
             # never released there, so without this the thread stays claim-blocked
@@ -4414,7 +4466,7 @@ def run_dispatch_cycle(
     Stop and manual reconciliation bypass quiesce and use the normal signature
     dedup path. ``hook_context`` is the fail-soft parsed hook stdin payload.
     """
-    if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
+    if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1" or os.environ.get(DISPATCHER_DAEMON_DISABLED_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
 
     if dispatch_is_draining(project_root, state_dir):
@@ -5289,6 +5341,9 @@ def _dispatch_state_appears_idle(recipients: dict[str, Any]) -> bool:
         "no_actionable_change",
         "unchanged",
         "substrate_mismatch_inert",
+        DOCUMENT_LEASE_HELD_RESULT,
+        *_LEGACY_LEASE_HELD_RESULT_TOKENS,
+        *EXPECTED_SUPPRESSION_REASONS,
     }
     for record in recipients.values():
         if not isinstance(record, dict):
@@ -5415,14 +5470,13 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
     for name in all_keys:
         annotation = recipient_annotations.get(name, "")
         rec = recipients.get(name) or {}
+        display_name = name.split(":", 1)[0] if ":" in name else name
+        harness_suffix = f" (harness {name.split(':', 1)[1]})" if ":" in name else ""
         if not rec:
-            display_name = name.split(":", 1)[0] if ":" in name else name
-            lines.append(f"- {display_name}: (no state recorded){annotation}")
+            lines.append(f"- {display_name}: (not evaluated; no state recorded){harness_suffix}{annotation}")
             continue
         sig = (rec.get("signature") or "")[:8]
         last_dispatched = (rec.get("last_dispatched_signature") or "")[:8] or "(none)"
-        display_name = name.split(":", 1)[0] if ":" in name else name
-        harness_suffix = f" (harness {name.split(':', 1)[1]})" if ":" in name else ""
         lines.append(
             f"- {display_name}: last_result={rec.get('last_result', '?')}, "
             f"pending={rec.get('pending_count', '?')}, "
@@ -5492,8 +5546,7 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
         last_dispatched = rec.get("last_dispatched_signature") or ""
         last_result = rec.get("last_result") or ""
         if not rec:
-            lines.append(f"- {name}: (no liveness info; no state recorded){annotation}")
-            overall_healthy = False
+            lines.append(f"- {name}: not evaluated (no state recorded for this tick).{annotation}")
         elif last_result == "no_pending":
             lines.append(f"- {name}: idle (no actionable work).{annotation}")
         elif last_result == "no_pending_after_filter":
@@ -5508,6 +5561,9 @@ def _emit_diagnose_summary(state_dir: Path, *, include_rotated_failures: bool = 
             lines.append(f"- {name}: suppressed (document lease held).{annotation}")
         elif last_result in _LEGACY_LEASE_HELD_RESULT_TOKENS:
             lines.append(f"- {name}: suppressed (document lease held; legacy result token).{annotation}")
+        elif last_result in EXPECTED_SUPPRESSION_REASONS:
+            reason = str(last_result).replace("_", " ")
+            lines.append(f"- {name}: suppressed ({reason}).{annotation}")
         elif sig == last_dispatched and sig:
             lines.append(f"- {name}: dispatched (signature matches last_dispatched).{annotation}")
         elif last_result == "unchanged":
