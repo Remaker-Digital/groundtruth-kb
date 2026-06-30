@@ -433,7 +433,7 @@ def _bridge_dispatch_keyword_check(
     ============  =========  ====================  ===================  ====================================================
     absent        absent     n/a                   NORMAL_STARTUP       normal fresh-session
     absent        present    n/a                   SPOOF_FALLBACK       warn; normal startup; do NOT bypass
-    present       absent     n/a                   LEGACY_FALLBACK      warn; legacy env-var-only behavior
+    present       absent     n/a                   LEGACY_FALLBACK      warn; normal startup; do NOT bypass
     present       present    yes                   DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted
     present       present    no                    DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted; audit log
     ============  =========  ====================  ===================  ====================================================
@@ -452,7 +452,7 @@ def _bridge_dispatch_keyword_check(
     if run_id and not keyword_match:
         return (
             StartupDecision.LEGACY_FALLBACK,
-            "env-var without keyword; preserving legacy env-var-only dispatch behavior",
+            "env-var without keyword; falling through to normal startup",
         )
 
     # Both present.
@@ -695,9 +695,11 @@ def main() -> int:
         pass
     # IP-4: receiver-side StartupDecision dispatch per bridge -005.
     decision, _reason = _bridge_dispatch_keyword_check()
-    if decision in (StartupDecision.DISPATCH_AUTHORIZED, StartupDecision.LEGACY_FALLBACK):
-        # Canonical dispatch or env-var-only legacy dispatch: emit the
-        # bridge auto-dispatch context (today's behavior).
+    if decision == StartupDecision.DISPATCH_AUTHORIZED:
+        # Canonical dispatch requires both the dispatcher run-id env var and
+        # the canonical init keyword side channel. Env-var-only legacy markers
+        # fall through to normal startup so inherited test/worker state cannot
+        # turn an interactive restart into a bridge worker.
         auto_dispatch_context = _bridge_auto_dispatch_context()
         if auto_dispatch_context is not None:
             payload = _session_start_payload(auto_dispatch_context)
@@ -706,10 +708,10 @@ def main() -> int:
             stderr_path.write_text("", encoding="utf-8")
             print(serialized)
             return 0
-    # SPOOF_FALLBACK and NORMAL_STARTUP both fall through to the canonical
-    # startup-service path. SPOOF_FALLBACK explicitly refuses to bypass
-    # normal startup on a keyword alone — defense against owner-typed or
-    # otherwise unverified keyword strings.
+    # SPOOF_FALLBACK, LEGACY_FALLBACK, and NORMAL_STARTUP all fall through to
+    # the canonical startup-service path. SPOOF_FALLBACK explicitly refuses to
+    # bypass normal startup on a keyword alone; LEGACY_FALLBACK now refuses to
+    # bypass on an inherited run-id alone.
     command = [
         prefer_pythonw_executable(sys.executable),
         str(STARTUP_SERVICE),

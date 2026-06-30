@@ -143,25 +143,21 @@ def test_envelope_content_not_subject_to_degraded_banner_flake(
 def test_bridge_auto_dispatch_context_bypasses_interactive_startup() -> None:
     """Bridge poller dispatch sessions must process the initial prompt.
 
-    The verified smart poller (and now the cross-harness event-driven trigger)
-    launches headless harnesses with ``GTKB_BRIDGE_POLLER_RUN_ID`` in the
-    environment. In that mode the SessionStart hook must not emit interactive
-    fresh-session semantics that cause Codex/Claude to discard the auto-dispatch
-    prompt as a startup stimulus.
+    The verified smart poller (and now the dispatcher daemon)
+    launches headless harnesses with ``GTKB_BRIDGE_POLLER_RUN_ID`` and
+    ``GTKB_BRIDGE_DISPATCH_KEYWORD`` in the environment. In that mode the
+    SessionStart hook must not emit interactive fresh-session semantics that
+    cause Codex/Claude to discard the auto-dispatch prompt as a startup
+    stimulus.
 
     Per IP-4 of bridge/gtkb-canonical-init-keyword-syntax-001 (Codex GO at -008):
-    this test pins the LEGACY_FALLBACK enum path -- env-var present, canonical
-    keyword absent. The hermetic env explicitly strips
-    ``GTKB_BRIDGE_DISPATCH_KEYWORD`` from any inherited parent state so the test
-    is deterministic in bridge auto-dispatched review sessions where the
-    parent's keyword env var would otherwise leak in (per Codex NO-GO at -010 F1).
-    The DISPATCH_AUTHORIZED canonical-keyword-matching path is covered by
-    ``test_dispatch_authorized_when_env_and_matching_keyword``.
+    this test pins the canonical DISPATCH_AUTHORIZED path. The run-id-only
+    legacy path is covered separately and must now fall through to normal
+    startup.
     """
     env = {k: v for k, v in os.environ.items() if k not in _BRIDGE_DISPATCH_ENV_VARS}
     env["GTKB_BRIDGE_POLLER_RUN_ID"] = "test-run-001"
-    # Explicitly do NOT set GTKB_BRIDGE_DISPATCH_KEYWORD: this test asserts
-    # the LEGACY_FALLBACK path (env-var-only legacy dispatch behavior).
+    env["GTKB_BRIDGE_DISPATCH_KEYWORD"] = "::init gtkb pb"
 
     result = _run_dispatcher(env=env)
     assert result.returncode == 0, f"dispatcher non-zero exit: {result.stderr}"
@@ -500,8 +496,8 @@ def test_spoof_fallback_when_keyword_without_env(tmp_path: Path, monkeypatch: py
 def test_legacy_fallback_when_env_without_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """env-var present, keyword absent -> LEGACY_FALLBACK (Claude side).
 
-    Preserves backward compat with older trigger versions that did not
-    set the canonical keyword env var alongside the run-id env var.
+    The enum path is retained for diagnostics, but `main()` must not treat this
+    as dispatch authorization.
     """
     _write_harness_state(tmp_path)
     hook = _load_claude_hook_isolated("legacy_fallback")
@@ -509,6 +505,50 @@ def test_legacy_fallback_when_env_without_keyword(tmp_path: Path, monkeypatch: p
     monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
     decision, _reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
     assert decision == hook.StartupDecision.LEGACY_FALLBACK
+
+
+def test_legacy_env_without_keyword_falls_through_to_normal_startup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Run-id-only inheritance must not emit bridge auto-dispatch context."""
+    module = _load_claude_hook_isolated("legacy_env_falls_through")
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "B")
+    monkeypatch.setattr(module, "_now_iso", lambda: "2026-06-05T04:00:00Z")
+    monkeypatch.setattr(module, "_render_role_startup_report", lambda role_profile: None)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-env-only")
+    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
+
+    context = "# GroundTruth-KB Programmatic Startup Payload\n\nnormal startup after env-only marker"
+    service_payload = {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": context,
+            "startupDisclosure": context,
+            "startupFreshness": {
+                "contract_version": module.STARTUP_FRESHNESS_CONTRACT_VERSION,
+                "request_started_at": "2026-06-05T04:00:00Z",
+                "report_origin": "in_memory_model_render",
+                "generated_at": "2026-06-05T04:00:00Z",
+                "payload_emitted_at": "2026-06-05T04:00:00Z",
+                "validation": {"startup_payload_fresh": True, "status": "fresh"},
+            },
+        }
+    }
+    process = module.subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout=json.dumps(service_payload),
+        stderr="",
+    )
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: process)
+
+    assert module.main() == 0
+    emitted = json.loads(capsys.readouterr().out)
+    emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
+    assert emitted_context == context
+    assert "Bridge Auto-Dispatch Session" not in emitted_context
+    assert "test-run-claude-env-only" not in emitted_context
 
 
 def test_dispatch_authorized_with_audit_when_mode_not_in_own_role_set(
@@ -673,7 +713,7 @@ def test_startup_relay_cache_not_written_by_bridge_dispatch_path(
     monkeypatch.setattr(module, "OUT_DIR", tmp_path)
     monkeypatch.setattr(module, "_bridge_auto_dispatch_context", lambda: "bridge auto-dispatch test context")
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-relay-isolation")
-    monkeypatch.delenv("GTKB_BRIDGE_DISPATCH_KEYWORD", raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb pb")
 
     rc = module.main()
     capsys.readouterr()
