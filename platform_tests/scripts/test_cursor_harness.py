@@ -293,3 +293,104 @@ def test_non_bridge_zero_output_success_is_preserved(
     assert exit_code == 0
     assert captured.out == ""
     assert captured.err == ""
+
+
+def test_cursor_agent_provenance_records_only_new_processes() -> None:
+    harness = _load_harness()
+    before = {
+        (10, 100.0): {
+            "pid": 10,
+            "ppid": 1,
+            "name": "agent.exe",
+            "create_time_epoch": 100.0,
+        }
+    }
+    after = {
+        **before,
+        (11, 200.0): {
+            "pid": 11,
+            "ppid": 1,
+            "name": "cursor-agent.exe",
+            "create_time_epoch": 200.0,
+        },
+        (12, 90.0): {
+            "pid": 12,
+            "ppid": 1,
+            "name": "cursor-agent.exe",
+            "create_time_epoch": 90.0,
+        },
+    }
+
+    records = harness._cursor_agent_provenance_records(
+        before,
+        after,
+        dispatch_root_pid=900,
+        started_at_epoch=150.0,
+    )
+
+    assert records == [{"pid": 11, "create_time_epoch": 200.0, "dispatch_root_pid": 900}]
+
+
+def test_dispatch_main_records_new_cursor_agent_provenance(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    snapshots = [
+        {},
+        {
+            (21, 300.0): {
+                "pid": 21,
+                "ppid": 1,
+                "name": "cursor-agent.exe",
+                "create_time_epoch": 300.0,
+            }
+        },
+    ]
+    merged: list[dict] = []
+
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-123")
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+    monkeypatch.setattr(harness.os, "getpid", lambda: 901)
+    monkeypatch.setattr(harness.time, "time", lambda: 250.0)
+    monkeypatch.setattr(harness, "_cursor_agent_snapshot", lambda _project_root: snapshots.pop(0))
+    monkeypatch.setattr(
+        harness, "_merge_cursor_agent_provenance", lambda _project_root, records: merged.extend(records)
+    )
+    monkeypatch.setattr(
+        harness.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr=""),
+    )
+
+    assert harness.main(["--prompt", "dispatch prompt"]) == 0
+
+    assert merged == [{"pid": 21, "create_time_epoch": 300.0, "dispatch_root_pid": 901}]
+    assert capsys.readouterr().out == "ok\n"
+
+
+def test_interactive_main_does_not_record_cursor_agent_provenance(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    merged: list[dict] = []
+
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    monkeypatch.delenv("GTKB_INHERITED_SESSION_ID", raising=False)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+    monkeypatch.setattr(
+        harness, "_merge_cursor_agent_provenance", lambda _project_root, records: merged.extend(records)
+    )
+    monkeypatch.setattr(
+        harness.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr=""),
+    )
+
+    assert harness.main(["--prompt", "ordinary prompt"]) == 0
+
+    assert merged == []
+    assert capsys.readouterr().out == "ok\n"
