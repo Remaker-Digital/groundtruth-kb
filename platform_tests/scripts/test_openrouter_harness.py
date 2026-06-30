@@ -384,6 +384,74 @@ def test_tool_loop_caps_bash_timeout_to_remaining_session_budget(tmp_path: Path,
     assert observed_timeouts == [3.0]
 
 
+def test_wi4933_grep_returns_without_exhausting_file_iterator(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = make_root(tmp_path)
+    first = root / "first.txt"
+    first.write_text("needle\n", encoding="utf-8")
+
+    def iter_files(_base: Path, **_kwargs):
+        yield first
+        raise AssertionError("grep exhausted the whole iterator before honoring max_results")
+
+    monkeypatch.setattr(orh, "_iter_text_files", iter_files)
+
+    result = orh.dispatch_tool_call("Grep", {"pattern": "needle", "max_results": 1}, metadata(), root)
+
+    assert result == "first.txt:1:needle"
+
+
+def test_wi4933_glob_prunes_runtime_cache_directories(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    (root / ".gtkb-state").mkdir()
+    (root / ".gtkb-state" / "leak.secret").write_text("hidden", encoding="utf-8")
+    (root / "src").mkdir()
+    (root / "src" / "keep.secret").write_text("visible", encoding="utf-8")
+
+    result = orh.dispatch_tool_call("Glob", {"pattern": "*.secret"}, metadata(), root)
+
+    assert "src/keep.secret" in result.splitlines()
+    assert ".gtkb-state/leak.secret" not in result
+
+
+def test_wi4933_tool_loop_stops_repeated_no_progress_calls(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    (root / "note.txt").write_text("hello", encoding="utf-8")
+    calls: list[dict] = []
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        calls.append(payload)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "id": "call_read",
+                                "function": {"name": "Read", "arguments": {"path": "note.txt"}},
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="repeated no-progress tool loop"):
+        orh.run_tool_loop(
+            "loop",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            20,
+            root,
+            chat_func=chat,
+            timeout=10.0,
+            session_timeout=120.0,
+        )
+
+    assert len(calls) == orh.MAX_REPEATED_TOOL_SIGNATURE_TURNS + 1
+
+
 # --- WI-4817: bounded transient-failure retry for call_openrouter_chat ---
 
 

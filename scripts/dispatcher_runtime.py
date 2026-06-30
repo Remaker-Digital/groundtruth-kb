@@ -272,6 +272,7 @@ DISPATCH_AUTH_ENV_KEYS: tuple[str, ...] = (
 FATAL_WORKER_OUTPUT_MARKERS = (
     ("max-turn exhaustion", "max_turn_exhaustion"),
     ("session timeout exceeded before Ollama chat turn", "worker_timeout"),
+    ("repeated no-progress tool loop", "max_turn_exhaustion"),
     ("Invalid authentication credentials", "auth_failure"),
     ("API Error: 401", "auth_failure"),
     ("Ollama chat request failed", "provider_failure"),

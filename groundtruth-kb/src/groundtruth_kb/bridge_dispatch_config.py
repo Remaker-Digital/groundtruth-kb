@@ -54,6 +54,7 @@ RUNTIME_FAILURE_CLASSES = {
     "provider_configuration_failure",
     "cursor_headless_cli_unavailable",
     "subprocess_execution_failed",
+    "worker_timeout",
     "work_intent_acquire_failed",
 }
 RUNTIME_BACKPRESSURE_CLASSES = frozenset({"provider_failure_backoff_active", "provider_rate_limited"})
@@ -78,6 +79,9 @@ RECENT_RUN_FAILURE_MARKERS = (
     ("provider_rate_limited", "provider_rate_limited"),
     ("HTTP 429", "provider_rate_limited"),
     ("max-turn exhaustion", "max_turn_exhaustion"),
+    ("repeated no-progress tool loop", "max_turn_exhaustion"),
+    ("session timeout exceeded before Ollama chat turn", "worker_timeout"),
+    ("session timeout exceeded before OpenRouter chat turn", "worker_timeout"),
     ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
     ("Cursor Agent CLI not found", "cursor_headless_cli_unavailable"),
     ("passed to Electron/Chromium", "cursor_headless_cli_unavailable"),
@@ -698,6 +702,10 @@ def _recent_run_failure_class(row: dict[str, Any]) -> str | None:
             return failure_class
     exit_code = row.get("exit_code")
     if isinstance(exit_code, int) and not isinstance(exit_code, bool) and exit_code != 0:
+        if exit_code == 4294967295:
+            return "process_terminated_abruptly"
+        if exit_code == 124:
+            return "worker_timeout"
         return "subprocess_execution_failed"
     return None
 

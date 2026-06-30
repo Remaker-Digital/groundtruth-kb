@@ -15,9 +15,8 @@ from groundtruth_kb.cli import main  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _no_cross_harness_trigger_disable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, raising=False)
-    monkeypatch.setattr(bridge_dispatch_config, "_read_windows_persistent_env_var", lambda _name, _scope: None)
+def _no_dispatcher_runtime_disable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
@@ -71,6 +70,13 @@ def _write_dispatch_state(root: Path, state: dict[str, object]) -> None:
     path.write_text(json.dumps(state), encoding="utf-8")
 
 
+def _write_recent_run(root: Path, dispatch_id: str, *, exit_code: int, stderr: str = "") -> None:
+    runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.exit_code").write_text(str(exit_code), encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.stderr.log").write_text(stderr, encoding="utf-8")
+
+
 def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
@@ -83,21 +89,21 @@ def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> 
     assert [row["id"] for row in payload["selected_by_role"]["loyal-opposition"]] == ["D"]
 
 
-def test_bridge_dispatch_health_cli_warns_when_kill_switch_active(
+def test_bridge_dispatch_health_cli_ignores_retired_worker_disable_env(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _root, config = _project(tmp_path)
-    monkeypatch.setenv(bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR, "1")
+    retired_env = "GTKB_NO_" + "CROSS_" + "HARN" + "ESS_TRIGGER"
+    monkeypatch.setenv(retired_env, "1")
 
     result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["health_status"] == "WARN"
+    assert payload["health_status"] == "PASS"
     findings = "\n".join(payload["findings"])
-    assert bridge_dispatch_config.CROSS_HARNESS_TRIGGER_DISABLE_ENV_VAR in findings
-    assert "Process" in findings
+    assert retired_env not in findings
 
 
 def test_bridge_dispatch_status_cli_reports_health(tmp_path: Path) -> None:
@@ -152,7 +158,7 @@ def test_bridge_dispatch_health_degrades_on_selected_runtime_failure(tmp_path: P
     assert payload["health_status"] == "WARN"
     findings = "\n".join(payload["findings"])
     assert "loyal-opposition:D circuit breaker is tripped" in findings
-    assert "loyal-opposition:D last_result=provider_failure_backoff_active" in findings
+    assert "loyal-opposition:D failure_class=max_turn_exhaustion" in findings
     assert "prime-builder last_result=work_intent_acquire_failed" in findings
     assert "prime-builder work intent acquisition failed" in findings
 
@@ -222,3 +228,43 @@ def test_bridge_dispatch_health_warns_for_stale_selected_launch_failure(tmp_path
     assert classification["severity"] == "WARN"
     assert classification["stale_failure_evidence"] is True
     assert f"recorded dispatch {dispatch_id} has no live worker" == classification["stale_failure_reason"]
+
+
+def test_bridge_dispatch_health_classifies_recent_ollama_timeout(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    dispatch_id = "2026-06-30T10-20-39Z-loyal-opposition-D-timeout"
+    _write_recent_run(
+        root,
+        dispatch_id,
+        exit_code=1,
+        stderr="ollama_harness: session timeout exceeded before Ollama chat turn\n",
+    )
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["health_status"] == "WARN"
+    findings = "\n".join(payload["findings"])
+    assert f"latest_run={dispatch_id}" in findings
+    assert "failure_class=worker_timeout" in findings
+    status = bridge_dispatch_config.collect_bridge_dispatch_status(root)
+    classification = status.runtime_classifications[-1]
+    assert classification["failure_class"] == "worker_timeout"
+
+
+def test_bridge_dispatch_health_classifies_recent_abrupt_termination(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    dispatch_id = "2026-06-30T10-58-53Z-loyal-opposition-D-abrupt"
+    _write_recent_run(root, dispatch_id, exit_code=4294967295)
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    findings = "\n".join(payload["findings"])
+    assert f"latest_run={dispatch_id}" in findings
+    assert "failure_class=process_terminated_abruptly" in findings
+    status = bridge_dispatch_config.collect_bridge_dispatch_status(root)
+    classification = status.runtime_classifications[-1]
+    assert classification["failure_class"] == "process_terminated_abruptly"

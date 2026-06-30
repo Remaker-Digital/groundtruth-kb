@@ -4522,6 +4522,34 @@ def test_wi4578_non_launched_failure_is_previous_launch_failure() -> None:
     ]
 
 
+def test_wi4933_repeated_no_progress_marker_is_max_turn_failure(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    stderr_path = tmp_path / "openrouter.stderr.log"
+    stderr_path.write_text(
+        "OpenRouter harness: repeated no-progress tool loop before final assistant text\n",
+        encoding="utf-8",
+    )
+
+    failure = trigger._detect_previous_launch_failure(
+        {
+            "last_launch": {
+                "dispatch_id": "prior-openrouter-no-progress",
+                "recipient": "loyal-opposition:F",
+                "launched": True,
+                "stderr_path": str(stderr_path),
+                "signature": "same-signature",
+            }
+        },
+        recipient="loyal-opposition:F",
+        signature="same-signature",
+    )
+
+    assert failure is not None
+    assert failure["error_type"] == "fatal_worker_output_marker"
+    assert failure["matched_markers"][0]["marker"] == "repeated no-progress tool loop"
+    assert trigger._failure_class_from_previous(failure) == "max_turn_exhaustion"
+
+
 def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

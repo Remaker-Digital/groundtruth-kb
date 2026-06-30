@@ -46,11 +46,28 @@ CHAT_MAX_ATTEMPTS = 3
 CHAT_RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)
 RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
 # WI-4734: full bridge verification can exceed the old 24-turn ceiling.
-DEFAULT_MAX_TURNS = 80
+# WI-4933: keep unattended dispatch bounded; callers can still override.
+DEFAULT_MAX_TURNS = 40
 ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
+MAX_FILE_SCAN_ENTRIES = 5000
+MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
+SKIPPED_SCAN_DIR_NAMES = frozenset(
+    {
+        ".git",
+        ".gtkb-state",
+        ".venv",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "node_modules",
+        "dist",
+        "build",
+    }
+)
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
@@ -87,6 +104,14 @@ BASH_GUARDS = (
 
 class OpenRouterHarnessError(RuntimeError):
     """Raised for fail-closed harness errors."""
+
+
+class FileScanLimitExceeded(OpenRouterHarnessError):
+    """Raised when a bounded filesystem tool scan reaches its entry cap."""
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(f"scan truncated after {limit} entries; narrow the path or pattern")
+        self.limit = limit
 
 
 @dataclass(frozen=True)
@@ -753,10 +778,27 @@ def _dispatch_edit(
     return f"edited {_relative_path(project_root, path)}"
 
 
-def _iter_text_files(root: Path) -> Iterable[Path]:
-    for path in root.rglob("*"):
-        if path.is_file():
-            yield path
+def _iter_bounded_paths(root: Path, *, max_entries: int = MAX_FILE_SCAN_ENTRIES) -> Iterable[Path]:
+    if root.is_file():
+        yield root
+        return
+    seen = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(name for name in dirnames if name not in SKIPPED_SCAN_DIR_NAMES)
+        for name in [*dirnames, *sorted(filenames)]:
+            seen += 1
+            if seen > max_entries:
+                raise FileScanLimitExceeded(max_entries)
+            yield Path(dirpath) / name
+
+
+def _iter_text_files(root: Path, *, max_entries: int = MAX_FILE_SCAN_ENTRIES) -> Iterable[Path]:
+    for path in _iter_bounded_paths(root, max_entries=max_entries):
+        try:
+            if path.is_file():
+                yield path
+        except OSError:
+            continue
 
 
 def _dispatch_grep(arguments: Mapping[str, Any], project_root: Path) -> str:
@@ -764,22 +806,24 @@ def _dispatch_grep(arguments: Mapping[str, Any], project_root: Path) -> str:
     base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
     max_results = _positive_int_argument(arguments, "max_results", MAX_GREP_RESULTS)
     regex = re.compile(pattern)
-    roots = [base] if base.is_file() else list(_iter_text_files(base))
     matches: list[str] = []
-    for file_path in roots:
-        rel = _relative_path_or_none(project_root, file_path)
-        if rel is None:
-            continue
-        try:
-            for line_no, line in enumerate(
-                file_path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
-            ):
-                if regex.search(line):
-                    matches.append(f"{rel}:{line_no}:{line[:300]}")
-                    if len(matches) >= max_results:
-                        return "\n".join(matches)
-        except OSError:
-            continue
+    try:
+        for file_path in _iter_text_files(base):
+            rel = _relative_path_or_none(project_root, file_path)
+            if rel is None:
+                continue
+            try:
+                for line_no, line in enumerate(
+                    file_path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
+                ):
+                    if regex.search(line):
+                        matches.append(f"{rel}:{line_no}:{line[:300]}")
+                        if len(matches) >= max_results:
+                            return "\n".join(matches)
+            except OSError:
+                continue
+    except FileScanLimitExceeded as exc:
+        matches.append(f"[{exc}]")
     return "\n".join(matches)
 
 
@@ -788,14 +832,17 @@ def _dispatch_glob(arguments: Mapping[str, Any], project_root: Path) -> str:
     base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
     max_results = _positive_int_argument(arguments, "max_results", MAX_GLOB_RESULTS)
     matches: list[str] = []
-    for path in base.rglob("*"):
-        rel = _relative_path_or_none(project_root, path)
-        if rel is None:
-            continue
-        if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(path.name, pattern):
-            matches.append(rel)
-            if len(matches) >= max_results:
-                break
+    try:
+        for path in _iter_bounded_paths(base):
+            rel = _relative_path_or_none(project_root, path)
+            if rel is None:
+                continue
+            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(path.name, pattern):
+                matches.append(rel)
+                if len(matches) >= max_results:
+                    break
+    except FileScanLimitExceeded as exc:
+        matches.append(f"[{exc}]")
     return "\n".join(sorted(matches))
 
 
@@ -951,6 +998,8 @@ def run_tool_loop(
     chat = chat_func or call_openrouter_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
     session_deadline = time.monotonic() + session_timeout
+    previous_tool_signature: str | None = None
+    repeated_tool_signature_turns = 0
 
     for _turn in range(max_turns):
         payload = {"model": model_route.model_id, "messages": messages, "stream": False}
@@ -980,6 +1029,15 @@ def run_tool_loop(
 
         if not isinstance(tool_calls, list):
             raise OpenRouterHarnessError("tool_calls must be a list")
+
+        tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
+        if tool_signature == previous_tool_signature:
+            repeated_tool_signature_turns += 1
+        else:
+            previous_tool_signature = tool_signature
+            repeated_tool_signature_turns = 1
+        if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
+            raise OpenRouterHarnessError("repeated no-progress tool loop before final assistant text")
 
         assistant_message: dict[str, Any] = {
             "role": "assistant",
