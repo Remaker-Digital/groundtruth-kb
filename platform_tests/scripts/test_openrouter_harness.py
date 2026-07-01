@@ -72,6 +72,22 @@ def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
+def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    inside = root / "inside.txt"
+    inside.write_text("inside", encoding="utf-8")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside", encoding="utf-8")
+
+    class _FakeBase:
+        def rglob(self, _pattern: str):
+            return [outside, inside]
+
+    monkeypatch.setattr(orh, "_resolve_tool_path", lambda *_args, **_kwargs: _FakeBase())
+
+    assert orh._dispatch_glob({"pattern": "*.txt"}, root) == "inside.txt"
+
+
 def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     root = make_root(tmp_path)
     prompt = orh.build_system_prompt("bridge-review", route(root))

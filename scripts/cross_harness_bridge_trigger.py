@@ -89,6 +89,7 @@ from bridge_work_intent_registry import (  # noqa: E402, I001
     current_holder as current_work_intent_holder,
     release as release_work_intent,
 )
+from groundtruth_kb.bridge_dispatch_reset import dispatch_is_draining  # noqa: E402
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     issue_dispatch_authorization_packets,
@@ -130,6 +131,9 @@ QUIESCE_STATE_FILENAME = "quiesce-state.json"
 DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
+PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
+PID_CREATE_TIME_META_KEY = "pid_create_time_epoch"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
 DISPATCH_FAILURES_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_FAILURES_MAX_BYTES"
 DISPATCH_SUPPRESSIONS_MAX_BYTES_ENV_VAR = "GTKB_DISPATCH_SUPPRESSIONS_MAX_BYTES"
 DEFAULT_JSONL_MAX_BYTES = 10 * 1024 * 1024
@@ -1056,9 +1060,57 @@ def _rotate_jsonl_if_needed(
         return
 
 
+def _pid_create_time_epoch(pid: int) -> float | None:
+    """Return the OS create-time epoch for ``pid`` when available."""
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_int <= 0:
+        return None
+    try:
+        import psutil  # noqa: PLC0415
+
+        return float(psutil.Process(pid_int).create_time())
+    except Exception:  # noqa: BLE001 - unavailable/vanished PIDs are not trusted
+        return None
+
+
+def _pid_create_time_matches(pid: int, expected_epoch: Any) -> bool:
+    try:
+        expected = float(expected_epoch)
+    except (TypeError, ValueError):
+        return False
+    actual = _pid_create_time_epoch(pid)
+    if actual is None:
+        return False
+    return abs(actual - expected) <= PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS
+
+
+def _read_pid_create_time_sidecar(runs_dir: Path, dispatch_id: str) -> float | None:
+    path = runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}"
+    try:
+        return float(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _dispatch_pid_provenance_matches(runs_dir: Path, dispatch_id: str, pid: int) -> bool:
+    expected = _read_pid_create_time_sidecar(runs_dir, dispatch_id)
+    return expected is not None and _pid_create_time_matches(pid, expected)
+
+
 def _dispatch_id_from_run_artifact(path: Path) -> str:
     name = path.name
-    for suffix in (".stdout.log", ".stderr.log", ".exit_code", ".pid", ".prompt.txt", ".input.json"):
+    for suffix in (
+        ".stdout.log",
+        ".stderr.log",
+        ".exit_code",
+        ".pid",
+        PID_CREATE_TIME_SUFFIX,
+        ".prompt.txt",
+        ".input.json",
+    ):
         if name.endswith(suffix):
             return name[: -len(suffix)]
     return path.stem
@@ -1076,7 +1128,7 @@ def _run_artifact_live(path: Path, runs_dir: Path) -> bool:
         pid = int(pid_file.read_text(encoding="utf-8").strip())
     except (OSError, TypeError, ValueError):
         return False
-    return _pid_alive(pid)
+    return _pid_alive(pid) and _dispatch_pid_provenance_matches(runs_dir, dispatch_id, pid)
 
 
 def _path_size(path: Path) -> int:
@@ -1285,14 +1337,17 @@ def _count_live_dispatched_processes(runs_dir: Path) -> int:
     Each successful ``_spawn_harness`` launch writes ``<dispatch_id>.pid``.
     A dispatch is LIVE iff its sidecar exists, its ``<dispatch_id>.exit_code``
     status file (written by ``run_with_status.py`` only on child EXIT) is
-    absent/empty, and the PID is alive. Sidecars whose process has exited or
-    died (or whose contents are malformed) are pruned during the count pass so
+    absent/empty, the PID is alive, and the matching create-time sidecar still
+    identifies the same OS process. Sidecars whose process has exited or died
+    (or whose contents are malformed/stale) are pruned during the count pass so
     the runs dir does not grow unbounded.
     """
     if not runs_dir.is_dir():
         return 0
     live = 0
     for pid_file in sorted(runs_dir.glob("*.pid")):
+        if pid_file.name == "daemon.pid":
+            continue
         dispatch_id = pid_file.name[: -len(".pid")]
         try:
             pid_text = pid_file.read_text(encoding="utf-8").strip()
@@ -1308,7 +1363,7 @@ def _count_live_dispatched_processes(runs_dir: Path) -> int:
             exited = status_file.exists() and status_file.stat().st_size > 0
         except OSError:
             exited = False
-        if exited or not _pid_alive(pid):
+        if exited or not _pid_alive(pid) or not _dispatch_pid_provenance_matches(runs_dir, dispatch_id, pid):
             _safe_unlink(pid_file)
             continue
         live += 1
@@ -2777,11 +2832,19 @@ def _spawn_harness(
         except Exception as e:
             # Re-raise to be handled by the outer try-except block
             raise e
+        pid_create_time = _pid_create_time_epoch(process.pid)
         meta.update({"launched": True, "pid": process.pid})
+        if pid_create_time is not None:
+            meta[PID_CREATE_TIME_META_KEY] = pid_create_time
         # WI-4472: live-process accounting sidecar. Written only for a
         # successful launch; consumed by _count_live_dispatched_processes.
         try:
             (runs_dir / f"{dispatch_id}.pid").write_text(str(process.pid), encoding="utf-8")
+            if pid_create_time is not None:
+                (runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}").write_text(
+                    f"{pid_create_time:.6f}",
+                    encoding="utf-8",
+                )
         except OSError:
             pass
     except (OSError, FileNotFoundError, subprocess.SubprocessError) as exc:
@@ -3236,6 +3299,9 @@ def run_trigger(
     """
     if os.environ.get(LOOP_PREVENTION_ENV_VAR) == "1":
         return {"skipped": True, "reason": "loop_prevention_env_var"}
+
+    if dispatch_is_draining(project_root, state_dir):
+        return {"skipped": True, "reason": "dispatch_drain_active"}
 
     _cleanup_stale_tmp_files(state_dir)
     retention_result = _apply_runtime_evidence_retention(project_root, state_dir)

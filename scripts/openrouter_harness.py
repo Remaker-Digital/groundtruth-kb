@@ -387,6 +387,13 @@ def _relative_path(project_root: Path, path: Path) -> str:
     return path.resolve().relative_to(project_root.resolve()).as_posix()
 
 
+def _relative_path_or_none(project_root: Path, path: Path) -> str | None:
+    try:
+        return _relative_path(project_root, path)
+    except ValueError:
+        return None
+
+
 def set_author_metadata_env(
     env: Mapping[str, str],
     model_id: str,
@@ -636,12 +643,15 @@ def _dispatch_grep(arguments: Mapping[str, Any], project_root: Path) -> str:
     roots = [base] if base.is_file() else list(_iter_text_files(base))
     matches: list[str] = []
     for file_path in roots:
+        rel = _relative_path_or_none(project_root, file_path)
+        if rel is None:
+            continue
         try:
             for line_no, line in enumerate(
                 file_path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
             ):
                 if regex.search(line):
-                    matches.append(f"{_relative_path(project_root, file_path)}:{line_no}:{line[:300]}")
+                    matches.append(f"{rel}:{line_no}:{line[:300]}")
                     if len(matches) >= max_results:
                         return "\n".join(matches)
         except OSError:
@@ -655,7 +665,9 @@ def _dispatch_glob(arguments: Mapping[str, Any], project_root: Path) -> str:
     max_results = _positive_int_argument(arguments, "max_results", MAX_GLOB_RESULTS)
     matches: list[str] = []
     for path in base.rglob("*"):
-        rel = _relative_path(project_root, path)
+        rel = _relative_path_or_none(project_root, path)
+        if rel is None:
+            continue
         if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(path.name, pattern):
             matches.append(rel)
             if len(matches) >= max_results:

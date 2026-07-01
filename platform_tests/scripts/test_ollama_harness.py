@@ -132,6 +132,22 @@ def test_tool_schemas_expose_only_canonical_tools():
         oh.build_tool_schemas(["Read", "Delete"])
 
 
+def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    inside = root / "inside.txt"
+    inside.write_text("inside", encoding="utf-8")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside", encoding="utf-8")
+
+    class _FakeBase:
+        def rglob(self, _pattern: str):
+            return [outside, inside]
+
+    monkeypatch.setattr(oh, "_resolve_tool_path", lambda *_args, **_kwargs: _FakeBase())
+
+    assert oh._dispatch_glob({"pattern": "*.txt"}, root) == "inside.txt"
+
+
 def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     root = make_root(tmp_path)
     (root / "note.txt").write_text("hello from file", encoding="utf-8")
