@@ -31,6 +31,7 @@ GOV-ARTIFACT-ORIENTED-GOVERNANCE-001 per Self-Diagnostic Leak Closure Slice 2.
 | deliberation_recall | What is the recall at 3 of the semantic index over recent owner-decision deliberations? |
 | advisory_latency | What is the median wall-clock latency from advisory filing to first Prime acknowledgement? |
 | assertion_signal_noise | What fraction of categorized assertions land outside chronic_noise (signal-bearing)? |
+| activity_envelope_load | What are the estimated global and per-activity context loads, and did unrelated activity shards or raw archival SoT payloads enter focused workflows? |
 
 ## Subcommands
 
@@ -58,6 +59,13 @@ Diff two runs by idempotency_key and benchmark value.
 Write an advisory effectiveness summary for an existing benchmark run.
 
     python -m scripts.benchmarks.cli observatory --run-id 20260514-040000
+
+### activity-envelope-load
+
+Emit a compact read-only session/activity envelope load report.
+
+    gt benchmarks activity-envelope-load --json
+    python scripts/benchmarks/activity_envelope_load.py --json
 
 ## Output Contract
 

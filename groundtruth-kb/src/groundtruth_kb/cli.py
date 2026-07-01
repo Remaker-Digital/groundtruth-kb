@@ -220,6 +220,32 @@ main.add_command(session_group)
 main.add_command(skills_group)
 
 
+@main.group("benchmarks")
+def benchmarks_group() -> None:
+    """Read-only GT-KB benchmark and measurement reports."""
+
+
+@benchmarks_group.command("activity-envelope-load")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def benchmarks_activity_envelope_load_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Report global and per-activity session envelope load estimates."""
+    try:
+        module = importlib.import_module("scripts.benchmarks.activity_envelope_load")
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parents[3]
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+        module = importlib.import_module("scripts.benchmarks.activity_envelope_load")
+    config = _resolve_config(ctx)
+    report = module.build_report(project_root=config.project_root)
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        click.echo(module.render_markdown(report), nl=False)
+    ctx.exit(0 if report["status"] in {"PASS", "WARN"} else 1)
+
+
 @main.group("commit")
 def commit_group() -> None:
     """Commit governance preflight commands."""

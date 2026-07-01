@@ -123,6 +123,29 @@ METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         ),
         value_direction="lower_is_better",
     ),
+    MetricDefinition(
+        metric_id="activity_envelope_load",
+        source_benchmark_id="activity_envelope_load",
+        headline="Estimated global and per-activity context load for the session/activity envelope split.",
+        decision_informed=(
+            "Whether startup and focused activities are keeping global context light while routing "
+            "history and archival state through compact query surfaces."
+        ),
+        interpretation=(
+            "Lower automatic payload estimates and zero FAIL issues suggest a cleaner activity-envelope split; "
+            "warnings identify surfaces that may deserve further sharding or compact query work."
+        ),
+        guardrails=(
+            "Token estimates use a deterministic character heuristic, not tokenizer-specific accounting.",
+            "The report measures configured surfaces and profile payloads; it does not prove every harness runtime loaded exactly that set.",
+            "A WARN status is advisory and does not by itself block release.",
+        ),
+        known_failure_modes=(
+            "Missing or stale activity profile classification can under-report loaded context.",
+            "Generated startup payloads outside the declared surfaces are not counted by this benchmark.",
+        ),
+        value_direction="lower_is_better",
+    ),
 )
 
 

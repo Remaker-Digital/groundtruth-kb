@@ -75,3 +75,9 @@ forbidden_payloads = [
     "unbounded_database_dumps",
 ]
 required_alternative = "Use a governed compact CLI/query surface with filters and bounded output."
+
+[measurement.thresholds]
+global_surface_warning_tokens = 60000
+global_surface_failure_tokens = 120000
+activity_auto_warning_tokens = 1200
+activity_auto_failure_tokens = 2400
