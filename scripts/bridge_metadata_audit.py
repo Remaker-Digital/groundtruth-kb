@@ -159,10 +159,11 @@ def audit_bridge_metadata(
     project_root: Path,
     *,
     bridge_dir: Path | None = None,
+    generated_at: str | None = None,
 ) -> AuditReport:
     root = project_root.resolve()
     bridge_path = (bridge_dir or root / "bridge").resolve()
-    generated_at = datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    generated_at = generated_at or datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     latest_files = _latest_bridge_files(bridge_path)
 
     session_id_slugs: dict[str, list[str]] = defaultdict(list)
@@ -289,12 +290,28 @@ def write_grandfather_report(project_root: Path, report: AuditReport) -> Path:
     return out_path
 
 
+def write_audit_reports(project_root: Path, report: AuditReport, out_dir: Path | None = None) -> tuple[Path, Path]:
+    report_dir = out_dir or project_root / ".gtkb-state" / "bridge-metadata-audit"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    safe_stamp = report.generated_at.replace(":", "").replace("-", "").replace("T", "-").rstrip("Z")
+    json_path = report_dir / f"bridge-metadata-audit-{safe_stamp}.json"
+    markdown_path = report_dir / f"bridge-metadata-audit-{safe_stamp}.md"
+    json_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    markdown_path.write_text(render_markdown_report(report), encoding="utf-8")
+    return json_path, markdown_path
+
+
 def run_cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only bridge author-metadata audit scanner.")
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     parser.add_argument("--bridge-dir", type=Path, default=None)
     parser.add_argument("--json", action="store_true", help="Emit JSON report on stdout.")
     parser.add_argument("--write-report", type=Path, default=None, help="Write markdown report to path.")
+    parser.add_argument(
+        "--write-state-report",
+        action="store_true",
+        help="Write JSON and markdown reports under .gtkb-state/bridge-metadata-audit/.",
+    )
     parser.add_argument(
         "--grandfather-report",
         action="store_true",
@@ -303,20 +320,30 @@ def run_cli(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     report = audit_bridge_metadata(args.project_root, bridge_dir=args.bridge_dir)
+    state_report_paths: tuple[Path, Path] | None = None
+    if args.write_state_report:
+        state_report_paths = write_audit_reports(args.project_root.resolve(), report)
+
     if args.grandfather_report:
         out_path = write_grandfather_report(args.project_root.resolve(), report)
         if args.json:
             payload = report.to_dict()
             payload["grandfather_report_path"] = str(out_path)
+            if state_report_paths is not None:
+                payload["state_report_paths"] = [str(path) for path in state_report_paths]
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:
             print(out_path)
     elif args.json:
-        print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+        payload = report.to_dict()
+        if state_report_paths is not None:
+            payload["state_report_paths"] = [str(path) for path in state_report_paths]
+        print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(render_markdown_report(report))
 
     if args.write_report is not None:
+        args.write_report.parent.mkdir(parents=True, exist_ok=True)
         args.write_report.write_text(render_markdown_report(report), encoding="utf-8")
     return 0
 

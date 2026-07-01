@@ -11,6 +11,7 @@ from scripts.bridge_metadata_audit import (
     COMPLIANCE_SYNTHETIC_SESSION,
     audit_bridge_metadata,
     run_cli,
+    write_audit_reports,
     write_grandfather_report,
 )
 
@@ -88,9 +89,27 @@ def test_audit_json_output_is_deterministic(tmp_path: Path) -> None:
     _write_bridge(tmp_path, "gtkb-clean-fixture-001.md", CLEAN_ARTIFACT)
     _write_bridge(tmp_path, "gtkb-missing-field-fixture-001.md", MISSING_FIELD_ARTIFACT)
 
-    first = json.dumps(audit_bridge_metadata(tmp_path).to_dict(), sort_keys=True)
-    second = json.dumps(audit_bridge_metadata(tmp_path).to_dict(), sort_keys=True)
+    timestamp = "2026-07-01T00:00:00Z"
+    first = json.dumps(audit_bridge_metadata(tmp_path, generated_at=timestamp).to_dict(), sort_keys=True)
+    second = json.dumps(audit_bridge_metadata(tmp_path, generated_at=timestamp).to_dict(), sort_keys=True)
     assert first == second
+
+
+def test_state_report_writes_json_markdown_without_bridge_mutation(tmp_path: Path) -> None:
+    _write_bridge(tmp_path, "gtkb-clean-fixture-001.md", CLEAN_ARTIFACT)
+    bridge_path = tmp_path / "bridge" / "gtkb-clean-fixture-001.md"
+    before = bridge_path.stat().st_mtime_ns
+
+    report = audit_bridge_metadata(tmp_path, generated_at="2026-07-01T00:00:00Z")
+    json_path, markdown_path = write_audit_reports(tmp_path, report)
+
+    assert json_path.is_file()
+    assert markdown_path.is_file()
+    assert json_path.parent == tmp_path / ".gtkb-state" / "bridge-metadata-audit"
+    assert markdown_path.parent == json_path.parent
+    assert json.loads(json_path.read_text(encoding="utf-8"))["artifact_count"] == 1
+    assert "Bridge author-metadata audit" in markdown_path.read_text(encoding="utf-8")
+    assert bridge_path.stat().st_mtime_ns == before
 
 
 def test_cli_json_exit_zero(tmp_path: Path, capsys) -> None:
