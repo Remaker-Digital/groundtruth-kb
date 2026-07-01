@@ -300,6 +300,24 @@ it as the production persistence boundary.
 Supervisor lifecycle commands: `status`, `install`, `enable`, `disable`,
 `uninstall` under `gt bridge dispatch daemon supervisor`.
 
+## Bridge author-metadata audit (WI-4938 / WI-4941)
+
+Read-only tooling audits latest status-bearing bridge artifacts for the six
+required author metadata fields and synthetic session-id patterns. It does not
+mutate committed bridge history.
+
+```bash
+gt bridge audit metadata --json
+python scripts/bridge_metadata_audit.py --grandfather-report --json
+```
+
+**Forward-prevention vs repair queue:** write-time enforcement (WI-4940+) applies
+only to newly authored bridge files. Historical non-compliance is recorded once
+in `.gtkb-state/bridge-metadata-grandfather-audit/grandfather-audit-<date>.json`
+(the grandfather audit). That JSON is an append-only baseline snapshot for
+release evidence and repair prioritization; it is not a backfill or rewrite of
+`bridge/*.md`.
+
 ## Review checklist
 
 Before accepting a bridge setup, verify:
