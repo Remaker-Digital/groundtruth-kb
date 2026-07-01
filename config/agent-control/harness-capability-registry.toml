@@ -428,7 +428,7 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 id = "skill.harness-parity-review"
 kind = "skill"
 canonical_name = "harness-parity-review"
-canonical_purpose = "Review and correct parity between Claude Code and Codex harness capabilities."
+canonical_purpose = "Review and correct parity across GT-KB harness capabilities, roles, skills, hooks, commands, and readiness surfaces."
 canonical_source = ".claude/skills/harness-parity-review/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
@@ -441,13 +441,13 @@ status = "native"
 surface = ".codex/skills/harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
-source_sha256 = "46d1ad941076a347c5d29cdd638c269a0fe0552064dbe977633f4452588659aa"
+source_sha256 = "b4b0b96b112aa9952c372f189fb732008eb8b41304b6be1dcf1bf10cf7f0ba94"
 
 [capabilities.antigravity]
 surface = ".agent/skills/harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/harness-parity-review/SKILL.md"
-source_sha256 = "46d1ad941076a347c5d29cdd638c269a0fe0552064dbe977633f4452588659aa"
+source_sha256 = "b4b0b96b112aa9952c372f189fb732008eb8b41304b6be1dcf1bf10cf7f0ba94"
 [capabilities.cursor]
 surface = ".cursor/skills/harness-parity-review/SKILL.md"
 status = "fallback"
@@ -1667,6 +1667,33 @@ surface = ".claude/hooks/spec-before-code.py"
 status = "native"
 
 
+[harnesses.claude]
+# Native Claude Code surfaces carry the full interactive session and bridge-review envelope.
+activity_envelope_projection_mode = "native"
+compact_result_envelope_mode = "native"
+compact_session_envelope_mode = "native"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "Interactive transcript history is available, but parity checks must use compact result/session fields rather than raw transcript archives."
+
+[harnesses.codex]
+# Codex Desktop/CLI uses native session-start dispatch plus generated skill adapters.
+activity_envelope_projection_mode = "native"
+compact_result_envelope_mode = "native"
+compact_session_envelope_mode = "native"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "Codex may retain local app thread history, but provider-comparable parity checks must use compact result/session fields."
+
+[harnesses.antigravity]
+# Antigravity uses the optimized startup path plus generated skill adapters.
+activity_envelope_projection_mode = "optimized-startup"
+compact_result_envelope_mode = "native"
+compact_session_envelope_mode = "optimized-startup"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "Antigravity startup intentionally skips heavy global reads; activity projection is assessed through the optimized overlay and adapter manifest."
+
 [harnesses.cursor]
 # Harness-level capability floor declaration for Cursor Agent parity tracking.
 bridge_compliance_gate_respect = true
@@ -1680,6 +1707,12 @@ skill_adapter_generation_supported = true
 skill_adapter_generator = "scripts/_bootstrap_cursor_harness.py"
 skill_adapter_manifest = ".cursor/skills/MANIFEST.json"
 skill_adapter_drift_check_supported = true
+activity_envelope_projection_mode = "fallback"
+compact_result_envelope_mode = "fallback"
+compact_session_envelope_mode = "fallback"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "Cursor parity is assessed through generated adapters and fallback startup hooks rather than a native GT-KB hook surface."
 
 [harnesses.ollama]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3
@@ -1701,6 +1734,12 @@ skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
 skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
 skill_adapter_drift_check_supported = true
 phase_1_only = true  # remove when role promotion lands in Phase 2+
+activity_envelope_projection_mode = "compact-provider"
+compact_result_envelope_mode = "compact-provider"
+compact_session_envelope_mode = "compact-provider"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "Ollama is a provider harness; it is assessed by compact dispatch/result envelopes and not by full interactive transcript archives."
 
 [harnesses.openrouter]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3.
@@ -1719,6 +1758,12 @@ skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
 skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
 skill_adapter_drift_check_supported = true
 phase_1_only = true
+activity_envelope_projection_mode = "compact-provider"
+compact_result_envelope_mode = "compact-provider"
+compact_session_envelope_mode = "compact-provider"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "OpenRouter is a provider harness; it is assessed by compact dispatch/result envelopes and not by full interactive transcript archives."
 
 # ── Slice 6 owner-approved typed parity waivers (DELIB-20266285) ──
 [[parity_waivers]]

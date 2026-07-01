@@ -89,7 +89,7 @@ _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 # The two axes are now derived separately:
 #
 # - ``can_fire_events``: the harness carries live event-firing hook surfaces
-#   (PostToolUse + Stop) that drive the cross-harness trigger. Only Claude Code
+#   that drive dispatcher-daemon eligibility. Only Claude Code
 #   and Codex CLI qualify (``.claude/hooks`` + ``.codex/hooks.json``; Codex on
 #   Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001). This is the honest
 #   eligibility axis for "is there an active event source".
@@ -105,6 +105,7 @@ _EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "code
 _DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
     {"claude", "claude-code", "codex", "codex-cli", "cursor", "ollama", "openrouter", "antigravity"}
 )
+_PROVIDER_HARNESS_TYPES = frozenset({"ollama", "openrouter"})
 
 # Deprecated alias preserved for back-compat readers; equals the event-firing axis.
 _EVENT_DRIVEN_HOOK_CAPABLE_TYPES = _EVENT_FIRING_CAPABLE_TYPES
@@ -189,6 +190,58 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
     return result
 
 
+def _string_or_none(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _envelope_metadata(record: dict[str, Any]) -> dict[str, Any]:
+    """Extract activity/result/session envelope metadata from invocation surfaces."""
+    surfaces = record.get("invocation_surfaces")
+    if not isinstance(surfaces, dict):
+        return {}
+    sources = [surfaces]
+    for key in ("activity_envelope", "result_envelope", "session_envelope", "envelope_projection"):
+        value = surfaces.get(key)
+        if isinstance(value, dict):
+            sources.append(value)
+
+    aliases = {
+        "activity_envelope_projection_mode": (
+            "activity_envelope_projection_mode",
+            "activity_projection_mode",
+            "activity_envelope_mode",
+        ),
+        "compact_result_envelope_mode": (
+            "compact_result_envelope_mode",
+            "result_envelope_mode",
+            "result_envelope",
+        ),
+        "compact_session_envelope_mode": (
+            "compact_session_envelope_mode",
+            "session_envelope_mode",
+            "session_envelope",
+        ),
+    }
+    result: dict[str, Any] = {}
+    for canonical, names in aliases.items():
+        for source in sources:
+            for name in names:
+                parsed = _string_or_none(source.get(name))
+                if parsed is not None:
+                    result[canonical] = parsed
+                    break
+            if canonical in result:
+                break
+    for source in sources:
+        parsed_bool = _bool_or_none(source.get("full_transcript_archive_required"))
+        if parsed_bool is not None:
+            result["full_transcript_archive_required"] = parsed_bool
+            break
+    return result
+
+
 def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = None) -> dict[str, Any]:
     """Project one ``current_harnesses`` row into a flat projection record."""
     record: dict[str, Any] = {field: row.get(field) for field in _PROJECTED_FIELDS}
@@ -205,6 +258,13 @@ def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = N
     # Deprecated back-compat alias for event-firing capability. New code reads
     # the split axes above; legacy topology readers still consume this field.
     record["event_driven_hooks"] = explicit.get("event_driven_hooks", record["can_fire_events"])
+    envelope = _envelope_metadata(record)
+    provider_harness = harness_type in _PROVIDER_HARNESS_TYPES
+    default_mode = "compact-provider" if provider_harness else "native"
+    record["activity_envelope_projection_mode"] = envelope.get("activity_envelope_projection_mode", default_mode)
+    record["compact_result_envelope_mode"] = envelope.get("compact_result_envelope_mode", default_mode)
+    record["compact_session_envelope_mode"] = envelope.get("compact_session_envelope_mode", default_mode)
+    record["full_transcript_archive_required"] = envelope.get("full_transcript_archive_required", False)
     if dispatch_config is not None:
         from groundtruth_kb.bridge_dispatch_config import apply_dispatch_config_to_record
 

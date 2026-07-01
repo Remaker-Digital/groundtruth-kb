@@ -328,7 +328,64 @@ reason = "test"
     report = module.check_harness_parity(tmp_path, role="prime-builder")
 
     assert report.selected_harnesses == ["codex"]
-    assert {result.harness for result in report.results} == {"codex"}
+    capability_results = [result for result in report.results if not result.capability_id.startswith("fleet.")]
+    coverage_results = [result for result in report.results if result.capability_id.startswith("fleet.")]
+    assert {result.harness for result in capability_results} == {"codex"}
+    assert [(result.capability_id, result.state) for result in coverage_results] == [
+        ("fleet.role-coverage.prime-builder", "PASS")
+    ]
+
+
+def test_universal_capabilities_keep_active_population_under_role_scope(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["prime-builder"],
+                "version": 1,
+            },
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            },
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.shared-session"
+kind = "hook"
+canonical_name = "shared-session"
+canonical_source = ".claude/hooks/shared-session.py"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "shared"
+applicability = "universal"
+
+[capabilities.codex]
+status = "unsupported"
+reason = "test"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "test"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, role="prime-builder")
+
+    assert report.selected_harnesses == ["codex"]
+    shared_results = [result for result in report.results if result.capability_id == "hook.shared-session"]
+    assert {result.harness for result in shared_results} == {"codex", "antigravity"}
 
 
 def test_explicit_harness_overrides_assigned_role_scope_for_diagnostics(tmp_path: Path) -> None:
@@ -379,6 +436,99 @@ reason = "test"
 
     assert report.selected_harnesses == ["antigravity"]
     assert {result.harness for result in report.results} == {"antigravity"}
+
+
+def test_fleet_role_coverage_reports_uncovered_operating_role(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "C",
+                "harness_name": "antigravity",
+                "harness_type": "antigravity",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            }
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.review"
+kind = "skill"
+canonical_name = "review"
+canonical_source = ".claude/skills/review/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "test"
+""",
+    )
+
+    report = module.check_harness_parity(tmp_path, include_all=True)
+
+    coverage_by_role = {
+        result.capability_id: result
+        for result in report.results
+        if result.capability_id.startswith("fleet.role-coverage.")
+    }
+    assert coverage_by_role["fleet.role-coverage.prime-builder"].state == "MISSING"
+    assert "No active harness is assigned `prime-builder`" in coverage_by_role["fleet.role-coverage.prime-builder"].note
+    assert coverage_by_role["fleet.role-coverage.loyal-opposition"].state == "PASS"
+
+
+def test_activity_envelope_projection_accepts_compact_provider_without_transcripts() -> None:
+    module = _load_module()
+    registry = {
+        "harnesses": {
+            "codex": {
+                "activity_envelope_projection_mode": "native",
+                "compact_result_envelope_mode": "native",
+                "compact_session_envelope_mode": "native",
+                "full_transcript_archive_required": False,
+            },
+            "openrouter": {
+                "activity_envelope_projection_mode": "compact-provider",
+                "compact_result_envelope_mode": "compact-provider",
+                "compact_session_envelope_mode": "compact-provider",
+                "full_transcript_archive_required": False,
+            },
+        }
+    }
+
+    results = module._activity_envelope_projection_results(["codex", "openrouter"], registry)
+
+    assert len(results) == 8
+    assert all(result.state == "PASS" for result in results)
+    openrouter_modes = {
+        result.capability_id: result.configured_status for result in results if result.harness == "openrouter"
+    }
+    assert openrouter_modes["activity_envelope.activity_envelope_projection_mode"] == "compact-provider"
+    assert openrouter_modes["activity_envelope.full_transcript_archive_independence"] == "false"
+
+
+def test_activity_envelope_projection_missing_field_fails_required_row() -> None:
+    module = _load_module()
+    registry = {
+        "harnesses": {
+            "ollama": {
+                "activity_envelope_projection_mode": "compact-provider",
+                "compact_session_envelope_mode": "compact-provider",
+                "full_transcript_archive_required": False,
+            }
+        }
+    }
+
+    results = module._activity_envelope_projection_results(["ollama"], registry)
+
+    missing = [result for result in results if result.state == "MISSING"]
+    assert len(missing) == 1
+    assert missing[0].capability_id == "activity_envelope.compact_result_envelope_mode"
 
 
 def test_api_skill_manifest_does_not_synthesize_hook_support(tmp_path: Path) -> None:

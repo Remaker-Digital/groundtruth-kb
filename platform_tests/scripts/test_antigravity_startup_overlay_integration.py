@@ -14,11 +14,13 @@ Cites Specifications:
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
 _AGENTS_MD = _ROOT / "AGENTS.md"
 _STARTUP_INDEX = _ROOT / "config" / "agent-control" / "SESSION-STARTUP-INDEX.md"
+_HARNESS_CAPABILITY_REGISTRY = _ROOT / "config" / "agent-control" / "harness-capability-registry.toml"
 
 
 def _read(path: Path) -> str:
@@ -65,3 +67,13 @@ def test_specification_citations_in_changed_surfaces() -> None:
     assert "GOV-SESSION-SELF-INITIALIZATION-001" in index_text
     assert "DCL-SESSION-STARTUP-TOKEN-BUDGET-001" in index_text
     assert "GOV-FILE-BRIDGE-AUTHORITY-001" in agents_text
+
+
+def test_antigravity_registry_declares_optimized_activity_envelope_projection() -> None:
+    registry = tomllib.loads(_read(_HARNESS_CAPABILITY_REGISTRY))
+    antigravity = registry["harnesses"]["antigravity"]
+
+    assert antigravity["activity_envelope_projection_mode"] == "optimized-startup"
+    assert antigravity["compact_session_envelope_mode"] == "optimized-startup"
+    assert antigravity["compact_result_envelope_mode"] == "native"
+    assert antigravity["full_transcript_archive_required"] is False

@@ -37,6 +37,23 @@ CAPABILITY_FLOOR_REQUIRED_FIELDS = (
     "tool_guard_adapter_fail_closed",
 )
 CANONICAL_TOOL_SUBSET = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
+ENVELOPE_MODE_FIELDS = {
+    "activity_envelope_projection_mode": "Activity envelope projection mode",
+    "compact_result_envelope_mode": "Compact result-envelope mode",
+    "compact_session_envelope_mode": "Compact session-envelope mode",
+}
+VALID_ENVELOPE_MODES = frozenset(
+    {
+        "native",
+        "fallback",
+        "adapter",
+        "generated-adapter",
+        "compact-provider",
+        "optimized-startup",
+        "typed-waiver",
+        "documented-limitation",
+    }
+)
 
 # ── Cross-harness parity schema (Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY) ──
 # Additive surface derived from ADR-CROSS-HARNESS-PARITY-001 +
@@ -55,6 +72,7 @@ WAIVER_REQUIRED_FIELDS = (
     "rationale",
     "owner_approval_ref",
 )
+OPERATING_ROLES = ("prime-builder", "loyal-opposition")
 
 
 def _load_known_harnesses_from_projection(project_root: Path | None = None) -> tuple[str, ...]:
@@ -344,7 +362,23 @@ def _scope_harnesses_for_role(
 def _role_applies(capability: dict[str, Any], role: str | None, include_all: bool) -> bool:
     if include_all or role is None:
         return True
+    if resolve_applicability(capability) == "universal":
+        return True
     return role in _as_string_list(capability.get("required_for_roles"))
+
+
+def _active_harnesses_from_selection(selected_harnesses: list[str], project_root: Path) -> list[str]:
+    active: list[str] = []
+    for selected_harness in selected_harnesses:
+        lifecycle = _harness_lifecycle_class(selected_harness, project_root)
+        if lifecycle in {"suspended", "registered_no_role"}:
+            continue
+        active.append(selected_harness)
+    return active
+
+
+def _coverage_blocking_states() -> set[str]:
+    return {"MISSING", "OWNER_ACTION_REQUIRED"}
 
 
 def _base_result(
@@ -633,6 +667,61 @@ def _evaluate_capability_floor(harness_name: str, registry_data: dict[str, Any])
     return results
 
 
+def _activity_envelope_projection_results(
+    selected_harnesses: list[str],
+    registry_data: dict[str, Any],
+) -> list[CapabilityResult]:
+    """Verify each selected harness declares activity/result/session envelope posture."""
+    harnesses_config = registry_data.get("harnesses", {}) if isinstance(registry_data, dict) else {}
+    results: list[CapabilityResult] = []
+    for harness_name in selected_harnesses:
+        floor = harnesses_config.get(harness_name, {}) if isinstance(harnesses_config, dict) else {}
+        floor = floor if isinstance(floor, dict) else {}
+        if not (any(field in floor for field in ENVELOPE_MODE_FIELDS) or "full_transcript_archive_required" in floor):
+            continue
+        for field, label in ENVELOPE_MODE_FIELDS.items():
+            value = str(floor.get(field) or "").strip()
+            valid = value in VALID_ENVELOPE_MODES
+            results.append(
+                CapabilityResult(
+                    harness=harness_name,
+                    capability_id=f"activity_envelope.{field}",
+                    capability_name=label,
+                    parity_class="required",
+                    required_for_roles=["prime-builder", "loyal-opposition"],
+                    configured_status=value or "missing",
+                    state="PASS" if valid else "MISSING",
+                    evidence=f"config/agent-control/harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
+                    note=("" if valid else f"Required activity-envelope field '{field}' is missing or invalid."),
+                )
+            )
+        transcript_required = floor.get("full_transcript_archive_required")
+        transcript_independent = transcript_required is False
+        results.append(
+            CapabilityResult(
+                harness=harness_name,
+                capability_id="activity_envelope.full_transcript_archive_independence",
+                capability_name="Full transcript archive independence",
+                parity_class="required",
+                required_for_roles=["prime-builder", "loyal-opposition"],
+                configured_status=str(transcript_required).lower()
+                if isinstance(transcript_required, bool)
+                else "missing",
+                state="PASS" if transcript_independent else "MISSING",
+                evidence=(
+                    "config/agent-control/harness-capability-registry.toml::"
+                    f"[harnesses.{harness_name}].full_transcript_archive_required"
+                ),
+                note=(
+                    ""
+                    if transcript_independent
+                    else "Harness must be assessable through compact result/session envelopes without full transcript archives."
+                ),
+            )
+        )
+    return results
+
+
 def resolve_applicability(capability: dict[str, Any]) -> str:
     """Resolve a capability's parity applicability (PARITY-APPLICABILITY-RULE).
 
@@ -708,6 +797,81 @@ def _apply_waiver(result: CapabilityResult, waiver: dict[str, Any] | None) -> Ca
         state=state,
         note=" ".join(note_parts),
     )
+
+
+def _fleet_role_coverage_results(
+    project_root: Path,
+    *,
+    selected_harnesses: list[str],
+    capabilities: list[dict[str, Any]],
+    waivers: dict[tuple[str, str], dict[str, Any]],
+    manifest_adapters: dict[str, dict[str, dict[str, Any]]],
+    selected_role: str | None,
+    explicit_harness: bool,
+) -> list[CapabilityResult]:
+    """Return fleet-level proof rows for role readiness.
+
+    The row is PASS when at least one active harness assigned the role has no
+    unwaived required role-relative capability blocker. Explicit single-harness
+    diagnostics stay harness-local and do not emit fleet rows.
+    """
+    if explicit_harness:
+        return []
+
+    roles = [selected_role] if selected_role else list(OPERATING_ROLES)
+    assigned_roles = _assigned_roles_by_harness(project_root)
+    active_selected = _active_harnesses_from_selection(selected_harnesses, project_root)
+    results: list[CapabilityResult] = []
+
+    for role in roles:
+        if role not in OPERATING_ROLES:
+            continue
+        candidates = [harness for harness in active_selected if role in assigned_roles.get(harness, [])]
+        ready: list[str] = []
+        blocked_notes: list[str] = []
+        for harness in candidates:
+            blockers: list[str] = []
+            for capability in capabilities:
+                if resolve_applicability(capability) != "role-relative":
+                    continue
+                if role not in _as_string_list(capability.get("required_for_roles")):
+                    continue
+                result = _status_for_surface(project_root, capability, harness, manifest_adapters)
+                result = _apply_waiver(result, waivers.get((result.capability_id, harness)))
+                if result.parity_class in REQUIRED_PARITY_CLASSES and result.state in _coverage_blocking_states():
+                    blockers.append(f"{result.capability_id}:{result.state}")
+            if blockers:
+                blocked_notes.append(f"{harness} blocked by {', '.join(sorted(blockers))}")
+            else:
+                ready.append(harness)
+
+        if ready:
+            state = "PASS"
+            note = f"At least one active harness assigned `{role}` covers required role-relative capabilities: {', '.join(ready)}."
+        elif candidates:
+            state = "MISSING"
+            note = "No active assigned harness covers required role-relative capabilities after waivers."
+            if blocked_notes:
+                note += " " + "; ".join(blocked_notes)
+        else:
+            state = "MISSING"
+            note = f"No active harness is assigned `{role}`."
+
+        results.append(
+            CapabilityResult(
+                harness="fleet",
+                capability_id=f"fleet.role-coverage.{role}",
+                capability_name=f"Fleet role coverage: {role}",
+                parity_class="required",
+                required_for_roles=[role],
+                configured_status="computed",
+                state=state,
+                evidence="harness-state/harness-registry.json + config/agent-control/harness-capability-registry.toml",
+                note=note,
+            )
+        )
+
+    return results
 
 
 def validate_parity_waiver(waiver: dict[str, Any]) -> list[str]:
@@ -790,7 +954,8 @@ def check_harness_parity(
     selected_role = _normalize_role(role)
     normalized_harness = _normalize_harness(harness, known_harnesses)
     explicit_harness = normalized_harness != "all"
-    selected_harnesses = _selected_harnesses(normalized_harness, known_harnesses)
+    base_selected_harnesses = _selected_harnesses(normalized_harness, known_harnesses)
+    selected_harnesses = list(base_selected_harnesses)
     selected_harnesses = _scope_harnesses_for_role(
         selected_harnesses,
         selected_role=selected_role,
@@ -833,10 +998,11 @@ def check_harness_parity(
             registered_floor_harnesses.append(selected_harness)
         else:
             active_harnesses.append(selected_harness)
+    universal_active_harnesses = _active_harnesses_from_selection(base_selected_harnesses, project_root)
 
     harness_manifest_adapters: dict[str, dict[str, dict[str, Any]]] = {}
     harnesses_config = registry.get("harnesses", {})
-    for selected_harness in active_harnesses:
+    for selected_harness in sorted(set(active_harnesses) | set(universal_active_harnesses)):
         floor = harnesses_config.get(selected_harness, {})
         manifest_path_str = floor.get("skill_adapter_manifest") if isinstance(floor, dict) else None
         if manifest_path_str:
@@ -863,11 +1029,32 @@ def check_harness_parity(
     for capability in capabilities:
         if not _role_applies(capability, selected_role, include_all):
             continue
-        for selected_harness in active_harnesses:
+        applicability = resolve_applicability(capability)
+        capability_harnesses = (
+            universal_active_harnesses
+            if applicability == "universal" and selected_role and not explicit_harness and not include_all
+            else active_harnesses
+        )
+        for selected_harness in capability_harnesses:
             result = _status_for_surface(project_root, capability, selected_harness, harness_manifest_adapters)
             results.append(_apply_waiver(result, waivers.get((result.capability_id, selected_harness))))
     for floor_harness in registered_floor_harnesses:
         results.extend(_evaluate_capability_floor(floor_harness, registry))
+    envelope_harnesses = (
+        universal_active_harnesses if selected_role and not explicit_harness and not include_all else active_harnesses
+    )
+    results.extend(_activity_envelope_projection_results(envelope_harnesses, registry))
+    results.extend(
+        _fleet_role_coverage_results(
+            project_root,
+            selected_harnesses=base_selected_harnesses,
+            capabilities=capabilities,
+            waivers=waivers,
+            manifest_adapters=harness_manifest_adapters,
+            selected_role=selected_role,
+            explicit_harness=explicit_harness,
+        )
+    )
 
     extras = _extra_project_skills(project_root, capabilities) if not errors else []
     counts = _count_states(results, extras, errors)
