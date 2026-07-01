@@ -715,13 +715,18 @@ def bridge_health_cmd(ctx: click.Context, json_output: bool) -> None:
 @bridge_group.command("show")
 @click.argument("slug")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--compact",
+    is_flag=True,
+    help="Return latest current/actionable summary only; omit full version chain.",
+)
 @click.pass_context
-def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
+def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool, compact: bool) -> None:
     """Show one bridge thread's version chain."""
     from groundtruth_kb.bridge.read_commands import show_thread
 
     config = _resolve_config(ctx)
-    payload = show_thread(config.project_root, slug)
+    payload = show_thread(config.project_root, slug, compact=compact)
     if payload is None:
         if json_output:
             click.echo(json.dumps({"error": "bridge_thread_not_found", "slug": slug}, indent=2, sort_keys=True))
@@ -734,6 +739,9 @@ def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
     click.echo(f"Bridge thread: {payload['slug']}")
     click.echo(f"Latest status: {payload['latest_status']}")
     click.echo(f"Latest path: {payload['latest_path']}")
+    if compact:
+        click.echo(f"Version count: {payload['version_count']} (compact mode; use full mode for version chain)")
+        return
     click.echo("Versions:")
     for version in payload["version_chain"]:
         status = version["status"] or "(unknown)"
@@ -743,14 +751,19 @@ def bridge_show_cmd(ctx: click.Context, slug: str, json_output: bool) -> None:
 @bridge_group.command("threads")
 @click.option("--wi", "wi_id", required=True, help="Work item id to search for, e.g. WI-4634.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--compact",
+    is_flag=True,
+    help="Return current/actionable thread summaries only; omit citing-path archival detail.",
+)
 @click.pass_context
-def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> None:
+def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool, compact: bool) -> None:
     """List bridge threads that cite a work item."""
     from groundtruth_kb.bridge.read_commands import threads_for_work_item
 
     config = _resolve_config(ctx)
     try:
-        payload = threads_for_work_item(config.project_root, wi_id)
+        payload = threads_for_work_item(config.project_root, wi_id, compact=compact)
     except ValueError as exc:
         click.echo(str(exc), err=True)
         ctx.exit(2)
@@ -768,6 +781,8 @@ def bridge_threads_cmd(ctx: click.Context, wi_id: str, json_output: bool) -> Non
         return
     for thread in payload["threads"]:
         click.echo(f"- {thread['slug']} ({thread['latest_status']} at {thread['latest_path']})")
+        if compact:
+            continue
         for citing_path in thread["citing_paths"]:
             click.echo(f"  cites: {citing_path}")
 
