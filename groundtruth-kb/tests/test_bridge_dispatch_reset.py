@@ -7,8 +7,10 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
+import groundtruth_kb.bridge_dispatch_reset as reset_module
 from groundtruth_kb.bridge_dispatch_reset import (
     DISPATCH_STATE_FILENAME,
     DRAIN_MARKER_FILENAME,
@@ -16,10 +18,9 @@ from groundtruth_kb.bridge_dispatch_reset import (
     PROVENANCE_LEDGER_FILENAME,
     QUIESCE_STATE_FILENAME,
     DispatchStateDirs,
+    dispatch_is_draining,
     drain,
     hard_reset,
-    dispatch_is_draining,
-    is_drain_marker_active,
     soft_reset,
 )
 from groundtruth_kb.cli import main
@@ -60,6 +61,19 @@ def _seed_state_dirs(project_dir: Path) -> DispatchStateDirs:
 
 def _read_dispatch_state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_live_dispatch_run(
+    state_dir: Path,
+    dispatch_id: str,
+    *,
+    pid: int = 8001,
+    create_time_epoch: float = 1234.5,
+) -> None:
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.pid").write_text(str(pid), encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time_epoch:.6f}", encoding="utf-8")
 
 
 def test_soft_reset_clears_transient_preserves_audit(project_dir: Path) -> None:
@@ -183,6 +197,56 @@ def test_drain_waits_then_terminates_stragglers(project_dir: Path) -> None:
     assert result2.terminated_pids == []
 
 
+def test_drain_dry_run_reports_live_dispatch_run_workers(
+    project_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_dirs = _seed_state_dirs(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    _write_live_dispatch_run(state_dir, "2026-06-30T23-00-00Z-loyal-opposition-D-live")
+    monkeypatch.setattr(reset_module, "_dispatch_run_pid_alive", lambda pid: int(pid) == 8001)
+    monkeypatch.setattr(
+        reset_module,
+        "_dispatch_run_pid_provenance_matches",
+        lambda pid, expected: int(pid) == 8001 and float(expected) == 1234.5,
+    )
+
+    result = drain(state_dirs, dry_run=True)
+
+    assert result.drained_pids == [8001]
+    assert result.terminated_pids == []
+    assert result.drain_markers_written == 0
+
+
+def test_drain_terminates_live_dispatch_run_workers(
+    project_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_dirs = _seed_state_dirs(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    _write_live_dispatch_run(state_dir, "2026-06-30T23-00-00Z-loyal-opposition-D-live")
+    monkeypatch.setattr(reset_module, "_dispatch_run_pid_alive", lambda pid: int(pid) == 8001)
+    monkeypatch.setattr(
+        reset_module,
+        "_dispatch_run_pid_provenance_matches",
+        lambda pid, expected: int(pid) == 8001 and float(expected) == 1234.5,
+    )
+    terminated: list[int] = []
+
+    result = drain(
+        state_dirs,
+        timeout_seconds=0.0,
+        now_fn=lambda: 0.0,
+        terminate_fn=terminated.append,
+        poll_interval=0.0,
+    )
+
+    assert terminated == [8001]
+    assert result.terminated_pids == [8001]
+    assert result.drain_markers_written == 1
+    assert (state_dir / DRAIN_MARKER_FILENAME).exists() is False
+
+
 # WI4793_DRY_RUN_TEST
 def test_reset_dry_run_mutates_nothing(project_dir: Path) -> None:
     state_dirs = _seed_state_dirs(project_dir)
@@ -207,39 +271,14 @@ def test_dispatch_is_draining_detects_marker(project_dir: Path) -> None:
     assert dispatch_is_draining(project_dir, state_dir)
 
 
-def test_run_trigger_skips_when_drain_marker_active(project_dir: Path) -> None:
-    import importlib.util
-    import sys
-
-    trigger_path = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
-    spec = importlib.util.spec_from_file_location("cross_harness_bridge_trigger_drain_test", trigger_path)
-    assert spec and spec.loader
-    trigger = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = trigger
-    spec.loader.exec_module(trigger)
-
+def test_dispatch_is_draining_detects_legacy_state_marker(project_dir: Path) -> None:
     state_dir = project_dir / ".gtkb-state" / "bridge-poller"
     state_dir.mkdir(parents=True)
-    (state_dir / DRAIN_MARKER_FILENAME).write_text(
+    legacy_state_dir = project_dir / ".gtkb-state" / "cross-harness-trigger"
+    legacy_state_dir.mkdir(parents=True)
+    (legacy_state_dir / DRAIN_MARKER_FILENAME).write_text(
         json.dumps({"active": True, "started_at": "2026-06-26T00:00:00+00:00"}),
         encoding="utf-8",
     )
-    (project_dir / "groundtruth.toml").write_text(
-        '[project]\nproject_name = "DrainTest"\nprofile = "dual-agent"\n',
-        encoding="utf-8",
-    )
-    (project_dir / "bridge").mkdir(exist_ok=True)
-    harness_state = project_dir / "harness-state"
-    harness_state.mkdir(exist_ok=True)
-    (harness_state / "harness-identities.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": {}}),
-        encoding="utf-8",
-    )
-    (harness_state / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": []}),
-        encoding="utf-8",
-    )
 
-    summary = trigger.run_trigger(project_root=project_dir, state_dir=state_dir, dry_run=True)
-    assert summary.get("skipped") is True
-    assert summary.get("reason") == "dispatch_drain_active"
+    assert dispatch_is_draining(project_dir, state_dir)

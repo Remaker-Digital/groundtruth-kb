@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 import groundtruth_kb.bridge_dispatch_config as bridge_dispatch_config  # noqa: E402
+import groundtruth_kb.bridge_dispatch_reset as bridge_dispatch_reset  # noqa: E402
 from groundtruth_kb.cli import main  # noqa: E402
 
 
@@ -77,6 +78,19 @@ def _write_recent_run(root: Path, dispatch_id: str, *, exit_code: int, stderr: s
     (runs_dir / f"{dispatch_id}.stderr.log").write_text(stderr, encoding="utf-8")
 
 
+def _write_live_dispatch_run(
+    root: Path,
+    dispatch_id: str,
+    *,
+    pid: int = 999999,
+    create_time_epoch: float = 1234.5,
+) -> None:
+    runs_dir = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{dispatch_id}.pid").write_text(str(pid), encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time_epoch:.6f}", encoding="utf-8")
+
+
 def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> None:
     _root, config = _project(tmp_path)
 
@@ -87,6 +101,30 @@ def test_bridge_dispatch_health_cli_reports_selected_targets(tmp_path: Path) -> 
     assert payload["health_status"] == "PASS"
     assert [row["id"] for row in payload["selected_by_role"]["prime-builder"]] == ["A"]
     assert [row["id"] for row in payload["selected_by_role"]["loyal-opposition"]] == ["D"]
+
+
+def test_bridge_dispatch_drain_dry_run_reports_live_dispatch_run_worker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _project(tmp_path)
+    _write_live_dispatch_run(root, "2026-06-30T23-10-00Z-loyal-opposition-D-live")
+    monkeypatch.setattr(bridge_dispatch_reset, "_dispatch_run_pid_alive", lambda pid: int(pid) == 999999)
+    monkeypatch.setattr(
+        bridge_dispatch_reset,
+        "_dispatch_run_pid_provenance_matches",
+        lambda pid, expected: int(pid) == 999999 and float(expected) == 1234.5,
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "drain", "--dry-run", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["drained_pids"] == [999999]
+    assert payload["terminated_pids"] == []
 
 
 def test_bridge_dispatch_daemon_stop_reaps_workers_before_daemon_tree(

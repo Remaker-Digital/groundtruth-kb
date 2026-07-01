@@ -13,6 +13,7 @@ sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 SCAN_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 
 import groundtruth_kb.bridge_dispatch_config as bridge_dispatch_config  # noqa: E402
+import groundtruth_kb.bridge_dispatch_reset as bridge_dispatch_reset  # noqa: E402
 from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     BENIGN_NONLAUNCH_LAUNCH_REASONS,
     _runtime_findings_for_recipient,
@@ -21,6 +22,7 @@ from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     select_dispatch_candidates,
 )
 from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report  # noqa: E402
+from groundtruth_kb.bridge_dispatch_reset import DispatchStateDirs, drain  # noqa: E402
 from groundtruth_kb.bridge_dispatch_rules import DispatchContext, context_from_bridge_text  # noqa: E402
 from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
     DispatchConfigTransactionError,
@@ -450,6 +452,43 @@ def test_wi4658_health_warns_when_quarantined_threads_present(tmp_path: Path) ->
     assert "2 bridge thread(s)" in finding
     assert "gtkb-wi4232-bridge-index-drift-pb-classification" in finding
     assert status.health_status == "WARN"
+
+
+def test_drain_dry_run_matches_status_live_dispatch_run_pids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "loyal-opposition:F": {
+                "last_result": "unchanged",
+                "pending_count": 1,
+                "selected_count": 0,
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-06-30T23-05-00Z-loyal-opposition-F-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+    monkeypatch.setattr(bridge_dispatch_reset, "_dispatch_run_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_reset,
+        "_dispatch_run_pid_provenance_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+    drain_result = drain(DispatchStateDirs.resolve(tmp_path), dry_run=True)
+
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "loyal-opposition:F")
+    assert classification["live_inflight_dispatch_count"] == 1
+    assert drain_result.drained_pids == [424242]
 
 
 def test_wi4658_health_silent_when_no_quarantined_threads(tmp_path: Path) -> None:
