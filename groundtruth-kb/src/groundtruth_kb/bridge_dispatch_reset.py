@@ -22,10 +22,10 @@ LEASES_DIR_NAME = "leases"
 PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
 DISPATCH_RUNS_DIR_NAME = "dispatch-runs"
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
-PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
-KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
+PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 DEFAULT_LEASE_TTL_SECONDS = 300
 COMPUTED_QUALITY_RELATIVE = Path(".gtkb-state") / "ops" / "dispatch-quality.json"
+KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
 
 TerminateFn = Callable[[int], None]
 NowFn = Callable[[], float]
@@ -506,6 +506,45 @@ def read_live_leases(state_dirs: DispatchStateDirs) -> list[LiveLease]:
     return leases
 
 
+def read_live_dispatch_runs(state_dirs: DispatchStateDirs) -> list[LiveLease]:
+    """Return live dispatch-run workers with provenance-verified PID sidecars."""
+    workers: list[LiveLease] = []
+    for dispatch_dir in state_dirs.dispatch_dirs:
+        runs_dir = dispatch_dir / DISPATCH_RUNS_DIR_NAME
+        if not runs_dir.is_dir():
+            continue
+        for dispatch_id in sorted(_dispatch_run_ids(runs_dir)):
+            pid_path = runs_dir / f"{dispatch_id}.pid"
+            exit_code_path = runs_dir / f"{dispatch_id}.exit_code"
+            try:
+                if exit_code_path.exists() and exit_code_path.stat().st_size > 0:
+                    continue
+            except OSError:
+                continue
+            if not pid_path.is_file():
+                continue
+            pid = _read_dispatch_run_pid(pid_path)
+            expected = _read_dispatch_run_create_time(runs_dir / f"{dispatch_id}{PID_CREATE_TIME_SUFFIX}")
+            if pid is None or not _dispatch_run_pid_alive(pid):
+                continue
+            if not _dispatch_run_pid_provenance_matches(pid, expected):
+                continue
+            workers.append(LiveLease(doc_slug=dispatch_id, pid=pid, path=pid_path))
+    return workers
+
+
+def read_live_workers(state_dirs: DispatchStateDirs) -> list[LiveLease]:
+    """Return all drainable live workers, preferring dispatch-runs provenance."""
+    live: list[LiveLease] = []
+    seen_pids: set[int] = set()
+    for worker in [*read_live_dispatch_runs(state_dirs), *read_live_leases(state_dirs)]:
+        if worker.pid in seen_pids:
+            continue
+        seen_pids.add(worker.pid)
+        live.append(worker)
+    return live
+
+
 def _write_drain_marker(state_dir: Path, *, dry_run: bool) -> bool:
     payload = {
         "active": True,
@@ -536,7 +575,7 @@ def drain(
     terminator = terminate_fn or terminate_pid_tree
     result = DrainResult(dry_run=dry_run)
     if dry_run:
-        live = read_live_leases(state_dirs)
+        live = read_live_workers(state_dirs)
         result.drained_pids = [lease.pid for lease in live]
         return result
 
@@ -548,14 +587,14 @@ def drain(
 
     deadline = clock() + max(0.0, float(timeout_seconds))
     while clock() < deadline:
-        live = read_live_leases(state_dirs)
+        live = read_live_workers(state_dirs)
         if not live:
             result.drained_pids = []
             _clear_drain_markers(state_dirs, dry_run=False)
             return result
         time.sleep(min(poll_interval, max(0.0, deadline - clock())))
 
-    live = read_live_leases(state_dirs)
+    live = read_live_workers(state_dirs)
     terminated: list[int] = []
     for lease in live:
         terminator(lease.pid)
