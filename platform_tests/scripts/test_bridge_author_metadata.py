@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts import ollama_harness as oh
+from scripts import openrouter_harness as orh
 from scripts.bridge_author_metadata import (
     ENV_VAR_HARNESS_NAME,
     FIELD_ENV_NAMES,
@@ -14,6 +16,7 @@ from scripts.bridge_author_metadata import (
     _resolve_durable_identity_fields,
     author_metadata_gaps_for_content,
     ensure_author_metadata,
+    is_synthetic_session_context_id,
     load_author_metadata,
 )
 
@@ -220,6 +223,85 @@ def test_runtime_envelope_supplies_session_model_fields(tmp_path: Path, monkeypa
         "author_model_version": "4.8",
         "author_model_configuration": "headless bridge auto-dispatch worker",
     }
+
+
+def test_dispatch_run_id_wins_for_runtime_session_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_registry_projection(tmp_path, _SINGLE_PB_REGISTRY)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run-123")
+    monkeypatch.setenv("GTKB_INHERITED_SESSION_ID", "inherited-session-456")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-789")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "runtime-model")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "runtime-version")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "runtime-config")
+
+    result = load_author_metadata(tmp_path)
+
+    assert result["author_session_context_id"] == "dispatch-run-123"
+
+
+def test_ensure_author_metadata_overrides_static_slug_when_dispatch_env_available(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    content = (
+        "GO\n"
+        "author_identity: OpenRouter Loyal Opposition\n"
+        "author_harness_id: F\n"
+        "author_session_context_id: openrouter-harness-f\n"
+        "author_model: deepseek/fixture\n"
+        "author_model_version: fixture\n"
+        "author_model_configuration: OpenRouter harness shim\n"
+        "\n## Verdict\n"
+    )
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run-123")
+
+    updated = ensure_author_metadata(content, project_root=tmp_path)
+
+    assert "author_session_context_id: dispatch-run-123\n" in updated
+    assert "openrouter-harness-f" not in updated
+
+
+def test_ensure_author_metadata_preserves_complete_real_session_when_dispatch_env_available(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    content = (
+        "GO\n"
+        "author_identity: loyal-opposition/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: real-session-123\n"
+        "author_model: model\n"
+        "author_model_version: version\n"
+        "author_model_configuration: config\n"
+        "\n## Verdict\n"
+    )
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run-123")
+
+    assert ensure_author_metadata(content, project_root=tmp_path) == content
+
+
+def test_static_headless_harness_slugs_are_synthetic_session_context_ids() -> None:
+    assert is_synthetic_session_context_id("openrouter-harness-f")
+    assert is_synthetic_session_context_id("ollama-harness-d")
+    assert not is_synthetic_session_context_id("2026-06-30T22-35-51Z-prime-builder-A-e54574")
+
+
+def test_headless_harness_env_injects_resolved_session_context() -> None:
+    openrouter_env = orh.set_author_metadata_env(
+        {"GTKB_BRIDGE_POLLER_RUN_ID": "openrouter-dispatch"},
+        "deepseek/fixture-model",
+        "fixture-model",
+        "https://openrouter.test",
+    )
+    ollama_env = oh.set_author_metadata_env(
+        {"GTKB_INHERITED_SESSION_ID": "ollama-inherited"},
+        "fixture-model:fixture-version",
+        "fixture-version",
+        "http://ollama.test",
+    )
+
+    assert openrouter_env["GTKB_AUTHOR_SESSION_CONTEXT_ID"] == "openrouter-dispatch"
+    assert ollama_env["GTKB_AUTHOR_SESSION_CONTEXT_ID"] == "ollama-inherited"
 
 
 def test_incomplete_sources_fail_closed_not_wrong_stamp(tmp_path: Path) -> None:

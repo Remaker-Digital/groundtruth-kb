@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -34,6 +36,40 @@ AUTHOR_METADATA = (
     "author_model_version: 5.5\n"
     "author_model_configuration: Extra High\n"
 )
+DISTINCT_AUTHOR_METADATA = (
+    "author_identity: Codex\n"
+    "author_harness_id: A\n"
+    "author_session_context_id: session-456\n"
+    "author_model: GPT-5.5\n"
+    "author_model_version: 5.5\n"
+    "author_model_configuration: Extra High\n"
+)
+SYNTHETIC_AUTHOR_METADATA = (
+    "author_identity: OpenRouter Loyal Opposition\n"
+    "author_harness_id: F\n"
+    "author_session_context_id: openrouter-harness-f\n"
+    "author_model: deepseek/deepseek-v4-pro\n"
+    "author_model_version: deepseek-v4-pro\n"
+    "author_model_configuration: OpenRouter harness shim\n"
+)
+WORK_INTENT_SESSION_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
+_HOOK_GLOBALS: dict[str, object] | None = None
+
+
+def _hook_globals() -> dict[str, object]:
+    global _HOOK_GLOBALS
+    if _HOOK_GLOBALS is None:
+        _HOOK_GLOBALS = runpy.run_path(str(ACTIVE_HOOK), run_name="bridge_compliance_gate_test")
+    return _HOOK_GLOBALS
 
 
 def _file_sha256(path: Path) -> str:
@@ -48,18 +84,77 @@ def _run_hook(payload: str) -> subprocess.CompletedProcess:
     bridge_id = _bridge_id_from_payload(payload_data)
     if bridge_id is not None:
         _claim_bridge_thread(bridge_id, session_id)
+    prior_env = {env_var: os.environ.get(env_var) for env_var in WORK_INTENT_SESSION_ENV_VARS}
+    for env_var in WORK_INTENT_SESSION_ENV_VARS:
+        os.environ[env_var] = session_id
     try:
-        return subprocess.run(
-            [sys.executable, str(ACTIVE_HOOK)],
-            input=payload,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=str(REPO_ROOT),
-        )
+        stdout = _evaluate_hook_payload(payload_data)
+        return subprocess.CompletedProcess([str(ACTIVE_HOOK)], 0, stdout, "")
     finally:
+        for env_var, value in prior_env.items():
+            if value is None:
+                os.environ.pop(env_var, None)
+            else:
+                os.environ[env_var] = value
         if bridge_id is not None:
             _release_bridge_thread(bridge_id, session_id)
+
+
+def _hook_decision(event: str, decision: str, reason: str) -> str:
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": event,
+                "permissionDecision": decision,
+                "permissionDecisionReason": reason,
+            }
+        }
+    )
+
+
+def _evaluate_hook_payload(payload_data: dict) -> str:
+    hook = _hook_globals()
+    tool_name = payload_data.get("tool_name", "")
+    tool_input = payload_data.get("tool_input", {})
+    cwd_path = Path(str(payload_data.get("cwd") or ".")).resolve()
+    write_tools = hook["WRITE_TOOLS"]
+    if tool_name not in write_tools:
+        return "{}"
+    file_path = str(tool_input.get("file_path") or "")
+    if not file_path:
+        return "{}"
+
+    work_intent_reason = hook["_bridge_work_intent_deny_reason"](
+        cwd_path=cwd_path,
+        file_path=file_path,
+        payload=payload_data,
+    )
+    if work_intent_reason:
+        return _hook_decision("PreToolUse", "deny", str(work_intent_reason))
+
+    content = str(tool_input.get("content", ""))
+    reason = hook["_deny_reason_for_content"](
+        cwd_path=cwd_path,
+        file_path=file_path,
+        content=content,
+        run_pending_preflight=tool_name == "Write",
+    )
+    if reason:
+        return _hook_decision("PreToolUse", "deny", str(reason))
+
+    heading_ask_reason = hook["_ask_reason_for_content"](file_path, content)
+    if heading_ask_reason:
+        return _hook_decision("PreToolUse", "ask", str(heading_ask_reason))
+
+    bridge_dir = hook["_canonical_project_root"](cwd_path) / "bridge"
+    if not bridge_dir.is_dir():
+        return "{}"
+
+    ask_reason = hook["_pending_proposal_ask_reason"](hook["_canonical_project_root"](cwd_path), file_path)
+    if ask_reason:
+        return _hook_decision("PreToolUse", "ask", str(ask_reason))
+
+    return "{}"
 
 
 def _bridge_id_from_payload(payload_data: dict) -> str | None:
@@ -163,13 +258,13 @@ def test_proposal_lacking_spec_links_blocked_with_deny() -> None:
             "hook_event_name": "PreToolUse",
             "tool_name": "Write",
             "tool_input": {
-                # Non-versioned bridge path (no -NNN): exempts the
-                # GTKB-GOV-PROPOSAL-STANDARDS Slice 1 body-status-token rule
-                # (versioned-only) so this fixture isolates the Specification
-                # Links clause under test. Versioned-heading-first BLOCK behavior
-                # is covered by test_bridge_compliance_gate_body_status_token.py.
-                "file_path": "bridge/test-fake-proposal-no-spec-links.md",
-                "content": "# Implementation Proposal\n\nDo a thing without citing any specs.",
+                "file_path": "bridge/test-fake-proposal-no-spec-links-001.md",
+                "content": (
+                    "NEW\n" + AUTHOR_METADATA + "\n"
+                    "bridge_kind: governance_advisory\n\n"
+                    "# Implementation Proposal\n\n"
+                    "Do a thing without citing any specs."
+                ),
             },
             "session_id": "test",
             "cwd": str(REPO_ROOT),
@@ -275,6 +370,32 @@ def test_malformed_advisory_report_blocked_with_template_message() -> None:
     assert "verified ADVISORY report template" in reason
 
 
+def test_bridge_artifact_synthetic_session_context_id_blocked_with_deny() -> None:
+    content = _template_shaped_advisory_content().replace(AUTHOR_METADATA, SYNTHETIC_AUTHOR_METADATA)
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "bridge/test-fake-advisory-synthetic-session-001.md",
+                "content": content,
+            },
+            "session_id": "test",
+            "cwd": str(REPO_ROOT),
+        }
+    )
+
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    hsoutput = output.get("hookSpecificOutput", {})
+    assert hsoutput.get("permissionDecision") == "deny"
+    reason = hsoutput.get("permissionDecisionReason", "")
+    assert "synthetic" in reason
+    assert "openrouter-harness-f" in reason
+
+
 def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
     """Verifies DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.A1:
     hook MUST hard-block (emit_deny) VERIFIED bridge reports lacking
@@ -287,7 +408,11 @@ def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
             "tool_name": "Write",
             "tool_input": {
                 "file_path": "bridge/test-fake-verified-no-tests-002.md",
-                "content": ("VERIFIED\n\n## Specification Links\n- DCL-EXAMPLE-001\n\nNo command evidence here."),
+                "content": (
+                    "VERIFIED\n"
+                    + DISTINCT_AUTHOR_METADATA
+                    + "\n## Specification Links\n- DCL-EXAMPLE-001\n\nNo command evidence here."
+                ),
             },
             "session_id": "test",
             "cwd": str(REPO_ROOT),

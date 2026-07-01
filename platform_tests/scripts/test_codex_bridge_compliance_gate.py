@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,24 @@ AUTHOR_METADATA = (
     "author_model_version: 5.5\n"
     "author_model_configuration: Extra High\n"
 )
+WORK_INTENT_SESSION_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_SESSION_ID",
+    "GTKB_INHERITED_SESSION_ID",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "ANTIGRAVITY_SESSION_ID",
+    "GTKB_SESSION_ID",
+)
+
+
+def _adapter_env(session_id: str = "test") -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT / "groundtruth-kb" / "src") + os.pathsep + str(REPO_ROOT)
+    for env_var in WORK_INTENT_SESSION_ENV_VARS:
+        env[env_var] = session_id
+    return env
 
 
 @pytest.fixture(autouse=True)
@@ -109,6 +128,7 @@ def test_adapter_denies_non_compliant_bridge_write() -> None:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        env=_adapter_env(),
         timeout=10,
         check=False,
     )
@@ -141,6 +161,7 @@ def test_adapter_allows_compliant_bridge_write() -> None:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        env=_adapter_env(),
         timeout=10,
         check=False,
     )

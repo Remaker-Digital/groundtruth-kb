@@ -232,6 +232,7 @@ def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | Non
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
         return None
     allowed_tools = ", ".join(model_route.allowed_tools)
+    session_id = resolve_openrouter_session_id(os.environ) or "<dispatch-session-id-required>"
     return f"""You are OpenRouter harness F operating as Loyal Opposition for GT-KB.
 
 Before you can write any bridge verdict, you MUST acquire the work-intent claim: python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command reports an existing holder, treat that JSON output as claim evidence — not as a harness crash. Do not proceed to Write until the claim command returns success.
@@ -262,7 +263,7 @@ as defective and report that defect instead of following stale instructions.
 Bridge verdict author metadata to include:
 author_identity: OpenRouter Loyal Opposition
 author_harness_id: F
-author_session_context_id: openrouter-harness-f
+author_session_context_id: {session_id}
 author_model: {model_route.model_id}
 author_model_version: {model_route.model_version}
 author_model_configuration: OpenRouter harness shim; route {model_route.key}; skill {skill}; guarded tools {allowed_tools}
@@ -394,6 +395,7 @@ def set_author_metadata_env(
     endpoint: str = DEFAULT_ENDPOINT,
 ) -> dict[str, str]:
     updated = dict(env)
+    session_id = resolve_openrouter_session_id(env)
     updated.update(
         {
             "GTKB_AUTHOR_IDENTITY": AUTHOR_IDENTITY,
@@ -403,6 +405,8 @@ def set_author_metadata_env(
             "GTKB_AUTHOR_MODEL_CONFIGURATION": f"OpenRouter endpoint={endpoint}; routing=static .api-harness/routing.toml",
         }
     )
+    if session_id:
+        updated["GTKB_AUTHOR_SESSION_CONTEXT_ID"] = session_id
     return updated
 
 
@@ -509,7 +513,7 @@ def invoke_guard_adapter(
         "tool_input": tool_input,
         "cwd": str(project_root),
         "project_root": str(project_root),
-        "session_id": resolve_openrouter_session_id(os.environ) or "openrouter-harness-f",
+        "session_id": resolve_openrouter_session_id(os.environ),
     }
     for relative_guard_path in paths:
         guard_path = relative_guard_path if relative_guard_path.is_absolute() else project_root / relative_guard_path

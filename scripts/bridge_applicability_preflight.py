@@ -359,11 +359,13 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
     except sqlite3.Error:
         return
     try:
+        columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(current_specifications)").fetchall()}
+        type_expr = "type" if "type" in columns else "NULL AS type"
         for spec_id, entry in applicable.items():
             if spec_id.startswith("DELIB-") or "/" in spec_id:
                 continue
             row = conn.execute(
-                "SELECT title, status, type FROM current_specifications WHERE id = ? LIMIT 1",
+                f"SELECT title, status, {type_expr} FROM current_specifications WHERE id = ? LIMIT 1",
                 (spec_id,),
             ).fetchone()
             entry.exists_in_membase = row is not None
