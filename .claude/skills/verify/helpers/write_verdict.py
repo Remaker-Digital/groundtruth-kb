@@ -33,6 +33,11 @@ from groundtruth_kb.bridge.prior_deliberations import (  # noqa: E402
     pre_populate_prior_deliberations,
 )
 
+from scripts.bridge_author_metadata import (  # noqa: E402
+    extract_author_metadata,
+    is_synthetic_session_context_id,
+)
+
 DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-prepopulation.json")
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
 VERSIONED_BRIDGE_RE_TEMPLATE = r"^{slug}-(?P<version>\d{{3}})\.md$"
@@ -593,6 +598,17 @@ def _assert_verdict_review_independence(slug: str, body: str, project_root: Path
         )
 
 
+def _assert_verdict_author_session_context_is_real(body: str) -> None:
+    session_context_id = extract_author_metadata(body).get("author_session_context_id")
+    if is_synthetic_session_context_id(session_context_id):
+        raise VerifiedFinalizationError(
+            "VERIFIED verdict body uses a synthetic author_session_context_id "
+            f"{session_context_id!r}. The finalization helper requires a concrete "
+            "author session context id before writing the bridge verdict (WI-4940; "
+            "GOV-DOCUMENT-AUTHOR-PROVENANCE-001)."
+        )
+
+
 def finalize_verified_commit(
     slug: str,
     body: str,
@@ -658,6 +674,7 @@ def finalize_verified_commit(
     )
 
     _assert_verdict_review_independence(slug, body_to_write, root)
+    _assert_verdict_author_session_context_is_real(body_to_write)
 
     # Determine which expected paths are actually dirty/modified/untracked
     # so we only expect those to be staged after `git add`.

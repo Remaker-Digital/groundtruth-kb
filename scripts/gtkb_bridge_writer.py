@@ -11,7 +11,11 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
-from scripts.bridge_author_metadata import ensure_author_metadata
+from scripts.bridge_author_metadata import (
+    ensure_author_metadata,
+    extract_author_metadata,
+    is_synthetic_session_context_id,
+)
 from scripts.verdict_evidence_anchor_preflight import (
     validate_verdict_evidence_anchors,
     violation_summary,
@@ -71,6 +75,23 @@ class BridgeEvidenceAnchorError(BridgeError):
     """
 
 
+def _synthetic_session_context_id_for_content(content: str) -> str | None:
+    session_context_id = extract_author_metadata(content).get("author_session_context_id")
+    if is_synthetic_session_context_id(session_context_id):
+        return str(session_context_id).strip().strip("`")
+    return None
+
+
+def _reject_synthetic_session_context_id(content: str) -> None:
+    synthetic_session_context_id = _synthetic_session_context_id_for_content(content)
+    if synthetic_session_context_id:
+        raise BridgeTransitionError(
+            "bridge artifact author_session_context_id must be a real session context id; "
+            f"got synthetic harness placeholder {synthetic_session_context_id!r}. "
+            "The authoring session or dispatcher must provide concrete metadata before write."
+        )
+
+
 def _bridge_dir(project_root: Path) -> Path:
     return project_root / "bridge"
 
@@ -113,6 +134,7 @@ def write_bridge_file(
         if require_author_metadata
         else content
     )
+    _reject_synthetic_session_context_id(content_to_write)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content_to_write, encoding="utf-8")
     written = target.read_text(encoding="utf-8")

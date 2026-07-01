@@ -49,6 +49,8 @@ try:
         BRIDGE_AUTHOR_METADATA_STATUSES,
         REQUIRED_AUTHOR_METADATA_FIELDS,
         author_metadata_gaps_for_content,
+        extract_author_metadata,
+        is_synthetic_session_context_id,
     )
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
     BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
@@ -64,6 +66,16 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
     def author_metadata_gaps_for_content(content: str) -> list[str]:
         values = dict(re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE))
         return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
+
+    def extract_author_metadata(content: str) -> dict[str, str]:
+        return {
+            key.lower(): value.strip()
+            for key, value in re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE)
+        }
+
+    def is_synthetic_session_context_id(value: object) -> bool:
+        text = str(value or "").strip().strip("`")
+        return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
 
 
 WRITE_TOOLS = {"Write", "Edit"}
@@ -1003,6 +1015,13 @@ def _has_commit_finalization_evidence(content: str) -> bool:
         return False
     section = "\n".join(_collect_section_lines(lines, start))
     return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) and FINALIZATION_PATH_BULLET_RE.search(section))
+
+
+def _synthetic_session_context_id_for_content(content: str) -> str | None:
+    session_context_id = extract_author_metadata(content).get("author_session_context_id")
+    if is_synthetic_session_context_id(session_context_id):
+        return str(session_context_id).strip().strip("`")
+    return None
 
 
 def _proposal_claims_owner_approval(content: str) -> bool:
@@ -1953,6 +1972,15 @@ def _deny_reason_for_content(
                     f"{', '.join(REQUIRED_AUTHOR_METADATA_FIELDS)}. The authoring session must "
                     "supply accurate model, version, and configuration values; the dispatcher "
                     "must not guess. (Hard-block per owner emergency audit directive 2026-05-19.)"
+                )
+            synthetic_session_context_id = _synthetic_session_context_id_for_content(content)
+            if synthetic_session_context_id:
+                return (
+                    "[Governance] Bridge artifacts must include a real author_session_context_id, "
+                    f"not synthetic harness placeholder {synthetic_session_context_id!r}. The authoring "
+                    "session or dispatcher must provide the concrete session context id before the "
+                    "bridge file reaches disk. (Hard-block per WI-4940; "
+                    "GOV-DOCUMENT-AUTHOR-PROVENANCE-001.)"
                 )
     return None
 
