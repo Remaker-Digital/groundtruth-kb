@@ -35,6 +35,12 @@ sources = [
     "active deployment artifacts",
 ]
 
+[activities.ops.classification]
+skills = "activity_only"
+terminology = "activity_only"
+history_state = "explicit_query"
+direction = "activity_only"
+
 [activities.ops.direction]
 stance = "triage-and-stabilize"
 guardrails = [
@@ -75,6 +81,12 @@ sources = [
     "related specifications",
     "open AUQ items",
 ]
+
+[activities.deliberation.classification]
+skills = "activity_only"
+terminology = "activity_only"
+history_state = "explicit_query"
+direction = "activity_only"
 
 [activities.deliberation.direction]
 stance = "capture-and-clarify"
@@ -119,6 +131,12 @@ sources = [
     "backlog priority order",
     "open NO-GO items",
 ]
+
+[activities.build.classification]
+skills = "activity_only"
+terminology = "activity_only"
+history_state = "explicit_query"
+direction = "activity_only"
 
 [activities.build.direction]
 stance = "implement-within-scope"
@@ -165,6 +183,12 @@ sources = [
     "implementation reports awaiting verification",
 ]
 
+[activities.test.classification]
+skills = "activity_only"
+terminology = "activity_only"
+history_state = "explicit_query"
+direction = "activity_only"
+
 [activities.test.direction]
 stance = "verify-evidence-first"
 guardrails = [
@@ -208,6 +232,12 @@ sources = [
     "specification-to-test coverage gaps",
 ]
 
+[activities.spec.classification]
+skills = "activity_only"
+terminology = "activity_only"
+history_state = "explicit_query"
+direction = "activity_only"
+
 [activities.spec.direction]
 stance = "capture-before-implement"
 guardrails = [
@@ -250,6 +280,12 @@ sources = [
     "project authorization expiry",
     "recent project completions",
 ]
+
+[activities.project.classification]
+skills = "activity_only"
+terminology = "activity_only"
+history_state = "explicit_query"
+direction = "activity_only"
 
 [activities.project.direction]
 stance = "overview-and-prioritize"

@@ -1,0 +1,77 @@
+schema_version = 1
+
+[taxonomy]
+authority = "SPEC-INTAKE-46594e"
+purpose = "Keep the global session envelope light, then compose activity-specific context only after an activity is opened."
+required_classes = [
+    "global_baseline",
+    "activity_only",
+    "explicit_query",
+    "never_startup",
+]
+
+[classes.global_baseline]
+load_policy = "session_start"
+description = "Minimal cross-role context required for basic GT-KB governance and operation before an activity is selected."
+required_payloads = [
+    "role_record",
+    "role_overlay",
+    "core_terminology_primer",
+    "file_bridge_current_state",
+    "dashboard_backlog_summary",
+    "selected_task_mapping",
+]
+allowed_surfaces = [
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".claude/rules/canonical-terminology.md",
+    ".claude/rules/file-bridge-protocol.md",
+    "config/agent-control/SESSION-STARTUP-INDEX.md",
+    "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md",
+    "config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md",
+    "memory/MEMORY.md",
+]
+excludes_payloads = [
+    "activity_skills",
+    "activity_specific_terminology",
+    "raw_archival_state",
+    "full_transcripts",
+    "generated_cache_corpora",
+]
+
+[classes.activity_only]
+load_policy = "open_activity"
+description = "Context that is useful only after a named activity envelope is active."
+allowed_payloads = [
+    "skills",
+    "terminology",
+    "direction",
+    "activity_guardrails",
+    "activity_manipulates",
+]
+requires_activity_profile = true
+
+[classes.explicit_query]
+load_policy = "on_demand_query"
+description = "State too large or too situational for automatic load; agents must use compact query/read surfaces."
+allowed_payloads = [
+    "history_state",
+    "bridge_thread_chain",
+    "transcript_inventory",
+    "archival_state",
+    "backlog_or_project_search_results",
+    "deliberation_search_results",
+]
+compact_surface_required = true
+
+[classes.never_startup]
+load_policy = "forbidden_startup"
+description = "Surfaces that must not be read wholesale during startup or routine activity entry."
+forbidden_payloads = [
+    "raw_bridge_archival_json",
+    "full_session_transcripts",
+    "generated_runtime_cache_directories",
+    "retired_aggregate_queue_artifacts",
+    "unbounded_database_dumps",
+]
+required_alternative = "Use a governed compact CLI/query surface with filters and bounded output."

@@ -47,6 +47,8 @@ session start.
 | Durable operating-role guidance | `.claude/rules/operating-role.md` | active | Human-readable role-resolution guidance; not the role record. |
 | File-bridge protocol | `.claude/rules/file-bridge-protocol.md` | active | Bridge statuses, gates, claim/preflight contract. |
 | Deliberation protocol | `.claude/rules/deliberation-protocol.md` | active | When to search/archive deliberations. |
+| Activity envelope sharding taxonomy | `config/agent-control/activity-envelope-sharding.toml` | active | Machine-readable boundary between `global_baseline`, `activity_only`, `explicit_query`, and `never_startup` payloads. |
+| Activity disposition profiles | `config/agent-control/activity-disposition-profiles.toml` | active | Six activity profiles; payload classes declare whether skills, terminology, history state, and direction are activity-only or explicit-query. |
 | Generated startup service | `scripts/session_self_initialization.py` | active | Emits the startup disclosure payload (its output is generated). |
 | Operational notepad | `memory/MEMORY.md` | active | Session state/bootstrap; ADR-0001 notepad tier (not canonical). |
 <!-- /inventory -->

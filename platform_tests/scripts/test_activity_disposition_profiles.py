@@ -24,6 +24,7 @@ from groundtruth_kb.activity.profiles import (
     CANONICAL_ACTIVITIES,
     ActivityProfile,
     ActivityProfileError,
+    load_activity_envelope_sharding,
     load_activity_profiles,
 )
 
@@ -34,6 +35,7 @@ from groundtruth_kb.activity.profiles import (
 _SHIPPED_CONFIG = (
     Path(__file__).resolve().parents[2] / "config" / "agent-control" / "activity-disposition-profiles.toml"
 )
+_SHARDING_CONFIG = Path(__file__).resolve().parents[2] / "config" / "agent-control" / "activity-envelope-sharding.toml"
 
 
 def _write_toml(tmp_path: Path, content: str) -> Path:
@@ -62,12 +64,45 @@ def _minimal_toml(overrides: dict[str, str] | None = None) -> str:
         lines.append("terminology = []")
         lines.append(f"[activities.{act}.history_state]")
         lines.append("sources = []")
+        lines.append(f"[activities.{act}.classification]")
+        lines.append('skills = "activity_only"')
+        lines.append('terminology = "activity_only"')
+        lines.append('history_state = "explicit_query"')
+        lines.append('direction = "activity_only"')
         lines.append(f"[activities.{act}.direction]")
         lines.append('stance = ""')
         lines.append("guardrails = []")
         lines.append("manipulates = []")
         lines.append("")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# SPEC-INTAKE-46594e: Session/activity envelope sharding taxonomy
+# ---------------------------------------------------------------------------
+
+
+def test_sharding_taxonomy_defines_required_classes() -> None:
+    sharding = load_activity_envelope_sharding(_SHARDING_CONFIG)
+    assert set(sharding.required_classes) == {
+        "global_baseline",
+        "activity_only",
+        "explicit_query",
+        "never_startup",
+    }
+    assert sharding.classes["global_baseline"].load_policy == "session_start"
+    assert sharding.classes["activity_only"].load_policy == "open_activity"
+    assert sharding.classes["explicit_query"].load_policy == "on_demand_query"
+    assert sharding.classes["never_startup"].load_policy == "forbidden_startup"
+
+
+def test_global_baseline_excludes_activity_and_archival_payloads() -> None:
+    sharding = load_activity_envelope_sharding(_SHARDING_CONFIG)
+    global_payloads = set(sharding.classes["global_baseline"].payloads)
+    assert "activity_skills" in global_payloads
+    assert "activity_specific_terminology" in global_payloads
+    assert "raw_archival_state" in global_payloads
+    assert "full_transcripts" in global_payloads
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +136,21 @@ def test_each_profile_defines_four_classes() -> None:
         for cls in _REQUIRED_CLASSES:
             value = getattr(profile, cls)
             assert value is not None, f"Activity '{name}' missing class '{cls}'"
+            assert cls in profile.classification, f"Activity '{name}' missing classification for '{cls}'"
+
+
+def test_profile_classifications_reference_sharding_taxonomy() -> None:
+    sharding = load_activity_envelope_sharding(_SHARDING_CONFIG)
+    profiles = load_activity_profiles(_SHIPPED_CONFIG)
+    for name, profile in profiles.items():
+        assert set(profile.classification) == set(_REQUIRED_CLASSES)
+        for payload_class, sharding_class in profile.classification.items():
+            assert sharding_class in sharding.classes, (
+                f"Activity '{name}' payload '{payload_class}' references unknown class '{sharding_class}'"
+            )
+        assert profile.classification["skills"] == "activity_only"
+        assert profile.classification["terminology"] == "activity_only"
+        assert profile.classification["history_state"] == "explicit_query"
 
 
 def test_skills_and_terminology_are_lists() -> None:
@@ -140,8 +190,18 @@ def test_headless_eligibility_valid_and_d4_consistent() -> None:
 def test_loader_rejects_missing_activity(tmp_path: Path) -> None:
     # Build a TOML without 'ops'.
     content = _minimal_toml()
-    # Remove the ops block lines.
-    lines = [ln for ln in content.splitlines() if "activities.ops" not in ln]
+    # Remove the full ops block, including nested classification/direction tables.
+    lines = []
+    skip = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[activities.ops"):
+            skip = True
+            continue
+        if skip and stripped.startswith("[activities.") and not stripped.startswith("[activities.ops"):
+            skip = False
+        if not skip:
+            lines.append(line)
     p = _write_toml(tmp_path, "\n".join(lines))
     with pytest.raises(ActivityProfileError, match="A1"):
         load_activity_profiles(p)
@@ -167,6 +227,29 @@ def test_loader_rejects_missing_class(tmp_path: Path) -> None:
             continue
         filtered.append(line)
     p = _write_toml(tmp_path, "\n".join(filtered))
+    with pytest.raises(ActivityProfileError, match="A2"):
+        load_activity_profiles(p)
+
+
+def test_loader_rejects_missing_payload_classification(tmp_path: Path) -> None:
+    content = _minimal_toml()
+    filtered = []
+    in_build_classification = False
+    for line in content.splitlines():
+        if line.strip() == "[activities.build.classification]":
+            in_build_classification = True
+        elif line.strip().startswith("[activities.") and line.strip() != "[activities.build.classification]":
+            in_build_classification = False
+        if in_build_classification and line.strip().startswith("history_state"):
+            continue
+        filtered.append(line)
+    p = _write_toml(tmp_path, "\n".join(filtered))
+    with pytest.raises(ActivityProfileError, match="A2"):
+        load_activity_profiles(p)
+
+
+def test_loader_rejects_unknown_payload_classification(tmp_path: Path) -> None:
+    p = _write_toml(tmp_path, _minimal_toml().replace('skills = "activity_only"', 'skills = "startup_blob"', 1))
     with pytest.raises(ActivityProfileError, match="A2"):
         load_activity_profiles(p)
 

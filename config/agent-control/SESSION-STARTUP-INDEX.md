@@ -33,6 +33,11 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    terminology and skill recommendations load only when an agent opens the
    corresponding activity envelope with `::open <activity>` per
    `SPEC-INTAKE-46594e` and `DCL-ACTIVITY-DISPOSITION-PROFILE-001`.
+   The enforceable sharding boundary is declared in
+   `config/agent-control/activity-envelope-sharding.toml`: `global_baseline`
+   loads at session start, `activity_only` loads on `::open <activity>`,
+   `explicit_query` stays behind compact query/read surfaces, and
+   `never_startup` is forbidden from routine startup loads.
 4. **File bridge** — read current TAFE/dispatcher bridge state and the
    status-bearing versioned files under `bridge/`; generated or cached startup
    counts are not live authority. The retired aggregate queue artifact must
@@ -86,6 +91,9 @@ payload (`DCL-SESSION-STARTUP-TOKEN-BUDGET-001`).
 For the full classified inventory of startup control surfaces (required files,
 settings, hooks, skills/commands/agents, generated/projected surfaces, retired
 surfaces), see `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md` (Slice A).
+For the session/activity envelope sharding taxonomy and the four payload classes
+that constrain startup versus opened activities, see
+`config/agent-control/activity-envelope-sharding.toml`.
 
 ## Authority Note
 
