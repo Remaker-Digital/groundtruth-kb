@@ -102,6 +102,24 @@ def test_env_local_loader_falls_back_from_in_root_release_worktree(tmp_path: Pat
     assert env_loader._default_env_local_path(worktree) == primary_env.resolve()
 
 
+def test_openrouter_reconfigures_output_streams_for_unicode_verdicts():
+    class Stream:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, str]] = []
+
+        def reconfigure(self, **kwargs: str) -> None:
+            self.calls.append(kwargs)
+
+    stdout = Stream()
+    stderr = Stream()
+
+    orh.ensure_utf8_output_streams(stdout, stderr)
+    orh.ensure_utf8_output_streams(object(), object())
+
+    assert stdout.calls == [{"encoding": "utf-8", "errors": "backslashreplace"}]
+    assert stderr.calls == [{"encoding": "utf-8", "errors": "backslashreplace"}]
+
+
 def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     root = make_root(tmp_path)
     prompt = orh.build_system_prompt("bridge-review", route(root))

@@ -3304,7 +3304,7 @@ def _dispatch_target_uses_stdin_prompt(target: DispatchTarget) -> bool:
             return True
         if str(headless.get("prompt_transport") or "").strip().lower() == "stdin":
             return True
-    return target.command_handle == "antigravity"
+    return False
 
 
 def _command_without_prompt_payload(command: list[str], prompt: str) -> list[str]:

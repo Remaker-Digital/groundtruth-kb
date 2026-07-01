@@ -3789,7 +3789,9 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
         harness_id="C",
         command_handle="antigravity",
         canonical_mode="lo",
-        invocation_surfaces={"headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--model", "gemini-2.5-flash"]}},
+        invocation_surfaces={
+            "headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--model", "gemini-2.5-flash"], "stdin": True}
+        },
     )
     item = type(
         "FakeItem",

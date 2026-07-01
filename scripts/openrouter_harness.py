@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fnmatch
 import json
 import os
@@ -163,6 +164,16 @@ def _sleep_with_budget(delay: float, deadline: float, message: str) -> None:
     if _remaining_timeout(deadline, message) < delay:
         raise OpenRouterHarnessError(message)
     time.sleep(delay)
+
+
+def ensure_utf8_output_streams(stdout: Any | None = None, stderr: Any | None = None) -> None:
+    """Make harness output safe for Unicode verdict text on Windows consoles."""
+    for stream in (stdout or sys.stdout, stderr or sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="backslashreplace")
 
 
 def _retry_after_delay_seconds(exc: urllib.error.HTTPError) -> float | None:
@@ -1102,6 +1113,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    ensure_utf8_output_streams()
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     project_root = resolve_project_root(Path.cwd())
