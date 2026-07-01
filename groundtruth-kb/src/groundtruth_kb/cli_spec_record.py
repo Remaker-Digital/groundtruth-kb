@@ -59,7 +59,10 @@ class SpecRecordRequest:
     testability: str | None
     source_paths_json: str | None
     application_scope: str | None
-    dry_run: bool
+    gap_state_capture: bool = False
+    gap_state_bridge_id: str | None = None
+    gap_state_reason: str | None = None
+    dry_run: bool = False
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:
@@ -80,7 +83,7 @@ def _changed_by() -> str:
 
 def _approval_packet_path(project_root: Path, artifact_id: str) -> Path:
     date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
-    return project_root / ".groundtruth" / "formal-artifact-approvals" / f"{date_prefix}-{artifact_id}.json"
+    return project_root / ".groundtruth" / "formal-artifact-approvals" / f"{date_prefix}-{artifact_id.lower()}.json"
 
 
 def _parse_json_option(raw: str | None, option_name: str, expected_type: type) -> Any:
@@ -124,6 +127,11 @@ def _validate_request_evidence(request: SpecRecordRequest) -> None:
         raise SpecRecordError("--auq-answer must be non-empty")
     if not request.change_reason.strip():
         raise SpecRecordError("--change-reason must be non-empty")
+    if request.gap_state_capture:
+        if not (request.gap_state_bridge_id and request.gap_state_bridge_id.strip()):
+            raise SpecRecordError("--gap-state-bridge-id is required with --gap-state-capture")
+        if not (request.gap_state_reason and request.gap_state_reason.strip()):
+            raise SpecRecordError("--gap-state-reason is required with --gap-state-capture")
 
 
 def _validate_string_list(value: list[Any] | None, option_name: str) -> list[str] | None:
@@ -163,6 +171,7 @@ def _build_packet(
     resolved_type: str,
     full_content: str,
     changed_by: str,
+    db_operation: dict[str, object],
 ) -> dict[str, object]:
     return construct_approval_packet(
         artifact_type=resolved_type,
@@ -177,6 +186,10 @@ def _build_packet(
         approved_by=request.approved_by or "owner",
         changed_by=changed_by,
         change_reason=request.change_reason,
+        capture_context="gap_state" if request.gap_state_capture else None,
+        gap_state_bridge_id=request.gap_state_bridge_id if request.gap_state_capture else None,
+        gap_state_reason=request.gap_state_reason if request.gap_state_capture else None,
+        intended_db_operation=db_operation if request.gap_state_capture else None,
     )
 
 
@@ -211,27 +224,29 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
         raise SpecRecordError(f"spec {request.spec_id} already exists; Slice 2 record is create-only")
 
     changed_by = _changed_by()
+    db_operation: dict[str, object] = {
+        "method": "insert_spec",
+        "id": request.spec_id,
+        "type": resolved_type,
+        "status": request.status,
+    }
     packet = _build_packet(
         request=request,
         resolved_type=resolved_type,
         full_content=full_content,
         changed_by=changed_by,
+        db_operation=db_operation,
     )
     validation = validate_packet(packet)
     if not validation.is_valid:
         raise SpecRecordError("; ".join(validation.errors))
 
     packet_path = _approval_packet_path(project_root, request.spec_id)
-    db_operation = {
-        "method": "insert_spec",
-        "id": request.spec_id,
-        "type": resolved_type,
-        "status": request.status,
-    }
     if request.dry_run:
         return {
             "created": False,
             "dry_run": True,
+            "gap_state_capture": request.gap_state_capture,
             "id": request.spec_id,
             "row": None,
             "approval_packet_path": str(packet_path),
@@ -270,6 +285,7 @@ def record_spec(config: GTConfig, request: SpecRecordRequest) -> dict[str, Any]:
     return {
         "created": True,
         "dry_run": False,
+        "gap_state_capture": request.gap_state_capture,
         "id": row["id"],
         "row": row,
         "approval_packet_path": str(packet_path),
