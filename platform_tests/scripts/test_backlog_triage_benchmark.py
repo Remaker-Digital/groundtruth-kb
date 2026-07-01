@@ -34,7 +34,6 @@ _WI_COLUMNS = (
     "title",
     "description",
     "acceptance_summary",
-    "approval_state",
     "origin",
     "component",
     "related_bridge_threads",
@@ -55,7 +54,6 @@ def _wi(**overrides):
         "title": "title",
         "description": "description",
         "acceptance_summary": "",
-        "approval_state": "unapproved",
         "origin": "hygiene",
         "component": "backlog",
         "related_bridge_threads": None,
@@ -142,10 +140,10 @@ def test_open_filter_excludes_terminal(sample_root):
 def test_router_and_signal_classification(sample_root):
     result = backlog_triage.run(WINDOW_START, WINDOW_END, sample_root)
     items = _items_by_id(result, sample_root)
-    # Router + no signal + unapproved -> retire_candidate_unapproved_noise.
+    # Router + no signal -> retire_candidate_router_low_signal.
     assert items["WI-ROUTER-NOISE"]["router_generated"] is True
     assert items["WI-ROUTER-NOISE"]["signal_bearing"] is False
-    assert items["WI-ROUTER-NOISE"]["label"] == "retire_candidate_unapproved_noise"
+    assert items["WI-ROUTER-NOISE"]["label"] == "retire_candidate_router_low_signal"
     # Router but bridge-linked -> signal-bearing wins, keep_signal.
     assert items["WI-ROUTER-SIGNAL"]["router_generated"] is True
     assert items["WI-ROUTER-SIGNAL"]["bridge_linked"] is True
@@ -163,7 +161,7 @@ def test_boilerplate_source_spec_id_is_not_a_signal(sample_root):
     assert item["has_source_spec_id"] is True  # surfaced informationally
     assert item["spec_linked"] is False  # but NOT counted as a spec link
     assert item["signal_bearing"] is False
-    assert item["label"] == "retire_candidate_unapproved_noise"
+    assert item["label"] == "retire_candidate_router_low_signal"
 
 
 def test_duplicate_group_resolution(sample_root):

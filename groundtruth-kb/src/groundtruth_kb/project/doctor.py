@@ -34,7 +34,6 @@ from groundtruth_kb.project.managed_registry import (
 from groundtruth_kb.project.profiles import get_profile
 
 STANDING_BACKLOG_STALE_NO_GO_DAYS = 14
-IMPLEMENTATION_ACTIVE_APPROVAL_STATES = frozenset({"implementation_authorized"})
 IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = frozenset({"in_progress"})
 IMPLEMENTATION_ACTIVE_STAGES = frozenset({"implementing"})
 _BRIDGE_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
@@ -5609,14 +5608,9 @@ def _active_authorized_work_item_ids(db: Any) -> set[str]:
 
 
 def _is_implementation_active_work_item(item: dict[str, Any]) -> bool:
-    approval_state = str(item.get("approval_state") or "").strip()
     resolution_status = str(item.get("resolution_status") or "").strip()
     stage = str(item.get("stage") or "").strip()
-    return (
-        approval_state in IMPLEMENTATION_ACTIVE_APPROVAL_STATES
-        or resolution_status in IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES
-        or stage in IMPLEMENTATION_ACTIVE_STAGES
-    )
+    return resolution_status in IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES or stage in IMPLEMENTATION_ACTIVE_STAGES
 
 
 def check_standing_backlog_health(
@@ -5667,7 +5661,6 @@ def check_standing_backlog_health(
                         "severity": "WARN",
                         "work_item_id": item_id,
                         "project_name": item.get("project_name"),
-                        "approval_state": item.get("approval_state"),
                         "resolution_status": item.get("resolution_status"),
                         "message": (
                             f"Implementation-active work item {item_id} is not listed in any active "

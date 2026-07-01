@@ -1,35 +1,36 @@
-# Backlog Approval State Rule
+# Backlog Approval State Retirement Rule
 
 ## Purpose
 
-MemBase work items must separate owner approval evidence from ordinary backlog presence. A work item can be tracked, prioritized, or reviewed without becoming implementation-approved.
+MemBase work-item `approval_state` is historical compatibility metadata only.
+It is not implementation authority, review authority, startup priority authority,
+or a text-edit bypass.
 
-## Canonical States
+## Canonical Authority
 
-- `unapproved`: no durable owner or bridge evidence authorizes implementation.
-- `auq_required`: owner intent is referenced, but the required AskUserQuestion or equivalent durable decision evidence is missing.
-- `auq_resolved`: durable owner decision evidence exists, but implementation has not been separately authorized.
-- `bridge_authorized`: the latest applicable bridge review is GO and the GO cites the work item or implementation scope.
-- `implementation_authorized`: implementation may proceed because durable owner evidence or a bridge GO has satisfied the approval gate.
+Implementation authority is project-level:
 
-## Transition Rule
+1. An active project authorization (`PAUTH-*`) defines the owner-approved scope.
+2. A live bridge `GO` approves the specific implementation proposal.
+3. A matching implementation-start authorization packet and work-intent claim
+   open the Prime Builder write path.
 
-Backlog creation, grooming, ordering, and review do not by themselves grant implementation authority. Moving a non-terminal work item to `implementation_authorized` requires one of these evidence paths:
+Individual work items do not have an approval state. A work item may be
+tracked, prioritized, reviewed, linked to a project, or included in a project
+authorization without becoming an independent approval authority.
 
-1. AskUserQuestion or equivalent durable owner-decision evidence that explicitly approves the implementation scope.
-2. A current bridge GO verdict that cites the work item or the implementation scope.
+## Legacy Data
 
-## Backfill Rule
+Historical rows may still carry legacy `approval_state` values. Tools may read
+or preserve those values for backward compatibility and audit continuity, but
+must not derive authorization, priority, or permission from them.
 
-Legacy work items with no approval_state must be backfilled deterministically:
-
-- `WI-3271` is `auq_resolved` because it has known durable owner-decision evidence.
-- Work items whose related bridge thread is latest `VERIFIED` are `implementation_authorized`.
-- Work items whose related bridge thread is latest `GO` are `bridge_authorized`.
-- Work items with source owner directive text and related deliberation evidence are `auq_resolved`.
-- Work items with source owner directive text but no durable deliberation evidence are `auq_required`.
-- All other active work items are `unapproved`.
+Do not backfill, promote, or transition `approval_state` as a governance step.
+Do not introduce new directives, skills, helper behavior, tests, or startup
+surfaces that treat a work-item approval state as live authority.
 
 ## Enforcement
 
-The approval-state gate must be deterministic and testable. Scripts or hooks that promote work to implementation authority must reject unknown states and must fail closed when required evidence cannot be found.
+Any live gate that accepts or rejects implementation based on `approval_state`
+is obsolete and must be replaced by the project-level authorization,
+bridge-`GO`, and implementation-start packet chain.

@@ -302,7 +302,6 @@ def _insert_promoted_work_item(
         source_spec_id=str(candidate.get("source_spec_id") or router.SOURCE_SPEC_ID),
         priority=candidate.get("priority"),
         stage="backlogged",
-        approval_state="auq_resolved",
         source_owner_directive=f"Per-batch owner AUQ {packet['auq_id']}",
         source_deliberation_query=f"Stage 3 advisory candidate {candidate['source_key']}",
         related_deliberation_ids=str(candidate["source_key"]),

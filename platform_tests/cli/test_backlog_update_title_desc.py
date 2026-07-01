@@ -6,9 +6,8 @@ item: WI-4357. Owner decisions: DELIB-20260870 (design), DELIB-20260871 (PAUTH
 strategy). PAUTH: PAUTH-PROJECT-GTKB-DETERMINISTIC-SERVICES-001-BACKLOG-UPDATE-TITLE-DESC-CLI-WI-4357.
 
 Each test seeds a fresh project with a deliberation row that backs a PAUTH
-authorization, a defect WI (for GOV-15 composition), and an improvement WI
-with bridge_authorized approval_state. The CLI is invoked via Click's
-``CliRunner`` against the in-tree ``gt`` entry point.
+authorization, a defect WI (for GOV-15 composition), and improvement WIs. The
+CLI is invoked via Click's ``CliRunner`` against the in-tree ``gt`` entry point.
 """
 
 from __future__ import annotations
@@ -34,7 +33,7 @@ SEED_PAUTH_ID = "PAUTH-PROJECT-TEST-BACKLOG-TEXT-EDIT-WI-IMPROVEMENT"
 @pytest.fixture(autouse=True)
 def set_harness_name(monkeypatch) -> None:
     """Ensure a deterministic active prime builder is resolved by default in these tests."""
-    monkeypatch.setenv("GTKB_HARNESS_NAME", "antigravity")
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
@@ -130,12 +129,12 @@ def _project(tmp_path: Path) -> tuple[Path, Path]:
         )
         db.insert_work_item(
             id="WI-BRIDGE",
-            title="Bridge-authorized work item",
+            title="Legacy approval-state work item",
             origin="improvement",
             component="platform",
             resolution_status="open",
             changed_by="test",
-            change_reason="seed bridge_authorized",
+            change_reason="seed legacy approval_state",
             stage="created",
             approval_state="bridge_authorized",
             project_name="PROJECT-TEST",
@@ -293,10 +292,10 @@ def test_nonexistent_delib_citation_rejected(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# T6: bridge_authorized approval_state admits a text edit (arm 1).
-# Spec: GOV-STANDING-BACKLOG-001 (approval_state disjunctive arm).
+# T6: bridge_authorized approval_state is ignored for text-edit authority.
+# Spec: PROJECT-GTKB-OBSOLETE-REFERENCE-PURGE / WI-4936.
 # ---------------------------------------------------------------------------
-def test_bridge_authorized_admits_text_edit(tmp_path: Path) -> None:
+def test_bridge_authorized_approval_state_does_not_admit_text_edit(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
     result = CliRunner().invoke(
         main,
@@ -306,13 +305,15 @@ def test_bridge_authorized_admits_text_edit(tmp_path: Path) -> None:
             "update",
             "WI-BRIDGE",
             "--title",
-            "Edit under bridge_authorized state",
+            "Attempt legacy approval-state edit",
             "--change-reason",
-            "text edit; approval_state arm satisfied",
+            "text edit; legacy approval_state must not satisfy the gate",
         ],
     )
-    assert result.exit_code == 0, result.output
-    assert _current_title(root / "groundtruth.db", "WI-BRIDGE") == "Edit under bridge_authorized state"
+    assert result.exit_code != 0, result.output
+    assert "without text-edit authorization" in result.output
+    assert _current_title(root / "groundtruth.db", "WI-BRIDGE") == "Legacy approval-state work item"
+    assert _version_count(root / "groundtruth.db", "WI-BRIDGE") == 1
 
 
 # ---------------------------------------------------------------------------

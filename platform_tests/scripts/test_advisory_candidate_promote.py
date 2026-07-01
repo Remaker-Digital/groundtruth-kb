@@ -180,7 +180,6 @@ def test_apply_promotes_with_auq_and_hash_evidence(tmp_path: Path) -> None:
     assert row["origin"] == "hygiene"
     assert row["component"] == "backlog"
     assert row["source_spec_id"] == "GOV-STANDING-BACKLOG-001"
-    assert row["approval_state"] == "auq_resolved"
     assert row["related_deliberation_ids"] == source_key
     assert "AUQ-STAGE3-PROMOTE" in row["change_reason"]
     assert packet["batch_hash"] in row["change_reason"]

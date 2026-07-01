@@ -7,8 +7,8 @@ command and its markdown parse/insert backend have been removed now that the
 legacy markdown backlog view is retired.
 
 The canonical backlog is read via ``gt backlog list`` / ``gt backlog status``
-against MemBase ``work_items``. Approval-state helpers live under the
-``groundtruth_kb.backlog`` package (``approval_state`` submodule).
+against MemBase ``work_items``. Legacy approval-state compatibility helpers
+remain under ``groundtruth_kb.backlog`` for historical rows only.
 """
 
 from __future__ import annotations

@@ -1264,10 +1264,10 @@ def _database_metrics(project_root: Path) -> dict[str, Any]:
 def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
     """Query MemBase work_items via ``gt backlog list --json`` (canonical backlog surface).
 
-    Returns a list of dicts with ``id``, ``title``, ``body``, ``approval_state``,
-    ``resolution_status``, and ``priority`` keys. The approval_state /
-    resolution_status / priority fields are required by the top-3 priority
-    selection in ``_backlog_metrics`` per SPEC-ENVELOPE-DISCLOSURE-UI-001.
+    Returns a list of dicts with ``id``, ``title``, ``body``,
+    ``resolution_status``, ``stage``, and ``priority`` keys. The status and
+    priority fields drive top-3 priority selection in ``_backlog_metrics`` per
+    SPEC-ENVELOPE-DISCLOSURE-UI-001.
 
     Per DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION, the canonical
     backlog is MemBase ``work_items``; the legacy markdown backlog view is retired.
@@ -1298,8 +1298,8 @@ def _backlog_items_from_membase(project_root: Path) -> list[dict[str, Any]]:
                 "id": str(row.get("id", "")),
                 "title": str(row.get("title", "")),
                 "body": str(row.get("description") or row.get("status_detail") or ""),
-                "approval_state": str(row.get("approval_state") or ""),
                 "resolution_status": str(row.get("resolution_status") or ""),
+                "stage": str(row.get("stage") or ""),
                 "priority": row.get("priority"),
             }
         )
@@ -1328,9 +1328,9 @@ def _residual_override_present(body: str) -> bool:
 
 
 _PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3, "P4": 4}
-_IMPLEMENTATION_ACTIVE_APPROVAL_STATES = {"implementation_authorized"}
 _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = {"in_progress"}
 _IMPLEMENTATION_ACTIVE_STAGES = {"implementing"}
+_TOP_PRIORITY_RESOLUTION_STATUSES = {"", "open", "in_progress", "blocked"}
 
 
 def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
@@ -1345,14 +1345,9 @@ def _top_priority_sort_key(item: dict[str, Any]) -> tuple[int, str]:
 
 
 def _is_implementation_active_backlog_item(item: dict[str, Any]) -> bool:
-    approval_state = str(item.get("approval_state") or "").strip()
     resolution_status = str(item.get("resolution_status") or "").strip()
     stage = str(item.get("stage") or "").strip()
-    return (
-        approval_state in _IMPLEMENTATION_ACTIVE_APPROVAL_STATES
-        or resolution_status in _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES
-        or stage in _IMPLEMENTATION_ACTIVE_STAGES
-    )
+    return resolution_status in _IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES or stage in _IMPLEMENTATION_ACTIVE_STAGES
 
 
 def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -1388,8 +1383,9 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
     # Top-3 selection per SPEC-ENVELOPE-DISCLOSURE-UI-001:
     # Operates on ALL classified items (bypasses the agent_red scope filter so
     # GT-KB infrastructure WIs appear in the session-startup priority surface).
-    # Applies: VERIFIED bridge filter, stale priority filter,
-    # approval_state='implementation_authorized', resolution_status open/in_progress/blocked.
+    # Applies: VERIFIED bridge filter, stale priority filter, and
+    # open/in_progress/blocked resolution status. Legacy work-item approval
+    # metadata is not authority and must not affect priority selection.
     # Computed once; reused at both consumption sites (dict field and tuple return).
     top_eligible: list[dict[str, Any]] = []
     for _item in classified:
@@ -1401,11 +1397,7 @@ def _backlog_metrics(project_root: Path) -> tuple[dict[str, Any], list[dict[str,
             continue
         if _STALE_PRIORITY_RE.search(_body):
             continue
-        if _is_implementation_active_backlog_item(_item) and _item.get("resolution_status") in (
-            "open",
-            "in_progress",
-            "blocked",
-        ):
+        if str(_item.get("resolution_status") or "") in _TOP_PRIORITY_RESOLUTION_STATUSES:
             top_eligible.append(_item)
     top_eligible.sort(key=_top_priority_sort_key)
     top_priority = top_eligible[:3]

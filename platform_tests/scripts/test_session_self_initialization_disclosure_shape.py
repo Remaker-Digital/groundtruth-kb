@@ -144,49 +144,45 @@ def test_init_disclosure_is_minimized_for_routing_only() -> None:
 # ---- Backlog projection / pipeline tests -----------------------------------
 
 
-def test_backlog_items_preserve_approval_state_field() -> None:
+def test_backlog_items_preserve_status_priority_shape() -> None:
     module = _load_module()
     items = module._backlog_items_from_membase(REPO_ROOT)
     assert items, "expected a non-empty backlog projection from MemBase"
     sample = items[0]
-    assert "approval_state" in sample
     assert "resolution_status" in sample
+    assert "stage" in sample
     assert "priority" in sample
 
 
-def test_top_3_filters_by_approval_state(monkeypatch) -> None:
-    """Top-3 must include only ``approval_state='implementation_authorized'`` items."""
+def test_top_3_does_not_filter_by_legacy_approval_metadata(monkeypatch) -> None:
+    """Top-3 must not derive priority eligibility from legacy approval metadata."""
     module = _load_module()
     synthetic = [
         {
             "id": "WI-9001",
-            "title": "Auth-required item",
+            "title": "Open item A",
             "body": "",
-            "approval_state": "auq_required",
             "resolution_status": "open",
             "priority": "P1",
         },
         {
             "id": "WI-9002",
-            "title": "Authorized item A",
+            "title": "Open item B",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
         {
             "id": "WI-9003",
-            "title": "Unapproved item",
+            "title": "Open item C",
             "body": "",
-            "approval_state": "unapproved",
             "resolution_status": "open",
             "priority": "P1",
         },
         {
             "id": "WI-9004",
-            "title": "Authorized item B",
+            "title": "Lower-priority open item",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P2",
         },
@@ -198,10 +194,7 @@ def test_top_3_filters_by_approval_state(monkeypatch) -> None:
     monkeypatch.setattr(module, "classify_dashboard_scope", lambda row: "agent_red_product")
     metrics, top = module._backlog_metrics(REPO_ROOT)
     top_ids = [item["id"] for item in top]
-    assert "WI-9001" not in top_ids
-    assert "WI-9003" not in top_ids
-    assert "WI-9002" in top_ids
-    assert "WI-9004" in top_ids
+    assert top_ids == ["WI-9001", "WI-9002", "WI-9003"]
     # Same list at both consumption sites
     assert metrics["top_priority_actions"] == top
 
@@ -212,25 +205,22 @@ def test_top_3_excludes_resolved_and_verified_wis(monkeypatch) -> None:
     synthetic = [
         {
             "id": "WI-9100",
-            "title": "Open authorized",
+            "title": "Open item",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
         {
             "id": "WI-9101",
-            "title": "Resolved authorized",
+            "title": "Resolved item",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "resolved",
             "priority": "P1",
         },
         {
             "id": "WI-9102",
-            "title": "Verified authorized",
+            "title": "Verified item",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "verified",
             "priority": "P1",
         },
@@ -258,7 +248,6 @@ def test_top_priority_dict_and_tuple_are_identical(monkeypatch) -> None:
                 "id": "WI-9200",
                 "title": "Item",
                 "body": "",
-                "approval_state": "implementation_authorized",
                 "resolution_status": "open",
                 "priority": "P1",
             }
@@ -278,7 +267,6 @@ def test_top_3_selection_is_deterministic(monkeypatch) -> None:
             "id": f"WI-9{i:03d}",
             "title": f"Item {i}",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         }
@@ -296,11 +284,9 @@ def test_top_3_selection_is_deterministic(monkeypatch) -> None:
 
 
 def test_top_3_selection_priority_then_wi_id(monkeypatch) -> None:
-    """Top-3 preserves the input ordering of eligible items (which is gt backlog
-    list's deterministic order: implementation_order, priority, then id).
+    """Top-3 sorts eligible items by priority, then stable work-item id.
 
-    The filter is order-preserving, so given a stable input order, the first
-    three implementation_authorized + open items are selected.
+    Given open items, the first three highest-priority stable ids are selected.
     """
     module = _load_module()
     synthetic = [
@@ -308,7 +294,6 @@ def test_top_3_selection_priority_then_wi_id(monkeypatch) -> None:
             "id": "WI-9400",
             "title": "First",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -316,7 +301,6 @@ def test_top_3_selection_priority_then_wi_id(monkeypatch) -> None:
             "id": "WI-9401",
             "title": "Second",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -324,7 +308,6 @@ def test_top_3_selection_priority_then_wi_id(monkeypatch) -> None:
             "id": "WI-9402",
             "title": "Third",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -332,7 +315,6 @@ def test_top_3_selection_priority_then_wi_id(monkeypatch) -> None:
             "id": "WI-9403",
             "title": "Fourth (excluded)",
             "body": "",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P2",
         },

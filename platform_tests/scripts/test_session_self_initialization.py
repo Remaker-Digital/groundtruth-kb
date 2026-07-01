@@ -274,10 +274,10 @@ def test_startup_model_contains_role_governance_and_kpi_inventory(tmp_path, monk
         model["role"]["bridge"]
         == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
     )
-    assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
+    assert "dispatcher daemon" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert "gtkb-bridge" in model["role"]["bridge_operation_instructions"]
-    assert "scripts/cross_harness_bridge_trigger.py" in model["role"]["bridge_operation_instructions"]
+    assert "scripts/dispatcher_runtime.py" in model["role"]["bridge_operation_instructions"]
     assert "two complementary axes" in model["role"]["bridge_operation_instructions"]
     assert "DISPATCHABLE WORK" in model["role"]["bridge_operation_instructions"]
     assert "NON-DISPATCHABLE WORK" in model["role"]["bridge_operation_instructions"]
@@ -1179,7 +1179,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         model["role"]["bridge"]
         == "always available through TAFE/dispatcher state plus versioned bridge files and checked at session startup"
     )
-    assert "cross-harness event-driven trigger" in model["role"]["bridge_dispatch"]
+    assert "dispatcher daemon" in model["role"]["bridge_dispatch"]
     assert "retired smart poller and OS poller remain archived" in model["role"]["bridge_dispatch"]
     assert model["role"]["role_mapping_source"] == "harness-state/harness-registry.json"
     assert model["role"]["harness_id"] == "B"
@@ -1211,7 +1211,7 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
         "summary counts, or hook-generated summaries" not in report
     )
     assert "do not display this checklist as a substitute for performing the verification" not in report
-    assert "Bridge dispatch startup rule: rely on the cross-harness event-driven trigger" not in report
+    assert "Bridge dispatch startup rule: rely on the dispatcher daemon" not in report
     assert "First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning." not in report
     assert "permanent owner permission to diagnose and repair bridge function/use" not in report
     assert (
@@ -1616,13 +1616,13 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
         "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
         "files and checked at session startup" in report_text
     )
-    assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in report_text
+    assert "Bridge dispatch: dispatcher daemon registered as PostToolUse and Stop hooks" in report_text
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in report_text
     assert "DISPATCHABLE WORK" in report_text
     assert "NON-DISPATCHABLE WORK" in report_text
     assert "Both axes are required" in report_text
     assert "Do NOT create new bridge automations" in report_text
-    assert "scripts/cross_harness_bridge_trigger.py" in report_text
+    assert "scripts/dispatcher_runtime.py" in report_text
     assert "retired smart poller and OS poller remain archived" in report_text
     assert "Startup Disclosure" in report_text
     assert "Strategic self-improvement directive" in report_text
@@ -1674,10 +1674,10 @@ def test_dashboard_and_report_are_written_with_time_series_kpi(tmp_path) -> None
     assert "GTKB-GOV-006" not in report_text
     assert "GTKB-GOV-007" not in report_text
     top_action_ids = [item["id"] for item in dashboard_data["model"]["top_priority_actions"]]
-    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires
-    # approval_state='implementation_authorized' AND a non-terminal resolution
-    # status. The list can legitimately be empty when no authorized agent_red
-    # items exist in MemBase at test-run time; assert structure, not population.
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires non-terminal
+    # resolution status and must not use legacy approval metadata authority.
+    # The list can legitimately be empty at test-run time; assert structure,
+    # not population.
     assert isinstance(top_action_ids, list)
     assert "Startup Focus Input Gate" not in report_text
     assert "Skills, Plug-ins, Directives, And Hooks" not in report_text
@@ -2144,13 +2144,13 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         "Bridge: always available through TAFE/dispatcher state plus versioned bridge "
         "files and checked at session startup" in context
     )
-    assert "Bridge dispatch: cross-harness event-driven trigger registered as PostToolUse and Stop hooks" in context
+    assert "Bridge dispatch: dispatcher daemon registered as PostToolUse and Stop hooks" in context
     assert "Bridge operation instructions: Bridge automation has two complementary axes" in context
     assert "DISPATCHABLE WORK" in context
     assert "NON-DISPATCHABLE WORK" in context
     assert "Both axes are required" in context
     assert "Do NOT create new bridge automations" in context
-    assert "scripts/cross_harness_bridge_trigger.py" in context
+    assert "scripts/dispatcher_runtime.py" in context
     assert "retired smart poller and OS poller remain archived" in context
     assert "Role mapping source: harness-state/harness-registry.json" in context
     assert "Harness self-identification: B" in context
@@ -2179,6 +2179,20 @@ def test_claude_code_startup_discovers_durable_role_without_forced_profile(tmp_p
         guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
         assert guard_state["discard_next_user_prompt"] is True
         assert guard_state["suppress_next_wrapup"] is True
+
+
+def test_harness_parity_status_uses_resolved_non_codex_harness_scope() -> None:
+    module = _load_module()
+
+    status = module._harness_parity_status(REPO_ROOT, harness_name="cursor", role_profile="prime-builder")
+
+    assert status["harness_scope"] == "cursor"
+    assert status["scope_kind"] == "assigned_harness"
+    assert status["evidence_type"] == "phase-1 catalog parity"
+    assert "phase-2 readiness" in status["operational_readiness"]
+    assert "--harness cursor --role prime-builder" in status["verification_command"]
+    assert status["phase2_command"] == "python scripts/harness_parity_phase2.py --project-root . --format markdown"
+    assert status["discovery_diff_command"] == "python scripts/parity_discovery_diff.py --project-root . --markdown"
 
 
 def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monkeypatch) -> None:
@@ -2799,7 +2813,7 @@ def test_wi3332_t4_pending_decisions_block_renders_question_stop_safe() -> None:
 # Smart-poller orient section retirement (Slice 4, 2026-05-09)
 # The smart-poller mechanism was retired; _render_smart_poller_section
 # is now a stub returning []. Bridge dispatch is governed by the
-# cross-harness event-driven trigger.
+# dispatcher daemon.
 # =====================================================================
 
 
@@ -3091,14 +3105,13 @@ def _make_recommender_fixture(tmp_path, backlog_items: list[dict[str, str]], ind
 def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, monkeypatch) -> None:
     """T-recommender-1: items whose mapped bridge thread is VERIFIED are filtered."""
     module = _load_module()
-    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires implementation_authorized
-    # + open/in_progress/blocked resolution status.
+    # Per SPEC-ENVELOPE-DISCLOSURE-UI-001: top-3 requires
+    # open/in_progress/blocked resolution status.
     backlog_items = [
         {
             "id": "GTKB-SHIPPED-ITEM-001",
             "title": "Already shipped",
             "body": "Body of done item.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3106,7 +3119,6 @@ def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, mo
             "id": "GTKB-ACTIVE-ITEM-002",
             "title": "Still in flight",
             "body": "Body of active item.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3114,7 +3126,6 @@ def test_recommender_1_top_priority_excludes_verified_bridge_thread(tmp_path, mo
             "id": "GTKB-ACTIVE-ITEM-003",
             "title": "Also in flight",
             "body": "Body of third item.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3158,7 +3169,6 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
             "id": "GTKB-NO-BRIDGE-001",
             "title": "Item without a bridge thread",
             "body": "Body.",
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3173,26 +3183,24 @@ def test_recommender_3_unmapped_work_item_treated_as_active(tmp_path, monkeypatc
     metrics, top = module._backlog_metrics(root)
     assert "GTKB-NO-BRIDGE-001" in [item["id"] for item in top]
     assert metrics["filtered_verified_ids"] == []
-    assert metrics["active_item_count"] == 1
+    assert metrics["visible_non_terminal_item_count"] == 1
 
 
-def test_backlog_metrics_counts_only_implementation_active_items(tmp_path, monkeypatch) -> None:
+def test_backlog_metrics_counts_only_status_active_items(tmp_path, monkeypatch) -> None:
     module = _load_module()
     backlog_items = [
         {
             "id": "GTKB-FUTURE-001",
-            "title": "Future unapproved work",
+            "title": "Future open work",
             "body": "Body.",
-            "approval_state": "unapproved",
             "resolution_status": "open",
             "priority": "P1",
         },
         {
-            "id": "GTKB-AUTHORIZED-002",
-            "title": "Authorized work",
+            "id": "GTKB-ACTIVE-002",
+            "title": "Active work",
             "body": "Body.",
-            "approval_state": "implementation_authorized",
-            "resolution_status": "open",
+            "resolution_status": "in_progress",
             "priority": "P2",
         },
     ]
@@ -3207,7 +3215,7 @@ def test_backlog_metrics_counts_only_implementation_active_items(tmp_path, monke
     assert metrics["visible_non_terminal_item_count"] == 2
     assert metrics["active_item_count"] == 1
     assert metrics["non_implementation_future_item_count"] == 1
-    assert [item["id"] for item in top] == ["GTKB-AUTHORIZED-002"]
+    assert [item["id"] for item in top] == ["GTKB-FUTURE-001", "GTKB-ACTIVE-002"]
 
 
 def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, monkeypatch) -> None:
@@ -3220,7 +3228,6 @@ def test_recommender_4_residual_override_keeps_verified_item_active(tmp_path, mo
             "body": (
                 "**Status:** VERIFIED (residual: SonarCloud URL still unverified)\n\nBody explaining the residual work."
             ),
-            "approval_state": "implementation_authorized",
             "resolution_status": "open",
             "priority": "P1",
         },
@@ -3569,8 +3576,8 @@ def test_backlog_fetch_is_in_process_no_child_interpreter(monkeypatch) -> None:
                     "id": "WI-9001",
                     "title": "Synthetic item",
                     "description": "body text",
-                    "approval_state": "auq_resolved",
                     "resolution_status": "open",
+                    "stage": "backlogged",
                     "priority": "P1",
                 }
             ]
@@ -3601,14 +3608,14 @@ def test_backlog_fetch_is_in_process_no_child_interpreter(monkeypatch) -> None:
 
     items = module._backlog_items_from_membase(REPO_ROOT)
 
-    # Shape preserved (id/title/body/approval_state/resolution_status/priority).
+    # Shape preserved (id/title/body/resolution_status/stage/priority).
     assert items == [
         {
             "id": "WI-9001",
             "title": "Synthetic item",
             "body": "body text",
-            "approval_state": "auq_resolved",
             "resolution_status": "open",
+            "stage": "backlogged",
             "priority": "P1",
         }
     ]

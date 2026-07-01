@@ -1,0 +1,16 @@
+{
+  "action": "update",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "retire-backlog-approval-state-md",
+  "artifact_type": "narrative_artifact",
+  "change_reason": "Retire individual backlog approval-state metadata and transitions in favor of project-level authorization.",
+  "changed_by": "antigravity-C",
+  "explicit_change_request": "Retire backlog approval-state metadata in backlog-approval-state.md",
+  "full_content": "# Backlog Approval State Retirement Rule\n\n## Purpose\n\nMemBase work-item `approval_state` is historical compatibility metadata only.\nIt is not implementation authority, review authority, startup priority authority,\nor a text-edit bypass.\n\n## Canonical Authority\n\nImplementation authority is project-level:\n\n1. An active project authorization (`PAUTH-*`) defines the owner-approved scope.\n2. A live bridge `GO` approves the specific implementation proposal.\n3. A matching implementation-start authorization packet and work-intent claim\n   open the Prime Builder write path.\n\nIndividual work items do not have an approval state. A work item may be\ntracked, prioritized, reviewed, linked to a project, or included in a project\nauthorization without becoming an independent approval authority.\n\n## Legacy Data\n\nHistorical rows may still carry legacy `approval_state` values. Tools may read\nor preserve those values for backward compatibility and audit continuity, but\nmust not derive authorization, priority, or permission from them.\n\nDo not backfill, promote, or transition `approval_state` as a governance step.\nDo not introduce new directives, skills, helper behavior, tests, or startup\nsurfaces that treat a work-item approval state as live authority.\n\n## Enforcement\n\nAny live gate that accepts or rejects implementation based on `approval_state`\nis obsolete and must be replaced by the project-level authorization,\nbridge-`GO`, and implementation-start packet chain.\n",
+  "full_content_sha256": "01eed62a7b6d2faf7c9c5471858a64df22070f5b2c2e08854d8ea5bf6cfe9559",
+  "presented_to_user": true,
+  "source_ref": "gtkb-project-level-approval-state-retirement-005.md",
+  "target_path": ".claude/rules/backlog-approval-state.md",
+  "transcript_captured": true
+}
