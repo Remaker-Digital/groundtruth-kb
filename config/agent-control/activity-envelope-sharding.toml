@@ -50,6 +50,17 @@ allowed_payloads = [
     "activity_manipulates",
 ]
 requires_activity_profile = true
+deferred_surfaces = [
+    ".claude/rules/codex-standing-priorities.md",
+    ".claude/rules/codex-way-of-working.md",
+    ".claude/rules/codex-review-operating-contract.md",
+    ".claude/rules/codex-loyal-opposition-runbook.md",
+    ".claude/rules/codex-knowledge-base-index.md",
+    ".claude/rules/codex-review-checklists.md",
+    ".claude/rules/groundtruth-kb-vision.md",
+    ".claude/rules/template-code-review.md",
+    ".claude/rules/template-decision-memo.md",
+]
 
 [classes.explicit_query]
 load_policy = "on_demand_query"
@@ -81,3 +92,31 @@ global_surface_warning_tokens = 60000
 global_surface_failure_tokens = 120000
 activity_auto_warning_tokens = 1200
 activity_auto_failure_tokens = 2400
+
+[migration.wi4949]
+work_item = "WI-4949"
+authority = "bridge/gtkb-envelope-sharding-initial-shard-migration-002.md"
+classification_rubric = """
+Global baseline (session start): role record, role overlay, core terminology primer,
+file-bridge protocol, SESSION-STARTUP-INDEX, MEMORY.md, and harness registry projection.
+Activity-only (after ::open <activity>): skills, terminology, direction, LO review
+runbooks, standing priorities, and activity disposition profile payloads.
+Explicit query (on demand): deliberation search, bridge thread chains, backlog/project
+search, codex-knowledge-base-index navigation.
+Never startup: raw archival JSON, full transcripts, aggregate queue artifacts.
+"""
+readiness_check = "Both Prime Builder and Loyal Opposition build_startup_model(fast_hook=True) succeed; core glossary scope is core_startup; deferred_surfaces do not intersect global_baseline.allowed_surfaces."
+
+[migration.wi4949.activity_map]
+build = [
+    ".claude/rules/codex-review-operating-contract.md",
+    ".claude/rules/codex-loyal-opposition-runbook.md",
+]
+test = [
+    ".claude/rules/codex-review-operating-contract.md",
+    ".claude/rules/codex-loyal-opposition-runbook.md",
+    ".claude/rules/codex-review-checklists.md",
+    ".claude/rules/template-code-review.md",
+]
+project = [".claude/rules/codex-standing-priorities.md", ".claude/rules/groundtruth-kb-vision.md"]
+deliberation = [".claude/rules/codex-way-of-working.md"]
