@@ -46,14 +46,12 @@ DEFAULT_STARTUP_GRACE_SECONDS = 120
 # primary timeout did not fire). Keep this >= the WI-4806 value + margin.
 DEFAULT_MAX_LIFETIME_SECONDS = 900
 
-# Default lease directories scanned by ``main`` / ``read_leases``. The trigger
-# runs with ``--state-dir .gtkb-state/bridge-poller`` so leases live under
-# ``.gtkb-state/bridge-poller/leases``; the cross-harness-trigger state dir is
-# scanned too for robustness. Overridable via ``--lease-dir`` (repeatable).
-DEFAULT_LEASE_DIRS = (
-    ".gtkb-state/bridge-poller/leases",
-    ".gtkb-state/cross-harness-trigger/leases",
-)
+# Default lease directories scanned by ``main`` / ``read_leases``. The
+# dispatcher runtime runs with ``--state-dir .gtkb-state/bridge-poller`` so
+# leases live under ``.gtkb-state/bridge-poller/leases``. Retired dispatch
+# substrate state directories are intentionally not scanned as live evidence.
+# Overridable via ``--lease-dir`` (repeatable).
+DEFAULT_LEASE_DIRS = (".gtkb-state/bridge-poller/leases",)
 
 
 @dataclass(frozen=True)

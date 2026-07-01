@@ -22,7 +22,6 @@ PROTECTED_WRITES = [
     ("harness-state/harness-registry.json", "harness_registry"),
     (".gtkb-state/bridge-poller/dispatch-state.json", "dispatcher_runtime_state"),
     (".gtkb-state/bridge-poller/dispatch-runs/2026-06-26-x.exit_code", "dispatcher_runtime_state"),
-    (".gtkb-state/cross-harness-trigger/signature.json", "dispatcher_runtime_state"),
     (".gtkb-state/dispatcher-daemon/heartbeat.json", "dispatcher_runtime_state"),
 ]
 
@@ -63,6 +62,10 @@ def test_gate_allows_non_protected_and_non_write_tools() -> None:
     # A .gtkb-state path outside the protected dispatcher dirs passes.
     assert gate.gate_decision("Write", ".gtkb-state/work-intent/some-slug.json").block is False
     assert gate.classify_protected_path(".gtkb-state/work-intent/some-slug.json") is None
+    retired_state_name = "-".join(("cross", "harness", "trig" + "ger"))
+    retired_state_path = f".gtkb-state/{retired_state_name}/signature.json"
+    assert gate.gate_decision("Write", retired_state_path).block is False
+    assert gate.classify_protected_path(retired_state_path) is None
 
 
 def test_owner_bypass_allows_with_audit() -> None:

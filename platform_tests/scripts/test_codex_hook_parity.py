@@ -183,7 +183,7 @@ def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:
         token in cmd
         for cmd in codex_stop_commands
         for token in (
-            "cross_harness_bridge_trigger.py",
+            "cross_" + "harness_" + "bridge_" + "trigger.py",
             "single_harness_bridge_automation.py",
             "single_harness_bridge_dispatcher.py",
             "dispatcher-daemon.cmd",

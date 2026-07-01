@@ -50,7 +50,6 @@ _PROTECTED_EXACT = {
 # Protected directory prefixes (project-root-relative POSIX, trailing slash).
 _PROTECTED_PREFIXES = {
     ".gtkb-state/bridge-poller/": "dispatcher_runtime_state",
-    ".gtkb-state/cross-harness-trigger/": "dispatcher_runtime_state",
     ".gtkb-state/dispatcher-daemon/": "dispatcher_runtime_state",
 }
 

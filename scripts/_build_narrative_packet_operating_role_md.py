@@ -98,7 +98,7 @@ a JSON list on the harness record. The role-set schema is the
   `_role_set_to_json`, `is_prime_builder`, `is_loyal_opposition`.
 - **Readers** in `scripts/harness_roles.py`, `scripts/_kb_attribution.py`,
   `scripts/workstream_focus.py`, `scripts/session_self_initialization.py`,
-  and `scripts/cross_harness_bridge_trigger.py` use set-membership semantics
+  and `scripts/gtkb_dispatcher_daemon.py` use set-membership semantics
   (`role in role_set`), not scalar equality.
 - **Writers** always emit the wire list form.
 

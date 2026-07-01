@@ -1,7 +1,7 @@
 # DEPRECATED — Smart Poller Retired (Slice 4, 2026-05-09)
 
 > ⚠️ **DEPRECATED** — The smart-poller mechanism this template documented
-> was retired on 2026-05-09 in favor of the cross-harness event-driven
+> was retired on 2026-05-09 in favor of the dispatcher-daemon
 > trigger. Do **NOT** follow this template for new installations.
 >
 > The smart-poller runtime (`scripts/run_smart_bridge_poller.vbs`,
@@ -13,16 +13,9 @@
 
 ## Replacement Mechanism
 
-The active bridge dispatch automation is the **cross-harness
-event-driven trigger** at
-`scripts/cross_harness_bridge_trigger.py`. It is registered in:
-
-- `.claude/settings.json` — `PostToolUse` and `Stop` hook arrays
-- `.codex/hooks.json` — Codex-side parity (forward-compatible per
-  `ADR-CODEX-HOOK-PARITY-FALLBACK-001`)
-
-When canonical bridge state changes, or the agent ends a turn, the trigger
-inspects dispatcher/TAFE state
+The active bridge dispatch automation is the **dispatcher daemon** at
+`scripts/gtkb_dispatcher_daemon.py`, kept alive by the headless dispatcher
+supervisor path. On each daemon cycle it inspects dispatcher/TAFE state
 and dispatches the appropriate counterpart harness if a recipient's actionable
 queue signature has changed.
 
@@ -34,7 +27,7 @@ queue signature has changed.
   `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`.
 - Tutorial: `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (cross-harness
   event-driven trigger setup is documented here per Slice 4 D5d).
-- Doctor check: `_check_cross_harness_trigger` in
+- Doctor check: `_check_dispatcher_daemon_substrate_readiness` in
   `groundtruth-kb/src/groundtruth_kb/project/doctor.py`.
 
 This file remains as a deprecated stub for two release cycles to give

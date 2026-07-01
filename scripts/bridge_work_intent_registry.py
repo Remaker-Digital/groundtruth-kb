@@ -441,7 +441,7 @@ def _claim_values(
 def _dispatch_harness_id(session_id: str) -> str | None:
     """Return the harness id encoded in a dispatch-format session id, else ``None``.
 
-    Parses the cross-harness-trigger dispatch id
+    Parses the dispatcher-daemon dispatch id
     ``<compact-ISO8601>-<role>-<harness_id>-<6hex>``. The role token is matched
     only to anchor the harness-id capture; it is never used for authorization.
     A raw-UUID / interactive (non-dispatch) id returns ``None``.

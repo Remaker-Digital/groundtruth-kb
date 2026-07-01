@@ -1,7 +1,7 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Rename-retry semantics for dispatcher daemon state writes.
 
-Authority: bridge `gtkb-cross-harness-trigger-windows-rename-race-001` GO at
+Authority: prior Windows rename-race bridge GO at
 `-004` (REVISED-1). IP-1 of the proposal: per-invocation temp paths +
 `PermissionError`-only retry with `total_attempts=5` semantics.
 

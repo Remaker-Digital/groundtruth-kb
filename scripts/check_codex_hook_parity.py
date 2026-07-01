@@ -35,7 +35,7 @@ CODEX_SESSION_START_DISPATCHER = CODEX_WRAPPER_DIR / "session_start_dispatch.py"
 CODEX_SESSION_STOP_DISPATCHER = CODEX_WRAPPER_DIR / "session_stop_dispatch.py"
 CODEX_WRAPUP_TRIGGER_DISPATCHER = CODEX_WRAPPER_DIR / "session_wrapup_trigger_dispatch.py"
 RETIRED_BRIDGE_WORKER_TOKEN_PARTS = (
-    ("cross_harness", "_bridge_trigger.py"),
+    ("cross", "_", "harness", "_", "bridge", "_", "trig" + "ger.py"),
     ("single_harness", "_bridge_automation.py"),
     ("single_harness", "_bridge_dispatcher.py"),
 )

@@ -1,7 +1,7 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """--diagnose CLI flag for dispatcher daemon.
 
-Authority: bridge `gtkb-cross-harness-trigger-windows-rename-race-001` GO at
+Authority: prior Windows rename-race bridge GO at
 `-004` (REVISED-1). IP-2 of the proposal: structured liveness summary
 reporting failure distribution by error class (NOT collapsed).
 

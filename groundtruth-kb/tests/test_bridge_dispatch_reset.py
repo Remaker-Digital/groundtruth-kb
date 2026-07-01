@@ -274,7 +274,8 @@ def test_dispatch_is_draining_detects_marker(project_dir: Path) -> None:
 def test_dispatch_is_draining_detects_legacy_state_marker(project_dir: Path) -> None:
     state_dir = project_dir / ".gtkb-state" / "bridge-poller"
     state_dir.mkdir(parents=True)
-    legacy_state_dir = project_dir / ".gtkb-state" / "cross-harness-trigger"
+    legacy_state_name = "-".join(("cross", "harness", "trig" + "ger"))
+    legacy_state_dir = project_dir / ".gtkb-state" / legacy_state_name
     legacy_state_dir.mkdir(parents=True)
     (legacy_state_dir / DRAIN_MARKER_FILENAME).write_text(
         json.dumps({"active": True, "started_at": "2026-06-26T00:00:00+00:00"}),

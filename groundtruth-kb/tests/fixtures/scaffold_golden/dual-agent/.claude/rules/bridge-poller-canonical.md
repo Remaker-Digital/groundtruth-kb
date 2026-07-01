@@ -2,13 +2,13 @@
 
 > ⚠️ **DEPRECATED** — This template documented the canonical smart-poller
 > behavior contract. The smart-poller mechanism was retired on 2026-05-09
-> in favor of the **cross-harness event-driven trigger**. Do **NOT** scaffold
+> in favor of the **dispatcher daemon**. Do **NOT** scaffold
 > projects from this template.
 
 ## Replacement Authority
 
 The canonical bridge dispatch automation is now the **cross-harness
-event-driven trigger** at `scripts/cross_harness_bridge_trigger.py`,
+event-driven trigger** at `scripts/gtkb_dispatcher_daemon.py`,
 registered in:
 
 - `.claude/settings.json` — `PostToolUse` and `Stop` hook arrays.
@@ -30,7 +30,7 @@ The replacement contract is described in:
   `scripts/uninstall_smart_poller_task.ps1` (archived).
 - `groundtruth-kb/scripts/bridge_poller_runner.py` (archived).
 - The doctor's `_check_smart_bridge_poller` end-to-end activation check (replaced
-  by `_check_cross_harness_trigger`).
+  by `_check_dispatcher_daemon_substrate_readiness`).
 
 All archived files live under `archive/smart-poller-2026-05-09/`.
 

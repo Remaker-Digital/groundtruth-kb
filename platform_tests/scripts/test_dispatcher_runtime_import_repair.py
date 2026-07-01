@@ -1,7 +1,7 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """WI-3360 regression: dispatcher daemon ``groundtruth_kb`` import bootstrap.
 
-Per ``bridge/gtkb-cross-harness-trigger-import-repair-003.md`` (Codex GO at
+Per the prior dispatcher import-repair bridge (Codex GO at
 ``-004``), IP-3.
 
 Defect: the PostToolUse/Stop hook registrations invoke

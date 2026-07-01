@@ -106,7 +106,7 @@ review or audit explicitly needs archival detail.
    - **Loyal Opposition** acts on `NEW` and `REVISED` (proposals/reports awaiting verdict).
    - **Prime Builder** acts only on `NO-GO` (revise) and `GO` (implement). `VERIFIED` is terminal closure for both roles, not queue work.
 3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version. The `Show-thread` helper below mechanizes that load.
-4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/cross-harness-trigger/`) to deduplicate against already-dispatched signatures.
+4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/dispatcher-daemon/`) to deduplicate against already-dispatched signatures.
 
 ### Revise
 

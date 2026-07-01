@@ -1,5 +1,5 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for per-document leasing in cross-harness bridge trigger.
+"""Tests for per-document leasing in dispatcher runtime.
 
 Verifies SPEC-INTAKE-57a736 Clauses 1, 2, 3, and 4.
 """
@@ -25,7 +25,7 @@ from bridge_lease_registry import (  # noqa: E402
     is_lease_held,
     release_lease,
 )
-from test_cross_harness_bridge_trigger import (  # noqa: E402
+from test_dispatcher_runtime import (  # noqa: E402
     _CLAUDE_INVOCATION_SURFACES,
     _load_trigger,
     _make_synthetic_project,
@@ -61,7 +61,7 @@ def test_active_lease_on_x_does_not_suppress_y(tmp_path: Path) -> None:
 
     # 3. Run trigger - should dispatch only Y
     trigger = _load_trigger()
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
 
     # Since example-y is unleased, it must be dispatched (which in dry_run returns "dry_run" reason)
     results = summary["results"]
@@ -168,5 +168,5 @@ def test_dispatch_uses_lease_not_harness_lock(tmp_path: Path) -> None:
     assert trigger.check_target_active(lo_target, state_dir) is True
 
     # 3. Run trigger - should dispatch normally since no lease file exists for example-x
-    summary = trigger.run_trigger(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
     assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"

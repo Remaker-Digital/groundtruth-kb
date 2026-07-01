@@ -1,6 +1,6 @@
 # GT-KB Development Environment Inventory
 
-Generated: 2026-06-30T20:37:06Z
+Generated: 2026-07-01T18:08:19Z
 Collector: gtkb-dev-environment-inventory-v1 (sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0)
 
 ## Project
@@ -13,7 +13,7 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:8212ae6b1de0eca07cb3f425165
 ## Redaction
 
 - Status: pass
-- Sensitive local environment entries detected: 6
+- Sensitive local environment entries detected: 2
 - Public output excludes raw credential values, local-only key names, and absolute local paths.
 
 ## Toolchain
@@ -26,9 +26,9 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:8212ae6b1de0eca07cb3f425165
 | `npm` | verified | `11.6.2` | `npm --version` |
 | `pip` | verified | `25.2` | `python -m pip --version` |
 | `playwright` | unsupported | `unknown` | `playwright --version` |
-| `pytest` | verified | `9.0.3` | `python -m pytest --version` |
+| `pytest` | verified | `9.1.1` | `python -m pytest --version` |
 | `python` | verified | `3.14.0` | `python --version` |
-| `ruff` | verified | `0.15.12` | `python -m ruff --version` |
+| `ruff` | verified | `0.15.20` | `python -m ruff --version` |
 
 ## Harness And Repo Surfaces
 
@@ -44,10 +44,10 @@ Collector: gtkb-dev-environment-inventory-v1 (sha256:8212ae6b1de0eca07cb3f425165
 
 | Harness | Role | Assignment Status | Configured/Verified Capabilities |
 |---|---|---|---:|
-| claude | prime-builder | configured | 14 |
-| codex | prime-builder | configured | 16 |
-| claude | loyal-opposition | configured | 14 |
-| codex | loyal-opposition | configured | 16 |
+| claude | prime-builder | configured | 13 |
+| codex | prime-builder | configured | 15 |
+| claude | loyal-opposition | configured | 13 |
+| codex | loyal-opposition | configured | 15 |
 
 ## Verification
 

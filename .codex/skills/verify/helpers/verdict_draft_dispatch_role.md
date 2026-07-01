@@ -63,16 +63,16 @@ Commit `7649578ac` (`refactor: share dispatch role-state constants`) touches 4 f
 
 1. **`groundtruth-kb/src/groundtruth_kb/bridge/role_state.py`** (new, +10 lines): Defines `ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")` and `BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime-builder", "codex": "loyal-opposition"}`.
 
-2. **`scripts/cross_harness_bridge_trigger.py`** (+3/-1): Replaced the standalone `ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")` literal with `from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS`.
+2. **`scripts/gtkb_dispatcher_daemon.py`** (+3/-1): Replaced the standalone `ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")` literal with `from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS`.
 
 3. **`groundtruth-kb/src/groundtruth_kb/project/doctor.py`** (+8/-3): Imports `BRIDGE_AGENT_TO_RECIPIENT` and `ROLE_STATE_KEYS` from the shared module. Replaces the standalone `_BRIDGE_AGENT_TO_RECIPIENT` dict literal and both `frozenset({"prime-builder", "loyal-opposition"})` instances with `frozenset(ROLE_STATE_KEYS)` and `frozenset((*ROLE_STATE_KEYS, "acting-prime-builder"))`.
 
-4. **`groundtruth-kb/tests/test_doctor_bridge_dispatch_liveness.py`** (+2 new assertions + new test): The existing `test_run_doctor_recipient_keys_match_cross_harness_trigger_canonical_labels` now also asserts that `cross_harness_bridge_trigger.ROLE_STATE_KEYS is role_state.ROLE_STATE_KEYS` and `doctor._BRIDGE_AGENT_TO_RECIPIENT is role_state.BRIDGE_AGENT_TO_RECIPIENT` — proving shared object identity, not just value equality. The new `test_no_duplicate_role_state_literals_in_dispatch_sources` asserts the old duplicate literal strings are absent from both the trigger and doctor source.
+4. **`groundtruth-kb/tests/test_doctor_bridge_dispatch_liveness.py`** (+2 new assertions + new test): The existing `test_run_doctor_recipient_keys_match_dispatcher_daemon_canonical_labels` now also asserts that `dispatcher_runtime.ROLE_STATE_KEYS is role_state.ROLE_STATE_KEYS` and `doctor._BRIDGE_AGENT_TO_RECIPIENT is role_state.BRIDGE_AGENT_TO_RECIPIENT` — proving shared object identity, not just value equality. The new `test_no_duplicate_role_state_literals_in_dispatch_sources` asserts the old duplicate literal strings are absent from both the trigger and doctor source.
 
 ### Test Results
 
 Both targeted tests pass:
-- `test_run_doctor_recipient_keys_match_cross_harness_trigger_canonical_labels` — PASS
+- `test_run_doctor_recipient_keys_match_dispatcher_daemon_canonical_labels` — PASS
 - `test_no_duplicate_role_state_literals_in_dispatch_sources` — PASS
 
 ### Verified Paths
@@ -80,7 +80,7 @@ Both targeted tests pass:
 - `groundtruth-kb/src/groundtruth_kb/bridge/role_state.py`
 - `groundtruth-kb/src/groundtruth_kb/project/doctor.py`
 - `groundtruth-kb/tests/test_doctor_bridge_dispatch_liveness.py`
-- `scripts/cross_harness_bridge_trigger.py`
+- `scripts/gtkb_dispatcher_daemon.py`
 
 ## Positive Confirmations
 

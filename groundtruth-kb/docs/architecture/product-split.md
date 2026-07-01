@@ -55,13 +55,12 @@ Dual-agent projects use a project-owned file bridge:
   verdicts.
 - Prime Builder writes `NEW` and `REVISED`.
 - Loyal Opposition writes `GO`, `NO-GO`, and terminal `VERIFIED`.
-- The cross-harness event-driven trigger
-  (`scripts/cross_harness_bridge_trigger.py`) registered as `PostToolUse` and
-  `Stop` hooks in `.claude/settings.json` and `.codex/hooks.json` dispatches
-  the appropriate counterpart harness when a recipient's actionable queue
-  signature changes. The retired smart-poller and OS-poller implementations
-  are archived under `archive/smart-poller-2026-05-09/`.
-- `BRIDGE-INVENTORY.md` captures hook registrations, the trigger script,
+- The dispatcher daemon
+  (`scripts/gtkb_dispatcher_daemon.py`) runs through the headless dispatcher
+  supervisor path and dispatches the appropriate counterpart harness when a
+  recipient's actionable queue signature changes. The retired smart-poller and
+  OS-poller implementations are archived under `archive/smart-poller-2026-05-09/`.
+- `BRIDGE-INVENTORY.md` captures daemon configuration, the daemon script,
   dispatch-state path, CLI commands, plugins, MCP servers, skills, logs,
   locks, and the manual bridge-scan fallback procedure.
 - `bridge-os-poller-setup-prompt.md` is retained as a DEPRECATED
@@ -106,7 +105,7 @@ The patterns packaged by `groundtruth-kb` were developed and validated in a
 production commercial SaaS project. The current reusable dual-agent pattern is:
 
 - File bridge queue and status protocol
-- Cross-harness event-driven bridge dispatch (PostToolUse + Stop hooks)
+- Cross-harness event-driven bridge dispatch (dispatcher daemon)
 - Prompt and agent-configuration capture
 - Session hook and rule file conventions
 - Operational expectations for evidence, auditability, and owner burden

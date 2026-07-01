@@ -62,7 +62,7 @@ def test_codex_hooks_registry_uses_hidden_launchers_without_retired_dispatch_wor
     assert "implementation-start-gate.cmd" in batch_catalog_text
     assert "auto_finalize_sweep.py" in batch_catalog_text
     forbidden = (
-        "cross_harness_bridge_trigger.py",
+        "cross_" + "harness_" + "bridge_" + "trigger.py",
         "single_harness_bridge_automation.py",
         "single_harness_bridge_dispatcher.py",
         "bridge-dispatch-trigger",

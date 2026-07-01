@@ -827,7 +827,7 @@ def test_worker_stop_writes_owner_decision_artifact_instead_of_blocking(tmp_path
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert result.stdout == "", "worker Stop hook must not emit an interactive block"
     artifact_path = (
-        project / ".gtkb-state" / "cross-harness-trigger" / "dispatch-runs" / f"{run_id}.owner-decision-requested.json"
+        project / ".gtkb-state" / "bridge-poller" / "dispatch-runs" / f"{run_id}.owner-decision-requested.json"
     )
     assert artifact_path.is_file()
     payload = json.loads(artifact_path.read_text(encoding="utf-8"))

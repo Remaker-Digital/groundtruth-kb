@@ -1,7 +1,7 @@
 # Dual-Agent Setup
 
 Configure a Prime Builder and a Loyal Opposition agent with a shared file
-bridge, activate the cross-harness event-driven trigger, and walk through a
+bridge, activate the dispatcher daemon, and walk through a
 complete proposal -> review -> VERIFIED cycle.
 
 ## Prerequisites
@@ -25,10 +25,10 @@ The `dual-agent` profile generates:
 - `BRIDGE-INVENTORY.md` - bridge runtime inventory
 - Status-bearing bridge files under `bridge/` plus TAFE/dispatcher bridge state
 - `.claude/hooks/`, `.claude/rules/`, `.claude/settings.json` - automation
-  hooks, rules, and the cross-harness-trigger registration
+  hooks, rules, and the dispatcher-daemon registration
 - `.codex/hooks.json` - Codex-side hook registration for cross-harness
   parity
-- `scripts/cross_harness_bridge_trigger.py` - the event-driven dispatch
+- `scripts/gtkb_dispatcher_daemon.py` - the event-driven dispatch
   entrypoint
 - `independent-progress-assessments/` - Codex report storage
 
@@ -41,21 +41,21 @@ references; do not follow its instructions.
 In current GT-KB hosts after the 2026-06-15 TAFE/dispatcher cutover,
 TAFE-backed bridge state is authoritative; the legacy bridge index aggregate
 was retired 2026-06-15. Bridge dispatch is
-automated by the **cross-harness event-driven trigger**, which fires on
+automated by the **dispatcher daemon**, which fires on
 tool-use and Stop events rather than on a fixed interval. The
 retired smart-poller and OS-scheduled-task implementations are no longer
 used; see `groundtruth-kb/docs/tutorials/bridge-smart-poller.md` and
 `bridge-os-scheduler.md` (both DEPRECATED stubs) for retirement context.
 
-The trigger entrypoint, hook registrations, and dispatch-state path are
+The daemon entrypoint, daemon configuration, and dispatch-state path are
 scaffolded automatically. The relevant artifacts are:
 
-- `scripts/cross_harness_bridge_trigger.py` - the trigger script that
+- `scripts/gtkb_dispatcher_daemon.py` - the daemon script that
   inspects bridge state and dispatches the appropriate counterpart harness when
   a recipient's actionable queue signature has changed.
-- `.claude/settings.json` - registers the trigger as a `PostToolUse` and
+- `.claude/settings.json` - registers the daemon as a `PostToolUse` and
   `Stop` hook on the Claude Code side.
-- `.codex/hooks.json` - registers the trigger as a `PostToolUse` and `Stop`
+- `.codex/hooks.json` - registers the daemon as a `PostToolUse` and `Stop`
   hook on the Codex side (forward-compatible per
   `ADR-CODEX-HOOK-PARITY-FALLBACK-001`).
 - `.gtkb-state/bridge-poller/dispatch-state.json` - per-recipient
@@ -81,8 +81,8 @@ gt project doctor
 
 The doctor reports:
 
-- `_check_cross_harness_trigger` - PASS/WARN/FAIL for trigger script
-  presence, both hook registrations, and dispatch-state freshness.
+- `_check_dispatcher_daemon` - PASS/WARN/FAIL for daemon script
+  presence, both daemon configuration, and dispatch-state freshness.
 - `_check_bridge_dispatch_liveness` - per-recipient dispatch-state liveness
   for `claude` and `codex`.
 
@@ -122,7 +122,7 @@ File: bridge/my-feature-001.md
 
 ### Loyal Opposition reviews
 
-The cross-harness event-driven trigger fires when bridge state updates,
+The dispatcher daemon fires when bridge state updates,
 dispatching Codex with the actionable signature. Codex picks up
 the NEW entry and writes a review at `bridge/my-feature-002.md` with a GO
 or NO-GO verdict. The latest status becomes:
@@ -171,7 +171,7 @@ re-auth steps.
 - [Method: Dual-Agent](../method/06-dual-agent.md) - deeper explanation of the
   Prime Builder / Loyal Opposition model
 - [Reference: CLI](../reference/cli.md) - full `gt project init` options
-- Slice 3 closure (cross-harness-trigger hook registrations):
+- Slice 3 closure (dispatcher-daemon daemon configuration):
   `bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`
 - Slice 4 retirement (smart-poller retirement context):
   `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`

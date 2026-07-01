@@ -12,10 +12,9 @@ coverage.
 
 Slice 4 (2026-05-09): the function under test was renamed from
 ``_check_bridge_poller`` to ``_check_bridge_dispatch_liveness`` after the
-smart-poller mechanism was retired in favor of the cross-harness
-event-driven trigger. The check is mechanism-agnostic — it surfaces
-dispatch freshness regardless of which mechanism updates the state file.
-The check name is now ``Claude bridge dispatch`` / ``Codex bridge dispatch``.
+smart-poller mechanism was retired. The check is mechanism-agnostic: it surfaces
+dispatch freshness from the live dispatcher state file. The check name is now
+``Claude bridge dispatch`` / ``Codex bridge dispatch``.
 """
 
 from __future__ import annotations
@@ -305,36 +304,25 @@ class TestCheckBridgeDispatchHelperEdgeCases:
         assert "unparseable" in result.message
 
 
-def test_run_doctor_recipient_keys_match_cross_harness_trigger_canonical_labels() -> None:
-    """TP8: ensure doctor mapping targets the cross-harness trigger's ROLE_STATE_KEYS."""
-    import sys
-    from pathlib import Path
-
-    repo_root = Path(__file__).resolve().parents[2]
-    scripts_dir = repo_root / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-
-    import cross_harness_bridge_trigger
-
+def test_run_doctor_recipient_keys_match_role_state_canonical_labels() -> None:
+    """TP8: ensure doctor mapping targets the canonical role-state labels."""
     from groundtruth_kb.bridge import role_state
     from groundtruth_kb.project.doctor import _BRIDGE_AGENT_TO_RECIPIENT
 
-    trigger_keys = set(cross_harness_bridge_trigger.ROLE_STATE_KEYS)
+    canonical_keys = set(role_state.ROLE_STATE_KEYS)
     doctor_keys = set(_BRIDGE_AGENT_TO_RECIPIENT.values())
 
-    assert doctor_keys == trigger_keys, f"Doctor keys {doctor_keys} do not match trigger keys {trigger_keys}"
+    assert doctor_keys == canonical_keys, f"Doctor keys {doctor_keys} do not match role keys {canonical_keys}"
     assert "prime" not in doctor_keys
     assert "codex" not in doctor_keys
-    assert cross_harness_bridge_trigger.ROLE_STATE_KEYS is role_state.ROLE_STATE_KEYS
     assert _BRIDGE_AGENT_TO_RECIPIENT is role_state.BRIDGE_AGENT_TO_RECIPIENT
 
 
 def test_no_duplicate_role_state_literals_in_dispatch_sources() -> None:
     """Role-state ownership stays in ``groundtruth_kb.bridge.role_state``."""
     repo_root = Path(__file__).resolve().parents[2]
-    trigger_source = (repo_root / "scripts" / "cross_harness_bridge_trigger.py").read_text(encoding="utf-8")
+    runtime_source = (repo_root / "scripts" / "dispatcher_runtime.py").read_text(encoding="utf-8")
     doctor_source = (repo_root / "groundtruth-kb/src/groundtruth_kb/project/doctor.py").read_text(encoding="utf-8")
 
-    assert 'ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")' not in trigger_source
+    assert 'ROLE_STATE_KEYS = ("prime-builder", "loyal-opposition")' not in runtime_source
     assert '_BRIDGE_AGENT_TO_RECIPIENT = {"claude": "prime-builder", "codex": "loyal-opposition"}' not in doctor_source

@@ -881,14 +881,14 @@ configuration/status/health CLI (see entry below).
 
 **Definition:** The current canonical bridge-dispatch automation, replacing
 the retired smart poller. Implemented as
-`scripts/gtkb_dispatcher_daemon.py` and registered as PostToolUse +
-Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The daemon
-fires on tool-use and Stop events and inspects dispatcher/TAFE bridge state to
-dispatch the appropriate counterpart harness when actionable work changes.
+`scripts/gtkb_dispatcher_daemon.py` and kept alive by the headless dispatcher
+supervisor path. The daemon inspects dispatcher/TAFE bridge state on bounded
+cycles and dispatches the appropriate counterpart harness when actionable work
+changes.
 Aggregate queue artifacts must not be cited as canonical dispatcher topology,
 dispatch health, target-selection, or bridge-state authority.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#cross-harness-event-driven-trigger).*
+*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#dispatcher-daemon).*
 
 ### role set
 
@@ -973,7 +973,7 @@ without writing `.claude/session/active-session-role.json`.
 
 **Definition:** The GT-KB diagnostic surface (typically invoked as
 `gt platform doctor` or equivalent) that runs structured health checks
-against platform infrastructure: cross-harness-trigger health, bridge state,
+against platform infrastructure: dispatcher-daemon health, bridge state,
 scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.

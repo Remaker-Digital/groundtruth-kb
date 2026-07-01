@@ -183,7 +183,7 @@ def test_activation_uninstalls_when_topology_is_not_single_harness(
     assert payload["single_harness_applicable"] is False
     # FAB-01: the "multi" fixture has codex A + claude B both active and
     # event-capable, so the gated wake is NOT applicable and the task is
-    # deactivated (the cross-harness trigger is the sole substrate here).
+    # deactivated (the dispatcher daemon is the sole substrate here).
     assert payload["gated_wake_applicable"] is False
     assert payload["activated"] is False
     assert payload["action"] == "deactivated_no_wake_needed"

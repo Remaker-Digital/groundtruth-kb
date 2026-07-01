@@ -745,12 +745,10 @@ retirement decision); bridge thread
 
 **Definition:** The current canonical bridge-dispatch automation, replacing
 the retired smart poller. Implemented as
-`scripts/gtkb_dispatcher_daemon.py` and registered as PostToolUse +
-Stop hooks in `.claude/settings.json` and `.codex/hooks.json`. The daemon
-fires on tool-use and Stop events: when bridge state is updated by
-a tool call or the agent ends a turn, the daemon inspects TAFE/dispatcher
-state and dispatches the appropriate counterpart harness if a recipient's
-actionable queue signature has changed. The daemon reuses the smart
+`scripts/gtkb_dispatcher_daemon.py` and kept alive by the headless dispatcher
+supervisor path. The daemon inspects TAFE/dispatcher state on bounded cycles
+and dispatches the appropriate counterpart harness if a recipient's actionable
+queue signature has changed. The daemon reuses the smart
 poller's actionable-signature scheme byte-identically per
 `platform_tests/scripts/test_gtkb_dispatcher_daemon.py` so the audit-trail
 invariants are preserved.
@@ -908,7 +906,7 @@ explicit owner approval and the cost/benefit analysis required by
 
 **Definition:** The GT-KB diagnostic surface (typically invoked as
 `gt platform doctor` or equivalent) that runs structured health checks
-against platform infrastructure: cross-harness-trigger health, bridge state,
+against platform infrastructure: dispatcher-daemon health, bridge state,
 scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.

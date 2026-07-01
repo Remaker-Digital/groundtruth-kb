@@ -11,10 +11,10 @@
 The OS-poller stack (Windows scheduled tasks `AgentRedFileBridgeIndexScan-*`,
 `AgentRedPollerLivenessWatcher`, the foreground watchdog, and the liveness
 watchers) polled blindly on a fixed interval regardless of bridge activity and
-was halted by owner directive on 2026-04-25. Bridge dispatch is now event-driven
-via the cross-harness event-driven trigger
-(`scripts/cross_harness_bridge_trigger.py`, registered as PostToolUse + Stop
-hooks); manual dispatcher/TAFE bridge-state scans remain the fallback. See
+was halted by owner directive on 2026-04-25. Bridge dispatch is now daemon-driven
+via the dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`) on the headless
+dispatcher supervisor path; manual dispatcher/TAFE bridge-state scans remain
+the fallback. See
 [`bridge-essential.md`](bridge-essential.md) for the canonical operating mode and
 the two-axis bridge-automation model.
 

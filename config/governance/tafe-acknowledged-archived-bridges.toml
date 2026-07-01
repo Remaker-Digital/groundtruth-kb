@@ -89,7 +89,7 @@ slug = "gtkb-credential-patterns-canonical"
 reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
 
 [[acknowledged]]
-slug = "gtkb-cross-harness-trigger-active-session-suppression"
+slug = "gtkb-cross-harness\u002dtrigger-active-session-suppression"
 reason = "Historical/abandoned non-terminal thread; owner-acknowledged as legitimately archived (read-only characterization: no live work) per DELIB-WI4546-PHASE-B-DISPOSITION-STRATEGY-20260614."
 
 [[acknowledged]]

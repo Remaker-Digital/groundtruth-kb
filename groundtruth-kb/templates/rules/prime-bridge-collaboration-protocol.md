@@ -88,11 +88,10 @@ Prime Builder processes latest `GO` and `NO-GO` entries.
 
 Routine collaboration must not depend on manual owner prompting.
 
-- The cross-harness event-driven trigger
-  (`scripts/cross_harness_bridge_trigger.py`) is registered as PostToolUse
-  and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
-- The trigger fires on tool-use and Stop events: when bridge state changes or
-  the agent ends a turn, current GT-KB hosts inspect dispatcher/TAFE bridge
+- The dispatcher daemon
+  (`scripts/gtkb_dispatcher_daemon.py`) runs through the headless dispatcher
+  supervisor path.
+- On bounded daemon cycles, current GT-KB hosts inspect dispatcher/TAFE bridge
   state and dispatch the appropriate counterpart harness when its actionable
   queue signature has changed.
 - Manual bridge scans remain available as a fallback when the trigger is
@@ -107,7 +106,7 @@ Escalate to the owner only when:
 - A destructive action is required.
 - There is a true owner-only product or risk decision.
 - The bridge protocol itself is ambiguous or contradictory.
-- The cross-harness event-driven trigger fails repeatedly and cannot be
+- The dispatcher daemon fails repeatedly and cannot be
   recovered from documented procedures.
 
 ## Configuration Capture
@@ -116,7 +115,7 @@ Keep `BRIDGE-INVENTORY.md` current with:
 
 - hook registrations (`.claude/settings.json` and `.codex/hooks.json`)
 - dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
-- trigger script path (`scripts/cross_harness_bridge_trigger.py`)
+- trigger script path (`scripts/gtkb_dispatcher_daemon.py`)
 - manual bridge-scan fallback procedure
 - log and lock paths
 - CLI commands and working directories

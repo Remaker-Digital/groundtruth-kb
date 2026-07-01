@@ -1,7 +1,7 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Concurrent _write_dispatch_state correctness against a shared state dir.
 
-Authority: bridge `gtkb-cross-harness-trigger-windows-rename-race-001` GO at
+Authority: prior Windows rename-race bridge GO at
 `-004` (REVISED-1). Codex F1 of -002: tests must cover concurrent calls to
 `_write_dispatch_state`, not only direct calls to `_rename_with_retry`.
 

@@ -102,7 +102,7 @@ if PACKAGE_SRC.is_dir() and str(PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(PACKAGE_SRC))
 
 PENDING_FILE_REL = "memory/pending-owner-decisions.md"
-DISPATCH_RUNS_REL = Path(".gtkb-state") / "cross-harness-trigger" / "dispatch-runs"
+DISPATCH_RUNS_REL = Path(".gtkb-state") / "bridge-poller" / "dispatch-runs"
 WORKER_RUN_ID_ENV_VAR = "GTKB_BRIDGE_POLLER_RUN_ID"
 PROJECT_ROOT_ENV_VAR = "GTKB_PROJECT_ROOT"
 
