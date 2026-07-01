@@ -41,6 +41,8 @@ try:
         BRIDGE_AUTHOR_METADATA_STATUSES,
         REQUIRED_AUTHOR_METADATA_FIELDS,
         author_metadata_gaps_for_content,
+        extract_author_metadata,
+        is_synthetic_session_context_id,
     )
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
     BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
@@ -56,6 +58,16 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
     def author_metadata_gaps_for_content(content: str) -> list[str]:
         values = dict(re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE))
         return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
+
+    def extract_author_metadata(content: str) -> dict[str, str]:
+        return {
+            key.lower(): value.strip()
+            for key, value in re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE)
+        }
+
+    def is_synthetic_session_context_id(value: object) -> bool:
+        text = str(value or "").strip().strip("`")
+        return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
 
 
 WRITE_TOOLS = {"Write", "Edit"}
@@ -445,8 +457,8 @@ def _versioned_bridge_entries(project_root: Path) -> dict[str, list[tuple[int, s
         slug = match.group(1)
         version = int(match.group(2))
         try:
-            rel_path = path.resolve().relative_to(project_root.resolve()).as_posix()
-        except (OSError, ValueError):
+            rel_path = path.relative_to(project_root).as_posix()
+        except ValueError:
             rel_path = path.as_posix()
         entries.setdefault(slug, []).append((version, status, rel_path, path))
     for values in entries.values():
@@ -770,6 +782,13 @@ def _has_spec_derived_verification(content: str) -> bool:
         and SPEC_TEST_HEADING_RE.search(content)
         and COMMAND_EVIDENCE_RE.search(content)
     )
+
+
+def _synthetic_session_context_id_for_content(content: str) -> str | None:
+    session_context_id = extract_author_metadata(content).get("author_session_context_id")
+    if is_synthetic_session_context_id(session_context_id):
+        return str(session_context_id).strip().strip("`")
+    return None
 
 
 def _proposal_claims_owner_approval(content: str) -> bool:
@@ -1105,10 +1124,10 @@ def _run_pending_applicability_preflight(
     return True, ""
 
 
-def _read_proposal_target_paths(project_root: Path, doc_name: str) -> list[str]:
+def _target_paths_from_bridge_entries(values: list[tuple[int, str, str, Path]]) -> list[str]:
     """Read target_paths from the latest Prime-authored proposal file."""
     proposal_path: Path | None = None
-    for _version, status, _rel_path, path in _versioned_bridge_entries(project_root).get(doc_name, []):
+    for _version, status, _rel_path, path in values:
         if status in {"NEW", "REVISED"}:
             proposal_path = path
             break
@@ -1141,15 +1160,22 @@ def _read_proposal_target_paths(project_root: Path, doc_name: str) -> list[str]:
     return paths
 
 
+def _read_proposal_target_paths(project_root: Path, doc_name: str) -> list[str]:
+    return _target_paths_from_bridge_entries(_versioned_bridge_entries(project_root).get(doc_name, []))
+
+
 def _pending_proposal_ask_reason(project_root: Path, file_path: str) -> str | None:
     """Return an ask-checkpoint reason when file_path matches a pending
     proposal's target_paths, or None."""
-    doc_statuses = _latest_bridge_statuses(project_root)
+    entries = _versioned_bridge_entries(project_root)
     file_path_normalized = file_path.replace("\\", "/")
-    for doc_name, status in doc_statuses.items():
+    for doc_name, values in entries.items():
+        if not values:
+            continue
+        status = values[0][1]
         if status not in ("NEW", "REVISED", "NO-GO"):
             continue
-        for tp in _read_proposal_target_paths(project_root, doc_name):
+        for tp in _target_paths_from_bridge_entries(values):
             tp_norm = tp.replace("\\", "/")
             if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
                 if status == "NO-GO":
@@ -1346,6 +1372,15 @@ def _deny_reason_for_content(
                     f"{', '.join(REQUIRED_AUTHOR_METADATA_FIELDS)}. The authoring session must "
                     "supply accurate model, version, and configuration values; the dispatcher "
                     "must not guess. (Hard-block per owner emergency audit directive 2026-05-19.)"
+                )
+            synthetic_session_context_id = _synthetic_session_context_id_for_content(content)
+            if synthetic_session_context_id:
+                return (
+                    "[Governance] Bridge artifacts must include a real author_session_context_id, "
+                    f"not synthetic harness placeholder {synthetic_session_context_id!r}. The authoring "
+                    "session or dispatcher must provide the concrete session context id before the "
+                    "bridge file reaches disk. (Hard-block per WI-4940; "
+                    "GOV-DOCUMENT-AUTHOR-PROVENANCE-001.)"
                 )
     return None
 

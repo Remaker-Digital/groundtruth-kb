@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-06-16T19:24:40Z",
+  "generated_at": "2026-07-01T09:01:40Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -134,7 +134,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 1,
+    "sensitive_environment_entry_count": 2,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -250,7 +250,7 @@
       "classification": "local_only",
       "evidence": ".mcp.json",
       "path": ".mcp.json",
-      "present": true
+      "present": false
     },
     "rules": {
       "classification": "public_safe",
@@ -378,7 +378,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -455,7 +455,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -532,7 +532,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -609,7 +609,7 @@
         },
         "mcp_support": {
           "evidence": ".mcp.json presence only; contents are local_only",
-          "status": "configured"
+          "status": "unknown"
         },
         "permission_approval_model": {
           "evidence": "AGENTS.md and harness role assignment",
@@ -689,11 +689,11 @@
       "version": "11.6.2"
     },
     "pip": {
-      "classification": "unknown",
+      "classification": "verified",
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
-      "status": "unknown",
-      "version": "unknown"
+      "status": "verified",
+      "version": "25.2"
     },
     "playwright": {
       "classification": "unsupported",

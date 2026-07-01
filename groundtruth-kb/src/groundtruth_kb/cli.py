@@ -340,6 +340,62 @@ def _emit_bridge_dispatch_health(ctx: click.Context, *, json_output: bool) -> No
     ctx.exit(0 if status.health_status != "FAIL" else 1)
 
 
+def _load_bridge_metadata_audit(project_root: Path) -> Any:
+    import importlib.util
+    import sys
+
+    script_path = project_root / "scripts" / "bridge_metadata_audit.py"
+    if not script_path.is_file():
+        raise click.ClickException(f"Bridge metadata audit helper not found: {script_path}")
+    spec = importlib.util.spec_from_file_location("bridge_metadata_audit", script_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load bridge metadata audit helper: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_group.group("audit")
+def bridge_audit_group() -> None:
+    """Read-only bridge artifact audits."""
+
+
+@bridge_audit_group.command("metadata")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--write-report", type=click.Path(path_type=Path), default=None, help="Write markdown report.")
+@click.option(
+    "--grandfather-report",
+    is_flag=True,
+    help="Write append-only grandfather audit JSON under .gtkb-state/.",
+)
+@click.pass_context
+def bridge_audit_metadata_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    write_report: Path | None,
+    grandfather_report: bool,
+) -> None:
+    """Scan latest bridge artifacts for author-metadata compliance (read-only)."""
+    config = _resolve_config(ctx)
+    audit_module = _load_bridge_metadata_audit(config.project_root)
+    report = audit_module.audit_bridge_metadata(config.project_root)
+    if grandfather_report:
+        out_path = audit_module.write_grandfather_report(config.project_root, report)
+        if json_output:
+            payload = report.to_dict()
+            payload["grandfather_report_path"] = str(out_path)
+            click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            click.echo(out_path)
+    elif json_output:
+        click.echo(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(audit_module.render_markdown_report(report))
+    if write_report is not None:
+        write_report.write_text(audit_module.render_markdown_report(report), encoding="utf-8")
+
+
 @bridge_group.command("config")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context

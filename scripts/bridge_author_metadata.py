@@ -14,6 +14,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+try:
+    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
 BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
     {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}
 )
@@ -48,9 +53,14 @@ FIELD_ENV_NAMES: dict[str, tuple[str, ...]] = {
     "author_harness_id": ("GTKB_AUTHOR_HARNESS_ID", "GTKB_HARNESS_ID", "CODEX_HARNESS_ID", "CLAUDE_HARNESS_ID"),
     "author_session_context_id": (
         "GTKB_AUTHOR_SESSION_CONTEXT_ID",
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_SESSION_ID",
+        "CODEX_THREAD_ID",
         "GTKB_SESSION_ID",
         "CODEX_SESSION_ID",
-        "CLAUDE_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
     ),
     "author_model": ("GTKB_AUTHOR_MODEL", "GTKB_MODEL", "CODEX_MODEL", "CLAUDE_MODEL"),
     "author_model_version": (
@@ -123,6 +133,13 @@ PLACEHOLDER_VALUES: frozenset[str] = frozenset(
         "[tbd]",
     }
 )
+SYNTHETIC_SESSION_CONTEXT_IDS: frozenset[str] = frozenset(
+    {
+        "openrouter-harness-f",
+        "ollama-harness-d",
+    }
+)
+SYNTHETIC_SESSION_CONTEXT_RE = re.compile(r"^(?:openrouter|ollama)-harness-[a-z]$", re.IGNORECASE)
 
 
 class BridgeAuthorMetadataError(RuntimeError):
@@ -147,6 +164,15 @@ def metadata_value_is_valid(value: object) -> bool:
         return False
     text = str(value).strip().strip("`")
     return text.lower() not in PLACEHOLDER_VALUES
+
+
+def is_synthetic_session_context_id(value: object) -> bool:
+    """Return true for static bridge session placeholders, not real session ids."""
+    if not metadata_value_is_valid(value):
+        return False
+    text = str(value).strip().strip("`")
+    lowered = text.lower()
+    return lowered in SYNTHETIC_SESSION_CONTEXT_IDS or SYNTHETIC_SESSION_CONTEXT_RE.fullmatch(text) is not None
 
 
 def _field_value(data: Mapping[str, Any], field: str) -> str | None:
@@ -231,6 +257,25 @@ def _metadata_from_env(env: Mapping[str, str]) -> dict[str, str]:
                 values[field] = str(value).strip().strip("`")
                 break
     return values
+
+
+def _runtime_session_context_id(environ: Mapping[str, str]) -> str:
+    explicit = str(environ.get("GTKB_AUTHOR_SESSION_CONTEXT_ID") or "").strip()
+    if metadata_value_is_valid(explicit):
+        return explicit.strip("`")
+    resolved = resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
+    if metadata_value_is_valid(resolved):
+        return resolved.strip("`")
+    return ""
+
+
+def _replace_author_metadata_value(content: str, field: str, value: str) -> str:
+    pattern = re.compile(rf"^(?P<key>{re.escape(field)}):\s*(?P<value>.*?)\s*$", re.IGNORECASE | re.MULTILINE)
+
+    def replacement(match: re.Match[str]) -> str:
+        return f"{match.group('key')}: {value}"
+
+    return pattern.sub(replacement, content, count=1)
 
 
 def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
@@ -351,7 +396,24 @@ def load_author_metadata(
     root = project_root or Path.cwd()
     environ = env or os.environ
     merged: dict[str, Any] = {}
-    merged.update(_resolve_durable_identity_fields(root, env=environ))
+
+    # Pre-populate only a stable session id for interactive sessions when it can
+    # be resolved from the runtime envelope. Model identity must come from the
+    # filing runtime, not from hardcoded guesses (WI-4885/WI-4939).
+    interactive_defaults = {}
+    harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+
+    if harness_name:
+        session_id = _runtime_session_context_id(environ)
+        if session_id:
+            interactive_defaults = {"author_session_context_id": session_id}
+
+    env_copy = dict(environ)
+    if harness_name and ENV_VAR_HARNESS_NAME not in env_copy:
+        env_copy[ENV_VAR_HARNESS_NAME] = harness_name
+
+    merged.update(interactive_defaults)
+    merged.update(_resolve_durable_identity_fields(root, env=env_copy))
     merged.update(_metadata_from_env(environ))
     if explicit:
         merged.update(normalize_author_metadata(explicit))
@@ -389,6 +451,10 @@ def ensure_author_metadata(
     if existing:
         gaps = author_metadata_gaps(existing)
         if not gaps:
+            session_context_id = existing.get("author_session_context_id")
+            runtime_session_id = _runtime_session_context_id(env or os.environ)
+            if is_synthetic_session_context_id(session_context_id) and runtime_session_id:
+                return _replace_author_metadata_value(content, "author_session_context_id", runtime_session_id)
             return content
         raise BridgeAuthorMetadataError(
             "bridge artifact contains partial or invalid author metadata: " + ", ".join(gaps)
