@@ -57,6 +57,19 @@ def test_show_thread_includes_status_tokenless_versions(tmp_path: Path) -> None:
     assert legacy["status_is_canonical"] is False
 
 
+def test_show_thread_compact_omits_version_chain(tmp_path: Path) -> None:
+    _write_bridge_file(tmp_path, "sample-thread-001.md", "NEW\n")
+    _write_bridge_file(tmp_path, "sample-thread-002.md", "GO\n")
+
+    payload = read_commands.show_thread(tmp_path, "sample-thread", compact=True)
+
+    assert payload is not None
+    assert payload["compact"] is True
+    assert payload["latest_status"] == "GO"
+    assert payload["version_count"] == 2
+    assert "version_chain" not in payload
+
+
 def test_threads_for_work_item_matches_any_version_and_reports_coverage(tmp_path: Path) -> None:
     _write_bridge_file(tmp_path, "sample-thread-001.md", "# Legacy proposal heading\n\nWork Item: WI-4634\n")
     _write_bridge_file(tmp_path, "sample-thread-002.md", "GO\n")
@@ -71,6 +84,19 @@ def test_threads_for_work_item_matches_any_version_and_reports_coverage(tmp_path
     assert payload["threads"][0]["citing_paths"] == ["bridge/sample-thread-001.md"]
     assert payload["coverage_caveat"]["total_threads"] == 3
     assert payload["coverage_caveat"]["threads_with_work_item_metadata"] == 2
+
+
+def test_threads_for_work_item_compact_omits_citing_paths(tmp_path: Path) -> None:
+    _write_bridge_file(tmp_path, "sample-thread-001.md", "NEW\n\nWork Item: WI-4634\n")
+    _write_bridge_file(tmp_path, "sample-thread-002.md", "GO\n")
+
+    payload = read_commands.threads_for_work_item(tmp_path, "WI-4634", compact=True)
+
+    assert payload["compact"] is True
+    assert payload["match_count"] == 1
+    assert payload["threads"][0]["slug"] == "sample-thread"
+    assert "citing_paths" not in payload["threads"][0]
+    assert payload["coverage_caveat"]["total_threads"] == 1
 
 
 def test_work_item_regex_reuses_project_lifecycle_constant() -> None:
@@ -92,6 +118,18 @@ def test_bridge_show_cli_json_and_not_found_exit(tmp_path: Path) -> None:
     assert json.loads(missing.output)["error"] == "bridge_thread_not_found"
 
 
+def test_bridge_show_cli_json_compact(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    _write_bridge_file(tmp_path, "sample-thread-001.md", "NEW\n")
+
+    result = _invoke(config_path, "bridge", "show", "sample-thread", "--json", "--compact")
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["compact"] is True
+    assert "version_chain" not in payload
+
+
 def test_bridge_threads_cli_json_empty_and_malformed(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
     _write_bridge_file(tmp_path, "sample-thread-001.md", "NEW\n\nWork Item: WI-4634\n")
@@ -110,6 +148,18 @@ def test_bridge_threads_cli_json_empty_and_malformed(tmp_path: Path) -> None:
 
     malformed = _invoke(config_path, "bridge", "threads", "--wi", "banana")
     assert malformed.exit_code == 2
+
+
+def test_bridge_threads_cli_json_compact(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    _write_bridge_file(tmp_path, "sample-thread-001.md", "NEW\n\nWork Item: WI-4634\n")
+
+    result = _invoke(config_path, "bridge", "threads", "--wi", "WI-4634", "--json", "--compact")
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["compact"] is True
+    assert "citing_paths" not in payload["threads"][0]
 
 
 def test_bridge_help_lists_read_commands(tmp_path: Path) -> None:

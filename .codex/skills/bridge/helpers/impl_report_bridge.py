@@ -90,6 +90,21 @@ class ImplReportPlan:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    def to_compact_dict(self) -> dict[str, Any]:
+        return {
+            "slug": self.slug,
+            "latest_status": self.latest_status,
+            "latest_path": self.latest_path,
+            "next_version": self.next_version,
+            "report_path": self.report_path,
+            "proposal_path": self.proposal_path,
+            "go_path": self.go_path,
+            "linked_specs": list(self.linked_specs),
+            "files_changed_count": len(self.files_changed),
+            "version_count": len(self.version_chain),
+            "compact": True,
+        }
+
 
 _SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$"
 _BRIDGE_KIND_RE = re.compile(r"^\s*bridge_kind:\s*(?P<kind>[A-Za-z0-9_-]+)\s*$", re.MULTILINE)
@@ -454,12 +469,18 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--draft-dir", type=Path, default=DEFAULT_DRAFT_DIR)
     parser.add_argument("--content-file", type=Path)
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="For plan mode, omit changed-file and version-chain payloads; emit current/actionable summary only.",
+    )
     args = parser.parse_args(argv)
 
     if args.mode == "plan":
+        plan = plan_report(args.slug, bridge_dir=args.bridge_dir, draft_dir=args.draft_dir)
         print(
             json.dumps(
-                plan_report(args.slug, bridge_dir=args.bridge_dir, draft_dir=args.draft_dir).to_dict(),
+                plan.to_compact_dict() if args.compact else plan.to_dict(),
                 indent=2,
                 sort_keys=True,
             )

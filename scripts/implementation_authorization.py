@@ -1552,6 +1552,29 @@ def list_named_packets(project_root: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def list_named_packets_compact(project_root: Path) -> dict[str, Any]:
+    """Return compact current/actionable authorization summaries without full packet bodies."""
+    rows = list_named_packets(project_root)
+    valid_rows = [row for row in rows if row.get("valid")]
+    return {
+        "compact": True,
+        "packet_count": len(rows),
+        "valid_count": len(valid_rows),
+        "invalid_count": len(rows) - len(valid_rows),
+        "invalid_packets_omitted": len(rows) - len(valid_rows),
+        "packets": [
+            {
+                "bridge_id": row.get("bridge_id"),
+                "valid": row.get("valid"),
+                "expires_at": row.get("expires_at"),
+                "path": row.get("path"),
+                "error": row.get("error"),
+            }
+            for row in valid_rows
+        ],
+    }
+
+
 def _raw_active_packet(project_root: Path) -> tuple[dict[str, Any] | None, str | None]:
     path = packet_path(project_root)
     if not path.is_file():
@@ -1844,6 +1867,12 @@ def main(argv: list[str] | None = None) -> int:
         "list",
         help="Enumerate named-cache packets under .gtkb-state/implementation-authorizations/by-bridge/",
     )
+    list_cmd = subparsers.choices["list"]
+    list_cmd.add_argument(
+        "--compact",
+        action="store_true",
+        help="Return compact current/actionable summaries without full target_path_globs payloads",
+    )
 
     args = parser.parse_args(argv)
     root = project_root_from_arg(args.project_root)
@@ -1873,8 +1902,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(packet, indent=2, sort_keys=True))
             return 0
         if args.command == "list":
-            rows = list_named_packets(root)
-            print(json.dumps(rows, indent=2, sort_keys=True))
+            payload = list_named_packets_compact(root) if args.compact else list_named_packets(root)
+            print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
     except AuthorizationError as exc:
         print(json.dumps({"authorized": False, "error": str(exc)}, indent=2, sort_keys=True))

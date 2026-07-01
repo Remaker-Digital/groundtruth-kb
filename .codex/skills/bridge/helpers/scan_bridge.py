@@ -386,11 +386,32 @@ def _summary_counts(threads: list[ThreadEntry]) -> dict[str, int]:
     return counts
 
 
+def _compact_thread_dict(thread: dict[str, Any]) -> dict[str, Any]:
+    """Return current/actionable thread summary without archival version chains."""
+    return {key: value for key, value in thread.items() if key != "version_chain"}
+
+
+def _compact_scan_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Suppress terminal VERIFIED/archive payloads; keep actionable summaries only."""
+    compact = dict(result)
+    compact["compact"] = True
+    compact["actionable"] = [_compact_thread_dict(thread) for thread in result.get("actionable", [])]
+    compact["blocked_non_activatable"] = [
+        _compact_thread_dict(thread) for thread in result.get("blocked_non_activatable", [])
+    ]
+    compact["terminal_verified_count"] = len(result.get("terminal_verified", []))
+    compact["excluded_archived_count"] = len(result.get("excluded_archived", []))
+    compact.pop("terminal_verified", None)
+    compact.pop("excluded_archived", None)
+    return compact
+
+
 def scan(
     role: Role,
     index_path: Path | None = None,
     *,
     index_text: str | None = None,
+    compact: bool = False,
 ) -> dict[str, Any]:
     """Scan versioned bridge state and return role-filtered actionable list.
 
@@ -425,7 +446,7 @@ def scan(
     threads = _parse_index(index_text)
     actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
 
-    return {
+    result = {
         "role": role,
         "actionable": [t.to_dict() for t in actionable],
         "blocked_non_activatable": blocked_non_activatable,
@@ -434,6 +455,9 @@ def scan(
         "summary": _summary_counts(threads),
         "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if compact:
+        return _compact_scan_result(result)
+    return result
 
 
 def _format_markdown(result: dict[str, Any]) -> str:
@@ -468,21 +492,30 @@ def _format_markdown(result: dict[str, Any]) -> str:
     else:
         lines.append("- (none)")
     lines.append("")
-    lines.append(f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})")
-    lines.append("")
-    if result.get("excluded_archived"):
-        for thread in result["excluded_archived"]:
-            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+    if result.get("compact"):
+        lines.append(f"## Excluded Archived Nonterminal (count only, {result.get('excluded_archived_count', 0)})")
+        lines.append("")
+        lines.append("- Full archived payloads omitted in compact mode; rerun without `--compact` for archival detail.")
+        lines.append("")
+        lines.append(f"## Terminal VERIFIED (count only, {result.get('terminal_verified_count', 0)})")
+        lines.append("")
+        lines.append("- Full VERIFIED payloads omitted in compact mode; rerun without `--compact` for archival detail.")
     else:
-        lines.append("- (none)")
-    lines.append("")
-    lines.append(f"## Terminal VERIFIED (context, {len(result['terminal_verified'])})")
-    lines.append("")
-    if result["terminal_verified"]:
-        for thread in result["terminal_verified"]:
-            lines.append(f"- {thread['document']} -- VERIFIED at `{thread['latest_path']}`")
-    else:
-        lines.append("- (none)")
+        lines.append(f"## Excluded Archived Nonterminal ({len(result.get('excluded_archived', []))})")
+        lines.append("")
+        if result.get("excluded_archived"):
+            for thread in result["excluded_archived"]:
+                lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+        else:
+            lines.append("- (none)")
+        lines.append("")
+        lines.append(f"## Terminal VERIFIED (context, {len(result['terminal_verified'])})")
+        lines.append("")
+        if result["terminal_verified"]:
+            for thread in result["terminal_verified"]:
+                lines.append(f"- {thread['document']} -- VERIFIED at `{thread['latest_path']}`")
+        else:
+            lines.append("- (none)")
     return "\n".join(lines)
 
 
@@ -493,10 +526,15 @@ def main(argv: list[str] | None = None) -> int:
         "--index-path", default=None, help="Optional compatibility-state locator used to infer project root"
     )
     parser.add_argument("--format", default="json", choices=["json", "markdown"], help="Output format (default: json)")
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Omit terminal VERIFIED/archive payloads; return current/actionable summaries only",
+    )
     args = parser.parse_args(argv)
 
     index_path = Path(args.index_path) if args.index_path else None
-    result = scan(role=args.role, index_path=index_path)
+    result = scan(role=args.role, index_path=index_path, compact=args.compact)
 
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))

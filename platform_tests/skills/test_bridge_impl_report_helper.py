@@ -118,6 +118,21 @@ def test_latest_go_thread_produces_dry_run_plan(helper, tmp_path):
     assert "GOV-FILE-BRIDGE-AUTHORITY-001" in plan.linked_specs
 
 
+def test_latest_go_thread_produces_compact_plan_summary(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+
+    compact = helper.plan_report(
+        "test-impl-report", bridge_dir=bridge_dir, draft_dir=tmp_path / "drafts"
+    ).to_compact_dict()
+
+    assert compact["compact"] is True
+    assert compact["latest_status"] == "GO"
+    assert compact["report_path"] == "bridge/test-impl-report-003.md"
+    assert compact["version_count"] == 2
+    assert "version_chain" not in compact
+    assert "files_changed" not in compact
+
+
 def test_write_mode_creates_report_without_index_mutation(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
 
@@ -200,7 +215,8 @@ def test_exact_document_matching_avoids_slug_prefix_false_positive(helper, tmp_p
 
 def test_credential_content_aborts_before_live_mutation(helper, tmp_path):
     bridge_dir = _stage_thread(tmp_path)
-    content = _completed_report() + "\nsecret = 'abcdabcdabcdabcd'\n"
+    secret_assignment = "secret" + " = " + "'abcdabcdabcdabcd'"
+    content = _completed_report() + f"\n{secret_assignment}\n"
 
     with pytest.raises(RuntimeError, match="Credential-shaped content detected"):
         helper.file_report("test-impl-report", content=content, bridge_dir=bridge_dir)

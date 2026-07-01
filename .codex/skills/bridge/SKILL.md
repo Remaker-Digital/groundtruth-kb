@@ -87,13 +87,17 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 **Canonical invocation** (deterministic, replaces manual grep+Read+regex):
 
 ```powershell
-python .codex/skills/bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> [--format json|markdown]
+python .codex/skills/bridge/helpers/scan_bridge.py --role <prime-builder|loyal-opposition> --compact [--format json|markdown]
 ```
 
 Current scans must use dispatcher/TAFE state and the status-bearing versioned
 files under `bridge/`; use `bridge-config` for dispatcher topology and health
 claims. Any helper that still requires aggregate queue state is defective and
 must not be used for live queue authority.
+Use `--compact` for routine startup, heartbeat, project, and dispatcher checks:
+it keeps current/actionable summaries and counts terminal/archive buckets without
+loading full VERIFIED or archived version payloads. Omit `--compact` only when a
+review or audit explicitly needs archival detail.
 
 **Action** (manual or via helper):
 
@@ -154,8 +158,11 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 1. Implement the work per the GO d proposal scope. Run the spec-derived tests; capture the exact commands and observed results.
 2. Use the helper's `plan` mode or no-index CLI successor to require latest `GO`, load the approved proposal and GO verdict, compute the next version, carry forward linked specifications, capture dirty files via `git diff --name-only HEAD --`, and show the proposed `NEW` report metadata without mutation:
    ```powershell
-   python .codex/skills/bridge/helpers/impl_report_bridge.py plan <topic-slug>
+   python .codex/skills/bridge/helpers/impl_report_bridge.py plan <topic-slug> --compact
    ```
+   Use compact plan output for routine implementation-start orientation. Omit
+   `--compact` only when you need the full changed-file and version-chain
+   payload for report drafting.
 3. Use `scaffold` mode when you need a non-dispatchable draft under `.gtkb-state/bridge-impl-reports/drafts/`; complete the implementation claim, command evidence, observed results, spec-to-test mapping, acceptance status, and risk/rollback before live filing.
 4. Use `file` mode only when the report content is ready for Loyal Opposition verification. The helper refuses non-`GO` latest status, exact-document mismatches, existing target files, and credential-shaped content. It writes `bridge/<topic-slug>-<next-version>.md` through the governed no-index bridge path:
    ```powershell
@@ -192,6 +199,9 @@ python .codex/skills/bridge/helpers/show_thread_bridge.py <topic-slug> [--format
 ```
 
 The helper resolves all `bridge/<slug>-NNN.md` files, sorts by version, and returns `{slug, versions, found, preview_lines_cap}` plus any legacy compatibility-view diagnostics when available. Per-version content preview is bounded (default 200 lines) so the output doesn't balloon for long bodies. Public Python API: `from show_thread_bridge import show; show("gtkb-foo")`.
+For CLI bridge reads, prefer `gt bridge show <topic-slug> --json --compact`
+and `gt bridge threads --wi <WI-ID> --json --compact` during routine checks; use
+full mode only when the version chain or citing-path archive is required.
 
 **Action** (manual or via helper):
 

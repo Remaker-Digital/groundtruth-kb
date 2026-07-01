@@ -109,6 +109,28 @@ NEW: bridge/gtkb-foo-001.md
         assert result["terminal_verified"][0]["latest_status"] == "VERIFIED"
 
 
+def test_compact_scan_omits_terminal_payloads_and_version_chains(helper) -> None:
+    index = """\
+Document: gtkb-go
+GO: bridge/gtkb-go-002.md
+NEW: bridge/gtkb-go-001.md
+
+Document: gtkb-verified
+VERIFIED: bridge/gtkb-verified-003.md
+GO: bridge/gtkb-verified-002.md
+NEW: bridge/gtkb-verified-001.md
+"""
+
+    result = helper.scan(role="prime-builder", index_text=index, compact=True)
+
+    assert result["compact"] is True
+    assert result["terminal_verified_count"] == 1
+    assert "terminal_verified" not in result
+    assert "excluded_archived" not in result
+    assert result["actionable"][0]["document"] == "gtkb-go"
+    assert "version_chain" not in result["actionable"][0]
+
+
 def test_t7_mixed_index_partitions_correctly(helper) -> None:
     index = """\
 Document: gtkb-a
