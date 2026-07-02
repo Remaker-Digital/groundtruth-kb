@@ -720,6 +720,101 @@ CREATE TABLE IF NOT EXISTS agent_capability_snapshots (
     UNIQUE(id, version)
 );
 
+CREATE TABLE IF NOT EXISTS dispatch_lanes (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    harness_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model_route TEXT NOT NULL,
+    role TEXT NOT NULL,
+    activity_type TEXT NOT NULL,
+    lifecycle TEXT NOT NULL,
+    dispatch_enabled INTEGER NOT NULL DEFAULT 0,
+    shadow_enabled INTEGER NOT NULL DEFAULT 1,
+    route_selectable INTEGER NOT NULL DEFAULT 0,
+    waiver_id TEXT,
+    blockage_reasons TEXT,
+    score_components TEXT,
+    caps TEXT,
+    evidence_refs TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_score_dimensions (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    weight_profile_id TEXT,
+    dimension_type TEXT NOT NULL,
+    default_weight REAL,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_scoring_evidence (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    lane_id TEXT NOT NULL,
+    evidence_type TEXT NOT NULL,
+    evidence_status TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    expires_at TEXT,
+    evidence_ref TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_score_snapshots (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    snapshot_kind TEXT NOT NULL,
+    weight_profile_id TEXT,
+    lane_scores TEXT NOT NULL,
+    promoted_from_snapshot_id TEXT,
+    status TEXT NOT NULL DEFAULT 'candidate',
+    metadata TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_lane_projection_snapshots (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    source_snapshot_id TEXT,
+    projection_mode TEXT NOT NULL,
+    projection_payload TEXT NOT NULL,
+    ranked_lanes TEXT NOT NULL,
+    blocked_lanes TEXT NOT NULL,
+    freshness TEXT NOT NULL,
+    runtime_suppression TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'candidate',
+    generated_at TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(id, version)
+);
+
 CREATE TABLE IF NOT EXISTS backlog_snapshots (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL,
@@ -960,6 +1055,23 @@ CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_id_version ON agent_ca
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_harness ON agent_capability_snapshots(harness_id);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_health ON agent_capability_snapshots(health_status);
 CREATE INDEX IF NOT EXISTS idx_agent_capability_snapshots_captured ON agent_capability_snapshots(captured_at);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_id_version ON dispatch_lanes(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_identity
+    ON dispatch_lanes(harness_id, provider, model_route, role, activity_type);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_lifecycle ON dispatch_lanes(lifecycle);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lanes_status ON dispatch_lanes(status);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_dimensions_id_version
+    ON dispatch_lane_score_dimensions(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_evidence_id_version
+    ON dispatch_lane_scoring_evidence(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_evidence_lane ON dispatch_lane_scoring_evidence(lane_id);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_evidence_type ON dispatch_lane_scoring_evidence(evidence_type);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_score_snapshots_id_version
+    ON dispatch_lane_score_snapshots(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_projection_snapshots_id_version
+    ON dispatch_lane_projection_snapshots(id, version);
+CREATE INDEX IF NOT EXISTS idx_dispatch_lane_projection_snapshots_mode
+    ON dispatch_lane_projection_snapshots(projection_mode);
 CREATE INDEX IF NOT EXISTS idx_backlog_id_version ON backlog_snapshots(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_id_version ON testable_elements(id, version);
 CREATE INDEX IF NOT EXISTS idx_te_subsystem ON testable_elements(subsystem);
@@ -1084,6 +1196,31 @@ CREATE VIEW IF NOT EXISTS current_agent_capability_snapshots AS
 SELECT a.* FROM agent_capability_snapshots a
 INNER JOIN (SELECT id, MAX(version) AS max_v FROM agent_capability_snapshots GROUP BY id) m
 ON a.id = m.id AND a.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lanes AS
+SELECT l.* FROM dispatch_lanes l
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lanes GROUP BY id) m
+ON l.id = m.id AND l.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_score_dimensions AS
+SELECT d.* FROM dispatch_lane_score_dimensions d
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_score_dimensions GROUP BY id) m
+ON d.id = m.id AND d.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_scoring_evidence AS
+SELECT e.* FROM dispatch_lane_scoring_evidence e
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_scoring_evidence GROUP BY id) m
+ON e.id = m.id AND e.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_score_snapshots AS
+SELECT s.* FROM dispatch_lane_score_snapshots s
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_score_snapshots GROUP BY id) m
+ON s.id = m.id AND s.version = m.max_v;
+
+CREATE VIEW IF NOT EXISTS current_dispatch_lane_projection_snapshots AS
+SELECT p.* FROM dispatch_lane_projection_snapshots p
+INNER JOIN (SELECT id, MAX(version) AS max_v FROM dispatch_lane_projection_snapshots GROUP BY id) m
+ON p.id = m.id AND p.version = m.max_v;
 
 CREATE VIEW IF NOT EXISTS current_backlog_snapshots AS
 SELECT b.* FROM backlog_snapshots b
@@ -6486,6 +6623,188 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def _next_dispatch_lane_version(self, lane_id: str) -> int:
+        row = self._get_conn().execute("SELECT MAX(version) FROM dispatch_lanes WHERE id = ?", (lane_id,)).fetchone()
+        return (row[0] or 0) + 1
+
+    def insert_dispatch_lane(
+        self,
+        id: str,
+        harness_id: str,
+        provider: str,
+        model_route: str,
+        role: str,
+        activity_type: str,
+        lifecycle: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        dispatch_enabled: bool = False,
+        shadow_enabled: bool = True,
+        route_selectable: bool = False,
+        waiver_id: str | None = None,
+        blockage_reasons: list[str] | None = None,
+        score_components: dict[str, Any] | None = None,
+        caps: dict[str, Any] | None = None,
+        evidence_refs: dict[str, Any] | None = None,
+        status: str = "active",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a governed dispatch lane registry row.
+
+        The row records lane identity and advisory/prod gating fields only. It
+        does not select dispatch targets or activate production lane ranking.
+        """
+        lane_id = _require_text("dispatch lane id", id)
+        version = self._next_dispatch_lane_version(lane_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO dispatch_lanes
+               (id, version, harness_id, provider, model_route, role, activity_type,
+                lifecycle, dispatch_enabled, shadow_enabled, route_selectable,
+                waiver_id, blockage_reasons, score_components, caps, evidence_refs,
+                status, metadata, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                lane_id,
+                version,
+                _require_text("harness_id", harness_id),
+                _require_text("provider", provider),
+                _require_text("model_route", model_route),
+                _require_text("role", role),
+                _require_text("activity_type", activity_type),
+                _require_text("lifecycle", lifecycle),
+                1 if dispatch_enabled else 0,
+                1 if shadow_enabled else 0,
+                1 if route_selectable else 0,
+                waiver_id,
+                _encode_json(blockage_reasons or []),
+                _encode_json(score_components or {}),
+                _encode_json(caps or {}),
+                _encode_json(evidence_refs or {}),
+                _require_text("status", status),
+                _encode_json(metadata or {}),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_dispatch_lane(lane_id)
+
+    def get_dispatch_lane(self, lane_id: str) -> dict[str, Any] | None:
+        """Return the current version of a dispatch lane registry row."""
+        row = self._get_conn().execute("SELECT * FROM current_dispatch_lanes WHERE id = ?", (lane_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+
+    def list_dispatch_lanes(
+        self,
+        *,
+        harness_id: str | None = None,
+        role: str | None = None,
+        activity_type: str | None = None,
+        lifecycle: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List current dispatch lane registry rows with optional filters."""
+        query = "SELECT * FROM current_dispatch_lanes WHERE 1=1"
+        params: list[Any] = []
+        if harness_id:
+            query += " AND harness_id = ?"
+            params.append(harness_id)
+        if role:
+            query += " AND role = ?"
+            params.append(role)
+        if activity_type:
+            query += " AND activity_type = ?"
+            params.append(activity_type)
+        if lifecycle:
+            query += " AND lifecycle = ?"
+            params.append(lifecycle)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY harness_id, role, activity_type, provider, model_route, id"
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def _next_dispatch_lane_projection_snapshot_version(self, snapshot_id: str) -> int:
+        row = (
+            self._get_conn()
+            .execute("SELECT MAX(version) FROM dispatch_lane_projection_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
+        return (row[0] or 0) + 1
+
+    def insert_dispatch_lane_projection_snapshot(
+        self,
+        id: str,
+        projection_mode: str,
+        projection_payload: dict[str, Any],
+        changed_by: str,
+        change_reason: str,
+        *,
+        source_snapshot_id: str | None = None,
+        status: str = "candidate",
+        generated_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Append a compact dispatch lane projection snapshot.
+
+        Projection payloads are append-only evidence for later dispatcher
+        consumption. This writer intentionally stores compact payload sections
+        only and does not write dispatcher runtime configuration.
+        """
+        snapshot_id = _require_text("dispatch lane projection snapshot id", id)
+        payload = dict(projection_payload)
+        version = self._next_dispatch_lane_projection_snapshot_version(snapshot_id)
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO dispatch_lane_projection_snapshots
+               (id, version, source_snapshot_id, projection_mode, projection_payload,
+                ranked_lanes, blocked_lanes, freshness, runtime_suppression,
+                status, generated_at, changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                snapshot_id,
+                version,
+                source_snapshot_id,
+                _require_text("projection_mode", projection_mode),
+                _encode_json(payload),
+                _encode_json(payload.get("effective_ranked_lanes") or {}),
+                _encode_json(payload.get("blocked_lanes") or []),
+                _encode_json(payload.get("freshness") or {}),
+                _encode_json(payload.get("runtime_suppression") or {}),
+                _require_text("status", status),
+                generated_at or str(payload.get("generated_at") or _now()),
+                _require_text("changed_by", changed_by),
+                _now(),
+                _require_text("change_reason", change_reason),
+            ),
+        )
+        conn.commit()
+        return self.get_dispatch_lane_projection_snapshot(snapshot_id)
+
+    def get_dispatch_lane_projection_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Return the current dispatch lane projection snapshot version."""
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM current_dispatch_lane_projection_snapshots WHERE id = ?", (snapshot_id,))
+            .fetchone()
+        )
+        return _row_to_dict(row) if row else None
+
+    def get_dispatch_lane_projection_snapshot_history(self, snapshot_id: str) -> list[dict[str, Any]]:
+        """Return all projection snapshot versions, newest-first."""
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM dispatch_lane_projection_snapshots WHERE id = ? ORDER BY version DESC",
+                (snapshot_id,),
+            )
+            .fetchall()
+        )
+        return [_row_to_dict(r) for r in rows]
+
     def insert_flow_event(
         self,
         id: str,
@@ -8887,6 +9206,16 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "test_summary",
         "recovery_actions",
         "artifact_links",
+        "blockage_reasons",
+        "score_components",
+        "caps",
+        "evidence_refs",
+        "lane_scores",
+        "projection_payload",
+        "ranked_lanes",
+        "blocked_lanes",
+        "freshness",
+        "runtime_suppression",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:
