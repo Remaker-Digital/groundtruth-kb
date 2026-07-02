@@ -6,7 +6,7 @@ bridge/gtkb-gov-proposal-standards-slice1-023.md).
 
 Versioned bridge files (bridge/<slug>-NNN.md) must begin with a canonical
 status token on the first non-blank line (NEW / REVISED / GO / NO-GO /
-VERIFIED / ADVISORY / DEFERRED / WITHDRAWN). New files (and overwrites of files that
+VERIFIED / NO-ACTION / ADVISORY / DEFERRED / WITHDRAWN). New files (and overwrites of files that
 currently have a canonical first line) must comply; files already on disk
 with a non-canonical first line are grandfathered. The rule fires only on the
 Write tool (full content); the Edit tool supplies empty content to the gate
@@ -33,7 +33,17 @@ def _load_gate():
 
 _gate = _load_gate()
 
-_CANONICAL_TOKENS = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN")
+_CANONICAL_TOKENS = (
+    "NEW",
+    "REVISED",
+    "GO",
+    "NO-GO",
+    "VERIFIED",
+    "NO-ACTION",
+    "ADVISORY",
+    "DEFERRED",
+    "WITHDRAWN",
+)
 
 
 def _versioned(tmp_path: Path, name: str = "gtkb-demo-thread-001.md") -> str:

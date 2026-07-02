@@ -86,6 +86,7 @@ BRIDGE_STATUS_TOKENS = (
     "GO",
     "NO-GO",
     "VERIFIED",
+    "NO-ACTION",
     "WITHDRAWN",
     "ADVISORY",
     "DEFERRED",
@@ -725,13 +726,7 @@ def _first_line_is_recognized_status(first_line: str) -> bool:
     verdicts) so the body-status-token rule never false-blocks a line the rest
     of the gate would recognize.
     """
-    return (
-        first_line == "ADVISORY"
-        or first_line == "DEFERRED"
-        or first_line == "WITHDRAWN"
-        or first_line in PENDING_PREFLIGHT_STATUSES
-        or first_line.startswith(("GO", "NO-GO", "VERIFIED"))
-    )
+    return first_line in BRIDGE_STATUS_TOKENS or first_line.startswith(("GO", "NO-GO", "VERIFIED"))
 
 
 def _ondisk_first_nonblank_line(file_path: str) -> str | None:
