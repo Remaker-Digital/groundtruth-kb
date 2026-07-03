@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -16,6 +17,8 @@ from windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_execu
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_STDIN_TIMEOUT_SECONDS = 0.2
+_PASS_RESPONSE = b"{}"
+_DECISION_PRIORITY = {"deny": 3, "ask": 2, "allow": 1}
 BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
     "user-prompt-submit": (
         ("cmd", ".codex/gtkb-hooks/workstream-focus.cmd"),
@@ -154,6 +157,88 @@ def _run_child(command: list[str], payload: bytes) -> tuple[int, bytes, bytes]:
     return int(process.returncode), stdout or b"", stderr or b""
 
 
+def _json_bytes(payload: dict[str, object]) -> bytes:
+    return json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()
+
+
+def _deny_response(reason: str) -> dict[str, object]:
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
+def _parse_child_stdout(stdout: bytes, hook_name: str) -> tuple[dict[str, object] | None, str | None]:
+    text = stdout.decode("utf-8-sig", errors="replace").strip()
+    if not text:
+        return {}, None
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return None, f"{hook_name} emitted invalid hook JSON: {exc.msg}"
+    if not isinstance(payload, dict):
+        return None, f"{hook_name} emitted a non-object hook JSON response"
+    return payload, None
+
+
+def _permission_decision(payload: dict[str, object]) -> tuple[str, str | None] | None:
+    hook_output = payload.get("hookSpecificOutput")
+    if isinstance(hook_output, dict):
+        decision = str(hook_output.get("permissionDecision") or "").strip().lower()
+        if decision in _DECISION_PRIORITY:
+            reason = hook_output.get("permissionDecisionReason")
+            return decision, str(reason) if reason is not None else None
+    if str(payload.get("decision") or "").strip().lower() == "block":
+        reason = payload.get("reason")
+        return "deny", str(reason) if reason is not None else "hook child returned decision=block"
+    return None
+
+
+def _merge_context_value(existing: object, incoming: object) -> object:
+    if isinstance(existing, str) and isinstance(incoming, str):
+        if not existing:
+            return incoming
+        if not incoming or incoming == existing:
+            return existing
+        return f"{existing}\n\n{incoming}"
+    if isinstance(existing, list):
+        return [*existing, incoming]
+    if existing == incoming:
+        return existing
+    return [existing, incoming]
+
+
+def _merged_batch_stdout(outputs: list[dict[str, object]]) -> bytes:
+    strongest_decision: tuple[int, dict[str, object]] | None = None
+    merged: dict[str, object] = {}
+    for payload in outputs:
+        if not payload:
+            continue
+        decision = _permission_decision(payload)
+        if decision is not None:
+            value, reason = decision
+            priority = _DECISION_PRIORITY[value]
+            normalized = payload if "hookSpecificOutput" in payload else _deny_response(reason or "hook denied")
+            if strongest_decision is None or priority > strongest_decision[0]:
+                strongest_decision = (priority, normalized)
+            continue
+        for key, value in payload.items():
+            if key in {"hookSpecificOutput", "decision", "reason"}:
+                continue
+            if key in merged:
+                merged[key] = _merge_context_value(merged[key], value)
+            else:
+                merged[key] = value
+    if strongest_decision is not None:
+        return _json_bytes(strongest_decision[1])
+    if merged:
+        return _json_bytes(merged)
+    return _PASS_RESPONSE
+
+
 def _batch_command(entry: tuple[str, ...]) -> list[str]:
     kind, raw_path, *raw_args = entry
     path = PROJECT_ROOT / raw_path
@@ -170,15 +255,21 @@ def _run_batch(batch_name: str, payload: bytes) -> tuple[int, bytes, bytes]:
     if entries is None:
         known = ", ".join(sorted(BATCHES))
         return 2, b"", f"unknown hook batch {batch_name!r}; known batches: {known}\n".encode()
-    stdout_parts: list[bytes] = []
+    stdout_payloads: list[dict[str, object]] = []
     stderr_parts: list[bytes] = []
     for entry in entries:
         returncode, stdout, stderr = _run_child(_batch_command(entry), payload)
-        stdout_parts.append(stdout)
         stderr_parts.append(stderr)
+        hook_name = entry[1] if len(entry) > 1 else entry[0]
+        parsed, parse_error = _parse_child_stdout(stdout, hook_name)
+        if parse_error is not None:
+            stderr_parts.append(f"{parse_error}\n".encode())
+            return 0, _json_bytes(_deny_response(parse_error)), b"".join(stderr_parts)
+        if parsed is not None:
+            stdout_payloads.append(parsed)
         if returncode != 0:
-            return returncode, b"".join(stdout_parts), b"".join(stderr_parts)
-    return 0, b"".join(stdout_parts), b"".join(stderr_parts)
+            return returncode, _merged_batch_stdout(stdout_payloads), b"".join(stderr_parts)
+    return 0, _merged_batch_stdout(stdout_payloads), b"".join(stderr_parts)
 
 
 def main(argv: list[str]) -> int:
