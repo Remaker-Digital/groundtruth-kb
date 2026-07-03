@@ -255,6 +255,17 @@ Owner-approved by-reference waiver captured at `DELIB-TEST-BY-REFERENCE-WAIVER`.
 
 
 @pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
+def test_claimed_repo_path_parser_preserves_dot_directories(harness_name: str) -> None:
+    helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_dot_paths")
+
+    assert helper._looks_like_claimed_repo_path(".codex/skills/verify/helpers/write_verdict.py")
+    assert helper._looks_like_claimed_repo_path("./.claude/skills/verify/helpers/write_verdict.py")
+    assert helper._looks_like_claimed_repo_path(".cursor/skills/verify/helpers/write_verdict.py,")
+    assert helper._looks_like_claimed_repo_path(".github/workflows/test.yml")
+    assert helper._looks_like_claimed_repo_path(".githooks/pre-commit")
+
+
+@pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
 def test_three_helper_copies_share_validation_behavior(harness_name: str, tmp_path: Path) -> None:
     helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_hardening")
     project_root = tmp_path / "repo"

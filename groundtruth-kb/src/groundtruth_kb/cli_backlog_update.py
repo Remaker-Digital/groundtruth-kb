@@ -233,7 +233,7 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
         try:
             auto_retired_projects = ProjectLifecycleService(db).auto_retire_projects_for_work_item(
                 request.work_item_id,
-                project_root=_PROJECT_ROOT,
+                project_root=Path(config.project_root),
                 changed_by=changed_by,
             )
         except Exception as exc:  # noqa: BLE001 - the work-item update already committed; actuation is best-effort.

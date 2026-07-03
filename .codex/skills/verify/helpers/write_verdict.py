@@ -285,7 +285,7 @@ def _unique_paths(project_root: Path, paths: list[str]) -> tuple[str, ...]:
 
 
 def _looks_like_claimed_repo_path(path_text: str) -> bool:
-    raw = path_text.strip().strip(".,;:)]}").strip()
+    raw = path_text.strip().rstrip(".,;:)]}")
     if not raw or " " in raw:
         return False
     return bool(

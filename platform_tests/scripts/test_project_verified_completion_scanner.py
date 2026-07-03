@@ -599,3 +599,33 @@ def test_wi4737_two_sided_guard_rejects_unlinked_and_unverified(scanner, tmp_pat
 
     verified = scanner.verified_work_items_by_project(tmp_path).get("PROJECT-X", set())
     assert verified == set(), f"two-sided guard breached: {verified}"
+
+
+def test_member_completion_ignores_verified_draft_bridge_file(scanner, tmp_path):
+    """A noncanonical ``*-draft.md`` file must not satisfy VERIFIED evidence."""
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "gtkb-draft-thread-001.md").write_text("NEW\n\nWork Item: WI-1\n", encoding="utf-8")
+    (bridge / "gtkb-draft-thread-002-draft.md").write_text("VERIFIED\n\n# Draft verdict\n", encoding="utf-8")
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        db.insert_project("Draft Project", "test", "seed", id="PROJECT-X", status="active")
+        db.insert_work_item("WI-1", "Member", "new", "backlog", "verified", "test", "seed")
+        db.link_project_work_item("PROJECT-X", "WI-1", "test", "seed")
+        db.add_project_artifact_link(
+            "PROJECT-X",
+            "bridge_thread",
+            "gtkb-draft-thread",
+            "test",
+            "seed implements link",
+            relationship="implements",
+        )
+    finally:
+        db.close()
+
+    result = scanner.member_completion_scan(tmp_path)[0]
+
+    assert result.completion_ready is False
+    assert result.non_verified_implements_bridge_threads == ["gtkb-draft-thread"]
+    assert result.unverified_bridge_work_item_ids == ["WI-1"]
+    assert "missing_verified_bridge_evidence" in result.exclusion_reasons

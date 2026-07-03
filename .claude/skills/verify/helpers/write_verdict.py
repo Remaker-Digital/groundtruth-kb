@@ -39,7 +39,7 @@ from scripts.bridge_author_metadata import (  # noqa: E402
 )
 
 DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-prepopulation.json")
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
+STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
 VERSIONED_BRIDGE_RE_TEMPLATE = r"^{slug}-(?P<version>\d{{3}})\.md$"
 RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
 UNRESOLVED_PLACEHOLDER_RE = re.compile(
@@ -290,7 +290,7 @@ def _unique_paths(project_root: Path, paths: list[str]) -> tuple[str, ...]:
 
 
 def _looks_like_claimed_repo_path(path_text: str) -> bool:
-    raw = path_text.strip().strip(".,;:)]}").strip()
+    raw = path_text.strip().rstrip(".,;:)]}")
     if not raw or " " in raw:
         return False
     return bool(

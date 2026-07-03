@@ -665,14 +665,15 @@ class ProjectLifecycleService:
         )
         return has_completed and not has_active
 
-    def member_completion_status(self, project_id: str) -> dict[str, Any]:
+    def member_completion_status(self, project_id: str, *, project_root: Path | None = None) -> dict[str, Any]:
         """Return the v6 member-WI automatic-retirement readiness record.
 
         ``GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`` v6 retires an
         active project automatically only when it has active member WIs, every
         active member WI has a terminal ``resolution_status``, no active
-        ``plan_incomplete`` guard exists, and no caller has taken the
-        keep-open election.
+        ``plan_incomplete`` guard exists, no caller has taken the keep-open
+        election, and, when a project root is available, every member WI has
+        project-scoped VERIFIED bridge evidence.
         """
         normalized_project_id = _require_nonempty(project_id, "project_id")
         project = self.db.get_project(normalized_project_id)
@@ -697,7 +698,24 @@ class ProjectLifecycleService:
 
         guard_refs = self._project_completion_guard_refs(normalized_project_id)
         keep_open_elected = self._project_keep_open_elected(normalized_project_id)
-        completion_ready = bool(member_ids) and not nonterminal_ids and not guard_refs and not keep_open_elected
+        non_verified_implements: list[str] = []
+        unverified_bridge_member_ids: list[str] = []
+        if project_root is not None:
+            non_verified_implements = sorted(
+                self._non_verified_implements_threads_by_project(project_root).get(normalized_project_id, set())
+            )
+            verified = self._verified_work_items_by_project(project_root).get(normalized_project_id, set())
+            unverified_bridge_member_ids = [work_item_id for work_item_id in member_ids if work_item_id not in verified]
+        verified_bridge_ready = project_root is None or (
+            not non_verified_implements and not unverified_bridge_member_ids
+        )
+        completion_ready = (
+            bool(member_ids)
+            and not nonterminal_ids
+            and not guard_refs
+            and not keep_open_elected
+            and verified_bridge_ready
+        )
         exclusion_reasons: list[str] = []
         if not member_ids:
             exclusion_reasons.append("zero_active_members")
@@ -707,6 +725,10 @@ class ProjectLifecycleService:
             exclusion_reasons.append("plan_incomplete_guard")
         if keep_open_elected:
             exclusion_reasons.append("keep_open_election")
+        if non_verified_implements:
+            exclusion_reasons.append("non_verified_implements_bridge_threads")
+        if unverified_bridge_member_ids:
+            exclusion_reasons.append("missing_verified_bridge_evidence")
 
         return {
             "project_id": normalized_project_id,
@@ -717,13 +739,17 @@ class ProjectLifecycleService:
             "completion_guarded": bool(guard_refs),
             "completion_guard_refs": guard_refs,
             "keep_open_elected": keep_open_elected,
+            "verified_bridge_evidence_required": project_root is not None,
+            "verified_bridge_evidence_ready": verified_bridge_ready,
+            "non_verified_implements_bridge_threads": non_verified_implements,
+            "unverified_bridge_work_item_ids": unverified_bridge_member_ids,
             "completion_ready": completion_ready,
             "exclusion_reasons": exclusion_reasons,
         }
 
-    def member_completion_ready(self, project_id: str) -> bool:
+    def member_completion_ready(self, project_id: str, *, project_root: Path | None = None) -> bool:
         """Return true when a project satisfies the v6 member-WI criterion."""
-        return bool(self.member_completion_status(project_id)["completion_ready"])
+        return bool(self.member_completion_status(project_id, project_root=project_root)["completion_ready"])
 
     def _authorization_completion_ready(
         self,
@@ -1353,7 +1379,7 @@ class ProjectLifecycleService:
         _ = project_root
         normalized_project_id = _require_nonempty(project_id, "project_id")
         try:
-            status = self.member_completion_status(normalized_project_id)
+            status = self.member_completion_status(normalized_project_id, project_root=project_root)
             if not status["completion_ready"]:
                 return None
             self.retire_project(

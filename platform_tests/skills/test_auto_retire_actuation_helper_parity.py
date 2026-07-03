@@ -63,7 +63,10 @@ def _init_verified_repo(tmp_path: Path) -> Path:
     _write(repo / "scripts" / "feature.py", "VALUE = 1\n")
     _git(repo, "add", "--", "bridge/parity-fixture-001.md", "bridge/parity-fixture-002.md", "scripts/feature.py")
     _git(repo, "commit", "-m", "chore: seed bridge thread")
-    _write(repo / "bridge" / "parity-fixture-003.md", "NEW\n\n# Implementation report\n")
+    _write(
+        repo / "bridge" / "parity-fixture-003.md",
+        "NEW\nauthor_identity: prime-builder/test\nauthor_harness_id: T\nauthor_session_context_id: test-prime-session\n\n# Implementation report\n",
+    )
     _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
     return repo
 
@@ -110,8 +113,19 @@ def _seed_retirable_project(project_root: Path) -> None:
     db = KnowledgeDB(project_root / "groundtruth.db")
     try:
         db.insert_project("Parity Project", "test", "seed", id="PROJECT-PARITY", status="active")
-        db.insert_work_item("WI-P1", "Member one", "new", "backlog", "verified", "test", "seed")
-        db.link_project_work_item("PROJECT-PARITY", "WI-P1", "test", "seed")
+        db.insert_work_item("WI-1001", "Member one", "new", "backlog", "verified", "test", "seed")
+        db.link_project_work_item("PROJECT-PARITY", "WI-1001", "test", "seed")
+        bridge = project_root / "bridge"
+        bridge.mkdir(parents=True, exist_ok=True)
+        (bridge / "parity-project-001.md").write_text("VERIFIED\n\nWork Item: WI-1001\n", encoding="utf-8")
+        db.add_project_artifact_link(
+            "PROJECT-PARITY",
+            "bridge_thread",
+            "parity-project",
+            "test",
+            "seed verified bridge evidence",
+            relationship="implements",
+        )
     finally:
         db.close()
 

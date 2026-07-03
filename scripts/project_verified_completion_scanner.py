@@ -124,6 +124,10 @@ class MemberCompletionReadiness:
     completion_guarded: bool
     completion_guard_refs: list[dict[str, Any]]
     keep_open_elected: bool
+    verified_bridge_evidence_required: bool
+    verified_bridge_evidence_ready: bool
+    non_verified_implements_bridge_threads: list[str]
+    unverified_bridge_work_item_ids: list[str]
     completion_ready: bool
     exclusion_reasons: list[str]
 
@@ -138,6 +142,10 @@ class MemberCompletionReadiness:
             completion_guarded=bool(status.get("completion_guarded")),
             completion_guard_refs=list(status.get("completion_guard_refs") or []),
             keep_open_elected=bool(status.get("keep_open_elected")),
+            verified_bridge_evidence_required=bool(status.get("verified_bridge_evidence_required")),
+            verified_bridge_evidence_ready=bool(status.get("verified_bridge_evidence_ready")),
+            non_verified_implements_bridge_threads=list(status.get("non_verified_implements_bridge_threads") or []),
+            unverified_bridge_work_item_ids=list(status.get("unverified_bridge_work_item_ids") or []),
             completion_ready=bool(status.get("completion_ready")),
             exclusion_reasons=list(status.get("exclusion_reasons") or []),
         )
@@ -152,6 +160,10 @@ class MemberCompletionReadiness:
             "completion_guarded": self.completion_guarded,
             "completion_guard_refs": self.completion_guard_refs,
             "keep_open_elected": self.keep_open_elected,
+            "verified_bridge_evidence_required": self.verified_bridge_evidence_required,
+            "verified_bridge_evidence_ready": self.verified_bridge_evidence_ready,
+            "non_verified_implements_bridge_threads": self.non_verified_implements_bridge_threads,
+            "unverified_bridge_work_item_ids": self.unverified_bridge_work_item_ids,
             "completion_ready": self.completion_ready,
             "exclusion_reasons": self.exclusion_reasons,
         }
@@ -464,7 +476,7 @@ def member_completion_scan(project_root: Path = PROJECT_ROOT) -> list[MemberComp
         service = ProjectLifecycleService(db)
         results = [
             MemberCompletionReadiness.from_service_status(
-                service.member_completion_status(str(project.get("id") or ""))
+                service.member_completion_status(str(project.get("id") or ""), project_root=project_root)
             )
             for project in db.list_projects(include_terminal=False)
             if str(project.get("id") or "")
@@ -516,6 +528,10 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"         completion guard: {refs}")
             if r.keep_open_elected:
                 print("         keep-open election: yes")
+            if r.non_verified_implements_bridge_threads:
+                print(f"         non-VERIFIED bridge threads: {', '.join(r.non_verified_implements_bridge_threads)}")
+            if r.unverified_bridge_work_item_ids:
+                print(f"         missing VERIFIED bridge evidence: {', '.join(r.unverified_bridge_work_item_ids)}")
             if r.exclusion_reasons:
                 print(f"         exclusion reasons: {', '.join(r.exclusion_reasons)}")
         return 0

@@ -29,7 +29,6 @@ authorizer alike.
 
 from __future__ import annotations
 
-import fnmatch
 import re
 from pathlib import Path
 
@@ -39,7 +38,7 @@ AUTHOR_SESSION_CONTEXT_UNREADABLE = "author_session_context_unreadable"
 
 #: Header lines a verdict uses to name the artifact it reviews, most specific first.
 _REVIEWED_REFERENCE_RE = re.compile(
-    r"^(?:Responds to|Reviewed report|Reviewed file|Approved proposal):\s*`?([^\s`]+)`?\s*$",
+    r"^(?:Responds to|Reviewed report|Reviewed file|Approved proposal):\s*`?([^\s`]+\.md)`?(?:\s+.*)?$",
     re.IGNORECASE | re.MULTILINE,
 )
 _AUTHOR_LINE_RE = re.compile(r"^author_session_context_id:\s*(\S+)\s*$", re.IGNORECASE)
@@ -82,12 +81,11 @@ def _versioned_bridge_files(bridge_id: str, project_root: Path) -> list[Path]:
     bridge_dir = Path(project_root) / "bridge"
     if not bridge_dir.is_dir():
         return []
-    patterns = (f"{bridge_id}-*.md", f"gtkb-{bridge_id}-*.md")
-    files = [
-        candidate
-        for candidate in bridge_dir.glob("*.md")
-        if any(fnmatch.fnmatch(candidate.name, pattern) for pattern in patterns)
-    ]
+    slugs = {bridge_id}
+    if not bridge_id.startswith("gtkb-"):
+        slugs.add(f"gtkb-{bridge_id}")
+    bridge_file_re = re.compile(rf"^(?:{'|'.join(re.escape(slug) for slug in sorted(slugs))})-\d{{3}}\.md$")
+    files = [candidate for candidate in bridge_dir.glob("*.md") if bridge_file_re.match(candidate.name)]
     files.sort(key=lambda candidate: candidate.name)
     return files
 
