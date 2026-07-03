@@ -274,3 +274,52 @@ def test_bridge_dispatch_report_treats_document_lease_held_as_stale_failure_cont
     )
     assert classification["severity"] == "WARN"
     assert classification["stale_failure_reason"] == "current document_lease_held non-launch"
+
+
+def test_wi5000_dispatch_health_passes_for_impl_auth_quarantine_visibility(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    state_dir.mkdir(parents=True)
+    (state_dir / "dispatch-state.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "updated_at": "2026-07-03T18:00:00Z",
+                "recipients": {
+                    "prime-builder:A": {
+                        "pending_count": 1,
+                        "selected_count": 0,
+                        "last_result": "all_impl_auth_quarantined",
+                        "failure_class": "subprocess_execution_failed",
+                        "last_launch": {
+                            "reason": "all_impl_auth_quarantined",
+                            "recipient": "prime-builder:A",
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    health = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+    assert health.exit_code == 0, health.output
+    health_payload = json.loads(health.output)
+    assert health_payload["health_status"] == "PASS"
+    assert any(
+        "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in finding
+        for finding in health_payload["findings"]
+    )
+
+    report = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--json"])
+    assert report.exit_code == 0, report.output
+    report_payload = json.loads(report.output)
+    assert report_payload["summary"]["health_status"] == "PASS"
+    findings = "\n".join(report_payload["reliability"]["findings"])
+    assert "dispatch runtime failure: prime-builder:A failure_class=subprocess_execution_failed" not in findings
+    assert "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in findings
+    classification = next(
+        row for row in report_payload["reliability"]["runtime_classifications"] if row["recipient"] == "prime-builder:A"
+    )
+    assert classification["severity"] == "PASS"
+    assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"

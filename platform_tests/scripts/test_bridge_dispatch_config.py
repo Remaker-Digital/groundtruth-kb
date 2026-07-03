@@ -1140,9 +1140,104 @@ def test_wi4992_all_impl_auth_quarantine_ignores_stale_failure_class() -> None:
 
     assert "dispatch runtime failure" not in findings
     assert "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in findings
-    assert classification["severity"] == "WARN"
+    assert classification["severity"] == "PASS"
     assert classification["stale_failure_evidence"] is True
     assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
+def test_wi5000_all_impl_auth_quarantine_stale_failure_is_health_pass(tmp_path: Path) -> None:
+    """Deterministic impl-auth quarantine visibility does not degrade dispatch health."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 0,
+                "last_result": "all_impl_auth_quarantined",
+                "failure_class": "subprocess_execution_failed",
+                "last_launch": {
+                    "reason": "all_impl_auth_quarantined",
+                    "recipient": "prime-builder:A",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "PASS"
+    assert "dispatch runtime failure" not in findings
+    assert "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "PASS"
+    assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
+def test_wi5000_all_impl_auth_quarantine_with_live_worker_warns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A concurrent live worker keeps impl-auth quarantine residue WARN-visible."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 0,
+                "last_result": "all_impl_auth_quarantined",
+                "failure_class": "subprocess_execution_failed",
+                "last_launch": {
+                    "reason": "all_impl_auth_quarantined",
+                    "recipient": "prime-builder:A",
+                },
+            }
+        },
+    )
+    _write_live_dispatch_run(tmp_path, "2026-07-03T18-00-00Z-prime-builder-A-live")
+    monkeypatch.setattr(bridge_dispatch_config, "_pid_alive", lambda pid: int(pid) == 424242)
+    monkeypatch.setattr(
+        bridge_dispatch_config,
+        "_pid_create_time_matches",
+        lambda pid, expected: int(pid) == 424242 and float(expected) == 1234.5,
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    assert status.health_status == "WARN"
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "WARN"
+    assert classification["live_inflight_dispatch_count"] == 1
+
+
+def test_wi5000_all_impl_auth_quarantine_circuit_breaker_still_warns(tmp_path: Path) -> None:
+    """Current failure signals still degrade health even when last_result is impl-auth quarantine."""
+    _write_project(tmp_path)
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 0,
+                "last_result": "all_impl_auth_quarantined",
+                "last_launch": {
+                    "reason": "all_impl_auth_quarantined",
+                    "recipient": "prime-builder:A",
+                },
+                "circuit_breaker_tripped": True,
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "WARN"
+    assert "circuit breaker is tripped" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "FAIL"
 
 
 def test_wi4768_per_role_saturation_emits_warn_not_fail(tmp_path: Path) -> None:

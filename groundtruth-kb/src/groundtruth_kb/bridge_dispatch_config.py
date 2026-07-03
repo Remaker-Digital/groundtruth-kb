@@ -675,12 +675,16 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     # backoff, so that finding reflects config/topology impossibility, not a
     # transient state. A recoverable "dispatch runtime failure" finding (e.g. a
     # tripped circuit breaker) on a still-eligible harness yields WARN, not FAIL.
+    health_degrading_findings = _health_degrading_dispatch_findings(findings, runtime_classifications)
     health = (
         "FAIL"
-        if any("no active dispatchable" in finding or finding.startswith("config error") for finding in findings)
+        if any(
+            "no active dispatchable" in finding or finding.startswith("config error")
+            for finding in health_degrading_findings
+        )
         else "PASS"
     )
-    if health == "PASS" and findings:
+    if health == "PASS" and health_degrading_findings:
         health = "WARN"
     return BridgeDispatchStatus(
         config=config,
@@ -794,6 +798,26 @@ def _load_projection(root: Path) -> dict[str, Any]:
 def _runtime_dispatch_findings(root: Path, selected_by_role: dict[str, list[dict[str, Any]]]) -> list[str]:
     findings, _classifications = _runtime_dispatch_evaluation(root, selected_by_role)
     return findings
+
+
+def _health_degrading_dispatch_findings(
+    findings: list[str],
+    runtime_classifications: list[dict[str, Any]],
+) -> list[str]:
+    neutral_findings: set[str] = set()
+    for classification in runtime_classifications:
+        if classification.get("stale_failure_reason") != "current all_impl_auth_quarantined non-launch":
+            continue
+        if _int_value(classification.get("live_inflight_dispatch_count"), default=0) != 0:
+            continue
+        for finding in classification.get("findings", ()):
+            if _is_impl_auth_quarantine_stale_finding(str(finding)):
+                neutral_findings.add(str(finding))
+    return [finding for finding in findings if finding not in neutral_findings]
+
+
+def _is_impl_auth_quarantine_stale_finding(finding: str) -> bool:
+    return "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in finding
 
 
 def _runtime_dispatch_evaluation(
@@ -1281,10 +1305,19 @@ def _runtime_classification_for_recipient(
                 f"{len(unique_slugs)} bridge thread(s) quarantined for malformed status token: "
                 f"{unique_slugs}"
             )
+    health_degrading_findings = [
+        finding
+        for finding in findings
+        if not (
+            stale_failure_reason == "current all_impl_auth_quarantined non-launch"
+            and live_inflight_dispatch_count == 0
+            and _is_impl_auth_quarantine_stale_finding(finding)
+        )
+    ]
     severity = "PASS"
-    if any(finding.startswith("dispatch runtime failure") for finding in findings):
+    if any(finding.startswith("dispatch runtime failure") for finding in health_degrading_findings):
         severity = "FAIL"
-    elif findings:
+    elif health_degrading_findings:
         severity = "WARN"
     return {
         "recipient": recipient_key,
