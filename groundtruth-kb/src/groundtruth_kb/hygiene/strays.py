@@ -9,6 +9,7 @@ DCL, stash, commit, or workspace state.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -25,6 +26,8 @@ from scripts.hygiene.stray_detector import (
     WorktreeEntry,
     detect_strays,
 )
+
+from groundtruth_kb.project.sot_registry import InvalidSoTRecord, UnknownDomain, default_registry_path, load_toml
 
 
 class StraysError(RuntimeError):
@@ -105,11 +108,72 @@ def _normalize_status_path(path: str) -> str:
     return path.replace("\\", "/")
 
 
-def collect_workspace_entries(root: Path, *, now: datetime) -> list[WorkspaceEntry]:
+def _glob_has_magic(pattern: str) -> bool:
+    return any(ch in pattern for ch in "*?[")
+
+
+def _load_active_registry_records(root: Path) -> tuple[Any, ...]:
+    registry_path = default_registry_path(root)
+    if not registry_path.is_file():
+        return ()
+    try:
+        return tuple(record for record in load_toml(registry_path) if record.lifecycle == "active")
+    except (InvalidSoTRecord, UnknownDomain, OSError) as exc:
+        raise StraysError(f"SoT artifact registry could not be loaded: {exc}") from exc
+
+
+def _registry_storage_path(record: Any) -> str:
+    return str(record.storage_path).strip().replace("\\", "/")
+
+
+def _registered_artifact_ids_for_path(rel_path: str, records: tuple[Any, ...]) -> tuple[str, ...]:
+    ids: list[str] = []
+    for record in records:
+        storage = _registry_storage_path(record)
+        if not storage or storage.startswith("membase:") or Path(storage).is_absolute():
+            continue
+        if _glob_has_magic(storage):
+            matched = fnmatch.fnmatch(rel_path, storage)
+        elif storage.endswith("/"):
+            matched = rel_path.startswith(storage.rstrip("/") + "/")
+        else:
+            matched = rel_path == storage
+        if matched:
+            ids.append(str(record.id))
+    return tuple(ids)
+
+
+def _iter_hidden_owner_runtime_artifacts(root: Path, records: tuple[Any, ...]) -> list[tuple[str, tuple[str, ...]]]:
+    hidden: list[tuple[str, tuple[str, ...]]] = []
+    for record in records:
+        storage = _registry_storage_path(record)
+        if (
+            not storage
+            or storage.startswith("membase:")
+            or Path(storage).is_absolute()
+            or _glob_has_magic(storage)
+            or storage.endswith("/")
+            or record.backup_policy != "gitignored_runtime"
+            or record.owner_role != "owner_only"
+        ):
+            continue
+        candidate = root / storage
+        if candidate.is_file():
+            hidden.append((storage, _registered_artifact_ids_for_path(storage, records)))
+    return hidden
+
+
+def collect_workspace_entries(
+    root: Path,
+    *,
+    now: datetime,
+    registered_artifacts: tuple[Any, ...] = (),
+) -> list[WorkspaceEntry]:
     """Collect dirty workspace paths from ``git status --porcelain``."""
     output = _run_git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])
     tokens = output.split("\0")
     entries: list[WorkspaceEntry] = []
+    seen_paths: set[str] = set()
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -125,16 +189,31 @@ def collect_workspace_entries(root: Path, *, now: datetime) -> list[WorkspaceEnt
         rel_path = _normalize_status_path(raw_path)
         tracked = status != "??"
         file_path = root / rel_path
+        registered_artifact_ids = _registered_artifact_ids_for_path(rel_path, registered_artifacts)
+        seen_paths.add(rel_path)
         entries.append(
             WorkspaceEntry(
                 path=rel_path,
                 last_modified=_path_mtime(root, rel_path, fallback=now),
                 tracked=tracked,
-                content_hash=_content_hash(file_path),
+                content_hash=None if registered_artifact_ids else _content_hash(file_path),
+                registered_artifact_ids=registered_artifact_ids,
             )
         )
         if "R" in status or "C" in status:
             index += 1
+    for rel_path, registered_artifact_ids in _iter_hidden_owner_runtime_artifacts(root, registered_artifacts):
+        if rel_path in seen_paths:
+            continue
+        entries.append(
+            WorkspaceEntry(
+                path=rel_path,
+                last_modified=_path_mtime(root, rel_path, fallback=now),
+                tracked=False,
+                content_hash=None,
+                registered_artifact_ids=registered_artifact_ids,
+            )
+        )
     return entries
 
 
@@ -233,7 +312,8 @@ def run_strays(
     if threshold_hours <= 0:
         raise StraysError("--threshold-hours must be greater than zero")
     now = (now or datetime.now(UTC)).astimezone(UTC)
-    workspace_entries = collect_workspace_entries(root, now=now)
+    registered_artifacts = _load_active_registry_records(root)
+    workspace_entries = collect_workspace_entries(root, now=now, registered_artifacts=registered_artifacts)
     stash_entries = collect_stash_entries(root)
     worktree_entries = collect_worktree_entries(root)
     active_session = make_active_session(

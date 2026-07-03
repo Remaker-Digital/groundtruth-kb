@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
 
 
 def _write_project(root: Path) -> Path:
@@ -75,3 +80,31 @@ def test_inventory_refresh_is_read_only_json(tmp_path: Path) -> None:
     payload = json.loads(result.output)
     assert payload["mutated"] is False
     assert payload["summary"]["artifact_count"] == 1
+
+
+def test_inventory_refresh_counts_gitignored_registered_artifact(tmp_path: Path) -> None:
+    config = _write_project(tmp_path)
+    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    registry.write_text(
+        registry.read_text(encoding="utf-8")
+        + """
+
+[[artifacts]]
+id = "owner-local-env"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = ".env.local"
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text(".env.local\n", encoding="utf-8")
+    (tmp_path / ".env.local").write_text("REGISTERED_LOCAL_SENTINEL\n", encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "add", ".gitignore", "config/registry/sot-artifacts.toml", "docs/rule.md")
+
+    result = CliRunner().invoke(main, ["--config", str(config), "admin", "inventory", "refresh", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["summary"]["artifact_count"] == 2
+    assert payload["summary"]["scanned_file_count"] == 2

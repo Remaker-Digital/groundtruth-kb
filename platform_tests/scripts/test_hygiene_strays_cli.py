@@ -40,6 +40,28 @@ def _old_mtime(path: Path, *, hours: int = 13) -> None:
     os.utime(path, (old, old))
 
 
+def _write_sot_registry(repo: Path) -> None:
+    registry_dir = repo / "config" / "registry"
+    registry_dir.mkdir(parents=True)
+    (registry_dir / "sot-artifacts.toml").write_text(
+        """
+[[artifacts]]
+id = "owner-local-env"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = ".env.local"
+authority_spec_id = "GOV-ENV-LOCAL-AUTHORITY-001"
+mutation_api = "owner-managed local file; GT-KB records path authority only"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "gitignored_runtime"
+health_check_function = ""
+owner_role = "owner_only"
+notes = ".env.local is preserved by cleanup scans without reading or serializing credential values."
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+
 def _run_strays(repo: Path, *extra: str) -> dict[str, object]:
     result = CliRunner().invoke(
         main,
@@ -103,6 +125,27 @@ def test_hygiene_strays_active_workspace_path_is_not_stale(tmp_path: Path) -> No
     assert report["counts"]["workspace_active_session"] == 1
     assert finding["classification"] == "active_session"
     assert finding["candidate_action"] == "skip"
+
+
+def test_hygiene_strays_preserves_gitignored_registered_local_artifact(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    _write_sot_registry(repo)
+    (repo / ".gitignore").write_text(".env.local\n", encoding="utf-8")
+    _git(repo, "add", ".gitignore", "config/registry/sot-artifacts.toml")
+    _git(repo, "commit", "-m", "registry")
+    env_local = repo / ".env.local"
+    env_local.write_text("REGISTERED_LOCAL_SENTINEL\n", encoding="utf-8")
+    _old_mtime(env_local)
+
+    report = _run_strays(repo)
+
+    by_path = {finding["path"]: finding for finding in report["workspace_findings"]}
+    assert report["counts"]["workspace_stale"] == 0
+    assert report["counts"]["workspace_registered_artifact"] == 1
+    assert by_path[".env.local"]["classification"] == "registered_artifact"
+    assert by_path[".env.local"]["candidate_action"] == "preserve_registered_artifact"
+    assert by_path[".env.local"]["registered_artifact_ids"] == ["owner-local-env"]
+    assert by_path[".env.local"]["unique_content"] is None
 
 
 def test_hygiene_strays_reports_orphaned_worktree_directory(tmp_path: Path) -> None:

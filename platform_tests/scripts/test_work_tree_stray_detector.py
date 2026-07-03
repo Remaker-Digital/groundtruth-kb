@@ -97,6 +97,22 @@ def test_stale_untracked_file_is_classified_stale(now: datetime) -> None:
     assert finding.candidate_action == "owner_review_stale_untracked_file"
 
 
+def test_registered_artifact_is_preserved_before_untracked_stale_heuristic(now: datetime) -> None:
+    entry = WorkspaceEntry(
+        path=".env.local",
+        last_modified=_hours_ago(now, 24),
+        tracked=False,
+        registered_artifact_ids=("owner-local-env",),
+    )
+
+    finding = classify_workspace_entry(entry, now=now)
+
+    assert finding.classification == "registered_artifact"
+    assert finding.triage_reason == "registered_sot_artifact_preserved"
+    assert finding.candidate_action == "preserve_registered_artifact"
+    assert finding.registered_artifact_ids == ("owner-local-env",)
+
+
 # ---------------------------------------------------------------------------
 # Category 3: recent work below the threshold
 # ---------------------------------------------------------------------------

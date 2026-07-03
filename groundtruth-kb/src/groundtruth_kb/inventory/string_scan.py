@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import subprocess
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,24 +67,6 @@ def _load_registry(project_root: Path, registry_path: Path | None = None) -> lis
     return artifacts
 
 
-def _git_tracked_paths(project_root: Path) -> set[str] | None:
-    proc = subprocess.run(
-        ["git", "-C", str(project_root), "ls-files"],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    if proc.returncode != 0:
-        return None
-    return {line.strip().replace("\\", "/") for line in proc.stdout.splitlines() if line.strip()}
-
-
-def _is_tracked(path: Path, project_root: Path, tracked: set[str] | None) -> bool:
-    if tracked is None:
-        return True
-    return _rel(path, project_root) in tracked
-
-
 def _glob_has_magic(pattern: str) -> bool:
     return any(ch in pattern for ch in "*?[")
 
@@ -93,7 +74,6 @@ def _glob_has_magic(pattern: str) -> bool:
 def _expand_artifact_files(
     artifact: ArtifactRecord,
     project_root: Path,
-    tracked: set[str] | None,
 ) -> tuple[list[Path], bool]:
     storage = artifact.storage_path.strip()
     if not storage or storage.startswith("membase:"):
@@ -110,7 +90,7 @@ def _expand_artifact_files(
             matches = [candidate]
         else:
             matches = []
-    files = [path for path in matches if path.is_file() and _is_tracked(path, project_root, tracked)]
+    files = [path for path in matches if path.is_file()]
     return files, bool(matches) or storage.startswith(".gtkb-state/")
 
 
@@ -118,11 +98,10 @@ def _artifact_inventory(
     project_root: Path, registry_path: Path | None = None
 ) -> tuple[list[ArtifactRecord], dict[str, list[ArtifactRecord]], list[dict[str, str]]]:
     artifacts = _load_registry(project_root, registry_path)
-    tracked = _git_tracked_paths(project_root)
     by_path: dict[str, list[ArtifactRecord]] = {}
     missing: list[dict[str, str]] = []
     for artifact in artifacts:
-        files, resolved = _expand_artifact_files(artifact, project_root, tracked)
+        files, resolved = _expand_artifact_files(artifact, project_root)
         if not resolved:
             missing.append(
                 {

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from groundtruth_kb.inventory import InventoryScanError, emit_markdown_ledger, load_match_file, scan_inventory_strings
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
 
 
 def _write_project(root: Path) -> None:
@@ -31,6 +36,33 @@ storage_path = "runtime/*.txt"
         + "\n",
         encoding="utf-8",
     )
+
+
+def test_scan_inventory_strings_includes_gitignored_registered_artifact(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    registry.write_text(
+        registry.read_text(encoding="utf-8")
+        + """
+
+[[artifacts]]
+id = "owner-local-env"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = ".env.local"
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text(".env.local\n", encoding="utf-8")
+    (tmp_path / ".env.local").write_text("REGISTERED_LOCAL_SENTINEL\n", encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "add", ".gitignore", "config/registry/sot-artifacts.toml", "docs/rule.md", "runtime/state.txt")
+
+    payload = scan_inventory_strings(tmp_path, ["REGISTERED_LOCAL_SENTINEL"])
+
+    assert payload["summary"]["total_hits"] == 1
+    assert payload["hits"][0]["path"] == ".env.local"
+    assert payload["hits"][0]["artifact_id"] == "owner-local-env"
 
 
 def test_scan_inventory_strings_reports_critical_and_warn_hits(tmp_path: Path) -> None:
