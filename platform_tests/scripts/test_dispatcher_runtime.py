@@ -429,6 +429,41 @@ def test_trigger_releases_inflight_lock_after_run(tmp_path: Path) -> None:
     assert trigger.runtime_inflight_active(state_dir) is False
 
 
+def test_operator_quiesce_skips_runtime_before_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trigger = _load_trigger()
+    from groundtruth_kb.bridge_dispatch_config import set_operator_quiesce
+
+    root = tmp_path / "project"
+    root.mkdir()
+    _make_synthetic_project(root)
+    state_dir = tmp_path / "state"
+    set_operator_quiesce(
+        root,
+        reason="commit window",
+        actor="operator",
+        ttl_seconds=600,
+    )
+    spawn_calls: list[dict] = []
+    monkeypatch.setattr(
+        trigger,
+        "_spawn_harness",
+        lambda **kwargs: spawn_calls.append(kwargs) or {"launched": True, "reason": "launched"},
+    )
+
+    result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
+
+    assert result["skipped"] is True
+    assert result["reason"] == trigger.OPERATOR_QUIESCE_ACTIVE_REASON
+    assert result["operator_quiesce"]["active"] is True
+    assert spawn_calls == []
+    state = trigger._load_dispatch_state(state_dir, root)
+    assert state["operator_quiesce"]["active"] is True
+    assert state["operator_quiesce"]["reason"] == "commit window"
+
+
 def test_migration_preserves_explicit_recipient_over_newer_unsuffixed_placeholder(tmp_path: Path) -> None:
     trigger = _load_trigger()
     root = tmp_path / "project"

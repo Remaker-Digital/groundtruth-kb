@@ -438,6 +438,109 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
     assert launch["recipient"] == "prime-builder:B"
 
 
+def test_daemon_operator_quiesce_suppresses_live_spawns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    runtime = daemon._load_dispatch_runtime()
+    daemon.set_operator_quiesce(
+        root,
+        reason="entangled commit window",
+        actor="operator",
+        ttl_seconds=600,
+    )
+    calls: list[dict] = []
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", lambda **kwargs: calls.append(kwargs))
+
+    result = daemon.run_tick(root)
+
+    assert result["mode"] == "live"
+    assert result["operator_quiesce"]["active"] is True
+    assert calls == []
+    assert "spawn_results" not in result
+    dispatchable = [record for record in result["decisions"] if record.get("would_dispatch")]
+    assert dispatchable
+    assert {record.get("reason") for record in dispatchable} == {runtime.OPERATOR_QUIESCE_ACTIVE_REASON}
+    status = daemon.collect_daemon_status(root)
+    assert status["operator_quiesce"]["active"] is True
+
+
+def test_daemon_quiesce_cli_set_status_clear_and_worker_clear_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    worker_env_vars = ("GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_DISPATCH_ID", "GTKB_WORK_INTENT_SESSION_ID")
+    for env_var in worker_env_vars:
+        monkeypatch.delenv(env_var, raising=False)
+
+    rc = daemon.main(
+        [
+            "quiesce",
+            "set",
+            "--project-root",
+            str(root),
+            "--reason",
+            "commit window",
+            "--actor",
+            "operator",
+            "--ttl-seconds",
+            "60",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["active"] is True
+    assert payload["reason"] == "commit window"
+
+    rc = daemon.main(["quiesce", "status", "--project-root", str(root)])
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["active"] is True
+
+    monkeypatch.setenv("GTKB_WORK_INTENT_SESSION_ID", "2026-07-03T15-18-10Z-prime-builder-A-demo")
+    rc = daemon.main(
+        [
+            "quiesce",
+            "clear",
+            "--project-root",
+            str(root),
+            "--reason",
+            "worker attempted clear",
+            "--actor",
+            "worker",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "dispatched workers may not clear" in captured.err
+
+    for env_var in worker_env_vars:
+        monkeypatch.delenv(env_var, raising=False)
+    rc = daemon.main(
+        [
+            "quiesce",
+            "clear",
+            "--project-root",
+            str(root),
+            "--reason",
+            "window complete",
+            "--actor",
+            "operator",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["active"] is False
+    assert payload["status"] == "cleared"
+
+
 def test_daemon_live_spawns_do_not_duplicate_lo_documents_across_targets(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

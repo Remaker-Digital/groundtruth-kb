@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import json
 import os
 import sys
 import tomllib
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,10 +18,12 @@ from groundtruth_kb.bridge_dispatch_rules import DispatchContext, DispatchRule
 DISPATCH_CONFIG_RELATIVE_PATH = Path("config") / "dispatcher" / "rules.toml"
 DISPATCH_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "dispatch-state.json"
 DISPATCH_RUNS_RELATIVE_PATH = DISPATCH_STATE_RELATIVE_PATH.parent / "dispatch-runs"
+OPERATOR_QUIESCE_RELATIVE_PATH = DISPATCH_STATE_RELATIVE_PATH.parent / "operator-quiesce.json"
 
 ROLE_PRIME_BUILDER = "prime-builder"
 ROLE_LOYAL_OPPOSITION = "loyal-opposition"
 DISPATCH_ROLES = (ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION)
+OPERATOR_QUIESCE_ACTIVE_REASON = "operator_quiesce_active"
 
 DEFAULT_SELECTION_ORDER = ("quality", "cost", "availability", "reviewer_precedence", "harness_id")
 GOVERNANCE_GRADE_LO_MIN_QUALITY = 80.0
@@ -39,6 +43,7 @@ RUNTIME_FAILURE_RESULTS = {
 }
 RUNTIME_BACKPRESSURE_RESULTS = frozenset(
     {
+        OPERATOR_QUIESCE_ACTIVE_REASON,
         "provider_failure_backoff_active",
         "provider_rate_limited",
         "retry_delay_enforced",
@@ -98,6 +103,213 @@ PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", PID_CREATE_TIME_SUFFIX)
 TERMINAL_DISPATCH_BRIDGE_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "RETIRED", "SUPERSEDED"})
+_DISPATCH_WORKER_ENV_VARS = (
+    "GTKB_BRIDGE_POLLER_RUN_ID",
+    "GTKB_DISPATCH_ID",
+    "GTKB_WORK_INTENT_SESSION_ID",
+)
+
+
+def _now_utc() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+
+def _coerce_utc(value: dt.datetime) -> dt.datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt.UTC)
+    return value.astimezone(dt.UTC)
+
+
+def _isoformat_z(value: dt.datetime) -> str:
+    return _coerce_utc(value).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _parse_iso_datetime(value: Any) -> dt.datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return _coerce_utc(dt.datetime.fromisoformat(value.strip().replace("Z", "+00:00")))
+    except ValueError:
+        return None
+
+
+def _operator_quiesce_path(project_root: Path) -> Path:
+    return project_root.resolve() / OPERATOR_QUIESCE_RELATIVE_PATH
+
+
+def _read_operator_quiesce_payload(project_root: Path) -> tuple[dict[str, Any] | None, str | None]:
+    path = _operator_quiesce_path(project_root)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, None
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, str(exc)
+    if not isinstance(raw, dict):
+        return None, "operator quiesce state is not a JSON object"
+    return raw, None
+
+
+def _write_operator_quiesce_payload(project_root: Path, payload: dict[str, Any]) -> None:
+    path = _operator_quiesce_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}-{uuid.uuid4().hex[:8]}.tmp")
+    try:
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+
+
+def _is_dispatched_worker_context(environ: dict[str, str] | None = None) -> bool:
+    env = os.environ if environ is None else environ
+    for key in _DISPATCH_WORKER_ENV_VARS:
+        value = str(env.get(key) or "")
+        if "-prime-builder-" in value or "-loyal-opposition-" in value:
+            return True
+    return False
+
+
+def operator_quiesce_status(project_root: Path, *, now: dt.datetime | None = None) -> dict[str, Any]:
+    """Return effective operator-quiesce status without mutating state."""
+    root = project_root.resolve()
+    path = _operator_quiesce_path(root)
+    now_utc = _coerce_utc(now or _now_utc())
+    payload, error = _read_operator_quiesce_payload(root)
+    base: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "active": False,
+        "status": "inactive",
+        "reason": None,
+        "actor": None,
+        "issued_at": None,
+        "expires_at": None,
+        "ttl_seconds": None,
+        "remaining_seconds": None,
+        "warning": None,
+    }
+    if error is not None:
+        base["status"] = "invalid"
+        base["warning"] = error
+        return base
+    if payload is None:
+        return base
+
+    for key in (
+        "reason",
+        "actor",
+        "issued_at",
+        "expires_at",
+        "ttl_seconds",
+        "cleared_at",
+        "cleared_by",
+        "clear_reason",
+        "updated_at",
+    ):
+        if key in payload:
+            base[key] = payload.get(key)
+
+    if payload.get("active") is not True:
+        base["status"] = "cleared" if payload.get("cleared_at") else "inactive"
+        return base
+
+    expires_at = _parse_iso_datetime(payload.get("expires_at"))
+    if expires_at is None:
+        base["status"] = "invalid"
+        base["warning"] = "active operator quiesce state has no valid expires_at"
+        return base
+
+    remaining = (expires_at - now_utc).total_seconds()
+    base["remaining_seconds"] = max(0.0, remaining)
+    if remaining <= 0:
+        base["status"] = "expired"
+        return base
+
+    base["active"] = True
+    base["status"] = "active"
+    return base
+
+
+def set_operator_quiesce(
+    project_root: Path,
+    *,
+    reason: str,
+    actor: str,
+    ttl_seconds: int | None = None,
+    expires_at: str | None = None,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Set a time-bound operator quiesce with required reason and actor metadata."""
+    reason = reason.strip()
+    actor = actor.strip()
+    if not reason:
+        raise ValueError("operator quiesce reason is required")
+    if not actor:
+        raise ValueError("operator quiesce actor is required")
+
+    now_utc = _coerce_utc(now or _now_utc())
+    expires_dt = _parse_iso_datetime(expires_at) if expires_at else None
+    if expires_dt is None:
+        if ttl_seconds is None:
+            raise ValueError("operator quiesce requires --ttl-seconds or --expires-at")
+        if ttl_seconds <= 0:
+            raise ValueError("operator quiesce ttl_seconds must be positive")
+        expires_dt = now_utc + dt.timedelta(seconds=ttl_seconds)
+    if expires_dt <= now_utc:
+        raise ValueError("operator quiesce expires_at must be in the future")
+
+    ttl = int((expires_dt - now_utc).total_seconds())
+    payload = {
+        "schema_version": 1,
+        "active": True,
+        "actor": actor,
+        "reason": reason,
+        "issued_at": _isoformat_z(now_utc),
+        "expires_at": _isoformat_z(expires_dt),
+        "ttl_seconds": ttl,
+        "updated_at": _isoformat_z(now_utc),
+    }
+    _write_operator_quiesce_payload(project_root, payload)
+    return operator_quiesce_status(project_root, now=now_utc)
+
+
+def clear_operator_quiesce(
+    project_root: Path,
+    *,
+    actor: str,
+    reason: str,
+    now: dt.datetime | None = None,
+    environ: dict[str, str] | None = None,
+    allow_dispatched_worker: bool = False,
+) -> dict[str, Any]:
+    """Clear operator quiesce unless the caller is an autonomous dispatch worker."""
+    actor = actor.strip()
+    reason = reason.strip()
+    if not actor:
+        raise ValueError("operator quiesce clear actor is required")
+    if not reason:
+        raise ValueError("operator quiesce clear reason is required")
+    if not allow_dispatched_worker and _is_dispatched_worker_context(environ):
+        raise ValueError("dispatched workers may not clear an active operator quiesce")
+
+    now_utc = _coerce_utc(now or _now_utc())
+    previous = operator_quiesce_status(project_root, now=now_utc)
+    payload = {
+        "schema_version": 1,
+        "active": False,
+        "cleared_at": _isoformat_z(now_utc),
+        "cleared_by": actor,
+        "clear_reason": reason,
+        "previous": previous,
+        "updated_at": _isoformat_z(now_utc),
+    }
+    _write_operator_quiesce_payload(project_root, payload)
+    return operator_quiesce_status(project_root, now=now_utc)
 
 
 @dataclass(frozen=True)
@@ -303,6 +515,7 @@ class BridgeDispatchStatus:
     health_findings: tuple[str, ...]
     consistency_findings: tuple[str, ...] = ()
     runtime_classifications: tuple[dict[str, Any], ...] = ()
+    operator_quiesce: dict[str, Any] = field(default_factory=dict)
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
@@ -313,6 +526,7 @@ class BridgeDispatchStatus:
             "health_findings": list(self.health_findings),
             "consistency_findings": list(self.consistency_findings),
             "runtime_classifications": list(self.runtime_classifications),
+            "operator_quiesce": dict(self.operator_quiesce),
         }
 
 
@@ -425,11 +639,20 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     selected_by_role: dict[str, list[dict[str, Any]]] = {}
     findings: list[str] = []
     consistency_findings = _dispatch_config_consistency_findings(raw_records, config)
+    quiesce = operator_quiesce_status(root)
 
     if config.errors:
         findings.extend(f"config error: {error}" for error in config.errors)
     findings.extend(f"dispatch budget config warning: {error}" for error in config.budget.errors)
     findings.extend(consistency_findings)
+    if quiesce.get("active"):
+        findings.append(
+            "dispatch operator quiesce active "
+            f"until {quiesce.get('expires_at')}: "
+            f"reason={quiesce.get('reason')!r}, actor={quiesce.get('actor')!r}"
+        )
+    elif quiesce.get("status") == "invalid":
+        findings.append(f"dispatch operator quiesce state invalid: {quiesce.get('warning')}")
     for role in DISPATCH_ROLES:
         context = DispatchContext(required_role=role)
         selected = select_dispatch_candidates(list(records), config, context)
@@ -467,6 +690,7 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         health_findings=tuple(findings),
         consistency_findings=tuple(consistency_findings),
         runtime_classifications=tuple(runtime_classifications),
+        operator_quiesce=quiesce,
     )
 
 
@@ -529,6 +753,17 @@ def format_bridge_dispatch_status(status: BridgeDispatchStatus) -> str:
         f"per_user_daily_usd={budget.per_user_daily_usd}"
     )
     lines.append("")
+    quiesce = status.operator_quiesce
+    if quiesce:
+        if quiesce.get("active"):
+            lines.append(
+                "Operator quiesce: active "
+                f"until {quiesce.get('expires_at')} "
+                f"(actor={quiesce.get('actor')}, reason={quiesce.get('reason')})"
+            )
+        else:
+            lines.append(f"Operator quiesce: {quiesce.get('status') or 'inactive'}")
+        lines.append("")
     lines.append("Selected candidates:")
     for role in DISPATCH_ROLES:
         ids = [str(row.get("id")) for row in status.selected_by_role.get(role, [])]

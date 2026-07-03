@@ -29,6 +29,8 @@ _PACKAGE_SRC = _SCRIPTS_DIR.parent / "groundtruth-kb" / "src"
 if _PACKAGE_SRC.is_dir() and str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
+from groundtruth_kb.bridge_dispatch_config import clear_operator_quiesce, set_operator_quiesce  # noqa: E402
+
 DAEMON_STATE_SUBDIR = (".gtkb-state", "dispatcher-daemon")
 BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 DAEMON_SUBSTRATE = "dispatcher_daemon"
@@ -790,6 +792,43 @@ def _execute_live_spawns(
         runtime._reconcile_terminal_bridge_recipient_state(recipients_state, project_root)
 
     spawn_results: list[dict[str, Any]] = []
+    operator_quiesce = runtime.operator_quiesce_status(project_root)
+    if operator_quiesce.get("active"):
+        reason = runtime.OPERATOR_QUIESCE_ACTIVE_REASON
+        for record in decision_records:
+            target = record.get("_spawn_target")
+            selected = record.get("_spawn_selected") or []
+            recipient = (
+                getattr(target, "dispatch_state_key", None)
+                or record.get("recipient")
+                or record.get("role")
+                or "unknown"
+            )
+            result = {
+                "recipient": recipient,
+                "launched": False,
+                "reason": reason,
+                "operator_quiesce": operator_quiesce,
+            }
+            record["spawned"] = False
+            record["spawn_reason"] = reason
+            record["operator_quiesce"] = operator_quiesce
+            prior = recipients_state.get(recipient)
+            recipient_state = dict(prior) if isinstance(prior, dict) else {}
+            recipient_state["updated_at"] = _now_iso()
+            recipient_state["last_result"] = reason
+            recipient_state["pending_count"] = len(selected)
+            recipient_state["selected_count"] = 0
+            recipient_state["last_launch"] = result
+            recipients_state[recipient] = recipient_state
+            if target is not None and selected:
+                spawn_results.append(result)
+        state["operator_quiesce"] = operator_quiesce
+        if not dry_run:
+            state["updated_at"] = _now_iso()
+            runtime._write_dispatch_state(state_dir, state)
+        return spawn_results
+
     tick_prime_fanout: dict[str, list[dict[str, Any]]] = {}
     for record in decision_records:
         target = record.get("_spawn_target")
@@ -1185,14 +1224,21 @@ def run_tick(
     state_dir = _daemon_state_dir(project_root)
     active_substrate = _active_substrate(project_root)
     mode = "live" if active_substrate == DAEMON_SUBSTRATE else "shadow"
+    runtime = _load_dispatch_runtime()
+    operator_quiesce = runtime.operator_quiesce_status(project_root)
+    quiesce_active = bool(operator_quiesce.get("active"))
     raw_decisions = compute_shadow_decisions(project_root, max_items=max_items)
     for record in raw_decisions:
         record["shadow_mode"] = mode == "shadow"
+        if quiesce_active:
+            record["operator_quiesce"] = operator_quiesce
+            if mode == "live" and record.get("_spawn_target") is not None and record.get("_spawn_selected"):
+                record["reason"] = runtime.OPERATOR_QUIESCE_ACTIVE_REASON
         if mode == "live" and "spawned" not in record:
             record["spawned"] = False
 
     spawn_results: list[dict[str, Any]] = []
-    if mode == "live":
+    if mode == "live" and not quiesce_active:
         spawn_results = _execute_live_spawns(
             project_root,
             raw_decisions,
@@ -1245,6 +1291,8 @@ def run_tick(
         "decisions": decisions,
         "dry_run": dry_run,
     }
+    if operator_quiesce.get("exists") or operator_quiesce.get("active"):
+        result["operator_quiesce"] = operator_quiesce
     if spawn_results:
         result["spawn_results"] = spawn_results
     if monitoring is not None:
@@ -1270,6 +1318,8 @@ def run_tick(
             "decision_count": len(decisions),
             "pid": os.getpid(),
         }
+        if operator_quiesce.get("exists") or operator_quiesce.get("active"):
+            status["operator_quiesce"] = operator_quiesce
         if spawn_results:
             status["spawn_count"] = sum(1 for item in spawn_results if item.get("launched"))
         if monitoring is not None:
@@ -1325,6 +1375,8 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
     state_dir = _daemon_state_dir(project_root)
     lock_path = state_dir / LOCK_FILENAME
     heartbeat_path = state_dir / HEARTBEAT_FILENAME
+    runtime = _load_dispatch_runtime()
+    operator_quiesce = runtime.operator_quiesce_status(project_root)
     # WI-4856 fix 2: mode/active_substrate derive from the active substrate
     # selection (mirrors run_tick), not a hardcoded "shadow".
     active_substrate = _active_substrate(project_root)
@@ -1333,6 +1385,7 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
         "running": False,
         "mode": "live" if active_substrate == DAEMON_SUBSTRATE else "shadow",
         "active_substrate": active_substrate,
+        "operator_quiesce": operator_quiesce,
         "heartbeat_path": str(heartbeat_path),
         "lock_path": str(lock_path),
     }
@@ -1391,6 +1444,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     tick_parser.add_argument("--dry-run", action="store_true")
     status_parser = subparsers.add_parser("status", help="Print daemon status JSON and exit.")
     status_parser.add_argument("--project-root", type=Path, default=None)
+    quiesce_parser = subparsers.add_parser("quiesce", help="Manage time-bound operator dispatch quiesce.")
+    quiesce_subparsers = quiesce_parser.add_subparsers(dest="quiesce_command")
+    quiesce_status = quiesce_subparsers.add_parser("status", help="Print operator quiesce JSON and exit.")
+    quiesce_status.add_argument("--project-root", type=Path, default=None)
+    quiesce_set = quiesce_subparsers.add_parser("set", help="Set a time-bound operator quiesce.")
+    quiesce_set.add_argument("--project-root", type=Path, default=None)
+    quiesce_set.add_argument("--reason", required=True)
+    quiesce_set.add_argument("--actor", default=os.environ.get("USERNAME", "operator"))
+    quiesce_set.add_argument("--ttl-seconds", type=int, default=1800)
+    quiesce_set.add_argument("--expires-at", default=None)
+    quiesce_clear = quiesce_subparsers.add_parser("clear", help="Clear operator quiesce.")
+    quiesce_clear.add_argument("--project-root", type=Path, default=None)
+    quiesce_clear.add_argument("--reason", required=True)
+    quiesce_clear.add_argument("--actor", default=os.environ.get("USERNAME", "operator"))
     parser.add_argument("--project-root", type=Path, default=None)
     parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
     parser.add_argument("--once", action="store_true", help="Run one tick and exit.")
@@ -1404,6 +1471,32 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    if args.command == "quiesce":
+        project_root = _resolve_project_root(args.project_root)
+        runtime = _load_dispatch_runtime()
+        command = getattr(args, "quiesce_command", None) or "status"
+        try:
+            if command == "set":
+                payload = set_operator_quiesce(
+                    project_root,
+                    reason=args.reason,
+                    actor=args.actor,
+                    ttl_seconds=args.ttl_seconds,
+                    expires_at=args.expires_at,
+                )
+            elif command == "clear":
+                payload = clear_operator_quiesce(
+                    project_root,
+                    reason=args.reason,
+                    actor=args.actor,
+                )
+            else:
+                payload = runtime.operator_quiesce_status(project_root)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
     if args.command == "status" or getattr(args, "status", False):
         project_root = _resolve_project_root(args.project_root)
         print(json.dumps(collect_daemon_status(project_root), indent=2, sort_keys=True))

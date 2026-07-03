@@ -14,6 +14,7 @@ for module_name in list(sys.modules):
     if module_name == "groundtruth_kb" or module_name.startswith("groundtruth_kb."):
         del sys.modules[module_name]
 
+from groundtruth_kb.bridge_dispatch_config import set_operator_quiesce  # noqa: E402
 from groundtruth_kb.cli import main  # noqa: E402
 
 
@@ -191,6 +192,33 @@ def test_bridge_dispatch_report_human_output_is_compact(tmp_path: Path) -> None:
     assert "Bridge dispatch report:" in result.output
     assert "Selected candidates:" in result.output
     assert "Recent runs:" in result.output
+
+
+def test_dispatch_status_health_and_report_surface_operator_quiesce(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    set_operator_quiesce(
+        root,
+        reason="commit window",
+        actor="operator",
+        ttl_seconds=600,
+    )
+
+    status = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "status", "--json"])
+    assert status.exit_code == 0, status.output
+    status_payload = json.loads(status.output)
+    assert status_payload["operator_quiesce"]["active"] is True
+    assert status_payload["health_status"] == "WARN"
+
+    health = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+    assert health.exit_code == 0, health.output
+    health_payload = json.loads(health.output)
+    assert any("dispatch operator quiesce active" in finding for finding in health_payload["findings"])
+
+    report = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--json"])
+    assert report.exit_code == 0, report.output
+    report_payload = json.loads(report.output)
+    assert any("dispatch operator quiesce active" in finding for finding in report_payload["reliability"]["findings"])
+    assert report_payload["summary"]["health_status"] == "WARN"
 
 
 def test_bridge_dispatch_report_does_not_count_stdout_stderr_only_sidecars_as_live(tmp_path: Path) -> None:

@@ -71,7 +71,11 @@ if _PACKAGE_SRC not in sys.path:
     sys.path.insert(0, _PACKAGE_SRC)
 
 from groundtruth_kb.bridge.role_state import ROLE_STATE_KEYS  # noqa: E402
-from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config  # noqa: E402
+from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
+    OPERATOR_QUIESCE_ACTIVE_REASON,
+    load_bridge_dispatch_config,
+    operator_quiesce_status,
+)
 from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
     dispatch_is_draining,
 )
@@ -1043,6 +1047,24 @@ def _write_quiesce_state(state_dir: Path, payload: dict[str, Any]) -> None:
                 tmp.unlink()
         except OSError:
             pass
+
+
+def _record_operator_quiesce_skip(
+    state_dir: Path,
+    project_root: Path,
+    quiesce: dict[str, Any],
+) -> None:
+    """Record effective operator quiesce without touching per-recipient signatures."""
+    state = _load_dispatch_state(state_dir, project_root)
+    if not isinstance(state, dict):
+        state = {}
+    state["schema_version"] = 1
+    state["updated_at"] = _now_iso()
+    state["operator_quiesce"] = quiesce
+    recipients = state.get("recipients")
+    if not isinstance(recipients, dict):
+        state["recipients"] = {}
+    _write_dispatch_state(state_dir, state)
 
 
 def _quiesce_window_seconds() -> float:
@@ -4963,6 +4985,15 @@ def run_dispatch_cycle(
                     pass
             _record_substrate_mismatch_skip(state_dir, active_substrate)
             return {"skipped": True, "reason": "substrate_mismatch_inert", "active_substrate": active_substrate}
+
+        operator_quiesce = operator_quiesce_status(project_root)
+        if operator_quiesce.get("active"):
+            _record_operator_quiesce_skip(state_dir, project_root, operator_quiesce)
+            return {
+                "skipped": True,
+                "reason": OPERATOR_QUIESCE_ACTIVE_REASON,
+                "operator_quiesce": operator_quiesce,
+            }
 
         # WI-3265 diagnostic instrumentation: capture the baseline at the start of
         # the normal (multi-harness) dispatch path. Observational only — these
