@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-03T03:57:55Z",
+  "generated_at": "2026-07-03T08:52:16Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -32,10 +32,13 @@
             "approval_policy=\"never\"",
             "-c",
             "model_reasoning_effort=\"xhigh\"",
+            "--sandbox",
+            "workspace-write",
             "{{PROMPT}}",
             "--cd",
             "{{PROJECT_ROOT}}"
-          ]
+          ],
+          "can_receive_dispatch": true
         }
       },
       "reviewer_precedence": 20,
@@ -43,12 +46,12 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 47
+      "version": 48
     },
     {
       "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
@@ -142,7 +145,7 @@
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",

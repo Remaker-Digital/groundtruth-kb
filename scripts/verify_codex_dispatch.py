@@ -20,6 +20,11 @@ from scripts.harness_projection_reader import load_harness_projection  # noqa: E
 HARNESS_ID = "A"
 HARNESS_NAME = "codex"
 HARNESS_TYPE = "codex"
+REQUIRED_MODEL = "gpt-5.5"
+REQUIRED_APPROVAL_CONFIG = 'approval_policy="never"'
+REQUIRED_REASONING_CONFIG = 'model_reasoning_effort="xhigh"'
+REQUIRED_SANDBOX_MODE = "workspace-write"
+FORBIDDEN_SANDBOX_MODES = {"danger-full-access"}
 
 
 class VerificationError(RuntimeError):
@@ -41,6 +46,24 @@ def _headless_argv(record: dict[str, Any]) -> list[str]:
     return [str(part) for part in argv if str(part)]
 
 
+def _flag_value(argv: list[str], flag: str) -> str | None:
+    prefix = f"{flag}="
+    for index, part in enumerate(argv):
+        if part == flag:
+            return argv[index + 1] if index + 1 < len(argv) else None
+        if part.startswith(prefix):
+            return part[len(prefix) :]
+    return None
+
+
+def _has_flag_value(argv: list[str], flag: str, expected: str) -> bool:
+    return _flag_value(argv, flag) == expected
+
+
+def _has_config(argv: list[str], expected: str) -> bool:
+    return expected in argv
+
+
 def evaluate_readiness(
     *,
     project_root: Path,
@@ -56,7 +79,23 @@ def evaluate_readiness(
     resolver = executable_resolver or shutil.which
     resolved_executable = resolver(argv[0]) if argv else None
     executable_ok = bool(resolved_executable) if require_executable else True
-    static_ok = bool(argv) and executable_ok
+    model_ok = _has_flag_value(argv, "--model", REQUIRED_MODEL)
+    approval_policy_ok = _has_config(argv, REQUIRED_APPROVAL_CONFIG)
+    reasoning_effort_ok = _has_config(argv, REQUIRED_REASONING_CONFIG)
+    sandbox_mode = _flag_value(argv, "--sandbox")
+    sandbox_forbidden = sandbox_mode in FORBIDDEN_SANDBOX_MODES
+    sandbox_ok = sandbox_mode == REQUIRED_SANDBOX_MODE and not sandbox_forbidden
+    project_root_selector = _flag_value(argv, "--cd")
+    project_root_selector_ok = project_root_selector in {"{{PROJECT_ROOT}}", str(project_root)}
+    static_ok = (
+        bool(argv)
+        and executable_ok
+        and model_ok
+        and approval_policy_ok
+        and reasoning_effort_ok
+        and sandbox_ok
+        and project_root_selector_ok
+    )
     dispatchable = (
         static_ok
         and record.get("status") == "active"
@@ -66,12 +105,22 @@ def evaluate_readiness(
     return {
         "can_receive_dispatch": bool(record.get("can_receive_dispatch")),
         "dispatchable": dispatchable,
+        "approval_policy_ok": approval_policy_ok,
         "executable_ok": executable_ok,
         "harness_id": recipient,
         "harness_name": record.get("harness_name"),
         "headless_argv": argv,
+        "model_ok": model_ok,
+        "project_root_selector": project_root_selector,
+        "project_root_selector_ok": project_root_selector_ok,
         "require_executable": require_executable,
+        "reasoning_effort_ok": reasoning_effort_ok,
         "resolved_executable": resolved_executable,
+        "required_model": REQUIRED_MODEL,
+        "required_sandbox_mode": REQUIRED_SANDBOX_MODE,
+        "sandbox_forbidden": sandbox_forbidden,
+        "sandbox_mode": sandbox_mode,
+        "sandbox_ok": sandbox_ok,
         "static_ok": static_ok,
         "status": record.get("status"),
     }

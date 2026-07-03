@@ -334,7 +334,11 @@ def test_harness_set_invocation_surface_cli_refreshes_projection(tmp_path: Path)
             "--model",
             "gpt-5.5",
             "-c",
+            'approval_policy="never"',
+            "-c",
             'model_reasoning_effort="xhigh"',
+            "--sandbox",
+            "workspace-write",
             "{{PROMPT}}",
             "--cd",
             "{{PROJECT_ROOT}}",
@@ -356,14 +360,19 @@ def test_harness_set_invocation_surface_cli_refreshes_projection(tmp_path: Path)
     assert result.exit_code == 0, result.output
     row = _harness_current(db_path, "A")
     assert row is not None
-    assert json.loads(row["invocation_surfaces"])["headless"]["argv"][2:6] == [
+    assert json.loads(row["invocation_surfaces"])["headless"]["argv"][2:10] == [
         "--model",
         "gpt-5.5",
         "-c",
+        'approval_policy="never"',
+        "-c",
         'model_reasoning_effort="xhigh"',
+        "--sandbox",
+        "workspace-write",
     ]
     role_map = _read_role_map(root)
     assert role_map["A"]["invocation_surfaces"]["headless"]["argv"] == surface["argv"]
+    assert role_map["A"]["invocation_surfaces"]["headless"]["can_receive_dispatch"] is True
 
 
 # --- T-HC-7: set-role assigns one role and preserves active PB/LO invariant ---
