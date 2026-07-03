@@ -313,7 +313,7 @@ def test_deepseek_v4_pro_cloud_route_can_be_selected_explicitly(ollama_harness_m
         'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[routing.ollama]\n"
         'default_model = "deepseek-v4-pro-cloud"\n'
-        "timeout_seconds = 180\n"
+        "timeout_seconds = 1800\n"
         "[routing.ollama.skills]\n"
         'bridge-review = "deepseek-v4-pro-cloud"\n',
         encoding="utf-8",

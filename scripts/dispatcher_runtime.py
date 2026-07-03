@@ -3040,6 +3040,17 @@ LO_REVIEW_WORKER_LIFETIME_SECONDS = 1800  # 30 min: LO/verification review defau
 PB_IMPL_WORKER_LIFETIME_SECONDS = 5400  # 90 min: PB implementation default
 LO_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_LO_SECONDS"
 PB_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_PB_SECONDS"
+HARNESS_WORKER_LIFETIME_ENV_PREFIX = "GTKB_WORKER_LIFETIME_HARNESS_"
+# WI-4986: start with generous harness/model-aware caps, then tighten from
+# measured telemetry. Claude-B/Opus Max review is routinely 15-30 min; Codex-A
+# PB implementation keeps the existing 90 min PB floor; Ollama-D/DeepSeek gets
+# a 30 min review floor instead of the API harness's old 180s fast-fail path.
+HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS = {
+    "A": PB_IMPL_WORKER_LIFETIME_SECONDS,
+    "B": 3600,
+    "D": LO_REVIEW_WORKER_LIFETIME_SECONDS,
+}
+_MODEL_HINT_FLAGS = ("--model", "-m")
 
 
 def _positive_int_env(name: str, default: int) -> int:
@@ -3071,6 +3082,82 @@ def worker_lifetime_seconds(role_label: str | None) -> int | None:
     if role_label == "prime-builder":
         return _positive_int_env(PB_WORKER_LIFETIME_ENV_VAR, PB_IMPL_WORKER_LIFETIME_SECONDS)
     return None
+
+
+def _worker_lifetime_env_var_for_harness(harness_id: str | None) -> str | None:
+    normalized = str(harness_id or "").strip().upper()
+    if not normalized:
+        return None
+    if not re.fullmatch(r"[A-Z0-9_]+", normalized):
+        return None
+    return f"{HARNESS_WORKER_LIFETIME_ENV_PREFIX}{normalized}_SECONDS"
+
+
+def _dispatch_target_model_hint(target: Any) -> str | None:
+    surfaces = getattr(target, "invocation_surfaces", None)
+    if not isinstance(surfaces, dict):
+        return None
+    headless = surfaces.get("headless")
+    if not isinstance(headless, dict):
+        return None
+    argv = headless.get("argv")
+    if not isinstance(argv, list):
+        return None
+    tokens = [str(token) for token in argv]
+    for index, token in enumerate(tokens):
+        if token in _MODEL_HINT_FLAGS and index + 1 < len(tokens):
+            candidate = tokens[index + 1].strip()
+            return candidate or None
+        if token.startswith("--model="):
+            candidate = token.split("=", 1)[1].strip()
+            return candidate or None
+        if token.startswith("model="):
+            candidate = token.split("=", 1)[1].strip()
+            return candidate or None
+    return None
+
+
+def worker_lifetime_profile(target: Any) -> dict[str, Any]:
+    """Return the effective worker lifetime profile for a dispatch target."""
+    harness_id = str(getattr(target, "harness_id", "") or "").strip().upper()
+    role_label = getattr(target, "needed_role_label", None)
+    role_fallback = worker_lifetime_seconds(role_label)
+    env_var = _worker_lifetime_env_var_for_harness(harness_id)
+    profile_key = f"{harness_id}:{getattr(target, 'command_handle', '')}:{role_label}"
+    if env_var:
+        raw = os.environ.get(env_var)
+        if raw is not None:
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                value = 0
+            if value > 0:
+                return {
+                    "seconds": value,
+                    "source": f"env:{env_var}",
+                    "profile": profile_key,
+                    "env_var": env_var,
+                    "role_fallback_seconds": role_fallback,
+                    "model_hint": _dispatch_target_model_hint(target),
+                }
+    if harness_id in HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS:
+        return {
+            "seconds": HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS[harness_id],
+            "source": f"harness_default:{harness_id}",
+            "profile": profile_key,
+            "env_var": env_var,
+            "role_fallback_seconds": role_fallback,
+            "model_hint": _dispatch_target_model_hint(target),
+        }
+    source = f"role_default:{role_label}" if role_fallback is not None else "run_with_status_default"
+    return {
+        "seconds": role_fallback,
+        "source": source,
+        "profile": profile_key,
+        "env_var": env_var,
+        "role_fallback_seconds": role_fallback,
+        "model_hint": _dispatch_target_model_hint(target),
+    }
 
 
 # WI-4805: staleness threshold (seconds) for the operator --reset-recipient
@@ -4128,6 +4215,12 @@ def _spawn_harness(
     # Explicitly strip in case the parent has either set:
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
     env.pop(DISPATCHER_DAEMON_DISABLED_ENV_VAR, None)
+    lifetime_profile = worker_lifetime_profile(target)
+    _worker_lifetime = lifetime_profile.get("seconds")
+    if _worker_lifetime is not None:
+        env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] = str(_worker_lifetime)
+        env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] = str(lifetime_profile.get("source") or "")
+        env["GTKB_DISPATCH_WORKER_LIFETIME_PROFILE"] = str(lifetime_profile.get("profile") or "")
     wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()
 
     selected = _selected_oldest_first(items, max_items)
@@ -4148,10 +4241,6 @@ def _spawn_harness(
         except OSError:
             pass
         wrapped_command.extend(["--stdin", str(stdin_path)])
-    # WI-4845: give dispatched Loyal Opposition / verification workers a longer
-    # lifetime so a full multi-turn bridge review can complete; other roles keep
-    # run_with_status.py's default.
-    _worker_lifetime = worker_lifetime_seconds(target.needed_role_label)
     if _worker_lifetime is not None:
         wrapped_command.extend(["--lifetime", str(_worker_lifetime)])
     wrapped_command.append(str(status_file_path))
@@ -4170,7 +4259,14 @@ def _spawn_harness(
         "selected_documents": [it.document_name for it in selected],
         "selected_top_files": [getattr(it, "top_file", "") for it in selected],
         "primary_bridge_id": selected[0].document_name if selected else "",
+        "worker_lifetime_seconds": _worker_lifetime,
+        "worker_lifetime_source": lifetime_profile.get("source"),
+        "worker_lifetime_profile": lifetime_profile.get("profile"),
+        "worker_lifetime_env_var": lifetime_profile.get("env_var"),
+        "worker_lifetime_role_fallback_seconds": lifetime_profile.get("role_fallback_seconds"),
     }
+    if lifetime_profile.get("model_hint"):
+        meta["worker_lifetime_model_hint"] = lifetime_profile.get("model_hint")
     try:
         try:
             process = subprocess.Popen(
@@ -4312,6 +4408,17 @@ def _launch_ts(launch: dict[str, Any]) -> float | None:
         return None
 
 
+def _launch_elapsed_seconds(launch: dict[str, Any], completed_at: str) -> float | None:
+    launch_ts = _launch_ts(launch)
+    if launch_ts is None:
+        return None
+    try:
+        completed_ts = dt.datetime.fromisoformat(completed_at.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+    return round(max(0.0, completed_ts - launch_ts), 3)
+
+
 def _primary_bridge_id_for_launch(launch: dict[str, Any]) -> str:
     raw_primary = launch.get("primary_bridge_id")
     if isinstance(raw_primary, str) and raw_primary.strip():
@@ -4324,8 +4431,8 @@ def _primary_bridge_id_for_launch(launch: dict[str, Any]) -> str:
     return ""
 
 
-def _document_lease_ttl_seconds(role_label: str | None) -> int:
-    lifetime = worker_lifetime_seconds(role_label) or 0
+def _document_lease_ttl_seconds(role_label: str | None, lifetime_seconds: int | None = None) -> int:
+    lifetime = lifetime_seconds if lifetime_seconds is not None else worker_lifetime_seconds(role_label) or 0
     return max(lifetime + 300, 600)
 
 
@@ -4379,6 +4486,7 @@ def _acquire_dispatch_document_leases(
     state_dir: Path,
     dispatch_id: str,
     dry_run: bool,
+    lifetime_seconds: int | None = None,
 ) -> tuple[list[Any], list[dict[str, Any]], list[Any]]:
     """Acquire dispatcher-owned leases for live LO document spawns."""
 
@@ -4387,7 +4495,7 @@ def _acquire_dispatch_document_leases(
     acquired_items: list[Any] = []
     acquired_records: list[dict[str, Any]] = []
     held_items: list[Any] = []
-    ttl_seconds = _document_lease_ttl_seconds(role_label)
+    ttl_seconds = _document_lease_ttl_seconds(role_label, lifetime_seconds=lifetime_seconds)
     for item in items:
         slug = getattr(item, "document_name", "")
         try:
@@ -4454,6 +4562,16 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         last_launch["exit_code_processed"] = True
         last_launch["exit_processed_at"] = processed_at
         last_launch.setdefault("completed_at", processed_at)
+        elapsed_seconds = _launch_elapsed_seconds(last_launch, processed_at)
+        if elapsed_seconds is not None:
+            last_launch["elapsed_seconds"] = elapsed_seconds
+        if exit_code == 124:
+            configured_lifetime = last_launch.get("worker_lifetime_seconds")
+            if isinstance(configured_lifetime, (int, float)) and configured_lifetime > 0:
+                last_launch["timeout_source"] = "configured_worker_lifetime"
+                last_launch["configured_lifetime_seconds"] = configured_lifetime
+            else:
+                last_launch["timeout_source"] = "run_with_status_default_or_launch_path_drift"
 
         max_retries = _dispatch_max_retries()
 
@@ -4559,12 +4677,29 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                 recipient_state["circuit_breaker_tripped"] = True
                 recipient_state["circuit_breaker_tripped_at"] = _now_iso()
             reason = failure_reason or "subprocess_execution_failed"
+            if reason == "worker_timeout" and not last_launch.get("timeout_source"):
+                last_launch["timeout_source"] = "harness_session_timeout"
             last_launch["exit_failure_reason"] = reason
             recipient_state["last_failure_reason"] = reason
             recipient_state["last_result"] = reason
             recipient_state["failure_class"] = reason
 
             # Since it failed, write to dispatch failures log as well
+            launch_failure_telemetry = {
+                key: last_launch[key]
+                for key in (
+                    "worker_lifetime_seconds",
+                    "worker_lifetime_source",
+                    "worker_lifetime_profile",
+                    "worker_lifetime_env_var",
+                    "worker_lifetime_role_fallback_seconds",
+                    "worker_lifetime_model_hint",
+                    "elapsed_seconds",
+                    "timeout_source",
+                    "configured_lifetime_seconds",
+                )
+                if key in last_launch
+            }
             _record_dispatch_failure(
                 state_dir,
                 {
@@ -4577,6 +4712,7 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                     "exit_code": exit_code,
                     "failure_count": failure_count,
                     "circuit_breaker_tripped": recipient_state.get("circuit_breaker_tripped", False),
+                    **launch_failure_telemetry,
                     **failure_extra,
                 },
             )
@@ -5334,6 +5470,7 @@ def run_dispatch_cycle(
                                     state_dir=state_dir,
                                     dispatch_id=dispatch_id,
                                     dry_run=dry_run,
+                                    lifetime_seconds=worker_lifetime_profile(target).get("seconds"),
                                 )
                                 if acquired_document_leases or lease_held_items:
                                     recipient_state["document_lease_acquired_count"] = len(acquired_document_leases)

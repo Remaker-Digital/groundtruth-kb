@@ -34,10 +34,43 @@ _REPO_ROOT = _SCRIPT_PATH.parents[1]
 # WI-3344: invocation_surfaces headless argv templates. {{PROMPT}} and
 # {{PROJECT_ROOT}} are the placeholder tokens _harness_command substitutes as
 # individual argv elements. Shared by the synthetic fixture and the FR8 tests.
-_CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
+_CODEX_HEADLESS_ARGV = [
+    "codex",
+    "exec",
+    "--model",
+    "gpt-5.5",
+    "-c",
+    'approval_policy="never"',
+    "-c",
+    'model_reasoning_effort="xhigh"',
+    "--sandbox",
+    "workspace-write",
+    "{{PROMPT}}",
+    "--cd",
+    "{{PROJECT_ROOT}}",
+]
+_CODEX_INVOCATION_SURFACES = {"headless": {"argv": _CODEX_HEADLESS_ARGV}}
 _CLAUDE_INVOCATION_SURFACES = {
     "headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}", "--output-format", "json"]}
 }
+
+
+def _expected_codex_command(prompt: str, project_root: Path) -> list[str]:
+    return [
+        "codex",
+        "exec",
+        "--model",
+        "gpt-5.5",
+        "-c",
+        'approval_policy="never"',
+        "-c",
+        'model_reasoning_effort="xhigh"',
+        "--sandbox",
+        "workspace-write",
+        prompt,
+        "--cd",
+        str(project_root),
+    ]
 
 
 def test_codex_hook_commands_do_not_use_foreground_console_launchers() -> None:
@@ -3453,7 +3486,7 @@ def test_harness_command_builds_argv_from_invocation_surfaces(tmp_path: Path, mo
         )
 
     codex_cmd = trigger._harness_command(_target("codex", _CODEX_INVOCATION_SURFACES), prompt, root)
-    assert codex_cmd == ["codex", "exec", prompt, "--cd", str(root)]
+    assert codex_cmd == _expected_codex_command(prompt, root)
 
     claude_cmd = trigger._harness_command(_target("claude", _CLAUDE_INVOCATION_SURFACES), prompt, root)
     assert claude_cmd == [
@@ -3518,7 +3551,7 @@ def test_non_claude_worker_command_does_not_receive_claude_permission_flags(
 
     command = trigger._harness_command(target, "::init gtkb lo\nwork", tmp_path)
 
-    assert command == ["codex", "exec", "::init gtkb lo\nwork", "--cd", str(tmp_path)]
+    assert command == _expected_codex_command("::init gtkb lo\nwork", tmp_path)
     assert "--permission-mode" not in command
     assert "--allowed-tools" not in command
 
@@ -3852,6 +3885,145 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
     assert creationflags & 0x00000200
 
 
+def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="lo",
+        invocation_surfaces={
+            "headless": {
+                "argv": [
+                    "claude",
+                    "--model",
+                    "opus-4.8",
+                    "--reasoning-effort",
+                    "max",
+                    "-p",
+                    "{{PROMPT}}",
+                ]
+            }
+        },
+    )
+
+    monkeypatch.setenv("GTKB_WORKER_LIFETIME_HARNESS_B_SECONDS", "4200")
+
+    profile = trigger.worker_lifetime_profile(target)
+
+    assert profile["seconds"] == 4200
+    assert profile["source"] == "env:GTKB_WORKER_LIFETIME_HARNESS_B_SECONDS"
+    assert profile["role_fallback_seconds"] == 1800
+    assert profile["model_hint"] == "opus-4.8"
+    assert trigger._document_lease_ttl_seconds("loyal-opposition", lifetime_seconds=4200) == 4500
+
+
+@pytest.mark.parametrize(
+    ("role", "harness_id", "handle", "mode", "argv", "status", "expected_seconds", "expected_source"),
+    [
+        (
+            "loyal-opposition",
+            "B",
+            "claude",
+            "lo",
+            ["claude", "--model", "opus-4.8", "--reasoning-effort", "max", "-p", "{{PROMPT}}"],
+            "NEW",
+            3600,
+            "harness_default:B",
+        ),
+        (
+            "loyal-opposition",
+            "D",
+            "ollama",
+            "lo",
+            ["ollama-harness", "{{PROMPT}}"],
+            "NEW",
+            1800,
+            "harness_default:D",
+        ),
+        (
+            "prime-builder",
+            "A",
+            "codex",
+            "pb",
+            _CODEX_HEADLESS_ARGV,
+            "GO",
+            5400,
+            "harness_default:A",
+        ),
+    ],
+)
+def test_spawn_harness_passes_target_lifetime_to_status_wrapper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+    harness_id: str,
+    handle: str,
+    mode: str,
+    argv: list[str],
+    status: str,
+    expected_seconds: int,
+    expected_source: str,
+) -> None:
+    trigger = _load_trigger()
+    for env_id in ("A", "B", "D"):
+        monkeypatch.delenv(f"GTKB_WORKER_LIFETIME_HARNESS_{env_id}_SECONDS", raising=False)
+    target = trigger.DispatchTarget(
+        needed_role_label=role,
+        harness_id=harness_id,
+        command_handle=handle,
+        canonical_mode=mode,
+        invocation_surfaces={"headless": {"argv": argv}},
+    )
+    item = SimpleNamespace(
+        document_name=f"gtkb-lifetime-{harness_id.lower()}",
+        top_status=status,
+        top_file=f"bridge/gtkb-lifetime-{harness_id.lower()}-001.md",
+        dispatchable=True,
+    )
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(
+        trigger,
+        "_issue_dispatch_authorization_for_selected",
+        lambda *args, **kwargs: {"ok": True, "reason": None, "context": {}},
+    )
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id=f"dispatch-lifetime-{harness_id.lower()}",
+    )
+
+    assert meta["launched"] is True
+    assert meta["worker_lifetime_seconds"] == expected_seconds
+    assert meta["worker_lifetime_source"] == expected_source
+    assert meta["worker_lifetime_profile"] == f"{harness_id}:{handle}:{role}"
+    wrapped = captured["args"][0]
+    lifetime_index = wrapped.index("--lifetime")
+    assert wrapped[lifetime_index + 1] == str(expected_seconds)
+    assert lifetime_index < wrapped.index(meta["status_file_path"])
+    env = captured["kwargs"]["env"]
+    assert env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] == str(expected_seconds)
+    assert env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] == expected_source
+
+
 def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4113,7 +4285,7 @@ def test_resolve_dispatch_target_attaches_invocation_surfaces_from_projection(
 
     # End-to-end: the resolved target's surfaces drive _harness_command.
     cmd = trigger._harness_command(target, "the-prompt", root)
-    assert cmd == ["codex", "exec", "the-prompt", "--cd", str(root)]
+    assert cmd == _expected_codex_command("the-prompt", root)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -4419,6 +4591,86 @@ def test_long_running_ollama_timeout_backs_off_from_completion_time(
     d_after = fallback["dispatch_state"]["recipients"]["loyal-opposition:D"]
     assert d_after["last_launch"]["completed_at"]
     assert d_after["last_launch"]["exit_processed_at"]
+
+
+def test_pending_exit_code_records_lifetime_and_elapsed_timeout_telemetry(tmp_path: Path) -> None:
+    """WI-4986: timeout diagnosis carries elapsed/lifetime evidence."""
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "dispatch-timeout-telemetry"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("124", encoding="utf-8")
+    launch = {
+        "dispatch_id": dispatch_id,
+        "recipient": "prime-builder:A",
+        "launched": True,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=3700)).isoformat(),
+        "signature": "abc123",
+        "needed_role_label": "prime-builder",
+        "worker_lifetime_seconds": 3600,
+        "worker_lifetime_source": "harness_default:A",
+        "worker_lifetime_profile": "A:codex:prime-builder",
+        "worker_lifetime_env_var": "GTKB_WORKER_LIFETIME_HARNESS_A_SECONDS",
+        "worker_lifetime_role_fallback_seconds": 5400,
+        "worker_lifetime_model_hint": "gpt-5.5",
+    }
+    recipients_state = {
+        "prime-builder:A": {
+            "last_launch": launch,
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, tmp_path)
+
+    processed_launch = recipients_state["prime-builder:A"]["last_launch"]
+    assert processed_launch["exit_code"] == 124
+    assert processed_launch["timeout_source"] == "configured_worker_lifetime"
+    assert processed_launch["configured_lifetime_seconds"] == 3600
+    assert processed_launch["elapsed_seconds"] >= 3600
+    failures = _failure_records(state_dir)
+    assert failures[-1]["dispatch_id"] == dispatch_id
+    assert failures[-1]["worker_lifetime_seconds"] == 3600
+    assert failures[-1]["worker_lifetime_source"] == "harness_default:A"
+    assert failures[-1]["worker_lifetime_model_hint"] == "gpt-5.5"
+    assert failures[-1]["timeout_source"] == "configured_worker_lifetime"
+    assert failures[-1]["elapsed_seconds"] >= 3600
+
+
+def test_pending_exit_code_surfaces_missing_lifetime_as_launch_path_drift(tmp_path: Path) -> None:
+    """WI-4986: stale daemon or bypassed launch path must not look like a normal timeout."""
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "dispatch-missing-lifetime"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("124", encoding="utf-8")
+    recipients_state = {
+        "prime-builder:A": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "recipient": "prime-builder:A",
+                "launched": True,
+                "launched_at": (datetime.now(UTC) - timedelta(seconds=601)).isoformat(),
+                "signature": "abc123",
+                "needed_role_label": "prime-builder",
+            },
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, tmp_path)
+
+    processed_launch = recipients_state["prime-builder:A"]["last_launch"]
+    assert processed_launch["timeout_source"] == "run_with_status_default_or_launch_path_drift"
+    failures = _failure_records(state_dir)
+    assert failures[-1]["timeout_source"] == "run_with_status_default_or_launch_path_drift"
+    assert "worker_lifetime_seconds" not in failures[-1]
 
 
 def test_lo_provider_failure_backoff_retries_preferred_after_retry_window(
@@ -5218,7 +5470,7 @@ prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"
                 "active",
                 {
                     "headless": {
-                        "argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"],
+                        "argv": _CODEX_HEADLESS_ARGV,
                         "max_items": 1,
                     }
                 },
