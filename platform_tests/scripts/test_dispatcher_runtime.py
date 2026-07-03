@@ -3994,9 +3994,26 @@ def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytes
 
     assert profile["seconds"] == 4200
     assert profile["source"] == "env:GTKB_WORKER_LIFETIME_HARNESS_B_SECONDS"
-    assert profile["role_fallback_seconds"] == 1800
+    assert profile["role_fallback_seconds"] == 3600
     assert profile["model_hint"] == "opus-4.8"
     assert trigger._document_lease_ttl_seconds("loyal-opposition", lifetime_seconds=4200) == 4500
+
+
+def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="Z",
+        command_handle="future-worker",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["future-worker", "{{PROMPT}}"]}},
+    )
+
+    profile = trigger.worker_lifetime_profile(target)
+
+    assert profile["seconds"] == trigger.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
+    assert profile["source"] == "role_default:loyal-opposition"
+    assert profile["role_fallback_seconds"] == trigger.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
 
 
 @pytest.mark.parametrize(
@@ -4014,12 +4031,30 @@ def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytes
         ),
         (
             "loyal-opposition",
+            "C",
+            "antigravity",
+            "lo",
+            [
+                "agy",
+                "--print",
+                "{{PROMPT}}",
+                "--print-timeout",
+                "30m",
+                "--model",
+                "Gemini 3.5 Flash (High)",
+            ],
+            "NEW",
+            3600,
+            "harness_default:C",
+        ),
+        (
+            "loyal-opposition",
             "D",
             "ollama",
             "lo",
             ["ollama-harness", "{{PROMPT}}"],
             "NEW",
-            1800,
+            3600,
             "harness_default:D",
         ),
         (
@@ -4047,7 +4082,7 @@ def test_spawn_harness_passes_target_lifetime_to_status_wrapper(
     expected_source: str,
 ) -> None:
     trigger = _load_trigger()
-    for env_id in ("A", "B", "D"):
+    for env_id in ("A", "B", "C", "D"):
         monkeypatch.delenv(f"GTKB_WORKER_LIFETIME_HARNESS_{env_id}_SECONDS", raising=False)
     target = trigger.DispatchTarget(
         needed_role_label=role,
@@ -4115,7 +4150,22 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
         command_handle="antigravity",
         canonical_mode="lo",
         invocation_surfaces={
-            "headless": {"argv": ["gemini", "-p", "{{PROMPT}}", "--model", "gemini-2.5-flash"], "stdin": True}
+            "headless": {
+                "argv": [
+                    "agy",
+                    "--print",
+                    "{{PROMPT}}",
+                    "--print-timeout",
+                    "30m",
+                    "--model",
+                    "Gemini 3.5 Flash (High)",
+                    "--dangerously-skip-permissions",
+                    "--add-dir",
+                    "{{PROJECT_ROOT}}",
+                ],
+                "stdin": True,
+                "prompt_transport": "stdin",
+            }
         },
     )
     item = type(
@@ -4157,6 +4207,8 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
     )
 
     assert meta["launched"] is True
+    assert meta["worker_lifetime_seconds"] == 3600
+    assert meta["worker_lifetime_source"] == "harness_default:C"
     wrapped = captured["args"][0]
     assert "--stdin" in wrapped
     stdin_path = Path(wrapped[wrapped.index("--stdin") + 1])
@@ -4164,7 +4216,17 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
     assert "gtkb-antigravity-stdin-prompt" in prompt
     status_index = next(index for index, value in enumerate(wrapped) if str(value).endswith(".exit_code"))
     child_argv = wrapped[status_index + 1 :]
-    assert child_argv == ["gemini", "--model", "gemini-2.5-flash"]
+    assert child_argv == [
+        "agy",
+        "--print",
+        "--print-timeout",
+        "30m",
+        "--model",
+        "Gemini 3.5 Flash (High)",
+        "--dangerously-skip-permissions",
+        "--add-dir",
+        str(tmp_path),
+    ]
     assert prompt not in child_argv
 
 

@@ -3051,28 +3051,27 @@ def _load_antigravity_rules(project_root: Path, mode: str) -> str:
     return "\n".join(parts)
 
 
-# WI-4845: per-role worker-lifetime caps (seconds) for dispatched workers. A
-# full multi-turn bridge review (read the version chain, proposal, and specs;
-# run preflights; author and finalize the verdict) or a Prime Builder
-# implementation routinely exceeds the 600s default that run_with_status.py
-# applies, so dispatched workers get a longer, per-role, env-tunable budget. The
-# 80-turn ceiling, per-call timeout, storm-watchdog (WI-4828), and per-role
-# concurrency cap (WI-4472/WI-4858) remain the runaway guards, so a longer
-# lifetime does not re-open the storm. Per Q3 of DELIB-20266203: LO review
-# ~30 min, PB implementation ~90 min, each env-configurable.
-LO_REVIEW_WORKER_LIFETIME_SECONDS = 1800  # 30 min: LO/verification review default
+# WI-4845 / WI-5003: per-role worker-lifetime caps (seconds) for dispatched
+# workers. A full multi-turn bridge review or Prime Builder implementation
+# routinely exceeds the 600s default that run_with_status.py applies, so
+# dispatched workers get a longer, env-tunable budget. Per
+# DELIB-20260703-DISPATCH-OPUS-FLOOR-20RUN-REFINEMENT, every harness starts at
+# an Opus-class floor until 20 profile-specific runs and quality/elapsed-time
+# analysis justify a lower threshold with 95% confidence.
+OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS = 3600
+LO_REVIEW_WORKER_LIFETIME_SECONDS = OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
 PB_IMPL_WORKER_LIFETIME_SECONDS = 5400  # 90 min: PB implementation default
 LO_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_LO_SECONDS"
 PB_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_PB_SECONDS"
 HARNESS_WORKER_LIFETIME_ENV_PREFIX = "GTKB_WORKER_LIFETIME_HARNESS_"
-# WI-4986: start with generous harness/model-aware caps, then tighten from
-# measured telemetry. Claude-B/Opus Max review is routinely 15-30 min; Codex-A
-# PB implementation keeps the existing 90 min PB floor; Ollama-D/DeepSeek gets
-# a 30 min review floor instead of the API harness's old 180s fast-fail path.
+# WI-4986/WI-5003: start with generous harness/model-aware caps, then tighten
+# from measured telemetry. Codex-A PB implementation keeps the existing 90 min
+# PB floor; B/C/D LO targets inherit the Opus-class review floor.
 HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS = {
     "A": PB_IMPL_WORKER_LIFETIME_SECONDS,
-    "B": 3600,
-    "D": LO_REVIEW_WORKER_LIFETIME_SECONDS,
+    "B": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
+    "C": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
+    "D": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
 }
 _MODEL_HINT_FLAGS = ("--model", "-m")
 

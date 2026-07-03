@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-03T08:52:16Z",
+  "generated_at": "2026-07-03T23:25:26Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -11,6 +11,7 @@
       "compact_session_envelope_mode": "native",
       "dispatch_availability": 90.0,
       "dispatch_cost": 60.0,
+      "dispatch_max_items": 1,
       "dispatch_quality": 90.0,
       "dispatch_tags": [
         "prime-builder",
@@ -94,7 +95,7 @@
     {
       "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
@@ -123,12 +124,14 @@
             "--print-timeout",
             "30m",
             "--model",
-            "gemini-2.5-flash",
+            "Gemini 3.5 Flash (High)",
             "--dangerously-skip-permissions",
             "--add-dir",
             "{{PROJECT_ROOT}}"
           ],
-          "can_receive_dispatch": true
+          "can_receive_dispatch": true,
+          "prompt_transport": "stdin",
+          "stdin": true
         },
         "interactive": {
           "kind": "ide",
@@ -140,7 +143,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 30
+      "version": 33
     },
     {
       "activity_envelope_projection_mode": "compact-provider",

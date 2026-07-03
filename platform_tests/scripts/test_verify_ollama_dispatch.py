@@ -368,7 +368,7 @@ def test_deepseek_v4_pro_cloud_route_can_be_selected_explicitly(ollama_harness_m
         'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[routing.ollama]\n"
         'default_model = "deepseek-v4-pro-cloud"\n'
-        "timeout_seconds = 1800\n"
+        "timeout_seconds = 3600\n"
         "[routing.ollama.skills]\n"
         'bridge-review = "deepseek-v4-pro-cloud"\n',
         encoding="utf-8",
@@ -379,6 +379,8 @@ def test_deepseek_v4_pro_cloud_route_can_be_selected_explicitly(ollama_harness_m
 
     assert route.key == "deepseek-v4-pro-cloud"
     assert route.model_id == "deepseek-v4-pro:cloud"
+    assert config.timeout_seconds == 3600
+    assert ollama_harness_module.derive_session_timeout_from_route_timeout(config.timeout_seconds) == 3660
 
 
 def test_bridge_filing_writes_fixture_file_with_NEW_first_line(verify_module, ollama_harness_module, tmp_path) -> None:

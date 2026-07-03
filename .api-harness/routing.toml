@@ -44,7 +44,7 @@ allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing.ollama]
 default_model = "deepseek-v4-pro-cloud"
-timeout_seconds = 1800
+timeout_seconds = 3600
 
 [routing.ollama.skills]
 bridge-review = "deepseek-v4-pro-cloud"
