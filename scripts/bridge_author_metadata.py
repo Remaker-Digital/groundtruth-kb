@@ -20,7 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover
     from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
 
 BRIDGE_AUTHOR_METADATA_STATUSES: frozenset[str] = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}
+    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "NO-ACTION"}
 )
 REQUIRED_AUTHOR_METADATA_FIELDS: tuple[str, ...] = (
     "author_identity",
