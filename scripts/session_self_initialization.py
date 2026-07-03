@@ -6917,7 +6917,7 @@ def _startup_service_context(result: dict[str, Any]) -> str:
         "### Codex Operating Resource Map",
         "",
         "- Resource authority: live project files under `E:\\GT-KB` are canonical; session overlays and generated startup/dashboard summaries are routing context only.",
-        "- Role authority: resolve `harness-state/harness-identities.json` first, then `harness-state/harness-registry.json` (canonical role registry per Slice 1 retirement); role records may be list-valued role sets.",
+        "- Role routing/default fallback: resolve `harness-state/harness-identities.json` first, then `harness-state/harness-registry.json` (canonical role registry per Slice 1 retirement); role records may be list-valued role sets, and explicit session role evidence governs interactive surfaces.",
         "- Bridge authority: read TAFE/dispatcher bridge state and status-bearing versioned files under `bridge/` before bridge queue claims; generated bridge counts are non-authoritative after startup generation.",
         "- Work subject authority: `.claude/session/work-subject.json`; GT-KB infrastructure is default unless owner direction names an application/adopter.",
         "- Knowledge surfaces: use `groundtruth.db` (MemBase), `memory/release-readiness.md`, `.claude/rules/`, `.codex/skills/`, and `docs/gtkb-dashboard/session-startup-report.md` as targeted context sources. Backlog is queried via `gt backlog list`.",

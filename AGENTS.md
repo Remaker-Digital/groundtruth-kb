@@ -42,14 +42,14 @@ As of 2026-05-05, Mike designates:
 - `harness-state/harness-identities.json` as the persistent source of truth for
   host-local harness installation IDs.
 - `harness-state/harness-registry.json` as the canonical role registry — the
-  single source-of-truth operating-role record for those harness IDs per Slice 1
-  retirement. No markdown rule file can override this durable assignment map;
-  rule files are behavior contracts describing how each role operates, not
-  records of which role is active.
+  durable dispatcher/default role record for those harness IDs per Slice 1
+  retirement. No markdown rule file can override this durable dispatch/default
+  metadata; rule files are behavior contracts describing how each role operates,
+  not records of which role is active for interactive surfaces.
 
-Session startup must identify the active harness by its durable installation ID
-before applying role-specific startup text, permissions, restrictions, or hook
-behavior. Current host-local identities:
+Session startup must identify the active harness by its durable installation ID,
+then resolve the session role before applying role-specific startup text,
+permissions, restrictions, or hook behavior. Current host-local identities:
 
 - Codex: `A`
 - Claude Code: `B`
@@ -89,21 +89,26 @@ When any harness is unavailable, any other registered harness (Codex, Claude
 Code, or Antigravity) may be assigned either Prime Builder or Loyal Opposition
 so the normal development process can continue instead of being suspended.
 
-Permissions and restrictions attach to the assigned operating role for the
-harness ID, not to any specific model, vendor, or transient session. When the
-assigned role is Prime Builder, apply only governance, permissions, and
-restrictions that pertain to Prime Builder. When the assigned role is Loyal
-Opposition, apply only governance, permissions, and restrictions that pertain to
-Loyal Opposition. If startup finds no recorded Prime Builder in the role map,
-the starting harness self-assigns Prime Builder and records that correction.
+Permissions and restrictions attach to the resolved session role, not to any
+specific model, vendor, or transient harness label. In headless dispatch, the
+dispatcher composes that session role from the durable role registry and the
+dispatched init keyword; in interactive sessions, transcript-defined role
+evidence can override the durable fallback for in-session surfaces. When the
+resolved session role is Prime Builder, apply only governance, permissions, and
+restrictions that pertain to Prime Builder. When the resolved session role is
+Loyal Opposition, apply only governance, permissions, and restrictions that
+pertain to Loyal Opposition. If startup finds no recorded Prime Builder in the
+role map, the starting harness self-assigns Prime Builder and records that
+correction.
 
 Interactive sessions MAY override the durable role for in-session surfaces — SessionStart disclosure, the workstream-focus menu, MemBase `changed_by` attribution, AUQ routing, and the Claude-native AXIS 2 surface — when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. The transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. This does not change the durable assignment map — runtime marker files such as `.claude/session/active-session-role.json` are cache/state only, not durable role records — and headless dispatch routing remains keyed to the durable role per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
 
 ## Prime Builder File Authority
 
-When the durable operating-role record assigns Prime Builder, the active AI
-harness may create, modify, or delete project files as needed to execute Prime
-Builder work without separate file-by-file owner approval.
+When the resolved session role is Prime Builder, the active AI harness may
+create, modify, or delete project files as needed to execute Prime Builder work
+without separate file-by-file owner approval, subject to the bridge GO and
+implementation-start gates below.
 
 Prime Builder file authority does not waive formal artifact governance,
 credential-safety requirements, release/deployment approval gates, or the normal
@@ -317,9 +322,8 @@ item, and release blockers or release-target constraints when present.
 - Ask Mike before destructive cleanup, credential changes, production
   deployment, or formal artifact mutation that requires explicit approval under
   the active governance rules.
-- If the active harness's resolved durable role record assigns Loyal
-  Opposition mode, return to additive, read-mostly behavior unless Mike
-  authorizes implementation work.
+- If the resolved session role is Loyal Opposition, return to additive,
+  read-mostly behavior unless Mike authorizes implementation work.
 - Exception: correct bridge function and bridge use are owner-authorized
   standing work. Loyal Opposition may diagnose, repair, and update bridge files,
   bridge configuration, startup behavior, generated bridge-status surfaces, and

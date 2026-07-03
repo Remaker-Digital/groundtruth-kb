@@ -473,6 +473,7 @@ def _make_status_file(
     agent: str,
     updated_at: str,
     state: str = "no_pending",
+    pending_count: int = 0,
 ) -> Path:
     """Write a smart-poller dispatch-state JSON file under the new path.
 
@@ -495,7 +496,7 @@ def _make_status_file(
             role: {
                 "updated_at": updated_at,
                 "last_result": state,
-                "pending_count": 0,
+                "pending_count": pending_count,
                 "raw_pending_count": 0,
                 "filtered_terminal_count": 0,
                 "signature": "test-fixture",
@@ -541,7 +542,7 @@ def test_bridge_poller_fresh_file_ok(tmp_path: Path) -> None:
 
 def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
     """dispatch-state recipient updated 5 min ago → WARN."""
-    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10))
+    _make_status_file(tmp_path, "codex", _utc_now_minus_seconds(5 * 60 + 10), "pending", pending_count=1)
     result = _check_bridge_dispatch_liveness(tmp_path, "codex")
     assert result.status == "warning", f"Expected warning, got {result.status}: {result.message}"
     assert "WARN" in result.message
@@ -549,7 +550,7 @@ def test_bridge_poller_5_min_old_warn(tmp_path: Path) -> None:
 
 def test_bridge_poller_15_min_old_alarm(tmp_path: Path) -> None:
     """dispatch-state recipient updated 15 min ago → ALARM."""
-    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60))
+    _make_status_file(tmp_path, "claude", _utc_now_minus_seconds(15 * 60), "pending", pending_count=1)
     result = _check_bridge_dispatch_liveness(tmp_path, "claude")
     assert result.status == "fail", f"Expected fail, got {result.status}: {result.message}"
     assert "ALARM" in result.message

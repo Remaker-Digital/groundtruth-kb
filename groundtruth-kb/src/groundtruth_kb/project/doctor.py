@@ -5447,6 +5447,103 @@ def _check_role_set_topology_consistency(target: Path) -> ToolCheck:
     )
 
 
+_ROLE_AUTHORITY_BOUNDARY_SCAN_PATHS = (
+    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
+    Path(".claude") / "rules" / "canonical-terminology.md",
+    Path(".claude") / "rules" / "operating-role.md",
+    Path("config") / "agent-control" / "SESSION-STARTUP-INDEX.md",
+    Path("scripts") / "session_role_resolution.py",
+    Path("scripts") / "session_self_initialization.py",
+    Path("scripts") / "bridge_work_intent_registry.py",
+    Path("scripts") / "bridge_claim_cli.py",
+    Path("scripts") / "_kb_attribution.py",
+    Path("groundtruth-kb") / "src" / "groundtruth_kb" / "mcp_surface" / "roles.py",
+)
+_ROLE_AUTHORITY_FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bdurable\s+map\s+wins\b", re.IGNORECASE),
+    re.compile(
+        r"\bdurable\s+(?:operating-?role|role)\s+record\s+assigns\s+(?:prime\s+builder|loyal\s+opposition)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bresolved\s+durable\s+role\s+record\s+assigns\s+(?:prime\s+builder|loyal\s+opposition)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bcanonical\s+role\s+registry\b.*\bsingle\s+source-of-truth\s+operating-role\s+record\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bdurable\s+role\b.*\b(?:permissions|restrictions|hook behavior|file authority)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\brole\s+authority:\s+resolve\b.*\bharness-state/harness-registry\.json\b", re.IGNORECASE),
+)
+_ROLE_AUTHORITY_QUALIFIERS = (
+    "headless dispatch",
+    "dispatch routing",
+    "dispatcher",
+    "fallback",
+    "routing labels only",
+    "interactive surfaces only",
+    "not authority",
+    "not behavior",
+    "display",
+    "labelling",
+    "labeling",
+    "metadata",
+    "schema",
+    "topology",
+    "provenance",
+)
+
+
+def _line_has_role_authority_boundary_violation(line: str) -> bool:
+    lowered = line.lower()
+    if any(qualifier in lowered for qualifier in _ROLE_AUTHORITY_QUALIFIERS):
+        return False
+    return any(pattern.search(line) for pattern in _ROLE_AUTHORITY_FORBIDDEN_PATTERNS)
+
+
+def _check_role_authority_boundary(target: Path) -> ToolCheck:
+    """Fail when non-dispatcher surfaces treat durable registry role as behavior authority."""
+
+    findings: list[str] = []
+    scanned = 0
+    for rel_path in _ROLE_AUTHORITY_BOUNDARY_SCAN_PATHS:
+        path = target / rel_path
+        if not path.is_file():
+            continue
+        scanned += 1
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            findings.append(f"{rel_path.as_posix()}: unreadable: {exc}")
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            if _line_has_role_authority_boundary_violation(line):
+                findings.append(f"{rel_path.as_posix()}:{line_number}: {line.strip()[:160]}")
+
+    if findings:
+        first = findings[0]
+        extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+        return ToolCheck(
+            name="Role-authority boundary",
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(findings)} registry-authority boundary findings; first: {first}{extra}",
+        )
+    return ToolCheck(
+        name="Role-authority boundary",
+        required=True,
+        found=scanned > 0,
+        status="pass",
+        message=f"role-authority boundary clean across {scanned} surfaces",
+    )
+
+
 def _check_da_harvest_coverage(target: Path) -> ToolCheck:
     """Check DA bridge-thread coverage for active VERIFIED threads.
 
@@ -6203,6 +6300,7 @@ def run_doctor(
         checks.append(_check_harness_local_scratchpad_boundary(target))
         checks.append(_check_external_harness_exec_boundary(target))
         checks.append(_check_role_set_topology_consistency(target))
+        checks.append(_check_role_authority_boundary(target))
         # Slice 7 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE: read-only
         # session-state role marker diagnostics (validity + best-effort staleness).
         checks.append(_check_session_role_marker_validity(target))

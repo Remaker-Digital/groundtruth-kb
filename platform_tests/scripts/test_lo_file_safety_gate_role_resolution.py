@@ -429,6 +429,39 @@ def test_is_lo_enforced_true_when_no_marker_session_envelope_lo(
 
 
 # ---------------------------------------------------------------------------
+# Test 6c: No marker, durable LO + open session envelope PB -> False
+# Models ::init gtkb pb overriding durable registry fallback for this session.
+# ---------------------------------------------------------------------------
+
+
+def test_is_lo_enforced_false_when_durable_lo_session_envelope_pb(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit open PB session envelope takes precedence over durable LO."""
+    _write_durable_role(project_root, "B", "loyal-opposition", "claude")
+    _write_envelope(project_root, "prime-builder", "claude")
+
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_root))
+    monkeypatch.delenv("GTKB_HARNESS_NAME", raising=False)
+    monkeypatch.delenv("GTKB_ACTIVE_HARNESS_ID", raising=False)
+    monkeypatch.delenv("GTKB_HARNESS_ID", raising=False)
+    for var in (
+        "GTKB_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "ANTIGRAVITY_SESSION_ID",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    payload: dict = {}
+    result = _is_lo_enforced(project_root, payload)
+    assert result is False, "Durable LO + open session envelope PB -> writes allowed (False)"
+
+
+# ---------------------------------------------------------------------------
 # Test 7: No marker, durable PB → False (writes allowed)
 # Durable PB with no marker still allows writes
 # ---------------------------------------------------------------------------
