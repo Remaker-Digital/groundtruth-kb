@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +58,7 @@ RUNTIME_FAILURE_CLASSES = {
     "subprocess_execution_failed",
     "worker_timeout",
     "work_intent_acquire_failed",
+    "verified_finalization_missing_commit",
 }
 RUNTIME_BACKPRESSURE_CLASSES = frozenset({"provider_failure_backoff_active", "provider_rate_limited"})
 RUNTIME_FAILURE_LAUNCH_REASONS = RUNTIME_FAILURE_RESULTS | {
@@ -1148,19 +1151,30 @@ def _latest_bridge_status_for_document(project_root: Path, bridge_id: str) -> st
     bridge_id = bridge_id.strip()
     if not bridge_id:
         return None
-    bridge_dir = project_root / "bridge"
-    if not bridge_dir.is_dir():
+    helper = _load_bridge_thread_files_helper(project_root)
+    if helper is None:
         return None
-    candidates = list(bridge_dir.glob(f"{bridge_id}-*.md"))
-    if not bridge_id.startswith("gtkb-"):
-        candidates.extend(bridge_dir.glob(f"gtkb-{bridge_id}-*.md"))
-    if not candidates:
+    return helper.latest_bridge_status_for_thread(
+        project_root,
+        bridge_id,
+        status_reader=_status_from_bridge_file,
+    )
+
+
+def _load_bridge_thread_files_helper(project_root: Path):
+    helper_path = project_root / "scripts" / "bridge_thread_files.py"
+    if not helper_path.is_file():
         return None
-    for path in sorted({path for path in candidates if path.is_file()}, key=lambda item: item.name, reverse=True):
-        status = _status_from_bridge_file(path)
-        if status is not None:
-            return status
-    return None
+    spec = importlib.util.spec_from_file_location("_gtkb_bridge_thread_files_for_dispatch_config", helper_path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    try:
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+    except Exception:
+        return None
+    return module
 
 
 def _status_from_bridge_file(path: Path) -> str | None:

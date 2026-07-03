@@ -136,7 +136,13 @@ def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, A
 
 
 from _env import load_env_local  # noqa: E402, I001
-from bridge_lease_registry import is_lease_held  # noqa: E402, I001
+from bridge_lease_registry import LeaseHandle, acquire_lease, is_lease_held, release_lease  # noqa: E402, I001
+from bridge_thread_files import (  # noqa: E402, I001
+    find_bridge_verdict_after,
+    latest_bridge_status_for_thread,
+    parse_versioned_bridge_filename,
+    versioned_bridge_files,
+)
 from bridge_work_intent_registry import (  # noqa: E402, I001
     MalformedBridgeStatusError,
     WorkIntentRegistryError,
@@ -287,6 +293,8 @@ FATAL_WORKER_OUTPUT_MARKERS = (
     ("guard denied Write", "guard_denied_write"),
     ("guard denied", "guard_denial"),
 )
+POST_VERDICT_RECONCILABLE_FAILURE_CLASSES = frozenset({"max_turn_exhaustion", "worker_timeout"})
+VERIFIED_FINALIZATION_MISSING_COMMIT = "verified_finalization_missing_commit"
 FAST_TRIP_FAILURE_CLASSES = frozenset(
     {
         "auth_failure",
@@ -296,6 +304,7 @@ FAST_TRIP_FAILURE_CLASSES = frozenset(
         "guard_denied_write",
         "guard_denial",
         "worker_timeout",
+        VERIFIED_FINALIZATION_MISSING_COMMIT,
     }
 )
 NON_RETRYABLE_WORKER_FAILURE_CLASSES = frozenset({"harness_unavailable_tier"})
@@ -2500,8 +2509,6 @@ def _self_review_refusal_reason(
     When no versioned file exists yet there is nothing to self-review, so this
     returns ``None`` rather than failing closed.
     """
-    import fnmatch
-
     from bridge_review_independence import (
         AUTHOR_SESSION_CONTEXT_UNREADABLE,
         parse_author_session_context_id,
@@ -2512,18 +2519,10 @@ def _self_review_refusal_reason(
     if not bridge_dir.is_dir():
         return None
 
-    pattern1 = f"gtkb-{bridge_id}-*.md"
-    pattern2 = f"{bridge_id}-*.md"
-
-    candidate_files = [
-        file
-        for file in bridge_dir.glob("*.md")
-        if fnmatch.fnmatch(file.name, pattern1) or fnmatch.fnmatch(file.name, pattern2)
-    ]
+    candidate_files = versioned_bridge_files(project_root, bridge_id)
     if not candidate_files:
         return None
 
-    candidate_files.sort(key=lambda f: f.name)
     latest_file = candidate_files[-1]
 
     try:
@@ -2561,36 +2560,79 @@ def _find_dispatch_verdict(
     dispatch_ts: float,
     bridge_id: str,
     project_root: Path,
+    after_version: int | None = None,
 ) -> tuple[str | None, float | None]:
     """Return a verdict file created after dispatch_ts, without polling."""
-    import fnmatch
 
     if not bridge_id:
         return None, None
-    bridge_dir = project_root / "bridge"
-    if not bridge_dir.is_dir():
+    verdict = find_bridge_verdict_after(
+        project_root=project_root,
+        slug=bridge_id,
+        dispatch_ts=dispatch_ts,
+        verdict_statuses=_DISPATCH_VERDICT_STATUSES,
+        status_reader=_status_from_bridge_file,
+        after_version=after_version,
+    )
+    if verdict is None:
         return None, None
-
-    pattern1 = f"gtkb-{bridge_id}-*.md"
-    pattern2 = f"{bridge_id}-*.md"
-    candidate_files = []
-    for file in bridge_dir.glob("*.md"):
-        name = file.name
-        if fnmatch.fnmatch(name, pattern1) or fnmatch.fnmatch(name, pattern2):
-            try:
-                mtime = file.stat().st_mtime
-                if mtime >= dispatch_ts and _status_from_bridge_file(file) in _DISPATCH_VERDICT_STATUSES:
-                    candidate_files.append((file, mtime))
-            except OSError:
-                continue
-
-    if not candidate_files:
-        return None, None
-    candidate_files.sort(key=lambda x: x[1])
-    chosen_file, chosen_mtime = candidate_files[0]
-    rel_path = f"bridge/{chosen_file.name}"
-    latency = max(0.0, chosen_mtime - dispatch_ts)
+    rel_path = f"bridge/{verdict.path.name}"
+    latency = max(0.0, verdict.mtime - dispatch_ts)
     return rel_path, latency
+
+
+def _git_commit_containing_path(project_root: Path, rel_path: str) -> str | None:
+    """Return latest commit containing ``rel_path``, or None when uncommitted."""
+
+    if shutil.which("git") is None:
+        return None
+    try:
+        log_result = subprocess.run(
+            ["git", "log", "-1", "--format=%H", "--", rel_path],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=15,
+            **no_window_subprocess_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if log_result.returncode != 0:
+        return None
+    commit_sha = next((line.strip() for line in log_result.stdout.splitlines() if line.strip()), "")
+    if not commit_sha:
+        return None
+    try:
+        cat_result = subprocess.run(
+            ["git", "cat-file", "-e", f"{commit_sha}:{rel_path}"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=15,
+            **no_window_subprocess_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return commit_sha if cat_result.returncode == 0 else None
+
+
+def _selected_top_version_for_launch(launch: dict[str, Any], bridge_id: str) -> int | None:
+    top_files = launch.get("selected_top_files")
+    if not isinstance(top_files, list):
+        return None
+    accepted_slugs = {bridge_id}
+    if not bridge_id.startswith("gtkb-"):
+        accepted_slugs.add(f"gtkb-{bridge_id}")
+    for raw_path in top_files:
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        parsed = parse_versioned_bridge_filename(Path(raw_path).name)
+        if parsed is None:
+            continue
+        slug, version = parsed
+        if slug in accepted_slugs:
+            return version
+    return None
 
 
 def _poll_and_log_verdict(
@@ -2721,21 +2763,7 @@ def _latest_bridge_status_for_document(project_root: Path | None, bridge_id: str
     bridge_id = bridge_id.strip()
     if not bridge_id:
         return None
-    bridge_dir = project_root / "bridge"
-    if not bridge_dir.is_dir():
-        return None
-
-    candidate_files = list(bridge_dir.glob(f"{bridge_id}-*.md"))
-    if not bridge_id.startswith("gtkb-"):
-        candidate_files.extend(bridge_dir.glob(f"gtkb-{bridge_id}-*.md"))
-    if not candidate_files:
-        return None
-    candidate_files = sorted({path for path in candidate_files if path.is_file()}, key=lambda path: path.name)
-    for path in reversed(candidate_files):
-        status = _status_from_bridge_file(path)
-        if status is not None:
-            return status
-    return None
+    return latest_bridge_status_for_thread(project_root, bridge_id, status_reader=_status_from_bridge_file)
 
 
 def _bridge_ids_from_recipient_state(recipient_state: dict[str, Any]) -> list[str]:
@@ -4140,6 +4168,7 @@ def _spawn_harness(
         "needed_role_label": target.needed_role_label,
         "status_file_path": str(status_file_path),
         "selected_documents": [it.document_name for it in selected],
+        "selected_top_files": [getattr(it, "top_file", "") for it in selected],
         "primary_bridge_id": selected[0].document_name if selected else "",
     }
     try:
@@ -4295,6 +4324,89 @@ def _primary_bridge_id_for_launch(launch: dict[str, Any]) -> str:
     return ""
 
 
+def _document_lease_ttl_seconds(role_label: str | None) -> int:
+    lifetime = worker_lifetime_seconds(role_label) or 0
+    return max(lifetime + 300, 600)
+
+
+def _document_lease_record(handle: LeaseHandle) -> dict[str, Any]:
+    return {
+        "doc_slug": handle.doc_slug,
+        "lease_token": handle.lease_token,
+        "action": handle.action,
+        "ttl_seconds": handle.ttl_seconds,
+        "path": str(handle.path),
+    }
+
+
+def _document_lease_handle_from_record(record: dict[str, Any]) -> LeaseHandle | None:
+    try:
+        doc_slug = str(record["doc_slug"])
+        lease_token = str(record["lease_token"])
+        action = str(record["action"])
+        ttl_seconds = int(record["ttl_seconds"])
+        path = Path(str(record["path"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return LeaseHandle(
+        doc_slug=doc_slug,
+        lease_token=lease_token,
+        action=action,
+        ttl_seconds=ttl_seconds,
+        path=path,
+    )
+
+
+def _release_document_lease_records(records: Any) -> list[str]:
+    if not isinstance(records, list):
+        return []
+    released: list[str] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        handle = _document_lease_handle_from_record(record)
+        if handle is None:
+            continue
+        release_lease(handle)
+        released.append(handle.doc_slug)
+    return released
+
+
+def _acquire_dispatch_document_leases(
+    items: list[Any],
+    *,
+    role_label: str,
+    state_dir: Path,
+    dispatch_id: str,
+    dry_run: bool,
+) -> tuple[list[Any], list[dict[str, Any]], list[Any]]:
+    """Acquire dispatcher-owned leases for live LO document spawns."""
+
+    if dry_run or role_label != "loyal-opposition":
+        return items, [], []
+    acquired_items: list[Any] = []
+    acquired_records: list[dict[str, Any]] = []
+    held_items: list[Any] = []
+    ttl_seconds = _document_lease_ttl_seconds(role_label)
+    for item in items:
+        slug = getattr(item, "document_name", "")
+        try:
+            handle = acquire_lease(
+                str(slug),
+                action=f"dispatch:{dispatch_id}",
+                state_dir=state_dir,
+                ttl_seconds=ttl_seconds,
+            )
+        except ValueError:
+            handle = None
+        if handle is None:
+            held_items.append(item)
+            continue
+        acquired_items.append(item)
+        acquired_records.append(_document_lease_record(handle))
+    return acquired_items, acquired_records, held_items
+
+
 def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Path, project_root: Path) -> None:
     """Check prior launch status files and update signature state."""
     for recipient, recipient_state in list(recipients_state.items()):
@@ -4350,30 +4462,61 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         failure_error_type: str | None = None
         failure_extra: dict[str, Any] = {}
         post_verdict_exit_reconciled = False
-        if matched_markers:
-            failure_reason = matched_markers[0]["label"]
-            failure_error_type = "fatal_worker_output_marker"
-            failure_extra.update(inspected_paths)
-            failure_extra["matched_markers"] = matched_markers
-        elif last_launch.get("needed_role_label") == "loyal-opposition":
+        if last_launch.get("needed_role_label") == "loyal-opposition":
             dispatch_ts = _launch_ts(last_launch)
             bridge_id = _primary_bridge_id_for_launch(last_launch)
+            after_version = _selected_top_version_for_launch(last_launch, bridge_id)
             verdict_path, verdict_latency = (
-                _find_dispatch_verdict(dispatch_ts=dispatch_ts, bridge_id=bridge_id, project_root=project_root)
+                _find_dispatch_verdict(
+                    dispatch_ts=dispatch_ts,
+                    bridge_id=bridge_id,
+                    project_root=project_root,
+                    after_version=after_version,
+                )
                 if dispatch_ts is not None
                 else (None, None)
             )
             if verdict_path:
+                verdict_status = _status_from_bridge_file(project_root / verdict_path)
                 last_launch["verdict_path"] = verdict_path
+                if verdict_status:
+                    last_launch["verdict_status"] = verdict_status
                 last_launch["verdict_latency_seconds"] = verdict_latency
-                if exit_code != 0:
-                    last_launch["exit_reconciled_after_verdict"] = True
-                    last_launch["post_verdict_exit_code"] = exit_code
-                    post_verdict_exit_reconciled = True
+                if verdict_status == "VERIFIED":
+                    commit_sha = _git_commit_containing_path(project_root, verdict_path)
+                    if commit_sha:
+                        last_launch["verified_commit_sha"] = commit_sha
+                    else:
+                        failure_reason = VERIFIED_FINALIZATION_MISSING_COMMIT
+                        failure_error_type = VERIFIED_FINALIZATION_MISSING_COMMIT
+                        failure_extra["verdict_path"] = verdict_path
+                if failure_reason is None and exit_code != 0:
+                    matched_label = str(matched_markers[0]["label"]) if matched_markers else ""
+                    if matched_label and matched_label not in POST_VERDICT_RECONCILABLE_FAILURE_CLASSES:
+                        failure_reason = matched_label
+                        failure_error_type = "fatal_worker_output_marker"
+                        failure_extra.update(inspected_paths)
+                        failure_extra["matched_markers"] = matched_markers
+                    else:
+                        if matched_markers:
+                            last_launch["post_verdict_reconciled_markers"] = matched_markers
+                        last_launch["exit_reconciled_after_verdict"] = True
+                        last_launch["post_verdict_exit_code"] = exit_code
+                        post_verdict_exit_reconciled = True
             elif exit_code == 0:
                 failure_reason = "no_verdict_produced"
                 failure_error_type = "missing_bridge_verdict"
                 failure_extra["bridge_id"] = bridge_id
+        if failure_reason is None and matched_markers and not post_verdict_exit_reconciled:
+            failure_reason = matched_markers[0]["label"]
+            failure_error_type = "fatal_worker_output_marker"
+            failure_extra.update(inspected_paths)
+            failure_extra["matched_markers"] = matched_markers
+
+        if last_launch.get("document_lease_handles") and not last_launch.get("document_leases_released_on_exit"):
+            last_launch["document_leases_released_on_exit"] = _release_document_lease_records(
+                last_launch.get("document_lease_handles")
+            )
 
         if (exit_code == 0 or post_verdict_exit_reconciled) and failure_reason is None:
             # Success: keep signature state aligned for every recipient role.
@@ -5003,6 +5146,7 @@ def run_dispatch_cycle(
                     dispatch_id: str | None = None
                     work_intent_session_id: str | None = None
                     acquired_work_intent_slugs: list[str] = []
+                    acquired_document_leases: list[dict[str, Any]] = []
 
                     recipient_state["selected_count"] = len(dispatched_selected)
                     recipient_state["pending_count"] = len(dispatched_filtered)
@@ -5180,6 +5324,37 @@ def run_dispatch_cycle(
                                     recipients_state[recipient] = recipient_state
                                     continue
 
+                                (
+                                    lease_selected,
+                                    acquired_document_leases,
+                                    lease_held_items,
+                                ) = _acquire_dispatch_document_leases(
+                                    dispatched_selected,
+                                    role_label=target.needed_role_label,
+                                    state_dir=state_dir,
+                                    dispatch_id=dispatch_id,
+                                    dry_run=dry_run,
+                                )
+                                if acquired_document_leases or lease_held_items:
+                                    recipient_state["document_lease_acquired_count"] = len(acquired_document_leases)
+                                    recipient_state["document_lease_held_count"] = len(lease_held_items)
+                                if not dry_run:
+                                    dispatched_selected = lease_selected
+                                    dispatched_signature = _signature(dispatched_selected)
+                                    spawn_items = list(reversed(dispatched_selected))
+                                    recipient_state["selected_count"] = len(dispatched_selected)
+                                    recipient_state["pending_count"] = len(dispatched_selected)
+                                    if not dispatched_selected:
+                                        recipient_state["last_suppressed_signature"] = signature
+                                        recipient_state["last_result"] = DOCUMENT_LEASE_HELD_RESULT
+                                        results[recipient] = {
+                                            "launched": False,
+                                            "reason": DOCUMENT_LEASE_HELD_RESULT,
+                                            "dispatch_id": dispatch_id,
+                                        }
+                                        recipients_state[recipient] = recipient_state
+                                        continue
+
                             # WI-4525 pre-spawn launchability gate. A static dispatch
                             # config defect (a hollow venv interpreter, an unresolvable
                             # argv head) must surface loudly HERE rather than spawning
@@ -5265,6 +5440,11 @@ def run_dispatch_cycle(
                                 launch["work_intent_session_id"] = work_intent_session_id
                             if acquired_work_intent_slugs:
                                 launch["work_intent_slugs"] = acquired_work_intent_slugs
+                            if acquired_document_leases:
+                                launch["document_lease_handles"] = acquired_document_leases
+                                launch["document_lease_slugs"] = [
+                                    str(record.get("doc_slug")) for record in acquired_document_leases
+                                ]
                             if (
                                 target.needed_role_label == "prime-builder"
                                 and acquired_work_intent_slugs
@@ -5274,6 +5454,10 @@ def run_dispatch_cycle(
                                     acquired_work_intent_slugs,
                                     project_root=project_root,
                                     session_id=work_intent_session_id or "",
+                                )
+                            if acquired_document_leases and not launch.get("launched"):
+                                launch["document_leases_released_on_launch_failure"] = _release_document_lease_records(
+                                    acquired_document_leases
                                 )
                             recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                             recipient_state["last_launch"] = launch

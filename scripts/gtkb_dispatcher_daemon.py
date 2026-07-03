@@ -787,6 +787,43 @@ def _execute_live_spawns(
                 recipient_state["selected_count"] = 0
                 continue
 
+        acquired_document_leases: list[dict[str, Any]] = []
+        if getattr(target, "needed_role_label", None) == "loyal-opposition" and selected:
+            pre_lease_signature = signature
+            if dispatch_id is None:
+                dispatch_id = runtime._new_dispatch_id(target.dispatch_state_key)
+            lease_selected, acquired_document_leases, lease_held_items = runtime._acquire_dispatch_document_leases(
+                selected,
+                role_label=target.needed_role_label,
+                state_dir=state_dir,
+                dispatch_id=dispatch_id,
+                dry_run=dry_run,
+            )
+            if recipient_state is not None:
+                recipient_state["document_lease_acquired_count"] = len(acquired_document_leases)
+                recipient_state["document_lease_held_count"] = len(lease_held_items)
+            if not dry_run:
+                selected = list(lease_selected)
+                signature = runtime._signature(selected)
+                record["signature"] = signature
+                if not selected:
+                    result = {
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": runtime.DOCUMENT_LEASE_HELD_RESULT,
+                        "dispatch_id": dispatch_id,
+                    }
+                    if recipient_state is not None:
+                        recipient_state["last_result"] = runtime.DOCUMENT_LEASE_HELD_RESULT
+                        recipient_state["last_suppressed_signature"] = pre_lease_signature
+                        recipient_state["pending_count"] = len(lease_held_items)
+                        recipient_state["selected_count"] = len(lease_held_items)
+                        recipient_state["last_launch"] = result
+                    record["spawned"] = False
+                    record["spawn_reason"] = runtime.DOCUMENT_LEASE_HELD_RESULT
+                    spawn_results.append(result)
+                    continue
+
         if getattr(target, "needed_role_label", None) == "prime-builder" and not dry_run:
             assert dispatch_id is not None
             assert work_intent_session_id is not None
@@ -838,6 +875,9 @@ def _execute_live_spawns(
             result["work_intent_session_id"] = work_intent_session_id
         if acquired_work_intent_slugs:
             result["work_intent_slugs"] = acquired_work_intent_slugs
+        if acquired_document_leases:
+            result["document_lease_handles"] = acquired_document_leases
+            result["document_lease_slugs"] = [str(record.get("doc_slug")) for record in acquired_document_leases]
         if (
             getattr(target, "needed_role_label", None) == "prime-builder"
             and acquired_work_intent_slugs
@@ -847,6 +887,10 @@ def _execute_live_spawns(
                 acquired_work_intent_slugs,
                 project_root=project_root,
                 session_id=work_intent_session_id or "",
+            )
+        if acquired_document_leases and not result.get("launched"):
+            result["document_leases_released_on_launch_failure"] = runtime._release_document_lease_records(
+                acquired_document_leases
             )
         if recipient_state is not None:
             recipient_state["last_launch"] = result

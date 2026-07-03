@@ -438,6 +438,74 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
     assert launch["recipient"] == "prime-builder:B"
 
 
+def test_daemon_live_spawns_do_not_duplicate_lo_documents_across_targets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    selected = [
+        types.SimpleNamespace(
+            document_name="duplicate-thread", top_status="NEW", top_file="bridge/duplicate-thread-001.md"
+        )
+    ]
+    target_a = runtime.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION,
+    )
+    target_d = runtime.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+    )
+    calls: list[str] = []
+
+    def _fake_spawn_harness(**kwargs):
+        calls.append(kwargs["target"].dispatch_state_key)
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn_harness)
+
+    results = daemon._execute_live_spawns(
+        root,
+        [
+            {
+                "role": "loyal-opposition",
+                "recipient": target_a.dispatch_state_key,
+                "signature": runtime._signature(selected),
+                "_spawn_target": target_a,
+                "_spawn_selected": selected,
+            },
+            {
+                "role": "loyal-opposition",
+                "recipient": target_d.dispatch_state_key,
+                "signature": runtime._signature(selected),
+                "_spawn_target": target_d,
+                "_spawn_selected": selected,
+            },
+        ],
+        max_items=1,
+        dry_run=False,
+    )
+
+    assert calls == ["loyal-opposition:A"]
+    assert results[0]["launched"] is True
+    assert results[1]["reason"] == runtime.DOCUMENT_LEASE_HELD_RESULT
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    assert state["recipients"]["loyal-opposition:D"]["last_result"] == runtime.DOCUMENT_LEASE_HELD_RESULT
+
+
 def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

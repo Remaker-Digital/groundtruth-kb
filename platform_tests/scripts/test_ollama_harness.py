@@ -307,6 +307,18 @@ def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Pa
     assert "terminal VERIFIED file" in prompt
 
 
+def test_tool_loop_reconciles_success_only_after_canonical_bridge_advancement(tmp_path: Path):
+    root = make_root(tmp_path)
+    prompt = oh.build_system_prompt("bridge-review", route(root))
+
+    assert prompt is not None
+    assert "canonical exact bridge thread" in prompt
+    assert "bridge/<slug>-NNN.md" in prompt
+    assert "Draft files, prefix-sibling slugs, and noncanonical filenames do not count" in prompt
+    assert "VERIFIED completion additionally requires the atomic" in prompt
+    assert "finalization helper commit" in prompt
+
+
 def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     root = make_root(tmp_path)
     urls: list[str] = []

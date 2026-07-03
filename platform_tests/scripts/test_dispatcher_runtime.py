@@ -3197,6 +3197,44 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
     assert rec["last_suppressed_signature"] is None
 
 
+def test_lo_live_spawn_acquires_document_lease_or_suppresses_duplicate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_new(root))
+    trigger = _load_trigger()
+    calls: list[list[str]] = []
+
+    def _fake_spawn_harness(**kwargs: object) -> dict[str, object]:
+        items = kwargs["items"]  # type: ignore[index]
+        calls.append([item.document_name for item in items])  # type: ignore[union-attr]
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,  # type: ignore[index, union-attr]
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
+    monkeypatch.setattr(trigger, "_post_dispatch_poll", lambda **_kwargs: None)
+
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
+
+    assert calls == [["example-thread"]]
+    first_launch = first["dispatch_state"]["recipients"]["loyal-opposition:A"]["last_launch"]
+    assert first_launch["document_lease_slugs"] == ["example-thread"]
+    assert (state_dir / "leases" / "example-thread.lock").is_file()
+
+    (state_dir / "dispatch-state.json").unlink()
+    calls.clear()
+    second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
+
+    assert calls == []
+    assert second["results"]["loyal-opposition:A"]["reason"] == "document_lease_held"
+
+
 def test_diagnostic_classifies_dispatched(tmp_path: Path) -> None:
     """WI-3265 IP-2: when the dispatch branch is entered for a recipient, its
     diagnostic record classifies as `dispatched`. dry-run yields a
@@ -4672,6 +4710,69 @@ def test_find_dispatch_verdict_ignores_non_verdict_statuses(tmp_path: Path) -> N
     assert latency == pytest.approx(2.0)
 
 
+def test_latest_bridge_status_ignores_draft_and_prefix_sibling_files(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    (bridge_dir / "example-thread-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "example-thread-002.md").write_text("GO\n", encoding="utf-8")
+    (bridge_dir / "example-thread-003-draft.md").write_text("VERIFIED\n", encoding="utf-8")
+    (bridge_dir / "example-thread-child-999.md").write_text("VERIFIED\n", encoding="utf-8")
+
+    assert trigger._latest_bridge_status_for_document(root, "example-thread") == "GO"
+
+
+def test_find_dispatch_verdict_ignores_draft_and_prefix_sibling_files(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    dispatch_ts = time.time() - 10
+
+    for name in ("example-thread-002-draft.md", "example-thread-child-002.md"):
+        path = bridge_dir / name
+        path.write_text("GO\n", encoding="utf-8")
+        os.utime(path, (dispatch_ts + 1, dispatch_ts + 1))
+
+    assert trigger._find_dispatch_verdict(
+        dispatch_ts=dispatch_ts,
+        bridge_id="example-thread",
+        project_root=root,
+    ) == (None, None)
+
+
+def test_find_dispatch_verdict_requires_canonical_version_advancement(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    dispatch_ts = time.time() - 10
+    current_top = bridge_dir / "example-thread-002.md"
+    current_top.write_text("GO\n\n# Edited current top\n", encoding="utf-8")
+    os.utime(current_top, (dispatch_ts + 1, dispatch_ts + 1))
+
+    assert trigger._find_dispatch_verdict(
+        dispatch_ts=dispatch_ts,
+        bridge_id="example-thread",
+        project_root=root,
+        after_version=2,
+    ) == (None, None)
+
+    next_version = bridge_dir / "example-thread-003.md"
+    next_version.write_text("NO-GO\n\n# New verdict\n", encoding="utf-8")
+    os.utime(next_version, (dispatch_ts + 2, dispatch_ts + 2))
+
+    verdict_path, latency = trigger._find_dispatch_verdict(
+        dispatch_ts=dispatch_ts,
+        bridge_id="example-thread",
+        project_root=root,
+        after_version=2,
+    )
+    assert verdict_path == "bridge/example-thread-003.md"
+    assert latency == pytest.approx(2.0)
+
+
 def test_lo_nonzero_exit_with_post_launch_verdict_reconciles_success(tmp_path: Path) -> None:
     """WI-4933: an LO worker that files a verdict then exits nonzero is recovered."""
     from datetime import datetime, timedelta
@@ -4686,7 +4787,7 @@ def test_lo_nonzero_exit_with_post_launch_verdict_reconciles_success(tmp_path: P
     dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-F-ab61d4"
     (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
     verdict_file = bridge_dir / "example-thread-002.md"
-    verdict_file.write_text("VERIFIED\n\n# Verification verdict\n", encoding="utf-8")
+    verdict_file.write_text("GO\n\n# Review verdict\n", encoding="utf-8")
 
     launch = {
         "dispatch_id": dispatch_id,
@@ -4719,6 +4820,7 @@ def test_lo_nonzero_exit_with_post_launch_verdict_reconciles_success(tmp_path: P
     assert last_launch["exit_reconciled_after_verdict"] is True
     assert last_launch["post_verdict_exit_code"] == 1
     assert last_launch["verdict_path"] == "bridge/example-thread-002.md"
+    assert last_launch["verdict_status"] == "GO"
     assert state["failure_count"] == 0
     assert state["circuit_breaker_tripped"] is False
     assert state["last_result"] == "verdict_reconciled"
@@ -4781,8 +4883,8 @@ def test_lo_nonzero_exit_without_verdict_remains_subprocess_failure(tmp_path: Pa
     assert failures[0]["error_type"] == "subprocess_execution_failed"
 
 
-def test_lo_nonzero_exit_with_fatal_marker_does_not_reconcile_verdict(tmp_path: Path) -> None:
-    """WI-4933: fatal worker-output markers still fail closed before reconciliation."""
+def test_lo_nonzero_exit_with_fatal_marker_does_not_reconcile_noncanonical_verdict(tmp_path: Path) -> None:
+    """WI-4977: timeout/max-turn exits only reconcile after canonical thread advancement."""
     from datetime import datetime, timedelta
 
     trigger = _load_trigger()
@@ -4796,7 +4898,8 @@ def test_lo_nonzero_exit_with_fatal_marker_does_not_reconcile_verdict(tmp_path: 
     (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
     stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
     stderr_path.write_text("Ollama harness: max-turn exhaustion before final assistant text\n", encoding="utf-8")
-    (bridge_dir / "example-thread-002.md").write_text("GO\n\n# Review verdict\n", encoding="utf-8")
+    (bridge_dir / "example-thread-002-draft.md").write_text("GO\n\n# Draft review verdict\n", encoding="utf-8")
+    (bridge_dir / "example-thread-child-002.md").write_text("GO\n\n# Prefix sibling review verdict\n", encoding="utf-8")
 
     recipients_state = {
         "loyal-opposition:F": {
@@ -4828,6 +4931,148 @@ def test_lo_nonzero_exit_with_fatal_marker_does_not_reconcile_verdict(tmp_path: 
     failures = _failure_records(state_dir)
     assert failures[0]["error_type"] == "fatal_worker_output_marker"
     assert failures[0]["matched_markers"][0]["label"] == "max_turn_exhaustion"
+
+
+def test_lo_max_turn_exit_with_canonical_verdict_reconciles_success(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-D-timeout-late"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stderr_path.write_text("Ollama harness: max-turn exhaustion before final assistant text\n", encoding="utf-8")
+    (bridge_dir / "example-thread-002.md").write_text("GO\n\n# Review verdict\n", encoding="utf-8")
+
+    recipients_state = {
+        "loyal-opposition:D": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "recipient": "loyal-opposition:D",
+                "launched": True,
+                "pid": 12345,
+                "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+                "stderr_path": str(stderr_path),
+                "signature": "sig-fixture",
+                "needed_role_label": "loyal-opposition",
+                "selected_documents": ["example-thread"],
+                "primary_bridge_id": "example-thread",
+            },
+            "failure_count": 1,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:D"]
+    last_launch = state["last_launch"]
+    assert last_launch["exit_reconciled_after_verdict"] is True
+    assert last_launch["post_verdict_reconciled_markers"][0]["label"] == "max_turn_exhaustion"
+    assert state["last_result"] == "verdict_reconciled"
+    assert state["failure_count"] == 0
+    assert _failure_records(state_dir) == []
+
+
+def test_verified_verdict_without_atomic_commit_remains_failure(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-D-uncommitted-verified"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    (bridge_dir / "example-thread-002.md").write_text("VERIFIED\n\n# Verification verdict\n", encoding="utf-8")
+    recipients_state = {
+        "loyal-opposition:D": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "recipient": "loyal-opposition:D",
+                "launched": True,
+                "pid": 12345,
+                "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+                "signature": "sig-fixture",
+                "needed_role_label": "loyal-opposition",
+                "selected_documents": ["example-thread"],
+                "primary_bridge_id": "example-thread",
+            },
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:D"]
+    assert state["last_failure_reason"] == "verified_finalization_missing_commit"
+    assert state["failure_class"] == "verified_finalization_missing_commit"
+    assert state["last_launch"]["verdict_path"] == "bridge/example-thread-002.md"
+
+
+def test_verified_verdict_with_atomic_commit_reconciles_success(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    if shutil.which("git") is None:
+        pytest.skip("git not available")
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-06-30T13-43-31Z-loyal-opposition-D-committed-verified"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("1", encoding="utf-8")
+    verdict = bridge_dir / "example-thread-002.md"
+    verdict.write_text("VERIFIED\n\n# Verification verdict\n", encoding="utf-8")
+    subprocess.run(["git", "add", "bridge/example-thread-002.md"], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=test@example.invalid",
+            "-c",
+            "user.name=Test",
+            "commit",
+            "-m",
+            "test: verified finalization",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    recipients_state = {
+        "loyal-opposition:D": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "recipient": "loyal-opposition:D",
+                "launched": True,
+                "pid": 12345,
+                "launched_at": (datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+                "signature": "sig-fixture",
+                "needed_role_label": "loyal-opposition",
+                "selected_documents": ["example-thread"],
+                "primary_bridge_id": "example-thread",
+            },
+            "failure_count": 1,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:D"]
+    assert state["last_result"] == "verdict_reconciled"
+    assert state["failure_count"] == 0
+    assert state["last_launch"]["verified_commit_sha"]
+    assert _failure_records(state_dir) == []
 
 
 def test_wi4578_non_launched_failure_is_previous_launch_failure() -> None:

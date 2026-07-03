@@ -364,6 +364,11 @@ The helper must create the local commit containing the verified path set and the
 new VERIFIED verdict artifact. If you cannot identify the verified path set or
 the helper cannot commit, fail closed and report NO-GO/blocker evidence instead
 of leaving a terminal VERIFIED file in the worktree.
+Headless dispatch success is reconciled only from canonical exact bridge thread
+advancement: write the next `bridge/<slug>-NNN.md` file for the selected slug.
+Draft files, prefix-sibling slugs, and noncanonical filenames do not count as
+completion evidence. VERIFIED completion additionally requires the atomic
+finalization helper commit.
 
 Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
