@@ -689,7 +689,7 @@ def test_no_actionable_documents_means_files_absent(tmp_path: Path) -> None:
 def _kind_aware() -> SimpleNamespace:
     """Lazy-import kind-aware routing helpers."""
     from groundtruth_kb.bridge.detector import BridgeDocument, BridgeStatus, BridgeVersion
-    from groundtruth_kb.bridge.disposition import CLASSIFICATION_OWNER_HOLD
+    from groundtruth_kb.bridge.disposition import CLASSIFICATION_HEADLESS_INELIGIBLE, CLASSIFICATION_OWNER_HOLD
     from groundtruth_kb.bridge.notify import (
         KIND_AWARE_ROUTING_ENV_VAR,
         _derive_dispatchable,
@@ -703,6 +703,7 @@ def _kind_aware() -> SimpleNamespace:
         BridgeDocument=BridgeDocument,
         BridgeStatus=BridgeStatus,
         BridgeVersion=BridgeVersion,
+        CLASSIFICATION_HEADLESS_INELIGIBLE=CLASSIFICATION_HEADLESS_INELIGIBLE,
         CLASSIFICATION_OWNER_HOLD=CLASSIFICATION_OWNER_HOLD,
         KIND_AWARE_ROUTING_ENV_VAR=KIND_AWARE_ROUTING_ENV_VAR,
         _derive_dispatchable=_derive_dispatchable,
@@ -943,6 +944,14 @@ def test_owner_hold_suppresses_prime_dispatch_only(tmp_path: Path) -> None:
     assert k._derive_dispatchable("REVISED", k.CLASSIFICATION_OWNER_HOLD) is True
 
 
+def test_headless_ineligible_suppresses_prime_dispatch_only() -> None:
+    k = _kind_aware()
+    assert k._derive_dispatchable("GO", k.CLASSIFICATION_HEADLESS_INELIGIBLE) is False
+    assert k._derive_dispatchable("NO-GO", k.CLASSIFICATION_HEADLESS_INELIGIBLE) is False
+    assert k._derive_dispatchable("NEW", k.CLASSIFICATION_HEADLESS_INELIGIBLE) is True
+    assert k._derive_dispatchable("REVISED", k.CLASSIFICATION_HEADLESS_INELIGIBLE) is True
+
+
 def test_classify_dispatchable_implementation_proposal_kind(tmp_path: Path) -> None:
     assert _classify_with_kind(tmp_path, "implementation_proposal") == "dispatchable"
     assert _classify_with_kind(tmp_path, "implementation_slice") == "dispatchable"
@@ -1090,6 +1099,44 @@ def test_compute_pending_prime_NO_GO_owner_hold_is_visible_but_not_dispatchable(
     assert prime[0].dispatchable is False
     assert prime[0].classification == "owner_hold"
     assert prime[0].top_status == "NO-GO"
+
+
+def test_compute_pending_prime_NO_GO_headless_ineligible_is_visible_but_not_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NO-GO", "implementation_proposal")
+    (root / "bridge" / "foo-004.md").write_text(
+        "\n".join(
+            [
+                "NO-GO",
+                "",
+                "The dispatch loop must be broken. Every headless Codex auto-dispatch for this thread",
+                "produces the same ACL deny; the dispatcher re-queues for Codex; the cycle repeats.",
+                "Do not re-dispatch to Codex headless for this specific task until ACL remediation is confirmed.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    parsed = n.parse_index(text)
+    prime, codex = n.compute_actionable_pending(parsed, project_root=root)
+    assert codex == []
+    assert len(prime) == 1
+    assert prime[0].dispatchable is False
+    assert prime[0].classification == "headless_ineligible"
+    assert prime[0].top_status == "NO-GO"
+
+
+def test_compute_pending_prime_NO_GO_headless_history_only_remains_dispatchable(tmp_path: Path) -> None:
+    n = _notify()
+    text, root = _make_index_with_kind(tmp_path, "foo", "NO-GO", "implementation_proposal")
+    (root / "bridge" / "foo-004.md").write_text(
+        "NO-GO\n\nThis finding mentions prior headless Codex dispatch history but requests a normal revision.\n",
+        encoding="utf-8",
+    )
+    parsed = n.parse_index(text)
+    prime, _ = n.compute_actionable_pending(parsed, project_root=root)
+    assert len(prime) == 1
+    assert prime[0].dispatchable is True
+    assert prime[0].classification == "dispatchable"
 
 
 def test_compute_pending_prime_NO_GO_scoping_proposal_is_dispatchable(tmp_path: Path) -> None:

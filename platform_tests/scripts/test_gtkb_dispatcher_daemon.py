@@ -1238,6 +1238,56 @@ def test_daemon_live_skips_owner_hold_prime_no_go(
     assert recipient_state["selected_count"] == 0
 
 
+def test_daemon_live_skips_headless_ineligible_prime_no_go(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    doc = "headless-ineligible-thread"
+    (root / "bridge" / f"{doc}-001.md").write_text(
+        "NEW\n\nbridge_kind: implementation_proposal\nauthor_session_context_id: fixture-author-session\n",
+        encoding="utf-8",
+    )
+    (root / "bridge" / f"{doc}-002.md").write_text(
+        "\n".join(
+            [
+                "NO-GO",
+                "",
+                "The dispatch loop must be broken. Every headless Codex auto-dispatch for this thread",
+                "produces the same ACL deny; the dispatcher re-queues for Codex; the cycle repeats.",
+                "Do not re-dispatch to Codex headless for this specific task until ACL remediation is confirmed.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (root / "bridge" / "INDEX.md").write_text(
+        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
+        encoding="utf-8",
+    )
+    runtime = daemon._load_dispatch_runtime()
+    spawn_calls: list[dict] = []
+
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", lambda **kwargs: spawn_calls.append(kwargs))
+
+    result = daemon.run_tick(root, max_items=2)
+
+    assert result["mode"] == "live"
+    assert spawn_calls == []
+    decision = next(record for record in result["decisions"] if record["role"] == "prime-builder")
+    assert decision["would_dispatch"] == []
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient_state = state["recipients"]["prime-builder:A"]
+    assert recipient_state["last_result"] == "no_pending"
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
+
+
 def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The daemon live-spawn command carries the per-role --lifetime override:
     LO target -> 1800s, PB target -> 5400s (WI-4845 defaults)."""

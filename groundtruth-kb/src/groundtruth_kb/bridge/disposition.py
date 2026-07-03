@@ -33,6 +33,7 @@ VERIFIED_CONTEXT_STATUSES: Final[frozenset[str]] = frozenset({STATUS_VERIFIED})
 
 CLASSIFICATION_TERMINAL: Final[str] = "terminal"
 CLASSIFICATION_OWNER_HOLD: Final[str] = "owner_hold"
+CLASSIFICATION_HEADLESS_INELIGIBLE: Final[str] = "headless_ineligible"
 
 # Bridge-kind substring tokens. Matched against the lowercased + kebab-to-snake
 # normalized bridge_kind value. Order matters: terminal is checked first so the
@@ -99,7 +100,10 @@ def dispatchable_for_status(status: str, classification: str = "ambiguous") -> b
     status_key = normalize_status(status)
     if status_key in LOYAL_OPPOSITION_ACTIONABLE_STATUSES:
         return True
-    if status_key in {STATUS_GO, STATUS_NO_GO} and classification == CLASSIFICATION_OWNER_HOLD:
+    if status_key in {STATUS_GO, STATUS_NO_GO} and classification in {
+        CLASSIFICATION_OWNER_HOLD,
+        CLASSIFICATION_HEADLESS_INELIGIBLE,
+    }:
         return False
     if status_key == STATUS_NO_GO:
         return True

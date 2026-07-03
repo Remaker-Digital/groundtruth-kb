@@ -78,6 +78,7 @@ from groundtruth_kb.bridge.detector import BridgeDocument, BridgeStatus, BridgeV
 from groundtruth_kb.bridge.disposition import (
     BRIDGE_KIND_DISPATCHABLE_TOKENS,
     BRIDGE_KIND_TERMINAL_TOKENS,
+    CLASSIFICATION_HEADLESS_INELIGIBLE,
     CLASSIFICATION_OWNER_HOLD,
     LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
     PRIME_ACTIONABLE_STATUSES,
@@ -116,6 +117,12 @@ _OWNER_HOLD_RE: Final[re.Pattern[str]] = re.compile(
     r"^\s*(?:[-*+]|\d+[.)])?\s*(?:#{1,6}\s*)?(?:\*\*)?"
     r"hold\s+for\s+owner\s+decision(?::)?(?:\*\*)?\s*(?::|\b)",
     re.IGNORECASE | re.MULTILINE,
+)
+_HEADLESS_INELIGIBLE_RE: Final[re.Pattern[str]] = re.compile(
+    r"\bdispatch\s+loop\s+must\s+be\s+broken\b"
+    r"|\bdo\s+not\s+re-?dispatch\s+to\s+codex\s+headless\b"
+    r"|\bno\s+further\s+(?:codex\s+)?headless\s+(?:auto-?)?re-?dispatch(?:es)?\b",
+    re.IGNORECASE,
 )
 
 # Header read budget (bytes). bridge_kind is always in the header section.
@@ -179,6 +186,30 @@ def _latest_verdict_declares_owner_hold(project_root: Path, doc: BridgeDocument)
     return _OWNER_HOLD_RE.search(head) is not None
 
 
+def _latest_verdict_declares_headless_ineligible(project_root: Path, doc: BridgeDocument) -> bool:
+    """Return True when the latest verdict explicitly blocks headless redispatch.
+
+    The match surface is intentionally narrow and imperative: "dispatch loop
+    must be broken", "do not re-dispatch to Codex headless", or "no further
+    Codex/headless redispatch". General historical discussion of headless
+    dispatch remains dispatchable.
+    """
+    if not doc.versions:
+        return False
+    top = doc.versions[0]
+    if top.status not in (BridgeStatus.GO, BridgeStatus.NO_GO):
+        return False
+
+    full_path = project_root / top.file_path
+    try:
+        with full_path.open("r", encoding="utf-8") as fh:
+            head = fh.read(_OWNER_HOLD_READ_BUDGET_BYTES)
+    except (OSError, UnicodeDecodeError):
+        return False
+
+    return _HEADLESS_INELIGIBLE_RE.search(head) is not None
+
+
 def classify_document_dispatchability(
     project_root: Path,
     doc: BridgeDocument,
@@ -199,12 +230,17 @@ def classify_document_dispatchability(
     - "owner_hold" — latest GO/NO-GO verdict explicitly says Hold for Owner
       Decision; action remains visible to Prime but headless dispatch is
       suppressed
+    - "headless_ineligible" — latest GO/NO-GO verdict explicitly says headless
+      redispatch must stop; action remains visible to Prime but headless
+      dispatch is suppressed
     - "ambiguous" — bridge_kind missing, bare "proposal", "review",
       "verification", or unrecognized; falls back to status-only routing
       via the dispatchable invariant in `_derive_dispatchable`
     """
     if _latest_verdict_declares_owner_hold(project_root, doc):
         return CLASSIFICATION_OWNER_HOLD
+    if _latest_verdict_declares_headless_ineligible(project_root, doc):
+        return CLASSIFICATION_HEADLESS_INELIGIBLE
 
     operative = find_operative_prime_version(doc)
     if operative is None:
