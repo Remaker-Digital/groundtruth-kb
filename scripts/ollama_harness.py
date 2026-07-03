@@ -588,6 +588,8 @@ def _default_guard_runner(
             [sys.executable, str(guard_path)],
             input=json.dumps(payload),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             cwd=str(payload.get("cwd") or Path.cwd()),
             env=dict(env),
@@ -849,6 +851,8 @@ def _default_command_runner(
     return subprocess.run(
         command,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         cwd=str(project_root),
         env=dict(env),

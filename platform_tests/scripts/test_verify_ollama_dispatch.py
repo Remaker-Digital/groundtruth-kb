@@ -24,6 +24,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -291,6 +292,60 @@ def test_dispatch_bash_nonzero_returns_model_visible_evidence(ollama_harness_mod
     assert "Command: python scripts/adr_dcl_clause_preflight.py --bridge-id fixture" in result
     assert "STDOUT:\nout" in result
     assert "STDERR:\nerr" in result
+
+
+def test_default_subprocess_runners_pin_utf8_decode_options(ollama_harness_module, tmp_path, monkeypatch) -> None:
+    captured: list[dict[str, object]] = []
+
+    def fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured.append(dict(kwargs))
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="out", stderr="err")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    guard_path = tmp_path / "guard.py"
+    guard_path.write_text("# fixture guard\n", encoding="utf-8")
+
+    guard_result = ollama_harness_module._default_guard_runner(
+        guard_path,
+        {"cwd": str(tmp_path)},
+        os.environ,
+        5.0,
+    )
+    command_result = ollama_harness_module._default_command_runner(
+        "fixture command",
+        tmp_path,
+        os.environ,
+        5.0,
+    )
+
+    assert guard_result.stdout == "out"
+    assert command_result.stdout == "out"
+    assert len(captured) == 2
+    assert all(call["text"] is True for call in captured)
+    assert all(call["encoding"] == "utf-8" for call in captured)
+    assert all(call["errors"] == "replace" for call in captured)
+
+
+def test_default_guard_runner_captures_utf8_bytes_invalid_under_cp1252(ollama_harness_module, tmp_path) -> None:
+    guard_path = tmp_path / "guard.py"
+    guard_path.write_text(
+        "import sys\n"
+        "sys.stdout.buffer.write(b'stdout:\\xe2\\x81\\xa0')\n"
+        "sys.stderr.buffer.write(b'stderr:\\xe2\\x81\\xa0')\n",
+        encoding="utf-8",
+    )
+
+    result = ollama_harness_module._default_guard_runner(
+        guard_path,
+        {"cwd": str(tmp_path)},
+        os.environ,
+        5.0,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == "stdout:\u2060"
+    assert result.stderr == "stderr:\u2060"
 
 
 def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
