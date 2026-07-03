@@ -1,0 +1,15 @@
+{
+  "action": "create",
+  "approval_mode": "approve",
+  "approved_by": "owner",
+  "artifact_id": "GOV-WORK-TREE-HYGIENE-001",
+  "artifact_type": "governance",
+  "change_reason": "WI-4356 Slice D exact-content approval for GOV-WORK-TREE-HYGIENE-001 before governed MemBase insert",
+  "changed_by": "prime-builder/codex",
+  "explicit_change_request": "Owner approved exact GOV-WORK-TREE-HYGIENE-001 content presented in Codex on 2026-07-03; content matches bridge/gtkb-work-tree-hygiene-slice-d-governance-spec-001.md lines 108-121.",
+  "full_content": "GOV-WORK-TREE-HYGIENE-001\n\nGT-KB must preserve abandoned-session work-tree hygiene through deterministic, report-first tooling. Work-tree edits older than twelve hours whose originating session is no longer active are stale candidates for independent triage. Git stashes, orphaned worktrees, and untracked runtime-evidence directories are stale candidates when they exceed the configured threshold and are not attached to an active session.\n\nThe authoritative implementation surfaces are the verified WI-4356 slices:\n1. Slice A read-only detector: scripts/hygiene/stray_detector.py.\n2. Slice B dry-run CLI: gt hygiene strays.\n3. Slice C doctor visibility check: gt project doctor work-tree strays check.\n\nThe detector and its consumers must read live git status, git stash, git worktree, active-session, and bridge/thread state at run time. They must not classify stale work from cached startup reports, automation memory, or stale dashboard summaries.\n\nDefault behavior is non-mutating. Destructive cleanup, stash dropping, branch/worktree pruning, untracked file deletion, or committing another session's stale work requires explicit owner-approved apply evidence for the specific batch being applied. Report-only detector, CLI, and doctor findings may be produced without owner approval.\n\nFuture scheduled or hook-based enforcement is out of scope until a separate bridge proposal receives GO and records the owner-approved apply policy.\n",
+  "full_content_sha256": "517aa901bbea84d16d227828e2a0559983eed8f8407147a437236b84244fccfb",
+  "presented_to_user": true,
+  "source_ref": "DELIB-20260703-GOV-WORK-TREE-HYGIENE-APPROVAL",
+  "transcript_captured": true
+}
