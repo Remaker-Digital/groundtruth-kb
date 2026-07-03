@@ -1,11 +1,14 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-06-29T06:12:00Z",
+  "generated_at": "2026-07-03T03:57:55Z",
   "harnesses": [
     {
+      "activity_envelope_projection_mode": "native",
       "can_fire_events": true,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
+      "compact_result_envelope_mode": "native",
+      "compact_session_envelope_mode": "native",
       "dispatch_availability": 90.0,
       "dispatch_cost": 60.0,
       "dispatch_quality": 90.0,
@@ -14,6 +17,7 @@
         "event-source"
       ],
       "event_driven_hooks": true,
+      "full_transcript_archive_required": false,
       "harness_name": "codex",
       "harness_type": "codex",
       "id": "A",
@@ -22,8 +26,12 @@
           "argv": [
             "codex",
             "exec",
+            "--model",
+            "gpt-5.5",
             "-c",
             "approval_policy=\"never\"",
+            "-c",
+            "model_reasoning_effort=\"xhigh\"",
             "{{PROMPT}}",
             "--cd",
             "{{PROJECT_ROOT}}"
@@ -35,21 +43,24 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 46
+      "version": 47
     },
     {
+      "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
       "can_receive_dispatch": false,
       "capabilities_ref": null,
+      "compact_result_envelope_mode": "native",
+      "compact_session_envelope_mode": "native",
       "dispatch_availability": 75.0,
       "dispatch_cost": 60.0,
       "dispatch_max_items": 3,
       "dispatch_quality": 95.0,
       "dispatch_tags": [
-        "prime-builder",
-        "event-source"
+        "loyal-opposition"
       ],
       "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
       "harness_name": "claude",
       "harness_type": "claude",
       "id": "B",
@@ -57,6 +68,10 @@
         "headless": {
           "argv": [
             "claude",
+            "--model",
+            "claude-opus-4-8",
+            "--effort",
+            "max",
             "-p",
             "{{PROMPT}}",
             "--add-dir",
@@ -68,15 +83,18 @@
       },
       "reviewer_precedence": 10,
       "role": [
-        "prime-builder"
+        "loyal-opposition"
       ],
-      "status": "suspended",
-      "version": 41
+      "status": "active",
+      "version": 44
     },
     {
+      "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
       "can_receive_dispatch": false,
       "capabilities_ref": null,
+      "compact_result_envelope_mode": "native",
+      "compact_session_envelope_mode": "native",
       "dispatch_availability": 80.0,
       "dispatch_cost": 30.0,
       "dispatch_quality": 80.0,
@@ -84,20 +102,30 @@
         "loyal-opposition"
       ],
       "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
       "harness_name": "antigravity",
       "harness_type": "antigravity",
       "id": "C",
       "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": true,
+          "event_driven_hooks": false
+        },
         "headless": {
           "argv": [
-            "gemini",
-            "-m",
-            "gemini-2.5-flash",
-            "--skip-trust",
-            "-p",
+            "agy",
+            "--print",
             "{{PROMPT}}",
-            "--approval-mode=yolo"
-          ]
+            "--print-timeout",
+            "30m",
+            "--model",
+            "gemini-2.5-flash",
+            "--dangerously-skip-permissions",
+            "--add-dir",
+            "{{PROJECT_ROOT}}"
+          ],
+          "can_receive_dispatch": true
         },
         "interactive": {
           "kind": "ide",
@@ -108,22 +136,26 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "retired",
-      "version": 27
+      "status": "active",
+      "version": 30
     },
     {
+      "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
+      "compact_result_envelope_mode": "compact-provider",
+      "compact_session_envelope_mode": "compact-provider",
       "dispatch_availability": 95.0,
-      "dispatch_cost": 30.0,
+      "dispatch_cost": 25.0,
       "dispatch_max_items": 2,
-      "dispatch_quality": 80.0,
+      "dispatch_quality": 92.0,
       "dispatch_tags": [
         "loyal-opposition",
         "low-cost"
       ],
       "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
       "harness_name": "ollama",
       "harness_type": "ollama",
       "id": "D",
@@ -135,7 +167,9 @@
             "-p",
             "{{PROMPT}}",
             "--skill",
-            "bridge-review"
+            "bridge-review",
+            "--model",
+            "deepseek-v4-pro-cloud"
           ],
           "max_items": 1
         }
@@ -145,12 +179,15 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 19
+      "version": 22
     },
     {
+      "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
       "can_receive_dispatch": false,
       "capabilities_ref": null,
+      "compact_result_envelope_mode": "native",
+      "compact_session_envelope_mode": "native",
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,
       "dispatch_max_items": 3,
@@ -159,6 +196,7 @@
         "prime-builder"
       ],
       "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
       "harness_name": "cursor",
       "harness_type": "cursor",
       "id": "E",
@@ -180,15 +218,18 @@
       },
       "reviewer_precedence": 15,
       "role": [
-        "prime-builder"
+        "loyal-opposition"
       ],
       "status": "active",
-      "version": 8
+      "version": 13
     },
     {
+      "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
+      "compact_result_envelope_mode": "compact-provider",
+      "compact_session_envelope_mode": "compact-provider",
       "dispatch_availability": 90.0,
       "dispatch_cost": 20.0,
       "dispatch_quality": 80.0,
@@ -197,6 +238,7 @@
         "low-cost"
       ],
       "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
       "harness_name": "openrouter",
       "harness_type": "openrouter",
       "id": "F",

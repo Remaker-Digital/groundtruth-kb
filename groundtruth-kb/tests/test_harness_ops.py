@@ -229,3 +229,39 @@ def test_set_precedence_appends_version_unchanged_status(db: Any) -> None:
 def test_set_precedence_unknown_harness_rejected(db: Any) -> None:
     with pytest.raises(harness_ops.HarnessOperationError, match="unknown harness"):
         harness_ops.set_harness_precedence(db, "Z", 1, changed_by="test", change_reason="x")
+
+
+# --- set-invocation-surface -------------------------------------------------
+
+
+def test_set_invocation_surface_replaces_named_surface_only(db: Any) -> None:
+    _register(
+        db,
+        "A",
+        harness_name="codex",
+        harness_type="codex-cli",
+        reviewer_precedence=4,
+        invocation_surfaces={
+            "interactive": {"command": "codex"},
+            "headless": {"argv": ["codex", "exec", "{{PROMPT}}"]},
+        },
+    )
+    record = harness_ops.set_invocation_surface(
+        db,
+        "A",
+        "headless",
+        {"argv": ["codex", "exec", "--model", "gpt-5.5", "{{PROMPT}}"]},
+        changed_by="test",
+        change_reason="pin headless model",
+    )
+
+    surfaces = _decode(record["invocation_surfaces"])
+    assert record["status"] == "registered"
+    assert record["reviewer_precedence"] == 4
+    assert surfaces["interactive"] == {"command": "codex"}
+    assert surfaces["headless"]["argv"] == ["codex", "exec", "--model", "gpt-5.5", "{{PROMPT}}"]
+
+
+def test_set_invocation_surface_unknown_harness_rejected(db: Any) -> None:
+    with pytest.raises(harness_ops.HarnessOperationError, match="unknown harness"):
+        harness_ops.set_invocation_surface(db, "Z", "headless", {}, changed_by="test", change_reason="x")

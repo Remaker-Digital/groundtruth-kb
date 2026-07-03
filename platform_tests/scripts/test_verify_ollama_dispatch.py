@@ -297,6 +297,35 @@ def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
     assert verify_module.OLLAMA_DISPATCH_REQUIRED_TOOLS == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
+def test_deepseek_v4_pro_cloud_route_can_be_selected_explicitly(ollama_harness_module, tmp_path) -> None:
+    (tmp_path / ".api-harness").mkdir()
+    (tmp_path / ".api-harness" / "routing.toml").write_text(
+        "schema_version = 1\n"
+        "[models.deepseek-v4-pro-cloud]\n"
+        'model_id = "deepseek-v4-pro:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "[models.deepseek-v4-pro]\n"
+        'model_id = "deepseek/deepseek-v4-pro"\n'
+        'provider = "openrouter"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "[routing.ollama]\n"
+        'default_model = "deepseek-v4-pro-cloud"\n'
+        "timeout_seconds = 180\n"
+        "[routing.ollama.skills]\n"
+        'bridge-review = "deepseek-v4-pro-cloud"\n',
+        encoding="utf-8",
+    )
+
+    config = ollama_harness_module.load_routing_config(tmp_path)
+    route = ollama_harness_module.resolve_model(config, "deepseek-v4-pro-cloud", skill="bridge-review")
+
+    assert route.key == "deepseek-v4-pro-cloud"
+    assert route.model_id == "deepseek-v4-pro:cloud"
+
+
 def test_bridge_filing_writes_fixture_file_with_NEW_first_line(verify_module, ollama_harness_module, tmp_path) -> None:
     """L3: fixture write through dispatch_tool_call must produce a file whose
     first non-blank line is exactly ``NEW``."""

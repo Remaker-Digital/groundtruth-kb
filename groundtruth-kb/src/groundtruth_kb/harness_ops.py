@@ -6,7 +6,7 @@ validate first, then an atomic append-only write whose
 ``changed_by`` / ``changed_at`` / ``change_reason`` columns are the audit
 trail. This module is that discipline for the ``harnesses``-table verbs
 (``register`` / ``activate`` / ``suspend`` / ``resume`` / ``retire`` /
-``set-precedence``).
+``set-precedence`` / ``set-invocation-surface``).
 
 It is pure DB logic: it imports only the standard library and
 ``groundtruth_kb.harness_lifecycle`` (the WI-3339 FSM), opens no file, and
@@ -495,4 +495,45 @@ def set_harness_precedence(
         changed_by=changed_by,
         change_reason=change_reason,
         reviewer_precedence=reviewer_precedence,
+    )
+
+
+def set_invocation_surface(
+    db: Any,
+    harness_id: str,
+    surface_name: str,
+    surface_value: Any,
+    *,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    """Replace one named invocation surface on an existing harness.
+
+    The operation appends a new harness version, preserving lifecycle status,
+    role metadata, precedence, type/name, and capabilities reference. It is the
+    narrow mutation path for headless argv changes: callers update only the
+    requested ``invocation_surfaces`` entry instead of rewriting the whole
+    harness record ad hoc.
+    """
+    surface_key = surface_name.strip()
+    if not surface_key:
+        raise HarnessOperationError("invocation surface name must be non-empty")
+    current = db.get_harness(harness_id)
+    if current is None:
+        raise HarnessOperationError(f"unknown harness {harness_id!r}; no such harness in the registry")
+    surfaces = _decode_json_field(current.get("invocation_surfaces"))
+    if surfaces is None:
+        surfaces = {}
+    if not isinstance(surfaces, dict):
+        raise HarnessOperationError(
+            f"harness {harness_id!r} invocation_surfaces must be a JSON object before updating {surface_key!r}"
+        )
+    updated = dict(surfaces)
+    updated[surface_key] = surface_value
+    return _append_version(
+        db,
+        current,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        invocation_surfaces=updated,
     )

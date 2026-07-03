@@ -320,6 +320,52 @@ def test_harness_set_precedence_cli(tmp_path: Path) -> None:
     assert _harness_current(db_path, "B")["reviewer_precedence"] == 7
 
 
+# --- T-HC-6b: set-invocation-surface ----------------------------------------
+
+
+def test_harness_set_invocation_surface_cli_refreshes_projection(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    db_path = root / "groundtruth.db"
+    _invoke(config, "register", "--id", "A", "--name", "codex", "--type", "codex-cli")
+    surface = {
+        "argv": [
+            "codex",
+            "exec",
+            "--model",
+            "gpt-5.5",
+            "-c",
+            'model_reasoning_effort="xhigh"',
+            "{{PROMPT}}",
+            "--cd",
+            "{{PROJECT_ROOT}}",
+        ],
+        "can_receive_dispatch": True,
+    }
+
+    result = _invoke(
+        config,
+        "set-invocation-surface",
+        "--harness",
+        "A",
+        "--surface",
+        "headless",
+        "--value-json",
+        json.dumps(surface),
+    )
+
+    assert result.exit_code == 0, result.output
+    row = _harness_current(db_path, "A")
+    assert row is not None
+    assert json.loads(row["invocation_surfaces"])["headless"]["argv"][2:6] == [
+        "--model",
+        "gpt-5.5",
+        "-c",
+        'model_reasoning_effort="xhigh"',
+    ]
+    role_map = _read_role_map(root)
+    assert role_map["A"]["invocation_surfaces"]["headless"]["argv"] == surface["argv"]
+
+
 # --- T-HC-7: set-role assigns one role and preserves active PB/LO invariant ---
 
 

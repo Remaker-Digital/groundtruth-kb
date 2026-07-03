@@ -8534,6 +8534,51 @@ def harness_set_precedence(ctx: click.Context, harness_id: str, precedence: int,
     _harness_emit(record)
 
 
+@harness_group.command("set-invocation-surface")
+@click.option("--harness", "harness_id", required=True, help="Harness id")
+@click.option("--surface", "surface_name", required=True, help="Invocation surface name, for example 'headless'")
+@click.option("--value-json", "value_json", required=True, help="JSON value to store for the named surface")
+@click.option(
+    "--reason",
+    "reason",
+    default="set invocation surface via gt harness set-invocation-surface",
+    help="Change reason",
+)
+@click.pass_context
+def harness_set_invocation_surface(
+    ctx: click.Context,
+    harness_id: str,
+    surface_name: str,
+    value_json: str,
+    reason: str,
+) -> None:
+    """Set one harness invocation surface and refresh the registry projection."""
+    import json as _json
+
+    from groundtruth_kb import harness_ops
+    from groundtruth_kb.harness_projection import generate_harness_projection
+
+    try:
+        surface_value = _json.loads(value_json)
+    except _json.JSONDecodeError as exc:
+        raise click.ClickException(f"--value-json is not valid JSON: {exc}") from exc
+    config = _resolve_config(ctx)
+    db = _open_db(config)
+    try:
+        record = harness_ops.set_invocation_surface(
+            db,
+            harness_id,
+            surface_name,
+            surface_value,
+            changed_by=_HARNESS_CLI_ACTOR,
+            change_reason=reason,
+        )
+    except harness_ops.HarnessOperationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    generate_harness_projection(db, config.project_root)
+    _harness_emit(record)
+
+
 @harness_group.command("set-role")
 @click.option(
     "--harness",
