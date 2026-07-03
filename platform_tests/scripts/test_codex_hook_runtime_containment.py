@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,27 @@ CODEX_HOOKS = REPO_ROOT / ".codex" / "hooks.json"
 BOM_SENSITIVE_CMD_WRAPPERS = (
     REPO_ROOT / ".codex" / "gtkb-hooks" / "workstream-focus.cmd",
     REPO_ROOT / ".codex" / "gtkb-hooks" / "formal-artifact-approval.cmd",
+)
+CODEX_CMD_PYTHON_HOOK_WRAPPERS = (
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-audit.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate-apply-patch-adapter.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "bridge-compliance-gate.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "code-quality-baseline-proposal-check.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "codex-mcp-worker-guard.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "credential-scan.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "destructive-gate.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "directive-enforcement.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "formal-artifact-approval.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "implementation-start-gate.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "lo-file-safety-gate.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "session-start.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "session-stop.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "wi-id-collision-gate.cmd",
+    REPO_ROOT / ".codex" / "gtkb-hooks" / "workstream-focus.cmd",
+)
+CODEX_PYTHONW = REPO_ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "pythonw.exe"
+BARE_CONSOLE_PYTHON_CMD = re.compile(
+    r"(?im)(?:^|[`(\s])(?:python(?:\.exe)?|py(?:\.exe)?)(?=$|[\s\"])",
 )
 
 
@@ -70,6 +92,18 @@ def test_codex_hooks_registry_uses_hidden_launchers_without_retired_dispatch_wor
         "gtkb_dispatcher_daemon.py",
     )
     assert not any(token in command for command in commands for token in forbidden)
+
+
+def test_codex_cmd_python_hook_wrappers_use_no_window_launcher() -> None:
+    launcher = str(REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window")
+    pythonw = str(CODEX_PYTHONW)
+
+    for path in CODEX_CMD_PYTHON_HOOK_WRAPPERS:
+        text = path.read_text(encoding="utf-8-sig")
+
+        assert pythonw in text, path
+        assert launcher in text, path
+        assert not BARE_CONSOLE_PYTHON_CMD.search(text), path
 
 
 def test_run_py_no_window_passes_finite_stdin_and_preserves_output_and_exit_code(tmp_path: Path) -> None:

@@ -1,2 +1,2 @@
 @echo off
-python "E:\GT-KB\.codex\gtkb-hooks\directive-enforcement-adapter.py"
+"E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe" "E:\GT-KB\.codex\gtkb-hooks\run_py_no_window" "E:\GT-KB\.codex\gtkb-hooks\directive-enforcement-adapter.py"
