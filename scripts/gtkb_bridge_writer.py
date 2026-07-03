@@ -46,8 +46,10 @@ def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
         return False
 
 
-VALID_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
-PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
+VALID_STATUSES: frozenset[str] = frozenset(
+    {"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED"}
+)
+PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "NO-ACTION"})
 LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
 
 PRIME_ROLE_SLOT = "prime-builder"

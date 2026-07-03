@@ -148,7 +148,7 @@ def _parse_versions(slug: str, bridge_dir: Path) -> list[BridgeVersion]:
     root = bridge_dir.parent
     pattern = re.compile(rf"^{re.escape(slug)}-(\d{{3}})\.md$")
     status_re = re.compile(
-        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
         re.IGNORECASE,
     )
     for path in bridge_dir.glob(f"{slug}-*.md"):

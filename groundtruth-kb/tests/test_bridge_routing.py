@@ -55,6 +55,22 @@ def test_routing_emits_routable_for_prime_authored_status_with_existing_file(
     assert routed.recipient == r.BridgeAgent.CODEX
 
 
+def test_routing_emits_routable_no_action_to_loyal_opposition(tmp_path: Path) -> None:
+    r = _routing()
+    rel = _make_bridge_file(tmp_path, "foo", 3)
+    transition = r.Transition(
+        document_name="foo",
+        from_status="GO",
+        from_file="bridge/foo-002.md",
+        to_status="NO-ACTION",
+        to_file=rel,
+    )
+    [routed] = r.route_transitions((transition,), project_root=tmp_path)
+    assert routed.outcome == r.TransitionOutcome.ROUTABLE
+    assert routed.authored_by == r.BridgeAgent.PRIME
+    assert routed.recipient == r.BridgeAgent.CODEX
+
+
 def test_routing_emits_routable_for_codex_authored_status_with_existing_file(
     tmp_path: Path,
 ) -> None:

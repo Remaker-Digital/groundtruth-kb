@@ -67,7 +67,9 @@ VERIFICATION_TEST_EVIDENCE_RE = re.compile(
     r"(?i)(?:\bpython -m pytest\b|\bpytest\b|\bruff\b|\bnpm test\b|\bpnpm test\b"
     r"|\buv run\b|\bmake test\b|\btest_[\w./-]+\.py\b|spec-to-test)"
 )
-BRIDGE_FILE_STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|ACCEPTED|BLOCKED)$")
+BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|ACCEPTED|BLOCKED)$"
+)
 REQUIREMENT_GAP_PHRASE = "New or revised requirement required before implementation"
 REQUIREMENT_SUFFICIENCY_PHRASES = (
     "Existing requirements sufficient",
@@ -375,6 +377,8 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
       report snapshot under review);
     - ``"terminal"``        - latest is a post-GO VERIFIED.
     - ``"deferred"``        - latest is owner-parked DEFERRED state.
+    - ``"no_action"``       - latest is PB-authored NO-ACTION; an older GO is
+      non-dispatchable until a later corrected GO becomes latest.
     """
     if not statuses_after_go:
         return "latest_is_go"
@@ -387,6 +391,8 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
         return "terminal"
     if latest == "DEFERRED":
         return "deferred"
+    if latest == "NO-ACTION":
+        return "no_action"
     # Defensive: a post-GO GO is handled by callers (newest-GO selection in
     # approved_files_for_go; the explicit newer-GO check in _validate_packet).
     return "awaiting_review"
@@ -429,6 +435,11 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
         raise AuthorizationError(
             "Bridge thread is DEFERRED; owner-directed parking is non-actionable. "
             "Wait for owner-directed resume or clear evidence before requesting authorization."
+        )
+    if state == "no_action":
+        raise AuthorizationError(
+            "Bridge thread is NO-ACTION; the prior GO is non-dispatchable. "
+            "A later corrected GO is required before implementation authorization."
         )
     # state is "latest_is_go" or "resumable" - the GO authorizes the work.
     go_file = entry.versions[go_index][1]
@@ -1440,6 +1451,11 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
             f"Bridge thread is DEFERRED (parked at {entry.latest_path}); "
             f"owner-directed parking is non-actionable until the owner-directed "
             f"resume or clear condition is met."
+        )
+    if state == "no_action":
+        raise AuthorizationError(
+            f"Bridge thread is NO-ACTION (at {entry.latest_path}); the pinned GO "
+            f"is non-dispatchable until a later corrected GO becomes latest."
         )
     project_authorization = packet.get("project_authorization")
     if isinstance(project_authorization, dict):

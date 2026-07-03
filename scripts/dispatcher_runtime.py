@@ -2695,7 +2695,7 @@ def _emit_trigger_diagnostic(state_dir: Path, record: dict[str, Any]) -> None:
 
 
 _BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED|RETIRED|SUPERSEDED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED|ACCEPTED|RETIRED|SUPERSEDED)\b",
     re.IGNORECASE,
 )
 _DISPATCH_VERDICT_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
@@ -4743,7 +4743,7 @@ def run_dispatch_cycle(
 
         # IP-3b: resolve dispatch targets from the durable role record. The
         # mapping from actionable-classification to needed-role is fixed:
-        # NEW/REVISED → Loyal Opposition; GO/NO-GO → Prime Builder.
+        # NEW/REVISED/NO-ACTION → Loyal Opposition; GO/NO-GO → Prime Builder.
         # Build targets defensively: if resolution fails (drift, missing
         # identity entry, etc.), record the failure and skip that recipient
         # for this cycle without aborting the whole run.

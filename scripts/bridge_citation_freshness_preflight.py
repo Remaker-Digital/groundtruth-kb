@@ -16,12 +16,12 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
     re.IGNORECASE,
 )
 BRIDGE_PATH_RE: Final[re.Pattern[str]] = re.compile(r"\bbridge/(?P<slug>[A-Za-z0-9_.-]+)-(?P<version>\d{3})\.md\b")
 STATUS_AT_VERSION_RE: Final[re.Pattern[str]] = re.compile(
-    r"\b(?:NEW|REVISED|GO|NO-GO|VERIFIED)(?:-\d+)?\s+at\s+-(?P<version>\d+)\b",
+    r"\b(?:NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED)(?:-\d+)?\s+at\s+-(?P<version>\d+)\b",
     re.IGNORECASE,
 )
 

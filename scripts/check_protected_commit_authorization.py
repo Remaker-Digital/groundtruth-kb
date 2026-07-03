@@ -31,7 +31,7 @@ from scripts.implementation_start_gate import (  # noqa: E402
 
 BY_BRIDGE_PACKETS_REL = Path(".gtkb-state/implementation-authorizations/by-bridge")
 VERSIONED_BRIDGE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
+STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
 
 EXTRA_PROTECTED_EXACT = frozenset({"groundtruth.db"})
 EXTRA_PROTECTED_PREFIXES = (".githooks/",)

@@ -15,7 +15,7 @@ from typing import Any, Final
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$"
+    r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$"
 )
 BRIDGE_PROJECT_RE: Final[re.Pattern[str]] = re.compile(r"^Project:\s*(\S+)\s*$", re.MULTILINE)
 

@@ -73,6 +73,7 @@ def _write_proposal(
     bridge_kind_line = f"bridge_kind: {bridge_kind}\n\n" if bridge_kind else ""
     body = (
         f"{status}\n\n"
+        f"author_session_context_id: fixture-proposal-session-{slug}-{version:03d}\n\n"
         f"{bridge_kind_line}"
         f"# Fixture proposal {slug} v{version}\n\n"
         f"target_paths: {target_paths_json}\n\n"
@@ -93,7 +94,11 @@ def _write_verdict(project_root: Path, slug: str, version: int, verdict: str = "
     suffix = "" if version == 1 else f"-{version:03d}"
     path = project_root / "bridge" / f"{slug}{suffix}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"{verdict}\n\nFixture {verdict} verdict for {slug} v{version}.\n", encoding="utf-8")
+    path.write_text(
+        f"{verdict}\n\nauthor_session_context_id: fixture-verdict-session-{slug}-{version:03d}\n\n"
+        f"Fixture {verdict} verdict for {slug} v{version}.\n",
+        encoding="utf-8",
+    )
     return path
 
 
@@ -178,6 +183,19 @@ def test_bridge_entry_records_deferred_status(auth_module, tmp_path):
     assert entry.versions[0] == ("DEFERRED", f"bridge/{slug}-003.md")
 
 
+def test_bridge_entry_records_no_action_status(auth_module, tmp_path):
+    """NO-ACTION is a versioned lifecycle status, not a malformed line."""
+    slug = "no-action-bridge"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+
+    entry = auth_module.bridge_entry(tmp_path, slug)
+
+    assert entry.latest_status == "NO-ACTION"
+    assert entry.versions[0] == ("NO-ACTION", f"bridge/{slug}-003.md")
+
+
 def test_bridge_entry_raises_for_malformed_deferred_file(auth_module, tmp_path):
     """Per-file status validation applies to DEFERRED chains too."""
     slug = "deferred-bridge"
@@ -202,6 +220,17 @@ def test_create_packet_fails_when_latest_status_is_deferred(auth_module, tmp_pat
     )
 
     with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
+def test_create_packet_fails_when_latest_status_is_no_action(auth_module, tmp_path):
+    """Latest NO-ACTION above older GO makes that GO non-dispatchable."""
+    slug = "no-action-bridge"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+
+    with pytest.raises(auth_module.AuthorizationError, match="NO-ACTION"):
         auth_module.create_authorization_packet(tmp_path, slug)
 
 
@@ -1737,6 +1766,7 @@ def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_
     proposal.parent.mkdir(parents=True, exist_ok=True)
     proposal.write_text(
         "NEW\n\n"
+        "author_session_context_id: fixture-proposal-session-fixture-bridge-001\n\n"
         f"# Fixture proposal {slug}\n\n"
         "## target_paths\n\n"
         "- `scripts/dummy.py`\n"
@@ -1837,6 +1867,20 @@ def test_approved_files_for_go_raises_on_latest_deferred(auth_module):
         auth_module.approved_files_for_go(entry)
 
 
+def test_approved_files_for_go_raises_on_latest_no_action(auth_module):
+    """Latest NO-ACTION is LO-actionable review state; an older GO cannot authorize."""
+    entry = auth_module.BridgeEntry(
+        bridge_id="x",
+        versions=[
+            ("NO-ACTION", "bridge/x-006.md"),
+            ("GO", "bridge/x-004.md"),
+            ("NEW", "bridge/x-001.md"),
+        ],
+    )
+    with pytest.raises(auth_module.AuthorizationError, match="NO-ACTION"):
+        auth_module.approved_files_for_go(entry)
+
+
 def test_approved_files_for_go_raises_when_no_go_in_chain(auth_module):
     """T17 -- a chain with no GO anywhere -> raises."""
     entry = auth_module.BridgeEntry(
@@ -1912,6 +1956,16 @@ def test_create_authorization_packet_raises_on_latest_deferred_above_go(auth_mod
         auth_module.create_authorization_packet(tmp_path, slug)
 
 
+def test_create_authorization_packet_raises_on_latest_no_action_above_go(auth_module, tmp_path):
+    """NO-ACTION above a GO requires a later corrected GO before implementation."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+
+    with pytest.raises(auth_module.AuthorizationError, match="NO-ACTION"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
 def test_validate_packet_raises_when_bridge_becomes_latest_deferred(auth_module, tmp_path):
     """A previously valid packet cannot stay valid after latest DEFERRED."""
     _make_groundtruth_toml(tmp_path)
@@ -1922,6 +1976,17 @@ def test_validate_packet_raises_when_bridge_becomes_latest_deferred(auth_module,
     _ignore_retired_index_fixture(tmp_path, [block])
 
     with pytest.raises(auth_module.AuthorizationError, match="DEFERRED"):
+        auth_module.activate_packet(tmp_path, slug)
+
+
+def test_validate_packet_raises_when_bridge_becomes_latest_no_action(auth_module, tmp_path):
+    """A previously valid packet cannot stay valid after latest NO-ACTION."""
+    _make_groundtruth_toml(tmp_path)
+    slug, _, _ = _setup_simple_go_bridge(tmp_path)
+    _begin_packet(auth_module, tmp_path, slug)
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+
+    with pytest.raises(auth_module.AuthorizationError, match="NO-ACTION"):
         auth_module.activate_packet(tmp_path, slug)
 
 

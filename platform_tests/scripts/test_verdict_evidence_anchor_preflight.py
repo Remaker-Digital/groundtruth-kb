@@ -266,10 +266,25 @@ def test_hook_allows_valid_nogo(tmp_path: Path) -> None:
 
 
 def test_hook_deny_reason_for_content_blocks_fabricated_nogo(tmp_path: Path) -> None:
-    _write_op(tmp_path, "bridge/foo-001.md", ["NEW", "", "## Implementation Plan", "tail"])
+    _write_op(
+        tmp_path,
+        "bridge/foo-001.md",
+        [
+            "NEW",
+            "author_identity: prime-builder/test",
+            "author_harness_id: T",
+            "author_session_context_id: test-prime-session",
+            "",
+            "## Implementation Plan",
+            "tail",
+        ],
+    )
     hook = _load_hook()
     bad = (
         "NO-GO\n"
+        "author_identity: loyal-opposition/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: test-lo-session\n"
         "bridge_kind: lo_verdict\n"
         "Responds to: bridge/foo-001.md\n"
         "\n"

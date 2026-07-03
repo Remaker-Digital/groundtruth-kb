@@ -1,4 +1,4 @@
-"""Unit tests for .claude/skills/bridge/helpers/scan_bridge.py."""
+"""Unit tests for .codex/skills/bridge/helpers/scan_bridge.py."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+HELPER_PATH = PROJECT_ROOT / ".codex" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 TEMPLATE_HELPER_PATH = (
     PROJECT_ROOT / "groundtruth-kb" / "templates" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
 )
@@ -93,6 +93,20 @@ NEW: bridge/gtkb-foo-001.md
     prime_result = helper.scan(role="prime-builder", index_text=index)
     assert len(lo_result["actionable"]) == 1
     assert lo_result["actionable"][0]["latest_status"] == "REVISED"
+    assert prime_result["actionable"] == []
+
+
+def test_latest_no_action_actionable_for_lo_not_prime(helper) -> None:
+    index = """\
+Document: gtkb-foo
+NO-ACTION: bridge/gtkb-foo-003.md
+GO: bridge/gtkb-foo-002.md
+NEW: bridge/gtkb-foo-001.md
+"""
+    lo_result = helper.scan(role="loyal-opposition", index_text=index)
+    prime_result = helper.scan(role="prime-builder", index_text=index)
+    assert len(lo_result["actionable"]) == 1
+    assert lo_result["actionable"][0]["latest_status"] == "NO-ACTION"
     assert prime_result["actionable"] == []
 
 

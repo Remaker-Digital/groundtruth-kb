@@ -11,7 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts.gtkb_bridge_writer import BridgeConflictError, BridgeTransitionError, write_bridge_file
+from scripts.gtkb_bridge_writer import (
+    PRIME_STATUSES,
+    VALID_STATUSES,
+    BridgeConflictError,
+    BridgeTransitionError,
+    write_bridge_file,
+)
 
 AUTHOR_METADATA = {
     "author_identity": "Codex",
@@ -60,6 +66,11 @@ def test_write_bridge_file_can_skip_author_metadata_for_test_fixtures(tmp_path: 
     path = write_bridge_file("fixture", 2, "GO\n\nfixture body\n", tmp_path, require_author_metadata=False)
 
     assert path.read_text(encoding="utf-8") == "GO\n\nfixture body\n"
+
+
+def test_no_action_is_valid_prime_authored_status() -> None:
+    assert "NO-ACTION" in VALID_STATUSES
+    assert "NO-ACTION" in PRIME_STATUSES
 
 
 def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> None:

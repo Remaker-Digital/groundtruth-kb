@@ -369,9 +369,21 @@ def test_bridge_file_status_raises_malformed_on_empty_file(tmp_path: Path, env) 
 
 def test_bridge_file_status_returns_canonical_status_unchanged(tmp_path: Path, env) -> None:
     """Non-regression: every canonical status token must still parse."""
-    for token in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"):
+    for token in ("NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"):
         path = _write_bridge_file(tmp_path, f"slug-{token.lower()}", 1, f"{token}\n\n# Body\n")
         assert env._bridge_file_status(path) == token
+
+
+def test_no_action_claim_uses_draft_kind_not_go_implementation(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"D": "loyal-opposition"})
+    _write_index(tmp_path, {"no-action-thread": "NO-ACTION"})
+    session_id = "2026-06-22T00-00-00Z-loyal-opposition-D-def456"
+
+    assert env.acquire("no-action-thread", session_id, project_root=tmp_path) is True
+
+    holder = env.current_holder("no-action-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_DRAFT
 
 
 def test_bridge_file_status_skips_leading_blank_lines(tmp_path: Path, env) -> None:

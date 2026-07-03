@@ -33,7 +33,7 @@ DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spe
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
 
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
     re.IGNORECASE,
 )
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
@@ -204,7 +204,7 @@ def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | N
         latest = max(versions, key=lambda v: v.version_number)
         if latest.status == "WITHDRAWN":
             return latest
-    for status_set in ({"NEW", "REVISED"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
+    for status_set in ({"NEW", "REVISED", "NO-ACTION"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
         candidates = [v for v in versions if v.status in status_set]
         if candidates:
             return max(candidates, key=lambda v: v.version_number)

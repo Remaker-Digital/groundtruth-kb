@@ -74,6 +74,11 @@ def test_bridge_status_enum_includes_deferred() -> None:
     assert d.BridgeStatus("DEFERRED") == d.BridgeStatus.DEFERRED
 
 
+def test_bridge_status_enum_includes_no_action() -> None:
+    d = _detector()
+    assert d.BridgeStatus("NO-ACTION") == d.BridgeStatus.NO_ACTION
+
+
 def test_parser_recognizes_deferred_status() -> None:
     d = _detector()
     text = "Document: deferred-thread\nDEFERRED: bridge/deferred-thread-002.md\nNO-GO: bridge/deferred-thread-001.md\n"
@@ -83,10 +88,30 @@ def test_parser_recognizes_deferred_status() -> None:
     assert result.documents[0].current_top.status == d.BridgeStatus.DEFERRED
 
 
+def test_parser_recognizes_no_action_status() -> None:
+    d = _detector()
+    text = (
+        "Document: no-action-thread\n"
+        "NO-ACTION: bridge/no-action-thread-003.md\n"
+        "GO: bridge/no-action-thread-002.md\n"
+        "NEW: bridge/no-action-thread-001.md\n"
+    )
+    result = d.parse_index(text)
+    assert result.errors == ()
+    assert result.documents[0].current_top is not None
+    assert result.documents[0].current_top.status == d.BridgeStatus.NO_ACTION
+
+
 def test_status_driver_classifies_deferred_non_actionable() -> None:
     d = _detector()
     s = _status_driver()
     assert d.BridgeStatus.DEFERRED.value in s.NON_ACTIONABLE_STATUSES
+
+
+def test_status_driver_does_not_classify_no_action_terminal() -> None:
+    d = _detector()
+    s = _status_driver()
+    assert d.BridgeStatus.NO_ACTION.value not in s.NON_ACTIONABLE_STATUSES
 
 
 def test_parser_handles_multiline_html_comment_blocks() -> None:

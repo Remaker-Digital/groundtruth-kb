@@ -65,7 +65,7 @@ MIN_QUOTE_LEN: Final[int] = 8
 QUOTE_ADJACENCY: Final[int] = 60
 
 _STATUS_LINE_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
     re.IGNORECASE,
 )
 

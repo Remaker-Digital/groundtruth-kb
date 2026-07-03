@@ -1310,7 +1310,7 @@ _RESIDUAL_OVERRIDE_RE = re.compile(r"\*\*Status:\*\*\s+VERIFIED\s*\(residual:", 
 _STALE_PRIORITY_RE = re.compile(r"\*\*Priority:\*\*\s+Stale\b", re.IGNORECASE)
 _BRIDGE_VERSION_FILE_RE = re.compile(r"^(?P<document>.+)-(?P<version>\d{3})\.md$")
 _BRIDGE_STATUS_LINE_RE = re.compile(
-    r"^#?\s*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
+    r"^#?\s*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN|PAUSED)\b",
     re.IGNORECASE,
 )
 

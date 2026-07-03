@@ -81,7 +81,7 @@ WAIVERS_HEADING_RE: Final[re.Pattern[str]] = re.compile(
 )
 
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b",
     re.IGNORECASE,
 )
 
@@ -533,14 +533,14 @@ def run(
         return 0
 
     # Step 3-4: Read each file → compute union of cited specs + collect waivers.
-    # IMPORTANT: only Prime-authored versions (NEW / REVISED) carry the
-    # ``## Specification Links`` section. Codex verdict files (GO / NO-GO /
+    # IMPORTANT: only Prime-authored versions (NEW / REVISED / NO-ACTION) carry
+    # the ``## Specification Links`` section. Codex verdict files (GO / NO-GO /
     # VERIFIED) typically lack that section because they inherit the spec
     # context from the proposal they reviewed. A2 enforcement therefore
     # compares against the most-recent PRIME-authored version, not the
     # absolute-latest version. Per the operative-Prime-version pattern from
     # smart-poller-kind-aware-routing-2026-04-30 F1 fix.
-    PRIME_AUTHORED_STATUSES = {"NEW", "REVISED"}
+    PRIME_AUTHORED_STATUSES = {"NEW", "REVISED", "NO-ACTION"}
     cited_history: dict[int, set[str]] = {}  # version_number → cited specs (Prime-authored only)
     cited_specs: set[str] = set()
     waivers: dict[str, Waiver] = {}

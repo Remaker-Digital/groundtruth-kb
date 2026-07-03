@@ -208,7 +208,7 @@ def _render_state_from_versioned_files(root: Path) -> str:
     bridge_dir = root / "bridge"
     grouped: dict[str, list[tuple[int, str, str]]] = {}
     status_re = re.compile(
-        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
         re.IGNORECASE,
     )
     file_re = re.compile(r"^(.+)-(\d{3,})\.md$")

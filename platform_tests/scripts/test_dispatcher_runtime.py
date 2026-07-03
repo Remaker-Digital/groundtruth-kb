@@ -258,7 +258,9 @@ def _write_work_subject(root: Path, subject: str) -> None:
 def _write_bridge_file(root: Path, name: str, body: str = "# placeholder\n") -> None:
     """Create a referenced bridge file so ``compute_actionable_pending`` keeps it."""
     stripped = body.lstrip()
-    if stripped and not stripped.startswith(("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "WITHDRAWN")):
+    if stripped and not stripped.startswith(
+        ("NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "WITHDRAWN")
+    ):
         if name.endswith("-001.md"):
             body = "NEW\n\n" + body
         elif name.endswith("-002.md"):
@@ -847,6 +849,38 @@ def test_run_dispatch_cycle_filters_owner_hold_prime_no_go_before_spawn(
     assert recipient_state["raw_pending_count"] == 1
     assert recipient_state["pending_count"] == 0
     assert recipient_state["selected_count"] == 0
+
+
+def test_run_dispatch_cycle_routes_no_action_to_lo_not_prime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    doc = "no-action-thread"
+
+    _write_bridge_file(root, f"{doc}-001.md", "NEW\n\nbridge_kind: implementation_proposal\n")
+    _write_bridge_file(root, f"{doc}-002.md", "GO\n\nFixture GO.\n")
+    _write_bridge_file(root, f"{doc}-003.md", "NO-ACTION\n\nPrime reports no implementation action.\n")
+    captured_documents: list[str] = []
+
+    def _fake_spawn_harness(**kwargs: object) -> dict[str, object]:
+        captured_documents.extend(item.document_name for item in kwargs["items"])  # type: ignore[index]
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,  # type: ignore[index, union-attr]
+            "launched": False,
+            "reason": "dry_run",
+        }
+
+    monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+    recipients = summary["dispatch_state"]["recipients"]
+
+    assert summary["results"]["loyal-opposition"]["reason"] == "dry_run"
+    assert captured_documents == [doc]
+    assert recipients["loyal-opposition:A"]["selected_count"] == 1
+    assert summary["results"]["prime-builder"]["reason"] == "no_pending"
 
 
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:

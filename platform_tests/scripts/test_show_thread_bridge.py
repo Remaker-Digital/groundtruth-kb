@@ -1,4 +1,4 @@
-"""Unit tests for .claude/skills/bridge/helpers/show_thread_bridge.py."""
+"""Unit tests for .codex/skills/bridge/helpers/show_thread_bridge.py."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "show_thread_bridge.py"
+HELPER_PATH = PROJECT_ROOT / ".codex" / "skills" / "bridge" / "helpers" / "show_thread_bridge.py"
 
 
 def _load_helper():
@@ -85,6 +85,7 @@ def test_t3_compound_suffix_slug_handled(helper, fake_bridge) -> None:
     assert [v["version"] for v in result["versions"]] == [1, 2]
 
 
+@pytest.mark.skip(reason="INDEX.md retired")
 def test_t4_drift_detection_missing_files(helper, fake_bridge) -> None:
     """INDEX references files that don't exist on disk → drift warning."""
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
@@ -99,6 +100,7 @@ def test_t4_drift_detection_missing_files(helper, fake_bridge) -> None:
     assert any("bridge/gtkb-foo-002.md" in d for d in result["drift"])
 
 
+@pytest.mark.skip(reason="INDEX.md retired")
 def test_t4b_drift_detection_orphan_disk_files(helper, fake_bridge) -> None:
     """On-disk file not referenced by INDEX → drift warning."""
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
@@ -146,6 +148,18 @@ def test_index_status_chain_returned(helper, fake_bridge) -> None:
     assert chain[1]["status"] == "NEW"
 
 
+def test_no_action_status_chain_returned(helper, fake_bridge) -> None:
+    _write_version(fake_bridge, "gtkb-foo", 1, "NEW")
+    _write_version(fake_bridge, "gtkb-foo", 2, "GO")
+    _write_version(fake_bridge, "gtkb-foo", 3, "NO-ACTION")
+
+    result = helper.show("gtkb-foo", bridge_dir=fake_bridge)
+
+    chain = result["index_status_chain"]
+    assert [item["status"] for item in chain] == ["NO-ACTION", "GO", "NEW"]
+
+
+@pytest.mark.skip(reason="INDEX.md retired")
 def test_slug_not_in_index_but_files_exist(helper, fake_bridge) -> None:
     """Files on disk but INDEX has no entry → found=True, document_entry empty."""
     _write_version(fake_bridge, "gtkb-foo", 1, "NEW")

@@ -4,11 +4,9 @@
 RETIRED (2026-05-09): This module belongs to the retired smart-poller
 runtime. The smart-poller scheduled task and runner script have been
 archived to ``archive/smart-poller-2026-05-09/``; bridge dispatch is now
-governed by the cross-harness event-driven trigger
-(``scripts/cross_harness_bridge_trigger.py``) registered as PostToolUse +
-Stop hooks in ``.claude/settings.json`` and ``.codex/hooks.json``. The
-notification-artifact API below is retained for compatibility and historical
-reference; the trigger writes its own dispatch state at
+governed by the dispatcher daemon. The notification-artifact API below is
+retained for compatibility and historical reference; the daemon writes its
+dispatch state at
 ``.gtkb-state/bridge-poller/dispatch-state.json``.
 
 Per ``bridge/gtkb-bridge-poller-p3-notify-2026-04-29-008.md`` GO at REVISED-3,
@@ -37,7 +35,7 @@ operational_state_change/candidate_spec_intake).
 Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-CLARIFICATION
 + smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4):
 
-- ``NEW`` / ``REVISED`` top status → Codex (Loyal Opposition reviews).
+- ``NEW`` / ``REVISED`` / ``NO-ACTION`` top status → Codex (Loyal Opposition reviews).
   Always dispatchable; kind classification is informational only.
 - ``NO-GO`` top status → Prime Builder (Prime revises). Always dispatchable
   because NO-GO is "proposal requires changes before approval", regardless
@@ -57,8 +55,8 @@ Routing contract (per ``AGENTS.md:153-159`` + DELIB-S319-SMART-POLLER-OBJECTIVE-
 
 Phase-2 Ollama dispatch wiring keeps this module role-actionability-only.
 Harness-local readiness (Ollama shim, daemon, route/tool subset) is applied
-downstream by ``scripts/cross_harness_bridge_trigger.py`` when a role-actionable
-entry resolves to harness D.
+downstream by the dispatcher daemon when a role-actionable entry resolves to
+harness D.
 
 Schema v3 (bumped from v2 per kind-aware-routing slice): ``pending_actions[]``
 entries now carry ``dispatchable`` (bool) + ``classification`` (str:
@@ -243,7 +241,7 @@ def _derive_dispatchable(top_status: str, classification: str) -> bool:
 
     Per smart-poller-kind-aware-routing-2026-04-30-009 REVISED-4 §1.1:
 
-    - NEW / REVISED → True (Codex reviews regardless of kind classification;
+    - NEW / REVISED / NO-ACTION → True (Codex reviews regardless of kind classification;
       terminal-kind means "no Prime follow-up", not "no Codex review")
     - NO-GO → True unless the latest verdict explicitly declares owner-hold
       (Prime revises regardless of kind, per file-bridge-protocol.md:92,
@@ -372,7 +370,7 @@ def compute_actionable_pending(
     recipient.
 
     - ``GO`` / ``NO-GO`` → Prime list.
-    - ``NEW`` / ``REVISED`` → Codex list.
+    - ``NEW`` / ``REVISED`` / ``NO-ACTION`` → Codex list.
     - ``ADVISORY`` -> Prime list, with ``dispatchable=False`` for headless
       automation.
     - ``VERIFIED`` / ``DEFERRED`` / ``WITHDRAWN`` -> excluded
