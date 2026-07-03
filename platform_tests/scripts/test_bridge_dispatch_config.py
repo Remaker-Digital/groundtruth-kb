@@ -1074,6 +1074,77 @@ def test_wi4718_benign_constant_contains_expected_reasons() -> None:
     assert isinstance(BENIGN_NONLAUNCH_LAUNCH_REASONS, frozenset)
 
 
+def test_wi4995_document_lease_held_ignores_stale_failure_class() -> None:
+    """document_lease_held is a benign current non-launch, not a subprocess failure."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "last_result": "document_lease_held",
+        "failure_class": "subprocess_execution_failed",
+        "last_launch": {
+            "reason": "document_lease_held",
+            "recipient": "loyal-opposition:B",
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("loyal-opposition:B", row)
+    findings = "\n".join(classification["findings"])
+
+    assert "dispatch runtime failure" not in findings
+    assert "stale failure evidence ignored (current document_lease_held non-launch)" in findings
+    assert classification["severity"] == "WARN"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == "current document_lease_held non-launch"
+
+
+def test_wi4995_document_lease_held_does_not_hide_current_exit_failure() -> None:
+    """A separate current failure signal still fails even when the row is lease-held."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "last_result": "document_lease_held",
+        "failure_class": "subprocess_execution_failed",
+        "last_launch": {
+            "reason": "document_lease_held",
+            "recipient": "loyal-opposition:B",
+            "exit_failure_reason": "no_verdict_produced",
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("loyal-opposition:B", row)
+    findings = "\n".join(classification["findings"])
+
+    assert "dispatch runtime failure: loyal-opposition:B failure_class=subprocess_execution_failed" in findings
+    assert (
+        "dispatch runtime failure: loyal-opposition:B last_launch.exit_failure_reason=no_verdict_produced" in findings
+    )
+    assert classification["severity"] == "FAIL"
+    assert classification["stale_failure_evidence"] is False
+
+
+def test_wi4992_all_impl_auth_quarantine_ignores_stale_failure_class() -> None:
+    """all_impl_auth_quarantined is deterministic non-work, not a subprocess failure."""
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 0,
+        "last_result": "all_impl_auth_quarantined",
+        "failure_class": "subprocess_execution_failed",
+        "last_launch": {
+            "reason": "all_impl_auth_quarantined",
+            "recipient": "prime-builder:A",
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("prime-builder:A", row)
+    findings = "\n".join(classification["findings"])
+
+    assert "dispatch runtime failure" not in findings
+    assert "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in findings
+    assert classification["severity"] == "WARN"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
 def test_wi4768_per_role_saturation_emits_warn_not_fail(tmp_path: Path) -> None:
     """Per-role worker saturation is live backpressure, not dispatcher failure."""
     _write_project(tmp_path)

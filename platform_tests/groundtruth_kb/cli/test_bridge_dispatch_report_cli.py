@@ -206,3 +206,43 @@ def test_bridge_dispatch_report_does_not_count_stdout_stderr_only_sidecars_as_li
     payload = json.loads(result.output)
     assert payload["live_state"]["live_worker_count"] == 0
     assert payload["history"]["recent_runs"][0]["state"] == "stale"
+
+
+def test_bridge_dispatch_report_treats_document_lease_held_as_stale_failure_context(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    state_dir.mkdir(parents=True)
+    (state_dir / "dispatch-state.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "updated_at": "2026-07-03T12:00:00Z",
+                "recipients": {
+                    "loyal-opposition:D": {
+                        "pending_count": 1,
+                        "selected_count": 1,
+                        "last_result": "document_lease_held",
+                        "failure_class": "subprocess_execution_failed",
+                        "last_launch": {
+                            "reason": "document_lease_held",
+                            "recipient": "loyal-opposition:D",
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    findings = "\n".join(payload["reliability"]["findings"])
+    assert "dispatch runtime failure: loyal-opposition:D failure_class=subprocess_execution_failed" not in findings
+    assert "stale failure evidence ignored (current document_lease_held non-launch)" in findings
+    classification = next(
+        row for row in payload["reliability"]["runtime_classifications"] if row["recipient"] == "loyal-opposition:D"
+    )
+    assert classification["severity"] == "WARN"
+    assert classification["stale_failure_reason"] == "current document_lease_held non-launch"

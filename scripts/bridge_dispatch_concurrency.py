@@ -31,7 +31,7 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Slot-record schema version. Bumped only on an incompatible record-shape change.
@@ -63,7 +63,7 @@ class DispatchCapacityExhausted(RuntimeError):
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _validate_role(role: str) -> str:
@@ -182,8 +182,8 @@ def _heartbeat_age_seconds(record: dict) -> float | None:
     except ValueError:
         return None
     if hb.tzinfo is None:
-        hb = hb.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - hb).total_seconds()
+        hb = hb.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - hb).total_seconds()
 
 
 def _slot_is_stale(record: dict) -> bool:

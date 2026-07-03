@@ -25,12 +25,12 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dispatcher_runtime.py"
 _CODEX_INVOCATION_SURFACES = {"headless": {"argv": ["codex", "exec", "{{PROMPT}}", "--cd", "{{PROJECT_ROOT}}"]}}
 
 
 def _load_trigger() -> ModuleType:
-    module_name = "cross_harness_bridge_trigger"
+    module_name = "dispatcher_runtime"
     if module_name in sys.modules:
         return sys.modules[module_name]
     spec = importlib.util.spec_from_file_location(module_name, _SCRIPT_PATH)
@@ -113,6 +113,7 @@ def test_per_role_count_is_role_scoped(tmp_path: Path, monkeypatch: pytest.Monke
     (runs_dir / "2026-06-21T05-00-00Z-loyal-opposition-A-bbbbbb.pid").write_text(str(me), encoding="utf-8")
     (runs_dir / "2026-06-21T05-00-00Z-prime-builder-B-cccccc.pid").write_text(str(me), encoding="utf-8")
     monkeypatch.setattr(trigger, "_pid_alive", lambda pid: str(pid) == str(me))
+    monkeypatch.setattr(trigger, "_dispatch_pid_provenance_matches", lambda runs_dir, dispatch_id, pid: True)
 
     assert trigger._count_live_dispatched_processes_for_role(runs_dir, "loyal-opposition") == 2
     assert trigger._count_live_dispatched_processes_for_role(runs_dir, "prime-builder") == 1

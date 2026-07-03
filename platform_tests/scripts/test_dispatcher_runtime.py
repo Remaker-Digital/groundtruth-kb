@@ -1854,11 +1854,12 @@ def test_prime_spawn_fails_closed_when_dispatch_authorization_fails(
     assert meta["launched"] is False
     assert meta["reason"] == "all_impl_auth_quarantined"
     assert popen_calls == []
-    failures = [
-        json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
+    suppressions = [
+        json.loads(line)
+        for line in (state_dir / "dispatch-suppressions.jsonl").read_text(encoding="utf-8").splitlines()
     ]
-    assert failures[-1]["document_name"] == doc
-    assert failures[-1]["reason"] == "impl_auth_quarantined"
+    assert suppressions[-1]["document_name"] == doc
+    assert suppressions[-1]["reason"] == "impl_auth_quarantined"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1989,11 +1990,12 @@ def test_issue_dispatch_auth_quarantines_bad_go_and_continues_healthy(
     assert result["ok"] is True
     assert result["context"]["bridge_ids"] == ["good-go-thread"]
     assert result["quarantined_slugs"] == [{"slug": "bad-go-thread", "error_message": "missing approved proposal"}]
-    failures = [
-        json.loads(line) for line in (state_dir / "dispatch-failures.jsonl").read_text(encoding="utf-8").splitlines()
+    suppressions = [
+        json.loads(line)
+        for line in (state_dir / "dispatch-suppressions.jsonl").read_text(encoding="utf-8").splitlines()
     ]
-    assert failures[-1]["document_name"] == "bad-go-thread"
-    assert failures[-1]["reason"] == "impl_auth_quarantined"
+    assert suppressions[-1]["document_name"] == "bad-go-thread"
+    assert suppressions[-1]["reason"] == "impl_auth_quarantined"
 
 
 def test_spawn_harness_dispatches_no_go_only_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

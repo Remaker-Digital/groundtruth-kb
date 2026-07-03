@@ -202,6 +202,105 @@ def _health_response_to_json(health: dict) -> dict[str, dict]:
     }
 
 
+def _item_document_name(item: Any) -> str:
+    return str(getattr(item, "document_name", ""))
+
+
+def _prime_fanout_batches(target: Any, selected: list[Any]) -> list[list[Any]]:
+    """Return one-document sub-batches for Prime Builder fan-out."""
+    if getattr(target, "needed_role_label", None) != "prime-builder":
+        return [selected]
+    return [[item] for item in selected]
+
+
+def _recipient_signature_map(recipient_state: dict[str, Any], key: str) -> dict[str, str]:
+    raw = recipient_state.get(key)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _selected_document_signature_matches(
+    recipient_state: dict[str, Any],
+    selected: list[Any],
+    signature: str,
+    *,
+    map_key: str,
+) -> bool:
+    if len(selected) != 1:
+        return recipient_state.get("last_dispatched_signature") == signature
+    document_name = _item_document_name(selected[0])
+    if not document_name:
+        return recipient_state.get("last_dispatched_signature") == signature
+    signature_map = _recipient_signature_map(recipient_state, map_key)
+    return (
+        signature_map.get(document_name) == signature or recipient_state.get("last_dispatched_signature") == signature
+    )
+
+
+def _store_selected_document_signature(
+    recipient_state: dict[str, Any],
+    selected: list[Any],
+    signature: str,
+    *,
+    map_key: str,
+) -> None:
+    if len(selected) != 1:
+        return
+    document_name = _item_document_name(selected[0])
+    if not document_name:
+        return
+    signature_map = _recipient_signature_map(recipient_state, map_key)
+    signature_map[document_name] = signature
+    recipient_state[map_key] = signature_map
+
+
+def _clear_selected_document_signature(recipient_state: dict[str, Any], selected: list[Any], *, map_key: str) -> None:
+    if len(selected) != 1:
+        return
+    document_name = _item_document_name(selected[0])
+    if not document_name:
+        return
+    signature_map = _recipient_signature_map(recipient_state, map_key)
+    if document_name in signature_map:
+        signature_map.pop(document_name, None)
+        recipient_state[map_key] = signature_map
+
+
+def _append_prime_fanout_result(
+    tick_fanout: dict[str, list[dict[str, Any]]],
+    recipient_state: dict[str, Any] | None,
+    *,
+    recipient: str | None,
+    selected: list[Any],
+    result: dict[str, Any],
+    signature: str | None,
+) -> None:
+    if recipient_state is None or recipient is None:
+        return
+    if not str(recipient).startswith("prime-builder"):
+        return
+    outcome = {
+        "document_names": [_item_document_name(item) for item in selected],
+        "signature": signature,
+        "launched": bool(result.get("launched")),
+        "reason": result.get("reason") or ("launched" if result.get("launched") else "not_launched"),
+        "dispatch_id": result.get("dispatch_id"),
+    }
+    outcomes = tick_fanout.setdefault(recipient, [])
+    outcomes.append(outcome)
+    recipient_state["fanout_results"] = outcomes
+    recipient_state["fanout_launched_count"] = sum(1 for item in outcomes if item.get("launched"))
+    recipient_state["fanout_skipped_held_count"] = sum(
+        1 for item in outcomes if item.get("reason") == "work_intent_already_held"
+    )
+    recipient_state["fanout_skipped_duplicate_count"] = sum(1 for item in outcomes if item.get("reason") == "unchanged")
+    recipient_state["fanout_impl_auth_quarantined_count"] = sum(
+        1 for item in outcomes if item.get("reason") == "all_impl_auth_quarantined"
+    )
+    recipient_state["fanout_at_cap_count"] = sum(
+        1 for item in outcomes if item.get("reason") == "per_role_concurrency_cap_reached"
+    )
+
+
 def _resolve_project_root(explicit: Path | None) -> Path:
     if explicit is not None:
         candidate = explicit.resolve()
@@ -604,13 +703,11 @@ def compute_shadow_decisions(
             selected, signature = runtime._target_selected_signature(target, remaining, max_items)
             h_info = harnesses.get(target.harness_id) or {}
             harness_type = str(h_info.get("harness_type") or "unknown").strip().lower()
-            record: dict[str, Any] = {
+            base_record: dict[str, Any] = {
                 "timestamp": _now_iso(),
                 "role": role_label,
                 "recipient": target.dispatch_state_key,
                 "harness_id": target.harness_id,
-                "signature": signature,
-                "would_dispatch": [getattr(item, "document_name", "") for item in selected],
                 "shadow_mode": True,
                 "spawned": False,
             }
@@ -636,14 +733,38 @@ def compute_shadow_decisions(
                 if backoff_skip is not None:
                     spawn_blocked_reason = str(backoff_skip.get("reason") or "provider_failure_backoff_active")
             if spawn_blocked_reason is not None:
+                record = {
+                    **base_record,
+                    "signature": signature,
+                    "would_dispatch": [getattr(item, "document_name", "") for item in selected],
+                }
                 record["reason"] = spawn_blocked_reason
+                decisions.append(record)
             else:
-                record["_spawn_target"] = target
-                record["_spawn_selected"] = selected
-            decisions.append(record)
+                batches = _prime_fanout_batches(target, selected)
+                if not batches:
+                    decisions.append(
+                        {
+                            **base_record,
+                            "signature": signature,
+                            "would_dispatch": [],
+                        }
+                    )
+                for fanout_index, batch in enumerate(batches):
+                    record = {
+                        **base_record,
+                        "signature": runtime._signature(batch),
+                        "would_dispatch": [getattr(item, "document_name", "") for item in batch],
+                        "_spawn_target": target,
+                        "_spawn_selected": batch,
+                    }
+                    if getattr(target, "needed_role_label", None) == "prime-builder":
+                        record["fanout_index"] = fanout_index
+                        record["fanout_total"] = len(selected)
+                    decisions.append(record)
             if not selected:
                 break
-            if "_spawn_target" in record:
+            if spawn_blocked_reason is None:
                 remaining = runtime._without_selected_dispatch_items(remaining, selected)
                 if not any(getattr(item, "dispatchable", True) for item in remaining):
                     break
@@ -669,6 +790,7 @@ def _execute_live_spawns(
         runtime._reconcile_terminal_bridge_recipient_state(recipients_state, project_root)
 
     spawn_results: list[dict[str, Any]] = []
+    tick_prime_fanout: dict[str, list[dict[str, Any]]] = {}
     for record in decision_records:
         target = record.get("_spawn_target")
         selected = record.get("_spawn_selected") or []
@@ -709,6 +831,7 @@ def _execute_live_spawns(
         acquired_work_intent_slugs: list[str] = []
 
         if getattr(target, "needed_role_label", None) == "prime-builder":
+            prime_original_selected = list(selected)
             dispatch_id = runtime._new_dispatch_id(target.dispatch_state_key)
             work_intent_session_id = runtime._work_intent_session_id(dispatch_id)
             work_intent_filter = runtime._filter_prime_selected_by_work_intent(
@@ -737,15 +860,22 @@ def _execute_live_spawns(
                     }
                 record["spawned"] = False
                 record["spawn_reason"] = reason
-                spawn_results.append(
-                    {
-                        "recipient": recipient,
-                        "launched": False,
-                        "reason": reason,
-                        "dispatch_id": dispatch_id,
-                        "work_intent_session_id": work_intent_session_id,
-                    }
+                result = {
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": reason,
+                    "dispatch_id": dispatch_id,
+                    "work_intent_session_id": work_intent_session_id,
+                }
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=prime_original_selected,
+                    result=result,
+                    signature=signature,
                 )
+                spawn_results.append(result)
                 continue
 
             selected = list(work_intent_filter["selected"])
@@ -765,23 +895,75 @@ def _execute_live_spawns(
                     }
                 record["spawned"] = False
                 record["spawn_reason"] = "work_intent_already_held"
-                spawn_results.append(
-                    {
-                        "recipient": recipient,
-                        "launched": False,
-                        "reason": "work_intent_already_held",
-                        "dispatch_id": dispatch_id,
-                        "work_intent_session_id": work_intent_session_id,
-                    }
+                result = {
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": "work_intent_already_held",
+                    "dispatch_id": dispatch_id,
+                    "work_intent_session_id": work_intent_session_id,
+                }
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=selected,
+                    result=result,
+                    signature=signature,
                 )
+                spawn_results.append(result)
                 continue
 
         if recipient_state is not None:
             prior_sig = recipient_state.get("last_dispatched_signature")
-            if prior_sig is not None and prior_sig == signature:
+            if getattr(target, "needed_role_label", None) == "prime-builder" and _selected_document_signature_matches(
+                recipient_state,
+                selected,
+                signature,
+                map_key="impl_auth_quarantined_signatures_by_document",
+            ):
+                record["spawned"] = False
+                record["spawn_reason"] = "all_impl_auth_quarantined"
+                result = {
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": "all_impl_auth_quarantined",
+                    "signature": signature,
+                }
+                recipient_state["last_result"] = "all_impl_auth_quarantined"
+                recipient_state["last_suppressed_signature"] = signature
+                recipient_state["pending_count"] = len(selected)
+                recipient_state["selected_count"] = 0
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=selected,
+                    result=result,
+                    signature=signature,
+                )
+                spawn_results.append(result)
+                continue
+            if (
+                getattr(target, "needed_role_label", None) == "prime-builder"
+                and _selected_document_signature_matches(
+                    recipient_state,
+                    selected,
+                    signature,
+                    map_key="last_dispatched_signatures_by_document",
+                )
+            ) or (prior_sig is not None and prior_sig == signature):
                 record["spawned"] = False
                 record["spawn_reason"] = "unchanged"
-                spawn_results.append({"recipient": recipient, "launched": False, "reason": "unchanged"})
+                result = {"recipient": recipient, "launched": False, "reason": "unchanged", "signature": signature}
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=selected,
+                    result=result,
+                    signature=signature,
+                )
+                spawn_results.append(result)
                 recipient_state["last_result"] = "unchanged"
                 recipient_state["pending_count"] = len(selected)
                 recipient_state["selected_count"] = 0
@@ -857,6 +1039,14 @@ def _execute_live_spawns(
                     recipient_state["selected_count"] = 0
                 record["spawned"] = False
                 record["spawn_reason"] = reason
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=selected,
+                    result=result,
+                    signature=signature,
+                )
                 spawn_results.append(result)
                 continue
             acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
@@ -897,15 +1087,43 @@ def _execute_live_spawns(
             if result.get("launched"):
                 recipient_state["last_dispatched_signature"] = signature
                 recipient_state["signature"] = signature
+                _store_selected_document_signature(
+                    recipient_state,
+                    selected,
+                    signature,
+                    map_key="last_dispatched_signatures_by_document",
+                )
+                _clear_selected_document_signature(
+                    recipient_state,
+                    selected,
+                    map_key="impl_auth_quarantined_signatures_by_document",
+                )
                 record["spawned"] = True
             else:
                 record["spawned"] = False
                 record["spawn_reason"] = result.get("reason")
+                if result.get("reason") == "all_impl_auth_quarantined":
+                    recipient_state["last_suppressed_signature"] = signature
+                    _store_selected_document_signature(
+                        recipient_state,
+                        selected,
+                        signature,
+                        map_key="impl_auth_quarantined_signatures_by_document",
+                    )
             recipient_state["last_result"] = result.get("reason") or (
                 "launched" if result.get("launched") else "not_launched"
             )
             recipient_state["pending_count"] = len(selected)
             recipient_state["selected_count"] = len(selected) if result.get("launched") else 0
+            if getattr(target, "needed_role_label", None) == "prime-builder":
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=selected,
+                    result=result,
+                    signature=signature,
+                )
         spawn_results.append(result)
 
     if not dry_run:

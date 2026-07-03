@@ -219,6 +219,8 @@ WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"
 # burying real, actionable failures in the `diagnose` "Recent failures" view.
 EXPECTED_SUPPRESSION_REASONS = frozenset(
     {
+        "all_impl_auth_quarantined",
+        "impl_auth_quarantined",
         "work_intent_already_held",
         "headless_takeover_cooldown",
         "same_role_project_claim_active",

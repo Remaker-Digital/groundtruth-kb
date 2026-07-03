@@ -1013,10 +1013,12 @@ def test_daemon_stop_ignores_unverified_pid_and_clears_state(tmp_path: Path, mon
 
 
 def _spawn_target(runtime, role_label: str, mode: str):
+    harness_id = "A" if role_label == "prime-builder" else "D"
+    command_handle = "codex" if role_label == "prime-builder" else "ollama"
     return runtime.DispatchTarget(
         needed_role_label=role_label,
-        harness_id="D",
-        command_handle="ollama",
+        harness_id=harness_id,
+        command_handle=command_handle,
         canonical_mode=mode,
         invocation_surfaces={"headless": {"argv": ["worker-cmd", "{{PROMPT}}"]}},
     )
@@ -1142,6 +1144,320 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
     assert recipient_state["work_intent_held_filtered_count"] == 1
     assert recipient_state["pending_count"] == 1
     assert recipient_state["selected_count"] == 0
+
+
+def test_wi4994_daemon_prime_fanout_launches_independent_documents(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    for slug in ("first-pb-thread", "second-pb-thread"):
+        _write_go_thread(root, slug)
+    launched_batches: list[list[str]] = []
+
+    def _fake_spawn_harness(**kwargs):
+        launched_batches.append([item.document_name for item in kwargs["items"]])
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn_harness)
+
+    result = daemon.run_tick(root, max_items=2)
+
+    assert result["mode"] == "live"
+    assert len(launched_batches) == 2
+    assert all(len(batch) == 1 for batch in launched_batches)
+    assert {batch[0] for batch in launched_batches} == {"first-pb-thread", "second-pb-thread"}
+    sessions = [item["work_intent_session_id"] for item in result["spawn_results"]]
+    assert len(set(sessions)) == 2
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient_state = state["recipients"]["prime-builder:A"]
+    assert recipient_state["fanout_launched_count"] == 2
+    assert set(recipient_state["last_dispatched_signatures_by_document"]) == {"first-pb-thread", "second-pb-thread"}
+
+
+def test_wi4994_daemon_prime_fanout_held_document_does_not_block_later_unheld(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    registry = sys.modules["bridge_work_intent_registry"]
+    for slug in ("held-pb-thread", "free-pb-thread"):
+        _write_go_thread(root, slug)
+    holder_session = "2026-07-03T12-00-00Z-prime-builder-A-held"
+    from gtkb_session_id import per_session_role_marker_path
+
+    marker_path = per_session_role_marker_path(root, holder_session)
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text(json.dumps({"role": "prime-builder", "session_id": holder_session}), encoding="utf-8")
+    assert registry.acquire("held-pb-thread", holder_session, project_root=root)
+    launched_docs: list[str] = []
+
+    def _fake_spawn_harness(**kwargs):
+        launched_docs.extend(item.document_name for item in kwargs["items"])
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn_harness)
+
+    result = daemon.run_tick(root, max_items=2)
+
+    assert launched_docs == ["free-pb-thread"]
+    reasons = [item.get("reason") for item in result["spawn_results"]]
+    assert "work_intent_already_held" in reasons
+    assert "launched" in reasons
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient_state = state["recipients"]["prime-builder:A"]
+    assert recipient_state["fanout_skipped_held_count"] == 1
+    assert recipient_state["fanout_launched_count"] == 1
+
+
+def test_wi4994_daemon_prime_fanout_dedupes_same_document_not_different_document(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    target = runtime.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="pb",
+        invocation_surfaces=_CODEX_INVOCATION,
+    )
+    selected_a = [types.SimpleNamespace(document_name="same-thread", top_status="GO", top_file="bridge/same-002.md")]
+    selected_b = [
+        types.SimpleNamespace(document_name="different-thread", top_status="GO", top_file="bridge/diff-002.md")
+    ]
+    for slug in ("same-thread", "different-thread"):
+        _write_go_thread(root, slug)
+    sig_a = runtime._signature(selected_a)
+    sig_b = runtime._signature(selected_b)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    runtime._write_dispatch_state(
+        state_dir,
+        {
+            "schema_version": 1,
+            "updated_at": daemon._now_iso(),
+            "recipients": {
+                "prime-builder:A": {
+                    "last_dispatched_signatures_by_document": {"same-thread": sig_a},
+                }
+            },
+        },
+    )
+    launched_docs: list[str] = []
+
+    def _fake_spawn_harness(**kwargs):
+        launched_docs.extend(item.document_name for item in kwargs["items"])
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn_harness)
+
+    results = daemon._execute_live_spawns(
+        root,
+        [
+            {
+                "role": "prime-builder",
+                "recipient": target.dispatch_state_key,
+                "signature": sig_a,
+                "_spawn_target": target,
+                "_spawn_selected": selected_a,
+            },
+            {
+                "role": "prime-builder",
+                "recipient": target.dispatch_state_key,
+                "signature": sig_b,
+                "_spawn_target": target,
+                "_spawn_selected": selected_b,
+            },
+        ],
+        max_items=1,
+        dry_run=False,
+    )
+
+    assert [item.get("reason") for item in results] == ["unchanged", "launched"]
+    assert launched_docs == ["different-thread"]
+
+
+def test_wi4994_daemon_prime_fanout_records_at_cap_per_spawn_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    for slug in ("first-cap-thread", "second-cap-thread"):
+        _write_go_thread(root, slug)
+    call_count = 0
+
+    def _fake_spawn_harness(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return {
+                "dispatch_id": kwargs.get("dispatch_id"),
+                "recipient": kwargs["target"].dispatch_state_key,
+                "launched": True,
+                "reason": "launched",
+            }
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": False,
+            "reason": "per_role_concurrency_cap_reached",
+        }
+
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(runtime, "_spawn_harness", _fake_spawn_harness)
+
+    result = daemon.run_tick(root, max_items=2)
+
+    assert [item.get("reason") for item in result["spawn_results"]] == [
+        "launched",
+        "per_role_concurrency_cap_reached",
+    ]
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient_state = state["recipients"]["prime-builder:A"]
+    assert recipient_state["fanout_launched_count"] == 1
+    assert recipient_state["fanout_at_cap_count"] == 1
+
+
+def test_wi4992_daemon_all_impl_auth_quarantine_suppresses_until_signature_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    target = runtime.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="pb",
+        invocation_surfaces=_CODEX_INVOCATION,
+    )
+    selected = [
+        types.SimpleNamespace(document_name="auth-quarantined-thread", top_status="GO", top_file="bridge/auth-002.md")
+    ]
+    _write_go_thread(root, "auth-quarantined-thread")
+    spawn_calls = 0
+
+    def _fake_issue(*args, **kwargs):
+        return {
+            "ok": False,
+            "reason": "all_impl_auth_quarantined",
+            "failed_slug": "auth-quarantined-thread",
+            "error": "new requirements required",
+        }
+
+    def _unexpected_popen(*args, **kwargs):
+        raise AssertionError("impl-auth quarantine must not launch a worker")
+
+    monkeypatch.setattr(runtime, "_issue_dispatch_authorization_for_selected", _fake_issue)
+    monkeypatch.setattr(runtime.subprocess, "Popen", _unexpected_popen)
+    real_spawn = runtime._spawn_harness
+
+    def _counting_spawn(**kwargs):
+        nonlocal spawn_calls
+        spawn_calls += 1
+        return real_spawn(**kwargs)
+
+    monkeypatch.setattr(runtime, "_spawn_harness", _counting_spawn)
+    decision = {
+        "role": "prime-builder",
+        "recipient": target.dispatch_state_key,
+        "signature": runtime._signature(selected),
+        "_spawn_target": target,
+        "_spawn_selected": selected,
+    }
+
+    first = daemon._execute_live_spawns(root, [decision], max_items=1, dry_run=False)
+    second = daemon._execute_live_spawns(root, [decision], max_items=1, dry_run=False)
+
+    assert spawn_calls == 1
+    assert first[0]["reason"] == "all_impl_auth_quarantined"
+    assert second[0]["reason"] == "all_impl_auth_quarantined"
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient_state = state["recipients"]["prime-builder:A"]
+    assert recipient_state["fanout_impl_auth_quarantined_count"] == 1
+    assert recipient_state["impl_auth_quarantined_signatures_by_document"]["auth-quarantined-thread"]
+
+
+def test_wi4992_daemon_impl_auth_quarantine_does_not_block_implementable_document(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    for slug in ("blocked-auth-thread", "implementable-thread"):
+        _write_go_thread(root, slug)
+    launched_docs: list[str] = []
+
+    def _fake_issue(selected, **kwargs):
+        bridge_id = selected[0].document_name
+        if bridge_id == "blocked-auth-thread":
+            return {
+                "ok": False,
+                "reason": "all_impl_auth_quarantined",
+                "failed_slug": bridge_id,
+                "error": "new requirements required",
+            }
+        return {
+            "ok": True,
+            "reason": None,
+            "context": {
+                "bridge_ids": [bridge_id],
+                "current_bridge_id": bridge_id,
+                "packets": [{"bridge_id": bridge_id, "packet_hash": f"hash-{bridge_id}"}],
+            },
+        }
+
+    class _FakeProcess:
+        pid = 4242
+
+    def _fake_popen(*args, **kwargs):
+        launched_docs.append(kwargs["env"]["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"])
+        return _FakeProcess()
+
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(runtime, "_issue_dispatch_authorization_for_selected", _fake_issue)
+    monkeypatch.setattr(runtime.subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(runtime, "_pid_create_time_epoch", lambda pid: 123.0)
+
+    result = daemon.run_tick(root, max_items=2)
+
+    result_reasons = [
+        item.get("reason") or ("launched" if item.get("launched") else None) for item in result["spawn_results"]
+    ]
+    assert sorted(result_reasons) == ["all_impl_auth_quarantined", "launched"]
+    assert launched_docs == ["implementable-thread"]
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient_state = state["recipients"]["prime-builder:A"]
+    assert recipient_state["fanout_impl_auth_quarantined_count"] == 1
+    assert recipient_state["fanout_launched_count"] == 1
 
 
 def test_daemon_execute_live_spawns_reconciles_terminal_bridge_residue(tmp_path: Path) -> None:

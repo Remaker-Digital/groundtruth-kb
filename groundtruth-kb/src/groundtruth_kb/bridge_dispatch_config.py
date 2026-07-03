@@ -70,7 +70,9 @@ RUNTIME_BACKPRESSURE_LAUNCH_REASONS = RUNTIME_BACKPRESSURE_RESULTS | RUNTIME_BAC
 # indicates benign backpressure rather than a dispatcher failure. The runtime
 # collapses all non-launch spawn results to last_result="launch_failed"; only the
 # reason field distinguishes saturation from failure.
-BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset({"concurrency_cap_reached", "per_role_concurrency_cap_reached"})
+BENIGN_NONLAUNCH_LAUNCH_REASONS = frozenset(
+    {"all_impl_auth_quarantined", "concurrency_cap_reached", "per_role_concurrency_cap_reached"}
+)
 DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS = frozenset(
     {
         "dispatch_budget_session_cap_reached",
@@ -78,6 +80,8 @@ DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS = frozenset(
     }
 )
 BENIGN_NONLAUNCH_LAUNCH_REASONS = BENIGN_NONLAUNCH_LAUNCH_REASONS | DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS
+DOCUMENT_LEASE_HELD_NONLAUNCH_REASON = "document_lease_held"
+IMPL_AUTH_QUARANTINED_NONLAUNCH_REASON = "all_impl_auth_quarantined"
 RECENT_RUN_FAILURE_MARKERS = (
     ("provider_rate_limited", "provider_rate_limited"),
     ("HTTP 429", "provider_rate_limited"),
@@ -864,6 +868,14 @@ def _runtime_classification_for_recipient(
         project_root=project_root,
         runs_dir=runs_dir,
     )
+    current_runtime_failure_signal = any(
+        (
+            last_result in RUNTIME_FAILURE_RESULTS or last_result.endswith("_dispatch_not_ready"),
+            launch_reason in RUNTIME_FAILURE_LAUNCH_REASONS,
+            launch_exit_failure in RUNTIME_FAILURE_RESULTS | RUNTIME_FAILURE_CLASSES,
+            row.get("circuit_breaker_tripped") is True,
+        )
+    )
     failure_evidence_present = any(
         (
             failure_class in RUNTIME_FAILURE_CLASSES,
@@ -877,6 +889,24 @@ def _runtime_classification_for_recipient(
             row.get("circuit_breaker_tripped") is True,
         )
     )
+    lease_held_nonlaunch = (
+        last_result == DOCUMENT_LEASE_HELD_NONLAUNCH_REASON or launch_reason == DOCUMENT_LEASE_HELD_NONLAUNCH_REASON
+    )
+    impl_auth_quarantined_nonlaunch = (
+        last_result == IMPL_AUTH_QUARANTINED_NONLAUNCH_REASON or launch_reason == IMPL_AUTH_QUARANTINED_NONLAUNCH_REASON
+    )
+    if (
+        stale_failure_reason is None
+        and (lease_held_nonlaunch or impl_auth_quarantined_nonlaunch)
+        and has_pending_work
+        and failure_evidence_present
+        and not current_runtime_failure_signal
+    ):
+        stale_failure_reason = (
+            "current document_lease_held non-launch"
+            if lease_held_nonlaunch
+            else "current all_impl_auth_quarantined non-launch"
+        )
     ignore_failure_fields = bool(stale_failure_reason and has_pending_work and failure_evidence_present)
 
     if ignore_failure_fields:
