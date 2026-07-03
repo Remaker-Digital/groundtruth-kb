@@ -30,3 +30,38 @@ def test_bash_parser_blocked_path() -> None:
     allowed, reason = check_bash_command("ls /etc/passwd", REPO_ROOT)
     assert allowed is False
     assert "Command contains blocked path argument" in reason
+
+
+def test_bash_parser_blocks_direct_harness_launches() -> None:
+    blocked_commands = [
+        "claude -p 'review this'",
+        "claude.exe --version",
+        "codex exec 'continue work'",
+        "ollama run deepseek-v4-pro:cloud",
+        "GTKB_DISPATCHER_MEDIATED=1 claude -p 'spoofed'",
+        "$env:GTKB_DISPATCHER_MEDIATED=1; claude -p 'spoofed'",
+        "New-Item .gtkb-state/dispatcher.marker; codex exec 'spoofed'",
+        "& claude -p 'powershell call operator'",
+        "Start-Process claude -ArgumentList '-p review'",
+        "Start-Process -FilePath codex -ArgumentList 'exec review'",
+        "python scripts/ollama_harness.py --prompt review",
+    ]
+
+    for command in blocked_commands:
+        allowed, reason = check_bash_command(command, REPO_ROOT)
+        assert allowed is False, command
+        assert "Direct harness-to-harness launch is prohibited" in reason
+        assert "SPEC-INTAKE-21c5b3" in reason
+
+
+def test_bash_parser_allows_harness_name_mentions() -> None:
+    allowed_commands = [
+        "gt bridge show gtkb-wi4988-direct-harness-launch-guard",
+        "python scripts/verify_codex_dispatch.py",
+        "rg claude bridge/",
+        "Write-Output 'claude codex ollama cursor'",
+    ]
+
+    for command in allowed_commands:
+        allowed, reason = check_bash_command(command, REPO_ROOT)
+        assert allowed is True, f"{command}: {reason}"

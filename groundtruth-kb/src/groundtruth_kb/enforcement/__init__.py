@@ -33,6 +33,37 @@ _NULL_SINKS = frozenset({"/dev/null", "/dev/stdout", "/dev/stderr", "nul"})
 
 # MSYS / Git-Bash drive form: /c/Users/... -> C:\Users\...
 _MSYS_PATH_RE = re.compile(r"^/([a-zA-Z])/(.*)$")
+_COMMAND_SEGMENT_RE = re.compile(r"(?:&&|\|\||[;|\r\n])")
+_COMMAND_TOKEN_RE = re.compile(r"\"([^\"]*)\"|'([^']*)'|([^\s]+)")
+_ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S+)$")
+_DIRECT_HARNESS_COMMANDS = frozenset(
+    {
+        "agy",
+        "antigravity",
+        "claude",
+        "cursor",
+        "cursor-agent",
+        "gemini",
+        "ollama",
+        "openrouter",
+        "openrouter-harness",
+    }
+)
+_DIRECT_CODEX_COMMAND = "codex"
+_DIRECT_HARNESS_SCRIPT_SHIMS = frozenset(
+    {
+        "_bootstrap_cursor_harness.py",
+        "cursor_harness.py",
+        "ollama_harness.py",
+        "openrouter_harness.py",
+    }
+)
+_PYTHON_COMMANDS = frozenset({"py", "python", "python3", "pythonw"})
+_DIRECT_HARNESS_DENIAL = (
+    "Direct harness-to-harness launch is prohibited by SPEC-INTAKE-21c5b3 / "
+    "DELIB-20260703-DIRECT-HARNESS-INVOKE-BAN; use bridge files, `gt bridge dispatch` "
+    "control-plane status/config surfaces, or independent owner/manual harness operation."
+)
 
 
 def _classify_path_token(token: str) -> str | None:
@@ -68,6 +99,103 @@ def _classify_path_token(token: str) -> str | None:
             return token
         return token.lstrip("/")
     return None  # relative path / flag / bare word — not a boundary risk
+
+
+def _command_tokens(segment: str) -> list[str]:
+    return [
+        next(group for group in match.groups() if group is not None) for match in _COMMAND_TOKEN_RE.finditer(segment)
+    ]
+
+
+def _token_basename(token: str) -> str:
+    cleaned = token.strip().strip("\"'`").lstrip("&").strip("\"'`")
+    return cleaned.replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+
+def _command_name(token: str) -> str:
+    name = _token_basename(token)
+    for suffix in (".exe", ".cmd", ".bat", ".ps1"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _drop_leading_assignments(tokens: list[str]) -> list[str]:
+    remaining = list(tokens)
+    while remaining and remaining[0].strip() == "&":
+        remaining = remaining[1:]
+    if remaining and _command_name(remaining[0]) == "env":
+        remaining = remaining[1:]
+    while remaining and _ENV_ASSIGNMENT_RE.match(remaining[0].strip()):
+        remaining = remaining[1:]
+    return remaining
+
+
+def _module_or_script_name(token: str) -> str:
+    basename = _token_basename(token)
+    if "." in basename and not basename.endswith(".py"):
+        basename = basename.rsplit(".", 1)[-1] + ".py"
+    return basename
+
+
+def _python_invokes_direct_harness_shim(tokens: list[str]) -> bool:
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "-m" and index + 1 < len(tokens):
+            return _module_or_script_name(tokens[index + 1]) in _DIRECT_HARNESS_SCRIPT_SHIMS
+        if token.startswith("-"):
+            index += 1
+            continue
+        return _module_or_script_name(token) in _DIRECT_HARNESS_SCRIPT_SHIMS
+    return False
+
+
+def _token_starts_with_exec(token: str) -> bool:
+    value = token.strip().strip("\"'`").lower()
+    return value == "exec" or value.startswith("exec ")
+
+
+def _codex_exec_requested(tokens: list[str]) -> bool:
+    return any(_token_starts_with_exec(token) for token in tokens)
+
+
+def _start_process_target(tokens: list[str]) -> tuple[str, list[str]]:
+    for index, token in enumerate(tokens):
+        lower = token.strip().lower()
+        if lower in {"-filepath", "-file"} and index + 1 < len(tokens):
+            return tokens[index + 1], tokens[index + 2 :]
+        if lower.startswith("-filepath="):
+            return token.split("=", 1)[1], tokens[index + 1 :]
+        if not lower.startswith("-"):
+            return token, tokens[index + 1 :]
+    return "", []
+
+
+def _direct_harness_launch_reason(command: str) -> str | None:
+    """Return a denial reason when interactive shell text directly launches a harness."""
+    for raw_segment in _COMMAND_SEGMENT_RE.split(command):
+        segment = raw_segment.strip()
+        if not segment:
+            continue
+        tokens = _drop_leading_assignments(_command_tokens(segment))
+        if not tokens:
+            continue
+        head = _command_name(tokens[0])
+        if head in _DIRECT_HARNESS_COMMANDS:
+            return _DIRECT_HARNESS_DENIAL
+        if head == _DIRECT_CODEX_COMMAND and len(tokens) > 1 and _token_starts_with_exec(tokens[1]):
+            return _DIRECT_HARNESS_DENIAL
+        if head in _PYTHON_COMMANDS and _python_invokes_direct_harness_shim(tokens):
+            return _DIRECT_HARNESS_DENIAL
+        if head == "start-process":
+            target, rest = _start_process_target(tokens[1:])
+            target_head = _command_name(target)
+            if target_head in _DIRECT_HARNESS_COMMANDS:
+                return _DIRECT_HARNESS_DENIAL
+            if target_head == _DIRECT_CODEX_COMMAND and _codex_exec_requested(rest):
+                return _DIRECT_HARNESS_DENIAL
+    return None
 
 
 class DirectiveEnforcementError(ValueError):
@@ -150,6 +278,10 @@ def check_bash_command(command: str, project_root: Path) -> tuple[bool, str]:
     paths, URLs, and null sinks pass; MSYS '/c/..' is translated to a drive path;
     a rooted-driveless '/foo' is treated as project-root-relative.
     """
+    direct_harness_reason = _direct_harness_launch_reason(command)
+    if direct_harness_reason is not None:
+        return False, direct_harness_reason
+
     # 1. Extract paths from output redirection
     for match in REDIRECTION_RE.finditer(command):
         target_path = match.group(1).strip().strip("\"'")

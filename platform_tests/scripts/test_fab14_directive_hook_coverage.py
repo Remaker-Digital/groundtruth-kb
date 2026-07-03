@@ -13,6 +13,7 @@ _CLAUDE_SETTINGS = _ROOT / ".claude" / "settings.json"
 _CODEX_HOOKS = _ROOT / ".codex" / "hooks.json"
 _CLAUDE_ADAPTER = _ROOT / ".claude" / "hooks" / "directive-enforcement-claude-adapter.py"
 _CODEX_ADAPTER = _ROOT / ".codex" / "gtkb-hooks" / "directive-enforcement-adapter.py"
+_CODEX_BATCH_RUNNER = _ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
 
 
 def _run_hook(path: Path, payload: dict, telemetry: Path) -> dict:
@@ -46,11 +47,13 @@ def test_codex_registers_directive_adapter_for_bash_and_apply_patch() -> None:
     registrations = [
         group.get("matcher", "")
         for group in hooks["hooks"]["PreToolUse"]
-        if any("directive-enforcement.cmd" in hook.get("command", "") for hook in group.get("hooks", []))
+        if any("--batch pretooluse-" in hook.get("command", "") for hook in group.get("hooks", []))
     ]
+    batch_runner = _CODEX_BATCH_RUNNER.read_text(encoding="utf-8")
 
     assert "Bash" in registrations
     assert "apply_patch" in registrations
+    assert '".codex/gtkb-hooks/directive-enforcement.cmd"' in batch_runner
 
 
 def test_powershell_command_false_positive_passes(tmp_path: Path) -> None:
@@ -90,3 +93,41 @@ def test_codex_bash_out_of_root_blocks_and_logs(tmp_path: Path) -> None:
     assert record["gate"] == "codex-directive-enforcement"
     assert record["pattern_id"] == "root-boundary-command"
     assert len(record["command_hash"]) == 64
+
+
+def test_codex_bash_direct_harness_launch_blocks_and_logs(tmp_path: Path) -> None:
+    telemetry = tmp_path / "denials.jsonl"
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "GTKB_DISPATCHER_MEDIATED=1 claude -p review"},
+        "cwd": str(_ROOT),
+    }
+
+    result = _run_hook(_CODEX_ADAPTER, payload, telemetry)
+
+    reason = result["hookSpecificOutput"]["permissionDecisionReason"]
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "Direct harness-to-harness launch is prohibited" in reason
+    assert "SPEC-INTAKE-21c5b3" in reason
+    record = json.loads(telemetry.read_text(encoding="utf-8").splitlines()[0])
+    assert record["gate"] == "codex-directive-enforcement"
+    assert record["pattern_id"] == "root-boundary-command"
+
+
+def test_claude_powershell_direct_harness_launch_blocks(tmp_path: Path) -> None:
+    telemetry = tmp_path / "denials.jsonl"
+    payload = {
+        "tool_name": "PowerShell",
+        "tool_input": {"command": "Start-Process -FilePath codex -ArgumentList 'exec review'"},
+        "cwd": str(_ROOT),
+    }
+
+    result = _run_hook(_CLAUDE_ADAPTER, payload, telemetry)
+
+    reason = result["hookSpecificOutput"]["permissionDecisionReason"]
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "Direct harness-to-harness launch is prohibited" in reason
+    assert "SPEC-INTAKE-21c5b3" in reason
+    record = json.loads(telemetry.read_text(encoding="utf-8").splitlines()[0])
+    assert record["gate"] == "directive-enforcement-claude-adapter"
+    assert record["pattern_id"] == "root-boundary-command"

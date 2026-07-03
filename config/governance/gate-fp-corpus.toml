@@ -62,6 +62,22 @@ note = 'double forward slash in comment should not be treated as a UNC absolute 
 command = 'type C:\Users\micha\.claude\settings.json'
 note = 'allow harness-specific settings files under the user profile directory'
 
+[[bash_parser_pass]]
+command = 'gt bridge show gtkb-wi4988-direct-harness-launch-guard'
+note = 'bridge status/read command mentions a direct-launch guard thread but does not launch a harness'
+
+[[bash_parser_pass]]
+command = 'python scripts/verify_codex_dispatch.py'
+note = 'readiness verification script name contains codex but is not a Codex worker launch'
+
+[[bash_parser_pass]]
+command = 'rg claude bridge/'
+note = 'search command mentions Claude but does not launch Claude Code'
+
+[[bash_parser_pass]]
+command = 'Write-Output "claude codex ollama cursor"'
+note = 'PowerShell output/prose mentioning harness names is not a launch'
+
 [[bash_parser_block]]
 command = 'cat C:\Users\micha\secret.txt'
 note = 'genuine out-of-root drive-letter absolute'
@@ -73,6 +89,50 @@ note = 'genuine UNC path'
 [[bash_parser_block]]
 command = 'cat /c/Users/micha/secret'
 note = 'MSYS /c/ translated to C:\Users\... -> out of root'
+
+[[bash_parser_block]]
+command = 'claude -p "review this"'
+note = 'direct Claude Code harness launch prohibited by WI-4988'
+
+[[bash_parser_block]]
+command = 'claude.exe --version'
+note = 'Windows .exe suffix still identifies a direct Claude Code launch'
+
+[[bash_parser_block]]
+command = 'codex exec "continue this work"'
+note = 'direct Codex headless worker launch prohibited by WI-4988'
+
+[[bash_parser_block]]
+command = 'ollama run deepseek-v4-pro:cloud'
+note = 'direct Ollama model/harness launch prohibited by WI-4988'
+
+[[bash_parser_block]]
+command = 'GTKB_DISPATCHER_MEDIATED=1 claude -p "spoofed"'
+note = 'shell-forgeable dispatcher env marker must not bypass direct-launch guard'
+
+[[bash_parser_block]]
+command = '$env:GTKB_DISPATCHER_MEDIATED=1; claude -p "spoofed"'
+note = 'PowerShell env spoof must not bypass direct-launch guard'
+
+[[bash_parser_block]]
+command = 'New-Item .gtkb-state/dispatcher.marker; codex exec "spoofed"'
+note = 'marker-file spoof before codex exec must still be denied'
+
+[[bash_parser_block]]
+command = '& claude -p "powershell call operator"'
+note = 'PowerShell call operator form of direct Claude launch'
+
+[[bash_parser_block]]
+command = 'Start-Process claude -ArgumentList "-p review"'
+note = 'PowerShell Start-Process direct Claude launch'
+
+[[bash_parser_block]]
+command = 'Start-Process -FilePath codex -ArgumentList "exec review"'
+note = 'PowerShell Start-Process direct Codex exec launch'
+
+[[bash_parser_block]]
+command = 'python scripts/ollama_harness.py --prompt review'
+note = 'project harness shim direct launch prohibited by WI-4988'
 
 # --- Cross-harness directive surfaces (FAB-14 re-scope) ---
 
