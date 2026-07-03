@@ -13,6 +13,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
+from session_start_dispatch_core import STARTUP_SERVICE_TIMEOUT_ENV, STARTUP_SERVICE_TIMEOUT_SECONDS  # noqa: E402
 from windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
@@ -85,15 +86,35 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
 }
 
 
-def _child_timeout_seconds() -> float:
-    raw = os.environ.get("GTKB_CODEX_HOOK_CHILD_TIMEOUT_SECONDS")
-    if not raw:
-        return DEFAULT_TIMEOUT_SECONDS
+def _is_session_start_dispatch_command(command: list[str] | None) -> bool:
+    if not command or len(command) < 2:
+        return False
+    script = Path(command[1])
+    return script.name == "session_start_dispatch.py" and script.parent.name == "gtkb-hooks"
+
+
+def _startup_dispatch_timeout_seconds() -> float:
+    raw = os.environ.get(STARTUP_SERVICE_TIMEOUT_ENV)
+    if raw is None or not raw.strip():
+        return STARTUP_SERVICE_TIMEOUT_SECONDS
     try:
         value = float(raw)
     except ValueError:
-        return DEFAULT_TIMEOUT_SECONDS
-    return value if value > 0 else DEFAULT_TIMEOUT_SECONDS
+        return STARTUP_SERVICE_TIMEOUT_SECONDS
+    return value if value > 0 else STARTUP_SERVICE_TIMEOUT_SECONDS
+
+
+def _child_timeout_seconds(command: list[str] | None = None) -> float:
+    raw = os.environ.get("GTKB_CODEX_HOOK_CHILD_TIMEOUT_SECONDS")
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            return DEFAULT_TIMEOUT_SECONDS
+        return value if value > 0 else DEFAULT_TIMEOUT_SECONDS
+    if _is_session_start_dispatch_command(command):
+        return _startup_dispatch_timeout_seconds()
+    return DEFAULT_TIMEOUT_SECONDS
 
 
 def _stdin_timeout_seconds() -> float:
@@ -146,7 +167,7 @@ def _run_child(command: list[str], payload: bytes) -> tuple[int, bytes, bytes]:
         **no_window_subprocess_kwargs(),
     )
     try:
-        stdout, stderr = process.communicate(input=payload, timeout=_child_timeout_seconds())
+        stdout, stderr = process.communicate(input=payload, timeout=_child_timeout_seconds(command))
     except subprocess.TimeoutExpired:
         _kill_process_tree(process.pid)
         try:
