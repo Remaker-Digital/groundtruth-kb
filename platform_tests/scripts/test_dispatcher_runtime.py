@@ -1186,6 +1186,8 @@ def test_wi5002_prime_unchanged_clears_stale_failure_fields(tmp_path: Path) -> N
     assert second["results"]["prime-builder"]["reason"] == "unchanged"
     recipient_state = second["dispatch_state"]["recipients"]["prime-builder:B"]
     assert recipient_state["last_result"] == "unchanged"
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
     assert "failure_class" not in recipient_state
     assert "last_failure_reason" not in recipient_state
 
@@ -1197,7 +1199,8 @@ def test_wi5002_prime_unchanged_clears_stale_failure_fields(tmp_path: Path) -> N
     )
     findings = "\n".join(classification["findings"])
     assert "dispatch runtime failure" not in findings
-    assert classification["severity"] == "WARN"
+    assert "last_result=unchanged with pending_count" not in findings
+    assert classification["severity"] == "PASS"
 
 
 def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> None:

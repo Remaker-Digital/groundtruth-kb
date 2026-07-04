@@ -1007,7 +1007,7 @@ def _execute_live_spawns(
                 )
                 spawn_results.append(result)
                 recipient_state["last_result"] = "unchanged"
-                recipient_state["pending_count"] = len(selected)
+                recipient_state["pending_count"] = 0
                 recipient_state["selected_count"] = 0
                 runtime._clear_stale_failure_fields(recipient_state)
                 continue

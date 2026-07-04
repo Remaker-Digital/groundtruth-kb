@@ -5384,6 +5384,8 @@ def run_dispatch_cycle(
                             # Skip without spawning. Legacy `signature` stays in sync.
                             recipient_state["signature"] = dispatched_signature
                             recipient_state["last_result"] = "unchanged"
+                            recipient_state["pending_count"] = 0
+                            recipient_state["selected_count"] = 0
                             _clear_stale_failure_fields(recipient_state)
                             results[recipient] = {"launched": False, "reason": "unchanged"}
                         else:

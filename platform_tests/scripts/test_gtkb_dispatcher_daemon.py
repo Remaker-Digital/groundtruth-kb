@@ -1462,6 +1462,8 @@ def test_wi5002_daemon_prime_fanout_unchanged_clears_stale_failure_fields(
     assert [item.get("reason") for item in results] == ["unchanged"]
     recipient_state = runtime._load_dispatch_state(state_dir, root)["recipients"]["prime-builder:A"]
     assert recipient_state["last_result"] == "unchanged"
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
     assert "failure_class" not in recipient_state
     assert "last_failure_reason" not in recipient_state
 
