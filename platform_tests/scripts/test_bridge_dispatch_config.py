@@ -190,6 +190,37 @@ def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
         )
 
 
+def test_wi4983_live_dispatch_config_routes_prime_no_go_only_to_prime() -> None:
+    config = load_bridge_dispatch_config(REPO_ROOT)
+    records = read_roles(REPO_ROOT)["harnesses"]
+
+    prime_go = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder", status="GO"),
+    )
+    prime_no_go = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder", status="NO-GO"),
+    )
+    prime_no_action = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder", status="NO-ACTION"),
+    )
+    lo_no_action = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="loyal-opposition", status="NO-ACTION"),
+    )
+
+    assert [row["id"] for row in prime_go] == ["A"]
+    assert [row["id"] for row in prime_no_go] == ["A"]
+    assert prime_no_action == []
+    assert [row["id"] for row in lo_no_action] == ["D", "C", "B"]
+
+
 def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
     _write_project(
         tmp_path,

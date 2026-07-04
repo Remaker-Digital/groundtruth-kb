@@ -98,7 +98,7 @@ tags = ["loyal-opposition", "low-cost"]
 [[rules]]
 id = "bridge-prime-builder-default"
 required_roles = ["prime-builder"]
-statuses = ["GO"]
+statuses = ["GO", "NO-GO"]
 prefer = ["availability", "quality", "cost"]
 
 [[rules]]

@@ -89,7 +89,7 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
     lo_rule = rule_by_id["bridge-loyal-opposition-cheap-fast-default"]
 
     assert prime_rule["required_roles"] == ["prime-builder"]
-    assert prime_rule["statuses"] == ["GO"]
+    assert prime_rule["statuses"] == ["GO", "NO-GO"]
     assert lo_rule["required_roles"] == ["loyal-opposition"]
     assert lo_rule["statuses"] == ["NEW", "REVISED", "NO-ACTION"]
 

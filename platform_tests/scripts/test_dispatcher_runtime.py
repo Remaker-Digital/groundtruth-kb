@@ -999,6 +999,93 @@ def test_run_dispatch_cycle_routes_no_action_to_lo_not_prime(tmp_path: Path, mon
     assert summary["results"]["prime-builder"]["reason"] == "no_pending"
 
 
+def test_wi4983_run_dispatch_cycle_routes_prime_no_go_to_codex_a(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    doc = "prime-no-go-thread"
+
+    (root / "config" / "dispatcher").mkdir(parents=True)
+    (root / "config" / "dispatcher" / "rules.toml").write_text(
+        """
+schema_version = 1
+selection_order = ["availability", "quality", "cost", "harness_id"]
+
+[[rules]]
+id = "bridge-prime-builder-default"
+required_roles = ["prime-builder"]
+statuses = ["GO", "NO-GO"]
+prefer = ["availability", "quality", "cost"]
+
+[[rules]]
+id = "bridge-loyal-opposition-cheap-fast-default"
+required_roles = ["loyal-opposition"]
+statuses = ["NEW", "REVISED", "NO-ACTION"]
+prefer = ["availability", "quality", "cost"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+    _write_registry(
+        root,
+        [
+            _rec(
+                "A",
+                "codex",
+                ["prime-builder"],
+                "active",
+                _CODEX_INVOCATION_SURFACES,
+                can_receive_dispatch=True,
+                can_fire_events=True,
+            ),
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "-p", "{{PROMPT}}"]}},
+                can_receive_dispatch=True,
+                can_fire_events=False,
+            ),
+        ],
+    )
+    _write_bridge_file(root, f"{doc}-001.md", "NEW\n\nbridge_kind: implementation_proposal\n")
+    _write_bridge_file(root, f"{doc}-002.md", "NO-GO\n\nFixture requires Prime revision.\n")
+    _write_index(
+        root,
+        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
+    )
+    captured: list[tuple[str, list[str]]] = []
+
+    def _fake_spawn_harness(**kwargs: object) -> dict[str, object]:
+        target = kwargs["target"]
+        items = kwargs["items"]
+        captured.append(
+            (
+                target.dispatch_state_key,  # type: ignore[union-attr]
+                [item.document_name for item in items],  # type: ignore[union-attr]
+            )
+        )
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": target.dispatch_state_key,  # type: ignore[union-attr]
+            "launched": False,
+            "reason": "dry_run",
+        }
+
+    monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
+    monkeypatch.setattr(trigger, "_spawn_harness", _fake_spawn_harness)
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert captured == [("prime-builder:A", [doc])]
+    assert summary["results"]["prime-builder"]["reason"] == "dry_run"
+    assert summary["results"]["prime-builder"]["selected_candidate"]["harness_id"] == "A"
+    assert summary["dispatch_state"]["recipients"]["prime-builder:A"]["selected_count"] == 1
+
+
 def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) -> None:
     """T-2-signature-computation: signature deterministic per recipient
     given identical INDEX state.
