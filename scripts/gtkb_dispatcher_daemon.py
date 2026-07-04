@@ -890,6 +890,8 @@ def _execute_live_spawns(
                     recipient_state["last_result"] = reason
                     recipient_state["pending_count"] = len(selected)
                     recipient_state["selected_count"] = 0
+                    if reason == "work_intent_already_held":
+                        runtime._clear_stale_failure_fields(recipient_state)
                     recipient_state["last_launch"] = {
                         "dispatch_id": dispatch_id,
                         "recipient": recipient,
@@ -925,6 +927,7 @@ def _execute_live_spawns(
                     recipient_state["last_result"] = "work_intent_already_held"
                     recipient_state["pending_count"] = 0
                     recipient_state["selected_count"] = 0
+                    runtime._clear_stale_failure_fields(recipient_state)
                     recipient_state["last_launch"] = {
                         "dispatch_id": dispatch_id,
                         "recipient": recipient,
@@ -1006,6 +1009,7 @@ def _execute_live_spawns(
                 recipient_state["last_result"] = "unchanged"
                 recipient_state["pending_count"] = len(selected)
                 recipient_state["selected_count"] = 0
+                runtime._clear_stale_failure_fields(recipient_state)
                 continue
 
         acquired_document_leases: list[dict[str, Any]] = []

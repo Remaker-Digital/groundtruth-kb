@@ -638,6 +638,8 @@ def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
     state = json.loads(state_path.read_text(encoding="utf-8"))
     prime_state = state["recipients"]["prime-builder:A"]
     signature = prime_state["last_dispatched_signature"]
+    prime_state["failure_class"] = "subprocess_execution_failed"
+    prime_state["last_failure_reason"] = "subprocess_execution_failed"
 
     state["recipients"]["prime-builder"] = {
         "updated_at": "2026-06-29T07:46:04+00:00",
@@ -660,6 +662,8 @@ def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
     assert repaired_state["last_dispatched_signature"] == signature
     assert repaired_state["last_result"] == "work_intent_already_held"
     assert repaired_state["pending_count"] == 0
+    assert "failure_class" not in repaired_state
+    assert "last_failure_reason" not in repaired_state
 
 
 def test_daemon_live_skips_not_ready_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1107,8 +1111,8 @@ def test_daemon_stop_ignores_unverified_pid_and_clears_state(tmp_path: Path, mon
 
 
 # ---------------------------------------------------------------------------
-# WI-4845: daemon passes a per-role worker --lifetime override so headless
-# workers complete (LO ~1800s, PB ~5400s, env-configurable). The cap is
+# WI-4845/WI-5003: daemon passes a per-role worker --lifetime override so headless
+# workers complete (LO Opus floor, PB ~5400s, env-configurable). The cap is
 # resolved by runtime.worker_lifetime_seconds and threaded into the spawn
 # command (run_with_status.py --lifetime) by runtime._spawn_harness, which the
 # daemon's live-spawn path reuses.
@@ -1402,6 +1406,64 @@ def test_wi4994_daemon_prime_fanout_dedupes_same_document_not_different_document
 
     assert [item.get("reason") for item in results] == ["unchanged", "launched"]
     assert launched_docs == ["different-thread"]
+
+
+def test_wi5002_daemon_prime_fanout_unchanged_clears_stale_failure_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_codex_prime_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    target = runtime.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="pb",
+        invocation_surfaces=_CODEX_INVOCATION,
+    )
+    selected = [types.SimpleNamespace(document_name="same-thread", top_status="GO", top_file="bridge/same-002.md")]
+    _write_go_thread(root, "same-thread")
+    signature = runtime._signature(selected)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    runtime._write_dispatch_state(
+        state_dir,
+        {
+            "schema_version": 1,
+            "updated_at": daemon._now_iso(),
+            "recipients": {
+                "prime-builder:A": {
+                    "last_dispatched_signatures_by_document": {"same-thread": signature},
+                    "failure_class": "subprocess_execution_failed",
+                    "last_failure_reason": "subprocess_execution_failed",
+                }
+            },
+        },
+    )
+
+    monkeypatch.setattr(runtime, "_spawn_harness", lambda **kwargs: pytest.fail("unchanged branch must not spawn"))
+
+    results = daemon._execute_live_spawns(
+        root,
+        [
+            {
+                "role": "prime-builder",
+                "recipient": target.dispatch_state_key,
+                "signature": signature,
+                "_spawn_target": target,
+                "_spawn_selected": selected,
+            },
+        ],
+        max_items=1,
+        dry_run=False,
+    )
+
+    assert [item.get("reason") for item in results] == ["unchanged"]
+    recipient_state = runtime._load_dispatch_state(state_dir, root)["recipients"]["prime-builder:A"]
+    assert recipient_state["last_result"] == "unchanged"
+    assert "failure_class" not in recipient_state
+    assert "last_failure_reason" not in recipient_state
 
 
 def test_wi4994_daemon_prime_fanout_records_at_cap_per_spawn_attempt(
@@ -1709,14 +1771,15 @@ def test_daemon_live_skips_headless_ineligible_prime_no_go(
 
 def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The daemon live-spawn command carries the per-role --lifetime override:
-    LO target -> 1800s, PB target -> 5400s (WI-4845 defaults)."""
+    LO target -> Opus floor, PB target -> 5400s."""
     daemon = _load_daemon()
     runtime = daemon._load_dispatch_runtime()
     monkeypatch.delenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
     monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
 
     lo_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "loyal-opposition", "lo"), tmp_path, monkeypatch)
-    assert _lifetime_value(lo_cmd) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS) == "1800"
+    assert runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS == 3600
+    assert _lifetime_value(lo_cmd) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS)
 
     pb_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "prime-builder", "pb"), tmp_path, monkeypatch)
     assert _lifetime_value(pb_cmd) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
@@ -1730,7 +1793,7 @@ def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.delenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
     monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
-    assert runtime.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
     assert runtime.worker_lifetime_seconds("prime-builder") == 5400
     assert runtime.worker_lifetime_seconds("some-other-role") is None
     assert runtime.worker_lifetime_seconds(None) is None
@@ -1742,7 +1805,7 @@ def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, "0")
     monkeypatch.setenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, "not-an-int")
-    assert runtime.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
     assert runtime.worker_lifetime_seconds("prime-builder") == 5400
 
 

@@ -2851,6 +2851,11 @@ def _recipient_state_has_visible_residue(recipient_state: dict[str, Any]) -> boo
     )
 
 
+def _clear_stale_failure_fields(recipient_state: dict[str, Any]) -> None:
+    recipient_state.pop("last_failure_reason", None)
+    recipient_state.pop("failure_class", None)
+
+
 def _reconcile_terminal_bridge_recipient_state(
     recipients_state: dict[str, Any],
     project_root: Path,
@@ -5350,6 +5355,7 @@ def run_dispatch_cycle(
 
                     if target.needed_role_label == "prime-builder" and not dispatched_selected:
                         recipient_state["last_result"] = "work_intent_already_held"
+                        _clear_stale_failure_fields(recipient_state)
                         results[recipient] = {
                             "launched": False,
                             "reason": "work_intent_already_held",
@@ -5378,6 +5384,7 @@ def run_dispatch_cycle(
                             # Skip without spawning. Legacy `signature` stays in sync.
                             recipient_state["signature"] = dispatched_signature
                             recipient_state["last_result"] = "unchanged"
+                            _clear_stale_failure_fields(recipient_state)
                             results[recipient] = {"launched": False, "reason": "unchanged"}
                         else:
                             subject_suppression = _application_subject_dispatch_suppression(project_root)

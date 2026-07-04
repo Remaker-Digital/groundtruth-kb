@@ -48,6 +48,8 @@ _CODEX_HEADLESS_ARGV = [
     "{{PROMPT}}",
     "--cd",
     "{{PROJECT_ROOT}}",
+    "--add-dir",
+    ".codex",
 ]
 _CODEX_INVOCATION_SURFACES = {"headless": {"argv": _CODEX_HEADLESS_ARGV}}
 _CLAUDE_INVOCATION_SURFACES = {
@@ -70,6 +72,8 @@ def _expected_codex_command(prompt: str, project_root: Path) -> list[str]:
         prompt,
         "--cd",
         str(project_root),
+        "--add-dir",
+        ".codex",
     ]
 
 
@@ -1072,6 +1076,41 @@ def test_unchanged_signature_does_not_replay(tmp_path: Path) -> None:
 
     second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert second["results"]["loyal-opposition"]["reason"] == "unchanged"
+
+
+def test_wi5002_prime_unchanged_clears_stale_failure_fields(tmp_path: Path) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(root, _index_with_one_go(root, doc="wi5002-stale-health"))
+
+    trigger = _load_trigger()
+    first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+    assert first["results"]["prime-builder"]["reason"] == "dry_run"
+
+    state_path = state_dir / trigger.DISPATCH_STATE_FILENAME
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    recipient_state = state["recipients"]["prime-builder:B"]
+    recipient_state["failure_class"] = "subprocess_execution_failed"
+    recipient_state["last_failure_reason"] = "subprocess_execution_failed"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert second["results"]["prime-builder"]["reason"] == "unchanged"
+    recipient_state = second["dispatch_state"]["recipients"]["prime-builder:B"]
+    assert recipient_state["last_result"] == "unchanged"
+    assert "failure_class" not in recipient_state
+    assert "last_failure_reason" not in recipient_state
+
+    from groundtruth_kb import bridge_dispatch_config
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient(
+        "prime-builder:B",
+        recipient_state,
+    )
+    findings = "\n".join(classification["findings"])
+    assert "dispatch runtime failure" not in findings
+    assert classification["severity"] == "WARN"
 
 
 def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> None:
