@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import re
 
-_PROTECTED_BRIDGE_PATH_PATTERN = (
-    r"(?:[A-Za-z]:)?"
-    r"(?:[\\/]|[\w .-]+[\\/])*"
-    r"bridge[\\/][A-Za-z0-9_.-]+-\d{3}\.md"
-)
+try:
+    from scripts.controlled_artifact_paths import BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN
+except ImportError:  # pragma: no cover - direct script execution path
+    from controlled_artifact_paths import BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN
 
-_PROTECTED_BRIDGE_PATH_RE = re.compile(_PROTECTED_BRIDGE_PATH_PATTERN, re.IGNORECASE)
+_PROTECTED_BRIDGE_PATH_RE = re.compile(BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN, re.IGNORECASE)
 _REDIRECT_TO_BRIDGE_RE = re.compile(
-    rf"(?:^|[\s;&|])(?:\d?>{{1,2}}|>{{1,2}})\s*['\"]?{_PROTECTED_BRIDGE_PATH_PATTERN}",
+    rf"(?:^|[\s;&|])(?:\d?>{{1,2}}|>{{1,2}})\s*['\"]?{BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN}",
     re.IGNORECASE,
 )
 _MUTATING_COMMAND_RE = re.compile(

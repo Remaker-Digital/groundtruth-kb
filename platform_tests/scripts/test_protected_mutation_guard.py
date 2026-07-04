@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from scripts import bridge_work_intent_registry
+from scripts.gtkb_session_id import per_session_role_marker_path
 from scripts.protected_mutation_guard import evaluate_mutation
 
 
@@ -47,6 +48,19 @@ def root(tmp_path: Path, monkeypatch) -> Path:
     marker_dir.mkdir(parents=True, exist_ok=True)
     marker_file = marker_dir / "active-session-role.json"
     marker_file.write_text(json.dumps({"role": "prime-builder"}), encoding="utf-8")
+    per_session_marker = per_session_role_marker_path(tmp_path, "session-1")
+    per_session_marker.parent.mkdir(parents=True, exist_ok=True)
+    per_session_marker.write_text(
+        json.dumps(
+            {
+                "role": "prime-builder",
+                "session_id": "session-1",
+                "session_id_source": "test-fixture",
+                "source": "test-fixture",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     return tmp_path
 
@@ -146,8 +160,34 @@ def test_target_outside_project_root_denied(root: Path) -> None:
 def test_forbidden_operation_bridge_index_denied(root: Path) -> None:
     res = evaluate_mutation(root, ["bridge/INDEX.md"], harness_id="A", session_id="session-1")
     assert res.allowed is False
-    assert res.reason_code == "forbidden_operation"
+    assert res.reason_code == "bridge_index_direct_mutation"
     assert "bridge/INDEX.md" in res.details
+
+
+@pytest.mark.parametrize(
+    ("path", "reason_code"),
+    [
+        ("bridge/example-001.md", "bridge_status_file_direct_mutation"),
+        ("groundtruth.db", "membase_direct_mutation"),
+        (".gtkb-state/implementation-authorizations/current.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/work-intent/thread.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/bridge-poller/dispatch-state.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/dispatcher-daemon/status.json", "runtime_authority_state_direct_mutation"),
+    ],
+)
+def test_direct_controlled_artifact_targets_denied_with_stable_reason(root: Path, path: str, reason_code: str) -> None:
+    res = evaluate_mutation(root, [path], harness_id="A", session_id="session-1")
+
+    assert res.allowed is False
+    assert res.reason_code == reason_code
+    assert "Direct mutation of controlled artifact" in res.details
+
+
+def test_non_status_bridge_target_remains_unprotected(root: Path) -> None:
+    res = evaluate_mutation(root, ["bridge/example-note.md"], harness_id="A", session_id="session-1")
+
+    assert res.allowed is True
+    assert res.reason_code == "not_protected"
 
 
 def test_dispatcher_rules_toml_direct_target_denied_with_stable_reason(root: Path) -> None:

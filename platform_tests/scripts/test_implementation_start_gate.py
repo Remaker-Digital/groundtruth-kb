@@ -20,6 +20,12 @@ from scripts import implementation_start_gate as gate  # noqa: E402
 from scripts.gtkb_session_id import per_session_role_marker_path  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _clear_ambient_work_intent_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in auth.gtkb_session_id.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(name, raising=False)
+
+
 def _proposal(
     *,
     bridge_id: str = "sample-implementation",
@@ -189,7 +195,7 @@ def _write_prime_marker(root: Path, session_id: str) -> None:
 
 
 def _claim_bridge(root: Path, bridge_id: str = "sample-implementation", session_id: str | None = None) -> None:
-    holder = session_id or auth.resolve_work_intent_session_id() or "session-1"
+    holder = session_id or "session-1"
     _write_prime_marker(root, holder)
     assert auth.bridge_work_intent_registry.acquire(bridge_id, holder, project_root=root)
 
@@ -458,13 +464,13 @@ def test_emergency_bridge_repair_allows_bridge_function_edit_without_packet(
     monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
     monkeypatch.setenv("GTKB_GATE_DENIALS_PATH", str(audit_path))
 
-    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/cross_harness_bridge_trigger.py"))
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/dispatcher_runtime.py"))
 
     assert result == {}
     [record] = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
     assert record["event"] == "exemption"
     assert record["pattern_id"] == "emergency-bridge-repair"
-    assert record["paths"] == ["scripts/cross_harness_bridge_trigger.py"]
+    assert record["paths"] == ["scripts/dispatcher_runtime.py"]
 
 
 def test_emergency_env_does_not_exempt_non_bridge_protected_edit(
@@ -479,7 +485,7 @@ def test_emergency_env_does_not_exempt_non_bridge_protected_edit(
 
 
 def test_no_emergency_env_blocks_bridge_function_edit(tmp_path: Path) -> None:
-    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/cross_harness_bridge_trigger.py"))
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/dispatcher_runtime.py"))
 
     assert result["decision"] == "block"
     assert "authorization packet" in result["reason"]
@@ -490,7 +496,7 @@ def test_emergency_env_does_not_exempt_unknown_mutating_target(tmp_path: Path, m
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "Bash",
-        "tool_input": {"command": "python -c \"open('scripts/cross_harness_bridge_trigger.py', 'w').write('x')\""},
+        "tool_input": {"command": "python -c \"open('scripts/dispatcher_runtime.py', 'w').write('x')\""},
     }
 
     result = gate.gate_decision(payload)
@@ -547,6 +553,10 @@ def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) 
         ("./.env.local", ".env.*"),
         ("env.local", "env.local"),
         ("env.staging", "env.staging"),
+        ("bridge/example-001.md", "bridge/<slug>-NNN.md"),
+        ("bridge/INDEX.md", "bridge/INDEX.md"),
+        ("groundtruth.db", "groundtruth.db"),
+        (".gtkb-state/implementation-authorizations/current.json", ".gtkb-state/implementation-authorizations/"),
     ],
 )
 def test_is_protected_path_preserves_dot_prefixed_protected_paths(path: str, classification: str) -> None:
@@ -745,17 +755,31 @@ def test_target_mismatch_blocks_even_with_valid_packet(tmp_path: Path) -> None:
     assert "outside implementation authorization scope" in result["reason"]
 
 
-def test_bridge_report_write_remains_open_without_authorization(tmp_path: Path) -> None:
+def test_bridge_status_file_write_blocks_without_governed_helper(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "apply_patch",
         "tool_input": {"patch": "*** Begin Patch\n*** Add File: bridge/example-001.md\n+NEW\n*** End Patch\n"},
     }
 
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "bridge_status_file_direct_mutation"
+    assert "governed bridge" in result["reason"]
+
+
+def test_non_status_bridge_note_write_remains_open_without_authorization(tmp_path: Path) -> None:
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "apply_patch",
+        "tool_input": {"patch": "*** Begin Patch\n*** Add File: bridge/example-note.md\n+note\n*** End Patch\n"},
+    }
+
     assert gate.gate_decision(payload) == {}
 
 
-def test_raw_patch_bridge_only_write_remains_open_without_authorization(tmp_path: Path) -> None:
+def test_raw_patch_bridge_status_and_index_write_blocks_without_authorization(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "apply_patch",
@@ -771,7 +795,11 @@ def test_raw_patch_bridge_only_write_remains_open_without_authorization(tmp_path
     }
 
     assert gate.changed_paths(payload) == (["bridge/example-001.md", "bridge/INDEX.md"], True)
-    assert gate.gate_decision(payload) == {}
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "controlled_artifact_direct_mutation"
+    assert "bridge/<slug>-NNN.md" in result["reason"]
+    assert "bridge/INDEX.md" in result["reason"]
 
 
 def test_raw_patch_protected_write_blocks_without_authorization(tmp_path: Path) -> None:
@@ -787,7 +815,7 @@ def test_raw_patch_protected_write_blocks_without_authorization(tmp_path: Path) 
     assert "authorization packet" in result["reason"]
 
 
-def test_nested_patch_payload_without_tool_name_allows_bridge_only_write(tmp_path: Path) -> None:
+def test_nested_patch_payload_without_tool_name_blocks_bridge_status_write(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),
         "event": "PreToolUse",
@@ -798,10 +826,12 @@ def test_nested_patch_payload_without_tool_name_allows_bridge_only_write(tmp_pat
     }
 
     assert gate.changed_paths(payload) == (["bridge/example-002.md"], True)
-    assert gate.gate_decision(payload) == {}
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "bridge_status_file_direct_mutation"
 
 
-def test_shell_payload_with_escaped_patch_newlines_allows_bridge_only_write(tmp_path: Path) -> None:
+def test_shell_payload_with_escaped_patch_newlines_blocks_bridge_status_write(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "Bash",
@@ -811,7 +841,9 @@ def test_shell_payload_with_escaped_patch_newlines_allows_bridge_only_write(tmp_
     }
 
     assert gate.changed_paths(payload) == (["bridge/example-003.md"], True)
-    assert gate.gate_decision(payload) == {}
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "bridge_status_file_direct_mutation"
 
 
 def test_shell_mutation_classification_blocks_protected_write(tmp_path: Path) -> None:
@@ -825,6 +857,33 @@ def test_shell_mutation_classification_blocks_protected_write(tmp_path: Path) ->
 
     assert result["decision"] == "block"
     assert "authorization packet" in result["reason"]
+
+
+@pytest.mark.parametrize(
+    ("path", "reason_code"),
+    [
+        ("groundtruth.db", "membase_direct_mutation"),
+        (
+            ".gtkb-state/implementation-authorizations/current.json",
+            "runtime_authority_state_direct_mutation",
+        ),
+        (".gtkb-state/work-intent/thread.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/bridge-poller/dispatch-state.json", "runtime_authority_state_direct_mutation"),
+        (".gtkb-state/dispatcher-daemon/status.json", "runtime_authority_state_direct_mutation"),
+    ],
+)
+def test_shell_mutation_blocks_controlled_authority_state(path: str, reason_code: str, tmp_path: Path) -> None:
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "Bash",
+        "tool_input": {"command": f"Set-Content -Path {path} -Value 'x'"},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == reason_code
+    assert "controlled artifact" in result["reason"]
 
 
 def test_memory_only_mutating_shell_payload_allowed_without_authorization(tmp_path: Path) -> None:

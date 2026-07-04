@@ -81,37 +81,32 @@ def _record_gate_exemption(pattern_id: str, subject: str, reason: str, paths: li
         pass
 
 
-PROTECTED_EXACT = {
-    ".claude/settings.json",
-    ".codex/hooks.json",
-    ".env",
-    "env.local",
-    "env.staging",
-    "pyproject.toml",
-    "groundtruth.toml",
-}
-PROTECTED_PREFIXES = (
-    "scripts/",
-    "groundtruth-kb/src/",
-    "groundtruth-kb/tests/",
-    "platform_tests/",
-    "tests/",
-    ".claude/hooks/",
-    ".claude/rules/",
-    ".codex/gtkb-hooks/",
-    "config/",
-    ".github/",
-)
-DISPATCHER_CONFIG_PATH = "config/dispatcher/rules.toml"
+try:
+    from scripts.controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        direct_write_block_reason_code,
+        normalize_relative_path_text,
+    )
+    from scripts.controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+    from scripts.controlled_artifact_paths import (
+        protected_path_classification as _controlled_path_classification,
+    )
+except ImportError:  # pragma: no cover - direct script execution path
+    from controlled_artifact_paths import (
+        DISPATCHER_CONFIG_PATH,
+        direct_write_block_reason_code,
+        normalize_relative_path_text,
+    )
+    from controlled_artifact_paths import (
+        is_protected_path as _controlled_is_protected_path,
+    )
+    from controlled_artifact_paths import (
+        protected_path_classification as _controlled_path_classification,
+    )
+
 DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"
-ALLOWED_WRITE_PREFIXES = (
-    "bridge/",
-    "independent-progress-assessments/",
-)
-DIAGNOSTIC_WRITE_PREFIXES = (
-    ".groundtruth/session/snapshots/",
-    ".gtkb-state/",
-)
 EMERGENCY_BRIDGE_REPAIR_ENV_VAR = "GTKB_EMERGENCY_BRIDGE_REPAIR"
 BRIDGE_FUNCTION_EXACT = {
     ".claude/settings.json",
@@ -251,37 +246,15 @@ def _normalize(root: Path, path_text: str) -> str | None:
 
 
 def _preserve_dot_prefixed_relative_path(relative_path: str) -> str:
-    rel = relative_path.replace("\\", "/")
-    while rel.startswith("./"):
-        rel = rel[2:]
-    return rel
+    return normalize_relative_path_text(relative_path)
 
 
 def is_protected_path(relative_path: str) -> bool:
-    rel = _preserve_dot_prefixed_relative_path(relative_path)
-    if rel in PROTECTED_EXACT:
-        return True
-    if rel.startswith(".env."):
-        return True
-    if rel.startswith(ALLOWED_WRITE_PREFIXES):
-        return False
-    if rel.startswith(DIAGNOSTIC_WRITE_PREFIXES):
-        return False
-    return any(rel.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+    return _controlled_is_protected_path(relative_path)
 
 
 def _protected_path_classification(relative_path: str) -> str:
-    rel = _preserve_dot_prefixed_relative_path(relative_path)
-    if rel == "<unknown-mutating-target>":
-        return rel
-    if rel in PROTECTED_EXACT:
-        return rel
-    if rel.startswith(".env."):
-        return ".env.*"
-    for prefix in PROTECTED_PREFIXES:
-        if rel.startswith(prefix):
-            return prefix
-    return rel
+    return _controlled_path_classification(relative_path)
 
 
 def _is_bridge_function_path(relative_path: str) -> bool:
@@ -317,9 +290,13 @@ def _dispatcher_config_cli_only_block(targets: list[str]) -> dict[str, Any]:
 
 
 def _paths_from_apply_patch(root: Path, text: str) -> list[str]:
-    normalized = (text or "").replace("`r`n", "\n").replace("`n", "\n").replace("\\r\\n", "\n").replace("\\n", "\n")
-    paths = PATCH_PATH_RE.findall(normalized)
-    paths.extend(PATCH_MOVE_RE.findall(normalized))
+    raw = text or ""
+    paths = PATCH_PATH_RE.findall(raw)
+    paths.extend(PATCH_MOVE_RE.findall(raw))
+    if not paths:
+        normalized = raw.replace("`r`n", "\n").replace("`n", "\n").replace("\\r\\n", "\n").replace("\\n", "\n")
+        paths = PATCH_PATH_RE.findall(normalized)
+        paths.extend(PATCH_MOVE_RE.findall(normalized))
     return [rel for raw in paths if (rel := _normalize(root, raw))]
 
 
@@ -1153,6 +1130,19 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         protected = [path for path in paths if is_protected_path(path)]
     if not protected:
         return {}
+    direct_reason_code = direct_write_block_reason_code(protected)
+    if direct_reason_code is not None:
+        classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
+        return {
+            "decision": "block",
+            "reason_code": direct_reason_code,
+            "reason": (
+                f"BLOCKED (GTKB-CONTROLLED-ARTIFACT-DIRECT-MUTATION): {BLOCKING_CLAUSE_ID}\n"
+                f"Reason: direct mutation matched controlled artifact surface(s): {classifications}. "
+                "Use the governed bridge, MemBase, dispatcher, or implementation-authorization helper path "
+                "for this artifact class; a raw tool or shell write is not valid authority evidence."
+            ),
+        }
     dispatcher_config_targets = _dispatcher_config_direct_edit_targets(protected)
     if dispatcher_config_targets:
         return _dispatcher_config_cli_only_block(dispatcher_config_targets)

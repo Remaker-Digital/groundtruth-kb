@@ -131,7 +131,7 @@ def test_routine_paths_short_circuit_before_packet_reads(tmp_path: Path, monkeyp
         paths=[
             "memory/MEMORY.md",
             "docs/guide.md",
-            "bridge/thread-001.md",
+            "bridge/thread-note.md",
             ".gtkb-state/state.json",
             "independent-progress-assessments/report.md",
         ],
@@ -221,6 +221,42 @@ def test_groundtruth_db_and_githooks_are_protected(tmp_path: Path, monkeypatch: 
 
     assert result["status"] == "fail"
     assert {finding["path"] for finding in result["findings"]} == {"groundtruth.db", ".githooks/pre-commit"}
+
+
+def test_bridge_index_and_runtime_state_paths_are_protected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module, "list_named_packets", lambda root: [])
+
+    paths = [
+        "bridge/INDEX.md",
+        ".gtkb-state/implementation-authorizations/current.json",
+        ".gtkb-state/work-intent/thread.json",
+        ".gtkb-state/bridge-poller/dispatch-state.json",
+        ".gtkb-state/dispatcher-daemon/status.json",
+    ]
+    result = module.evaluate(tmp_path, paths=paths)
+
+    assert result["status"] == "fail"
+    assert {finding["path"] for finding in result["findings"]} == set(paths)
+
+
+def test_non_verified_numbered_bridge_files_remain_helper_commit_compatible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+
+    def fail_if_called(root):
+        raise AssertionError("non-VERIFIED numbered bridge files should not read implementation packets")
+
+    monkeypatch.setattr(module, "list_named_packets", fail_if_called)
+    bridge_file = tmp_path / "bridge" / "example-003.md"
+    bridge_file.parent.mkdir()
+    bridge_file.write_text("NEW\n\n# Implementation report\n", encoding="utf-8")
+
+    result = module.evaluate(tmp_path, paths=["bridge/example-003.md"])
+
+    assert result["status"] == "pass"
+    assert result["protected_paths"] == []
 
 
 def test_json_shape_for_cli_paths(tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch) -> None:

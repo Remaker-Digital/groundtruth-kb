@@ -15,6 +15,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.controlled_artifact_paths import (  # noqa: E402
+    classify_controlled_artifact,
+    is_versioned_bridge_status_file,
+)
 from scripts.implementation_authorization import (  # noqa: E402
     AuthorizationError,
     bridge_entry,
@@ -22,18 +26,11 @@ from scripts.implementation_authorization import (  # noqa: E402
     list_named_packets,
     path_authorized,
 )
-from scripts.implementation_start_gate import (  # noqa: E402
-    ALLOWED_WRITE_PREFIXES,
-    DIAGNOSTIC_WRITE_PREFIXES,
-    PROTECTED_EXACT,
-    PROTECTED_PREFIXES,
-)
 
 BY_BRIDGE_PACKETS_REL = Path(".gtkb-state/implementation-authorizations/by-bridge")
 VERSIONED_BRIDGE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
 
-EXTRA_PROTECTED_EXACT = frozenset({"groundtruth.db"})
 EXTRA_PROTECTED_PREFIXES = (".githooks/",)
 
 
@@ -59,13 +56,13 @@ def _is_narrative_artifact(rel_path: str) -> bool:
 
 def is_protected_path(rel_path: str) -> bool:
     rel = _normalize_rel(rel_path)
-    if rel.startswith(ALLOWED_WRITE_PREFIXES) or rel.startswith(DIAGNOSTIC_WRITE_PREFIXES):
-        return False
     if _is_narrative_artifact(rel):
         return False
-    if rel in PROTECTED_EXACT or rel in EXTRA_PROTECTED_EXACT:
+    if rel.startswith(EXTRA_PROTECTED_PREFIXES):
         return True
-    return rel.startswith(PROTECTED_PREFIXES + EXTRA_PROTECTED_PREFIXES)
+    if is_versioned_bridge_status_file(rel):
+        return False
+    return classify_controlled_artifact(rel).is_controlled
 
 
 def _staged_paths(root: Path) -> list[str]:

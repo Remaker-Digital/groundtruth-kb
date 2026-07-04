@@ -55,6 +55,7 @@ def _run_adapter(path: Path, command: str) -> subprocess.CompletedProcess[str]:
     "command",
     [
         "Get-Content bridge/example-001.md",
+        "Get-Content bridge/INDEX.md",
         "git diff -- bridge/example-001.md",
         "python -c \"from pathlib import Path; print(Path('bridge/example-001.md').read_text())\"",
     ],
@@ -67,7 +68,9 @@ def test_read_only_bridge_references_are_allowed(command: str) -> None:
     "command",
     [
         "echo GO > bridge/example-001.md",
+        "echo GO > bridge/INDEX.md",
         "Set-Content bridge/example-001.md 'GO'",
+        "Set-Content bridge/INDEX.md 'GO'",
         "Move-Item tmp.md bridge/example-001.md",
         "python -c \"from pathlib import Path; Path('bridge/example-001.md').write_text('GO')\"",
         "python -c \"import os; os.replace('tmp.md', r'E:\\GT-KB\\bridge\\example-001.md')\"",
@@ -119,7 +122,6 @@ def test_codex_bridge_bash_adapters_ignore_benign_bridge_references(
         "Move-Item tmp.md bridge/example-001.md",
         "git restore -- bridge/example-001.md",
         "python -c \"import os; os.replace('tmp.md', r'E:\\GT-KB\\bridge\\example-001.md')\"",
-        "cat > bridge/example-001.md <<'EOF'\nNEW\n",
     ],
 )
 def test_codex_bridge_bash_adapters_fail_closed_for_unsupported_likely_writes(
