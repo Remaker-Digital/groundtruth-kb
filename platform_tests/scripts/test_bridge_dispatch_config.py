@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sqlite3
 import sys
 import tomllib
 from pathlib import Path
@@ -60,6 +61,15 @@ rules = []
         ),
         encoding="utf-8",
     )
+
+
+def _write_current_work_items(root: Path, rows: dict[str, str]) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as con:
+        con.execute("CREATE TABLE current_work_items (id TEXT PRIMARY KEY, resolution_status TEXT)")
+        con.executemany(
+            "INSERT INTO current_work_items (id, resolution_status) VALUES (?, ?)",
+            sorted(rows.items()),
+        )
 
 
 def _default_harnesses() -> list[dict]:
@@ -420,6 +430,46 @@ def _write_dispatch_state(root: Path, recipients: dict[str, dict]) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps({"recipients": recipients, "schema_version": 1, "updated_at": "2026-06-18T17:00:00Z"}),
+        encoding="utf-8",
+    )
+
+
+def _write_bridge_thread_status_helper(root: Path) -> None:
+    scripts_dir = root / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    (scripts_dir / "bridge_thread_files.py").write_text(
+        """
+from pathlib import Path
+
+
+def latest_bridge_status_for_thread(project_root, bridge_id, status_reader):
+    bridge_dir = Path(project_root) / "bridge"
+    versioned = []
+    for path in bridge_dir.glob("*.md"):
+        stem = path.stem
+        prefix = f"{bridge_id}-"
+        if not stem.startswith(prefix):
+            continue
+        suffix = stem[len(prefix):]
+        if len(suffix) == 3 and suffix.isdigit():
+            versioned.append((int(suffix), path))
+    if not versioned:
+        return None
+    return status_reader(sorted(versioned, reverse=True)[0][1])
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+
+def _write_bridge_thread(root: Path, slug: str, latest_status: str, work_item_id: str) -> None:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    (bridge_dir / f"{slug}-001.md").write_text(
+        f"NEW\n\nbridge_kind: implementation_proposal\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / f"{slug}-002.md").write_text(
+        f"{latest_status}\n\nWork Item: {work_item_id}\n",
         encoding="utf-8",
     )
 
@@ -1204,6 +1254,45 @@ def test_wi5000_all_impl_auth_quarantine_stale_failure_is_health_pass(tmp_path: 
     classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
     assert classification["severity"] == "PASS"
     assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
+def test_terminal_work_item_dispatch_residue_is_health_pass(tmp_path: Path) -> None:
+    """A GO/NO-GO row linked to a terminal work item is historical residue, not live failure."""
+    _write_project(tmp_path)
+    _write_bridge_thread_status_helper(tmp_path)
+    doc = "retired-work-item-thread"
+    _write_bridge_thread(tmp_path, doc, "NO-GO", "WI-5002")
+    _write_current_work_items(tmp_path, {"WI-5002": "retired"})
+    _write_dispatch_state(
+        tmp_path,
+        {
+            "prime-builder:A": {
+                "pending_count": 1,
+                "selected_count": 1,
+                "last_result": "subprocess_execution_failed",
+                "failure_class": "subprocess_execution_failed",
+                "last_launch": {
+                    "recipient": "prime-builder:A",
+                    "primary_bridge_id": doc,
+                    "selected_documents": [doc],
+                    "exit_failure_reason": "subprocess_execution_failed",
+                },
+            }
+        },
+    )
+
+    status = collect_bridge_dispatch_status(tmp_path)
+
+    findings = "\n".join(status.health_findings)
+    assert status.health_status == "PASS"
+    assert "dispatch runtime failure" not in findings
+    assert "referenced bridge work item terminal" in findings
+    classification = next(row for row in status.runtime_classifications if row["recipient"] == "prime-builder:A")
+    assert classification["severity"] == "PASS"
+    assert classification["stale_failure_evidence"] is True
+    assert classification["stale_failure_reason"] == (
+        f"referenced bridge work item terminal ({doc}: referenced work item terminal (WI-5002=retired))"
+    )
 
 
 def test_wi5000_all_impl_auth_quarantine_with_live_worker_warns(

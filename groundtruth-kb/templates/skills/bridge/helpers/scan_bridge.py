@@ -49,6 +49,7 @@ import argparse
 import datetime as _dt
 import json
 import re
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -93,15 +94,23 @@ _KIND_TERMINAL_TOKENS = (
 _HEADER_READ_BUDGET_BYTES = 4096
 
 _STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 _BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
 _VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3})\.md$")
-_FILE_STATUS_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+_WORK_ITEM_VERSION_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+_WORK_ITEM_METADATA_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:Work Items?|work_item_ids?|work_item_id)\s*:\s*(?P<value>.+)$",
     re.IGNORECASE,
 )
+_WORK_ITEM_ID_RE = re.compile(r"\bWI-\d+\b", re.IGNORECASE)
+_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    re.IGNORECASE,
+)
+_TERMINAL_WORK_ITEM_RESOLUTION_STATUSES = frozenset({"verified", "resolved", "retired", "wont_fix", "not_a_defect"})
+_WORK_ITEM_HEADER_READ_BUDGET_BYTES = 16_384
 
 
 @dataclass(frozen=True)
@@ -262,9 +271,76 @@ def _is_terminal_kind_go(thread: ThreadEntry, project_root: Path) -> bool:
     return any(token in bk_normalized for token in _KIND_TERMINAL_TOKENS)
 
 
+def _bridge_version_files_for_thread(project_root: Path, bridge_id: str) -> list[Path]:
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return []
+    versioned: list[tuple[int, Path]] = []
+    for path in bridge_dir.glob("*.md"):
+        match = _WORK_ITEM_VERSION_FILE_RE.match(path.name)
+        if match is None or match.group("slug") != bridge_id:
+            continue
+        versioned.append((int(match.group("version")), path))
+    return [path for _version, path in sorted(versioned, key=lambda row: row[0], reverse=True)]
+
+
+def _work_item_ids_for_bridge_thread(project_root: Path, bridge_id: str) -> list[str]:
+    work_item_ids: list[str] = []
+    for path in _bridge_version_files_for_thread(project_root, bridge_id):
+        try:
+            head = path.read_text(encoding="utf-8", errors="replace")[:_WORK_ITEM_HEADER_READ_BUDGET_BYTES]
+        except OSError:
+            continue
+        for line in head.splitlines():
+            match = _WORK_ITEM_METADATA_LINE_RE.match(line)
+            if match is None:
+                continue
+            for raw_work_item_id in _WORK_ITEM_ID_RE.findall(match.group("value")):
+                work_item_id = raw_work_item_id.upper()
+                if work_item_id not in work_item_ids:
+                    work_item_ids.append(work_item_id)
+        if work_item_ids:
+            return work_item_ids
+    return work_item_ids
+
+
+def _work_item_resolution_status(project_root: Path, work_item_id: str) -> str | None:
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return None
+    try:
+        with sqlite3.connect(db_path) as con:
+            row = con.execute(
+                "SELECT resolution_status FROM current_work_items WHERE id = ? LIMIT 1",
+                (work_item_id,),
+            ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None or row[0] is None:
+        return None
+    return str(row[0]).strip()
+
+
+def _terminal_work_item_reason_for_thread(project_root: Path, bridge_id: str) -> str | None:
+    work_item_ids = _work_item_ids_for_bridge_thread(project_root, bridge_id)
+    if not work_item_ids:
+        return None
+    terminal: list[tuple[str, str]] = []
+    for work_item_id in work_item_ids:
+        resolution_status = _work_item_resolution_status(project_root, work_item_id)
+        if resolution_status is None:
+            return None
+        normalized = resolution_status.lower()
+        if normalized not in _TERMINAL_WORK_ITEM_RESOLUTION_STATUSES:
+            return None
+        terminal.append((work_item_id, normalized))
+    rendered = ", ".join(f"{work_item_id}={status}" for work_item_id, status in terminal)
+    return f"referenced work item terminal ({rendered})"
+
+
 def _role_filter(
     threads: list[ThreadEntry], role: Role, project_root: Path
-) -> tuple[list[ThreadEntry], list[ThreadEntry]]:
+) -> tuple[list[ThreadEntry], list[ThreadEntry], list[dict[str, Any]]]:
     """Return (actionable, terminal_verified) for the given role.
 
     For ``prime-builder``, a latest ``GO`` whose operative Prime proposal carries
@@ -280,14 +356,23 @@ def _role_filter(
         raise ValueError(f"Unknown role {role!r}; expected 'prime-builder' or 'loyal-opposition'")
 
     actionable: list[ThreadEntry] = []
+    blocked_non_activatable: list[dict[str, Any]] = []
     for t in threads:
         if t.latest_status not in actionable_statuses:
             continue
         if role == "prime-builder" and t.latest_status == "GO" and _is_terminal_kind_go(t, project_root):
             continue
+        if role == "prime-builder" and t.latest_status in {"GO", "NO-GO"}:
+            terminal_work_item_reason = _terminal_work_item_reason_for_thread(project_root, t.document)
+            if terminal_work_item_reason is not None:
+                blocked = t.to_dict()
+                blocked["go_file"] = t.latest_path
+                blocked["reasons"] = [terminal_work_item_reason]
+                blocked_non_activatable.append(blocked)
+                continue
         actionable.append(t)
     terminal_verified = [t for t in threads if t.latest_status in TERMINAL_STATUSES]
-    return actionable, terminal_verified
+    return actionable, terminal_verified, blocked_non_activatable
 
 
 def _summary_counts(threads: list[ThreadEntry]) -> dict[str, int]:
@@ -332,11 +417,12 @@ def scan(
         project_root = PROJECT_ROOT
 
     threads = _parse_index(index_text)
-    actionable, terminal_verified = _role_filter(threads, role, project_root)
+    actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
 
     return {
         "role": role,
         "actionable": [t.to_dict() for t in actionable],
+        "blocked_non_activatable": blocked_non_activatable,
         "terminal_verified": [t.to_dict() for t in terminal_verified],
         "summary": _summary_counts(threads),
         "generated_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -362,6 +448,16 @@ def _format_markdown(result: dict[str, Any]) -> str:
     if result["actionable"]:
         for thread in result["actionable"]:
             lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+    else:
+        lines.append("- (none)")
+    lines.append("")
+    lines.append(f"## Blocked (non-activatable GO/NO-GO) ({len(result.get('blocked_non_activatable', []))})")
+    lines.append("")
+    if result.get("blocked_non_activatable"):
+        for thread in result["blocked_non_activatable"]:
+            lines.append(f"- **{thread['document']}** -- {thread['latest_status']} at `{thread['latest_path']}`")
+            for reason in thread.get("reasons", []):
+                lines.append(f"  - {reason}")
     else:
         lines.append("- (none)")
     lines.append("")

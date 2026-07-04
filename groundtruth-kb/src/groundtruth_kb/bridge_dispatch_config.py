@@ -6,6 +6,8 @@ import datetime as dt
 import importlib.util
 import json
 import os
+import re
+import sqlite3
 import sys
 import tomllib
 import uuid
@@ -103,6 +105,14 @@ PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 RECENT_RUN_SUFFIXES = (".stdout.log", ".stderr.log", ".exit_code", ".pid", PID_CREATE_TIME_SUFFIX)
 TERMINAL_DISPATCH_BRIDGE_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "RETIRED", "SUPERSEDED"})
+TERMINAL_WORK_ITEM_RESOLUTION_STATUSES = frozenset({"verified", "resolved", "retired", "wont_fix", "not_a_defect"})
+_WORK_ITEM_METADATA_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:Work Items?|work_item_ids?|work_item_id)\s*:\s*(?P<value>.+)$",
+    re.IGNORECASE,
+)
+_WORK_ITEM_ID_RE = re.compile(r"\bWI-\d+\b", re.IGNORECASE)
+_BRIDGE_VERSION_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+_WORK_ITEM_HEADER_READ_BUDGET_BYTES = 16_384
 _DISPATCH_WORKER_ENV_VARS = (
     "GTKB_BRIDGE_POLLER_RUN_ID",
     "GTKB_DISPATCH_ID",
@@ -806,18 +816,33 @@ def _health_degrading_dispatch_findings(
 ) -> list[str]:
     neutral_findings: set[str] = set()
     for classification in runtime_classifications:
-        if classification.get("stale_failure_reason") != "current all_impl_auth_quarantined non-launch":
-            continue
         if _int_value(classification.get("live_inflight_dispatch_count"), default=0) != 0:
             continue
+        stale_failure_reason = str(classification.get("stale_failure_reason") or "")
         for finding in classification.get("findings", ()):
-            if _is_impl_auth_quarantine_stale_finding(str(finding)):
+            if (
+                stale_failure_reason == "current all_impl_auth_quarantined non-launch"
+                and _is_impl_auth_quarantine_stale_finding(str(finding))
+            ) or (
+                _is_terminal_reconciliation_stale_reason(stale_failure_reason)
+                and _is_terminal_reconciliation_stale_finding(str(finding))
+            ):
                 neutral_findings.add(str(finding))
     return [finding for finding in findings if finding not in neutral_findings]
 
 
 def _is_impl_auth_quarantine_stale_finding(finding: str) -> bool:
     return "stale failure evidence ignored (current all_impl_auth_quarantined non-launch)" in finding
+
+
+def _is_terminal_reconciliation_stale_reason(reason: str) -> bool:
+    return reason.startswith("referenced bridge document terminal") or reason.startswith(
+        "referenced bridge work item terminal"
+    )
+
+
+def _is_terminal_reconciliation_stale_finding(finding: str) -> bool:
+    return "stale failure evidence ignored (referenced bridge " in finding
 
 
 def _runtime_dispatch_evaluation(
@@ -1309,9 +1334,17 @@ def _runtime_classification_for_recipient(
         finding
         for finding in findings
         if not (
-            stale_failure_reason == "current all_impl_auth_quarantined non-launch"
-            and live_inflight_dispatch_count == 0
-            and _is_impl_auth_quarantine_stale_finding(finding)
+            live_inflight_dispatch_count == 0
+            and (
+                (
+                    stale_failure_reason == "current all_impl_auth_quarantined non-launch"
+                    and _is_impl_auth_quarantine_stale_finding(finding)
+                )
+                or (
+                    _is_terminal_reconciliation_stale_reason(stale_failure_reason or "")
+                    and _is_terminal_reconciliation_stale_finding(finding)
+                )
+            )
         )
     ]
     severity = "PASS"
@@ -1414,10 +1447,10 @@ def _terminal_bridge_reconciliation_reason(project_root: Path | None, row: dict[
     statuses = {bridge_id: _latest_bridge_status_for_document(project_root, bridge_id) for bridge_id in bridge_ids}
     if not statuses or any(status is None for status in statuses.values()):
         return None
-    if not all(status in TERMINAL_DISPATCH_BRIDGE_STATUSES for status in statuses.values() if status is not None):
-        return None
-    rendered = ", ".join(f"{bridge_id}={status}" for bridge_id, status in sorted(statuses.items()))
-    return f"referenced bridge document terminal ({rendered})"
+    if all(status in TERMINAL_DISPATCH_BRIDGE_STATUSES for status in statuses.values() if status is not None):
+        rendered = ", ".join(f"{bridge_id}={status}" for bridge_id, status in sorted(statuses.items()))
+        return f"referenced bridge document terminal ({rendered})"
+    return _terminal_work_item_reconciliation_reason(project_root, bridge_ids)
 
 
 def _bridge_ids_from_runtime_row(row: dict[str, Any]) -> list[str]:
@@ -1443,6 +1476,89 @@ def _bridge_ids_from_runtime_row(row: dict[str, Any]) -> list[str]:
     if isinstance(last_launch, dict):
         _add_from_mapping(last_launch)
     return ids
+
+
+def _bridge_version_files_for_thread(project_root: Path, bridge_id: str) -> list[Path]:
+    bridge_dir = project_root / "bridge"
+    if not bridge_dir.is_dir():
+        return []
+    versioned: list[tuple[int, Path]] = []
+    for path in bridge_dir.glob("*.md"):
+        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
+        if match is None or match.group("slug") != bridge_id:
+            continue
+        versioned.append((int(match.group("version")), path))
+    return [path for _version, path in sorted(versioned, key=lambda row: row[0], reverse=True)]
+
+
+def _work_item_ids_for_bridge_thread(project_root: Path, bridge_id: str) -> list[str]:
+    work_item_ids: list[str] = []
+    for path in _bridge_version_files_for_thread(project_root, bridge_id):
+        try:
+            head = path.read_text(encoding="utf-8", errors="replace")[:_WORK_ITEM_HEADER_READ_BUDGET_BYTES]
+        except OSError:
+            continue
+        for line in head.splitlines():
+            match = _WORK_ITEM_METADATA_LINE_RE.match(line)
+            if match is None:
+                continue
+            for raw_work_item_id in _WORK_ITEM_ID_RE.findall(match.group("value")):
+                work_item_id = raw_work_item_id.upper()
+                if work_item_id not in work_item_ids:
+                    work_item_ids.append(work_item_id)
+        if work_item_ids:
+            return work_item_ids
+    return work_item_ids
+
+
+def _work_item_resolution_status(project_root: Path, work_item_id: str) -> str | None:
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return None
+    try:
+        with sqlite3.connect(db_path) as con:
+            row = con.execute(
+                "SELECT resolution_status FROM current_work_items WHERE id = ? LIMIT 1",
+                (work_item_id,),
+            ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None or row[0] is None:
+        return None
+    return str(row[0]).strip()
+
+
+def _terminal_work_item_evidence_for_bridge(project_root: Path, bridge_id: str) -> dict[str, Any] | None:
+    work_item_ids = _work_item_ids_for_bridge_thread(project_root, bridge_id)
+    if not work_item_ids:
+        return None
+    statuses: list[dict[str, str]] = []
+    for work_item_id in work_item_ids:
+        resolution_status = _work_item_resolution_status(project_root, work_item_id)
+        if resolution_status is None:
+            return None
+        normalized = resolution_status.lower()
+        if normalized not in TERMINAL_WORK_ITEM_RESOLUTION_STATUSES:
+            return None
+        statuses.append({"id": work_item_id, "resolution_status": normalized})
+    rendered = ", ".join(f"{row['id']}={row['resolution_status']}" for row in statuses)
+    return {
+        "reason": f"referenced work item terminal ({rendered})",
+        "work_items": statuses,
+    }
+
+
+def _terminal_work_item_reconciliation_reason(project_root: Path | None, bridge_ids: list[str]) -> str | None:
+    if project_root is None or not bridge_ids:
+        return None
+    terminal: list[tuple[str, str]] = []
+    for bridge_id in bridge_ids:
+        evidence = _terminal_work_item_evidence_for_bridge(project_root, bridge_id)
+        if evidence is None:
+            return None
+        terminal.append((bridge_id, str(evidence["reason"])))
+    rendered = ", ".join(f"{bridge_id}: {reason}" for bridge_id, reason in terminal)
+    return f"referenced bridge work item terminal ({rendered})"
 
 
 def _latest_bridge_status_for_document(project_root: Path, bridge_id: str) -> str | None:

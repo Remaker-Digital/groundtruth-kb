@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -239,6 +240,31 @@ def _write_bridge_thread(bridge_dir: Path, slug: str, operative_kind: str, lates
     )
 
 
+def _write_current_work_items(root: Path, rows: dict[str, str]) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as con:
+        con.execute("CREATE TABLE current_work_items (id TEXT PRIMARY KEY, resolution_status TEXT)")
+        con.executemany(
+            "INSERT INTO current_work_items (id, resolution_status) VALUES (?, ?)",
+            sorted(rows.items()),
+        )
+
+
+def _write_work_item_bridge_thread(
+    bridge_dir: Path,
+    slug: str,
+    latest_status: str,
+    work_item_id: str,
+) -> None:
+    (bridge_dir / f"{slug}-001.md").write_text(
+        f"NEW\n\nbridge_kind: implementation_proposal\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+    (bridge_dir / f"{slug}-002.md").write_text(
+        f"{latest_status}\n\nWork Item: {work_item_id}\n",
+        encoding="utf-8",
+    )
+
+
 def test_terminal_kind_go_excluded_from_prime(helper, tmp_path) -> None:
     """A latest GO with terminal-kind bridge_kind is excluded from Prime work,
     while a non-terminal GO and a terminal-kind NO-GO are preserved."""
@@ -269,6 +295,26 @@ def test_terminal_kind_go_excluded_from_prime(helper, tmp_path) -> None:
     # Terminal-kind GO excluded; non-terminal GO and terminal-kind NO-GO kept.
     assert prime_docs == {"gtkb-impl", "gtkb-gov-nogo"}
     assert "gtkb-gov" not in prime_docs
+
+
+def test_template_terminal_work_item_go_moved_to_blocked_bucket(tmp_path) -> None:
+    """The managed helper template excludes GO/NO-GO entries whose MemBase WI is terminal."""
+    template_helper = _load_module(TEMPLATE_HELPER_PATH, "scan_bridge_template_terminal_wi")
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _write_work_item_bridge_thread(bridge_dir, "gtkb-terminal-wi", "NO-GO", "WI-5002")
+    _write_current_work_items(tmp_path, {"WI-5002": "retired"})
+    index = "Document: gtkb-terminal-wi\nNO-GO: bridge/gtkb-terminal-wi-002.md\nNEW: bridge/gtkb-terminal-wi-001.md\n"
+    index_path = bridge_dir / "INDEX.md"
+    index_path.write_text(index, encoding="utf-8")
+
+    result = template_helper.scan(role="prime-builder", index_text=index, index_path=index_path)
+
+    assert result["actionable"] == []
+    assert len(result["blocked_non_activatable"]) == 1
+    assert result["blocked_non_activatable"][0]["document"] == "gtkb-terminal-wi"
+    assert result["blocked_non_activatable"][0]["latest_status"] == "NO-GO"
+    assert result["blocked_non_activatable"][0]["reasons"] == ["referenced work item terminal (WI-5002=retired)"]
 
 
 def test_terminal_kind_does_not_affect_lo(helper, tmp_path) -> None:

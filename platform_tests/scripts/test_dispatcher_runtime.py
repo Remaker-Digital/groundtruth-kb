@@ -19,6 +19,7 @@ import importlib.util
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -274,6 +275,15 @@ def _make_synthetic_project(root: Path) -> Path:
 
 def _write_index(root: Path, body: str) -> None:
     (root / "bridge" / "INDEX.md").write_text(body, encoding="utf-8")
+
+
+def _write_current_work_items(root: Path, rows: dict[str, str]) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as con:
+        con.execute("CREATE TABLE current_work_items (id TEXT PRIMARY KEY, resolution_status TEXT)")
+        con.executemany(
+            "INSERT INTO current_work_items (id, resolution_status) VALUES (?, ?)",
+            sorted(rows.items()),
+        )
 
 
 def _write_work_subject(root: Path, subject: str) -> None:
@@ -1201,6 +1211,38 @@ def test_wi5002_prime_unchanged_clears_stale_failure_fields(tmp_path: Path) -> N
     assert "dispatch runtime failure" not in findings
     assert "last_result=unchanged with pending_count" not in findings
     assert classification["severity"] == "PASS"
+
+
+def test_terminal_work_item_go_suppressed_before_prime_dispatch(tmp_path: Path) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    doc = "wi5008-terminal-carry-forward"
+    _write_bridge_file(
+        root,
+        f"{doc}-001.md",
+        "NEW\n\nbridge_kind: implementation_proposal\nWork Item: WI-5002\n",
+    )
+    _write_bridge_file(root, f"{doc}-002.md", "GO\n\nWork Item: WI-5002\n")
+    _write_index(root, f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n")
+    _write_current_work_items(root, {"WI-5002": "retired"})
+
+    summary = _load_trigger().run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    assert summary["results"]["prime-builder"]["reason"] == "no_pending_after_filter"
+    suppressions = summary["terminal_work_item_suppressions"]["prime-builder"]
+    assert suppressions == [
+        {
+            "document_name": doc,
+            "top_status": "GO",
+            "top_file": f"bridge/{doc}-002.md",
+            "reason": "referenced work item terminal (WI-5002=retired)",
+            "work_items": [{"id": "WI-5002", "resolution_status": "retired"}],
+        }
+    ]
+    recipient_state = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert recipient_state["pending_count"] == 0
+    assert recipient_state["selected_count"] == 0
+    assert recipient_state["terminal_work_item_suppressions"] == suppressions
 
 
 def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> None:
@@ -2934,6 +2976,68 @@ def test_dispatch_cycle_clears_terminal_bridge_failover_residue(
     assert rec["circuit_breaker_tripped"] is False
     assert rec["signature"] == "stale-signature"
     assert rec["last_dispatched_signature"] == "stale-signature"
+    assert "failure_class" not in rec
+    assert "last_failure_reason" not in rec
+
+
+def test_dispatch_cycle_clears_terminal_work_item_failover_residue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Terminal MemBase work items make selected GO/NO-GO bridge residue historical."""
+    root = _make_synthetic_project(tmp_path)
+    doc = "retired-work-item-thread"
+    _write_bridge_file(root, f"{doc}-001.md", "NEW\n\nbridge_kind: implementation_proposal\nWork Item: WI-5002\n")
+    _write_bridge_file(root, f"{doc}-002.md", "NO-GO\n\nWork Item: WI-5002\n")
+    _write_index(root, f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n")
+    _write_current_work_items(root, {"WI-5002": "retired"})
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "dispatch-state.json").write_text(
+        json.dumps(
+            {
+                "recipients": {
+                    "prime-builder:B": {
+                        "last_result": "subprocess_execution_failed",
+                        "failure_class": "subprocess_execution_failed",
+                        "last_failure_reason": "subprocess_execution_failed",
+                        "failure_count": 3,
+                        "circuit_breaker_tripped": True,
+                        "pending_count": 1,
+                        "selected_count": 1,
+                        "last_launch": {
+                            "dispatch_id": "prior-codex",
+                            "recipient": "prime-builder:B",
+                            "launched": True,
+                            "primary_bridge_id": doc,
+                            "selected_documents": [doc],
+                            "signature": "stale-signature",
+                            "exit_failure_reason": "subprocess_execution_failed",
+                        },
+                    }
+                },
+                "schema_version": 1,
+                "updated_at": "2026-07-04T09:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
+
+    trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    state = json.loads((state_dir / "dispatch-state.json").read_text(encoding="utf-8"))
+    rec = state["recipients"]["prime-builder:B"]
+    assert rec["last_result"] == "terminal_bridge_reconciled"
+    assert rec["terminal_bridge_reconciliation_reason"] == (
+        f"referenced bridge work item terminal ({doc}: referenced work item terminal (WI-5002=retired))"
+    )
+    assert rec["pending_count"] == 0
+    assert rec["selected_count"] == 0
+    assert rec["failure_count"] == 0
+    assert rec["circuit_breaker_tripped"] is False
     assert "failure_class" not in rec
     assert "last_failure_reason" not in rec
 
