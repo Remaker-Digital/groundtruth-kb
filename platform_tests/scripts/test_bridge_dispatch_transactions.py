@@ -2,7 +2,7 @@
 
 ``bridge_dispatch_transactions._apply_transaction`` regenerates the static
 ``harness-state/harness-registry.json`` projection after an applied rules.toml
-mutation, so the cross-harness trigger (which resolves dispatchability from the
+mutation, so the dispatcher daemon (which resolves dispatchability from the
 static projection, NOT from ``config/dispatcher/rules.toml``) honors
 ``set_eligibility`` immediately. Pre-fix the projection stayed stale while
 ``gt bridge dispatch status`` merged the overlay live, producing the WI-4820
@@ -28,7 +28,7 @@ _PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
 if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
-from groundtruth_kb.bridge_dispatch_transactions import set_eligibility  # noqa: E402
+from groundtruth_kb.bridge_dispatch_transactions import set_eligibility, set_rule  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.harness_projection import generate_harness_projection, harness_registry_path  # noqa: E402
 
@@ -113,6 +113,14 @@ def _budget_harness(root: Path, harness_id: str) -> dict[str, object]:
     return rules.get("budget", {}).get("harnesses", {}).get(harness_id, {})
 
 
+def _rule_statuses(root: Path, rule_id: str) -> list[str]:
+    rules = tomllib.loads((root / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
+    for rule in rules.get("rules", []):
+        if rule.get("id") == rule_id:
+            return list(rule.get("statuses", []))
+    raise AssertionError(f"rule {rule_id!r} not present")
+
+
 def test_set_eligibility_regenerates_projection(tmp_path: Path) -> None:
     root = tmp_path / "project"
     _seed(root)
@@ -168,3 +176,21 @@ def test_dry_run_does_not_regenerate_projection(tmp_path: Path) -> None:
     # The static projection is untouched by a dry run.
     assert _projection_can_receive(root, "D") is False
     assert _budget_harness(root, "D") == expected_budget
+
+
+def test_set_rule_accepts_no_action_status_for_lo_routing(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    _seed(root)
+
+    result = set_rule(
+        root,
+        "bridge-loyal-opposition-default",
+        statuses=("NEW", "REVISED", "NO-ACTION"),
+        dry_run=True,
+    )
+
+    assert result.status == "dry_run"
+    assert result.config is not None
+    rule = next(row for row in result.config["rules"] if row["id"] == "bridge-loyal-opposition-default")
+    assert rule["statuses"] == ["NEW", "REVISED", "NO-ACTION"]
+    assert _rule_statuses(root, "bridge-loyal-opposition-default") == ["NEW", "REVISED"]

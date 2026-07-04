@@ -46,10 +46,11 @@ can_fire_events = true
 dispatch_cost = 60
 dispatch_quality = 90
 dispatch_availability = 90
+max_items = 1
 tags = ["prime-builder", "event-source"]
 
 [harnesses.B]
-can_receive_dispatch = false
+can_receive_dispatch = true
 can_fire_events = false
 dispatch_cost = 60
 dispatch_quality = 95
@@ -59,7 +60,7 @@ tags = ["loyal-opposition"]
 
 [harnesses.C]
 description = "Antigravity: Loyal Opposition dispatch target."
-can_receive_dispatch = false
+can_receive_dispatch = true
 can_fire_events = false
 dispatch_cost = 30
 dispatch_quality = 80
@@ -68,7 +69,7 @@ tags = ["loyal-opposition"]
 
 [harnesses.D]
 description = "Ollama-shim: cloud-routed LO dispatch target (current route: deepseek-v4-pro-cloud -> deepseek-v4-pro:cloud)."
-can_receive_dispatch = false
+can_receive_dispatch = true
 can_fire_events = false
 dispatch_cost = 25
 dispatch_quality = 92
@@ -97,11 +98,11 @@ tags = ["loyal-opposition", "low-cost"]
 [[rules]]
 id = "bridge-prime-builder-default"
 required_roles = ["prime-builder"]
-statuses = ["GO", "NO-GO"]
+statuses = ["GO"]
 prefer = ["availability", "quality", "cost"]
 
 [[rules]]
 id = "bridge-loyal-opposition-cheap-fast-default"
 required_roles = ["loyal-opposition"]
-statuses = ["NEW", "REVISED"]
+statuses = ["NEW", "REVISED", "NO-ACTION"]
 prefer = ["availability", "quality", "cost"]

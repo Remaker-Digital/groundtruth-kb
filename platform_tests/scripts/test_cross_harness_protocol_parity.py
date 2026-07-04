@@ -23,6 +23,8 @@ EXPECTED_IDENTITIES = {
 }
 VALID_ROLES = {"prime-builder", "loyal-opposition"}
 VALID_STATUSES = {"active", "suspended", "retired"}
+EXPECTED_EVENT_SOURCES = {"A"}
+EXPECTED_DISPATCH_TARGETS = {"A", "B", "C", "D"}
 
 
 def _read_json(relative_path: str) -> dict[str, Any]:
@@ -60,7 +62,7 @@ def test_durable_harness_identity_and_role_surfaces_cover_expected_harnesses() -
         if row["status"] == "active":
             active_rows.append(row)
             assert row["role"]
-            assert row["can_receive_dispatch"] is True
+            assert isinstance(row["can_receive_dispatch"], bool)
         else:
             suspended_or_retired_rows.append(row)
             assert row["can_fire_events"] is False
@@ -70,12 +72,10 @@ def test_durable_harness_identity_and_role_surfaces_cover_expected_harnesses() -
     assert any("loyal-opposition" in row["role"] for row in active_rows)
     assert all(row["status"] in {"suspended", "retired"} for row in suspended_or_retired_rows)
 
-    assert registry_by_id["A"]["event_driven_hooks"] is True
-    assert registry_by_id["B"]["event_driven_hooks"] is False
-    assert registry_by_id["C"]["event_driven_hooks"] is False
-    assert registry_by_id["D"]["event_driven_hooks"] is False
-    assert registry_by_id["E"]["event_driven_hooks"] is True
-    assert registry_by_id["F"]["event_driven_hooks"] is False
+    assert {row["id"] for row in registry["harnesses"] if row["can_fire_events"]} == EXPECTED_EVENT_SOURCES
+    assert {row["id"] for row in registry["harnesses"] if row["can_receive_dispatch"]} == EXPECTED_DISPATCH_TARGETS
+    for harness_id, row in registry_by_id.items():
+        assert row["event_driven_hooks"] is (harness_id in EXPECTED_EVENT_SOURCES)
 
 
 def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
@@ -89,13 +89,16 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
     lo_rule = rule_by_id["bridge-loyal-opposition-cheap-fast-default"]
 
     assert prime_rule["required_roles"] == ["prime-builder"]
-    assert prime_rule["statuses"] == ["GO", "NO-GO"]
+    assert prime_rule["statuses"] == ["GO"]
     assert lo_rule["required_roles"] == ["loyal-opposition"]
-    assert lo_rule["statuses"] == ["NEW", "REVISED"]
+    assert lo_rule["statuses"] == ["NEW", "REVISED", "NO-ACTION"]
 
     protocol = _read_text(".claude/rules/file-bridge-protocol.md")
+    disposition = _read_text("groundtruth-kb/src/groundtruth_kb/bridge/disposition.py")
     assert "GO, NO-GO, or ADVISORY" in protocol
     assert "NEW or REVISED entries" in protocol
+    assert 'STATUS_NO_ACTION: Final[str] = "NO-ACTION"' in disposition
+    assert "LOYAL_OPPOSITION_ACTIONABLE_STATUSES" in disposition
     assert (
         "ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs"
         in protocol
@@ -122,8 +125,10 @@ def test_protected_mutation_surfaces_expose_go_packet_and_claim_requirements() -
     for needle in ("missing_bridge_go", "missing_implementation_packet", "missing_or_stale_claim"):
         assert needle in protected_guard
 
-    assert "implementation-start-gate" in codex_hooks
-    assert "bridge-compliance-gate" in codex_hooks
+    assert "--batch pretooluse-bash" in codex_hooks
+    assert "--batch pretooluse-apply-patch" in codex_hooks
+    assert "bridge-compliance-gate.cmd" in _read_text(".codex/gtkb-hooks/run_py_no_window.py")
+    assert "implementation-start-gate.cmd" in _read_text(".codex/gtkb-hooks/run_py_no_window.py")
     assert "implementation-start-gate.py" in claude_settings
     assert "bridge-compliance-gate.py" in claude_settings
 
@@ -175,14 +180,15 @@ def test_hook_fallback_surfaces_distinguish_event_sources_from_dispatch_targets(
     by_id = {row["id"]: row for row in registry["harnesses"]}
     event_sources = {row["id"] for row in registry["harnesses"] if row["can_fire_events"]}
     dispatch_only = {row["id"] for row in registry["harnesses"] if not row["can_fire_events"]}
+    dispatch_targets = {row["id"] for row in registry["harnesses"] if row["can_receive_dispatch"]}
 
-    assert event_sources == {"A", "E"}
-    assert dispatch_only == {"B", "C", "D", "F"}
-    assert all(
-        by_id[harness_id]["can_receive_dispatch"]
-        for harness_id in EXPECTED_IDENTITIES.values()
-        if by_id[harness_id]["status"] == "active"
-    )
+    assert event_sources == EXPECTED_EVENT_SOURCES
+    assert dispatch_only == {"B", "C", "D", "E", "F"}
+    assert dispatch_targets == EXPECTED_DISPATCH_TARGETS
+    inactive_targets = {
+        harness_id for harness_id in EXPECTED_IDENTITIES.values() if not by_id[harness_id]["can_receive_dispatch"]
+    }
+    assert inactive_targets == {"E", "F"}
 
     forbidden_hook_dispatch = (
         "cross_" + "harness_" + "bridge_" + "trigger.py",

@@ -16,7 +16,7 @@ from groundtruth_kb.bridge_dispatch_config import DISPATCH_CONFIG_RELATIVE_PATH
 TRANSACTION_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-dispatch-config-transactions"
 
 VALID_ROLES = frozenset({"prime-builder", "loyal-opposition"})
-VALID_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED"})
+VALID_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED"})
 VALID_PREFERENCES = frozenset({"quality", "cost", "availability", "reviewer_precedence", "harness_id", "id"})
 HARNESS_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 RULE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
@@ -357,7 +357,7 @@ def _apply_transaction(
     _append_jsonl(
         audit_path, _record(transaction, parameters, before_hash=before_hash, after_hash=after_hash, status="applied")
     )
-    # WI-4820: the cross-harness trigger resolves dispatchability from the static
+    # WI-4820: the dispatcher daemon resolves dispatchability from the static
     # harness-registry projection, NOT from config/dispatcher/rules.toml. The
     # projection generator already merges this overlay, so regenerate it now as a
     # write-through; otherwise the trigger keeps reading a stale projection and
@@ -382,7 +382,7 @@ def _apply_transaction(
 def _regenerate_harness_projection(root: Path) -> str:
     """Write-through the dispatcher-config overlay into the harness-registry projection.
 
-    The cross-harness trigger resolves dispatchability from the static
+    The dispatcher daemon resolves dispatchability from the static
     ``harness-state/harness-registry.json`` projection, not from
     ``config/dispatcher/rules.toml``. ``generate_harness_projection`` already
     merges the rules.toml overlay per harness, so regenerating here keeps the
