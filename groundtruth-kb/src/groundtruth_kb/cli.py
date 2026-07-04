@@ -712,6 +712,24 @@ def bridge_health_cmd(ctx: click.Context, json_output: bool) -> None:
     _emit_bridge_dispatch_health(ctx, json_output=json_output)
 
 
+@bridge_group.command("state-report")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--markdown", "markdown_output", is_flag=True, help="Emit owner-standard Markdown tables.")
+@click.pass_context
+def bridge_state_report_cmd(ctx: click.Context, json_output: bool, markdown_output: bool) -> None:
+    """Report deterministic bridge, dispatcher, and harness state."""
+    from groundtruth_kb.bridge.state_report import build_state_report, render_markdown
+
+    if json_output and markdown_output:
+        raise click.ClickException("Choose only one output mode: --json or --markdown.")
+    config = _resolve_config(ctx)
+    report = build_state_report(config.project_root)
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+    click.echo(render_markdown(report), nl=False)
+
+
 @bridge_group.command("show")
 @click.argument("slug")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
