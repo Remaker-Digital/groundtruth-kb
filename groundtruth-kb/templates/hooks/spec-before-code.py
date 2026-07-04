@@ -3,7 +3,8 @@
 PreToolUse hook: spec-before-code advisory.
 
 Checks if the file being written/edited has a specification covering it
-via the source_paths field. Emits an advisory if no spec covers the path.
+via the source_paths field or, for platform_tests/ files, explicit bridge
+evidence. Emits an advisory if no spec covers the path.
 
 Hook type: PreToolUse (tools: Write, Edit, NotebookEdit)
 
@@ -14,12 +15,16 @@ All rights reserved.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
 SOURCE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".cs"}
 WRITE_TOOLS = {"Write", "Edit", "NotebookEdit"}
 DB_FILENAME = "groundtruth.db"
+BRIDGE_STATUS_TOKENS = {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"}
+BRIDGE_VERSIONED_FILE_RE = re.compile(r"^.+-\d{3,}\.md$")
+PATH_TOKEN_BOUNDARY_RE = r"A-Za-z0-9_./:\\-"
 
 
 def _find_db(cwd: str) -> Path | None:
@@ -44,6 +49,86 @@ def _get_target_path(tool_name: str, tool_input: dict) -> str | None:
 
 def _is_source_file(path: str) -> bool:
     return Path(path).suffix in SOURCE_EXTENSIONS
+
+
+def _normalize_path(path: str) -> str:
+    normalized = path.replace("\\", "/").strip()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _is_platform_test_path(path: str) -> bool:
+    normalized = "/" + _normalize_path(path).lstrip("/")
+    return "/platform_tests/" in normalized
+
+
+def _target_path_candidates(target_path: str) -> set[str]:
+    normalized = _normalize_path(target_path)
+    candidates = {normalized}
+    marker = "/platform_tests/"
+    marker_index = normalized.rfind(marker)
+    if marker_index >= 0:
+        candidates.add(normalized[marker_index + 1 :])
+    elif normalized.startswith("platform_tests/"):
+        candidates.add(normalized)
+    return {candidate for candidate in candidates if candidate}
+
+
+def _contains_path_token(text: str, path: str) -> bool:
+    pattern = rf"(?<![{PATH_TOKEN_BOUNDARY_RE}]){re.escape(path)}(?![{PATH_TOKEN_BOUNDARY_RE}])"
+    return re.search(pattern, text) is not None
+
+
+def _is_status_bearing_bridge_file(path: Path, content: str) -> bool:
+    if not BRIDGE_VERSIONED_FILE_RE.match(path.name):
+        return False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        return stripped in BRIDGE_STATUS_TOKENS
+    return False
+
+
+def _find_bridge_dir(cwd: str, db_path: Path) -> Path | None:
+    starts = [Path(cwd), db_path.parent]
+    seen: set[Path] = set()
+    for start in starts:
+        try:
+            candidates = [start, *start.parents]
+        except RuntimeError:
+            candidates = [start]
+        for parent in candidates:
+            if parent in seen:
+                continue
+            seen.add(parent)
+            bridge_dir = parent / "bridge"
+            if bridge_dir.is_dir():
+                return bridge_dir
+    return None
+
+
+def _bridge_evidence_covers_platform_test(cwd: str, db_path: Path, target_path: str) -> bool:
+    if not _is_platform_test_path(target_path):
+        return False
+
+    bridge_dir = _find_bridge_dir(cwd, db_path)
+    if bridge_dir is None:
+        return False
+
+    candidates = _target_path_candidates(target_path)
+    for bridge_file in sorted(bridge_dir.glob("*.md")):
+        try:
+            content = bridge_file.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        normalized_content = content.replace("\\", "/")
+        if not _is_status_bearing_bridge_file(bridge_file, normalized_content):
+            continue
+        if any(_contains_path_token(normalized_content, candidate) for candidate in candidates):
+            return True
+    return False
 
 
 def _query_source_paths(db_path: Path, target_path: str) -> tuple[bool, bool]:
@@ -133,6 +218,12 @@ def main() -> None:
         sys.exit(0)
 
     has_source_paths, covers_target = _query_source_paths(db_path, target_path)
+    bridge_covers_target = _bridge_evidence_covers_platform_test(cwd, db_path, target_path)
+
+    if covers_target or bridge_covers_target:
+        # Spec covers this path
+        emit_pass()
+        sys.exit(0)
 
     if not has_source_paths:
         emit_additional_context(
@@ -150,7 +241,6 @@ def main() -> None:
         )
         sys.exit(0)
 
-    # Spec covers this path
     emit_pass()
     sys.exit(0)
 

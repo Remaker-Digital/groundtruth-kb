@@ -577,6 +577,95 @@ def test_spec_before_code_match_via_migrated_db(tmp_path):
     assert output == {}
 
 
+def test_spec_before_code_platform_tests_match_via_bridge_evidence(tmp_path):
+    """platform_tests path with explicit bridge evidence passes without matching source_paths."""
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    db.insert_spec(
+        id="SPEC-001",
+        title="Platform test coverage",
+        status="specified",
+        changed_by="test",
+        change_reason="test",
+        source_paths=["src/other.py"],
+    )
+    db.close()
+
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "platform-test-coverage-001.md").write_text(
+        "NEW\n\n"
+        'target_paths: ["platform_tests/groundtruth_kb/test_auth.py"]\n\n'
+        "## Spec-to-Test Mapping\n\n"
+        "| Spec | Verification |\n"
+        "| --- | --- |\n"
+        "| `SPEC-001` | `platform_tests/groundtruth_kb/test_auth.py` |\n",
+        encoding="utf-8",
+    )
+
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "platform_tests/groundtruth_kb/test_auth.py",
+                "content": "def test_auth(): pass",
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    assert output == {}
+
+
+def test_spec_before_code_platform_tests_unmapped_bridge_evidence_warns(tmp_path):
+    """Unrelated platform_tests path still warns when bridge evidence maps another file."""
+    from groundtruth_kb.db import KnowledgeDB
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    db.insert_spec(
+        id="SPEC-001",
+        title="Platform test coverage",
+        status="specified",
+        changed_by="test",
+        change_reason="test",
+        source_paths=["src/other.py"],
+    )
+    db.close()
+
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "platform-test-coverage-001.md").write_text(
+        "NEW\n\n"
+        'target_paths: ["platform_tests/groundtruth_kb/test_other.py"]\n\n'
+        "## Spec-to-Test Mapping\n\n"
+        "| `SPEC-001` | `platform_tests/groundtruth_kb/test_other.py` |\n",
+        encoding="utf-8",
+    )
+
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "platform_tests/groundtruth_kb/test_auth.py",
+                "content": "def test_auth(): pass",
+            },
+            "session_id": "test",
+            "cwd": str(tmp_path),
+        }
+    )
+    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    assert result.returncode == 0
+    output = json.loads(result.stdout)
+    assert "hookSpecificOutput" in output
+    assert "No specification found covering" in output["hookSpecificOutput"]["additionalContext"]
+
+
 # ---------------------------------------------------------------------------
 # Bridge compliance gate
 # ---------------------------------------------------------------------------
