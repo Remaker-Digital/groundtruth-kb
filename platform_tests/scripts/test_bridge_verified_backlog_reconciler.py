@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from groundtruth_kb.db import KnowledgeDB
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -60,6 +61,12 @@ def _write_work_item_metadata(root: Path, slug: str, item_id: str, *, version: s
     path = root / "bridge" / f"{slug}-{version}.md"
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     path.write_text(f"{existing}\nWork Item: {item_id}\n", encoding="utf-8")
+
+
+def _write_bridge_kind(root: Path, slug: str, bridge_kind: str, *, version: str = "001") -> None:
+    path = root / "bridge" / f"{slug}-{version}.md"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    path.write_text(f"{existing}\nbridge_kind: {bridge_kind}\n", encoding="utf-8")
 
 
 def _db(root: Path) -> KnowledgeDB:
@@ -153,6 +160,106 @@ def test_shared_parent_resolves_when_all_links_are_verified(tmp_path: Path) -> N
         assert row is not None
         assert row["resolution_status"] == "resolved"
         assert summary["resolved_ids"] == ["WI-0003"]
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("status", ["ADVISORY", "WITHDRAWN"])
+def test_non_implementation_terminal_link_does_not_block_verified_implementation(tmp_path: Path, status: str) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"impl-thread": "VERIFIED", "traceability-thread": status})
+    _write_parent_evidence(tmp_path, "impl-thread", "WI-0201")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0201", ["impl-thread", "traceability-thread"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0201")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert summary["resolved_ids"] == ["WI-0201"]
+        candidate = summary["candidates"][0]
+        assert candidate["reason"] == "non_implementation_links_ignored"
+        assert candidate["satisfied_implementation_bridge_threads"] == ["impl-thread"]
+        assert candidate["non_blocking_bridge_threads"] == ["traceability-thread"]
+        assert "traceability-thread" in row["completion_evidence"]
+    finally:
+        db.close()
+
+
+def test_advisory_kind_go_link_does_not_block_verified_implementation(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"impl-thread": "VERIFIED", "advisory-go": "GO"})
+    _write_parent_evidence(tmp_path, "impl-thread", "WI-0202")
+    _write_bridge_kind(tmp_path, "advisory-go", "governance_advisory_revision")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0202", ["impl-thread", "advisory-go"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0202")
+        assert row is not None
+        assert row["resolution_status"] == "resolved"
+        assert summary["resolved_ids"] == ["WI-0202"]
+        candidate = summary["candidates"][0]
+        assert candidate["reason"] == "non_implementation_links_ignored"
+        assert candidate["non_blocking_bridge_threads"] == ["advisory-go"]
+    finally:
+        db.close()
+
+
+def test_advisory_link_alone_does_not_resolve_without_verified_implementation(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"advisory": "ADVISORY"})
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0203", ["advisory"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0203")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "linked_bridge_not_verified"
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("blocking_status", ["NEW", "REVISED", "NO-GO", "DEFERRED"])
+def test_implementation_like_non_verified_links_still_block_resolution(tmp_path: Path, blocking_status: str) -> None:
+    module = _load_module()
+    _write_index(tmp_path, {"impl-thread": "VERIFIED", "blocking-thread": blocking_status})
+    _write_parent_evidence(tmp_path, "impl-thread", "WI-0204")
+    db = _db(tmp_path)
+    try:
+        _insert_work_item(db, "WI-0204", ["impl-thread", "blocking-thread"])
+    finally:
+        db.close()
+
+    summary = module.reconcile(project_root=tmp_path, apply=True)
+
+    db = _db(tmp_path)
+    try:
+        row = db.get_work_item("WI-0204")
+        assert row is not None
+        assert row["resolution_status"] == "open"
+        assert summary["resolved_ids"] == []
+        assert summary["candidates"][0]["reason"] == "linked_bridge_not_verified"
     finally:
         db.close()
 

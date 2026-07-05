@@ -32,6 +32,11 @@ TOKEN_SPLIT_RE = re.compile(r"[,;\r\n]+")
 # WI mention. The captured ID is upper-cased to key the reverse index against the
 # canonical uppercase work_items.id form.
 _WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*(WI-[A-Za-z0-9-]+)\s*$", re.MULTILINE | re.IGNORECASE)
+_BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*([A-Za-z0-9_.-]+)\s*$", re.MULTILINE | re.IGNORECASE)
+_ADVISORY_GO_TEXT_RE = re.compile(
+    r"\b(?:constrained to advisory(?: and planning)?|advisory and planning direction only|planning direction only)\b",
+    re.IGNORECASE,
+)
 
 CHANGED_BY = "bridge-verified-backlog-reconciler"
 CHANGE_REASON = (
@@ -296,6 +301,38 @@ def bridge_thread_declares_work_item(
     return False
 
 
+def bridge_thread_is_advisory_kind(
+    project_root: Path, slug: str, *, file_index: dict[str, list[Path]] | None = None
+) -> bool:
+    """Return True only for threads explicitly marked as advisory/planning work."""
+
+    for path in _bridge_thread_files(project_root, slug, file_index=file_index):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        for match in _BRIDGE_KIND_RE.finditer(text):
+            if "advisory" in match.group(1).lower():
+                return True
+        if _ADVISORY_GO_TEXT_RE.search(text):
+            return True
+    return False
+
+
+def bridge_thread_is_non_implementation_link(
+    project_root: Path,
+    slug: str,
+    status: str,
+    *,
+    file_index: dict[str, list[Path]] | None = None,
+) -> bool:
+    """Return True for terminal/advisory links that should not block closure."""
+
+    if status in {"ADVISORY", "WITHDRAWN"}:
+        return True
+    return status == "GO" and bridge_thread_is_advisory_kind(project_root, slug, file_index=file_index)
+
+
 def umbrella_satisfaction(
     project_root: Path,
     slug: str,
@@ -354,6 +391,17 @@ def _completion_evidence(current: dict[str, Any], row: dict[str, Any]) -> str:
             f"{', '.join(slugs)}. Source: "
             "DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM (WI-4704 parent-evidence relaxation)."
         )
+    elif reason == "non_implementation_links_ignored":
+        implementation = ", ".join(row.get("satisfied_implementation_bridge_threads", []))
+        non_implementation = ", ".join(row.get("non_blocking_bridge_threads", []))
+        evidence = (
+            "Bridge VERIFIED backlog reconciler resolved this work item because at least one "
+            "recognized implementation bridge thread is satisfied by VERIFIED evidence "
+            f"({implementation}) and the remaining linked non-implementation bridge threads "
+            f"are terminal/advisory traceability links that do not block closure ({non_implementation}). "
+            "Source: DELIB-S345-BRIDGE-VERIFICATION-RETIRES-PARENT-BACKLOG-ITEM and WI-4535 "
+            "advisory-link resolution."
+        )
     else:
         evidence = (
             "Bridge VERIFIED backlog reconciler resolved this work item because "
@@ -408,8 +456,19 @@ def classify_work_item(
         if statuses.get(slug) != "VERIFIED"
     }
     umbrella_satisfied_slugs = [slug for slug, ev in umbrella_evidence.items() if ev["satisfied"]]
+    non_blocking_bridge_threads = [
+        slug
+        for slug in recognized
+        if statuses.get(slug) != "VERIFIED"
+        and slug not in umbrella_satisfied_slugs
+        and bridge_thread_is_non_implementation_link(project_root, slug, statuses[slug], file_index=file_index)
+    ]
     unsatisfied_non_verified = [
-        slug for slug in recognized if statuses.get(slug) != "VERIFIED" and slug not in umbrella_satisfied_slugs
+        slug
+        for slug in recognized
+        if statuses.get(slug) != "VERIFIED"
+        and slug not in umbrella_satisfied_slugs
+        and slug not in non_blocking_bridge_threads
     ]
     # Class 2 (WI-4704): canonical parent-evidence relaxation. When all links are
     # otherwise satisfied but some VERIFIED link lacks the broad WI-id evidence,
@@ -422,6 +481,13 @@ def classify_work_item(
         if statuses.get(slug) == "VERIFIED"
         and bridge_thread_declares_work_item(project_root, slug, item["id"], file_index=file_index)
     ]
+    satisfied_verified_threads = [
+        slug
+        for slug in recognized
+        if statuses.get(slug) == "VERIFIED"
+        and (slug not in missing_parent_evidence or slug in canonical_evidence_threads)
+    ]
+    satisfied_implementation_threads = sorted(set(satisfied_verified_threads + umbrella_satisfied_slugs))
 
     if not ignore_terminal and item.get("resolution_status") in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
         action = "skip"
@@ -435,7 +501,7 @@ def classify_work_item(
     elif not recognized:
         action = "skip"
         reason = "unrecognized_only"
-    elif unsatisfied_non_verified:
+    elif unsatisfied_non_verified or non_blocking_bridge_threads and not satisfied_implementation_threads:
         action = "skip"
         reason = "linked_bridge_not_verified"
     elif missing_parent_evidence and not canonical_evidence_threads:
@@ -443,7 +509,9 @@ def classify_work_item(
         reason = "missing_parent_evidence"
     else:
         action = "resolve"
-        if umbrella_satisfied_slugs:
+        if non_blocking_bridge_threads:
+            reason = "non_implementation_links_ignored"
+        elif umbrella_satisfied_slugs:
             reason = "umbrella_children_all_verified"
         elif missing_parent_evidence:
             reason = "parent_evidence_canonical_relaxed"
@@ -463,7 +531,9 @@ def classify_work_item(
         "missing_parent_evidence": missing_parent_evidence,
         "umbrella_evidence": umbrella_evidence,
         "umbrella_satisfied": umbrella_satisfied_slugs,
+        "non_blocking_bridge_threads": non_blocking_bridge_threads,
         "canonical_evidence_threads": canonical_evidence_threads,
+        "satisfied_implementation_bridge_threads": satisfied_implementation_threads,
         "action": action,
         "reason": reason,
     }
