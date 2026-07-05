@@ -194,6 +194,44 @@ def test_bridge_dispatch_report_human_output_is_compact(tmp_path: Path) -> None:
     assert "Recent runs:" in result.output
 
 
+def test_dispatch_health_status_and_report_json_expose_dimension_rollup(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root, config = _project(tmp_path)
+    (root / "scripts").mkdir()
+    (root / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# test marker\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.collect_complex_health",
+        lambda project_root: {
+            "health_status": "WARN",
+            "aggregate_status": "degraded",
+            "healthy": False,
+            "components": {"daemon": {"severity": "WARN"}},
+            "findings": ["WARN daemon: dispatcher daemon is not running"],
+        },
+    )
+
+    health = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "health", "--json"])
+    assert health.exit_code == 0, health.output
+    health_payload = json.loads(health.output)
+    assert health_payload["health_status"] == "WARN"
+    assert set(health_payload["dimensions"]) == {"complex_lifecycle", "routing_config"}
+    assert health_payload["complex_lifecycle"]["health_status"] == "WARN"
+    assert health_payload["routing_config"]["health_status"] == "PASS"
+
+    status = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "status", "--json"])
+    assert status.exit_code == 0, status.output
+    status_payload = json.loads(status.output)
+    assert status_payload["health_rollup"]["dimensions"]["complex_lifecycle"]["health_status"] == "WARN"
+
+    report = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--json"])
+    assert report.exit_code == 0, report.output
+    report_payload = json.loads(report.output)
+    assert report_payload["summary"]["health_status"] == "WARN"
+    assert report_payload["reliability"]["health_rollup"]["dimensions"]["routing_config"]["health_status"] == "PASS"
+
+
 def test_dispatch_status_health_and_report_surface_operator_quiesce(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
     set_operator_quiesce(

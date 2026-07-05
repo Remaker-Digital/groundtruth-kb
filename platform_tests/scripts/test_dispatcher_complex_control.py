@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import sys
 import types
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,12 +21,17 @@ from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError  # noqa: 
 def _daemon_module(tmp_path: Path, *, running: bool = True) -> types.SimpleNamespace:
     state_dir = tmp_path / ".gtkb-state" / "dispatcher-daemon"
     state_dir.mkdir(parents=True, exist_ok=True)
+    status = {"running": running, "mode": "live"}
+    if running:
+        status["heartbeat_at"] = datetime.now(UTC).isoformat()
+        status["heartbeat_age_seconds"] = 0.0
     return types.SimpleNamespace(
         PID_FILENAME="daemon.pid",
         daemon_state_dir=lambda project_root: state_dir,
-        collect_daemon_status=lambda project_root: {"running": running, "mode": "live"},
+        collect_daemon_status=lambda project_root: dict(status),
         read_daemon_status=lambda project_root: {"running": running},
         daemon_process_alive=lambda _state_dir: running,
+        _heartbeat_stale_seconds=lambda: 180.0,
     )
 
 
@@ -71,7 +77,60 @@ def test_collect_complex_health_reports_lifecycle_findings(tmp_path, monkeypatch
 
     assert health["health_status"] == "WARN"
     assert health["aggregate_status"] == "degraded"
-    assert "daemon: dispatcher daemon is not running" in health["findings"]
+    assert "WARN daemon: dispatcher daemon is not running" in health["findings"]
+
+
+def test_collect_complex_health_escalates_failed_task_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        complex_mod,
+        "collect_supervisor_status",
+        lambda project_root, *, task_name: {
+            "healthy": False,
+            "registered": False,
+            "findings": ["scheduled task 'GTKB-Supervisor-Test' is not registered"],
+        },
+    )
+    monkeypatch.setattr(
+        complex_mod,
+        "collect_watchdog_status",
+        lambda project_root, *, task_name: {"healthy": True, "state": "Ready", "findings": []},
+    )
+
+    health = complex_mod.collect_complex_health(
+        tmp_path,
+        supervisor_task_name="GTKB-Supervisor-Test",
+        daemon_module=_daemon_module(tmp_path, running=True),
+    )
+
+    assert health["health_status"] == "FAIL"
+    assert health["components"]["supervisor"]["severity"] == "FAIL"
+    assert any("FAIL supervisor: scheduled task" in finding for finding in health["findings"])
+
+
+def test_collect_complex_health_warns_on_stale_watchdog_heartbeat(tmp_path, monkeypatch):
+    heartbeat_dir = tmp_path / ".gtkb-state" / "ops"
+    heartbeat_dir.mkdir(parents=True)
+    (heartbeat_dir / "storm-watchdog-heartbeat.txt").write_text(
+        "2000-01-01T00:00:00+00:00 codex=0 family=0 threshold=15\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        complex_mod,
+        "collect_supervisor_status",
+        lambda project_root, *, task_name: {"healthy": True, "state": "Ready", "findings": []},
+    )
+    monkeypatch.setattr(
+        complex_mod,
+        "collect_watchdog_status",
+        lambda project_root, *, task_name: {"healthy": True, "state": "Ready", "findings": []},
+    )
+
+    health = complex_mod.collect_complex_health(tmp_path, daemon_module=_daemon_module(tmp_path, running=True))
+
+    assert health["health_status"] == "WARN"
+    assert health["components"]["watchdog"]["severity"] == "WARN"
+    assert health["components"]["watchdog"]["heartbeat"]["fresh"] is False
+    assert any("WARN watchdog: watchdog heartbeat is stale" in finding for finding in health["findings"])
 
 
 def test_enable_complex_fans_out_in_order_and_keeps_error_payload(monkeypatch):

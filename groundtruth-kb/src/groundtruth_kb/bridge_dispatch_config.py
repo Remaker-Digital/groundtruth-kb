@@ -98,6 +98,7 @@ DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS = frozenset(
 BENIGN_NONLAUNCH_LAUNCH_REASONS = BENIGN_NONLAUNCH_LAUNCH_REASONS | DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS
 DOCUMENT_LEASE_HELD_NONLAUNCH_REASON = "document_lease_held"
 IMPL_AUTH_QUARANTINED_NONLAUNCH_REASON = "all_impl_auth_quarantined"
+HEALTH_STATUS_RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
 RECENT_RUN_FAILURE_MARKERS = (
     ("provider_rate_limited", "provider_rate_limited"),
     ("HTTP 429", "provider_rate_limited"),
@@ -710,6 +711,96 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         runtime_classifications=tuple(runtime_classifications),
         operator_quiesce=quiesce,
     )
+
+
+def collect_bridge_dispatch_health(
+    project_root: Path,
+    *,
+    routing_status: BridgeDispatchStatus | None = None,
+) -> dict[str, Any]:
+    """Return the owner-facing two-dimension dispatch health rollup."""
+    root = project_root.resolve()
+    status = routing_status or collect_bridge_dispatch_status(root)
+    routing_dimension = _routing_config_health_dimension(status)
+    complex_dimension = _complex_lifecycle_health_dimension(root)
+    aggregate = _max_health_status(
+        str(routing_dimension["health_status"]),
+        str(complex_dimension["health_status"]),
+    )
+    dimensions = {
+        "complex_lifecycle": complex_dimension,
+        "routing_config": routing_dimension,
+    }
+    findings: list[str] = []
+    for dimension_name, dimension in dimensions.items():
+        for finding in dimension.get("findings", []):
+            findings.append(f"{dimension_name}: {finding}")
+    return {
+        "schema_version": 1,
+        "health_status": aggregate,
+        "dimensions": dimensions,
+        "complex_lifecycle": complex_dimension,
+        "routing_config": routing_dimension,
+        "findings": findings,
+        "selected_by_role": status.selected_by_role,
+        "config_path": str(status.config.path),
+    }
+
+
+def _routing_config_health_dimension(status: BridgeDispatchStatus) -> dict[str, Any]:
+    return {
+        "name": "routing_config",
+        "health_status": status.health_status,
+        "findings": list(status.health_findings),
+        "selected_by_role": status.selected_by_role,
+        "config_path": str(status.config.path),
+        "consistency_findings": list(status.consistency_findings),
+        "runtime_classifications": list(status.runtime_classifications),
+        "operator_quiesce": dict(status.operator_quiesce),
+    }
+
+
+def _complex_lifecycle_health_dimension(project_root: Path) -> dict[str, Any]:
+    root = project_root.resolve()
+    daemon_script = root / "scripts" / "gtkb_dispatcher_daemon.py"
+    if not daemon_script.is_file():
+        return {
+            "name": "complex_lifecycle",
+            "enabled": False,
+            "health_status": "PASS",
+            "findings": [],
+            "reason": "dispatcher complex daemon script is not present under this project root",
+        }
+    try:
+        from groundtruth_kb.dispatcher_complex import collect_complex_health
+
+        payload = collect_complex_health(root)
+    except Exception as exc:  # noqa: BLE001 - health command must isolate lifecycle probe failures
+        return {
+            "name": "complex_lifecycle",
+            "enabled": True,
+            "health_status": "FAIL",
+            "findings": [f"complex lifecycle probe failed: {exc}"],
+            "error": str(exc),
+        }
+    return {
+        "name": "complex_lifecycle",
+        "enabled": True,
+        "health_status": str(payload.get("health_status") or "FAIL"),
+        "aggregate_status": payload.get("aggregate_status"),
+        "healthy": payload.get("healthy"),
+        "components": payload.get("components", {}),
+        "findings": list(payload.get("findings") or []),
+    }
+
+
+def _max_health_status(*statuses: str) -> str:
+    result = "PASS"
+    for status in statuses:
+        normalized = status.upper()
+        if HEALTH_STATUS_RANK.get(normalized, 0) > HEALTH_STATUS_RANK[result]:
+            result = normalized
+    return result
 
 
 def _read_windows_persistent_env_var(name: str, scope: str) -> str | None:

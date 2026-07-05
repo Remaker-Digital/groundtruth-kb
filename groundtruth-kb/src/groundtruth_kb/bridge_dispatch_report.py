@@ -11,7 +11,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from groundtruth_kb.bridge_dispatch_config import DISPATCH_ROLES, collect_bridge_dispatch_status
+from groundtruth_kb.bridge_dispatch_config import (
+    DISPATCH_ROLES,
+    collect_bridge_dispatch_health,
+    collect_bridge_dispatch_status,
+)
 
 STATE_DIR_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller"
 RUNS_RELATIVE_PATH = STATE_DIR_RELATIVE_PATH / "dispatch-runs"
@@ -30,6 +34,7 @@ def build_bridge_dispatch_report(
     root = project_root.resolve()
     status = collect_bridge_dispatch_status(root)
     status_payload = status.to_json_dict()
+    health_rollup = collect_bridge_dispatch_health(root, routing_status=status)
     now_utc = now or datetime.now(UTC)
 
     state, state_warnings = _read_json(root / STATE_DIR_RELATIVE_PATH / "dispatch-state.json")
@@ -69,7 +74,7 @@ def build_bridge_dispatch_report(
 
     return {
         "summary": {
-            "health_status": status.health_status,
+            "health_status": health_rollup["health_status"],
             "health_finding_count": len(status.health_findings),
             "runtime_failure_count": runtime_failure_count,
             "runtime_warning_count": runtime_warning_count,
@@ -92,6 +97,7 @@ def build_bridge_dispatch_report(
         },
         "reliability": {
             "health_status": status.health_status,
+            "health_rollup": health_rollup,
             "findings": list(status.health_findings),
             "consistency_findings": list(status.consistency_findings),
             "runtime_classifications": list(status.runtime_classifications),

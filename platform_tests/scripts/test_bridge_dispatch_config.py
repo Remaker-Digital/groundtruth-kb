@@ -18,6 +18,7 @@ import groundtruth_kb.bridge_dispatch_reset as bridge_dispatch_reset  # noqa: E4
 from groundtruth_kb.bridge_dispatch_config import (  # noqa: E402
     BENIGN_NONLAUNCH_LAUNCH_REASONS,
     _runtime_findings_for_recipient,
+    collect_bridge_dispatch_health,
     collect_bridge_dispatch_status,
     load_bridge_dispatch_config,
     select_dispatch_candidates,
@@ -134,6 +135,34 @@ def test_collect_status_keeps_role_and_dispatchability_orthogonal(tmp_path: Path
     assert claude["role"] == ["prime-builder"]
     assert claude["can_receive_dispatch"] is False
     assert claude["can_fire_events"] is True
+
+
+def test_collect_bridge_dispatch_health_reports_complex_and_routing_dimensions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_project(tmp_path)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# test marker\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.collect_complex_health",
+        lambda project_root: {
+            "health_status": "WARN",
+            "aggregate_status": "degraded",
+            "healthy": False,
+            "components": {"daemon": {"severity": "WARN"}},
+            "findings": ["WARN daemon: dispatcher daemon is not running"],
+        },
+    )
+
+    payload = collect_bridge_dispatch_health(tmp_path)
+
+    assert payload["health_status"] == "WARN"
+    assert set(payload["dimensions"]) == {"complex_lifecycle", "routing_config"}
+    assert payload["complex_lifecycle"]["health_status"] == "WARN"
+    assert payload["routing_config"]["health_status"] == "PASS"
+    assert payload["selected_by_role"]["prime-builder"][0]["id"] == "A"
+    assert "complex_lifecycle: WARN daemon: dispatcher daemon is not running" in payload["findings"]
 
 
 def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Path) -> None:
