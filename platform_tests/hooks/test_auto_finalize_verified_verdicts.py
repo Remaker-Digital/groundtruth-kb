@@ -146,6 +146,48 @@ def test_sweep_noops_when_no_untracked_verdicts(repo):
     assert result == {"finalized": [], "skipped": [], "errors": []}
 
 
+def test_sweep_does_not_call_planner_before_cheap_gate(repo, monkeypatch):
+    monkeypatch.setattr(
+        sweep_mod,
+        "_planner_report_only",
+        lambda: pytest.fail("planner should not run when cheap gate finds no VERIFIED verdicts"),
+    )
+
+    result = sweep_mod.sweep()
+
+    assert result == {"finalized": [], "skipped": [], "errors": []}
+
+
+def test_sweep_consults_planner_after_cheap_gate(repo, monkeypatch):
+    _write_thread(repo, "thread-planner")
+    monkeypatch.setattr(
+        sweep_mod,
+        "_planner_report_only",
+        lambda: {"status": "ok", "summary": {"dirty_paths": 2, "actuator_actions": {"safe_commit": 1}}},
+    )
+
+    result = sweep_mod.sweep(dry_run=True)
+
+    assert result["planner"]["status"] == "ok"
+    assert result["planner"]["summary"]["actuator_actions"]["safe_commit"] == 1
+    assert len(result["finalized"]) == 1
+
+
+def test_sweep_planner_error_is_fail_soft(repo, monkeypatch):
+    _write_thread(repo, "thread-planner-error")
+
+    def fail_planner() -> dict:
+        raise RuntimeError("planner unavailable")
+
+    monkeypatch.setattr(sweep_mod, "_planner_report_only", fail_planner)
+
+    result = sweep_mod.sweep(dry_run=True)
+
+    assert result["planner"]["status"] == "error"
+    assert "planner unavailable" in result["planner"]["reason"]
+    assert len(result["finalized"]) == 1
+
+
 def test_sweep_idempotent(repo):
     _write_thread(repo, "thread-d")
     first = sweep_mod.sweep()
@@ -167,5 +209,7 @@ def test_sweep_registered_in_both_harness_surfaces():
     """Cross-harness parity: the shared script is a Stop hook in both surfaces."""
     claude = (_REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8")
     codex = (_REPO_ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8")
+    codex_batch = (_REPO_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py").read_text(encoding="utf-8")
     assert "auto_finalize_sweep.py" in claude, "missing Claude .claude/settings.json registration"
-    assert "auto_finalize_sweep.py" in codex, "missing Codex .codex/hooks.json registration"
+    assert "--batch stop" in codex, "missing Codex Stop batch registration"
+    assert "scripts/auto_finalize_sweep.py" in codex_batch, "missing Codex Stop batch auto-finalizer"

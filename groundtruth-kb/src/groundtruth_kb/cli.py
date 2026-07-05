@@ -2849,6 +2849,62 @@ def hygiene_strays(
         raise SystemExit(2)
 
 
+@hygiene_group.command("auto-resolve")
+@click.option(
+    "--root",
+    type=click.Path(file_okay=False),
+    default=".",
+    show_default=True,
+    help="Repository root to inspect.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "markdown"]),
+    default="json",
+    show_default=True,
+    help="Output format.",
+)
+@click.option(
+    "--apply",
+    "apply_changes",
+    is_flag=True,
+    default=False,
+    help="Refuse live apply and emit the missing evidence packet.",
+)
+@click.option(
+    "--evidence",
+    "evidence_refs",
+    multiple=True,
+    help="Item-specific apply evidence reference; repeatable.",
+)
+def hygiene_auto_resolve(root: str, fmt: str, apply_changes: bool, evidence_refs: tuple[str, ...]) -> None:
+    """Build the read-only WI-4979 work-tree auto-resolve action plan."""
+    from groundtruth_kb.hygiene.auto_resolve import (  # noqa: PLC0415
+        AutoResolveError,
+        build_plan,
+        format_markdown,
+        refuse_apply,
+    )
+
+    root_path = Path(root).resolve()
+    try:
+        plan = build_plan(root_path)
+    except AutoResolveError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+
+    if apply_changes:
+        refusal = refuse_apply(plan, evidence_refs=evidence_refs)
+        click.echo(json.dumps(refusal, indent=2, sort_keys=True))
+        raise SystemExit(2)
+
+    if fmt == "markdown":
+        click.echo(format_markdown(plan), nl=False)
+    else:
+        click.echo(json.dumps(plan, indent=2, sort_keys=True))
+
+
 # ---------------------------------------------------------------------------
 # gt validate - deterministic validation services
 # ---------------------------------------------------------------------------

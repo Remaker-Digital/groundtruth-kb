@@ -6106,6 +6106,26 @@ def _format_work_tree_stray_ages(ages: list[float]) -> str:
     return f"age_hours=min={min(ages):.1f} avg={average:.1f} max={max(ages):.1f}"
 
 
+def _format_auto_resolve_summary(report: dict[str, Any]) -> str:
+    summary = report.get("auto_resolve_summary")
+    if not isinstance(summary, dict):
+        plan = report.get("auto_resolve_plan")
+        if not isinstance(plan, dict):
+            return ""
+        counts = plan.get("counts", {})
+        if not isinstance(counts, dict):
+            return ""
+        summary = {
+            "dirty_paths": counts.get("dirty_paths", 0),
+            "actuator_actions": counts.get("actuator_actions", {}),
+        }
+    actions = summary.get("actuator_actions", {})
+    action_text = "none"
+    if isinstance(actions, dict) and actions:
+        action_text = ",".join(f"{key}={value}" for key, value in sorted(actions.items()) if value)
+    return f"; auto_resolve=dirty_paths={summary.get('dirty_paths', 0)} actions={action_text}"
+
+
 def _check_work_tree_strays(target: Path) -> ToolCheck:
     """Read-only WI-4356 doctor visibility for stale work-tree strays."""
     check_name = "work-tree strays"
@@ -6146,6 +6166,7 @@ def _check_work_tree_strays(target: Path) -> ToolCheck:
         )
 
     ages = _format_work_tree_stray_ages(_work_tree_stray_age_hours(report))
+    auto_resolve = _format_auto_resolve_summary(report)
     return ToolCheck(
         name=check_name,
         required=False,
@@ -6153,7 +6174,7 @@ def _check_work_tree_strays(target: Path) -> ToolCheck:
         status="warning",
         message=(
             f"Work-tree strays: {stale} stale "
-            f"(workspace={workspace}, stash={stash}, worktree={worktree}; {ages}); "
+            f"(workspace={workspace}, stash={stash}, worktree={worktree}; {ages}{auto_resolve}); "
             "run `gt hygiene strays` for read-only details"
         ),
     )

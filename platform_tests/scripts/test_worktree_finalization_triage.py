@@ -8,9 +8,11 @@ import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(_REPO_ROOT / "groundtruth-kb" / "src"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 import worktree_finalization_triage as triage  # noqa: E402
+from groundtruth_kb.hygiene import auto_resolve  # noqa: E402
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
@@ -75,15 +77,22 @@ def test_plan_groups_dirty_paths_and_blocks_forbidden_actions(tmp_path: Path) ->
     assert by_path["bridge/thread-a-002.md"]["bucket"] == "bridge_thread_chain"
     assert by_path["bridge/thread-a-002.md"]["bridge_status"] == "VERIFIED"
     assert by_path["bridge/thread-a-002.md"]["candidate_action"] == "blocked_commit_requires_specific_apply_evidence"
+    assert by_path["bridge/thread-a-002.md"]["actuator_action"] == "safe_commit"
+    assert by_path["bridge/thread-a-002.md"]["apply_status"] == "blocked_missing_specific_apply_evidence"
     assert by_path["scripts/existing_tool.py"]["bucket"] == "protected_source_test_config"
+    assert by_path["scripts/existing_tool.py"]["actuator_action"] == "manual_owner_review"
     assert by_path[".cursor/gtkb-hooks/last-session-start.json"]["bucket"] == "harness_runtime_projection"
+    assert by_path[".cursor/gtkb-hooks/last-session-start.json"]["actuator_action"] == "auto_ignore"
     assert by_path[".temp_verdict_body"]["bucket"] == "scratch_junk"
     assert (
         by_path[".temp_verdict_body"]["candidate_action"] == "blocked_untracked_file_deletion_requires_apply_evidence"
     )
+    assert by_path[".temp_verdict_body"]["actuator_action"] == "auto_drop_byte_identical"
     assert by_path["notes.txt"]["bucket"] == "manual_owner_review"
     assert "destructive_bulk_cleanup" in plan["forbidden_operations"]
     assert "committing_another_session_stale_work_without_specific_apply_evidence" in plan["forbidden_operations"]
+    assert plan["action_taxonomy"] == list(auto_resolve.ACTUATOR_ACTIONS)
+    assert plan["counts"]["actuator_actions"]["safe_commit"] == 1
 
 
 def test_plan_is_json_serializable_and_stably_sorted(tmp_path: Path) -> None:
@@ -129,3 +138,10 @@ def test_cli_emits_json_and_markdown_without_mutation(tmp_path: Path, capsys) ->
     assert "# Worktree Finalization Triage" in markdown_output
     assert "blocked_commit_requires_specific_apply_evidence" in markdown_output
     assert _status(repo) == before
+
+
+def test_script_exports_canonical_auto_resolve_engine() -> None:
+    assert triage.build_plan is auto_resolve.build_plan
+    assert triage.classify_entry is auto_resolve.classify_entry
+    assert triage.FORBIDDEN_OPERATIONS is auto_resolve.FORBIDDEN_OPERATIONS
+    assert triage.ACTUATOR_ACTIONS is auto_resolve.ACTUATOR_ACTIONS

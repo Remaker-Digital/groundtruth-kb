@@ -25,6 +25,17 @@ def _git(repo: Path, *args: str) -> None:
     )
 
 
+def _status(repo: Path) -> str:
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
+
+
 def _init_repo(repo: Path) -> Path:
     _git(repo, "init")
     _git(repo, "config", "user.email", "gtkb-tests@example.invalid")
@@ -110,6 +121,8 @@ def test_hygiene_strays_reports_stale_tracked_and_untracked_paths(tmp_path: Path
     assert by_path["tracked.txt"]["tracked"] is True
     assert by_path["stray.txt"]["classification"] == "stale"
     assert by_path["stray.txt"]["tracked"] is False
+    assert report["auto_resolve_plan"]["counts"]["dirty_paths"] == 2
+    assert report["auto_resolve_summary"]["actuator_actions"]["manual_owner_review"] == 2
 
 
 def test_hygiene_strays_active_workspace_path_is_not_stale(tmp_path: Path) -> None:
@@ -170,3 +183,34 @@ def test_parse_stash_entries_uses_epoch_timestamp() -> None:
     assert report[0].stash_ref == "stash@{0}"
     assert report[0].created_at == datetime.fromtimestamp(1782684000, UTC)
     assert report[0].subject == "WIP on branch"
+
+
+def test_hygiene_auto_resolve_cli_reports_plan_and_refuses_apply_without_mutation(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    (repo / ".cursor" / "gtkb-hooks").mkdir(parents=True)
+    (repo / ".cursor" / "gtkb-hooks" / "last-session-start.json").write_text("{}\n", encoding="utf-8")
+    before = _status(repo)
+
+    result = CliRunner().invoke(
+        main,
+        ["hygiene", "auto-resolve", "--root", str(repo), "--format", "json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["read_only"] is True
+    assert payload["candidate_actions_only"] is True
+    assert payload["counts"]["actuator_actions"]["auto_ignore"] == 1
+    assert payload["items"][0]["actuator_action"] == "auto_ignore"
+
+    refused = CliRunner().invoke(
+        main,
+        ["hygiene", "auto-resolve", "--root", str(repo), "--apply", "--evidence", "packet-1"],
+    )
+
+    assert refused.exit_code == 2
+    refusal = json.loads(refused.output)
+    assert refusal["status"] == "refused"
+    assert refusal["applied"] is False
+    assert "untracked_file_deletion" in refusal["forbidden_operations"]
+    assert _status(repo) == before

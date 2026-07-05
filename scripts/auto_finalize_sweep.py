@@ -111,6 +111,17 @@ def _all_untracked_bridge_md() -> list[str]:
     )
 
 
+def _planner_report_only() -> dict:
+    """Consult the shared WI-4979 planner in report-only mode, fail-soft."""
+    try:
+        import worktree_finalization_triage as triage  # type: ignore[import-not-found]
+
+        plan = triage.build_plan(PROJECT_ROOT)
+        return {"status": "ok", "summary": triage.summarize_plan(plan)}
+    except Exception as exc:  # noqa: BLE001 - Stop-hook advisory must fail soft
+        return {"status": "error", "reason": repr(exc)}
+
+
 def _slug_of(rel: str) -> str | None:
     name = Path(rel).name
     m = _VERSION_RE.search(name)
@@ -209,6 +220,12 @@ def sweep(*, dry_run: bool = False) -> dict:
     untracked = _enumerate_untracked_verified()
     if not untracked:
         return summary
+    try:
+        summary["planner"] = _planner_report_only()
+    except Exception as exc:  # noqa: BLE001 - Stop-hook advisory must fail soft
+        summary["planner"] = {"status": "error", "reason": repr(exc)}
+    if summary["planner"].get("status") == "error":
+        _audit({"action": "planner_error", "reason": summary["planner"].get("reason")})
 
     all_untracked = _all_untracked_bridge_md()
     handled_slugs: set[str] = set()

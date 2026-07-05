@@ -27,6 +27,7 @@ from scripts.hygiene.stray_detector import (
     detect_strays,
 )
 
+from groundtruth_kb.hygiene.auto_resolve import AutoResolveError, build_plan, summarize_plan
 from groundtruth_kb.project.sot_registry import InvalidSoTRecord, UnknownDomain, default_registry_path, load_toml
 
 
@@ -328,6 +329,10 @@ def run_strays(
         active_session=active_session,
         threshold_hours=threshold_hours,
     )
+    try:
+        auto_resolve_plan = build_plan(root)
+    except AutoResolveError as exc:
+        raise StraysError(f"auto-resolve plan could not be built: {exc}") from exc
     report["source"] = {
         "root": str(root),
         "workspace_command": "git status --porcelain=v1 -z --untracked-files=all",
@@ -338,6 +343,8 @@ def run_strays(
         "active_stash_refs": list(active_stash_refs),
     }
     report["candidate_actions_only"] = True
+    report["auto_resolve_plan"] = auto_resolve_plan
+    report["auto_resolve_summary"] = summarize_plan(auto_resolve_plan)
     return report
 
 
@@ -372,6 +379,13 @@ def format_human(report: dict[str, Any]) -> str:
         ),
         "candidate_actions_only: true",
     ]
+    auto_summary = report.get("auto_resolve_summary")
+    if isinstance(auto_summary, dict):
+        action_counts = auto_summary.get("actuator_actions", {})
+        actions = "none"
+        if isinstance(action_counts, dict) and action_counts:
+            actions = ", ".join(f"{key}={value}" for key, value in sorted(action_counts.items()))
+        lines.append(f"auto_resolve: dirty_paths={auto_summary.get('dirty_paths', 0)} actions={actions}")
     for key, label, identity in (
         ("workspace_findings", "workspace", "path"),
         ("stash_findings", "stash", "stash_ref"),

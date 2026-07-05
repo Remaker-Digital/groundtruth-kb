@@ -16,6 +16,7 @@ def _report(
     stash_stale: int = 0,
     worktree_stale: int = 0,
     findings: dict[str, list[dict[str, Any]]] | None = None,
+    auto_resolve_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload = {
         "counts": {
@@ -29,6 +30,8 @@ def _report(
     }
     if findings:
         payload.update(findings)
+    if auto_resolve_summary:
+        payload["auto_resolve_summary"] = auto_resolve_summary
     return payload
 
 
@@ -59,6 +62,10 @@ def test_work_tree_strays_warning_reports_counts_and_age_distribution(monkeypatc
                 "stash_findings": [{"classification": "stale", "age_hours": 25}],
                 "worktree_findings": [{"classification": "stale", "age_hours": 48}],
             },
+            auto_resolve_summary={
+                "dirty_paths": 4,
+                "actuator_actions": {"manual_owner_review": 3, "safe_commit": 1},
+            },
         ),
     )
 
@@ -70,6 +77,7 @@ def test_work_tree_strays_warning_reports_counts_and_age_distribution(monkeypatc
     assert "stash=1" in check.message
     assert "worktree=1" in check.message
     assert "age_hours=min=13.0 avg=28.7 max=48.0" in check.message
+    assert "auto_resolve=dirty_paths=4 actions=manual_owner_review=3,safe_commit=1" in check.message
     assert "read-only details" in check.message
 
 
