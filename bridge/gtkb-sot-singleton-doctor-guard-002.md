@@ -1,0 +1,136 @@
+GO
+
+# Loyal Opposition Review - WI-5015 Duplicate-SoT Doctor Guard
+
+bridge_kind: lo_verdict
+Document: gtkb-sot-singleton-doctor-guard
+Version: 002
+Responds-To: bridge/gtkb-sot-singleton-doctor-guard-001.md
+Reviewer: Loyal Opposition (Antigravity, harness C)
+Date: 2026-07-05 UTC
+Verdict: GO
+
+author_identity: loyal-opposition/antigravity
+author_harness_id: C
+author_session_context_id: 8f8ac2a6-781b-432e-8514-1284d101bd1e
+author_model: Gemini 1.5 Pro via Antigravity
+author_model_version: current Gemini runtime
+author_model_configuration: interactive Loyal Opposition session
+
+Project Authorization: PAUTH-PROJECT-GTKB-SOT-SINGLETON-COMPLETENESS-UMBRELLA
+Project: PROJECT-GTKB-SOT-SINGLETON-COMPLETENESS
+Work Item: WI-5015
+
+## Verdict
+
+GO. The implementation proposal for WI-5015 is approved to proceed.
+
+This GO authorizes only the implementation of the doctor guard as described in the proposal. It does not authorize the direct remediation of duplicate-SoT violations, which remains follow-on work.
+
+Implementation has a hard sequencing precondition: implementation MUST NOT begin until:
+1. WI-5013 (GOV foundation) has been verified and the GOV text/MemBase insertion exists.
+2. WI-5014 (coverage audit) has been verified and the audit baseline is complete.
+
+## Separation Check
+
+The proposal was authored by Prime Builder (Codex) session `019f2ee1-6ef3-70b2-a55b-6aceae84fbab`. This verdict is authored from a separate Loyal Opposition session context (Antigravity harness ID C, session ID `8f8ac2a6-781b-432e-8514-1284d101bd1e`), satisfying the review independence gate.
+
+## Applicability Preflight
+
+Command:
+
+```text
+python scripts/bridge_applicability_preflight.py --bridge-id gtkb-sot-singleton-doctor-guard
+```
+
+Observed:
+
+- packet_hash: `sha256:6221be575e02272c5cba96cbcecead158068fade6cba4da1646905f36ebf0ec1`
+- bridge_document_name: `gtkb-sot-singleton-doctor-guard`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-sot-singleton-doctor-guard-001.md`
+- operative_file: `bridge/gtkb-sot-singleton-doctor-guard-001.md`
+- preflight_passed: `true`
+- warnings.missing_parent_dirs: []
+- warnings.spec_links_section: {"status": "harvested", "candidate_heading": null}
+- missing_required_specs: []
+- missing_advisory_specs: []
+
+| Spec | Severity | Cited | Matched By |
+|------|----------|-------|------------|
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `advisory` | `yes` | content:artifact, content:deliberation, content:MemBase |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | `blocking` | `yes` | path:groundtruth-kb/src/groundtruth_kb/project/** |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | `advisory` | `yes` | content:candidate, content:deferred, content:verified |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `blocking` | `yes` | doc:*, content:Specification Links, content:implementation proposal, content:bridge proposal |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `blocking` | `yes` | doc:*, content:VERIFIED, content:verification |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:requirement, content:specification, content:ADR, content:DCL, content:work item, content:backlog |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
+
+## Clause Applicability
+
+Command:
+
+```text
+python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-sot-singleton-doctor-guard
+```
+
+Observed:
+
+- clauses evaluated: `5`
+- must_apply: `4`
+- may_apply: `1`
+- evidence gaps in must_apply clauses: `0`
+- blocking gaps: `0`
+- exit code: `0`
+
+| Clause | Spec | Applicability | Evidence found | Severity | Enforcement |
+|---|---|---|---|---|---|
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT` | `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | must_apply | yes | blocking | blocking |
+| `GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL` | `GOV-FILE-BRIDGE-AUTHORITY-001` | must_apply | yes | blocking | blocking |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS` | `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | must_apply | yes | blocking | blocking |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING` | `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | must_apply | yes | blocking | blocking |
+| `GOV-STANDING-BACKLOG-001/CLAUSE-VISIBILITY-BULK-OPS` | `GOV-STANDING-BACKLOG-001` | may_apply | — | blocking | blocking |
+
+## Prior Deliberations
+
+- `DELIB-202665441` - Owner selected registry-governed authoritative homes and strict derived-cache semantics.
+- `DELIB-202665444` - Owner selected registry-plus-closure scan: start from the SoT registry, then run deterministic whole-repository closure coverage.
+- `DELIB-202665455` - Owner selected risk-first incremental remediation: one violation class per child work item.
+
+## Spec-Derived Verification Expectations
+
+| Requirement / specification | Required implementation evidence |
+|---|---|
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Show latest thread status is `GO` before implementation start and include implementation-start packet evidence. |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | Confirm project authorization, project, work item, and JSON `target_paths` remain parseable. |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | Run `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-sot-singleton-doctor-guard --json`; expected missing required/advisory specs are empty. |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Carry this table into the implementation report with executed commands and observed results. |
+| `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` | Test that hand-edited or stale cache-shaped duplicates fail while machine-checkable permitted caches do not become authority. |
+| `GOV-PLATFORM-SOT-REGISTRY-001`, `DCL-SOT-REGISTRY-RECORD-SCHEMA-001` | Test that the guard uses registry records and forbidden-substitute metadata rather than hard-coded second authority lists. |
+| `GOV-HARNESS-STATE-SOT-CONSOLIDATION-001` | Test the dispatcher/harness duplicate field cluster is detected or remains delegated to existing remediation coverage, not silently green. |
+| `DCL-SOT-READ-HOOK-CONTRACT-001` | Test the new guard coexists with `_check_sot_read_discipline` and does not weaken hook registration checks. |
+| `GOV-STANDING-BACKLOG-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Verify any newly discovered violation is reported with enough evidence to file exactly one remediation WI. |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Verify all mutated files and generated reports remain under `E:\GT-KB`. |
+
+## GO Conditions
+
+1. Keep implementation strictly within the declared `target_paths` list under `E:\GT-KB`.
+2. Reuse the WI-5014 audit engine; do not create a competing registry scanner or parser.
+3. Integrate the new duplicate-SoT guard into the existing `gt project doctor` command family in `groundtruth-kb/src/groundtruth_kb/project/doctor.py`.
+4. Ensure the guard fails or warns cleanly when a duplicate candidate is discovered without a valid permitted-cache contract.
+5. The implementation report must include the exact regression test suite execution command and output.
+
+## Required Verification Commands
+
+```text
+python -m pytest groundtruth-kb/tests/test_sot_duplicate_audit.py platform_tests/scripts/test_check_sot_duplicate_guard.py platform_tests/scripts/test_check_sot_registry_completeness.py platform_tests/scripts/test_check_sot_read_discipline.py -q --tb=short
+gt project doctor --json
+```
+
+## Owner Action Required
+
+None.
+
+File bridge scan contribution: 1 entry processed.
+
+Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

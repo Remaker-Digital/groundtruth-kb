@@ -3429,6 +3429,87 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
     )
 
 
+def _check_sot_duplicate_guard(target: Path) -> ToolCheck:
+    """Run the duplicate-SoT drift-prevention guard from the verified audit engine."""
+    check_name = "SoT duplicate guard"
+
+    try:
+        from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit
+    except Exception as exc:  # pragma: no cover - defensive import boundary
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"duplicate-SoT audit engine unavailable: {exc}",
+        )
+
+    try:
+        report = run_duplicate_sot_audit(target)
+    except Exception as exc:  # intentional-catch: baseline unavailable or structurally invalid
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"duplicate-SoT audit baseline unavailable: {exc}",
+        )
+
+    if not report.coverage_complete:
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=(
+                "duplicate-SoT audit baseline incomplete: "
+                f"registry_count={report.registry_count}, "
+                f"persistent_file_count={report.persistent_file_count}, "
+                f"registered_file_count={report.registered_file_count}"
+            ),
+        )
+
+    violations = [candidate for candidate in report.candidates if candidate.classification == "duplicate_sot_violation"]
+    uncovered = [candidate for candidate in violations if not candidate.remediation_work_item_id]
+    if uncovered:
+        first = "; ".join(
+            f"{candidate.candidate_id} paths={','.join(candidate.paths)} "
+            f"fields={','.join(candidate.duplicated_fields) or 'n/a'}"
+            for candidate in uncovered[:3]
+        )
+        suffix = "" if len(uncovered) <= 3 else f"; +{len(uncovered) - 3} more"
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(uncovered)} uncovered duplicate-SoT violation(s): {first}{suffix}",
+        )
+
+    if violations:
+        first = "; ".join(
+            f"{candidate.candidate_id}->{candidate.remediation_work_item_id}"
+            f"({candidate.remediation_status or 'covered'})"
+            for candidate in violations[:3]
+        )
+        suffix = "" if len(violations) <= 3 else f"; +{len(violations) - 3} more"
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"{len(violations)} duplicate-SoT violation(s) covered by remediation work: {first}{suffix}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="pass",
+        message=f"coverage complete; {len(report.candidates)} candidate(s); no duplicate-SoT violations",
+    )
+
+
 def _check_settings_hook_registration_drift(
     target: Path, profile_name: str, registration: SettingsHookRegistration
 ) -> ToolCheck:
@@ -6275,6 +6356,7 @@ def run_doctor(
         checks.append(_check_managed_artifact_drift(target, profile))
         checks.append(_check_sot_registry_completeness(target))
         checks.append(_check_sot_read_discipline(target))
+        checks.append(_check_sot_duplicate_guard(target))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
                 checks.append(_check_settings_hook_registration_drift(target, profile, registration))
