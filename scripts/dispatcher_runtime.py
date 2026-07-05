@@ -62,6 +62,12 @@ _RUNTIME_DIR = str(Path(__file__).resolve().parent)
 if _RUNTIME_DIR not in sys.path:
     sys.path.insert(0, _RUNTIME_DIR)
 
+from bridge_dispatch_concurrency import (  # noqa: E402
+    DEFAULT_ROLE_LIMITS as DISPATCH_ROLE_LIMIT_DEFAULTS,
+)
+from bridge_dispatch_concurrency import (  # noqa: E402
+    role_limit as configured_dispatch_role_limit,
+)
 from harness_projection_reader import load_harness_projection  # noqa: E402
 
 # The lazy ``import groundtruth_kb`` calls in the dispatch/detection paths
@@ -247,10 +253,13 @@ MAX_LIVE_DISPATCHED_PROCESSES_ENV_VAR = "GTKB_MAX_LIVE_DISPATCHED_PROCESSES"
 DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES = 8
 # CA9165 (SPEC-INTAKE-ca9165): per-role concurrency cap. Bounds how many of the
 # global pool a single role (prime-builder / loyal-opposition) may hold so one
-# role cannot starve the other role's dispatch lane. Default (3) sits inside the
-# global default (8) and is evaluated AFTER the global cap (which keeps precedence).
+# role cannot starve the other role's dispatch lane. Defaults are supplied by
+# scripts/bridge_dispatch_concurrency.py so the standalone WI-3375 role-limit
+# contract and the live dispatcher cannot drift. The legacy flat override below
+# is kept for backward-compatible operator tuning and is evaluated AFTER the
+# global cap (which keeps precedence).
 MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR = "GTKB_MAX_LIVE_DISPATCHED_PER_ROLE"
-DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE = 3
+DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE = max(DISPATCH_ROLE_LIMIT_DEFAULTS.values())
 
 # Selected-batch cap mirrors the smart-poller's default per
 # ``groundtruth-kb/scripts/bridge_poller_runner.py:670-673``. Bumping this
@@ -2213,21 +2222,38 @@ def _max_live_dispatched_processes() -> int:
     return parsed if parsed > 0 else DEFAULT_MAX_LIVE_DISPATCHED_PROCESSES
 
 
-def _max_live_dispatched_per_role() -> int:
-    """Resolve the per-role concurrency cap (CA9165 / SPEC-INTAKE-ca9165).
-
-    Reads ``GTKB_MAX_LIVE_DISPATCHED_PER_ROLE``; fail-safe to
-    ``DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE`` on missing/blank/invalid input and
-    on non-positive values, mirroring :func:`_max_live_dispatched_processes`.
-    """
+def _legacy_flat_per_role_cap_override() -> int | None:
+    """Resolve the backward-compatible flat per-role cap override if present."""
     raw = os.environ.get(MAX_LIVE_DISPATCHED_PER_ROLE_ENV_VAR)
     if raw is None or raw.strip() == "":
-        return DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
+        return None
     try:
         parsed = int(raw)
     except ValueError:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _max_live_dispatched_per_role(role_label: str) -> int:
+    """Resolve the per-role concurrency cap (CA9165 / SPEC-INTAKE-ca9165).
+
+    The live dispatcher uses ``scripts.bridge_dispatch_concurrency.role_limit``
+    as the shared role-specific limit contract (default loyal-opposition=3,
+    prime-builder=2, plus the module's per-role environment overrides). The
+    legacy ``GTKB_MAX_LIVE_DISPATCHED_PER_ROLE`` flat override still wins when
+    set to a positive integer so existing operator tuning keeps working.
+
+    Unknown role labels fail safe to the historical flat default instead of
+    crashing the daemon; target resolution should normally restrict labels to
+    the canonical Prime Builder / Loyal Opposition pair.
+    """
+    legacy_override = _legacy_flat_per_role_cap_override()
+    if legacy_override is not None:
+        return legacy_override
+    try:
+        return configured_dispatch_role_limit(role_label)
+    except ValueError:
         return DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
-    return parsed if parsed > 0 else DEFAULT_MAX_LIVE_DISPATCHED_PER_ROLE
 
 
 def _safe_unlink(path: Path) -> None:
@@ -4247,7 +4273,7 @@ def _spawn_harness(
     # reintroduce binary same-role active-session suppression: same-role workers
     # below the cap still spawn (per-document lease + work-intent claim provide
     # the per-item dedup).
-    per_role_cap = _max_live_dispatched_per_role()
+    per_role_cap = _max_live_dispatched_per_role(target.needed_role_label)
     per_role_live = _count_live_dispatched_processes_for_role(runs_dir, target.needed_role_label)
     if per_role_live >= per_role_cap:
         meta = {
