@@ -1,10 +1,10 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-05T07:57:34Z",
+  "generated_at": "2026-07-05T13:32:51Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
-      "can_fire_events": true,
+      "can_fire_events": false,
       "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
@@ -14,27 +14,25 @@
       "dispatch_max_items": 1,
       "dispatch_quality": 90.0,
       "dispatch_tags": [
-        "event-source",
         "prime-builder"
       ],
-      "event_driven_hooks": true,
+      "event_driven_hooks": false,
       "full_transcript_archive_required": false,
       "harness_name": "codex",
       "harness_type": "codex",
       "id": "A",
       "invocation_surfaces": {
         "dispatch": {
-          "can_fire_events": true,
+          "can_fire_events": false,
           "can_receive_dispatch": true,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 1,
           "dispatch_quality": 90,
           "dispatch_tags": [
-            "event-source",
             "prime-builder"
           ],
-          "event_driven_hooks": true
+          "event_driven_hooks": false
         },
         "headless": {
           "argv": [

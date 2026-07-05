@@ -42,12 +42,12 @@ estimated_usd_per_dispatch = 0.0
 [harnesses.A]
 description = "Codex"
 max_items = 4
-tags = ["loyal-opposition", "prime-builder", "event-source"]
+tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.B]
 description = "Claude Code"
 max_items = 4
-tags = ["loyal-opposition", "prime-builder", "event-source"]
+tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.C]
 description = "Antigravity"
@@ -62,7 +62,7 @@ tags = ["loyal-opposition", "low-cost"]
 [harnesses.E]
 description = "Cursor"
 max_items = 4
-tags = ["loyal-opposition", "prime-builder", "event-source"]
+tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.F]
 description = "OpenRouter"

@@ -144,6 +144,33 @@ class TestBuildProjection:
         assert record["dispatch_max_items"] == 2
         assert record["dispatch_tags"] == ["low-cost", "loyal-opposition"]
 
+    def test_build_projection_neutralizes_legacy_event_source_metadata(self, db: Any) -> None:
+        _insert_harness(
+            db,
+            id="A",
+            harness_name="codex",
+            harness_type="codex",
+            role=["prime-builder"],
+            invocation_surfaces={
+                "dispatch": {
+                    "can_receive_dispatch": True,
+                    "can_fire_events": True,
+                    "event_driven_hooks": True,
+                    "dispatch_tags": ["event-source", "prime-builder"],
+                }
+            },
+        )
+        record = build_projection(db.list_harnesses())["harnesses"][0]
+        dispatch_surface = record["invocation_surfaces"]["dispatch"]
+
+        assert record["can_receive_dispatch"] is True
+        assert record["can_fire_events"] is False
+        assert record["event_driven_hooks"] is False
+        assert record["dispatch_tags"] == ["prime-builder"]
+        assert dispatch_surface["can_fire_events"] is False
+        assert dispatch_surface["event_driven_hooks"] is False
+        assert dispatch_surface["dispatch_tags"] == ["prime-builder"]
+
     def test_build_projection_ignores_dispatch_config_overlay_argument(self, db: Any) -> None:
         _insert_harness(
             db,

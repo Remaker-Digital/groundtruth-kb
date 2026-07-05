@@ -88,26 +88,25 @@ _JSON_DECODED_FIELDS = ("role", "invocation_surfaces")
 #
 # The two axes are now derived separately:
 #
-# - ``can_fire_events``: the harness carries live event-firing hook surfaces
-#   that drive dispatcher-daemon eligibility. Only Claude Code
-#   and Codex CLI qualify (``.claude/hooks`` + ``.codex/hooks.json``; Codex on
-#   Windows per ADR-CODEX-HOOK-PARITY-FALLBACK-001). This is the honest
-#   eligibility axis for "is there an active event source".
+# - ``can_fire_events``: retained compatibility field for historical
+#   event-firing hook surfaces. The dispatcher daemon is now the only live
+#   dispatch event source, so current projections neutralize this axis even
+#   when legacy registry metadata says otherwise.
 # - ``can_receive_dispatch``: the harness can be spawned headless as a dispatch
 #   target. All registered launchable harness types qualify.
 #
-# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias for
-# ``can_fire_events`` so legacy topology readers continue to ask the event
-# source question correctly. New code MUST read ``can_fire_events`` /
+# ``event_driven_hooks`` is retained as a DEPRECATED back-compat alias for the
+# neutralized event-source axis. New code MUST read ``can_fire_events`` /
 # ``can_receive_dispatch``.
-_EVENT_FIRING_CAPABLE_TYPES = frozenset({"claude", "claude-code", "codex", "codex-cli", "cursor"})
+_EVENT_FIRING_CAPABLE_TYPES: frozenset[str] = frozenset()
 
 _DISPATCH_RECEIVE_CAPABLE_TYPES = frozenset(
     {"claude", "claude-code", "codex", "codex-cli", "cursor", "ollama", "openrouter", "antigravity"}
 )
 _PROVIDER_HARNESS_TYPES = frozenset({"ollama", "openrouter"})
 
-# Deprecated alias preserved for back-compat readers; equals the event-firing axis.
+# Deprecated alias preserved for back-compat readers; equals the neutralized
+# event-source axis.
 _EVENT_DRIVEN_HOOK_CAPABLE_TYPES = _EVENT_FIRING_CAPABLE_TYPES
 
 
@@ -179,6 +178,27 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, (list, tuple, set, frozenset)):
         return []
     return sorted({str(item).strip() for item in value if str(item).strip()})
+
+
+def _without_event_source_tag(tags: list[str]) -> list[str]:
+    return sorted({tag for tag in tags if tag != "event-source"})
+
+
+def _neutralize_event_source_metadata(surfaces: Any) -> Any:
+    if not isinstance(surfaces, dict):
+        return surfaces
+    neutralized = {key: dict(value) if isinstance(value, dict) else value for key, value in surfaces.items()}
+
+    for source in (neutralized, *(value for value in neutralized.values() if isinstance(value, dict))):
+        for key in ("can_fire_events", "fire_events", "event_source", "event_driven_hooks"):
+            if key in source:
+                source[key] = False
+        for key in ("dispatch_tags", "tags"):
+            tags = _string_list(source.get(key))
+            if tags:
+                source[key] = _without_event_source_tag(tags)
+
+    return neutralized
 
 
 def _dispatch_metadata(record: dict[str, Any]) -> dict[str, Any]:
@@ -305,23 +325,25 @@ def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = N
     record: dict[str, Any] = {field: row.get(field) for field in _PROJECTED_FIELDS}
     for field in _JSON_DECODED_FIELDS:
         record[field] = _decode_json_field(row.get(field))
+    record["invocation_surfaces"] = _neutralize_event_source_metadata(record.get("invocation_surfaces"))
     harness_type = str(record.get("harness_type") or "").strip().lower()
     explicit = _dispatch_metadata(record)
-    # Honest split axes (FAB-01 / HYG-004).
-    record["can_fire_events"] = explicit.get("can_fire_events", harness_type in _EVENT_FIRING_CAPABLE_TYPES)
+    # Honest split axes (FAB-01 / HYG-004). Event firing is schema-retained
+    # but daemon-owned after WI-5020, so legacy explicit metadata is ignored.
+    record["can_fire_events"] = False
     record["can_receive_dispatch"] = explicit.get(
         "can_receive_dispatch",
         harness_type in _DISPATCH_RECEIVE_CAPABLE_TYPES,
     )
-    # Deprecated back-compat alias for event-firing capability. New code reads
-    # the split axes above; legacy topology readers still consume this field.
-    record["event_driven_hooks"] = explicit.get("event_driven_hooks", record["can_fire_events"])
+    # Deprecated back-compat alias for the neutralized event-source capability.
+    record["event_driven_hooks"] = False
     for field in ("dispatch_quality", "dispatch_cost", "dispatch_availability", "dispatch_max_items"):
         if field in explicit:
             record[field] = explicit[field]
     tags = explicit.get("dispatch_tags")
-    if isinstance(tags, list) and tags:
-        record["dispatch_tags"] = tags
+    filtered_tags = _without_event_source_tag(tags) if isinstance(tags, list) else []
+    if filtered_tags:
+        record["dispatch_tags"] = filtered_tags
     else:
         derived_tags = _string_list(record.get("role"))
         if record["can_fire_events"]:

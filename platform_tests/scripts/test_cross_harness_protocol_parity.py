@@ -23,8 +23,8 @@ EXPECTED_IDENTITIES = {
 }
 VALID_ROLES = {"prime-builder", "loyal-opposition"}
 VALID_STATUSES = {"active", "suspended", "retired"}
-EXPECTED_EVENT_SOURCES = {"A"}
-EXPECTED_DISPATCH_TARGETS = {"A", "B", "C", "D"}
+EXPECTED_EVENT_SOURCES: set[str] = set()
+EXPECTED_DISPATCH_TARGETS = {"A", "B", "C"}
 
 
 def _read_json(relative_path: str) -> dict[str, Any]:
@@ -183,12 +183,12 @@ def test_hook_fallback_surfaces_distinguish_event_sources_from_dispatch_targets(
     dispatch_targets = {row["id"] for row in registry["harnesses"] if row["can_receive_dispatch"]}
 
     assert event_sources == EXPECTED_EVENT_SOURCES
-    assert dispatch_only == {"B", "C", "D", "E", "F"}
+    assert dispatch_only == set(EXPECTED_IDENTITIES.values())
     assert dispatch_targets == EXPECTED_DISPATCH_TARGETS
     inactive_targets = {
         harness_id for harness_id in EXPECTED_IDENTITIES.values() if not by_id[harness_id]["can_receive_dispatch"]
     }
-    assert inactive_targets == {"E", "F"}
+    assert inactive_targets == {"D", "E", "F"}
 
     forbidden_hook_dispatch = (
         "cross_" + "harness_" + "bridge_" + "trigger.py",

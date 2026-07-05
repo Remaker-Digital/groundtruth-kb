@@ -98,8 +98,8 @@ harnesses:
     status: active
     roles:
       - prime-builder
-    dispatch_mode: event_source
-    can_fire_events: true
+    dispatch_mode: dispatch_target
+    can_fire_events: false
     can_receive_dispatch: true
     invocation_surfaces:
       - codex exec headless invocation from the harness registry projection
@@ -109,7 +109,7 @@ harnesses:
       - .codex/gtkb-hooks
     notes:
       - Current interactive Prime Builder harness in this session.
-      - Windows hook parity is guarded by ADR-CODEX-HOOK-PARITY-FALLBACK-001.
+      - Dispatcher events are daemon-owned; harness hook surfaces are not configured event sources.
 
   - harness_id: B
     harness_name: claude
@@ -168,8 +168,8 @@ harnesses:
     status: active
     roles:
       - prime-builder
-    dispatch_mode: event_source
-    can_fire_events: true
+    dispatch_mode: dispatch_target
+    can_fire_events: false
     can_receive_dispatch: true
     invocation_surfaces:
       - scripts/cursor_harness.py bridge-review headless invocation
@@ -177,7 +177,7 @@ harnesses:
     hook_surfaces:
       - cursor harness bridge-review adapter
     notes:
-      - Active event source and dispatch receiver in the harness registry projection.
+      - Active Prime Builder-capable harness retained as dispatch receiver inventory.
       - Current durable role is Prime Builder even when a dispatch context acts as reviewer.
 
   - harness_id: F

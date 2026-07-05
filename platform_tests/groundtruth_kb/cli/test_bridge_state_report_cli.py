@@ -35,19 +35,9 @@ model = "gpt-5.5"
 model = "deepseek-v4-pro-cloud"
 
 [harnesses.A]
-can_receive_dispatch = true
-can_fire_events = true
-dispatch_cost = 60
-dispatch_quality = 90
-dispatch_availability = 90
 max_items = 1
 
 [harnesses.D]
-can_receive_dispatch = true
-can_fire_events = false
-dispatch_cost = 25
-dispatch_quality = 92
-dispatch_availability = 95
 max_items = 2
 
 rules = []
@@ -69,9 +59,13 @@ rules = []
                         "harness_type": "codex",
                         "status": "active",
                         "role": ["prime-builder"],
-                        "can_fire_events": True,
+                        "can_fire_events": False,
                         "can_receive_dispatch": True,
-                        "event_driven_hooks": True,
+                        "event_driven_hooks": False,
+                        "dispatch_cost": 60,
+                        "dispatch_quality": 90,
+                        "dispatch_availability": 90,
+                        "dispatch_max_items": 1,
                         "reviewer_precedence": 20,
                         "invocation_surfaces": {
                             "headless": {
@@ -97,6 +91,10 @@ rules = []
                         "can_fire_events": False,
                         "can_receive_dispatch": True,
                         "event_driven_hooks": False,
+                        "dispatch_cost": 25,
+                        "dispatch_quality": 92,
+                        "dispatch_availability": 95,
+                        "dispatch_max_items": 2,
                         "reviewer_precedence": 10,
                         "invocation_surfaces": {
                             "headless": {
@@ -163,7 +161,7 @@ def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tm
     harnesses = {row["id"]: row for row in payload["harnesses"]["rows"]}
     assert harnesses["A"]["model_config"] == "gpt-5.5; reasoning=xhigh; approval_policy=never"
     assert harnesses["D"]["model_config"] == "deepseek-v4-pro-cloud; skill=bridge-review"
-    assert harnesses["A"]["events"] == "yes"
+    assert harnesses["A"]["events"] == "no"
     assert harnesses["D"]["dispatchable"] == "yes"
 
 
