@@ -37,6 +37,8 @@ def _proposal(
         [
             "NEW",
             "",
+            f"author_session_context_id: fixture-proposal-session-{bridge_id}",
+            "",
             "# Implementation Proposal",
             "",
             f"Document: {bridge_id}",
@@ -62,6 +64,19 @@ def _proposal(
     )
 
 
+def _go_verdict_body(bridge_id: str = "sample-implementation") -> str:
+    return "\n".join(
+        [
+            "GO",
+            "",
+            f"author_session_context_id: fixture-go-session-{bridge_id}",
+            "",
+            "# Review",
+            "",
+        ]
+    )
+
+
 def _write_thread(
     root: Path,
     *,
@@ -81,7 +96,7 @@ def _write_thread(
             proposal_body = "\n".join(proposal_lines) + "\n"
     (bridge / proposal_name).write_text(proposal_body, encoding="utf-8")
     if latest_status == "GO":
-        (bridge / go_name).write_text("GO\n\n# Review\n", encoding="utf-8")
+        (bridge / go_name).write_text(_go_verdict_body(bridge_id), encoding="utf-8")
         lines = [
             f"Document: {bridge_id}",
             f"GO: bridge/{go_name}",
@@ -334,12 +349,12 @@ def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
     (bridge / "bridge-a-001.md").write_text(
         _proposal(bridge_id="bridge-a", target_paths=["scripts/shared.py"]), encoding="utf-8"
     )
-    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
         _proposal(bridge_id="bridge-b", target_paths=["scripts/shared.py", "scripts/b_only.py"]),
         encoding="utf-8",
     )
-    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
         "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
         "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
@@ -991,7 +1006,7 @@ def test_gate_blocks_ambiguous_named_packet_fallback(tmp_path: Path) -> None:
         _proposal(bridge_id="bridge-b", target_paths=[shared_target]),
         encoding="utf-8",
     )
-    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
         "\n".join(
             [
@@ -1178,11 +1193,11 @@ def test_gate_blocks_when_other_session_claim_packet_reserves_target(
     (bridge / "bridge-a-001.md").write_text(
         _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
     )
-    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
         _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
     )
-    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
         "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
         "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
@@ -1226,11 +1241,11 @@ def test_collision_ignores_expired_claim_for_overlapping_packet(
     (bridge / "bridge-a-001.md").write_text(
         _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
     )
-    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
         _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
     )
-    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
         "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
         "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
@@ -1269,11 +1284,11 @@ def test_collision_ignores_same_session_overlapping_claim(tmp_path: Path, monkey
     (bridge / "bridge-a-001.md").write_text(
         _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
     )
-    (bridge / "bridge-a-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
         _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
     )
-    (bridge / "bridge-b-002.md").write_text("GO\n\n# Review\n", encoding="utf-8")
+    (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
         "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
         "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
@@ -1290,6 +1305,43 @@ def test_collision_ignores_same_session_overlapping_claim(tmp_path: Path, monkey
     _claim_bridge(tmp_path, "bridge-b", "session-A")
 
     assert gate.gate_decision(_apply_patch_payload(tmp_path, target=shared_target, session_id="session-A")) == {}
+
+
+def test_gate_blocks_when_other_session_glob_packet_reserves_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-4996: a peer packet glob reserves matching concrete protected edits."""
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
+    concrete_target = "scripts/dispatcher_runtime.py"
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "bridge-a-001.md").write_text(
+        _proposal(bridge_id="bridge-a", target_paths=[concrete_target]), encoding="utf-8"
+    )
+    (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
+    (bridge / "bridge-b-001.md").write_text(
+        _proposal(bridge_id="bridge-b", target_paths=["scripts/*.py"]), encoding="utf-8"
+    )
+    (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
+    (bridge / "INDEX.md").write_text(
+        "Document: bridge-a\nGO: bridge/bridge-a-002.md\nNEW: bridge/bridge-a-001.md\n\n"
+        "Document: bridge-b\nGO: bridge/bridge-b-002.md\nNEW: bridge/bridge-b-001.md\n",
+        encoding="utf-8",
+    )
+    packet_a = auth.create_authorization_packet(tmp_path, "bridge-a")
+    auth.write_packet(tmp_path, packet_a)
+    auth.write_named_packet(tmp_path, packet_a, "bridge-a")
+    packet_b = auth.create_authorization_packet(tmp_path, "bridge-b")
+    auth.write_packet(tmp_path, packet_b)
+    auth.write_named_packet(tmp_path, packet_b, "bridge-b")
+    _claim_bridge(tmp_path, "bridge-a", "session-A")
+    _claim_bridge(tmp_path, "bridge-b", "session-B")
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target=concrete_target, session_id="session-A"))
+
+    assert result["decision"] == "block"
+    assert "bridge-b" in result["reason"]
+    assert concrete_target in result["reason"]
 
 
 @pytest.mark.parametrize(

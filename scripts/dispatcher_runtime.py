@@ -167,6 +167,8 @@ from windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_execu
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     create_authorization_packet,
+    cross_claim_path_collision_reason,
+    target_patterns_overlap,
     write_named_packet,
     write_packet,
 )
@@ -223,6 +225,8 @@ DEFAULT_JSONL_ROLLOVERS = 5
 DEFAULT_DISPATCH_FAILURES_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"
+TARGET_PATH_OVERLAP_SELECTED_REASON = "target_path_overlap_selected"
+TARGET_PATH_OVERLAP_INFLIGHT_REASON = "target_path_overlap_inflight"
 # WI-4396: expected, non-actionable lease/contention suppression reasons. These
 # are normal concurrency outcomes (launched: false with a holder), NOT actionable
 # dispatch failures, so the shared writer routes them to
@@ -235,6 +239,8 @@ EXPECTED_SUPPRESSION_REASONS = frozenset(
         "work_intent_already_held",
         "headless_takeover_cooldown",
         "same_role_project_claim_active",
+        TARGET_PATH_OVERLAP_SELECTED_REASON,
+        TARGET_PATH_OVERLAP_INFLIGHT_REASON,
         WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
     }
 )
@@ -1757,6 +1763,143 @@ def _filter_prime_selected_by_work_intent(
     return {"ok": True, "reason": None, "selected": unheld, "held_count": held_count}
 
 
+def _record_prime_target_path_overlap(
+    *,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    item: Any,
+    reason: str,
+    packet: dict[str, Any],
+    overlap_with_document_name: str | None = None,
+    overlap_with_session_id: str | None = None,
+    overlapping_targets: list[str] | None = None,
+    collision_reason: str | None = None,
+) -> None:
+    payload: dict[str, Any] = {
+        "ts": _now_iso(),
+        "dispatch_id": dispatch_id,
+        "recipient": recipient,
+        "launched": False,
+        "reason": reason,
+        "document_name": item.document_name,
+        "top_status": item.top_status,
+        "top_file": item.top_file,
+        "target_path_globs": packet.get("target_path_globs", []),
+    }
+    if overlap_with_document_name:
+        payload["overlap_with_document_name"] = overlap_with_document_name
+    if overlap_with_session_id:
+        payload["overlap_with_session_id"] = overlap_with_session_id
+    if overlapping_targets:
+        payload["overlapping_targets"] = overlapping_targets
+    if collision_reason:
+        payload["collision_reason"] = collision_reason
+    _record_dispatch_suppression(state_dir, payload)
+
+
+def _filter_prime_selected_by_target_paths(
+    selected: list[Any],
+    *,
+    project_root: Path,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    session_id: str,
+) -> dict[str, Any]:
+    """Drop later GO items whose implementation target paths are already reserved."""
+    retained: list[Any] = []
+    retained_go_packets: list[tuple[Any, dict[str, Any]]] = []
+    suppressed_count = 0
+    first_reason: str | None = None
+    suppressions: list[dict[str, Any]] = []
+
+    for item in selected:
+        if str(getattr(item, "top_status", "")).upper() != "GO":
+            retained.append(item)
+            continue
+
+        bridge_id = str(item.document_name)
+        try:
+            packet = create_authorization_packet(project_root, bridge_id)
+        except AuthorizationError:
+            # Let the existing impl-auth quarantine path report malformed or
+            # unauthorizable GO items; this filter only owns overlap suppression.
+            retained.append(item)
+            continue
+
+        selected_overlap: tuple[Any, list[str]] | None = None
+        for prior_item, prior_packet in retained_go_packets:
+            overlapping = target_patterns_overlap(
+                [str(target) for target in packet.get("target_path_globs", [])],
+                [str(target) for target in prior_packet.get("target_path_globs", [])],
+            )
+            if overlapping:
+                selected_overlap = (prior_item, overlapping)
+                break
+        if selected_overlap is not None:
+            prior_item, overlapping = selected_overlap
+            _record_prime_target_path_overlap(
+                state_dir=state_dir,
+                recipient=recipient,
+                dispatch_id=dispatch_id,
+                item=item,
+                reason=TARGET_PATH_OVERLAP_SELECTED_REASON,
+                packet=packet,
+                overlap_with_document_name=str(prior_item.document_name),
+                overlapping_targets=overlapping,
+            )
+            suppressed_count += 1
+            first_reason = first_reason or TARGET_PATH_OVERLAP_SELECTED_REASON
+            suppressions.append(
+                {
+                    "reason": TARGET_PATH_OVERLAP_SELECTED_REASON,
+                    "document_name": bridge_id,
+                    "overlap_with_document_name": str(prior_item.document_name),
+                    "overlapping_targets": overlapping,
+                }
+            )
+            continue
+
+        collision_reason = cross_claim_path_collision_reason(
+            project_root,
+            targets=[str(target) for target in packet.get("target_path_globs", [])],
+            bridge_id=bridge_id,
+            session_id=session_id,
+        )
+        if collision_reason:
+            _record_prime_target_path_overlap(
+                state_dir=state_dir,
+                recipient=recipient,
+                dispatch_id=dispatch_id,
+                item=item,
+                reason=TARGET_PATH_OVERLAP_INFLIGHT_REASON,
+                packet=packet,
+                collision_reason=collision_reason,
+            )
+            suppressed_count += 1
+            first_reason = first_reason or TARGET_PATH_OVERLAP_INFLIGHT_REASON
+            suppressions.append(
+                {
+                    "reason": TARGET_PATH_OVERLAP_INFLIGHT_REASON,
+                    "document_name": bridge_id,
+                    "collision_reason": collision_reason,
+                }
+            )
+            continue
+
+        retained.append(item)
+        retained_go_packets.append((item, packet))
+
+    return {
+        "ok": True,
+        "reason": first_reason,
+        "selected": retained,
+        "suppressed_count": suppressed_count,
+        "suppressions": suppressions,
+    }
+
+
 def _release_prime_work_intents(slugs: list[str], *, project_root: Path, session_id: str) -> None:
     for slug in slugs:
         try:
@@ -1886,6 +2029,7 @@ def _issue_dispatch_authorization_for_selected(
     state_dir: Path,
     recipient: str,
     dispatch_id: str,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Create implementation-start packets for a selected Prime dispatch batch.
 
@@ -1905,21 +2049,29 @@ def _issue_dispatch_authorization_for_selected(
 
     for bridge_id in bridge_ids:
         try:
-            packet = create_authorization_packet(project_root, bridge_id)
+            if session_id is None:
+                packet = create_authorization_packet(project_root, bridge_id)
+            else:
+                packet = create_authorization_packet(project_root, bridge_id, session_id=session_id)
         except AuthorizationError as exc:
+            overlap_suppression = "Concurrent path reservation conflict" in str(exc)
+            reason = TARGET_PATH_OVERLAP_INFLIGHT_REASON if overlap_suppression else "impl_auth_quarantined"
             quarantined_slugs.append({"slug": bridge_id, "error_message": str(exc)})
             quarantine_payload: dict[str, Any] = {
                 "ts": _now_iso(),
                 "dispatch_id": dispatch_id,
                 "recipient": recipient,
                 "launched": False,
-                "reason": "impl_auth_quarantined",
+                "reason": reason,
                 "document_name": bridge_id,
                 "error_type": type(exc).__name__,
                 "error_message": str(exc),
                 "bridge_ids": [bridge_id],
             }
-            _record_dispatch_failure(state_dir, quarantine_payload)
+            if overlap_suppression:
+                _record_dispatch_suppression(state_dir, quarantine_payload)
+            else:
+                _record_dispatch_failure(state_dir, quarantine_payload)
             continue
         successful_bridge_ids.append(bridge_id)
         successful_packets.append(packet)
@@ -4307,6 +4459,7 @@ def _spawn_harness(
             state_dir=state_dir,
             recipient=recipient_key,
             dispatch_id=dispatch_id,
+            session_id=_work_intent_session_id(dispatch_id),
         )
         if not issue_result["ok"]:
             return {
@@ -5510,17 +5663,39 @@ def run_dispatch_cycle(
                             continue
                         dispatched_selected = list(work_intent_filter["selected"])
                         dispatched_signature = _signature(dispatched_selected)
+                        recipient_state["selected_count"] = len(dispatched_selected)
+
+                        target_path_filter = _filter_prime_selected_by_target_paths(
+                            dispatched_selected,
+                            project_root=project_root,
+                            state_dir=state_dir,
+                            recipient=recipient,
+                            dispatch_id=dispatch_id,
+                            session_id=work_intent_session_id,
+                        )
+                        recipient_state["target_path_overlap_filtered_count"] = target_path_filter["suppressed_count"]
+                        if target_path_filter["suppressions"]:
+                            recipient_state["target_path_overlap_suppressions"] = target_path_filter["suppressions"]
+                        dispatched_selected = list(target_path_filter["selected"])
+                        dispatched_signature = _signature(dispatched_selected)
                         # _spawn_harness expects newest-first input and applies
                         # _selected_oldest_first itself before building the prompt.
                         spawn_items = list(reversed(dispatched_selected))
                         recipient_state["selected_count"] = len(dispatched_selected)
 
                     if target.needed_role_label == "prime-builder" and not dispatched_selected:
-                        recipient_state["last_result"] = "work_intent_already_held"
+                        suppressed_reason = None
+                        if target.needed_role_label == "prime-builder":
+                            suppressions = recipient_state.get("target_path_overlap_suppressions")
+                            if isinstance(suppressions, list) and suppressions:
+                                first_suppression = suppressions[0]
+                                if isinstance(first_suppression, dict):
+                                    suppressed_reason = first_suppression.get("reason")
+                        recipient_state["last_result"] = suppressed_reason or "work_intent_already_held"
                         _clear_stale_failure_fields(recipient_state)
                         results[recipient] = {
                             "launched": False,
-                            "reason": "work_intent_already_held",
+                            "reason": recipient_state["last_result"],
                             "dispatch_id": dispatch_id,
                             "work_intent_session_id": work_intent_session_id,
                         }

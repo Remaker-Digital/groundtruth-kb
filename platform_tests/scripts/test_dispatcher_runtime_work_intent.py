@@ -47,6 +47,15 @@ _BRIDGE_KIND_BODY = (
 )
 
 
+def _bridge_kind_body(target_paths: list[str] | None = None) -> str:
+    if target_paths is None:
+        return _BRIDGE_KIND_BODY
+    return _BRIDGE_KIND_BODY.replace(
+        'target_paths: ["scripts/dispatcher_runtime.py"]',
+        f"target_paths: {json.dumps(target_paths)}",
+    )
+
+
 class _FakeProcess:
     pid = 4242
 
@@ -61,18 +70,23 @@ def _write_prime_session_marker(root: Path, session_id: str) -> None:
     marker.write_text(json.dumps({"role": "prime-builder", "session_id": session_id}), encoding="utf-8")
 
 
-def _index_with_go_documents(root: Path, *slugs: str) -> str:
+def _index_with_go_documents(
+    root: Path,
+    *slugs: str,
+    target_paths_by_slug: dict[str, list[str]] | None = None,
+) -> str:
     chunks = ["# bridge index\n"]
     for slug in slugs:
+        target_paths = target_paths_by_slug.get(slug) if target_paths_by_slug else None
         _write_bridge_file(
             root,
             f"{slug}-001.md",
-            "NEW\n\nauthor_session_context_id: fixture-author-session\n\n" + _BRIDGE_KIND_BODY,
+            "NEW\n\nauthor_session_context_id: fixture-author-session\n\n" + _bridge_kind_body(target_paths),
         )
         _write_bridge_file(
             root,
             f"{slug}-002.md",
-            "GO\n\nauthor_session_context_id: fixture-go-session\n\n" + _BRIDGE_KIND_BODY,
+            "GO\n\nauthor_session_context_id: fixture-go-session\n\n" + _bridge_kind_body(target_paths),
         )
         chunks.append(f"\nDocument: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}-001.md\n")
     return "".join(chunks)
@@ -139,6 +153,143 @@ def test_prime_dispatch_filters_held_work_intent_and_signs_unheld_batch(
         and record.get("document_name") == "held-thread"
         and record.get("holder_session_id") == "foreground-session"
         for record in suppressions
+    )
+
+
+def test_prime_dispatch_suppresses_same_batch_target_path_overlap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4996: overlapping GO items in one batch launch only the oldest eligible one."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    shared_target = "scripts/shared.py"
+    _write_index(
+        root,
+        _index_with_go_documents(
+            root,
+            "first-thread",
+            "second-thread",
+            target_paths_by_slug={
+                "first-thread": [shared_target],
+                "second-thread": [shared_target],
+            },
+        ),
+    )
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
+    selected = _prime_selected(trigger, root, max_items=2)
+    assert len(selected) == 2
+    launched_doc = selected[0].document_name
+    suppressed_doc = selected[1].document_name
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=False)
+
+    result = summary["results"]["prime-builder"]
+    assert result["launched"] is True
+    rec = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert rec["selected_count"] == 1
+    assert rec["target_path_overlap_filtered_count"] == 1
+    assert current_holder(launched_doc, project_root=root) is not None
+    assert current_holder(suppressed_doc, project_root=root) is None
+    assert any(
+        record.get("reason") == "target_path_overlap_selected"
+        and record.get("document_name") == suppressed_doc
+        and record.get("overlap_with_document_name") == launched_doc
+        and shared_target in record.get("overlapping_targets", [])
+        for record in _suppression_records(state_dir)
+    )
+
+
+def test_prime_dispatch_keeps_disjoint_go_items_fanning_out_to_cap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4996: target serialization preserves normal fan-out for disjoint paths."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_index(
+        root,
+        _index_with_go_documents(
+            root,
+            "first-thread",
+            "second-thread",
+            target_paths_by_slug={
+                "first-thread": ["scripts/first.py"],
+                "second-thread": ["platform_tests/scripts/test_second.py"],
+            },
+        ),
+    )
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=False)
+
+    result = summary["results"]["prime-builder"]
+    assert result["launched"] is True
+    rec = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert rec["selected_count"] == 2
+    assert rec["target_path_overlap_filtered_count"] == 0
+    assert current_holder("first-thread", project_root=root) is not None
+    assert current_holder("second-thread", project_root=root) is not None
+    assert not any(
+        record.get("reason") in {"target_path_overlap_selected", "target_path_overlap_inflight"}
+        for record in _suppression_records(state_dir)
+    )
+
+
+def test_prime_dispatch_suppresses_later_tick_inflight_target_path_overlap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-4996: a later GO item is suppressed when an in-flight packet reserves its path."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    shared_target = "scripts/shared.py"
+    _write_index(
+        root,
+        _index_with_go_documents(
+            root,
+            "inflight-thread",
+            target_paths_by_slug={"inflight-thread": [shared_target]},
+        ),
+    )
+    trigger = _load_trigger()
+    packet = trigger.create_authorization_packet(root, "inflight-thread")
+    trigger.write_named_packet(root, packet, "inflight-thread")
+    _write_prime_session_marker(root, "foreground-session")
+    assert acquire("inflight-thread", "foreground-session", ttl_seconds=120, project_root=root)
+    _write_index(
+        root,
+        _index_with_go_documents(
+            root,
+            "later-thread",
+            target_paths_by_slug={"later-thread": [shared_target]},
+        ),
+    )
+    popen_calls: list[object] = []
+
+    def _unexpected_popen(*args, **kwargs):
+        popen_calls.append((args, kwargs))
+        return _FakeProcess()
+
+    monkeypatch.setattr(trigger.subprocess, "Popen", _unexpected_popen)
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=1, dry_run=False)
+
+    assert popen_calls == []
+    result = summary["results"]["prime-builder"]
+    assert result["launched"] is False
+    assert result["reason"] == "target_path_overlap_inflight"
+    rec = summary["dispatch_state"]["recipients"]["prime-builder"]
+    assert rec["selected_count"] == 0
+    assert rec["target_path_overlap_filtered_count"] == 1
+    assert current_holder("later-thread", project_root=root) is None
+    assert any(
+        record.get("reason") == "target_path_overlap_inflight"
+        and record.get("document_name") == "later-thread"
+        and "inflight-thread" in str(record.get("collision_reason", ""))
+        for record in _suppression_records(state_dir)
     )
 
 

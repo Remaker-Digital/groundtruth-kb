@@ -234,6 +234,47 @@ def test_create_packet_fails_when_latest_status_is_no_action(auth_module, tmp_pa
         auth_module.create_authorization_packet(tmp_path, slug)
 
 
+def test_target_patterns_overlap_handles_exact_and_glob(auth_module):
+    """WI-4996: target overlap detects exact, glob-vs-file, and disjoint prefixes."""
+    overlap = auth_module.target_patterns_overlap
+
+    assert overlap(["scripts/shared.py"], ["scripts/shared.py"]) == ["scripts/shared.py"]
+    assert overlap(["scripts/*.py"], ["scripts/dispatcher_runtime.py"]) == ["scripts/dispatcher_runtime.py"]
+    assert overlap(["scripts/*.py"], ["platform_tests/scripts/test_dispatcher_runtime.py"]) == []
+    assert overlap(["scripts/*.py"], ["scripts/*.md"]) == ["scripts/*.py <-> scripts/*.md"]
+
+
+def test_create_packet_blocks_different_session_overlapping_named_packet(auth_module, tmp_path):
+    """WI-4996: begin-time packet creation refuses another active claim's target paths."""
+    _write_proposal(tmp_path, "bridge-a", version=1, target_paths=["scripts/*.py"])
+    _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
+    _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/dispatcher_runtime.py"])
+    _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
+    packet_a = auth_module.create_authorization_packet(tmp_path, "bridge-a")
+    auth_module.write_named_packet(tmp_path, packet_a, "bridge-a")
+    _write_prime_marker(tmp_path, "session-A")
+    assert auth_module.bridge_work_intent_registry.acquire("bridge-a", "session-A", project_root=tmp_path)
+
+    with pytest.raises(auth_module.AuthorizationError, match="Concurrent path reservation conflict"):
+        auth_module.create_authorization_packet(tmp_path, "bridge-b", session_id="session-B")
+
+
+def test_create_packet_allows_same_session_overlapping_named_packet(auth_module, tmp_path):
+    """WI-4996: same-session multi-thread implementation is not self-suppressed."""
+    _write_proposal(tmp_path, "bridge-a", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
+    _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
+    packet_a = auth_module.create_authorization_packet(tmp_path, "bridge-a")
+    auth_module.write_named_packet(tmp_path, packet_a, "bridge-a")
+    _write_prime_marker(tmp_path, "session-A")
+    assert auth_module.bridge_work_intent_registry.acquire("bridge-a", "session-A", project_root=tmp_path)
+
+    packet_b = auth_module.create_authorization_packet(tmp_path, "bridge-b", session_id="session-A")
+
+    assert packet_b["bridge_id"] == "bridge-b"
+
+
 # ---------------------------------------------------------------------------
 # IP-2: named-packet cache + activate + list
 # ---------------------------------------------------------------------------

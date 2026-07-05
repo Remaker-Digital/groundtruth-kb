@@ -83,6 +83,7 @@ TARGET_PATHS_RE = re.compile(
     r"(?:\*\*)?target_paths(?:\*\*)?\s*:(?:\*\*)?\s*(\[[^\n]+\])",
     re.IGNORECASE,
 )
+GLOB_META_RE = re.compile(r"[*?\[]")
 PROJECT_AUTHORIZATION_KEYS = frozenset({"project authorization", "project authorization id"})
 PROJECT_KEYS = frozenset({"project", "project id"})
 WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
@@ -1166,6 +1167,72 @@ def normalize_relative_path(project_root: Path, path_text: str) -> str:
         raise AuthorizationError(f"Path escapes project root: {path_text}") from exc
 
 
+def normalize_target_pattern(pattern: str) -> str:
+    return str(pattern).strip().replace("\\", "/").lstrip("./")
+
+
+def _has_glob_meta(pattern: str) -> bool:
+    return GLOB_META_RE.search(pattern) is not None
+
+
+def _target_pattern_authorizes_path(pattern: str, relative_path: str) -> bool:
+    normalized = normalize_target_pattern(pattern)
+    rel = normalize_target_pattern(relative_path)
+    if fnmatch.fnmatch(rel, normalized):
+        return True
+    return normalized.endswith("/**") and rel.startswith(normalized[:-3].rstrip("/") + "/")
+
+
+def _literal_top_level_prefix(pattern: str) -> str | None:
+    normalized = normalize_target_pattern(pattern)
+    if not normalized:
+        return None
+    first = normalized.split("/", 1)[0]
+    if not first or _has_glob_meta(first):
+        return None
+    return first
+
+
+def _patterns_provably_disjoint(left: str, right: str) -> bool:
+    left_prefix = _literal_top_level_prefix(left)
+    right_prefix = _literal_top_level_prefix(right)
+    return bool(left_prefix and right_prefix and left_prefix != right_prefix)
+
+
+def target_patterns_overlap(left_patterns: list[str], right_patterns: list[str]) -> list[str]:
+    """Return normalized overlap witnesses between two target path/pattern sets.
+
+    Exact file matches are overlap. Glob-vs-file uses the same predicate as
+    protected mutation authorization. Glob-vs-glob is conservative: patterns
+    overlap unless their literal top-level prefixes prove they cannot intersect.
+    """
+    witnesses: list[str] = []
+    left_normalized = [normalize_target_pattern(pattern) for pattern in left_patterns if str(pattern).strip()]
+    right_normalized = [normalize_target_pattern(pattern) for pattern in right_patterns if str(pattern).strip()]
+
+    for left in left_normalized:
+        for right in right_normalized:
+            if left == right:
+                witnesses.append(left)
+                continue
+            left_is_glob = _has_glob_meta(left)
+            right_is_glob = _has_glob_meta(right)
+            if not left_is_glob and not right_is_glob:
+                continue
+            if left_is_glob and not right_is_glob:
+                if _target_pattern_authorizes_path(left, right):
+                    witnesses.append(right)
+                continue
+            if right_is_glob and not left_is_glob:
+                if _target_pattern_authorizes_path(right, left):
+                    witnesses.append(left)
+                continue
+            if _patterns_provably_disjoint(left, right):
+                continue
+            witnesses.append(f"{left} <-> {right}")
+    return sorted(set(witnesses))
+
+
 def packet_hash(packet: dict[str, Any]) -> str:
     material = {key: value for key, value in packet.items() if key != "packet_hash"}
     encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -1218,6 +1285,7 @@ def create_authorization_packet(
     *,
     expires_minutes: int = DEFAULT_EXPIRY_MINUTES,
     owner_sufficiency_deliberation_id: str | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     entry = bridge_entry(project_root, bridge_id)
     proposal_rel, go_rel = approved_files_for_go(entry)
@@ -1299,6 +1367,16 @@ def create_authorization_packet(
                 "'Existing requirements sufficient' or 'New or revised requirement required before implementation'"
             )
 
+    if target_paths and session_id:
+        collision_reason = cross_claim_path_collision_reason(
+            project_root,
+            targets=target_paths,
+            bridge_id=bridge_id,
+            session_id=session_id,
+        )
+        if collision_reason:
+            errors.append(collision_reason)
+
     if errors:
         raise AuthorizationError("; ".join(errors))
 
@@ -1355,6 +1433,7 @@ def issue_dispatch_authorization_packets(
     *,
     dispatch_id: str | None = None,
     expires_minutes: int = DEFAULT_EXPIRY_MINUTES,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Create/refresh implementation packets for an automated Prime dispatch.
 
@@ -1373,7 +1452,12 @@ def issue_dispatch_authorization_packets(
         }
 
     packets = [
-        create_authorization_packet(project_root, bridge_id, expires_minutes=expires_minutes)
+        create_authorization_packet(
+            project_root,
+            bridge_id,
+            expires_minutes=expires_minutes,
+            session_id=session_id,
+        )
         for bridge_id in bridge_ids
     ]
     for bridge_id, packet in zip(bridge_ids, packets, strict=True):
@@ -1653,12 +1737,8 @@ def clear_active_packet_if_terminal(project_root: Path, *, force: bool = False) 
 
 
 def path_authorized(packet: dict[str, Any], relative_path: str) -> bool:
-    rel = relative_path.replace("\\", "/").lstrip("./")
     for pattern in packet.get("target_path_globs", []):
-        normalized = str(pattern).replace("\\", "/").lstrip("./")
-        if fnmatch.fnmatch(rel, normalized):
-            return True
-        if normalized.endswith("/**") and rel.startswith(normalized[:-3].rstrip("/") + "/"):
+        if _target_pattern_authorizes_path(str(pattern), relative_path):
             return True
     return False
 
@@ -1828,7 +1908,10 @@ def cross_claim_path_collision_reason(
             packet = load_named_packet(project_root, other_bridge_id)
         except AuthorizationError:
             continue  # expired, invalid, or missing — skip
-        overlapping = [t for t in targets if path_authorized(packet, t)]
+        overlapping = target_patterns_overlap(
+            [str(target) for target in packet.get("target_path_globs", [])],
+            [str(target) for target in targets],
+        )
         if not overlapping:
             continue
         try:
@@ -1903,6 +1986,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.bridge_id,
                 expires_minutes=args.expires_minutes,
                 owner_sufficiency_deliberation_id=args.owner_sufficiency_deliberation_id,
+                session_id=session_id,
             )
             if not args.no_write:
                 write_packet(root, packet)
