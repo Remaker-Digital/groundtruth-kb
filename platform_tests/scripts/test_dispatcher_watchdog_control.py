@@ -242,9 +242,21 @@ def test_doctor_watchdog_task_reports_healthy(monkeypatch, tmp_path):
         encoding="utf-8",
     )
     monkeypatch.setattr(doctor_mod.os, "name", "nt")
+
+    def _fake_complex_health(target):
+        return {
+            "components": {
+                "watchdog": {
+                    "status": {"healthy": True, "registered": True, "findings": []},
+                    "severity": "PASS",
+                    "heartbeat": {"fresh": True},
+                }
+            }
+        }
+
     monkeypatch.setattr(
-        "groundtruth_kb.dispatcher_watchdog.collect_watchdog_status",
-        lambda target: {"healthy": True, "registered": True, "findings": []},
+        "groundtruth_kb.dispatcher_complex.collect_complex_health",
+        _fake_complex_health,
     )
 
     check = doctor_mod._check_dispatcher_daemon_watchdog_task(tmp_path)
@@ -262,18 +274,62 @@ def test_doctor_watchdog_task_warns_with_install_hint(monkeypatch, tmp_path):
         encoding="utf-8",
     )
     monkeypatch.setattr(doctor_mod.os, "name", "nt")
+
+    def _fake_complex_health(target):
+        return {
+            "components": {
+                "watchdog": {
+                    "status": {
+                        "healthy": False,
+                        "registered": True,
+                        "findings": ["scheduled task does not launch via pythonw.exe"],
+                    },
+                    "severity": "WARN",
+                    "heartbeat": {"fresh": True},
+                }
+            }
+        }
+
     monkeypatch.setattr(
-        "groundtruth_kb.dispatcher_watchdog.collect_watchdog_status",
-        lambda target: {
-            "healthy": False,
-            "registered": True,
-            "findings": ["scheduled task does not launch via pythonw.exe"],
-        },
+        "groundtruth_kb.dispatcher_complex.collect_complex_health",
+        _fake_complex_health,
     )
 
     check = doctor_mod._check_dispatcher_daemon_watchdog_task(tmp_path)
     assert check.status == "warning"
     assert "gt bridge dispatch daemon watchdog install" in check.message
+
+
+def test_doctor_watchdog_task_preserves_raw_status_when_complex_heartbeat_stale(monkeypatch, tmp_path):
+    from groundtruth_kb.project import doctor as doctor_mod
+
+    (tmp_path / "harness-state").mkdir()
+    (tmp_path / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": "dispatcher_daemon"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(doctor_mod.os, "name", "nt")
+
+    def _fake_complex_health(target):
+        return {
+            "components": {
+                "watchdog": {
+                    "status": {"healthy": True, "registered": True, "findings": []},
+                    "severity": "WARN",
+                    "finding": "watchdog heartbeat is stale (99.0s > 15.0s)",
+                    "heartbeat": {"fresh": False},
+                }
+            }
+        }
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.collect_complex_health",
+        _fake_complex_health,
+    )
+
+    check = doctor_mod._check_dispatcher_daemon_watchdog_task(tmp_path)
+    assert check.status == "pass"
+    assert "GTKB-HarnessStormWatchdog" in check.message
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell installer is Windows-only")

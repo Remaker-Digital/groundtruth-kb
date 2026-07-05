@@ -11,6 +11,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -4605,50 +4606,19 @@ def _check_dispatcher_daemon_substrate_readiness(target: Path) -> ToolCheck:
     )
 
 
-def _check_dispatcher_daemon_supervisor_task(target: Path) -> ToolCheck:
+def _check_dispatcher_daemon_supervisor_task(
+    target: Path,
+    load_complex_health: Callable[[], dict[str, Any]] | None = None,
+) -> ToolCheck:
     """Warn when dispatcher_daemon substrate lacks a healthy Windows supervisor (WI-4937)."""
     check_name = "Dispatcher daemon supervisor task"
-    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
+    skip = _dispatcher_daemon_task_skip_check(target, check_name=check_name, component_label="supervisor")
+    if skip is not None:
+        return skip
 
-    if os.name != "nt":
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="supervisor task check is Windows-only; skipped on this host",
-        )
-
-    sub_path = target / "harness-state" / "bridge-substrate.json"
-    substrate = DISPATCHER_DAEMON_SUBSTRATE
-    if sub_path.is_file():
-        try:
-            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
-            if isinstance(sub_doc, dict):
-                raw = sub_doc.get("substrate")
-                if isinstance(raw, str) and raw.strip():
-                    substrate = raw.strip()
-        except (OSError, json.JSONDecodeError):
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message="harness-state/bridge-substrate.json is unreadable; supervisor check skipped",
-            )
-
-    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"substrate is {substrate!r}; supervisor task not required",
-        )
-
-    from groundtruth_kb.dispatcher_supervisor import collect_supervisor_status
-
-    status = collect_supervisor_status(target)
+    status = _dispatcher_complex_component_status(
+        load_complex_health or _dispatcher_complex_health_reader(target), "supervisor"
+    )
     if status.get("healthy"):
         return ToolCheck(
             name=check_name,
@@ -4668,50 +4638,19 @@ def _check_dispatcher_daemon_supervisor_task(target: Path) -> ToolCheck:
     )
 
 
-def _check_dispatcher_daemon_watchdog_task(target: Path) -> ToolCheck:
+def _check_dispatcher_daemon_watchdog_task(
+    target: Path,
+    load_complex_health: Callable[[], dict[str, Any]] | None = None,
+) -> ToolCheck:
     """Warn when dispatcher_daemon substrate lacks a healthy Windows storm watchdog (WI-5023)."""
     check_name = "Dispatcher daemon watchdog task"
-    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
+    skip = _dispatcher_daemon_task_skip_check(target, check_name=check_name, component_label="watchdog")
+    if skip is not None:
+        return skip
 
-    if os.name != "nt":
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="watchdog task check is Windows-only; skipped on this host",
-        )
-
-    sub_path = target / "harness-state" / "bridge-substrate.json"
-    substrate = DISPATCHER_DAEMON_SUBSTRATE
-    if sub_path.is_file():
-        try:
-            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
-            if isinstance(sub_doc, dict):
-                raw = sub_doc.get("substrate")
-                if isinstance(raw, str) and raw.strip():
-                    substrate = raw.strip()
-        except (OSError, json.JSONDecodeError):
-            return ToolCheck(
-                name=check_name,
-                required=False,
-                found=True,
-                status="warning",
-                message="harness-state/bridge-substrate.json is unreadable; watchdog check skipped",
-            )
-
-    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message=f"substrate is {substrate!r}; watchdog task not required",
-        )
-
-    from groundtruth_kb.dispatcher_watchdog import collect_watchdog_status
-
-    status = collect_watchdog_status(target)
+    status = _dispatcher_complex_component_status(
+        load_complex_health or _dispatcher_complex_health_reader(target), "watchdog"
+    )
     if status.get("healthy"):
         return ToolCheck(
             name=check_name,
@@ -4729,6 +4668,97 @@ def _check_dispatcher_daemon_watchdog_task(target: Path) -> ToolCheck:
         status="warning",
         message=(f"{detail}. Install/enable with: gt bridge dispatch daemon watchdog install"),
     )
+
+
+def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, component_label: str) -> ToolCheck | None:
+    """Return a completed skip/warning check when the component probe is not applicable."""
+    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
+
+    if os.name != "nt":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"{component_label} task check is Windows-only; skipped on this host",
+        )
+
+    sub_path = target / "harness-state" / "bridge-substrate.json"
+    substrate = DISPATCHER_DAEMON_SUBSTRATE
+    if sub_path.is_file():
+        try:
+            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            if isinstance(sub_doc, dict):
+                raw = sub_doc.get("substrate")
+                if isinstance(raw, str) and raw.strip():
+                    substrate = raw.strip()
+        except (OSError, json.JSONDecodeError):
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message=f"harness-state/bridge-substrate.json is unreadable; {component_label} check skipped",
+            )
+
+    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"substrate is {substrate!r}; {component_label} task not required",
+        )
+
+    return None
+
+
+def _collect_dispatcher_complex_health(target: Path) -> dict[str, Any]:
+    from groundtruth_kb.dispatcher_complex import collect_complex_health
+
+    return collect_complex_health(target)
+
+
+def _dispatcher_complex_health_reader(target: Path) -> Callable[[], dict[str, Any]]:
+    health: dict[str, Any] | None = None
+
+    def read() -> dict[str, Any]:
+        nonlocal health
+        if health is None:
+            health = _collect_dispatcher_complex_health(target)
+        return health
+
+    return read
+
+
+def _dispatcher_complex_component_status(
+    load_complex_health: Callable[[], dict[str, Any]],
+    component_name: str,
+) -> dict[str, Any]:
+    health = load_complex_health()
+    components = health.get("components")
+    if not isinstance(components, dict):
+        return {
+            "healthy": False,
+            "registered": False,
+            "findings": ["dispatcher complex health payload has no components"],
+        }
+    component = components.get(component_name)
+    if not isinstance(component, dict):
+        return {
+            "healthy": False,
+            "registered": False,
+            "findings": [f"dispatcher complex health payload has no {component_name} component"],
+        }
+    status = component.get("status")
+    if isinstance(status, dict):
+        return status
+    finding = component.get("finding") or component.get("error") or f"{component_name} status unavailable"
+    return {
+        "healthy": False,
+        "registered": False,
+        "findings": [str(finding)],
+    }
 
 
 def _retired_bridge_worker_markers() -> tuple[str, ...]:
@@ -6416,8 +6446,9 @@ def run_doctor(
         # in Slice 6 after a coverage audit.
         checks.append(_check_parity_discovery_diff(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
-        checks.append(_check_dispatcher_daemon_supervisor_task(target))
-        checks.append(_check_dispatcher_daemon_watchdog_task(target))
+        dispatcher_complex_health = _dispatcher_complex_health_reader(target)
+        checks.append(_check_dispatcher_daemon_supervisor_task(target, dispatcher_complex_health))
+        checks.append(_check_dispatcher_daemon_watchdog_task(target, dispatcher_complex_health))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
