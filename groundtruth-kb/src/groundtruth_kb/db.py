@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 
 # Default DB path — overridden by GTConfig.db_path or constructor arg
 DB_PATH = Path("./groundtruth.db")
+DEFAULT_SQLITE_BUSY_TIMEOUT_MS = 30_000
 _VALID_APPLICATION_SCOPES = frozenset({"gtkb_platform", "agent_red_application"})
 
 
@@ -1532,11 +1533,13 @@ class KnowledgeDB:
         if self._conn is None:
             self._conn = sqlite3.connect(
                 str(self.db_path),
+                timeout=DEFAULT_SQLITE_BUSY_TIMEOUT_MS / 1000,
                 check_same_thread=self._check_same_thread,
             )
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
+            self._conn.execute(f"PRAGMA busy_timeout={DEFAULT_SQLITE_BUSY_TIMEOUT_MS}")
         return self._conn
 
     def _ensure_schema(self) -> None:
