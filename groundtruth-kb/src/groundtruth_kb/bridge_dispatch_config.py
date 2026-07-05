@@ -29,6 +29,15 @@ OPERATOR_QUIESCE_ACTIVE_REASON = "operator_quiesce_active"
 
 DEFAULT_SELECTION_ORDER = ("quality", "cost", "availability", "reviewer_precedence", "harness_id")
 GOVERNANCE_GRADE_LO_MIN_QUALITY = 80.0
+DISPATCH_CONFIG_HARNESS_AUTHORITY_FIELDS = frozenset(
+    {
+        "can_receive_dispatch",
+        "can_fire_events",
+        "dispatch_cost",
+        "dispatch_quality",
+        "dispatch_availability",
+    }
+)
 RUNTIME_FAILURE_RESULTS = {
     "all_slugs_quarantined",
     "circuit_breaker_active",
@@ -584,7 +593,13 @@ def apply_dispatch_config_to_record(
     record: dict[str, Any],
     config: BridgeDispatchConfig | None,
 ) -> dict[str, Any]:
-    """Overlay dispatch config fields onto one projected harness record."""
+    """Overlay policy-only dispatch config fields onto one projected harness record.
+
+    WI-5012 moved dispatch capability and ranking authority to the harness
+    registry/MemBase projection. ``rules.toml`` may still carry per-harness
+    policy such as caps or tags, but it must not override the five authoritative
+    dispatch fields.
+    """
     if config is None:
         return record
     harness_id = str(record.get("id") or "")
@@ -592,17 +607,6 @@ def apply_dispatch_config_to_record(
     if overlay is None:
         return record
     updated = dict(record)
-    if overlay.can_fire_events is not None:
-        updated["can_fire_events"] = overlay.can_fire_events
-        updated["event_driven_hooks"] = overlay.can_fire_events
-    if overlay.can_receive_dispatch is not None:
-        updated["can_receive_dispatch"] = overlay.can_receive_dispatch
-    if overlay.dispatch_cost is not None:
-        updated["dispatch_cost"] = overlay.dispatch_cost
-    if overlay.dispatch_quality is not None:
-        updated["dispatch_quality"] = overlay.dispatch_quality
-    if overlay.dispatch_availability is not None:
-        updated["dispatch_availability"] = overlay.dispatch_availability
     if overlay.max_items is not None:
         updated["dispatch_max_items"] = overlay.max_items
     if overlay.tags:
@@ -1668,35 +1672,18 @@ def _dispatch_config_consistency_findings(
         overlay = config.overlay_for(harness_id)
         if overlay is None:
             continue
-        if overlay.can_receive_dispatch is not None:
-            raw_receive = _optional_bool(raw.get("can_receive_dispatch"))
-            if raw_receive is not None and raw_receive != overlay.can_receive_dispatch:
-                findings.append(
-                    "dispatch config drift warning: "
-                    f"harness {harness_id} can_receive_dispatch "
-                    f"rules.toml={overlay.can_receive_dispatch} harness-registry={raw_receive}"
-                )
-            if overlay.can_receive_dispatch is True and _record_status(raw) != "active":
-                findings.append(
-                    "dispatch config drift warning: "
-                    f"harness {harness_id} can_receive_dispatch rules.toml=True "
-                    f"but harness-registry status={_record_status(raw) or '(missing)'}"
-                )
-        if overlay.can_fire_events is not None:
-            raw_fire = _optional_bool(raw.get("can_fire_events"))
-            if raw_fire is not None and raw_fire != overlay.can_fire_events:
-                findings.append(
-                    "dispatch config drift warning: "
-                    f"harness {harness_id} can_fire_events "
-                    f"rules.toml={overlay.can_fire_events} harness-registry={raw_fire}"
-                )
-            raw_hooks = _optional_bool(raw.get("event_driven_hooks"))
-            if raw_hooks is not None and raw_hooks != overlay.can_fire_events:
-                findings.append(
-                    "dispatch config drift warning: "
-                    f"harness {harness_id} event_driven_hooks "
-                    f"rules.toml={overlay.can_fire_events} harness-registry={raw_hooks}"
-                )
+        deprecated = [
+            field
+            for field in sorted(DISPATCH_CONFIG_HARNESS_AUTHORITY_FIELDS)
+            if getattr(overlay, field, None) is not None
+        ]
+        if deprecated:
+            fields = ", ".join(deprecated)
+            findings.append(
+                "dispatch config policy warning: "
+                f"harness {harness_id} rules.toml carries deprecated authoritative field(s) "
+                f"{fields}; ignored in favor of harness-registry/MemBase"
+            )
     return findings
 
 

@@ -1,0 +1,135 @@
+VERIFIED
+
+# WI-4992 Impl-Auth Quarantine Dispatch Suppression — Post-Implementation Verification Verdict
+
+bridge_kind: lo_verdict
+Document: gtkb-wi4992-impl-auth-quarantine-dispatch-suppression
+Version: 006
+Author: Loyal Opposition (Claude, harness B)
+Date: 2026-07-03 UTC
+Reviewer: Loyal Opposition
+Responds to: bridge/gtkb-wi4992-impl-auth-quarantine-dispatch-suppression-005.md (REVISED; implementation report)
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 901d970b-b437-4794-83bc-b84ac044f8d9
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; ::init gtkb lo; ::open build; auto-process loop; resolved role loyal-opposition
+
+Project Authorization: PAUTH-PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-WI-4992-IMPL-AUTH-QUARANTINE
+Project: PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION
+Work Item: WI-4992
+
+Recommended commit type: `feat:` (combined dispatcher-modernization commit; WI-4992's own change is `fix`, but this commit also carries WI-4994 PB fan-out, a net-new capability).
+
+---
+
+## Verdict Summary
+
+**VERIFIED.** WI-4992 implements the impl-auth quarantine dispatch suppression
+approved in the `-002` GO, using the GO N2 mechanism (non-dispatchable-until-revised
+keyed to the deterministic impl-auth-quarantine reason and the bridge document's
+current top-file signature; auto-re-evaluated on revision). Loyal Opposition
+independently re-executed the combined dispatcher suite (267 passed, 0 failed) on
+the current frozen source and confirmed the suppression code. Both preflights pass
+on the latest operative file (`-005`) and independence holds.
+
+**Combined-commit note (owner AUQ 2026-07-03).** WI-4992, WI-4994, and WI-4995 were
+implemented in parallel by Codex-A into overlapping dispatcher source files, so
+their changes cannot be separated per-thread in the working tree. Independent
+dispatched LO reviews (WI-4994 `-008`, WI-4995 `-008`) converged on the same
+finding and NO-GO'd all three pending an owner sequencing/scope decision. The
+version churn on these threads was report/verdict-only — the dispatched revisions
+made no source mutation, so the verified source state is stable. The owner
+resolved the blocker via AskUserQuestion: **combine into one commit** referencing
+all three WIs, VERIFIED on each. To execute this safely I quiesced automated
+dispatch (bridge substrate `none`) so the threads and shared files are frozen.
+**This verdict's commit carries the full shared source change set for all three
+threads**; the WI-4994 and WI-4995 VERIFIED verdicts follow, each citing this
+combined commit.
+
+## Review Independence
+
+- Report (`-005`) author: `author_harness_id: A` (Codex), dispatched PB session.
+- Review session context: `901d970b-b437-4794-83bc-b84ac044f8d9` (Claude, harness B).
+- Distinct author and reviewer session contexts and distinct harnesses; review independence satisfied.
+- Thread read: `-001` NEW, `-002` GO (this reviewer), `-003` report, `-004` dispatched-LO NO-GO, `-005` REVISED report.
+
+## Applicability Preflight
+
+- operative_file: `bridge/gtkb-wi4992-impl-auth-quarantine-dispatch-suppression-005.md`
+- preflight_passed: `true`
+- missing_required_specs: []
+- packet_hash: `sha256:16c05ec2f1b8d09126c45d833cf835a9b02b4add826ec3931ba3eec89bbf9273`
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- operative_file: `bridge/gtkb-wi4992-impl-auth-quarantine-dispatch-suppression-005.md`
+- Blocking gaps (gate-failing): 0; exit 0 (pass).
+
+## Spec-to-Test Mapping
+
+Loyal Opposition re-ran the suite itself (267 passed, 0 failed) on the frozen
+source; "Executed=yes" reflects this reviewer's own run.
+
+| Spec / GO expectation | Test re-executed by LO | Executed | Result |
+| --- | --- | --- | --- |
+| SPEC-CENTRALIZED-DISPATCH-SERVICE-001 — impl-auth-quarantined GO not repeatedly dispatched; implementable sibling still dispatches | test_wi4992_daemon_all_impl_auth_quarantine_suppresses_until_signature_changes and test_wi4992_daemon_impl_auth_quarantine_does_not_block_implementable_document | yes | passed (in 267) |
+| GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 — impl-auth gate still denies; no bypass | test_prime_spawn_fails_closed_when_dispatch_authorization_fails | yes | passed (in 267) |
+| SPEC-CENTRALIZED-DISPATCH-SERVICE-001 — health no longer reports false PB subprocess failure on all_impl_auth_quarantined | test_wi4992_all_impl_auth_quarantine_ignores_stale_failure_class | yes | passed (in 267) |
+| GOV-FILE-BRIDGE-AUTHORITY-001 — suppression keyed to top-file signature; revised version re-enters evaluation | test_wi4992_daemon_all_impl_auth_quarantine_suppresses_until_signature_changes | yes | passed (in 267) |
+| DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 — code-quality gates (both) | ruff check and ruff format --check on all 10 shared files | yes | All checks passed; 10 files already formatted |
+
+## Verification Evidence (code confirmation)
+
+- `groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py` contains the
+  `impl_auth_quarantine` / `all_impl_auth_quarantined` classification alongside the
+  WI-4995 `DOCUMENT_LEASE_HELD_NONLAUNCH_REASON` branch — the entanglement this
+  combined commit resolves.
+- Suppression is keyed to the per-document top-file signature (re-evaluated on
+  revision); the impl-auth gate remains the refusal source (no bypass).
+- LO combined-suite re-run on the frozen source: `267 passed, 0 failed`.
+
+## Files Verified (this thread's scope; committed in the combined commit)
+
+- `scripts/dispatcher_runtime.py`
+- `scripts/gtkb_dispatcher_daemon.py`
+- `groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py`
+- `platform_tests/scripts/test_dispatcher_runtime.py`
+- `platform_tests/scripts/test_gtkb_dispatcher_daemon.py`
+- `platform_tests/scripts/test_bridge_dispatch_config.py`
+
+The combined commit also carries WI-4994's and WI-4995's shared-file changes
+(`bridge_dispatch_concurrency.py`, the fan-out daemon edits, the lease-held
+classifier, and their tests) per the owner combine decision.
+
+## Prior Deliberations
+
+- `DELIB-20260703-HEADLESS-DISPATCH-STABILITY-GOAL` (owner goal); the WI-4992
+  `-001`/GO `-002` chain; sibling WI-4994 (PB fan-out) and WI-4995 (lease-held
+  health) verified in the same combined commit; the reviewer's originating live
+  observation (516 impl-auth-quarantine attempts) captured as the WI-4992 backlog
+  row. Owner AUQ 2026-07-03 authorized the combined commit and the dispatch quiesce.
+
+## Commands Executed
+
+```
+gt bridge show gtkb-wi4992-impl-auth-quarantine-dispatch-suppression   # REVISED report at -005
+pytest platform_tests/scripts/test_gtkb_dispatcher_daemon.py platform_tests/scripts/test_dispatcher_runtime.py platform_tests/scripts/test_dispatcher_runtime_work_intent.py platform_tests/scripts/test_perrole_concurrency_cap_dispatch.py platform_tests/scripts/test_bridge_dispatch_config.py platform_tests/groundtruth_kb/cli/test_bridge_dispatch_report_cli.py   # 267 passed, 0 failed
+ruff check <10 shared files>   # All checks passed
+ruff format --check <10 shared files>   # 10 files already formatted
+python scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi4992-impl-auth-quarantine-dispatch-suppression   # preflight_passed: true; packet_hash sha256:16c05ec2…
+python scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi4992-impl-auth-quarantine-dispatch-suppression          # 0 blocking gaps, exit 0
+gt mode set-bridge-substrate --substrate none   # quiesce automated dispatch to freeze the threads
+```
+
+## Owner Decisions / Input
+
+- Owner AskUserQuestion (2026-07-03): resolve the WI-4992/4994/4995 shared-file
+  entanglement by **combining into one commit** referencing all three WIs, with
+  VERIFIED recorded on each thread; and (follow-up AUQ) **quiesce dispatch, then
+  combine**. This verdict's commit is that combined commit.
+
+---
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

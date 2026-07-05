@@ -4705,6 +4705,9 @@ def _rec(
     can_receive_dispatch=None,
     can_fire_events=None,
     reviewer_precedence=None,
+    dispatch_quality=None,
+    dispatch_cost=None,
+    dispatch_availability=None,
 ) -> dict:
     """Build one registry record. status=_NO_STATUS omits the status key
     (assertion 5: absent status). Pass status=None / "" / "bogus" for the other
@@ -4726,6 +4729,12 @@ def _rec(
         record["can_fire_events"] = can_fire_events
     if reviewer_precedence is not None:
         record["reviewer_precedence"] = reviewer_precedence
+    if dispatch_quality is not None:
+        record["dispatch_quality"] = dispatch_quality
+    if dispatch_cost is not None:
+        record["dispatch_cost"] = dispatch_cost
+    if dispatch_availability is not None:
+        record["dispatch_availability"] = dispatch_availability
     return record
 
 
@@ -5852,6 +5861,9 @@ prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"
                 },
                 can_receive_dispatch=True,
                 reviewer_precedence=20,
+                dispatch_quality=90,
+                dispatch_cost=60,
+                dispatch_availability=90,
             ),
             _rec(
                 "D",
@@ -5861,6 +5873,9 @@ prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"
                 {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"], "max_items": 1}},
                 can_receive_dispatch=True,
                 reviewer_precedence=10,
+                dispatch_quality=80,
+                dispatch_cost=30,
+                dispatch_availability=95,
             ),
             _rec(
                 "F",
@@ -5870,6 +5885,9 @@ prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"
                 {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"], "max_items": 1}},
                 can_receive_dispatch=True,
                 reviewer_precedence=30,
+                dispatch_quality=80,
+                dispatch_cost=20,
+                dispatch_availability=90,
             ),
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],

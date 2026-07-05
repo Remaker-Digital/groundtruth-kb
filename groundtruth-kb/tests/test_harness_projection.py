@@ -114,6 +114,50 @@ class TestBuildProjection:
         for record in doc["harnesses"]:
             assert "topology" not in record
 
+    def test_build_projection_projects_dispatch_metadata_from_invocation_surface(self, db: Any) -> None:
+        _insert_harness(
+            db,
+            id="D",
+            harness_name="ollama",
+            harness_type="ollama",
+            role=["loyal-opposition"],
+            invocation_surfaces={
+                "dispatch": {
+                    "can_receive_dispatch": False,
+                    "can_fire_events": False,
+                    "event_driven_hooks": False,
+                    "dispatch_quality": 92,
+                    "dispatch_cost": 25,
+                    "dispatch_availability": 95,
+                    "dispatch_max_items": 2,
+                    "dispatch_tags": ["low-cost", "loyal-opposition"],
+                }
+            },
+        )
+        record = build_projection(db.list_harnesses())["harnesses"][0]
+        assert record["can_receive_dispatch"] is False
+        assert record["can_fire_events"] is False
+        assert record["event_driven_hooks"] is False
+        assert record["dispatch_quality"] == 92.0
+        assert record["dispatch_cost"] == 25.0
+        assert record["dispatch_availability"] == 95.0
+        assert record["dispatch_max_items"] == 2
+        assert record["dispatch_tags"] == ["low-cost", "loyal-opposition"]
+
+    def test_build_projection_ignores_dispatch_config_overlay_argument(self, db: Any) -> None:
+        _insert_harness(
+            db,
+            id="Z",
+            harness_name="fixture",
+            harness_type="custom",
+            role=["loyal-opposition"],
+        )
+        doc = build_projection(
+            db.list_harnesses(), dispatch_config={"harnesses": {"Z": {"can_receive_dispatch": True}}}
+        )
+        record = doc["harnesses"][0]
+        assert record["can_receive_dispatch"] is False
+
 
 class TestGenerateHarnessProjection:
     """generate_harness_projection() — the DB-to-file writer."""

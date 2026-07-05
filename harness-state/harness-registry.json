@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-04T01:22:00Z",
+  "generated_at": "2026-07-05T07:57:34Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -14,8 +14,8 @@
       "dispatch_max_items": 1,
       "dispatch_quality": 90.0,
       "dispatch_tags": [
-        "prime-builder",
-        "event-source"
+        "event-source",
+        "prime-builder"
       ],
       "event_driven_hooks": true,
       "full_transcript_archive_required": false,
@@ -23,6 +23,19 @@
       "harness_type": "codex",
       "id": "A",
       "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": true,
+          "can_receive_dispatch": true,
+          "dispatch_availability": 90,
+          "dispatch_cost": 60,
+          "dispatch_max_items": 1,
+          "dispatch_quality": 90,
+          "dispatch_tags": [
+            "event-source",
+            "prime-builder"
+          ],
+          "event_driven_hooks": true
+        },
         "headless": {
           "argv": [
             "codex",
@@ -49,7 +62,7 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 49
+      "version": 50
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -71,6 +84,18 @@
       "harness_type": "claude",
       "id": "B",
       "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": true,
+          "dispatch_availability": 75,
+          "dispatch_cost": 60,
+          "dispatch_max_items": 3,
+          "dispatch_quality": 95,
+          "dispatch_tags": [
+            "loyal-opposition"
+          ],
+          "event_driven_hooks": false
+        },
         "headless": {
           "argv": [
             "claude",
@@ -92,7 +117,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 44
+      "version": 45
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -116,6 +141,12 @@
         "dispatch": {
           "can_fire_events": false,
           "can_receive_dispatch": true,
+          "dispatch_availability": 80,
+          "dispatch_cost": 30,
+          "dispatch_quality": 80,
+          "dispatch_tags": [
+            "loyal-opposition"
+          ],
           "event_driven_hooks": false
         },
         "headless": {
@@ -145,12 +176,12 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 33
+      "version": 34
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -159,8 +190,8 @@
       "dispatch_max_items": 2,
       "dispatch_quality": 92.0,
       "dispatch_tags": [
-        "loyal-opposition",
-        "low-cost"
+        "low-cost",
+        "loyal-opposition"
       ],
       "event_driven_hooks": false,
       "full_transcript_archive_required": false,
@@ -168,6 +199,19 @@
       "harness_type": "ollama",
       "id": "D",
       "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": false,
+          "dispatch_availability": 95,
+          "dispatch_cost": 25,
+          "dispatch_max_items": 2,
+          "dispatch_quality": 92,
+          "dispatch_tags": [
+            "low-cost",
+            "loyal-opposition"
+          ],
+          "event_driven_hooks": false
+        },
         "headless": {
           "argv": [
             "groundtruth-kb/.venv/Scripts/python.exe",
@@ -187,7 +231,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 22
+      "version": 23
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -209,6 +253,18 @@
       "harness_type": "cursor",
       "id": "E",
       "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": false,
+          "dispatch_availability": 90,
+          "dispatch_cost": 20,
+          "dispatch_max_items": 3,
+          "dispatch_quality": 80,
+          "dispatch_tags": [
+            "prime-builder"
+          ],
+          "event_driven_hooks": false
+        },
         "headless": {
           "argv": [
             "groundtruth-kb/.venv/Scripts/python.exe",
@@ -229,7 +285,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 13
+      "version": 14
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
@@ -242,8 +298,8 @@
       "dispatch_cost": 20.0,
       "dispatch_quality": 80.0,
       "dispatch_tags": [
-        "loyal-opposition",
-        "low-cost"
+        "low-cost",
+        "loyal-opposition"
       ],
       "event_driven_hooks": false,
       "full_transcript_archive_required": false,
@@ -251,6 +307,18 @@
       "harness_type": "openrouter",
       "id": "F",
       "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": false,
+          "dispatch_availability": 90,
+          "dispatch_cost": 20,
+          "dispatch_quality": 80,
+          "dispatch_tags": [
+            "low-cost",
+            "loyal-opposition"
+          ],
+          "event_driven_hooks": false
+        },
         "headless": {
           "argv": [
             "groundtruth-kb/.venv/Scripts/python.exe",
@@ -267,7 +335,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 17
+      "version": 18
     }
   ],
   "schema_version": 1,

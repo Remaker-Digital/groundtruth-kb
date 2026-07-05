@@ -137,12 +137,12 @@ def test_duplicate_guard_fails_uncovered_invalid_derived_cache(tmp_path: Path) -
     result = _check_sot_duplicate_guard(tmp_path)
 
     assert result.status == "fail"
-    assert "uncovered duplicate-SoT violation" in result.message
+    assert "persistent duplicate-SoT violation" in result.message
     assert "invalid-derived-cache:cache.json" in result.message
     assert "read_only" in result.message
 
 
-def test_duplicate_guard_warns_on_known_covered_dispatch_duplicate(tmp_path: Path) -> None:
+def test_duplicate_guard_fails_on_known_covered_dispatch_duplicate(tmp_path: Path) -> None:
     _write_registry(
         tmp_path,
         _registry_record("harness-registry", "harness-state/harness-registry.json", domain="harness_state"),
@@ -151,10 +151,10 @@ def test_duplicate_guard_warns_on_known_covered_dispatch_duplicate(tmp_path: Pat
 
     result = _check_sot_duplicate_guard(tmp_path)
 
-    assert result.status == "warning"
-    assert result.required is False
-    assert "duplicate-dispatch-harness-fields->WI-5012" in result.message
-    assert "existing_covering_work_item" in result.message
+    assert result.status == "fail"
+    assert result.required is True
+    assert "persistent duplicate-SoT violation" in result.message
+    assert "duplicate-dispatch-harness-fields" in result.message
 
 
 def test_run_doctor_bridge_profile_wires_duplicate_guard() -> None:

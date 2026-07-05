@@ -537,3 +537,102 @@ def set_invocation_surface(
         change_reason=change_reason,
         invocation_surfaces=updated,
     )
+
+
+def set_dispatch_metadata(
+    db: Any,
+    harness_id: str,
+    *,
+    can_receive_dispatch: bool | None = None,
+    can_fire_events: bool | None = None,
+    dispatch_quality: float | None = None,
+    dispatch_cost: float | None = None,
+    dispatch_availability: float | None = None,
+    dispatch_max_items: int | None = None,
+    dispatch_tags: list[str] | tuple[str, ...] | None = None,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    """Append a harness version with updated canonical dispatch metadata.
+
+    WI-5012 makes the harness registry/MemBase the authoritative home for
+    dispatchability and ranking fields. The fields are stored under the existing
+    ``invocation_surfaces.dispatch`` object to avoid a schema migration while
+    preserving the append-only harness version discipline.
+    """
+    current = db.get_harness(harness_id)
+    if current is None:
+        raise HarnessOperationError(f"unknown harness {harness_id!r}; no such harness in the registry")
+    surfaces = _decode_json_field(current.get("invocation_surfaces"))
+    if surfaces is None:
+        surfaces = {}
+    if not isinstance(surfaces, dict):
+        raise HarnessOperationError(f"harness {harness_id!r} invocation_surfaces must be a JSON object")
+    updated_surfaces = dict(surfaces)
+    dispatch = updated_surfaces.get("dispatch")
+    if dispatch is None:
+        dispatch = {}
+    if not isinstance(dispatch, dict):
+        raise HarnessOperationError(f"harness {harness_id!r} invocation_surfaces.dispatch must be a JSON object")
+    updated_dispatch = dict(dispatch)
+
+    changed = False
+    if can_receive_dispatch is not None:
+        updated_dispatch["can_receive_dispatch"] = bool(can_receive_dispatch)
+        changed = True
+    if can_fire_events is not None:
+        updated_dispatch["can_fire_events"] = bool(can_fire_events)
+        updated_dispatch["event_driven_hooks"] = bool(can_fire_events)
+        changed = True
+    for field, value in (
+        ("dispatch_quality", dispatch_quality),
+        ("dispatch_cost", dispatch_cost),
+        ("dispatch_availability", dispatch_availability),
+    ):
+        if value is not None:
+            updated_dispatch[field] = _validate_dispatch_score(field, value)
+            changed = True
+    if dispatch_max_items is not None:
+        updated_dispatch["dispatch_max_items"] = _validate_dispatch_max_items(dispatch_max_items)
+        changed = True
+    if dispatch_tags is not None:
+        updated_dispatch["dispatch_tags"] = _validate_dispatch_tags(dispatch_tags)
+        changed = True
+    if not changed:
+        raise HarnessOperationError("at least one dispatch metadata field must be provided")
+
+    updated_surfaces["dispatch"] = updated_dispatch
+    return _append_version(
+        db,
+        current,
+        changed_by=changed_by,
+        change_reason=change_reason,
+        invocation_surfaces=updated_surfaces,
+    )
+
+
+def _validate_dispatch_score(name: str, value: float) -> float | int:
+    try:
+        score = float(value)
+    except (TypeError, ValueError) as exc:
+        raise HarnessOperationError(f"{name} must be numeric") from exc
+    if score < 0 or score > 100:
+        raise HarnessOperationError(f"{name} must be between 0 and 100")
+    return int(score) if score.is_integer() else score
+
+
+def _validate_dispatch_max_items(value: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HarnessOperationError("dispatch_max_items must be an integer") from exc
+    if parsed < 1:
+        raise HarnessOperationError("dispatch_max_items must be at least 1")
+    return parsed
+
+
+def _validate_dispatch_tags(values: list[str] | tuple[str, ...]) -> list[str]:
+    cleaned = sorted({str(value).strip() for value in values if str(value).strip()})
+    if not cleaned:
+        raise HarnessOperationError("dispatch_tags must include at least one value")
+    return cleaned

@@ -11,7 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from groundtruth_kb.bridge_dispatch_config import DISPATCH_CONFIG_RELATIVE_PATH
+from groundtruth_kb.bridge_dispatch_config import (
+    DISPATCH_CONFIG_HARNESS_AUTHORITY_FIELDS,
+    DISPATCH_CONFIG_RELATIVE_PATH,
+)
 
 TRANSACTION_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-dispatch-config-transactions"
 
@@ -45,11 +48,6 @@ BUDGET_FLOAT_FIELDS = frozenset(
 )
 HARNESS_FIELD_ORDER = (
     "description",
-    "can_receive_dispatch",
-    "can_fire_events",
-    "dispatch_cost",
-    "dispatch_quality",
-    "dispatch_availability",
     "max_items",
     "tags",
 )
@@ -107,21 +105,24 @@ def set_eligibility(
     dry_run: bool = False,
     defer_to_next_session: bool = False,
 ) -> DispatchConfigTransactionResult:
-    def mutate(raw: dict[str, Any]) -> dict[str, Any]:
-        harness = _require_harness(raw, harness_id)
-        if can_receive_dispatch is None and can_fire_events is None:
-            raise DispatchConfigTransactionError("at least one eligibility field must be provided")
-        if can_receive_dispatch is not None:
-            harness["can_receive_dispatch"] = bool(can_receive_dispatch)
-        if can_fire_events is not None:
-            harness["can_fire_events"] = bool(can_fire_events)
-        return raw
-
-    return _apply_transaction(
+    if can_receive_dispatch is None and can_fire_events is None:
+        raise DispatchConfigTransactionError("at least one eligibility field must be provided")
+    return _apply_registry_metadata_transaction(
         project_root,
         "set-eligibility",
-        {"harness_id": _validate_harness_id(harness_id)},
-        mutate,
+        {
+            "harness_id": _validate_harness_id(harness_id),
+            "can_receive_dispatch": can_receive_dispatch,
+            "can_fire_events": can_fire_events,
+        },
+        lambda harness_ops, db: harness_ops.set_dispatch_metadata(
+            db,
+            harness_id,
+            can_receive_dispatch=can_receive_dispatch,
+            can_fire_events=can_fire_events,
+            changed_by="gt-bridge-dispatch-config-cli",
+            change_reason="set dispatch eligibility via gt bridge dispatch config",
+        ),
         dry_run=dry_run,
         defer_to_next_session=defer_to_next_session,
     )
@@ -137,23 +138,26 @@ def set_weights(
     dry_run: bool = False,
     defer_to_next_session: bool = False,
 ) -> DispatchConfigTransactionResult:
-    def mutate(raw: dict[str, Any]) -> dict[str, Any]:
-        harness = _require_harness(raw, harness_id)
-        if dispatch_quality is None and dispatch_cost is None and dispatch_availability is None:
-            raise DispatchConfigTransactionError("at least one weight field must be provided")
-        if dispatch_quality is not None:
-            harness["dispatch_quality"] = _validate_score("dispatch_quality", dispatch_quality)
-        if dispatch_cost is not None:
-            harness["dispatch_cost"] = _validate_score("dispatch_cost", dispatch_cost)
-        if dispatch_availability is not None:
-            harness["dispatch_availability"] = _validate_score("dispatch_availability", dispatch_availability)
-        return raw
-
-    return _apply_transaction(
+    if dispatch_quality is None and dispatch_cost is None and dispatch_availability is None:
+        raise DispatchConfigTransactionError("at least one weight field must be provided")
+    return _apply_registry_metadata_transaction(
         project_root,
         "set-weights",
-        {"harness_id": _validate_harness_id(harness_id)},
-        mutate,
+        {
+            "harness_id": _validate_harness_id(harness_id),
+            "dispatch_quality": dispatch_quality,
+            "dispatch_cost": dispatch_cost,
+            "dispatch_availability": dispatch_availability,
+        },
+        lambda harness_ops, db: harness_ops.set_dispatch_metadata(
+            db,
+            harness_id,
+            dispatch_quality=dispatch_quality,
+            dispatch_cost=dispatch_cost,
+            dispatch_availability=dispatch_availability,
+            changed_by="gt-bridge-dispatch-config-cli",
+            change_reason="set dispatch ranking weights via gt bridge dispatch config",
+        ),
         dry_run=dry_run,
         defer_to_next_session=defer_to_next_session,
     )
@@ -245,6 +249,18 @@ def add_harness(
     dry_run: bool = False,
     defer_to_next_session: bool = False,
 ) -> DispatchConfigTransactionResult:
+    if (
+        can_receive_dispatch is not None
+        or can_fire_events is not None
+        or dispatch_quality is not None
+        or dispatch_cost is not None
+        or dispatch_availability is not None
+    ):
+        raise DispatchConfigTransactionError(
+            "dispatch capability and ranking fields live in harness registry/MemBase; "
+            "register the harness with gt harness and update invocation_surfaces.dispatch"
+        )
+
     def mutate(raw: dict[str, Any]) -> dict[str, Any]:
         harnesses = _harnesses(raw)
         validated_id = _validate_harness_id(harness_id)
@@ -253,16 +269,6 @@ def add_harness(
         row: dict[str, Any] = {}
         if description:
             row["description"] = description
-        if can_receive_dispatch is not None:
-            row["can_receive_dispatch"] = bool(can_receive_dispatch)
-        if can_fire_events is not None:
-            row["can_fire_events"] = bool(can_fire_events)
-        if dispatch_cost is not None:
-            row["dispatch_cost"] = _validate_score("dispatch_cost", dispatch_cost)
-        if dispatch_quality is not None:
-            row["dispatch_quality"] = _validate_score("dispatch_quality", dispatch_quality)
-        if dispatch_availability is not None:
-            row["dispatch_availability"] = _validate_score("dispatch_availability", dispatch_availability)
         if max_items is not None:
             row["max_items"] = _validate_max_items(max_items)
         if tags:
@@ -305,6 +311,78 @@ def remove_harness(
     )
 
 
+def _apply_registry_metadata_transaction(
+    project_root: Path,
+    transaction: str,
+    parameters: dict[str, Any],
+    mutate: Any,
+    *,
+    dry_run: bool,
+    defer_to_next_session: bool,
+) -> DispatchConfigTransactionResult:
+    if dry_run and defer_to_next_session:
+        raise DispatchConfigTransactionError("--dry-run and --defer-to-next-session are mutually exclusive")
+    root = project_root.resolve()
+    registry_path = root / "harness-state" / "harness-registry.json"
+    before_bytes = registry_path.read_bytes() if registry_path.exists() else b""
+    before_hash = _hash_bytes(before_bytes)
+    state_dir = root / TRANSACTION_STATE_RELATIVE_PATH
+
+    if dry_run:
+        return DispatchConfigTransactionResult(
+            transaction=transaction,
+            status="dry_run",
+            mutated=False,
+            config_path=registry_path,
+            message=f"{transaction}: dry run; harness registry unchanged",
+        )
+
+    if defer_to_next_session:
+        pending_path = state_dir / "pending.jsonl"
+        audit_path = state_dir / "audit.jsonl"
+        record = _record(transaction, parameters, before_hash=before_hash, after_hash=before_hash, status="deferred")
+        _append_jsonl(pending_path, record)
+        _append_jsonl(audit_path, record)
+        return DispatchConfigTransactionResult(
+            transaction=transaction,
+            status="deferred",
+            mutated=False,
+            config_path=registry_path,
+            audit_path=audit_path,
+            pending_path=pending_path,
+            message=f"{transaction}: deferred to next session; harness registry unchanged",
+        )
+
+    try:
+        from groundtruth_kb import harness_ops
+        from groundtruth_kb.db import KnowledgeDB
+        from groundtruth_kb.harness_projection import generate_harness_projection
+    except Exception as exc:  # pragma: no cover - import boundary
+        raise DispatchConfigTransactionError(f"harness registry transaction support unavailable: {exc}") from exc
+
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    try:
+        mutate(harness_ops, db)
+    except harness_ops.HarnessOperationError as exc:
+        raise DispatchConfigTransactionError(str(exc)) from exc
+    generate_harness_projection(db, root)
+    after_bytes = registry_path.read_bytes() if registry_path.exists() else b""
+    after_hash = _hash_bytes(after_bytes)
+    audit_path = state_dir / "audit.jsonl"
+    _append_jsonl(
+        audit_path,
+        _record(transaction, parameters, before_hash=before_hash, after_hash=after_hash, status="applied"),
+    )
+    return DispatchConfigTransactionResult(
+        transaction=transaction,
+        status="applied",
+        mutated=after_hash != before_hash,
+        config_path=registry_path,
+        audit_path=audit_path,
+        message=f"{transaction}: applied to harness registry/MemBase; harness-registry projection regenerated",
+    )
+
+
 def _apply_transaction(
     project_root: Path,
     transaction: str,
@@ -322,6 +400,7 @@ def _apply_transaction(
     raw = _parse_config(before_bytes, config_path)
     updated = mutate(_clone(raw))
     rendered = _render_dispatch_config(updated).encode("utf-8")
+    result_config = _parse_config(rendered, config_path)
     before_hash = _hash_bytes(before_bytes)
     after_hash = _hash_bytes(rendered)
     if dry_run:
@@ -331,7 +410,7 @@ def _apply_transaction(
             mutated=False,
             config_path=config_path,
             message=f"{transaction}: dry run; no files written",
-            config=updated,
+            config=result_config,
         )
 
     state_dir = root / TRANSACTION_STATE_RELATIVE_PATH
@@ -349,7 +428,7 @@ def _apply_transaction(
             audit_path=audit_path,
             pending_path=pending_path,
             message=f"{transaction}: deferred to next session; config unchanged",
-            config=updated,
+            config=result_config,
         )
 
     config_path.write_bytes(rendered)
@@ -357,54 +436,15 @@ def _apply_transaction(
     _append_jsonl(
         audit_path, _record(transaction, parameters, before_hash=before_hash, after_hash=after_hash, status="applied")
     )
-    # WI-4820: the dispatcher daemon resolves dispatchability from the static
-    # harness-registry projection, NOT from config/dispatcher/rules.toml. The
-    # projection generator already merges this overlay, so regenerate it now as a
-    # write-through; otherwise the trigger keeps reading a stale projection and
-    # `set-eligibility` (and the other overlay mutators) is a false-green. This
-    # runs only on the applied path (dry_run / defer_to_next_session return
-    # earlier), and fails soft so the rules.toml write is never half-applied.
-    regen_message = _regenerate_harness_projection(root)
-    message = f"{transaction}: applied"
-    if regen_message:
-        message = f"{message}; {regen_message}"
     return DispatchConfigTransactionResult(
         transaction=transaction,
         status="applied",
         mutated=True,
         config_path=config_path,
         audit_path=audit_path,
-        message=message,
-        config=updated,
+        message=f"{transaction}: applied",
+        config=result_config,
     )
-
-
-def _regenerate_harness_projection(root: Path) -> str:
-    """Write-through the dispatcher-config overlay into the harness-registry projection.
-
-    The dispatcher daemon resolves dispatchability from the static
-    ``harness-state/harness-registry.json`` projection, not from
-    ``config/dispatcher/rules.toml``. ``generate_harness_projection`` already
-    merges the rules.toml overlay per harness, so regenerating here keeps the
-    trigger's source consistent with the just-applied config change (WI-4820).
-
-    Fails soft: on any error the rules.toml write is preserved and a warning
-    string is returned for the caller to surface, rather than raising and leaving
-    the transaction half-applied (graceful degradation per the GO review notes).
-    """
-    try:
-        from groundtruth_kb.db import KnowledgeDB
-        from groundtruth_kb.harness_projection import generate_harness_projection
-
-        db = KnowledgeDB(db_path=root / "groundtruth.db")
-        generate_harness_projection(db, root)
-        return "harness-registry projection regenerated"
-    except Exception as exc:  # intentional-catch: regen must never half-fail the config write
-        return (
-            "WARNING: harness-registry projection regen failed "
-            f"({type(exc).__name__}: {exc}); rules.toml written but the dispatch "
-            "trigger may read a stale projection until the next regeneration"
-        )
 
 
 def _read_config_bytes(path: Path) -> bytes:
@@ -572,8 +612,13 @@ def _render_dispatch_config(raw: dict[str, Any]) -> str:
                 )
     harnesses = _harnesses(raw)
     for harness_id in sorted(harnesses):
+        harness_policy = {
+            key: value
+            for key, value in harnesses[harness_id].items()
+            if key not in DISPATCH_CONFIG_HARNESS_AUTHORITY_FIELDS
+        }
         lines.extend(["", f"[harnesses.{harness_id}]"])
-        lines.extend(_render_table(harnesses[harness_id], HARNESS_FIELD_ORDER))
+        lines.extend(_render_table(harness_policy, HARNESS_FIELD_ORDER))
     for rule in rules:
         lines.extend(["", "[[rules]]"])
         lines.extend(_render_table(rule, RULE_FIELD_ORDER))

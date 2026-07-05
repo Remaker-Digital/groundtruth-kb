@@ -3470,35 +3470,19 @@ def _check_sot_duplicate_guard(target: Path) -> ToolCheck:
         )
 
     violations = [candidate for candidate in report.candidates if candidate.classification == "duplicate_sot_violation"]
-    uncovered = [candidate for candidate in violations if not candidate.remediation_work_item_id]
-    if uncovered:
+    if violations:
         first = "; ".join(
             f"{candidate.candidate_id} paths={','.join(candidate.paths)} "
             f"fields={','.join(candidate.duplicated_fields) or 'n/a'}"
-            for candidate in uncovered[:3]
-        )
-        suffix = "" if len(uncovered) <= 3 else f"; +{len(uncovered) - 3} more"
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="fail",
-            message=f"{len(uncovered)} uncovered duplicate-SoT violation(s): {first}{suffix}",
-        )
-
-    if violations:
-        first = "; ".join(
-            f"{candidate.candidate_id}->{candidate.remediation_work_item_id}"
-            f"({candidate.remediation_status or 'covered'})"
             for candidate in violations[:3]
         )
         suffix = "" if len(violations) <= 3 else f"; +{len(violations) - 3} more"
         return ToolCheck(
             name=check_name,
-            required=False,
+            required=True,
             found=True,
-            status="warning",
-            message=f"{len(violations)} duplicate-SoT violation(s) covered by remediation work: {first}{suffix}",
+            status="fail",
+            message=f"{len(violations)} persistent duplicate-SoT violation(s): {first}{suffix}",
         )
 
     return ToolCheck(
@@ -4681,6 +4665,69 @@ def _check_dispatcher_daemon_supervisor_task(target: Path) -> ToolCheck:
         found=bool(status.get("registered")),
         status="warning",
         message=(f"{detail}. Install/enable with: gt bridge dispatch daemon supervisor install"),
+    )
+
+
+def _check_dispatcher_daemon_watchdog_task(target: Path) -> ToolCheck:
+    """Warn when dispatcher_daemon substrate lacks a healthy Windows storm watchdog (WI-5023)."""
+    check_name = "Dispatcher daemon watchdog task"
+    from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
+
+    if os.name != "nt":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="watchdog task check is Windows-only; skipped on this host",
+        )
+
+    sub_path = target / "harness-state" / "bridge-substrate.json"
+    substrate = DISPATCHER_DAEMON_SUBSTRATE
+    if sub_path.is_file():
+        try:
+            sub_doc = json.loads(sub_path.read_text(encoding="utf-8"))
+            if isinstance(sub_doc, dict):
+                raw = sub_doc.get("substrate")
+                if isinstance(raw, str) and raw.strip():
+                    substrate = raw.strip()
+        except (OSError, json.JSONDecodeError):
+            return ToolCheck(
+                name=check_name,
+                required=False,
+                found=True,
+                status="warning",
+                message="harness-state/bridge-substrate.json is unreadable; watchdog check skipped",
+            )
+
+    if substrate != DISPATCHER_DAEMON_SUBSTRATE:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=f"substrate is {substrate!r}; watchdog task not required",
+        )
+
+    from groundtruth_kb.dispatcher_watchdog import collect_watchdog_status
+
+    status = collect_watchdog_status(target)
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="GTKB-HarnessStormWatchdog is registered, enabled, hidden, and uses pythonw.exe",
+        )
+    findings = status.get("findings") or []
+    detail = "; ".join(str(item) for item in findings) or "watchdog unhealthy"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=bool(status.get("registered")),
+        status="warning",
+        message=(f"{detail}. Install/enable with: gt bridge dispatch daemon watchdog install"),
     )
 
 
@@ -6370,6 +6417,7 @@ def run_doctor(
         checks.append(_check_parity_discovery_diff(target))
         checks.append(_check_dispatcher_daemon_substrate_readiness(target))
         checks.append(_check_dispatcher_daemon_supervisor_task(target))
+        checks.append(_check_dispatcher_daemon_watchdog_task(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001

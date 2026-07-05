@@ -147,7 +147,41 @@ def _bool_or_none(value: Any) -> bool | None:
     return None
 
 
-def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
+def _float_or_none(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return []
+    return sorted({str(item).strip() for item in value if str(item).strip()})
+
+
+def _dispatch_metadata(record: dict[str, Any]) -> dict[str, Any]:
     """Extract explicit dispatch capability metadata from invocation surfaces.
 
     ``harnesses`` has no dedicated dispatchability columns, and this bridge
@@ -177,7 +211,7 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
         "can_receive_dispatch": ("can_receive_dispatch", "receive_dispatch", "dispatch_target"),
         "event_driven_hooks": ("event_driven_hooks",),
     }
-    result: dict[str, bool] = {}
+    result: dict[str, Any] = {}
     for canonical, names in aliases.items():
         for source in sources:
             for name in names:
@@ -187,6 +221,30 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, bool]:
                     break
             if canonical in result:
                 break
+    numeric_aliases = {
+        "dispatch_quality": ("dispatch_quality", "quality"),
+        "dispatch_cost": ("dispatch_cost", "cost"),
+        "dispatch_availability": ("dispatch_availability", "availability"),
+    }
+    for canonical, names in numeric_aliases.items():
+        for source in sources:
+            for name in names:
+                parsed_float = _float_or_none(source.get(name))
+                if parsed_float is not None:
+                    result[canonical] = parsed_float
+                    break
+            if canonical in result:
+                break
+    for source in sources:
+        parsed_int = _int_or_none(source.get("dispatch_max_items", source.get("max_items")))
+        if parsed_int is not None:
+            result["dispatch_max_items"] = parsed_int
+            break
+    for source in sources:
+        tags = _string_list(source.get("dispatch_tags", source.get("tags")))
+        if tags:
+            result["dispatch_tags"] = tags
+            break
     return result
 
 
@@ -258,6 +316,19 @@ def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = N
     # Deprecated back-compat alias for event-firing capability. New code reads
     # the split axes above; legacy topology readers still consume this field.
     record["event_driven_hooks"] = explicit.get("event_driven_hooks", record["can_fire_events"])
+    for field in ("dispatch_quality", "dispatch_cost", "dispatch_availability", "dispatch_max_items"):
+        if field in explicit:
+            record[field] = explicit[field]
+    tags = explicit.get("dispatch_tags")
+    if isinstance(tags, list) and tags:
+        record["dispatch_tags"] = tags
+    else:
+        derived_tags = _string_list(record.get("role"))
+        if record["can_fire_events"]:
+            derived_tags.append("event-source")
+        if harness_type in _PROVIDER_HARNESS_TYPES:
+            derived_tags.append("low-cost")
+        record["dispatch_tags"] = sorted(set(derived_tags))
     envelope = _envelope_metadata(record)
     provider_harness = harness_type in _PROVIDER_HARNESS_TYPES
     default_mode = "compact-provider" if provider_harness else "native"
@@ -265,10 +336,7 @@ def _project_harness_record(row: dict[str, Any], dispatch_config: Any | None = N
     record["compact_result_envelope_mode"] = envelope.get("compact_result_envelope_mode", default_mode)
     record["compact_session_envelope_mode"] = envelope.get("compact_session_envelope_mode", default_mode)
     record["full_transcript_archive_required"] = envelope.get("full_transcript_archive_required", False)
-    if dispatch_config is not None:
-        from groundtruth_kb.bridge_dispatch_config import apply_dispatch_config_to_record
-
-        record = apply_dispatch_config_to_record(record, dispatch_config)
+    _ = dispatch_config  # Back-compat parameter; WI-5012 forbids config-derived dispatch authority.
     return record
 
 
@@ -281,7 +349,8 @@ def build_projection(harness_rows: list[dict[str, Any]], *, dispatch_config: Any
     — topology is a derived pure function over the harness set (FR4), never a
     persisted value.
     """
-    records = [_project_harness_record(row, dispatch_config=dispatch_config) for row in harness_rows]
+    _ = dispatch_config  # Back-compat parameter; projection authority is MemBase-only after WI-5012.
+    records = [_project_harness_record(row) for row in harness_rows]
     records.sort(key=lambda r: str(r.get("id") or ""))
     return {
         "schema_version": PROJECTION_SCHEMA_VERSION,
@@ -352,14 +421,7 @@ def generate_harness_projection(
     function does not force a ``groundtruth_kb.db`` import). Returns the written
     path.
     """
-    dispatch_config = None
-    try:
-        from groundtruth_kb.bridge_dispatch_config import load_bridge_dispatch_config
-
-        dispatch_config = load_bridge_dispatch_config(project_root)
-    except Exception:  # intentional-catch: autogenerated check fix
-        dispatch_config = None
-    document = build_projection(db.list_harnesses(), dispatch_config=dispatch_config)
+    document = build_projection(db.list_harnesses())
     path = harness_registry_path(project_root, projection_path)
     return _write_projection(path, document)
 

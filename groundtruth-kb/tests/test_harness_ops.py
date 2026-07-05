@@ -265,3 +265,101 @@ def test_set_invocation_surface_replaces_named_surface_only(db: Any) -> None:
 def test_set_invocation_surface_unknown_harness_rejected(db: Any) -> None:
     with pytest.raises(harness_ops.HarnessOperationError, match="unknown harness"):
         harness_ops.set_invocation_surface(db, "Z", "headless", {}, changed_by="test", change_reason="x")
+
+
+# --- set-dispatch-metadata --------------------------------------------------
+
+
+def test_set_dispatch_metadata_updates_dispatch_surface_only(db: Any) -> None:
+    _register(
+        db,
+        "A",
+        harness_name="codex",
+        harness_type="codex-cli",
+        invocation_surfaces={
+            "interactive": {"command": "codex"},
+            "headless": {"argv": ["codex", "exec", "{{PROMPT}}"]},
+        },
+    )
+
+    record = harness_ops.set_dispatch_metadata(
+        db,
+        "A",
+        can_receive_dispatch=True,
+        can_fire_events=True,
+        dispatch_quality=90,
+        dispatch_cost=60,
+        dispatch_availability=85.5,
+        dispatch_max_items=2,
+        dispatch_tags=["prime-builder", "event-source", "prime-builder"],
+        changed_by="test",
+        change_reason="set dispatch metadata",
+    )
+
+    surfaces = _decode(record["invocation_surfaces"])
+    assert record["version"] == 2
+    assert surfaces["interactive"] == {"command": "codex"}
+    assert surfaces["headless"] == {"argv": ["codex", "exec", "{{PROMPT}}"]}
+    assert surfaces["dispatch"] == {
+        "can_receive_dispatch": True,
+        "can_fire_events": True,
+        "event_driven_hooks": True,
+        "dispatch_quality": 90,
+        "dispatch_cost": 60,
+        "dispatch_availability": 85.5,
+        "dispatch_max_items": 2,
+        "dispatch_tags": ["event-source", "prime-builder"],
+    }
+
+
+def test_set_dispatch_metadata_preserves_existing_dispatch_fields(db: Any) -> None:
+    _register(
+        db,
+        "D",
+        harness_name="ollama",
+        harness_type="ollama",
+        invocation_surfaces={
+            "dispatch": {
+                "can_receive_dispatch": True,
+                "dispatch_quality": 92,
+                "dispatch_cost": 25,
+            }
+        },
+    )
+
+    record = harness_ops.set_dispatch_metadata(
+        db,
+        "D",
+        can_receive_dispatch=False,
+        changed_by="test",
+        change_reason="disable dispatch target",
+    )
+
+    dispatch = _decode(record["invocation_surfaces"])["dispatch"]
+    assert dispatch["can_receive_dispatch"] is False
+    assert dispatch["dispatch_quality"] == 92
+    assert dispatch["dispatch_cost"] == 25
+
+
+def test_set_dispatch_metadata_unknown_harness_rejected(db: Any) -> None:
+    with pytest.raises(harness_ops.HarnessOperationError, match="unknown harness"):
+        harness_ops.set_dispatch_metadata(
+            db,
+            "Z",
+            can_receive_dispatch=True,
+            changed_by="test",
+            change_reason="x",
+        )
+
+
+def test_set_dispatch_metadata_rejects_invalid_score(db: Any) -> None:
+    _register(db, "A", harness_name="codex", harness_type="codex-cli")
+
+    with pytest.raises(harness_ops.HarnessOperationError, match="between 0 and 100"):
+        harness_ops.set_dispatch_metadata(
+            db,
+            "A",
+            dispatch_quality=101,
+            changed_by="test",
+            change_reason="x",
+        )

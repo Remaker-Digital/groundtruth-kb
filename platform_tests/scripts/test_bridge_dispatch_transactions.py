@@ -1,13 +1,10 @@
-"""Regression tests for the WI-4820 dispatch-eligibility write-through.
+"""Regression tests for WI-5012 registry-backed dispatch metadata transactions.
 
-``bridge_dispatch_transactions._apply_transaction`` regenerates the static
-``harness-state/harness-registry.json`` projection after an applied rules.toml
-mutation, so the dispatcher daemon (which resolves dispatchability from the
-static projection, NOT from ``config/dispatcher/rules.toml``) honors
-``set_eligibility`` immediately. Pre-fix the projection stayed stale while
-``gt bridge dispatch status`` merged the overlay live, producing the WI-4820
-false-green: status reported the harness enabled and selected while the trigger
-returned ``no_active_target_for_role``.
+``set_eligibility`` and ``set_weights`` no longer write the dispatch capability
+or ranking authority fields into ``config/dispatcher/rules.toml``. They append a
+new MemBase harness version under ``invocation_surfaces.dispatch`` and regenerate
+the static ``harness-state/harness-registry.json`` projection, which is the
+dispatcher trigger's hot-path source of truth.
 
 Specs: GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (fresh canonical read),
 DCL-HARNESS-STATE-SOT-READER-CONTRACT-001 (projection consistency),
@@ -23,18 +20,31 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
 if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
-from groundtruth_kb.bridge_dispatch_transactions import set_eligibility, set_rule  # noqa: E402
+from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
+    DispatchConfigTransactionError,
+    add_harness,
+    set_eligibility,
+    set_rule,
+    set_weights,
+)
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.harness_projection import generate_harness_projection, harness_registry_path  # noqa: E402
 
-# rules.toml overlay starts harness D DISABLED so the seeded projection (which
-# applies the overlay) reads can_receive_dispatch=false — the baseline the
-# trigger would see.
+_AUTHORITATIVE_FIELDS = {
+    "can_receive_dispatch",
+    "can_fire_events",
+    "dispatch_cost",
+    "dispatch_quality",
+    "dispatch_availability",
+}
+
 _RULES_TOML = """\
 schema_version = 1
 selection_order = ["quality", "cost", "availability", "harness_id"]
@@ -54,11 +64,6 @@ estimated_usd_per_dispatch = 0.0
 
 [harnesses.D]
 description = "LO"
-can_receive_dispatch = false
-can_fire_events = false
-dispatch_cost = 30
-dispatch_quality = 80
-dispatch_availability = 95
 max_items = 2
 tags = ["loyal-opposition"]
 
@@ -71,7 +76,7 @@ prefer = ["quality", "cost", "availability", "harness_id"]
 
 
 def _seed(root: Path) -> None:
-    """Seed a real groundtruth.db registry + rules.toml + generated projection."""
+    """Seed a real groundtruth.db registry + policy-only rules.toml + projection."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "groundtruth.toml").write_text(
         '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n', encoding="utf-8"
@@ -85,32 +90,47 @@ def _seed(root: Path) -> None:
         harness_type="ollama",
         role=["loyal-opposition"],
         changed_by="test",
-        change_reason="WI-4820 dispatch-eligibility write-through fixture",
+        change_reason="WI-5012 dispatch metadata fixture",
         status="active",
+        invocation_surfaces={
+            "dispatch": {
+                "can_receive_dispatch": False,
+                "can_fire_events": False,
+                "event_driven_hooks": False,
+                "dispatch_cost": 30,
+                "dispatch_quality": 80,
+                "dispatch_availability": 95,
+                "dispatch_max_items": 2,
+                "dispatch_tags": ["loyal-opposition"],
+            }
+        },
     )
     generate_harness_projection(db, root)
 
 
-def _projection_can_receive(root: Path, harness_id: str) -> bool | None:
-    """Return the projection ``can_receive_dispatch`` — the exact field the
-    trigger's ``_record_can_receive_dispatch`` gate reads from the static
-    ``harness-registry.json``. Resolved via ``harness_registry_path`` so the test
-    honors the ``GTKB_HARNESS_REGISTRY_PATH`` override the scripts/ conftest sets."""
+def _projection_record(root: Path, harness_id: str) -> dict[str, object]:
     data = json.loads(harness_registry_path(root).read_text(encoding="utf-8"))
     for record in data.get("harnesses", []):
         if record.get("id") == harness_id:
-            return record.get("can_receive_dispatch")
+            return record
     raise AssertionError(f"harness {harness_id!r} not present in projection")
 
 
-def _rules_can_receive(root: Path, harness_id: str) -> bool | None:
+def _rules_harness(root: Path, harness_id: str) -> dict[str, object]:
     rules = tomllib.loads((root / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
-    return rules.get("harnesses", {}).get(harness_id, {}).get("can_receive_dispatch")
+    return rules.get("harnesses", {}).get(harness_id, {})
 
 
 def _budget_harness(root: Path, harness_id: str) -> dict[str, object]:
     rules = tomllib.loads((root / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
     return rules.get("budget", {}).get("harnesses", {}).get(harness_id, {})
+
+
+def _db_dispatch_surface(root: Path, harness_id: str) -> dict[str, object]:
+    row = KnowledgeDB(db_path=root / "groundtruth.db").get_harness(harness_id)
+    assert row is not None
+    surfaces = json.loads(row["invocation_surfaces"])
+    return surfaces["dispatch"]
 
 
 def _rule_statuses(root: Path, rule_id: str) -> list[str]:
@@ -121,25 +141,26 @@ def _rule_statuses(root: Path, rule_id: str) -> list[str]:
     raise AssertionError(f"rule {rule_id!r} not present")
 
 
-def test_set_eligibility_regenerates_projection(tmp_path: Path) -> None:
+def _assert_rules_policy_only(root: Path, harness_id: str) -> None:
+    assert not (_AUTHORITATIVE_FIELDS & set(_rules_harness(root, harness_id)))
+
+
+def test_set_eligibility_updates_registry_projection_without_rules_authority(tmp_path: Path) -> None:
     root = tmp_path / "project"
     _seed(root)
     expected_budget = _budget_harness(root, "D")
-    # Baseline: the rules.toml overlay disables D, so the static projection the
-    # trigger reads is False.
-    assert _projection_can_receive(root, "D") is False
+    assert _projection_record(root, "D")["can_receive_dispatch"] is False
+    _assert_rules_policy_only(root, "D")
 
     result = set_eligibility(root, "D", can_receive_dispatch=True, can_fire_events=None)
 
     assert result.status == "applied"
     assert result.mutated is True
+    assert "harness registry/MemBase" in result.message
     assert "projection regenerated" in result.message
-    # The fix: the static projection now reflects the enable, so the trigger's
-    # dispatchability gate sees D as a target instead of a false-green.
-    assert _projection_can_receive(root, "D") is True
-    # rules.toml and the projection now agree — no drift, no false-green.
-    assert _rules_can_receive(root, "D") is True
-    assert _projection_can_receive(root, "D") == _rules_can_receive(root, "D")
+    assert _projection_record(root, "D")["can_receive_dispatch"] is True
+    assert _db_dispatch_surface(root, "D")["can_receive_dispatch"] is True
+    _assert_rules_policy_only(root, "D")
     assert _budget_harness(root, "D") == expected_budget
 
 
@@ -148,34 +169,57 @@ def test_set_eligibility_disable_flips_projection_back(tmp_path: Path) -> None:
     _seed(root)
     expected_budget = _budget_harness(root, "D")
     set_eligibility(root, "D", can_receive_dispatch=True, can_fire_events=None)
-    assert _projection_can_receive(root, "D") is True
+    assert _projection_record(root, "D")["can_receive_dispatch"] is True
 
     result = set_eligibility(root, "D", can_receive_dispatch=False, can_fire_events=None)
 
     assert result.status == "applied"
-    assert _projection_can_receive(root, "D") is False
-    assert _projection_can_receive(root, "D") == _rules_can_receive(root, "D")
+    assert _projection_record(root, "D")["can_receive_dispatch"] is False
+    assert _db_dispatch_surface(root, "D")["can_receive_dispatch"] is False
+    _assert_rules_policy_only(root, "D")
     assert _budget_harness(root, "D") == expected_budget
 
 
+def test_set_weights_updates_registry_projection_without_rules_authority(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    _seed(root)
+
+    result = set_weights(root, "D", dispatch_quality=88, dispatch_cost=24, dispatch_availability=91)
+
+    assert result.status == "applied"
+    projection = _projection_record(root, "D")
+    assert projection["dispatch_quality"] == 88.0
+    assert projection["dispatch_cost"] == 24.0
+    assert projection["dispatch_availability"] == 91.0
+    dispatch = _db_dispatch_surface(root, "D")
+    assert dispatch["dispatch_quality"] == 88
+    assert dispatch["dispatch_cost"] == 24
+    assert dispatch["dispatch_availability"] == 91
+    _assert_rules_policy_only(root, "D")
+
+
 def test_dry_run_does_not_regenerate_projection(tmp_path: Path) -> None:
-    # Cursor GO review note #2: the regen must run only on the applied path,
-    # never on dry_run.
     root = tmp_path / "project"
     _seed(root)
     expected_budget = _budget_harness(root, "D")
-    assert _projection_can_receive(root, "D") is False
+    assert _projection_record(root, "D")["can_receive_dispatch"] is False
 
     result = set_eligibility(root, "D", can_receive_dispatch=True, can_fire_events=None, dry_run=True)
 
     assert result.status == "dry_run"
     assert result.mutated is False
-    assert result.config is not None
-    assert result.config.get("budget", {}).get("harnesses", {}).get("D") == expected_budget
+    assert result.config is None
     assert "projection regenerated" not in result.message
-    # The static projection is untouched by a dry run.
-    assert _projection_can_receive(root, "D") is False
+    assert _projection_record(root, "D")["can_receive_dispatch"] is False
     assert _budget_harness(root, "D") == expected_budget
+
+
+def test_add_harness_rejects_registry_authority_fields(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    _seed(root)
+
+    with pytest.raises(DispatchConfigTransactionError, match="harness registry/MemBase"):
+        add_harness(root, "G", can_receive_dispatch=True)
 
 
 def test_set_rule_accepts_no_action_status_for_lo_routing(tmp_path: Path) -> None:

@@ -93,7 +93,7 @@ def test_lo_quality_floor_excludes_explicit_subfloor_candidates_before_cost_rank
     assert [row["id"] for row in selected] == ["A"]
 
 
-def test_lo_quality_floor_uses_overlayed_dispatch_quality() -> None:
+def test_lo_quality_floor_ignores_deprecated_config_dispatch_quality() -> None:
     records = [_record("F", cost=20.0, quality=72.0)]
     config = _dispatch_config(
         harnesses={
@@ -110,8 +110,7 @@ def test_lo_quality_floor_uses_overlayed_dispatch_quality() -> None:
         DispatchContext(required_role="loyal-opposition"),
     )
 
-    assert [row["id"] for row in selected] == ["F"]
-    assert selected[0]["dispatch_quality"] == 85.0
+    assert selected == []
 
 
 def test_prime_builder_selection_is_not_affected_by_lo_floor() -> None:

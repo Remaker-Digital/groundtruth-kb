@@ -31,7 +31,8 @@ from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
     set_rule,
     set_weights,
 )
-from groundtruth_kb.harness_projection import read_roles  # noqa: E402
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.harness_projection import generate_harness_projection, read_roles  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -175,21 +176,26 @@ def test_dispatcher_daemon_topology_does_not_require_event_firing_harnesses(tmp_
     assert [row["id"] for row in status.selected_by_role["loyal-opposition"]] == ["D", "F"]
 
 
-def test_wi4768_live_dispatch_config_projection_drift_is_visible() -> None:
+def test_wi5012_live_dispatch_config_keeps_registry_dispatch_authority() -> None:
     rules = tomllib.loads((REPO_ROOT / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
     harness_b_rules = rules["harnesses"]["B"]
 
-    rules_can_receive = harness_b_rules["can_receive_dispatch"]
-    assert isinstance(rules_can_receive, bool)
-    assert "interactive-only" not in harness_b_rules["tags"]
+    authoritative_fields = {
+        "can_receive_dispatch",
+        "can_fire_events",
+        "dispatch_cost",
+        "dispatch_quality",
+        "dispatch_availability",
+    }
+    assert not (authoritative_fields & set(harness_b_rules))
 
     projection = read_roles(REPO_ROOT)
     harness_b = next(row for row in projection["harnesses"] if row["id"] == "B")
-    assert harness_b["can_receive_dispatch"] is rules_can_receive
+    assert isinstance(harness_b["can_receive_dispatch"], bool)
 
     status_payload = collect_bridge_dispatch_status(REPO_ROOT).to_json_dict()
     harness_b_status = next(row for row in status_payload["harnesses"] if row["id"] == "B")
-    assert harness_b_status["can_receive_dispatch"] is rules_can_receive
+    assert harness_b_status["can_receive_dispatch"] is harness_b["can_receive_dispatch"]
     assert harness_b_status["status"] == harness_b["status"]
     selected_roles = [role for role in harness_b["role"] if role in status_payload["selected_by_role"]]
     if harness_b["status"] == "active" and harness_b_status["can_receive_dispatch"]:
@@ -228,10 +234,10 @@ def test_wi4983_live_dispatch_config_routes_prime_no_go_only_to_prime() -> None:
     assert [row["id"] for row in prime_go] == ["A"]
     assert [row["id"] for row in prime_no_go] == ["A"]
     assert prime_no_action == []
-    assert [row["id"] for row in lo_no_action] == ["D", "C", "B"]
+    assert [row["id"] for row in lo_no_action] == ["B", "C"]
 
 
-def test_config_overlay_can_disable_dispatchability(tmp_path: Path) -> None:
+def test_config_overlay_cannot_disable_registry_dispatchability(tmp_path: Path) -> None:
     _write_project(
         tmp_path,
         rules="""
@@ -247,9 +253,12 @@ rules = []
 
     status = collect_bridge_dispatch_status(tmp_path)
 
-    assert status.health_status == "FAIL"
-    assert status.selected_by_role["prime-builder"] == []
-    assert any("prime-builder" in finding for finding in status.health_findings)
+    assert status.health_status == "WARN"
+    assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
+    assert any(
+        "harness A rules.toml carries deprecated authoritative field(s)" in finding
+        for finding in status.consistency_findings
+    )
 
 
 def test_dispatch_budget_config_parses_and_reports_without_changing_selection(tmp_path: Path) -> None:
@@ -1421,12 +1430,16 @@ def test_wi4768_orphaned_failure_evidence_warns_not_fails(tmp_path: Path) -> Non
     assert classification["stale_failure_reason"] == "recipient evidence points to loyal-opposition:D"
 
 
-def test_wi4768_status_surfaces_config_projection_drift(tmp_path: Path) -> None:
-    """Status keeps overlay behavior visible by reporting raw projection drift."""
+def test_wi5012_status_warns_and_ignores_deprecated_config_authority_fields(tmp_path: Path) -> None:
+    """Deprecated rules.toml authority fields are visible but cannot override projection."""
     harnesses = _default_harnesses()
     for harness in harnesses:
         if harness["id"] == "F":
             harness["can_receive_dispatch"] = False
+        if harness["id"] == "D":
+            harness["dispatch_quality"] = 95
+            harness["dispatch_cost"] = 30
+            harness["dispatch_availability"] = 80
     _write_project(
         tmp_path,
         harnesses=harnesses,
@@ -1445,10 +1458,10 @@ rules = []
 
     assert status.health_status == "WARN"
     assert any(
-        "harness F can_receive_dispatch rules.toml=True harness-registry=False" in finding
+        "harness F rules.toml carries deprecated authoritative field(s)" in finding
         for finding in status.consistency_findings
     )
-    assert any(row["id"] == "F" for row in status.selected_by_role["loyal-opposition"])
+    assert all(row["id"] != "F" for row in status.selected_by_role["loyal-opposition"])
 
 
 def test_wi4765_report_builder_preserves_dispatch_runtime_failure_causes(tmp_path: Path) -> None:
@@ -1487,11 +1500,8 @@ schema_version = 1
 selection_order = ["quality", "cost", "availability", "harness_id"]
 
 [harnesses.A]
-can_receive_dispatch = true
-can_fire_events = true
-dispatch_cost = 60
-dispatch_quality = 90
-dispatch_availability = 90
+max_items = 1
+tags = ["prime-builder"]
 
 [[rules]]
 id = "bridge-prime-builder-default"
@@ -1500,6 +1510,28 @@ statuses = ["GO"]
 prefer = ["quality", "cost", "availability", "harness_id"]
 """.lstrip(),
     )
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    db.insert_harness(
+        id="A",
+        harness_name="codex",
+        harness_type="codex",
+        role=["prime-builder"],
+        changed_by="test",
+        change_reason="WI-5012 dispatch metadata fixture",
+        status="active",
+        invocation_surfaces={
+            "dispatch": {
+                "can_receive_dispatch": True,
+                "can_fire_events": True,
+                "event_driven_hooks": True,
+                "dispatch_cost": 60,
+                "dispatch_quality": 90,
+                "dispatch_availability": 90,
+                "dispatch_tags": ["prime-builder"],
+            }
+        },
+    )
+    generate_harness_projection(db, tmp_path)
 
     set_eligibility(tmp_path, "A", can_receive_dispatch=False, can_fire_events=None)
     set_weights(tmp_path, "A", dispatch_quality=75, dispatch_cost=20, dispatch_availability=None)
@@ -1508,9 +1540,14 @@ prefer = ["quality", "cost", "availability", "harness_id"]
     dispatch_config = load_bridge_dispatch_config(tmp_path)
     overlay = dispatch_config.overlay_for("A")
     assert overlay is not None
-    assert overlay.can_receive_dispatch is False
-    assert overlay.dispatch_quality == 75
-    assert overlay.dispatch_cost == 20
+    assert overlay.can_receive_dispatch is None
+    assert overlay.dispatch_quality is None
+    assert overlay.dispatch_cost is None
+    projection = read_roles(tmp_path)
+    harness_a = next(row for row in projection["harnesses"] if row["id"] == "A")
+    assert harness_a["can_receive_dispatch"] is False
+    assert harness_a["dispatch_quality"] == 75.0
+    assert harness_a["dispatch_cost"] == 20.0
     assert dispatch_config.rules[0].statuses == ("GO", "NO-GO")
     assert dispatch_config.selection_order_for(DispatchContext(required_role="prime-builder", status="GO")) == (
         "cost",
