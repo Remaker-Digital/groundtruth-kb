@@ -140,6 +140,12 @@ SYNTHETIC_SESSION_CONTEXT_IDS: frozenset[str] = frozenset(
     }
 )
 SYNTHETIC_SESSION_CONTEXT_RE = re.compile(r"^(?:openrouter|ollama)-harness-[a-z]$", re.IGNORECASE)
+DISPATCH_RUN_ID_RE = re.compile(
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)-"
+    r"(?P<role>acting-prime-builder|loyal-opposition|prime-builder)-"
+    r"(?P<harness_id>[A-Za-z][A-Za-z0-9]*)-"
+    r"(?P<suffix>[0-9a-fA-F]{6})$"
+)
 
 
 class BridgeAuthorMetadataError(RuntimeError):
@@ -285,6 +291,16 @@ def _record_can_receive_dispatch(record: Mapping[str, object]) -> bool:
     return record.get("event_driven_hooks") is True
 
 
+def _dispatch_harness_id_from_run_id(value: object) -> str | None:
+    """Return the durable harness id from a dispatcher run id, if well-formed."""
+    if not metadata_value_is_valid(value):
+        return None
+    match = DISPATCH_RUN_ID_RE.fullmatch(str(value).strip().strip("`"))
+    if match is None:
+        return None
+    return match.group("harness_id").upper()
+
+
 def _resolve_durable_identity_fields(
     project_root: Path,
     *,
@@ -296,19 +312,20 @@ def _resolve_durable_identity_fields(
     "<id>"}`` resolved per call from the filing harness's own durable identity,
     using the same ``<role>/<harness_name>`` label form as
     ``scripts/_kb_attribution.resolve_changed_by``. The filing harness is
-    resolved with a two-source priority — ``GTKB_HARNESS_NAME`` env, then the
-    active Prime Builder fallback in the registry projection at
-    ``project_root``. If multiple active Prime Builders exist, fallback
-    metadata resolves only when exactly one is dispatchable. ``project_root`` is
-    threaded through the projection-backed loaders so callers (and tests) read
-    the intended registry rather than a module-global root.
+    resolved with a three-source priority — ``GTKB_HARNESS_NAME`` env, a
+    well-formed dispatcher ``GTKB_BRIDGE_POLLER_RUN_ID``, then the active Prime
+    Builder fallback in the registry projection at ``project_root``. If
+    multiple active Prime Builders exist, fallback metadata resolves only when
+    exactly one is dispatchable. ``project_root`` is threaded through the
+    projection-backed loaders so callers (and tests) read the intended registry
+    rather than a module-global root.
 
     Returns ``{}`` (never ``None``) when the filing harness cannot be resolved
-    unambiguously — no ``GTKB_HARNESS_NAME`` and no unambiguous active
-    Prime Builder fallback, no registry id for the resolved name, or no role
-    assignment — so it contributes nothing rather than a wrong value, and an
-    incomplete merged set fails closed in ``validate_author_metadata`` instead
-    of inheriting another harness's values.
+    unambiguously — no ``GTKB_HARNESS_NAME`` and no unambiguous dispatch/run-id
+    or active Prime Builder fallback, no registry id for the resolved name, or
+    no role assignment — so it contributes nothing rather than a wrong value,
+    and an incomplete merged set fails closed in ``validate_author_metadata``
+    instead of inheriting another harness's values.
 
     It NEVER returns the four per-session runtime fields
     (``author_session_context_id``, ``author_model``, ``author_model_version``,
@@ -331,6 +348,20 @@ def _resolve_durable_identity_fields(
     identities = load_harness_identities(project_root).get("harnesses", {})
 
     harness_name = (environ.get(ENV_VAR_HARNESS_NAME) or "").strip()
+    if not harness_name:
+        dispatch_harness_id = _dispatch_harness_id_from_run_id(environ.get("GTKB_BRIDGE_POLLER_RUN_ID"))
+        if dispatch_harness_id:
+            harness_name = next(
+                (
+                    name
+                    for name, record in identities.items()
+                    if isinstance(record, dict) and record.get("id") == dispatch_harness_id
+                ),
+                "",
+            )
+            if not harness_name:
+                return {}
+
     if not harness_name:
         prime_ids = [
             hid for hid, record in assignments.items() if isinstance(record, dict) and is_prime_builder(record)

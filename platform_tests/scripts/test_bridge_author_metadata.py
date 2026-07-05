@@ -13,6 +13,7 @@ from scripts.bridge_author_metadata import (
     ENV_VAR_HARNESS_NAME,
     FIELD_ENV_NAMES,
     BridgeAuthorMetadataError,
+    _dispatch_harness_id_from_run_id,
     _resolve_durable_identity_fields,
     author_metadata_gaps_for_content,
     ensure_author_metadata,
@@ -50,6 +51,11 @@ _AUTHOR_ENV_VARS = tuple(
 _SINGLE_PB_REGISTRY = [
     {"id": "B", "harness_name": "claude", "role": ["prime-builder"], "status": "active"},
     {"id": "A", "harness_name": "codex", "role": ["loyal-opposition"], "status": "active"},
+]
+
+_PB_AND_LO_REGISTRY = [
+    {"id": "A", "harness_name": "codex", "role": ["prime-builder"], "status": "active"},
+    {"id": "B", "harness_name": "claude", "role": ["loyal-opposition"], "status": "active"},
 ]
 
 # The four per-session runtime fields a filing harness supplies through its own
@@ -180,6 +186,70 @@ def test_durable_identity_fields_resolve_single_dispatchable_prime_builder(tmp_p
     fields = _resolve_durable_identity_fields(tmp_path)
 
     assert fields == {"author_identity": "prime-builder/codex", "author_harness_id": "A"}
+
+
+def test_dispatch_run_id_parser_handles_realistic_role_tokens() -> None:
+    assert _dispatch_harness_id_from_run_id("2026-07-05T07-50-27Z-loyal-opposition-B-54c749") == "B"
+    assert _dispatch_harness_id_from_run_id("2026-07-05T22-13-00Z-prime-builder-A-7ad6c6") == "A"
+    assert _dispatch_harness_id_from_run_id("2026-07-05T22-13-00Z-acting-prime-builder-E-7ad6c6") == "E"
+
+
+def test_dispatch_run_id_resolves_durable_identity_when_harness_name_unset(tmp_path: Path) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+
+    fields = _resolve_durable_identity_fields(
+        tmp_path,
+        env={"GTKB_BRIDGE_POLLER_RUN_ID": "2026-07-05T07-50-27Z-loyal-opposition-B-54c749"},
+    )
+
+    assert fields == {"author_identity": "loyal-opposition/claude", "author_harness_id": "B"}
+
+
+def test_load_author_metadata_uses_dispatch_run_id_for_durable_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "2026-07-05T07-50-27Z-loyal-opposition-B-54c749")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "claude-opus-4-8")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "4.8")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "headless bridge auto-dispatch worker")
+
+    result = load_author_metadata(tmp_path)
+
+    assert result == {
+        "author_identity": "loyal-opposition/claude",
+        "author_harness_id": "B",
+        "author_session_context_id": "2026-07-05T07-50-27Z-loyal-opposition-B-54c749",
+        "author_model": "claude-opus-4-8",
+        "author_model_version": "4.8",
+        "author_model_configuration": "headless bridge auto-dispatch worker",
+    }
+
+
+def test_dispatch_run_id_token_role_does_not_override_registry_role(tmp_path: Path) -> None:
+    _write_registry_projection(tmp_path, _SINGLE_PB_REGISTRY)
+
+    fields = _resolve_durable_identity_fields(
+        tmp_path,
+        env={"GTKB_BRIDGE_POLLER_RUN_ID": "2026-07-05T07-50-27Z-loyal-opposition-B-54c749"},
+    )
+
+    assert fields == {"author_identity": "prime-builder/claude", "author_harness_id": "B"}
+
+
+def test_malformed_dispatch_run_id_does_not_resolve_harness_suffix(tmp_path: Path) -> None:
+    _write_registry_projection(
+        tmp_path,
+        [{"id": "ABCDEF", "harness_name": "fake", "role": ["loyal-opposition"], "status": "active"}],
+    )
+
+    fields = _resolve_durable_identity_fields(
+        tmp_path,
+        env={"GTKB_BRIDGE_POLLER_RUN_ID": "2026-07-05T07-50-27Z-loyal-opposition-ABCDEF"},
+    )
+
+    assert fields == {}
 
 
 def test_stale_current_json_is_not_read_as_baseline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
