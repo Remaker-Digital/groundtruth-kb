@@ -98,8 +98,10 @@ QUESTION_HASH_LENGTH = 16
 # sets this for hooks); fall back to walking up from this file's location.
 PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]).resolve()
 PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
-if PACKAGE_SRC.is_dir() and str(PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_SRC))
+HOOK_REPO_SRC = Path(__file__).resolve().parents[2] / "groundtruth-kb" / "src"
+for package_src in (PACKAGE_SRC, HOOK_REPO_SRC):
+    if package_src.is_dir() and str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
 
 PENDING_FILE_REL = "memory/pending-owner-decisions.md"
 DISPATCH_RUNS_REL = Path(".gtkb-state") / "bridge-poller" / "dispatch-runs"
@@ -890,6 +892,52 @@ def _write_pending_file(path: Path, sections: dict[str, list[DecisionEntry]]) ->
     os.replace(tmp, path)
 
 
+def _auto_resolve_cross_session_pending(sections: dict[str, list[DecisionEntry]]) -> bool:
+    """Move stale pending entries to Resolved when exact live evidence exists."""
+    pending = sections.get("pending", [])
+    if not pending:
+        return False
+
+    try:
+        from groundtruth_kb.owner_decision.resolution_signals import (
+            build_live_bridge_status_reader,
+            read_owner_decision_deliberations,
+            resolve_pending_entries,
+        )
+
+        signals = resolve_pending_entries(
+            pending,
+            deliberation_reader=lambda: read_owner_decision_deliberations(PROJECT_ROOT),
+            bridge_status_reader=build_live_bridge_status_reader(PROJECT_ROOT),
+        )
+    except Exception as exc:  # noqa: BLE001 - hook must leave entries pending
+        sys.stderr.write(f"owner-decision-tracker: cross-session resolution scan failed: {exc}\n")
+        return False
+
+    if not signals:
+        return False
+
+    resolved_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    session_hint = _session_hint()
+    retained: list[DecisionEntry] = []
+    mutated = False
+    for entry in pending:
+        signal = signals.get(entry.id.upper())
+        if signal is None:
+            retained.append(entry)
+            continue
+        entry.status = "resolved"
+        entry.resolved_at = resolved_at
+        entry.resolved_in_session = session_hint
+        entry.resolved_via = signal.resolved_via
+        entry.answer = signal.answer
+        entry.notes = f"{entry.notes} {signal.note}".strip()
+        sections["resolved"].append(entry)
+        mutated = True
+    sections["pending"] = retained
+    return mutated
+
+
 def _next_decision_id(sections: dict[str, list[DecisionEntry]]) -> str:
     """Compute the next DECISION-NNNN id based on highest extant suffix.
 
@@ -1310,6 +1358,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
     pending_path = PROJECT_ROOT / PENDING_FILE_REL
     _ensure_pending_file(pending_path)
     sections = _read_pending_file(pending_path)
+    cross_session_mutated = _auto_resolve_cross_session_pending(sections)
 
     # Build a set of existing question hashes for idempotence.
     existing_hashes: set[str] = set()
@@ -1338,7 +1387,7 @@ def _stop_handler(stdin_text: str) -> dict[str, str] | None:
 
     asked_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     session_hint = _session_hint()
-    mutated = False
+    mutated = cross_session_mutated
 
     # Scan A -- AskUserQuestion pairs. Track per-turn count for block-emission
     # decision (per Codex -004 Q1: per just-completed turn, not session-cumulative).
@@ -1647,6 +1696,8 @@ def _user_prompt_handler(stdin_text: str) -> str:
         return f"[owner-decision-tracker] acknowledged {len(sections['pending'])} pending decision(s); they remain in the queue."
 
     # No shortcut; emit nudge if pending exist and prompt doesn't reference them.
+    if _auto_resolve_cross_session_pending(sections):
+        _write_pending_file(pending_path, sections)
     marker = _pending_freshness_marker(pending_path, sections["pending"])
     if not sections["pending"]:
         return (
