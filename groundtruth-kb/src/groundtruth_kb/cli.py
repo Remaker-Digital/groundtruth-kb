@@ -1151,6 +1151,167 @@ def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool) -> None:
     _emit_bridge_dispatch_report(ctx, json_output=json_output)
 
 
+@bridge_dispatch_group.group("complex")
+def bridge_dispatch_complex_group() -> None:
+    """Aggregate dispatcher daemon, supervisor, and watchdog controls."""
+
+
+def _emit_complex_status(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Dispatcher complex aggregate status: {payload.get('aggregate_status')}")
+    health_status = payload.get("health_status")
+    if health_status:
+        click.echo(f"Lifecycle health: {health_status}")
+    for name, component in payload.get("components", {}).items():
+        status = component.get("status") if isinstance(component, dict) else None
+        detail = ""
+        if isinstance(status, dict):
+            detail = str(status.get("state") or status.get("mode") or status.get("running") or "")
+        suffix = f" ({detail})" if detail else ""
+        click.echo(f"{name}: healthy={component.get('healthy')}{suffix}")
+    for item in payload.get("findings") or []:
+        click.echo(f"Finding: {item}")
+
+
+def _emit_complex_action_result(ctx: click.Context, payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        if not payload.get("ok"):
+            ctx.exit(1)
+        return
+    action = payload.get("action")
+    if payload.get("ok"):
+        components = ", ".join(payload.get("components", {}).keys())
+        click.echo(f"Dispatcher complex {action} complete: {components}.")
+        return
+    failures = []
+    for name, component in payload.get("components", {}).items():
+        if not component.get("ok"):
+            failures.append(f"{name}: {component.get('error')}")
+    raise click.ClickException("; ".join(failures) or f"dispatcher complex {action} failed")
+
+
+@bridge_dispatch_complex_group.command("status")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_status_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Report dispatcher daemon complex component state."""
+    from groundtruth_kb.dispatcher_complex import collect_complex_status
+
+    config = _resolve_config(ctx)
+    payload = collect_complex_status(
+        config.project_root,
+        supervisor_task_name=supervisor_task_name,
+        watchdog_task_name=watchdog_task_name,
+    )
+    _emit_complex_status(payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("health")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_health_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Report dispatcher daemon complex lifecycle health."""
+    from groundtruth_kb.dispatcher_complex import collect_complex_health
+
+    config = _resolve_config(ctx)
+    payload = collect_complex_health(
+        config.project_root,
+        supervisor_task_name=supervisor_task_name,
+        watchdog_task_name=watchdog_task_name,
+    )
+    _emit_complex_status(payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("enable")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_enable_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Enable the dispatcher supervisor and watchdog scheduled tasks."""
+    from groundtruth_kb.dispatcher_complex import enable_complex
+
+    payload = enable_complex(supervisor_task_name=supervisor_task_name, watchdog_task_name=watchdog_task_name)
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("disable")
+@click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_disable_cmd(
+    ctx: click.Context,
+    supervisor_task_name: str,
+    watchdog_task_name: str,
+    json_output: bool,
+) -> None:
+    """Disable the dispatcher supervisor and watchdog scheduled tasks."""
+    from groundtruth_kb.dispatcher_complex import disable_complex
+
+    payload = disable_complex(supervisor_task_name=supervisor_task_name, watchdog_task_name=watchdog_task_name)
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("start")
+@click.option("--interval", type=int, default=30, show_default=True, help="Daemon tick interval in seconds.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_start_cmd(ctx: click.Context, interval: int, json_output: bool) -> None:
+    """Start only the dispatcher daemon process."""
+    from groundtruth_kb.dispatcher_complex import DispatcherComplexError, start_complex
+
+    config = _resolve_config(ctx)
+    try:
+        payload = start_complex(config.project_root, interval=interval)
+    except DispatcherComplexError as exc:
+        if json_output:
+            click.echo(json.dumps(exc.payload, indent=2, sort_keys=True))
+            ctx.exit(1)
+        raise click.ClickException(str(exc)) from exc
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+
+
+@bridge_dispatch_complex_group.command("stop")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_complex_stop_cmd(ctx: click.Context, json_output: bool) -> None:
+    """Stop only the dispatcher daemon process."""
+    from groundtruth_kb.dispatcher_complex import DispatcherComplexError, stop_complex
+
+    config = _resolve_config(ctx)
+    try:
+        payload = stop_complex(config.project_root)
+    except DispatcherComplexError as exc:
+        if json_output:
+            click.echo(json.dumps(exc.payload, indent=2, sort_keys=True))
+            ctx.exit(1)
+        raise click.ClickException(str(exc)) from exc
+    _emit_complex_action_result(ctx, payload, json_output=json_output)
+
+
 @bridge_dispatch_group.group("daemon")
 def bridge_dispatch_daemon_group() -> None:
     """Shadow-mode dispatcher daemon control (WI-4787)."""
