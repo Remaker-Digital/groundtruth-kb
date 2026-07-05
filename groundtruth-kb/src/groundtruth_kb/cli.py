@@ -4034,6 +4034,44 @@ def registry_diff(ctx: click.Context, json_output: bool) -> None:
     ctx.invoke(registry_validate, json_output=json_output)
 
 
+@registry_cmd.command("audit-duplicates")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Evidence directory for JSON and markdown audit reports.",
+)
+@click.option("--no-write", is_flag=True, help="Run audit without writing evidence files.")
+@click.pass_context
+def registry_audit_duplicates(ctx: click.Context, json_output: bool, output_dir: Path | None, no_write: bool) -> None:
+    """Run the platform duplicate-SoT registry-plus-closure audit."""
+    from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit, write_report_files
+
+    config = _resolve_config(ctx)
+    report = run_duplicate_sot_audit(Path(config.project_root))
+    payload = report.as_dict()
+    if not no_write:
+        evidence_dir = output_dir or Path(config.project_root) / ".gtkb-state" / "sot-singleton-audit"
+        json_path, markdown_path = write_report_files(report, evidence_dir)
+        payload["evidence_files"] = [
+            str(json_path.relative_to(config.project_root).as_posix()),
+            str(markdown_path.relative_to(config.project_root).as_posix()),
+        ]
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(
+        "SoT duplicate audit: "
+        f"{payload['registry_count']} registry records, "
+        f"{payload['persistent_file_count']} persistent files, "
+        f"{payload['violation_count']} violation(s), "
+        f"{payload['uncovered_violation_count']} uncovered."
+    )
+    if report.uncovered_violation_count:
+        raise SystemExit(1)
+
+
 # ---------------------------------------------------------------------------
 # gt projects
 # ---------------------------------------------------------------------------
