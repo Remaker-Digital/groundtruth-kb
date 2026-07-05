@@ -54,7 +54,7 @@ WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w`])(?P<path>[A-Za-z]:[\\/][^\s`|<
 FENCED_CODE_BLOCK_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)(?:\n```|$)", re.DOTALL)
 TARGET_PATHS_DECL_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?`?target_paths`?\s*[:=]\s*(?P<value>\[[^\n]+\])")
 REPORT_PATH_TOKEN_RE = re.compile(
-    r"`(?P<code>[^`\n]+)`|(?P<plain>(?:\.?/?(?:scripts|groundtruth-kb|platform_tests|tests|config|"
+    r"`(?P<code>[^`\n]+)`|(?P<plain>(?<![\w./-])(?:\.?/?(?:scripts|groundtruth-kb|platform_tests|tests|config|"
     r"\.claude|\.codex|\.cursor|\.github|\.githooks|bridge|applications)/[^\s`|<>'\"]+|"
     r"pyproject\.toml|groundtruth\.toml|groundtruth\.db))"
 )
@@ -160,10 +160,10 @@ def _bridge_versions(slug: str, project_root: Path) -> list[BridgeVersion]:
 def _assert_verification_ready(slug: str, project_root: Path) -> tuple[int, str]:
     versions = _bridge_versions(slug, project_root)
     latest = versions[0]
-    if latest.status not in {"NEW", "REVISED"}:
+    if latest.status not in {"NEW", "REVISED", "NO-ACTION"}:
         raise VerifiedFinalizationError(
             "VERIFIED finalization requires a post-implementation report latest "
-            f"status of NEW or REVISED; got {latest.status} at {latest.rel_path}."
+            f"status of NEW, REVISED, or NO-ACTION; got {latest.status} at {latest.rel_path}."
         )
     if not any(version.status == "GO" for version in versions[1:]):
         raise VerifiedFinalizationError(f"VERIFIED finalization requires a prior GO in the bridge chain for {slug!r}.")
@@ -259,7 +259,7 @@ def validate_verified_body(body: str, *, project_root: Path | None = None) -> No
 
 
 def _normalize_repo_path(project_root: Path, path_text: str) -> str:
-    raw = path_text.strip().strip("'\"")
+    raw = path_text.strip().strip("'\"").rstrip(".,;:)]}")
     if not raw:
         raise VerifiedFinalizationError("Committed path list contains an empty path.")
     path = Path(raw)
@@ -328,14 +328,6 @@ def _looks_like_claimed_repo_path(path_text: str) -> bool:
 
 def _claimed_paths_from_report(report_text: str, project_root: Path) -> tuple[str, ...]:
     paths: list[str] = []
-    for match in TARGET_PATHS_DECL_RE.finditer(report_text):
-        try:
-            parsed = json.loads(match.group("value"))
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, list):
-            paths.extend(str(item) for item in parsed if _looks_like_claimed_repo_path(str(item)))
-
     for heading in (
         "Files Changed",
         "Changed Files",
@@ -692,16 +684,33 @@ def finalize_verified_commit(
     try:
         _run_git_with_lock_retry(["add", "-f", "--", *expected_paths], cwd=root)
         staged_after = set(_staged_paths(root))
-        missing = set(dirty_expected_paths) - staged_after
+
+        # Support directory targets by expanding them into their staged children.
+        expanded_dirty_expected = set()
+        for path in dirty_expected_paths:
+            path_obj = root / path
+            if path_obj.is_dir():
+                prefix = path.rstrip("/") + "/"
+                children = {p for p in staged_after if p.startswith(prefix)}
+                if children:
+                    expanded_dirty_expected.update(children)
+                else:
+                    expanded_dirty_expected.add(path)
+            else:
+                expanded_dirty_expected.add(path)
+
+        missing = expanded_dirty_expected - staged_after
         # Anything staged beyond the helper's own expected paths must be a
         # pre-existing unrelated entry (tolerated); the helper must never have
-        # introduced new staging of its own beyond `dirty_expected_paths`.
-        unexpected_new = (staged_after - set(dirty_expected_paths)) - staged_before
+        # introduced new staging of its own beyond `expanded_dirty_expected`.
+        unexpected_new = (staged_after - expanded_dirty_expected) - staged_before
         if missing or unexpected_new:
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
                 f"missing={sorted(missing)}; unexpected_new={sorted(unexpected_new)}; "
-                f"expected_dirty={list(dirty_expected_paths)}; pre_existing_staged={sorted(staged_before)}"
+                f"expected_dirty={list(dirty_expected_paths)}; "
+                f"expanded_dirty={sorted(expanded_dirty_expected)}; "
+                f"pre_existing_staged={sorted(staged_before)}"
             )
         # Commit ONLY the verified path set via explicit pathspec so unrelated
         # pre-existing staged files are never folded into this VERIFIED commit.
