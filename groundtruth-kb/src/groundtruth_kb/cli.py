@@ -1322,6 +1322,131 @@ def bridge_dispatch_daemon_supervisor_uninstall_cmd(
     click.echo(result.get("stdout") or f"Supervisor uninstall complete (dry_run={dry_run}).")
 
 
+@bridge_dispatch_daemon_group.group("watchdog")
+def bridge_dispatch_daemon_watchdog_group() -> None:
+    """Windows GTKB-HarnessStormWatchdog scheduled-task control (WI-5023)."""
+
+
+def _emit_watchdog_status(ctx: click.Context, *, task_name: str, json_output: bool) -> None:
+    from groundtruth_kb.dispatcher_watchdog import collect_watchdog_status
+
+    config = _resolve_config(ctx)
+    payload = collect_watchdog_status(config.project_root, task_name=task_name)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Watchdog platform: {payload.get('platform')}")
+    click.echo(f"Task: {payload.get('task_name')}")
+    click.echo(f"Registered: {payload.get('registered')}")
+    click.echo(f"State: {payload.get('state')}")
+    click.echo(f"Healthy: {payload.get('healthy')}")
+    findings = payload.get("findings") or []
+    for item in findings:
+        click.echo(f"Finding: {item}")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("status")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_status_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Report Windows storm-watchdog scheduled-task health."""
+    _emit_watchdog_status(ctx, task_name=task_name, json_output=json_output)
+
+
+@bridge_dispatch_daemon_watchdog_group.command("install")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--interval-minutes", type=int, default=1, show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_install_cmd(
+    ctx: click.Context,
+    task_name: str,
+    interval_minutes: int,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Register and enable the headless storm-watchdog task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, install_watchdog
+
+    config = _resolve_config(ctx)
+    try:
+        result = install_watchdog(
+            config.project_root,
+            task_name=task_name,
+            interval_minutes=interval_minutes,
+            dry_run=dry_run,
+        )
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Watchdog install complete (dry_run={dry_run}).")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("enable")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_enable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Enable the storm-watchdog scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, enable_watchdog
+
+    try:
+        result = enable_watchdog(task_name=task_name)
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Enabled watchdog task {task_name}.")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("disable")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_disable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Disable the storm-watchdog scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, disable_watchdog
+
+    try:
+        result = disable_watchdog(task_name=task_name)
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Disabled watchdog task {task_name}.")
+
+
+@bridge_dispatch_daemon_watchdog_group.command("uninstall")
+@click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_daemon_watchdog_uninstall_cmd(
+    ctx: click.Context, task_name: str, dry_run: bool, json_output: bool
+) -> None:
+    """Unregister the storm-watchdog scheduled task (Windows)."""
+    from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, uninstall_watchdog
+
+    _resolve_config(ctx)
+    try:
+        result = uninstall_watchdog(
+            task_name=task_name,
+            dry_run=dry_run,
+        )
+    except DispatcherWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Watchdog uninstall complete (dry_run={dry_run}).")
+
+
 @bridge_dispatch_daemon_group.command("start")
 @click.option("--interval", type=int, default=30, show_default=True, help="Tick interval in seconds.")
 @click.pass_context
