@@ -204,3 +204,56 @@ def test_go_impl_allowed_for_registry_acting_prime_builder(tmp_path: Path, env) 
     holder = env.current_holder("go-thread", project_root=tmp_path)
     assert holder is not None
     assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_go_impl_preempts_lingering_non_go_draft_claim(tmp_path: Path, env) -> None:
+    """WI-4849: a Prime GO implementation claim may replace a stale draft claim."""
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_index(tmp_path, {"handoff-thread": "NEW"})
+    draft_session = "2026-06-13T22-00-00Z-loyal-opposition-D-20c71a"
+    prime_session = "2026-06-13T22-19-33Z-prime-builder-B-6a8e3e"
+
+    assert env.acquire("handoff-thread", draft_session, project_root=tmp_path) is True
+    draft_holder = env.current_holder("handoff-thread", project_root=tmp_path)
+    assert draft_holder is not None
+    assert draft_holder["claim_kind"] == env.CLAIM_KIND_DRAFT
+
+    _write_index(tmp_path, {"handoff-thread": "GO"})
+
+    assert env.acquire("handoff-thread", prime_session, project_root=tmp_path) is True
+    holder = env.current_holder("handoff-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == prime_session
+    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_go_impl_does_not_preempt_peer_go_implementation_claim(tmp_path: Path, env) -> None:
+    """WI-4849 negative control: an active peer go_implementation holder remains exclusive."""
+    _write_registry(tmp_path, {"B": "prime-builder", "C": "prime-builder"})
+    _write_index(tmp_path, {"go-thread": "GO"})
+    first_session = "2026-06-13T22-19-33Z-prime-builder-B-6a8e3e"
+    second_session = "2026-06-13T22-20-33Z-prime-builder-C-a1b2c3"
+
+    assert env.acquire("go-thread", first_session, project_root=tmp_path) is True
+    assert env.acquire("go-thread", second_session, project_root=tmp_path) is False
+    holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == first_session
+    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_lo_dispatch_cannot_upgrade_own_draft_after_go(tmp_path: Path, env) -> None:
+    """WI-4849 keeps the GO role guard ahead of any draft-preemption path."""
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_index(tmp_path, {"handoff-thread": "NEW"})
+    lo_session = "2026-06-13T22-00-00Z-loyal-opposition-D-20c71a"
+
+    assert env.acquire("handoff-thread", lo_session, project_root=tmp_path) is True
+    _write_index(tmp_path, {"handoff-thread": "GO"})
+
+    with pytest.raises(env.WorkIntentRegistryError, match="prime-builder harness"):
+        env.acquire("handoff-thread", lo_session, project_root=tmp_path)
+    holder = env.current_holder("handoff-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == lo_session
+    assert holder["claim_kind"] == env.CLAIM_KIND_DRAFT

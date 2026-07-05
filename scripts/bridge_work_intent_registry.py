@@ -526,6 +526,14 @@ def _go_implementation_eligible(session_id: str, *, project_root: Path | None = 
     return _resolve_go_implementation_eligibility(session_id, project_root=project_root)[0]
 
 
+def _can_preempt_lingering_draft(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
+    """Return true when a GO implementation claim may replace a draft claim."""
+    return (
+        incoming.get("claim_kind") == CLAIM_KIND_GO_IMPLEMENTATION
+        and existing.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION
+    )
+
+
 def acquire(
     thread_slug: str,
     session_id: str,
@@ -549,11 +557,6 @@ def acquire(
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
             now = now_utc()
-            if row:
-                existing = _row_to_record(row)
-                if not _is_expired(existing, now=now) and existing["session_id"] != session_id:
-                    return False
-
             values = _claim_values(slug, session_id, ttl_seconds=ttl_seconds, project_root=project_root, now=now)
             if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
                 # WI-4534 Slice A: registry-authoritative role-eligibility guard.
@@ -567,6 +570,11 @@ def acquire(
                         f"go_implementation claim requires a prime-builder harness; "
                         f"session {session_id!r} resolves to {detail} (not prime-eligible)"
                     )
+            if row:
+                existing = _row_to_record(row)
+                if not _is_expired(existing, now=now) and existing["session_id"] != session_id:
+                    if not _can_preempt_lingering_draft(existing, values):
+                        return False
             conn.execute(
                 """
                 INSERT OR REPLACE INTO work_intent_claims

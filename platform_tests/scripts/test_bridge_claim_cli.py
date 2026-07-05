@@ -57,6 +57,12 @@ def _write_go_thread(root: Path, slug: str) -> None:
     (bridge / f"{slug}-002.md").write_text("GO\n\nFixture verdict.\n", encoding="utf-8")
 
 
+def _write_new_thread(root: Path, slug: str) -> None:
+    bridge = root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / f"{slug}-001.md").write_text("NEW\n\nFixture proposal.\n", encoding="utf-8")
+
+
 def _write_prime_marker(root: Path, session_id: str) -> None:
     marker_dir = root / ".claude" / "session"
     marker_dir.mkdir(parents=True, exist_ok=True)
@@ -217,6 +223,46 @@ def test_claim_refused_when_other_session_holds_slug(tmp_path: Path) -> None:
     assert second.returncode == 2
     holder = json.loads(second.stdout)
     assert holder["session_id"] == "session-a"
+
+
+def test_claim_go_implementation_preempts_lingering_draft_claim(tmp_path: Path) -> None:
+    """WI-4849: CLI acquire replaces a non-GO draft claim once the thread is GO."""
+    slug = "gtkb-handoff-thread"
+    draft_session = "lo-review-session"
+    prime_session = "prime-implementation-session"
+    _write_new_thread(tmp_path, slug)
+
+    first = _run_cli(tmp_path, "claim", slug, env={"CLAUDE_SESSION_ID": draft_session})
+    assert first.returncode == 0, first.stderr
+    assert json.loads(first.stdout)["claim_kind"] == "draft"
+
+    (tmp_path / "bridge" / f"{slug}-002.md").write_text("GO\n\nFixture verdict.\n", encoding="utf-8")
+    _write_prime_marker(tmp_path, prime_session)
+
+    second = _run_cli(tmp_path, "claim", slug, env={"CODEX_THREAD_ID": prime_session})
+    assert second.returncode == 0, second.stderr
+    holder = json.loads(second.stdout)
+    assert holder["session_id"] == prime_session
+    assert holder["claim_kind"] == "go_implementation"
+
+
+def test_claim_go_implementation_refuses_peer_go_holder(tmp_path: Path) -> None:
+    """WI-4849 negative control: a peer go_implementation claim stays exclusive."""
+    slug = "gtkb-peer-go-thread"
+    first_session = "prime-session-a"
+    second_session = "prime-session-b"
+    _write_go_thread(tmp_path, slug)
+    _write_prime_marker(tmp_path, first_session)
+    _write_prime_marker(tmp_path, second_session)
+
+    first = _run_cli(tmp_path, "claim", slug, env={"CODEX_THREAD_ID": first_session})
+    assert first.returncode == 0, first.stderr
+
+    second = _run_cli(tmp_path, "claim", slug, env={"CODEX_THREAD_ID": second_session})
+    assert second.returncode == 2
+    holder = json.loads(second.stdout)
+    assert holder["session_id"] == first_session
+    assert holder["claim_kind"] == "go_implementation"
 
 
 # ---------------------------------------------------------------------------
