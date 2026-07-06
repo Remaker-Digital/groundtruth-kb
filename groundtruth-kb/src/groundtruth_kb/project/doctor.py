@@ -4879,6 +4879,68 @@ def _check_service_sot_watchdog(
     )
 
 
+def _check_deliberation_search_backend(target: Path) -> ToolCheck:
+    """Fail loudly when mandatory deliberation semantic search is degraded."""
+    check_name = "Deliberation search backend"
+    db_path = target / "groundtruth.db"
+    if not db_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message="Deliberation search backend unavailable: groundtruth.db not found",
+        )
+
+    try:
+        from groundtruth_kb.db import KnowledgeDB
+
+        db = KnowledgeDB(db_path)
+        try:
+            status = db.deliberation_search_backend_status()
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001 - doctor checks must report, not crash
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"Deliberation search backend probe failed: {exc}",
+        )
+
+    current_count = int(status.get("current_deliberation_count") or 0)
+    indexed_count = int(status.get("indexed_deliberation_count") or 0)
+    chunk_count = int(status.get("indexed_chunk_count") or 0)
+    chroma_path = str(status.get("canonical_chroma_path") or "<unknown>")
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="pass",
+            message=(
+                "Deliberation search backend healthy: ChromaDB importable; "
+                f"indexed {indexed_count}/{current_count} current deliberations "
+                f"({chunk_count} chunks) at {chroma_path}"
+            ),
+        )
+
+    reason = str(status.get("degradation_reason") or "unknown_degradation")
+    found = bool(status.get("chromadb_importable")) and bool(status.get("index_path_exists"))
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=found,
+        status="fail",
+        message=(
+            f"Deliberation search backend degraded ({reason}): "
+            f"indexed {indexed_count}/{current_count} current deliberations "
+            f"({chunk_count} chunks) at {chroma_path}; run `gt deliberations rebuild-index`"
+        ),
+    )
+
+
 def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, component_label: str) -> ToolCheck | None:
     """Return a completed skip/warning check when the component probe is not applicable."""
     from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
@@ -4925,7 +4987,34 @@ def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, compone
 def _collect_dispatcher_complex_health(target: Path) -> dict[str, Any]:
     from groundtruth_kb.dispatcher_complex import collect_complex_health
 
-    return collect_complex_health(target)
+    try:
+        return collect_complex_health(target)
+    except Exception as exc:  # intentional-catch: doctor probes fail soft
+        return {
+            "components": {
+                "daemon": {
+                    "status": {
+                        "healthy": False,
+                        "registered": False,
+                        "findings": [f"dispatcher complex health unavailable: {exc}"],
+                    }
+                },
+                "supervisor": {
+                    "status": {
+                        "healthy": False,
+                        "registered": False,
+                        "findings": [f"dispatcher complex health unavailable: {exc}"],
+                    }
+                },
+                "watchdog": {
+                    "status": {
+                        "healthy": False,
+                        "registered": False,
+                        "findings": [f"dispatcher complex health unavailable: {exc}"],
+                    }
+                },
+            }
+        }
 
 
 def _dispatcher_complex_health_reader(target: Path) -> Callable[[], dict[str, Any]]:
@@ -6691,6 +6780,7 @@ def run_doctor(
         checks.append(_check_dispatcher_daemon_supervisor_task(target, dispatcher_complex_health))
         checks.append(_check_dispatcher_daemon_watchdog_task(target, dispatcher_complex_health))
         checks.append(_check_service_sot_watchdog(target))
+        checks.append(_check_deliberation_search_backend(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
