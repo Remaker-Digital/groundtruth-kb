@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +10,9 @@ from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "bridge_citation_freshness_preflight.py"
+STATE_LINE_RE = re.compile(
+    r"^(?P<status>NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED):\s+bridge/(?P<filename>[^/\s]+\.md)$"
+)
 
 
 def _load_module() -> ModuleType:
@@ -21,10 +25,16 @@ def _load_module() -> ModuleType:
     return module
 
 
-def _bridge_dir(tmp_path: Path, index_text: str) -> Path:
+def _bridge_dir(tmp_path: Path, state_text: str) -> Path:
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "INDEX.md").write_text(index_text, encoding="utf-8")
+    for line in state_text.splitlines():
+        match = STATE_LINE_RE.match(line.strip())
+        if match is None:
+            continue
+        filename = match.group("filename")
+        status = match.group("status")
+        (bridge_dir / filename).write_text(f"{status}\n\n# {filename}\n", encoding="utf-8")
     return bridge_dir
 
 
@@ -34,12 +44,11 @@ def _content_file(tmp_path: Path, text: str) -> Path:
     return path
 
 
-def _packet(module: ModuleType, tmp_path: Path, index_text: str, content: str, *, bridge_id: str = "target") -> dict:
-    bridge_dir = _bridge_dir(tmp_path, index_text)
+def _packet(module: ModuleType, tmp_path: Path, state_text: str, content: str, *, bridge_id: str = "target") -> dict:
+    bridge_dir = _bridge_dir(tmp_path, state_text)
     content_file = _content_file(tmp_path, content)
     return module.build_packet(
         bridge_id=bridge_id,
-        index_path=bridge_dir / "INDEX.md",
         bridge_dir=bridge_dir,
         content_file=content_file,
     )
@@ -109,7 +118,7 @@ def test_slug_not_in_index_handled(tmp_path: Path) -> None:
     assert packet["missing_count"] == 1
     missing = packet["missing_citations"][0]
     assert missing["cited_slug"] == "not-in-index"
-    assert "not found in bridge/INDEX.md" in missing["cleanup_hint"]
+    assert "not found in numbered bridge files" in missing["cleanup_hint"]
 
 
 def test_wi3267_fixture_workflow_contract_adr_citation(tmp_path: Path) -> None:
@@ -160,6 +169,42 @@ def test_warning_payload_includes_latest_version_and_cleanup_hint(tmp_path: Path
     assert set(warning).issuperset({"latest_version", "latest_path", "latest_status", "severity", "cleanup_hint"})
     assert warning["severity"] == "warn"
     assert "Update the citation" in warning["cleanup_hint"]
+    assert warning["evidence_boundary"] == "stale_current_state"
+
+
+def test_archive_reason_suppresses_warning_for_terminal_history(tmp_path: Path) -> None:
+    module = _load_module()
+    packet = _packet(
+        module,
+        tmp_path,
+        "Document: target\nNEW: bridge/target-001.md\n\n"
+        "Document: runtime-thread\nVERIFIED: bridge/runtime-thread-004.md\n"
+        "GO: bridge/runtime-thread-003.md\n",
+        "Use archived evidence bridge/runtime-thread-003.md; archive_reason: verifier disputed the GO text.\n",
+    )
+
+    assert packet["warning_count"] == 0
+    assert packet["justified_count"] == 1
+    justified = packet["justified_citations"][0]
+    assert justified["cited_slug"] == "runtime-thread"
+    assert justified["evidence_boundary"] == "archival_full_evidence"
+    assert justified["justification"] == "verifier disputed the GO text"
+
+
+def test_full_evidence_reason_suppresses_warning_for_active_history(tmp_path: Path) -> None:
+    module = _load_module()
+    packet = _packet(
+        module,
+        tmp_path,
+        "Document: target\nNEW: bridge/target-001.md\n\n"
+        "Document: active-thread\nGO: bridge/active-thread-002.md\n"
+        "NEW: bridge/active-thread-001.md\n",
+        "Review original proposal bridge/active-thread-001.md; full_evidence_reason: compare initial scope.\n",
+    )
+
+    assert packet["warnings"] == []
+    assert packet["justified_count"] == 1
+    assert packet["justified_citations"][0]["evidence_boundary"] == "historical_full_evidence"
 
 
 def test_citeable_markdown_section_emitted(tmp_path: Path) -> None:
@@ -210,8 +255,6 @@ def test_json_output_schema(tmp_path: Path) -> None:
             str(SCRIPT),
             "--bridge-id",
             "target",
-            "--index-path",
-            str(bridge_dir / "INDEX.md"),
             "--bridge-dir",
             str(bridge_dir),
             "--content-file",
@@ -227,7 +270,7 @@ def test_json_output_schema(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert set(payload).issuperset(
-        {"bridge_id", "content_file", "index_path", "citations", "warnings", "missing_citations", "markdown"}
+        {"bridge_id", "content_file", "bridge_state", "citations", "warnings", "missing_citations", "markdown"}
     )
     assert payload["warnings"][0]["latest_version"] == 2
 
@@ -247,8 +290,6 @@ def test_exit_code_advisory_zero(tmp_path: Path) -> None:
             str(SCRIPT),
             "--bridge-id",
             "target",
-            "--index-path",
-            str(bridge_dir / "INDEX.md"),
             "--bridge-dir",
             str(bridge_dir),
             "--content-file",

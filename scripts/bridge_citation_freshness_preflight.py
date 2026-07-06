@@ -24,6 +24,12 @@ STATUS_AT_VERSION_RE: Final[re.Pattern[str]] = re.compile(
     r"\b(?:NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED)(?:-\d+)?\s+at\s+-(?P<version>\d+)\b",
     re.IGNORECASE,
 )
+ARCHIVAL_JUSTIFICATION_RE: Final[re.Pattern[str]] = re.compile(
+    r"\b(?:archive_reason|archival_reason|historical_reason|full_evidence_reason|"
+    r"full_output_reason|archival citation|historical citation)\s*[:=]\s*(?P<reason>[^\n.;]+)",
+    re.IGNORECASE,
+)
+TERMINAL_ARCHIVE_STATUSES: Final[frozenset[str]] = frozenset({"VERIFIED", "WITHDRAWN"})
 
 
 @dataclass(frozen=True)
@@ -39,6 +45,7 @@ class Citation:
     cited_version: int
     source: str
     text: str
+    context: str
 
 
 def _status_from_bridge_file(path: Path) -> str | None:
@@ -116,6 +123,7 @@ def extract_citations(content: str, *, known_slugs: set[str], bridge_id: str) ->
                 cited_version=version,
                 source="path",
                 text=match.group(0),
+                context=_context_window(content, match.start(), match.end()),
             )
         )
 
@@ -136,6 +144,7 @@ def extract_citations(content: str, *, known_slugs: set[str], bridge_id: str) ->
                         cited_version=version,
                         source="status_at",
                         text=status_match.group(0),
+                        context=window,
                     )
                 )
     return citations
@@ -157,9 +166,35 @@ def _warning_for(citation: Citation, latest: BridgeFileVersion) -> dict[str, Any
         "latest_status": latest.status,
         "severity": "warn",
         "source": citation.source,
+        "evidence_boundary": "stale_current_state",
         "cleanup_hint": (
             f"Citation of {cited_path} is stale; {latest_path} is the current latest version "
-            f"(status {latest.status}). Update the citation or document why the historical version is intentionally cited."
+            f"(status {latest.status}). Update the citation or add archive_reason/full_evidence_reason "
+            "next to it when the historical version is intentionally cited."
+        ),
+    }
+
+
+def _archival_justification_for(citation: Citation, latest: BridgeFileVersion) -> dict[str, Any] | None:
+    match = ARCHIVAL_JUSTIFICATION_RE.search(citation.context)
+    if match is None:
+        return None
+    cited_path = _version_path(citation.cited_slug, citation.cited_version)
+    boundary = "archival_full_evidence" if latest.status in TERMINAL_ARCHIVE_STATUSES else "historical_full_evidence"
+    return {
+        "cited_slug": citation.cited_slug,
+        "cited_version": citation.cited_version,
+        "cited_path": cited_path,
+        "latest_version": latest.version,
+        "latest_path": latest.rel_path,
+        "latest_status": latest.status,
+        "severity": "info",
+        "source": citation.source,
+        "evidence_boundary": boundary,
+        "justification": match.group("reason").strip(),
+        "cleanup_hint": (
+            f"Citation of {cited_path} is non-latest, but it is explicitly justified as "
+            f"{boundary}; current latest is {latest.rel_path} (status {latest.status})."
         ),
     }
 
@@ -183,9 +218,14 @@ def render_markdown(packet: dict[str, Any]) -> str:
     lines = ["## Citation Freshness", ""]
     warnings = packet["warnings"]
     missing = packet["missing_citations"]
-    if not warnings and not missing:
+    justified = packet.get("justified_citations", [])
+    if not warnings and not missing and not justified:
         lines.append("No stale cross-thread citations detected.")
         return "\n".join(lines) + "\n"
+
+    if not warnings and not missing:
+        lines.append("No unjustified stale cross-thread citations detected.")
+        lines.append("")
 
     if warnings:
         lines.extend(
@@ -214,6 +254,24 @@ def render_markdown(packet: dict[str, Any]) -> str:
         )
         for item in missing:
             lines.append(f"| `{item['cited_slug']}` | {item['cited_version']} | {item['cleanup_hint']} |")
+    if justified:
+        if warnings or missing:
+            lines.append("")
+        lines.extend(
+            [
+                "| Justified Thread | Cited Version | Latest Version | Evidence Boundary | Justification |",
+                "|---|---:|---:|---|---|",
+            ]
+        )
+        for item in justified:
+            lines.append(
+                "| "
+                f"`{item['cited_slug']}` | "
+                f"{item['cited_version']} | "
+                f"{item['latest_version']} | "
+                f"`{item['evidence_boundary']}` | "
+                f"{item['justification']} |"
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -231,12 +289,17 @@ def build_packet(
 
     warnings: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
+    justified: list[dict[str, Any]] = []
     for citation in citations:
         current = latest.get(citation.cited_slug)
         if current is None:
             missing.append(_missing_for(citation))
             continue
         if citation.cited_version != current.version:
+            archival_justification = _archival_justification_for(citation, current)
+            if archival_justification is not None:
+                justified.append(archival_justification)
+                continue
             warnings.append(_warning_for(citation, current))
 
     packet: dict[str, Any] = {
@@ -245,8 +308,10 @@ def build_packet(
         "bridge_state": str(bridge_dir),
         "citations": [asdict(citation) for citation in citations],
         "warnings": warnings,
+        "justified_citations": justified,
         "missing_citations": missing,
         "warning_count": len(warnings),
+        "justified_count": len(justified),
         "missing_count": len(missing),
     }
     packet["markdown"] = render_markdown(packet)
