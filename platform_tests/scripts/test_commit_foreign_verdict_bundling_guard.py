@@ -12,6 +12,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PATHSPEC_SCRIPT = PROJECT_ROOT / "scripts" / "check_commit_pathspec_safety.py"
 SCOPE_SCRIPT = PROJECT_ROOT / "scripts" / "check_commit_scope_bundling.py"
+WHOLE_FILE_REFORMAT_SCRIPT = PROJECT_ROOT / "scripts" / "check_whole_file_reformat.py"
 
 
 def _load_module(path: Path, name: str):
@@ -25,6 +26,10 @@ def _load_module(path: Path, name: str):
 
 pathspec_checker = _load_module(PATHSPEC_SCRIPT, "check_commit_pathspec_safety_foreign_guard")
 scope_checker = _load_module(SCOPE_SCRIPT, "check_commit_scope_bundling_foreign_guard")
+whole_file_reformat_checker = _load_module(
+    WHOLE_FILE_REFORMAT_SCRIPT,
+    "check_whole_file_reformat_foreign_guard",
+)
 
 
 def _write_verdict(
@@ -147,3 +152,10 @@ def test_scope_bundling_warns_on_foreign_staged_verdict(tmp_path: Path) -> None:
 
     assert result["status"] == "warn"
     assert any(finding["kind"] == "foreign_staged_verdict" for finding in result["findings"])
+
+
+def test_whole_file_reformat_detector_excludes_bridge_verdict_paths() -> None:
+    assert (
+        whole_file_reformat_checker.exclusion_reason("bridge/gtkb-foreign-fixture-008.md")
+        == "excluded_by_pattern:bridge/**"
+    )
