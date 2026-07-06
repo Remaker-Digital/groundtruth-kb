@@ -95,6 +95,7 @@ def _init_legacy_projection_schema(db_path: Path) -> None:
 
 def test_shipped_registry_declares_restore_action_for_every_record() -> None:
     raw_records = tomllib.loads(_REGISTRY.read_text(encoding="utf-8"))["artifacts"]
+    by_id = {record["id"]: record for record in raw_records}
 
     assert raw_records
     assert all("restore_action" in record for record in raw_records)
@@ -108,6 +109,10 @@ def test_shipped_registry_declares_restore_action_for_every_record() -> None:
         "ensure_alive",
         "noop",
     } <= {record["restore_action"] for record in raw_records}
+    assert by_id["dispatcher-supervisor-task"]["restore_action"] == "ensure_alive"
+    assert by_id["dispatcher-supervisor-task"]["health_check_function"] == "_check_dispatcher_daemon_supervisor_task"
+    assert by_id["dispatcher-storm-watchdog-task"]["restore_action"] == "ensure_alive"
+    assert by_id["dispatcher-storm-watchdog-task"]["health_check_function"] == "_check_dispatcher_daemon_watchdog_task"
 
 
 def test_loader_rejects_invalid_restore_action(tmp_path: Path) -> None:

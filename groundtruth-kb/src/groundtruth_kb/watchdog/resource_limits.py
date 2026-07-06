@@ -12,6 +12,7 @@ from groundtruth_kb.watchdog.restore_policy import AutoRestoreAction, RestorePol
 
 ProbeCallable = Callable[[], dict[str, Any]]
 RestoreCallable = Callable[[], dict[str, Any] | None]
+RESTORABLE_EXECUTION_STATUSES = frozenset({"WARN", "FAIL"})
 
 
 @dataclass(frozen=True)
@@ -121,7 +122,7 @@ def execute_resource_bounded_restore(
         )
 
     pre = fresh_probe()
-    if _probe_status(pre) != "FAIL":
+    if _probe_status(pre) not in RESTORABLE_EXECUTION_STATUSES:
         return ResourceBoundedRestoreResult(
             status="skipped",
             reason_code="fresh_probe_not_failed",
@@ -163,7 +164,7 @@ def execute_resource_bounded_restore(
         )
 
     success = success_probe()
-    if _probe_status(success) == "FAIL":
+    if _probe_status(success) in RESTORABLE_EXECUTION_STATUSES:
         return ResourceBoundedRestoreResult(
             status="failed",
             reason_code="symptom_probe_still_failing",

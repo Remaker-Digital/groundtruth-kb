@@ -55,6 +55,18 @@ def test_policy_auto_restores_safe_idempotent_action_after_fresh_failure_probe()
     assert decision.to_json_dict()["kind"] == "auto_restore"
 
 
+def test_policy_auto_restores_safe_idempotent_action_after_fresh_warning_probe() -> None:
+    decision = decide_restore_action(
+        artifact_id="dispatcher-supervisor-task",
+        restore_action="ensure_alive",
+        probe_status="WARN",
+        fresh_probe=True,
+    )
+
+    assert isinstance(decision, AutoRestoreAction)
+    assert decision.reason_code == "safe_auto_restore"
+
+
 def test_policy_escalates_canonical_restore_instead_of_auto_mutating() -> None:
     decision = decide_restore_action(
         artifact_id="membase-specifications",

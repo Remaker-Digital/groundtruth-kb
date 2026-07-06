@@ -1,10 +1,5 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Detection-only service and SoT availability watchdog.
-
-The runner intentionally probes and records symptoms only. Restoration policy,
-restore-action dispatch, and canonical-store mutation belong to later slices of
-PROJECT-GTKB-SERVICE-SOT-WATCHDOG.
-"""
+"""Service and SoT availability watchdog with bounded safe restores."""
 
 from __future__ import annotations
 
@@ -18,9 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.config import GTConfig
+from groundtruth_kb.dispatcher_disable_guard import disable_guard_status
 from groundtruth_kb.operating_state import COMPONENTS, STATUS_ORDER, collect_operating_state
 from groundtruth_kb.project.sot_registry import SoTArtifact, default_registry_path
 from groundtruth_kb.project.sot_registry import load_toml as load_sot_toml
+from groundtruth_kb.watchdog.resource_limits import execute_resource_bounded_restore
+from groundtruth_kb.watchdog.restore_policy import AutoRestoreAction, decide_artifact_restoration
 
 DEFAULT_TASK_NAME = "GTKB-ServiceSoTWatchdog"
 DEFAULT_INTERVAL_MINUTES = 5
@@ -28,6 +26,7 @@ DEFAULT_STATUS_STALE_SECONDS = 900.0
 RUNNER_SCRIPT = "scripts/gtkb_service_sot_watchdog.py"
 INSTALL_SCRIPT = "scripts/install_service_sot_watchdog_task.ps1"
 STATUS_RELATIVE_PATH = Path(".gtkb-state") / "watchdog" / "service-sot-status.json"
+RESTORE_RETRY_RELATIVE_PATH = Path(".gtkb-state") / "watchdog" / "restore-retries.json"
 
 
 class ServiceSoTWatchdogError(RuntimeError):
@@ -152,7 +151,8 @@ def _invoke_health_check(function_name: str, project_root: Path) -> dict[str, An
     profile_name = _doctor_profile_name(project_root)
     try:
         signature = inspect.signature(func)
-        params = list(signature.parameters)
+        parameters = list(signature.parameters.values())
+        params = [param.name for param in parameters]
         if function_name == "_check_bridge_dispatch_liveness":
             # The SoT registry names one dispatch-state health function, while
             # the doctor probes per recipient. Cover both known bridge agents and
@@ -171,6 +171,19 @@ def _invoke_health_check(function_name: str, project_root: Path) -> dict[str, An
             return _tool_check_to_dict(func(project_root))
         if params == ["target", "profile_name"]:
             return _tool_check_to_dict(func(project_root, profile_name))
+        if params and params[0] == "target":
+            supported_kinds = {
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            }
+            required_extra = [
+                param.name
+                for param in parameters[1:]
+                if param.kind in supported_kinds and param.default is inspect.Signature.empty
+            ]
+            if not required_extra:
+                return _tool_check_to_dict(func(project_root))
     except Exception as exc:  # noqa: BLE001 - watchdog must report, not crash
         return {
             "name": function_name,
@@ -211,6 +224,208 @@ def _artifact_probe(artifact: SoTArtifact, project_root: Path) -> dict[str, Any]
     }
 
 
+def _retry_state_path(project_root: Path) -> Path:
+    return project_root.resolve() / RESTORE_RETRY_RELATIVE_PATH
+
+
+def _retry_key(artifact: SoTArtifact) -> str:
+    return f"{artifact.id}:{artifact.restore_action}"
+
+
+def _load_retry_state(project_root: Path) -> dict[str, Any]:
+    path = _retry_state_path(project_root)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return {"schema_version": 1, "attempts": {}}
+    if not isinstance(payload, dict):
+        return {"schema_version": 1, "attempts": {}}
+    attempts = payload.get("attempts")
+    if not isinstance(attempts, dict):
+        payload["attempts"] = {}
+    payload.setdefault("schema_version", 1)
+    return payload
+
+
+def _retry_attempts(retry_state: dict[str, Any], artifact: SoTArtifact) -> int:
+    attempts = retry_state.get("attempts")
+    record = attempts.get(_retry_key(artifact)) if isinstance(attempts, dict) else None
+    if not isinstance(record, dict):
+        return 0
+    try:
+        value = int(record.get("attempts", 0))
+    except (TypeError, ValueError):
+        return 0
+    return max(value, 0)
+
+
+def _set_retry_attempts(
+    retry_state: dict[str, Any],
+    artifact: SoTArtifact,
+    *,
+    attempts: int,
+    result: dict[str, Any],
+) -> None:
+    records = retry_state.setdefault("attempts", {})
+    if not isinstance(records, dict):
+        records = {}
+        retry_state["attempts"] = records
+    key = _retry_key(artifact)
+    if attempts <= 0:
+        records.pop(key, None)
+    else:
+        records[key] = {
+            "artifact_id": artifact.id,
+            "restore_action": artifact.restore_action,
+            "attempts": attempts,
+            "updated_at": _now_iso(),
+            "last_result": result,
+        }
+    retry_state["updated_at"] = _now_iso()
+
+
+def _write_retry_state(project_root: Path, retry_state: dict[str, Any]) -> None:
+    path = _retry_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(retry_state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _task_name_for_artifact(artifact: SoTArtifact) -> str | None:
+    if artifact.id == "dispatcher-supervisor-task":
+        return "GTKB-DispatcherDaemon"
+    if artifact.id == "dispatcher-storm-watchdog-task":
+        return "GTKB-HarnessStormWatchdog"
+    storage_path = str(artifact.storage_path or "")
+    prefix = "windows-scheduled-task:"
+    if storage_path.startswith(prefix):
+        return storage_path.removeprefix(prefix)
+    return None
+
+
+def _active_disable_guard(artifact: SoTArtifact, project_root: Path) -> dict[str, Any] | None:
+    task_name = _task_name_for_artifact(artifact)
+    if task_name is None:
+        return None
+    status = disable_guard_status(project_root, task_name=task_name)
+    return status if status.get("active") else None
+
+
+def _restore_callable_for_artifact(artifact: SoTArtifact, project_root: Path):
+    if artifact.id == "dispatcher-supervisor-task":
+        from groundtruth_kb.dispatcher_supervisor import install_supervisor
+
+        return lambda: install_supervisor(project_root)
+    if artifact.id == "dispatcher-storm-watchdog-task":
+        from groundtruth_kb.dispatcher_watchdog import install_watchdog
+
+        return lambda: install_watchdog(project_root)
+    return None
+
+
+def _deferred_restore_payload(
+    artifact: SoTArtifact,
+    *,
+    decision: dict[str, Any],
+    reason_code: str,
+    detail: str,
+    disable_guard: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "artifact_id": artifact.id,
+        "restore_action": artifact.restore_action,
+        "status": "deferred",
+        "reason_code": reason_code,
+        "detail": detail,
+        "decision": decision,
+    }
+    if disable_guard is not None:
+        payload["disable_guard"] = disable_guard
+    return payload
+
+
+def _evaluate_restore_for_artifact(
+    artifact: SoTArtifact,
+    probe: dict[str, Any],
+    project_root: Path,
+    retry_state: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    retry_attempts = _retry_attempts(retry_state, artifact)
+    decision = decide_artifact_restoration(artifact, probe, retry_attempts=retry_attempts)
+    decision_payload = decision.to_json_dict()
+    probe["restore_decision"] = decision_payload
+    if not isinstance(decision, AutoRestoreAction):
+        if decision.kind == "escalate":
+            return (
+                probe,
+                [],
+                [
+                    _deferred_restore_payload(
+                        artifact,
+                        decision=decision_payload,
+                        reason_code=decision.reason_code,
+                        detail=decision.detail,
+                    )
+                ],
+            )
+        return probe, [], []
+
+    disable_guard = _active_disable_guard(artifact, project_root)
+    if disable_guard is not None:
+        return (
+            probe,
+            [],
+            [
+                _deferred_restore_payload(
+                    artifact,
+                    decision=decision_payload,
+                    reason_code="disable_guard_active",
+                    detail="active dispatcher disable guard suppresses automatic restore",
+                    disable_guard=disable_guard,
+                )
+            ],
+        )
+
+    restore = _restore_callable_for_artifact(artifact, project_root)
+    if restore is None:
+        return (
+            probe,
+            [],
+            [
+                _deferred_restore_payload(
+                    artifact,
+                    decision=decision_payload,
+                    reason_code="restore_recipe_unavailable",
+                    detail=f"no restore recipe is registered for artifact {artifact.id!r}",
+                )
+            ],
+        )
+
+    result = execute_resource_bounded_restore(
+        decision,
+        restore=restore,
+        fresh_probe=lambda: _artifact_probe(artifact, project_root),
+        success_probe=lambda: _artifact_probe(artifact, project_root),
+    )
+    result_payload = {
+        "artifact_id": artifact.id,
+        "restore_action": artifact.restore_action,
+        "decision": decision_payload,
+        "result": result.to_json_dict(),
+    }
+    if result.status == "executed":
+        _set_retry_attempts(retry_state, artifact, attempts=0, result=result_payload)
+        if isinstance(result.success_probe, dict):
+            probe["pre_restore_probe"] = dict(probe)
+            probe.update(result.success_probe)
+        probe["restore_result"] = result.to_json_dict()
+        return probe, [result_payload], []
+    if result.status == "failed":
+        _set_retry_attempts(retry_state, artifact, attempts=retry_attempts + 1, result=result_payload)
+        probe["restore_result"] = result.to_json_dict()
+        return probe, [result_payload], []
+    return probe, [], [result_payload]
+
+
 def probe_sot_registry(project_root: Path) -> dict[str, Any]:
     """Probe every SoT registry row with a non-empty health-check function."""
     root = project_root.resolve()
@@ -225,11 +440,19 @@ def probe_sot_registry(project_root: Path) -> dict[str, Any]:
             "findings": [f"SoT registry load failed: {type(exc).__name__}: {exc}"],
         }
 
-    artifacts = [
-        _artifact_probe(record, root)
-        for record in records
-        if record.lifecycle == "active" and (record.health_check_function or "").strip()
-    ]
+    retry_state = _load_retry_state(root)
+    artifacts: list[dict[str, Any]] = []
+    restore_actions_executed: list[dict[str, Any]] = []
+    restore_actions_deferred: list[dict[str, Any]] = []
+    for record in records:
+        if record.lifecycle != "active" or not (record.health_check_function or "").strip():
+            continue
+        probe = _artifact_probe(record, root)
+        evaluated, executed, deferred = _evaluate_restore_for_artifact(record, probe, root, retry_state)
+        artifacts.append(evaluated)
+        restore_actions_executed.extend(executed)
+        restore_actions_deferred.extend(deferred)
+    _write_retry_state(root, retry_state)
     findings = [
         f"{item['artifact_id']}: {item['status']} - {item.get('detail', '')}"
         for item in artifacts
@@ -240,6 +463,10 @@ def probe_sot_registry(project_root: Path) -> dict[str, Any]:
         "registry_path": str(registry_path),
         "artifacts": artifacts,
         "findings": findings,
+        "restore_actions_executed": restore_actions_executed,
+        "restore_actions_deferred": restore_actions_deferred,
+        "canonical_mutations_executed": [],
+        "retry_state_path": str(_retry_state_path(root)),
     }
 
 
@@ -263,14 +490,16 @@ def build_service_sot_status(
         "summary": {
             "gt_status_component_count": len(gt_status.get("components", [])),
             "sot_artifact_probe_count": len(sot_status.get("artifacts", [])),
-            "restore_actions_executed": 0,
+            "restore_actions_executed": len(sot_status.get("restore_actions_executed", [])),
+            "restore_actions_deferred": len(sot_status.get("restore_actions_deferred", [])),
             "canonical_mutations_executed": 0,
         },
         "gt_status": gt_status,
         "sot_registry": sot_status,
         "findings": list(gt_status.get("findings", [])) + list(sot_status.get("findings", [])),
-        "restore_actions_executed": [],
-        "canonical_mutations_executed": [],
+        "restore_actions_executed": list(sot_status.get("restore_actions_executed", [])),
+        "restore_actions_deferred": list(sot_status.get("restore_actions_deferred", [])),
+        "canonical_mutations_executed": list(sot_status.get("canonical_mutations_executed", [])),
     }
 
 

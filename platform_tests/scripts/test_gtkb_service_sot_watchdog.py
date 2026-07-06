@@ -37,7 +37,7 @@ class _FakeComponent:
         }
 
 
-def _artifact(artifact_id: str, health_check: str) -> SoTArtifact:
+def _artifact(artifact_id: str, health_check: str, *, restore_action: str = "manual") -> SoTArtifact:
     return SoTArtifact(
         id=artifact_id,
         domain="specifications",
@@ -49,6 +49,7 @@ def _artifact(artifact_id: str, health_check: str) -> SoTArtifact:
         backup_policy="membase_export",
         health_check_function=health_check,
         owner_role="shared",
+        restore_action=restore_action,
     )
 
 
@@ -107,6 +108,118 @@ def test_watchdog_records_probe_exception_as_failure(monkeypatch, tmp_path):
 
     assert payload["overall_status"] == "FAIL"
     assert any("db unreachable" in finding for finding in payload["findings"])
+
+
+def test_health_check_invokes_target_with_optional_dependencies(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        doctor_mod,
+        "_check_optional_dependency_test",
+        lambda target, load_complex_health=None: SimpleNamespace(
+            name="optional dependency test",
+            status="pass",
+            message=str(target),
+            found=True,
+            required=False,
+        ),
+        raising=False,
+    )
+
+    payload = service_sot._invoke_health_check("_check_optional_dependency_test", tmp_path)
+
+    assert payload["status"] == "PASS"
+    assert payload["found"] is True
+
+
+def test_watchdog_executes_safe_restore_and_records_payload(monkeypatch, tmp_path):
+    def _fake_collect_operating_state(project_root, *, config, startup, components):
+        return SimpleNamespace(overall_status="PASS", components=())
+
+    probes = iter(
+        [
+            {"name": "supervisor", "status": "WARN", "detail": "task disabled", "found": True, "required": False},
+            {"name": "supervisor", "status": "WARN", "detail": "task disabled", "found": True, "required": False},
+            {"name": "supervisor", "status": "PASS", "detail": "task ready", "found": True, "required": False},
+        ]
+    )
+    calls: list[Path] = []
+
+    monkeypatch.setattr(service_sot, "collect_operating_state", _fake_collect_operating_state)
+    monkeypatch.setattr(
+        service_sot,
+        "load_sot_toml",
+        lambda _path: (
+            _artifact(
+                "dispatcher-supervisor-task",
+                "_check_dispatcher_daemon_supervisor_task",
+                restore_action="ensure_alive",
+            ),
+        ),
+    )
+    monkeypatch.setattr(service_sot, "_invoke_health_check", lambda function_name, project_root: next(probes))
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.install_supervisor",
+        lambda project_root: calls.append(project_root) or {"action": "install"},
+    )
+
+    payload = service_sot.build_service_sot_status(tmp_path, config=object())
+
+    assert calls == [tmp_path.resolve()]
+    assert payload["overall_status"] == "PASS"
+    assert payload["summary"]["restore_actions_executed"] == 1
+    assert payload["restore_actions_deferred"] == []
+    assert payload["canonical_mutations_executed"] == []
+    artifact = payload["sot_registry"]["artifacts"][0]
+    assert artifact["status"] == "PASS"
+    assert artifact["pre_restore_probe"]["status"] == "WARN"
+
+
+def test_watchdog_defers_safe_restore_when_disable_guard_active(monkeypatch, tmp_path):
+    from groundtruth_kb.dispatcher_disable_guard import record_guarded_disable
+
+    def _fake_collect_operating_state(project_root, *, config, startup, components):
+        return SimpleNamespace(overall_status="PASS", components=())
+
+    record_guarded_disable(
+        tmp_path,
+        task_names=["GTKB-DispatcherDaemon"],
+        component="dispatcher-supervisor",
+        ttl_seconds=600,
+        reason="maintenance",
+        actor="prime-builder/codex",
+    )
+    monkeypatch.setattr(service_sot, "collect_operating_state", _fake_collect_operating_state)
+    monkeypatch.setattr(
+        service_sot,
+        "load_sot_toml",
+        lambda _path: (
+            _artifact(
+                "dispatcher-supervisor-task",
+                "_check_dispatcher_daemon_supervisor_task",
+                restore_action="ensure_alive",
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        service_sot,
+        "_invoke_health_check",
+        lambda function_name, project_root: {
+            "name": "supervisor",
+            "status": "WARN",
+            "detail": "task disabled",
+            "found": True,
+            "required": False,
+        },
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.install_supervisor",
+        lambda project_root: (_ for _ in ()).throw(AssertionError("restore should be suppressed")),
+    )
+
+    payload = service_sot.build_service_sot_status(tmp_path, config=object())
+
+    assert payload["restore_actions_executed"] == []
+    assert payload["restore_actions_deferred"][0]["reason_code"] == "disable_guard_active"
+    assert payload["restore_actions_deferred"][0]["disable_guard"]["active"] is True
 
 
 def test_write_service_sot_status_writes_json(tmp_path):

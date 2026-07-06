@@ -1269,6 +1269,55 @@ def _emit_complex_action_result(ctx: click.Context, payload: dict[str, Any], *, 
     raise click.ClickException("; ".join(failures) or f"dispatcher complex {action} failed")
 
 
+def _record_dispatch_disable_guard(
+    ctx: click.Context,
+    *,
+    task_names: list[str],
+    component: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+) -> dict[str, Any]:
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError, record_guarded_disable
+
+    config = _resolve_config(ctx)
+    try:
+        return record_guarded_disable(
+            config.project_root,
+            task_names=task_names,
+            component=component,
+            ttl_seconds=ttl_seconds,
+            owner_quiesce_record=owner_quiesce_record,
+            reason=reason,
+            actor=actor,
+        )
+    except DispatcherDisableGuardError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _validate_dispatch_disable_guard(
+    *,
+    task_names: list[str],
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+) -> None:
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError, validate_guarded_disable_request
+
+    try:
+        validate_guarded_disable_request(
+            task_names=task_names,
+            ttl_seconds=ttl_seconds,
+            owner_quiesce_record=owner_quiesce_record,
+            reason=reason,
+            actor=actor,
+        )
+    except DispatcherDisableGuardError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 @bridge_dispatch_complex_group.command("status")
 @click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
 @click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
@@ -1336,18 +1385,43 @@ def bridge_dispatch_complex_enable_cmd(
 @bridge_dispatch_complex_group.command("disable")
 @click.option("--supervisor-task-name", default="GTKB-DispatcherDaemon", show_default=True)
 @click.option("--watchdog-task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--ttl-seconds", type=int, default=None, help="Bound the disable until this TTL expires.")
+@click.option("--owner-quiesce-record", default=None, help="Explicit owner quiesce evidence, e.g. DELIB/AUQ id.")
+@click.option("--reason", default="", help="Reason for the bounded disable.")
+@click.option("--actor", default="prime-builder/codex", show_default=True, help="Actor recorded in the guard audit.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def bridge_dispatch_complex_disable_cmd(
     ctx: click.Context,
     supervisor_task_name: str,
     watchdog_task_name: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
     json_output: bool,
 ) -> None:
     """Disable the dispatcher supervisor and watchdog scheduled tasks."""
     from groundtruth_kb.dispatcher_complex import disable_complex
 
+    _validate_dispatch_disable_guard(
+        task_names=[supervisor_task_name, watchdog_task_name],
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
     payload = disable_complex(supervisor_task_name=supervisor_task_name, watchdog_task_name=watchdog_task_name)
+    guard = _record_dispatch_disable_guard(
+        ctx,
+        task_names=[supervisor_task_name, watchdog_task_name],
+        component="dispatcher-complex",
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    payload["disable_guard"] = guard
     _emit_complex_action_result(ctx, payload, json_output=json_output)
 
 
@@ -1517,16 +1591,45 @@ def bridge_dispatch_daemon_supervisor_enable_cmd(ctx: click.Context, task_name: 
 
 @bridge_dispatch_daemon_supervisor_group.command("disable")
 @click.option("--task-name", default="GTKB-DispatcherDaemon", show_default=True)
+@click.option("--ttl-seconds", type=int, default=None, help="Bound the disable until this TTL expires.")
+@click.option("--owner-quiesce-record", default=None, help="Explicit owner quiesce evidence, e.g. DELIB/AUQ id.")
+@click.option("--reason", default="", help="Reason for the bounded disable.")
+@click.option("--actor", default="prime-builder/codex", show_default=True, help="Actor recorded in the guard audit.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
-def bridge_dispatch_daemon_supervisor_disable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+def bridge_dispatch_daemon_supervisor_disable_cmd(
+    ctx: click.Context,
+    task_name: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+    json_output: bool,
+) -> None:
     """Disable the dispatcher supervisor scheduled task (Windows)."""
     from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError, disable_supervisor
 
+    _validate_dispatch_disable_guard(
+        task_names=[task_name],
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
     try:
         result = disable_supervisor(task_name=task_name)
     except DispatcherSupervisorError as exc:
         raise click.ClickException(str(exc)) from exc
+    guard = _record_dispatch_disable_guard(
+        ctx,
+        task_names=[task_name],
+        component="dispatcher-supervisor",
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    result["disable_guard"] = guard
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True))
         return
@@ -1643,16 +1746,45 @@ def bridge_dispatch_daemon_watchdog_enable_cmd(ctx: click.Context, task_name: st
 
 @bridge_dispatch_daemon_watchdog_group.command("disable")
 @click.option("--task-name", default="GTKB-HarnessStormWatchdog", show_default=True)
+@click.option("--ttl-seconds", type=int, default=None, help="Bound the disable until this TTL expires.")
+@click.option("--owner-quiesce-record", default=None, help="Explicit owner quiesce evidence, e.g. DELIB/AUQ id.")
+@click.option("--reason", default="", help="Reason for the bounded disable.")
+@click.option("--actor", default="prime-builder/codex", show_default=True, help="Actor recorded in the guard audit.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
-def bridge_dispatch_daemon_watchdog_disable_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+def bridge_dispatch_daemon_watchdog_disable_cmd(
+    ctx: click.Context,
+    task_name: str,
+    ttl_seconds: int | None,
+    owner_quiesce_record: str | None,
+    reason: str,
+    actor: str,
+    json_output: bool,
+) -> None:
     """Disable the storm-watchdog scheduled task (Windows)."""
     from groundtruth_kb.dispatcher_watchdog import DispatcherWatchdogError, disable_watchdog
 
+    _validate_dispatch_disable_guard(
+        task_names=[task_name],
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
     try:
         result = disable_watchdog(task_name=task_name)
     except DispatcherWatchdogError as exc:
         raise click.ClickException(str(exc)) from exc
+    guard = _record_dispatch_disable_guard(
+        ctx,
+        task_names=[task_name],
+        component="dispatcher-watchdog",
+        ttl_seconds=ttl_seconds,
+        owner_quiesce_record=owner_quiesce_record,
+        reason=reason,
+        actor=actor,
+    )
+    result["disable_guard"] = guard
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True))
         return

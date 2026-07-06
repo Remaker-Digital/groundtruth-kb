@@ -14,7 +14,7 @@ SAFE_AUTO_RESTORE_ACTIONS = frozenset({"ensure_alive", "regenerate_from_source"}
 CANONICAL_RESTORE_ACTIONS = frozenset({"git_restore", "membase_export_restore"})
 NO_RESTORE_ACTIONS = frozenset({"visibility_only", "noop"})
 MANUAL_RESTORE_ACTIONS = frozenset({"manual"})
-RESTORABLE_PROBE_STATUSES = frozenset({"FAIL"})
+RESTORABLE_PROBE_STATUSES = frozenset({"WARN", "FAIL"})
 
 RestoreTier = Literal["safe", "canonical", "visibility_only", "manual", "noop", "unknown"]
 

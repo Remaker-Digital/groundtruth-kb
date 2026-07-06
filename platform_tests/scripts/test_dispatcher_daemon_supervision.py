@@ -35,25 +35,23 @@ def _load_watchdog_launcher():
     return module
 
 
-@pytest.fixture(autouse=True)
-def _reset_daemon_logger():
-    """The daemon logger is a module-level singleton; clear its handlers between
-    tests so each test's RotatingFileHandler points at its own tmp dir."""
+def _clear_daemon_logger_handlers() -> None:
     logger = logging.getLogger("gtkb.dispatcher_daemon")
-    saved = list(logger.handlers)
-    for handler in saved:
-        logger.removeHandler(handler)
-        try:
-            handler.close()
-        except Exception:  # noqa: BLE001
-            pass
-    yield
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
         try:
             handler.close()
         except Exception:  # noqa: BLE001
             pass
+
+
+@pytest.fixture(autouse=True)
+def _reset_daemon_logger():
+    """The daemon logger is a module-level singleton; clear its handlers between
+    tests so each test's RotatingFileHandler points at its own tmp dir."""
+    _clear_daemon_logger_handlers()
+    yield
+    _clear_daemon_logger_handlers()
 
 
 # --- D3: idempotent ensure-alive ---------------------------------------------
@@ -204,6 +202,7 @@ def test_fatal_exception_logged(tmp_path, monkeypatch):
         raise RuntimeError("injected tick failure")
 
     monkeypatch.setattr(daemon, "run_tick", _boom)
+    _clear_daemon_logger_handlers()
     with pytest.raises(RuntimeError, match="injected tick failure"):
         daemon.run_loop(tmp_path, tick_seconds=1)
     log_path = daemon._daemon_state_dir(tmp_path) / daemon.DAEMON_LOG_FILENAME

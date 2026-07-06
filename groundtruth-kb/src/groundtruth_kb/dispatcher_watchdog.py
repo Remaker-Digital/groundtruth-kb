@@ -93,6 +93,9 @@ def collect_watchdog_status(
         "healthy": False,
         "findings": [],
     }
+    from groundtruth_kb.dispatcher_disable_guard import disable_guard_status
+
+    payload["disable_guard"] = disable_guard_status(root, task_name=task_name)
     if os.name != "nt":
         payload["findings"].append("storm watchdog is Windows-only; non-Windows hosts skip scheduled-task control")
         return payload

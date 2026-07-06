@@ -291,6 +291,38 @@ health_check_function = "_check_bridge_dispatch_liveness"
 owner_role = "automated_only"
 notes = "Per-recipient dispatch state for the dispatcher daemon."
 
+[[artifacts]]
+id = "dispatcher-supervisor-task"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = "windows-scheduled-task:GTKB-DispatcherDaemon"
+authority_spec_id = "DCL-DISPATCHER-DAEMON-SUPERVISION-CONTRACT-001"
+mutation_api = "gt bridge dispatch daemon supervisor install|enable|disable|uninstall"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "regenerable_from_source"
+restore_action = "ensure_alive"
+health_check_function = "_check_dispatcher_daemon_supervisor_task"
+owner_role = "automated_only"
+depends_on = ["bridge-dispatch-state"]
+forbidden_substitutes = []
+notes = "Windows scheduled-task supervisor that keeps the dispatcher daemon alive across IDE/terminal closure; restored through safe ensure-alive controls."
+
+[[artifacts]]
+id = "dispatcher-storm-watchdog-task"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = "windows-scheduled-task:GTKB-HarnessStormWatchdog"
+authority_spec_id = "ADR-DISPATCHER-COMPLEX-CLI-001"
+mutation_api = "gt bridge dispatch daemon watchdog install|enable|disable|uninstall; gt bridge dispatch complex enable|disable"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "regenerable_from_source"
+restore_action = "ensure_alive"
+health_check_function = "_check_dispatcher_daemon_watchdog_task"
+owner_role = "automated_only"
+depends_on = ["dispatcher-supervisor-task"]
+forbidden_substitutes = []
+notes = "Windows scheduled-task watchdog for harness storm detection; registered separately so complex disable cannot leave it silently unhealed."
+
 # =========================================================================
 # Harness state
 # =========================================================================

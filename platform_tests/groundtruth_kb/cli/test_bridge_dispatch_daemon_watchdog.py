@@ -75,6 +75,10 @@ def test_cli_watchdog_control_commands_dispatch(monkeypatch) -> None:
         lambda *, task_name: calls.append(f"disable:{task_name}") or {"action": "disable", "task_name": task_name},
     )
     monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.record_guarded_disable",
+        lambda project_root, **kwargs: {"ok": True, "records": [{"task_name": kwargs["task_names"][0]}]},
+    )
+    monkeypatch.setattr(
         "groundtruth_kb.dispatcher_watchdog.uninstall_watchdog",
         lambda *, task_name, dry_run: (
             calls.append(f"uninstall:{task_name}:{dry_run}")
@@ -87,7 +91,19 @@ def test_cli_watchdog_control_commands_dispatch(monkeypatch) -> None:
     commands = [
         ["bridge", "dispatch", "daemon", "watchdog", "install", "--task-name", "GTKB-WD-Test", "--dry-run"],
         ["bridge", "dispatch", "daemon", "watchdog", "enable", "--task-name", "GTKB-WD-Test"],
-        ["bridge", "dispatch", "daemon", "watchdog", "disable", "--task-name", "GTKB-WD-Test"],
+        [
+            "bridge",
+            "dispatch",
+            "daemon",
+            "watchdog",
+            "disable",
+            "--task-name",
+            "GTKB-WD-Test",
+            "--ttl-seconds",
+            "60",
+            "--reason",
+            "maintenance",
+        ],
         ["bridge", "dispatch", "daemon", "watchdog", "uninstall", "--task-name", "GTKB-WD-Test", "--dry-run"],
     ]
 
@@ -101,3 +117,21 @@ def test_cli_watchdog_control_commands_dispatch(monkeypatch) -> None:
         "disable:GTKB-WD-Test",
         "uninstall:GTKB-WD-Test:True",
     ]
+
+
+def test_cli_watchdog_disable_refuses_unbounded_disable(monkeypatch) -> None:
+    from groundtruth_kb.cli import main
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_watchdog.disable_watchdog",
+        lambda *, task_name: (_ for _ in ()).throw(AssertionError("disable should be guarded first")),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "daemon", "watchdog", "disable"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code != 0
+    assert "requires --ttl-seconds or --owner-quiesce-record" in result.output

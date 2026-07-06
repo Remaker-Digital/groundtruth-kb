@@ -240,3 +240,56 @@ def test_cli_supervisor_status_json(monkeypatch):
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["healthy"] is True
+
+
+def test_cli_supervisor_disable_refuses_unbounded_disable(monkeypatch):
+    from groundtruth_kb.cli import main
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.disable_supervisor",
+        lambda *, task_name: (_ for _ in ()).throw(AssertionError("disable should be guarded first")),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "daemon", "supervisor", "disable"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code != 0
+    assert "requires --ttl-seconds or --owner-quiesce-record" in result.output
+
+
+def test_cli_supervisor_disable_accepts_ttl_guard(monkeypatch):
+    from groundtruth_kb.cli import main
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.disable_supervisor",
+        lambda *, task_name: {"action": "disable", "task_name": task_name},
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.record_guarded_disable",
+        lambda project_root, **kwargs: {"ok": True, "records": [{"task_name": kwargs["task_names"][0]}]},
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "bridge",
+            "dispatch",
+            "daemon",
+            "supervisor",
+            "disable",
+            "--ttl-seconds",
+            "60",
+            "--reason",
+            "maintenance",
+            "--json",
+        ],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["disable_guard"]["ok"] is True
+    assert payload["disable_guard"]["records"][0]["task_name"] == "GTKB-DispatcherDaemon"

@@ -114,6 +114,10 @@ def test_cli_complex_enable_disable_dispatch(monkeypatch) -> None:
             }
         ),
     )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.record_guarded_disable",
+        lambda project_root, **kwargs: {"ok": True, "records": [{"task_name": item} for item in kwargs["task_names"]]},
+    )
     runner = CliRunner()
     env = {"GTKB_PROJECT_ROOT": str(_REPO_ROOT)}
 
@@ -142,6 +146,10 @@ def test_cli_complex_enable_disable_dispatch(monkeypatch) -> None:
             "GTKB-Supervisor-Test",
             "--watchdog-task-name",
             "GTKB-Watchdog-Test",
+            "--ttl-seconds",
+            "60",
+            "--reason",
+            "maintenance",
         ],
         env=env,
     )
@@ -152,6 +160,26 @@ def test_cli_complex_enable_disable_dispatch(monkeypatch) -> None:
         "enable:GTKB-Supervisor-Test:GTKB-Watchdog-Test",
         "disable:GTKB-Supervisor-Test:GTKB-Watchdog-Test",
     ]
+
+
+def test_cli_complex_disable_refuses_unbounded_disable(monkeypatch) -> None:
+    from groundtruth_kb.cli import main
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.disable_complex",
+        lambda *, supervisor_task_name, watchdog_task_name: (_ for _ in ()).throw(
+            AssertionError("disable should be guarded first")
+        ),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "complex", "disable"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code != 0
+    assert "requires --ttl-seconds or --owner-quiesce-record" in result.output
 
 
 def test_cli_complex_start_stop_dispatch_only_daemon(monkeypatch) -> None:

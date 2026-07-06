@@ -93,6 +93,9 @@ def collect_supervisor_status(
         "healthy": False,
         "findings": [],
     }
+    from groundtruth_kb.dispatcher_disable_guard import disable_guard_status
+
+    payload["disable_guard"] = disable_guard_status(root, task_name=task_name)
     if os.name != "nt":
         payload["findings"].append("supervisor is Windows-only; non-Windows hosts use manual daemon lifecycle")
         return payload
