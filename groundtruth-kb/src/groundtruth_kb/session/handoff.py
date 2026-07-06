@@ -418,6 +418,18 @@ def _role_from_envelope(envelope: dict[str, Any]) -> str:
     return "prime-builder"
 
 
+def _init_keyword_for_role(role: str) -> str:
+    if role == "loyal-opposition":
+        return "::init gtkb lo"
+    return "::init gtkb pb"
+
+
+def _activity_keyword_for_role(role: str) -> str:
+    if role == "loyal-opposition":
+        return "::open test"
+    return "::open build"
+
+
 _DOCUMENT_LINE = re.compile(r"^Document:\s*(?P<name>\S+)\s*$")
 _STATUS_LINE = re.compile(r"^(?P<status>[A-Z-]+):\s*(?P<path>\S+)\s*$")
 _VERSIONED_BRIDGE_FILE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
@@ -594,11 +606,29 @@ def _assemble_prompt(
     lines.append("")
     lines.append("## Next-Session Direction")
     lines.append("")
+    lines.append("Send startup keywords and task content as separate messages:")
+    lines.append("")
+    lines.append("1. Session role:")
+    lines.append("")
+    lines.append("```text")
+    lines.append(_init_keyword_for_role(role))
+    lines.append("```")
+    lines.append("")
+    lines.append("2. Activity envelope:")
+    lines.append("")
+    lines.append("```text")
+    lines.append(_activity_keyword_for_role(role))
+    lines.append("```")
+    lines.append("")
+    lines.append("3. Handoff body:")
+    lines.append("")
+    lines.append("```text")
     lines.append(
         "Read this handoff prompt, then read live dispatcher/TAFE state and "
         "the versioned bridge file chain. Act on the role-actionable entries "
         "above in oldest-first order.",
     )
+    lines.append("```")
     lines.append("")
     return "\n".join(lines)
 

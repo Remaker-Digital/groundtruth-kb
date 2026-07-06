@@ -103,7 +103,17 @@ to check current status. Use `gt assert` to verify specifications against the co
 
 ### Starting a New Session
 
+Send startup keywords and task content as separate messages:
+
+```text
+::init gtkb pb
 ```
+
+```text
+::open project
+```
+
+```text
 Continue work on _test_golden_dual_agent.
 Key files: CLAUDE.md, MEMORY.md, BRIDGE-INVENTORY.md (if used)
 Next: [describe task].

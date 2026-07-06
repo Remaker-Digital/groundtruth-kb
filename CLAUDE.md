@@ -198,7 +198,17 @@ For application-specific origin/component taxonomy, see application-side archite
 
 ### Starting a New Session
 
+Send startup keywords and task content as separate messages:
+
+```text
+::init gtkb pb
 ```
+
+```text
+::open project
+```
+
+```text
 Continue work on GroundTruth-KB platform.
 Location: E:\GT-KB
 Key files: CLAUDE.md, memory/MEMORY.md

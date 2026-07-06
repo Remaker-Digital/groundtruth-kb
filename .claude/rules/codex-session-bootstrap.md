@@ -5,6 +5,13 @@ restart.
 
 > **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
 > state and status-bearing numbered bridge files are canonical.
+>
+> **2026-07-01 activity envelope sharding (WI-4949):** Base startup loads only
+> `global_baseline` surfaces per `config/agent-control/activity-envelope-sharding.toml`.
+> Codex LO runbooks, standing priorities, checklists, and templates listed under
+> `classes.activity_only.deferred_surfaces` and `migration.wi4949.activity_map`
+> load only after `::open <activity>`. `.codex/` skill adapters are generated
+> from canonical `.claude/skills/` sources and require no separate startup load.
 
 ## What To Expect On Restart
 
@@ -57,7 +64,7 @@ this workspace and reads `AGENTS.md`:
   entries may be Loyal Opposition responses created in a separate previous
   session.
 - The poller is separate from the bridge. The retired OS poller remains
-  disabled. Use the cross-harness event-driven trigger when its registrations and
+  disabled. Use the dispatcher daemon when its registrations and
   dispatch state are healthy; otherwise use manual scans or activate monitoring
   only when Prime Builder and Loyal Opposition are running in separate harnesses
   or asynchronous monitoring is otherwise needed.
@@ -126,22 +133,30 @@ Optional local environment overrides remain available:
 9. Review-mode hooks should auto-activate from `harness-state/harness-identities.json`
    plus canonical role state in `harness-state/harness-registry.json`.
    Only set an environment flag if you need to force or override the detected mode.
-10. Confirm the assigned AI harness loads:
+10. Confirm **global baseline** startup surfaces loaded (see
+    `config/agent-control/activity-envelope-sharding.toml` § `classes.global_baseline`
+    and `config/agent-control/SESSION-STARTUP-INDEX.md`):
    - `AGENTS.md`
    - `harness-state/harness-identities.json`
    - `harness-state/harness-registry.json`
    - `.claude/rules/operating-role.md` guidance
-   - `.claude/rules/canonical-terminology.md`
-   - `.claude/rules/codex-standing-priorities.md`
-   - `.claude/rules/codex-way-of-working.md`
-   - `.claude/rules/codex-review-operating-contract.md`
-   - `.claude/rules/codex-loyal-opposition-runbook.md`
-   - `.claude/rules/codex-knowledge-base-index.md`
-11. For substantial work, use:
+   - `.claude/rules/canonical-terminology.md` (core primer subset only)
+   - `.claude/rules/file-bridge-protocol.md`
+   - `config/agent-control/SESSION-STARTUP-INDEX.md` + role overlay
+11. **Do not** load activity-only Codex surfaces at base startup. Open the matching
+    activity envelope first (`::open build|test|project|deliberation|spec|ops`) and
+    then load deferred surfaces from `migration.wi4949.activity_map` in
+    `activity-envelope-sharding.toml`. Typical mappings:
+    - `::open build` or `::open test` → `codex-review-operating-contract.md`,
+      `codex-loyal-opposition-runbook.md`
+    - `::open test` → also `codex-review-checklists.md`, `template-code-review.md`
+    - `::open project` → `codex-standing-priorities.md`, `groundtruth-kb-vision.md`
+    - `::open deliberation` → `codex-way-of-working.md`
+12. For substantial LO review work inside an opened activity envelope, use:
    - `.claude/rules/codex-review-checklists.md`
    - `.claude/rules/template-code-review.md`
    - `.claude/rules/template-decision-memo.md`
-12. In Loyal Opposition mode, include the standard project-state startup
+13. In Loyal Opposition mode, include the standard project-state startup
     report after bridge verification:
     - direct `git status --short --branch`
     - TAFE/dispatcher latest-status counts and latest `NEW`/`REVISED`
@@ -154,7 +169,22 @@ Optional local environment overrides remain available:
 
 ## Quick Restart Prompt
 
-Use this at the start of a new session if needed:
+Use these as separate messages at the start of a new Prime Builder session if
+needed. For a Loyal Opposition session, use `::init gtkb lo` for message 1.
+
+Message 1:
+
+```text
+::init gtkb pb
+```
+
+Message 2:
+
+```text
+::open project
+```
+
+Message 3:
 
 ```text
 Resolve this harness's persistent ID from
@@ -163,14 +193,14 @@ recorded for that harness ID in `harness-state/harness-registry.json`, read
 through `groundtruth_kb.harness_projection.read_roles` or the `roles`
 subcommand under `gt harness`.
 Load AGENTS.md, the harness identity map, the role assignment map,
-.claude/rules/canonical-terminology.md,
-.claude/rules/codex-session-bootstrap.md,
-.claude/rules/codex-standing-priorities.md,
-.claude/rules/codex-way-of-working.md,
-.claude/rules/codex-review-operating-contract.md,
-.claude/rules/codex-loyal-opposition-runbook.md, and
-.claude/rules/codex-knowledge-base-index.md. Surface the
-standing strategic self-improvement directive from codex-standing-priorities,
+.claude/rules/canonical-terminology.md (core primer subset),
+.claude/rules/file-bridge-protocol.md,
+config/agent-control/SESSION-STARTUP-INDEX.md, and the active role overlay.
+Defer activity-only Codex surfaces (standing priorities, review contract,
+loyal-opposition runbook, way-of-working, checklists) until `::open <activity>`
+per config/agent-control/activity-envelope-sharding.toml migration.wi4949.
+Surface the standing strategic self-improvement directive from
+codex-standing-priorities after opening the project activity envelope,
 including that future-work candidates flow to MemBase rather than MEMORY.md,
 that consideration backlog items are distinct from implementation-approved
 backlog items, and that executing a consideration item requires owner
@@ -198,4 +228,3 @@ When Loyal Opposition review mode is active, the local hook behavior should:
 ---
 
 Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-

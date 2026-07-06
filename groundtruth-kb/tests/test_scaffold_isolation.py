@@ -373,6 +373,11 @@ def test_tp_integ_1_scaffold_emits_phase9_section1_enumeration(in_root_sandbox: 
     assert "Quickstart" in readme_text
     assert "[service]" in readme_text
 
+    # WI-4961: scaffolded session kickoff guidance keeps startup keywords and
+    # the task body in separate messages.
+    claude_text = (in_root_sandbox / "CLAUDE.md").read_text(encoding="utf-8")
+    _assert_starting_session_sequence(claude_text)
+
 
 def test_tp_integ_1b_doctor_service_endpoint_check_passes(in_root_sandbox: Path) -> None:
     """TP2 (cross-slice integration): scaffolded service endpoint clears
@@ -457,6 +462,16 @@ def _normalize_for_diff(content: bytes, rel_path: Path) -> bytes:
 def _list_fixture_files(profile: str) -> set[Path]:
     fixture_root = _GOLDEN_FIXTURE_ROOT / profile
     return {f.relative_to(fixture_root) for f in fixture_root.rglob("*") if f.is_file()}
+
+
+def _assert_starting_session_sequence(text: str) -> None:
+    section = text.split("### Starting a New Session", 1)[1].split("### Session Wrap-Up", 1)[0]
+    fences = re.findall(r"```text\r?\n(.*?)\r?\n```", section, flags=re.DOTALL)
+    assert len(fences) >= 3
+    assert fences[0].strip() == "::init gtkb pb"
+    assert fences[1].strip() == "::open project"
+    assert "Continue work on" in fences[2]
+    assert all("Continue work on" not in fence for fence in fences[:2])
 
 
 def _force_rmtree(path: Path) -> None:
