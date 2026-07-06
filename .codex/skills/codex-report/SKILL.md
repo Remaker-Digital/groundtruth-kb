@@ -54,6 +54,15 @@ Include for most reports:
 - Rollback or containment notes
 - Open decisions required from owner
 
+## Advisory Report Mode
+
+When the report is an advisory rather than a bridge verdict, classify the
+recommendation as `adopt`, `adapt`, `reject`, `defer`, or `monitor`. For
+`adopt` or `adapt`, include a `Required Prime Builder Owner-Grilling Gate`
+section before any implementation proposal exists. That section must name the
+owner questions Prime Builder must resolve, practical options, tradeoffs, and
+the durable artifact outcome expected from the decision.
+
 ## Output
 
 Generate timestamped file:

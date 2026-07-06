@@ -67,6 +67,13 @@ hook) converts written advisories into MemBase work items idempotently. Do not
 mutate the backlog directly from this skill — detection is read-only; backlog
 promotion happens downstream through the advisory and the router.
 
+Classify each routed advisory as `adopt`, `adapt`, `reject`, `defer`, or
+`monitor`. For `adopt` or `adapt`, the advisory MUST include a `Required Prime
+Builder Owner-Grilling Gate` section before any derived implementation proposal
+exists. The gate names the owner questions Prime Builder must ask, practical
+options, tradeoffs, and the durable artifact outcome expected from the
+decision.
+
 ## Output discipline
 
 A radar pass produces compact cues, not a report. For each material finding

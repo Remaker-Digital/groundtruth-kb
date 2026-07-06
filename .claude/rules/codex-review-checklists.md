@@ -60,6 +60,22 @@ Purpose: reusable checklists for rigorous proposal review, code review, and alte
 - Which option minimizes regret?
 - What decision does the owner need to make?
 
+## Advisory Report Checklist
+
+- Is the advisory classified as exactly one of `adopt`, `adapt`, `reject`,
+  `defer`, or `monitor`?
+- For `adopt` or `adapt`, does the report include a `Required Prime Builder
+  Owner-Grilling Gate` section before any derived implementation proposal
+  exists?
+- Does the gate identify the owner questions, practical options, tradeoffs,
+  and expected durable artifact outcome?
+- Does the report say whether Prime Builder should create a bridge proposal,
+  capture a deliberation, defer the item, or reject the recommendation?
+- Are blocking owner decisions routed through the owner-decision channel rather
+  than buried in prose?
+- Are source advisory paths, affected specs/WIs, and verification expectations
+  concrete enough for Prime Builder to act without rediscovery?
+
 ## Configuration Review Checklist
 
 - Are controls portable or machine-local only?

@@ -95,6 +95,12 @@ Every generated advisory report MUST include the following sections:
 10. **Owner decisions required** - listed only when genuinely blocking; otherwise stated as "None" with rationale.
 11. **Residual risk** - unresolved or de-prioritized risks after Prime executes the action plan.
 
+When the report recommends that Prime Builder `adopt` or `adapt` an advisory
+finding into implementation work, it MUST also include a `Required Prime Builder
+Owner-Grilling Gate` section before any derived implementation proposal exists.
+The gate names the owner questions, practical options, tradeoffs, and durable
+artifact outcome needed to make the recommendation implementation-ready.
+
 ## Action Classification
 
 Every actionable finding in the report MUST be classified as exactly one of:
