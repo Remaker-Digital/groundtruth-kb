@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-05T13:32:51Z",
+  "generated_at": "2026-07-06T19:55:07Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -65,7 +65,7 @@
     {
       "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
@@ -84,7 +84,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": true,
+          "can_receive_dispatch": false,
           "dispatch_availability": 75,
           "dispatch_cost": 60,
           "dispatch_max_items": 3,
@@ -115,7 +115,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 45
+      "version": 46
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -179,7 +179,7 @@
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -199,7 +199,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": false,
+          "can_receive_dispatch": true,
           "dispatch_availability": 95,
           "dispatch_cost": 25,
           "dispatch_max_items": 2,
@@ -219,7 +219,7 @@
             "--skill",
             "bridge-review",
             "--model",
-            "deepseek-v4-pro-cloud"
+            "kimi-k2-7-code-cloud"
           ],
           "max_items": 1
         }
@@ -229,7 +229,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 23
+      "version": 25
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -288,7 +288,7 @@
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -297,7 +297,7 @@
       "dispatch_quality": 80.0,
       "dispatch_tags": [
         "low-cost",
-        "loyal-opposition"
+        "prime-builder"
       ],
       "event_driven_hooks": false,
       "full_transcript_archive_required": false,
@@ -307,13 +307,13 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": false,
+          "can_receive_dispatch": true,
           "dispatch_availability": 90,
           "dispatch_cost": 20,
           "dispatch_quality": 80,
           "dispatch_tags": [
             "low-cost",
-            "loyal-opposition"
+            "prime-builder"
           ],
           "event_driven_hooks": false
         },
@@ -324,16 +324,20 @@
             "-p",
             "{{PROMPT}}",
             "--skill",
-            "bridge-review"
+            "implementation",
+            "--max-turns",
+            "80",
+            "--session-timeout",
+            "5400"
           ]
         }
       },
       "reviewer_precedence": 20,
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
       "status": "active",
-      "version": 18
+      "version": 29
     }
   ],
   "schema_version": 1,

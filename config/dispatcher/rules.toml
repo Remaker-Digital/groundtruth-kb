@@ -66,8 +66,8 @@ tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.F]
 description = "OpenRouter"
-max_items = 4
-tags = ["loyal-opposition", "low-cost"]
+max_items = 1
+tags = ["low-cost", "prime-builder"]
 
 [[rules]]
 id = "bridge-prime-builder-default"
