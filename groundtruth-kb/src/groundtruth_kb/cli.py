@@ -220,6 +220,80 @@ main.add_command(session_group)
 main.add_command(skills_group)
 
 
+@main.group("env")
+def env_cmd() -> None:
+    """Local environment source-of-truth commands."""
+
+
+def _load_env_sot_helpers() -> Any:
+    from groundtruth_kb import env_sot
+
+    return env_sot
+
+
+@env_cmd.command("plan")
+@click.option("--app", default="agent-red", show_default=True, help="Application env layout to inspect.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def env_plan_cmd(ctx: click.Context, app: str, json_output: bool) -> None:
+    """Plan Agent Red local env SoT migration without printing values."""
+
+    config = _resolve_config(ctx)
+    env_sot = _load_env_sot_helpers()
+    try:
+        plan = env_sot.build_plan(Path(config.project_root), app=app)
+    except env_sot.EnvSotError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(env_sot.render_plan(plan))
+
+
+@env_cmd.command("check")
+@click.option("--app", default="agent-red", show_default=True, help="Application env layout to inspect.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def env_check_cmd(ctx: click.Context, app: str, json_output: bool) -> None:
+    """Check whether local env files are safe for app SoT migration."""
+
+    config = _resolve_config(ctx)
+    env_sot = _load_env_sot_helpers()
+    try:
+        plan = env_sot.check_plan(Path(config.project_root), app=app)
+    except env_sot.EnvSotError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(env_sot.render_plan(plan))
+    if not plan.ok_for_apply:
+        raise SystemExit(1)
+
+
+@env_cmd.command("migrate")
+@click.option("--app", default="agent-red", show_default=True, help="Application env layout to migrate.")
+@click.option("--dry-run", is_flag=True, default=False, help="Plan migration without mutating files.")
+@click.option("--apply", "apply_", is_flag=True, default=False, help="Apply the migration when checks pass.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def env_migrate_cmd(ctx: click.Context, app: str, dry_run: bool, apply_: bool, json_output: bool) -> None:
+    """Move app env keys to the Agent Red SoT and generate admin views."""
+
+    if dry_run and apply_:
+        raise click.UsageError("Use either --dry-run or --apply, not both.")
+    config = _resolve_config(ctx)
+    env_sot = _load_env_sot_helpers()
+    try:
+        result = env_sot.migrate(Path(config.project_root), app=app, apply=apply_)
+    except env_sot.EnvSotError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    else:
+        click.echo(env_sot.render_migration_result(result))
+
+
 @main.group("benchmarks")
 def benchmarks_group() -> None:
     """Read-only GT-KB benchmark and measurement reports."""
