@@ -297,6 +297,65 @@ def test_same_role_project_holder_ignores_expired_or_lapsed_claim(
     assert env.same_role_project_holder("prime-builder", "PROJECT-X", "other-session", project_root=tmp_path) is None
 
 
+def test_go_impl_peer_claim_stays_locked_until_lapsed_then_reacquires(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """WI-4823: same-thread GO implementation ownership is exclusive until
+    deadline+grace lapse, then a peer Prime session may take over.
+    """
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    first_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    second_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
+    monkeypatch.setattr(env, "now_utc", lambda: base)
+
+    assert env.acquire("thread-a", first_session, project_root=tmp_path)
+    assert env.acquire("thread-a", second_session, project_root=tmp_path) is False
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == first_session
+
+    lapsed = base + timedelta(seconds=env.GO_IMPLEMENTATION_DEADLINE_SECONDS + env.GO_IMPLEMENTATION_GRACE_SECONDS + 1)
+    monkeypatch.setattr(env, "now_utc", lambda: lapsed)
+
+    assert env.current_holder("thread-a", project_root=tmp_path) is None
+    assert env.acquire("thread-a", second_session, project_root=tmp_path)
+    holder = env.current_holder("thread-a", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == second_session
+    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_impl_authorization_refuses_borrowed_work_intent_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    """WI-4823: implementation authorization must not accept another session's
+    work-intent claim as provenance for the current caller.
+    """
+    from scripts import implementation_authorization
+
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
+    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    caller_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
+    monkeypatch.setattr(implementation_authorization.bridge_work_intent_registry, "now_utc", lambda: base)
+
+    assert env.acquire("thread-a", holder_session, project_root=tmp_path)
+
+    assert implementation_authorization.work_intent_claim_block_reason(tmp_path, "thread-a", holder_session) is None
+    reason = implementation_authorization.work_intent_claim_block_reason(tmp_path, "thread-a", caller_session)
+    assert reason is not None
+    assert "claimed by session" in reason
+    assert holder_session in reason
+    assert caller_session in reason
+
+
 def test_same_role_project_holder_ignores_different_role(tmp_path: Path, env) -> None:
     _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
     _write_project_thread(tmp_path, "thread-a", "NEW", project_id="PROJECT-X")
