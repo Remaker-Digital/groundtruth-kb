@@ -42,6 +42,7 @@ def _minimal_valid_record(record_id: str, storage_path: str) -> str:
         mutation_api = "n/a"
         versioning_policy = "git_tracked"
         backup_policy = "git_tracked"
+        restore_action = "manual"
         health_check_function = ""
         owner_role = "shared"
         """
@@ -65,6 +66,7 @@ def _init_sot_artifacts_table(db_path: Path) -> None:
                 mutation_api TEXT NOT NULL,
                 versioning_policy TEXT NOT NULL,
                 backup_policy TEXT NOT NULL,
+                restore_action TEXT NOT NULL DEFAULT 'manual',
                 health_check_function TEXT,
                 owner_role TEXT NOT NULL,
                 depends_on TEXT,
@@ -96,9 +98,9 @@ def _insert_projection_row(db_path: Path, record_id: str, storage_path: str, lif
             INSERT INTO sot_artifacts (
                 id, version, domain, lifecycle, storage_path, authority_spec_id,
                 mutation_api, versioning_policy, backup_policy, health_check_function,
-                owner_role, depends_on, forbidden_substitutes, notes,
+                owner_role, restore_action, depends_on, forbidden_substitutes, notes,
                 changed_by, changed_at, change_reason
-            ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
+            ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
             """,
             (
                 record_id,
@@ -111,6 +113,7 @@ def _insert_projection_row(db_path: Path, record_id: str, storage_path: str, lif
                 "git_tracked",
                 "",
                 "shared",
+                "manual",
                 "test",
                 "2026-06-04T00:00:00Z",
                 "fixture",

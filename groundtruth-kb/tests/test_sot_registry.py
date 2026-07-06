@@ -72,6 +72,15 @@ def test_bootstrap_all_records_have_valid_enums() -> None:
             "shared",
             "automated_only",
         }
+        assert r.restore_action in {
+            "manual",
+            "visibility_only",
+            "git_restore",
+            "membase_export_restore",
+            "regenerate_from_source",
+            "ensure_alive",
+            "noop",
+        }
 
 
 def test_bootstrap_no_duplicate_ids() -> None:
@@ -245,6 +254,26 @@ def test_loader_accepts_optional_fields(tmp_path: Path) -> None:
     assert r.notes == "Optional fields exercise."
 
 
+def test_loader_rejects_invalid_restore_action(tmp_path: Path) -> None:
+    body = """
+        [[artifacts]]
+        id = "bad-restore"
+        domain = "control_surface"
+        lifecycle = "active"
+        storage_path = "x"
+        authority_spec_id = "GOV-X"
+        mutation_api = "n/a"
+        versioning_policy = "git_tracked"
+        backup_policy = "git_tracked"
+        restore_action = "invented"
+        health_check_function = ""
+        owner_role = "shared"
+    """
+    path = _write_toml(tmp_path, body)
+    with pytest.raises(InvalidSoTRecord, match="restore_action"):
+        load_toml(path)
+
+
 def test_loader_health_check_can_be_null(tmp_path: Path) -> None:
     body = """
         [[artifacts]]
@@ -330,6 +359,38 @@ def test_parity_detects_field_divergence() -> None:
     report = validate_projection_parity([toml_rec], [proj_rec])
     assert report.in_sync is False
     assert report.field_divergences == (("x", "lifecycle"),)
+
+
+def test_parity_detects_restore_action_divergence() -> None:
+    toml_rec = SoTArtifact(
+        id="x",
+        domain="control_surface",
+        lifecycle="active",
+        storage_path="path",
+        authority_spec_id="GOV-X",
+        mutation_api="n/a",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function=None,
+        owner_role="shared",
+        restore_action="ensure_alive",
+    )
+    proj_rec = SoTArtifact(
+        id="x",
+        domain="control_surface",
+        lifecycle="active",
+        storage_path="path",
+        authority_spec_id="GOV-X",
+        mutation_api="n/a",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function=None,
+        owner_role="shared",
+        restore_action="manual",
+    )
+    report = validate_projection_parity([toml_rec], [proj_rec])
+    assert report.in_sync is False
+    assert report.field_divergences == (("x", "restore_action"),)
 
 
 # ---------------------------------------------------------------------------

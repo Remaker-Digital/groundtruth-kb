@@ -366,6 +366,38 @@ def _records_to_dict(records: list[SoTArtifact]) -> dict[str, SoTArtifact]:
     return {r.id: r for r in records}
 
 
+def _infer_restore_action(
+    *,
+    record_id: str,
+    lifecycle: str,
+    storage_path: str,
+    versioning_policy: str,
+    backup_policy: str,
+    owner_role: str,
+) -> RestoreAction:
+    """Infer restore metadata for legacy projections that predate the column."""
+
+    if lifecycle == "archive":
+        return "noop"
+    if backup_policy == "membase_export":
+        return "membase_export_restore"
+    if backup_policy == "regenerable_from_source" or versioning_policy == "regenerated_from_source":
+        return "regenerate_from_source"
+    if backup_policy == "gitignored_runtime":
+        if "dispatch-state" in storage_path or "dispatcher" in record_id:
+            return "ensure_alive"
+        if "work-intent" in storage_path:
+            return "noop"
+        if owner_role == "owner_only":
+            return "visibility_only"
+        return "noop"
+    if owner_role == "owner_only":
+        return "manual"
+    if backup_policy == "git_tracked":
+        return "git_restore"
+    return _DEFAULT_RESTORE_ACTION
+
+
 def validate_projection_parity(
     toml_records: list[SoTArtifact],
     projection_records: list[SoTArtifact],
@@ -421,7 +453,7 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(sot_artifacts)")
         columns = {row[1] for row in cur.fetchall()}
-        restore_expr = "restore_action" if "restore_action" in columns else f"'{_DEFAULT_RESTORE_ACTION}'"
+        restore_expr = "restore_action" if "restore_action" in columns else "NULL"
         # Tolerate fresh DBs where the view doesn't yet exist.
         try:
             cur.execute(
@@ -452,7 +484,15 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
                 backup_policy=row[7],
                 health_check_function=row[8],
                 owner_role=row[9],
-                restore_action=row[10],
+                restore_action=row[10]
+                or _infer_restore_action(
+                    record_id=row[0],
+                    lifecycle=row[2],
+                    storage_path=row[3],
+                    versioning_policy=row[6],
+                    backup_policy=row[7],
+                    owner_role=row[9],
+                ),
                 depends_on=depends_on,
                 forbidden_substitutes=forbidden,
                 notes=row[13] or "",
@@ -487,7 +527,6 @@ def sync_projection(
     import sqlite3
     from datetime import UTC, datetime
 
-    proj_by_id = {r.id: r for r in load_projection(db_path)}
     inserted: list[str] = []
     updated: list[str] = []
     unchanged: list[str] = []
@@ -497,6 +536,8 @@ def sync_projection(
     try:
         cur = conn.cursor()
         _ensure_restore_action_column(cur)
+        conn.commit()
+        proj_by_id = {r.id: r for r in load_projection(db_path)}
         for rec in toml_records:
             existing = proj_by_id.get(rec.id)
             if existing is not None:
