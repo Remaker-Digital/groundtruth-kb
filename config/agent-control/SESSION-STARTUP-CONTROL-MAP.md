@@ -42,8 +42,13 @@ session start.
 | Surface | Path | Classification | Notes |
 |---|---|---|---|
 | Platform rules & behavior | `CLAUDE.md` | active | Top-level platform guidance; GOV-01 ≤300-line cap. |
-| Loyal Opposition / cross-harness rules | `AGENTS.md` | active | Codex-side startup contract; durable-role disclosure. |
+| Loyal Opposition / cross-harness rules | `AGENTS.md` | active | Codex-side startup contract; dispatcher/default role disclosure. |
 | Canonical glossary | `.claude/rules/canonical-terminology.md` | active | Base startup loads the core primer subset only; full corpus and activity-specific terms load on `::open <activity>` (SPEC-INTAKE-46594e). |
+| Codex session bootstrap | `.claude/rules/codex-session-bootstrap.md` | active | Phase A bridge/global; Phase B defers activity-only Codex surfaces (WI-4949). |
+| Codex standing priorities | `.claude/rules/codex-standing-priorities.md` | active | **activity_only** — load on `::open project` per `activity-envelope-sharding.toml`. |
+| Codex review operating contract | `.claude/rules/codex-review-operating-contract.md` | active | **activity_only** — load on `::open build|test`. |
+| Codex LO runbook | `.claude/rules/codex-loyal-opposition-runbook.md` | active | **activity_only** — load on `::open build|test`. |
+| Codex knowledge-base index | `.claude/rules/codex-knowledge-base-index.md` | active | **explicit_query** — on-demand navigation; not base startup. |
 | Durable operating-role guidance | `.claude/rules/operating-role.md` | active | Human-readable role-resolution guidance; not the role record. |
 | File-bridge protocol | `.claude/rules/file-bridge-protocol.md` | active | Bridge statuses, gates, claim/preflight contract. |
 | Deliberation protocol | `.claude/rules/deliberation-protocol.md` | active | When to search/archive deliberations. |

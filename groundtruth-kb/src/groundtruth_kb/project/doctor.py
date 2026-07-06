@@ -14,7 +14,7 @@ import sys
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -1271,6 +1271,156 @@ def _check_harness_metadata_freshness(target: Path) -> ToolCheck:
             "Harness metadata freshness clean: cloud routes have non-cheap dispatch cost and non-local descriptions"
         ),
     )
+
+
+_HARNESS_MODEL_PIN_CONFIRMATIONS_REL = Path("config") / "agent-control" / "harness-model-pin-confirmations.toml"
+_DEFAULT_HARNESS_MODEL_PIN_STALE_AFTER_DAYS = 90
+
+
+def _check_harness_model_pin_reconfirmation(target: Path) -> ToolCheck:
+    """Surface active dispatch harness model pins that need owner reconfirmation."""
+    import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
+    from groundtruth_kb.bridge.state_report import _argv_value as _state_report_argv_value  # noqa: PLC0415
+    from groundtruth_kb.harness_projection import HarnessStateError, read_roles  # noqa: PLC0415
+
+    check_name = "Harness model pin reconfirmation"
+    try:
+        registry = read_roles(project_root=target)
+    except HarnessStateError as exc:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"harness registry unreadable; cannot surface model pins: {exc}",
+        )
+
+    active_pins: list[dict[str, str]] = []
+    harnesses = registry.get("harnesses") if isinstance(registry, dict) else None
+    if isinstance(harnesses, list):
+        for record in harnesses:
+            if not isinstance(record, dict):
+                continue
+            status = str(record.get("status") or "").strip().lower()
+            if status != "active" or record.get("can_receive_dispatch") is not True:
+                continue
+            surfaces = record.get("invocation_surfaces")
+            headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+            argv = headless.get("argv") if isinstance(headless, dict) else None
+            argv_items = [str(item) for item in argv] if isinstance(argv, list) else []
+            model_pin = _state_report_argv_value(argv_items, "--model") or _state_report_argv_value(argv_items, "-m")
+            active_pins.append(
+                {
+                    "id": str(record.get("id") or "?"),
+                    "name": str(record.get("harness_name") or record.get("harness_type") or "?"),
+                    "model_pin": model_pin or "(unspecified)",
+                }
+            )
+
+    if not active_pins:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="no active dispatch-capable harness model pins found through canonical harness projection",
+        )
+
+    config_path = target / _HARNESS_MODEL_PIN_CONFIRMATIONS_REL
+    config: dict[str, Any] = {}
+    config_found = config_path.is_file()
+    findings: list[str] = []
+    if config_found:
+        try:
+            config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as exc:
+            findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} unreadable: {exc}")
+            config = {}
+    else:
+        findings.append(f"{_HARNESS_MODEL_PIN_CONFIRMATIONS_REL.as_posix()} missing")
+
+    stale_after_days = _DEFAULT_HARNESS_MODEL_PIN_STALE_AFTER_DAYS
+    configured_stale_after = config.get("stale_after_days") if isinstance(config, dict) else None
+    if isinstance(configured_stale_after, int) and configured_stale_after > 0:
+        stale_after_days = configured_stale_after
+    elif configured_stale_after is not None:
+        findings.append("stale_after_days must be a positive integer")
+
+    confirmations = config.get("confirmations") if isinstance(config, dict) else None
+    if not isinstance(confirmations, dict):
+        confirmations = {}
+
+    now = datetime.now(UTC)
+    for pin in active_pins:
+        harness_id = pin["id"]
+        label = f"{harness_id}/{pin['name']}={pin['model_pin']}"
+        confirmation = confirmations.get(harness_id)
+        if not isinstance(confirmation, dict):
+            findings.append(f"missing owner confirmation for {label}")
+            continue
+
+        confirmed_pin = confirmation.get("model_pin")
+        if confirmed_pin != pin["model_pin"]:
+            findings.append(f"owner confirmation changed for {label}; last_confirmed={confirmed_pin!r}")
+            continue
+
+        confirmed_at = _parse_model_pin_confirmed_at(confirmation.get("confirmed_at"))
+        if confirmed_at is None:
+            findings.append(f"owner confirmation for {label} has no parseable confirmed_at")
+            continue
+        age_days = (now - confirmed_at).days
+        if age_days > stale_after_days:
+            findings.append(
+                f"owner confirmation stale for {label}; confirmed_at={confirmed_at.date().isoformat()} "
+                f"age_days={age_days} stale_after_days={stale_after_days}"
+            )
+
+    current = ", ".join(f"{pin['id']}/{pin['name']}={pin['model_pin']}" for pin in active_pins)
+    if findings:
+        details = "; ".join(findings)
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=config_found,
+            status="warning",
+            message=f"{len(active_pins)} active dispatch model pin(s): {current}; "
+            f"{len(findings)} warning(s): {details}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="pass",
+        message=(
+            f"{len(active_pins)} active dispatch model pin(s) owner-confirmed within {stale_after_days} days: {current}"
+        ),
+    )
+
+
+def _parse_model_pin_confirmed_at(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day, tzinfo=UTC)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        candidates = [raw]
+        if raw.endswith("Z"):
+            candidates.append(raw[:-1] + "+00:00")
+        for candidate in candidates:
+            try:
+                parsed = datetime.fromisoformat(candidate)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+        with suppress(ValueError):
+            parsed_date = date.fromisoformat(raw)
+            return datetime(parsed_date.year, parsed_date.month, parsed_date.day, tzinfo=UTC)
+    return None
 
 
 def _json_file_contains_hook(path: Path, expected: str) -> bool:
@@ -5636,14 +5786,25 @@ _ROLE_AUTHORITY_FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = (
         r"\bdurable\s+role\b.*\b(?:permissions|restrictions|hook behavior|file authority)\b",
         re.IGNORECASE,
     ),
+    re.compile(
+        r"\bdispatcher/default\s+role\b.*\b(?:permissions|restrictions|hook behavior|file authority)\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\brole\s+authority:\s+resolve\b.*\bharness-state/harness-registry\.json\b", re.IGNORECASE),
 )
 _ROLE_AUTHORITY_QUALIFIERS = (
     "headless dispatch",
     "dispatch routing",
-    "dispatcher",
+    "dispatcher-routing",
+    "dispatcher daemon",
+    "dispatcher role set",
+    "dispatcher/default role metadata",
     "fallback",
+    "registry fallback",
     "routing labels only",
+    "resolved session role",
+    "session role",
+    "session-stated role",
     "interactive surfaces only",
     "not authority",
     "not behavior",
@@ -6507,6 +6668,11 @@ def run_doctor(
         # routes are still advertised as cheap/local in dispatcher or canonical
         # narrative surfaces.
         checks.append(_check_harness_metadata_freshness(target))
+        # WI-4999: owner-facing reconfirmation surface for active dispatch
+        # harness model pins. WARN-only because vendor-default introspection is
+        # intentionally out of scope; owner confirmation metadata is the durable
+        # evidence.
+        checks.append(_check_harness_model_pin_reconfirmation(target))
         checks.append(_check_dispatcher_config_cli_only_guard(target))
         # WI-4323: Ollama harness 4-store consistency. Verifies identities + registry +
         # capability registry + routing TOML agree about ollama→D / status=registered /

@@ -355,7 +355,7 @@ def validate_manifest(manifest: HarnessQualityManifest = HARNESS_QUALITY_MANIFES
     if mode_ids != {"prime_builder", "loyal_opposition"}:
         errors.append(f"benchmark modes must be exactly prime_builder and loyal_opposition: {sorted(mode_ids)}")
     if any(mode.durable_role_changes_allowed for mode in manifest.modes):
-        errors.append("benchmark modes must not allow durable role changes")
+        errors.append("benchmark modes must not allow dispatcher/default role changes")
 
     missing_decisions = set(OWNER_DECISION_IDS) - set(manifest.owner_decision_ids)
     if missing_decisions:

@@ -1,4 +1,4 @@
-"""Slice 10: dispatcher daemon remains durable-role-keyed regardless of
+"""Slice 10: dispatcher daemon remains dispatcher-role-keyed regardless of
 any interactive session-role marker.
 
 bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-005.md
@@ -7,7 +7,7 @@ bridge/gtkb-interactive-session-role-override-slice-10-regression-tests-005.md
 Module scope (per the slice proposal):
 
 - Verification that ``scripts/dispatcher_runtime.py`` continues
-  to dispatch counterpart bridge work using durable role authority and
+  to dispatch counterpart bridge work using dispatcher role-set authority and
   that the session-state role marker has no effect on:
     1. Recipient selection (``_resolve_dispatch_target``).
     2. Init-keyword emission (first line of ``_dispatch_prompt``).
@@ -16,7 +16,7 @@ Module scope (per the slice proposal):
 - This is the load-bearing safety contract behind
   ``GOV-SESSION-ROLE-AUTHORITY-001``: the interactive session-stated role
   governs in-session surfaces only; headless dispatch routing remains
-  keyed to the durable role per ``DCL-SESSION-ROLE-RESOLUTION-001``.
+  keyed to the dispatcher role set per ``DCL-SESSION-ROLE-RESOLUTION-001``.
 
 Tests stand up a synthetic project root (claude=B=prime-builder,
 codex=A=loyal-opposition) with optional session-role marker present, then
@@ -147,7 +147,7 @@ def test_resolve_dispatch_target_ignores_session_role_marker(
     expected_mode: str,
 ) -> None:
     """``_resolve_dispatch_target`` resolves the recipient strictly from the
-    durable role map; the presence of any session-state marker (with any
+    dispatcher/default role map; the presence of any session-state marker (with any
     role, including the opposite of the durable mapping) must not change
     the resolved target.
 
@@ -174,7 +174,7 @@ def test_resolve_dispatch_target_ignores_session_role_marker(
 
 
 # ---------------------------------------------------------------------------
-# Test 2: dispatched init keyword is keyed to durable role, not marker role.
+# Test 2: dispatched init keyword is keyed to dispatcher role, not marker role.
 # ---------------------------------------------------------------------------
 
 
@@ -195,9 +195,9 @@ def test_dispatch_prompt_first_line_emits_durable_keyed_keyword(
     session-state marker.
 
     Receiver-side ``_bridge_dispatch_keyword_check`` performs
-    set-membership against the receiver's own durable role set. If the
+    set-membership against the receiver's own dispatcher role set. If the
     emitter ever drifted to mark the prompt with the marker's role, a
-    durable-Prime harness receiving a marker-derived LO keyword would
+    registry-Prime harness receiving a marker-derived LO keyword would
     STRICT_DROP — the cross-harness round-trip would silently break.
     """
     project_root = _make_synthetic_project(tmp_path)

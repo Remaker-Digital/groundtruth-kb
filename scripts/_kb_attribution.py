@@ -95,7 +95,7 @@ def _role_for_harness_id(harness_id: str) -> str | None:
     """Return the primary role assigned to a given harness ID, or None if unassigned.
 
     Per IP-8 of gtkb-single-harness-bridge-dispatcher-001 (Codex GO at -014):
-    the durable role record's ``role`` field is a role-set wire form (JSON
+    the dispatcher/default role record's ``role`` field is a role-set wire form (JSON
     list of role tokens). This helper returns the Prime-first primary role
     string for backward compatibility with attribution call sites that
     expect a scalar. The legacy compatibility/provenance value
@@ -241,18 +241,18 @@ def _session_role_override(harness_name: str) -> str | None:
     Slice 6 of PROJECT-GTKB-INTERACTIVE-SESSION-ROLE-OVERRIDE
     (bridge/gtkb-interactive-session-role-override-slice-6-attribution-role-awareness-001.md,
     Codex GO at -002). Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 1,
-    a declared interactive session role overrides the durable role for the
+    a declared interactive session role overrides the registry fallback role for the
     ``changed_by`` LABEL. This is a LABEL OVERRIDE ONLY: it is layered on top of
-    the fail-closed durable resolution in ``resolve_changed_by`` (the durable
+    the fail-closed registry resolution in ``resolve_changed_by`` (the registry
     role must already have resolved, preserving the
     ``gtkb-kb-attribution-harness-aware`` mis-attribution invariant).
 
     Returns the marker role only when a valid interactive marker won the shared
-    resolver's interactive resolution; returns ``None`` for durable sources so
-    the caller keeps its already-resolved (fail-closed) durable role.
+    resolver's interactive resolution; returns ``None`` for registry fallback
+    sources so the caller keeps its already-resolved (fail-closed) registry role.
 
     Excluded in headless dispatch context (``GTKB_BRIDGE_POLLER_RUN_ID`` set):
-    durable role remains the attribution authority for dispatched work. (Slice 3
+    dispatcher/default role remains the attribution authority for dispatched work. (Slice 3
     already clears the marker at every SessionStart in both dispatchers, so a
     headless session has no marker; this guard makes the interactive-only intent
     explicit.)
@@ -260,7 +260,7 @@ def _session_role_override(harness_name: str) -> str | None:
     ``current_session_id`` is ``None`` in CLI/subprocess attribution context, so
     the resolver's ``marker_session_id_unverified`` branch applies; Slice 3 keeps
     the marker fresh-per-session. Fail-soft: any resolver error returns ``None``
-    (keep the durable role); it never masks a durable-attribution failure.
+    (keep the registry role); it never masks a registry-attribution failure.
     """
     if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
         return None
@@ -320,11 +320,11 @@ def resolve_changed_by(*, harness_name: str | None = None) -> str:
             f"resolve_changed_by: harness_id '{harness_id}' (harness_name "
             f"'{resolved}') has no role assignment in {ROLE_ASSIGNMENTS_PATH.name}."
         )
-    # Slice 6: a declared interactive session role overrides the durable role for
+    # Slice 6: a declared interactive session role overrides the registry fallback role for
     # the attribution LABEL (ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 1).
-    # This is layered AFTER the fail-closed durable resolution above, so the
-    # durable role must still resolve (mis-attribution invariant preserved); the
-    # marker overrides only the label, and falls back to the durable role when no
+    # This is layered AFTER the fail-closed registry resolution above, so the
+    # registry role must still resolve (mis-attribution invariant preserved); the
+    # marker overrides only the label, and falls back to the registry role when no
     # valid marker is present.
     effective_role = _session_role_override(resolved) or role
     return f"{effective_role}/{resolved}"

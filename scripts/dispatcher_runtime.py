@@ -486,7 +486,7 @@ def _load_quiesce_state(state_dir: Path) -> dict[str, Any]:
 #
 # Legacy keys in dispatch-state.json's recipients map are ``"prime"`` and
 # ``"codex"`` (hardcoded by the smart-poller and pre-canonical-init-keyword
-# trigger code). New keys are durable role labels ``"prime-builder"`` and
+# trigger code). New keys are dispatcher role labels ``"prime-builder"`` and
 # ``"loyal-opposition"`` per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
 #
 # Migration plan:
@@ -534,7 +534,7 @@ def _merge_role_retry_evidence(existing: dict[str, Any], value: dict[str, Any]) 
 
 
 def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:
-    """Translate legacy state-keys to durable role labels on read, suffixing with active IDs.
+    """Translate legacy state-keys to dispatcher role labels on read, suffixing with active IDs.
 
     Per IP-3c: legacy ``"prime"`` and ``"codex"`` recipient keys are migrated.
     Unsuffixed role keys are resolved to active roles: ``role_label:harness_id``.
@@ -3793,7 +3793,7 @@ def _command_without_prompt_payload(command: list[str], prompt: str) -> list[str
 
 @dataclass(frozen=True)
 class DispatchTarget:
-    """Resolved dispatch target for a needed durable role.
+    """Resolved dispatch target for a needed dispatcher role.
 
     Single source of truth for recipient-keyed routing decisions. Constructed
     by ``_resolve_dispatch_target(needed_role_label)`` per
@@ -4144,7 +4144,7 @@ def _resolve_dispatch_targets(
     state_dir: Path | None = None,
     items: list[Any] | None = None,
 ) -> list[DispatchTarget]:
-    """Resolve which harnesses should receive work needing the given durable role.
+    """Resolve which harnesses should receive work needing the given dispatcher role.
 
     Allows multiple active harnesses per role concurrently. Dispatchability,
     status/activity rules, and final ranking are read from
@@ -4329,13 +4329,13 @@ def _spawn_harness(
 
     Per IP-3b of bridge/gtkb-canonical-init-keyword-syntax-001-007.md
     (Codex GO at -008): takes a resolved ``DispatchTarget`` instead of a
-    legacy ``recipient`` string. The target carries the durable role label,
+    legacy ``recipient`` string. The target carries the dispatcher role label,
     harness ID, command handle, and canonical mode required by downstream
     callers.
 
     The ``recipient`` field in returned meta dicts is preserved as
-    ``target.dispatch_state_key`` (the durable role label) so dispatch logs
-    record durable identity rather than legacy aliases.
+    ``target.dispatch_state_key`` (the dispatcher role label) so dispatch logs
+    record dispatcher identity rather than legacy aliases.
 
     Per Codex F2 on ``-008``: does NOT set ``GTKB_NO_dispatcher_daemon``
     on the child env (and explicitly strips it via ``env.pop`` so a parent's
@@ -5362,7 +5362,7 @@ def run_dispatch_cycle(
         _process_pending_exit_codes(recipients_state, state_dir, project_root)
         _reconcile_terminal_bridge_recipient_state(recipients_state, project_root)
 
-        # IP-3b: resolve dispatch targets from the durable role record. The
+        # IP-3b: resolve dispatch targets from the dispatcher/default role record. The
         # mapping from actionable-classification to needed-role is fixed:
         # NEW/REVISED/NO-ACTION → Loyal Opposition; GO/NO-GO → Prime Builder.
         # Build targets defensively: if resolution fails (drift, missing

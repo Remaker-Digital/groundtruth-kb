@@ -13,7 +13,7 @@ source_of_truth_refs:
   - harness-state harness registry projection generated from MemBase
   - harness-state harness identities projection
   - config/agent-control/harness-capability-registry.toml
-  - AGENTS.md durable operating role assignment
+  - AGENTS.md dispatcher/default role assignment
   - .claude/rules/operating-role.md human-readable role contract
 
 canonical_reader_refs:
@@ -178,7 +178,7 @@ harnesses:
       - cursor harness bridge-review adapter
     notes:
       - Active Prime Builder-capable harness retained as dispatch receiver inventory.
-      - Current durable role is Prime Builder even when a dispatch context acts as reviewer.
+      - Current dispatcher/default role is Prime Builder even when a dispatch context acts as reviewer.
 
   - harness_id: F
     harness_name: openrouter

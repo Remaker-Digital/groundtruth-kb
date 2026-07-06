@@ -3449,7 +3449,7 @@ def discover_role_profile(
     harness_id: str | None = None,
     role_record_path: Path | None = None,
 ) -> str:
-    """Read the durable role assignment from the single harness role map."""
+    """Read the dispatcher/default role assignment from the single harness role map."""
 
     role_profile, _document, _path = role_for_harness(
         project_root,
@@ -4458,7 +4458,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             "- Startup mode: Loyal Opposition review and verification.",
             "- Default session purpose: process Prime Builder reviews and verifications on the file bridge.",
             "- Session-focus menu: not presented in Loyal Opposition mode; numbered focus choices are Prime Builder startup controls.",
-            "- Bridge/dispatch distinction: the file bridge is the durable role handoff and review mechanism; the dispatcher daemon is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
+            "- Bridge/dispatch distinction: the file bridge is the Prime Builder/Loyal Opposition handoff and review mechanism; the dispatcher daemon is the dispatch automation registered as PostToolUse and Stop hooks (retired smart poller and OS poller archived per Slice 4).",
             "- Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup.",
             "- Live bridge authority: current bridge state must be determined from TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; this generated report is not authoritative after generation.",
             "- Mandatory direct-read rule: before reporting the live bridge scan count, read current TAFE/dispatcher bridge state and versioned bridge files directly; do not derive bridge state from startup reports, dashboard JSON, cached documents, copied excerpts, summary counts, or hook-generated summaries.",
@@ -7389,13 +7389,13 @@ def main(argv: list[str] | None = None) -> int:
         "--role-record-path",
         type=Path,
         default=None,
-        help="Deprecated alias: override the single durable role-assignment map path.",
+        help="Deprecated alias: override the single dispatcher/default role-assignment map path.",
     )
     parser.add_argument(
         "--role-assignment-path",
         type=Path,
         default=None,
-        help="Override the single durable role-assignment map path.",
+        help="Override the single dispatcher/default role-assignment map path.",
     )
     parser.add_argument(
         "--user-preferences-path",

@@ -2,8 +2,9 @@
 
 Owner directive date: 2026-04-20
 
-The active Prime Builder is the harness whose durable role record in
-`harness-state/harness-registry.json` resolves to `prime-builder` (read via
+The active Prime Builder is the harness whose dispatcher/default role record in
+`harness-state/harness-registry.json` resolves to `prime-builder` for registry
+fallback and headless dispatch routing (read via
 `groundtruth_kb.harness_projection.read_roles` or `gt harness roles`); an
 interactive session may resolve to Prime Builder via the session-stated role
 per `DCL-SESSION-ROLE-RESOLUTION-001`. This file is the Prime Builder behavior
@@ -21,7 +22,7 @@ for the Prime Builder role; the **current role record** lives at
 `gt harness`.
 This file is loaded automatically at
 session start before role-specific directives are applied, but no markdown rule
-file can override the durable role assignment map.
+file can override the dispatcher/default role assignment map.
 
 While this role assignment is active, apply only governance, permissions, and
 restrictions that pertain to Prime Builder. Do not import Loyal Opposition-only
@@ -92,15 +93,15 @@ durable harness assignment (`harness-state/harness-registry.json`, read through
 or from an interactive owner declaration via the canonical init keyword
 `::init gtkb pb`.
 Per `DCL-SESSION-ROLE-RESOLUTION-001`, the resolved role is the session-stated
-role when an interactive session has declared one, and the durable role
-otherwise.
+role when an interactive session has declared one, and the registry fallback
+role otherwise.
 
 When an interactive session resolves to Prime Builder by session-stated override
-(the durable role is Loyal Opposition, but the owner typed `::init gtkb pb`),
+(the dispatcher/default role is Loyal Opposition, but the owner typed `::init gtkb pb`),
 this behavior contract governs the session. Conversely, a durable-Prime harness
 running an interactive session that declared `::init gtkb lo` operates under the
 Loyal Opposition contract for that session. Headless dispatch routing is
-unaffected and remains keyed to the durable role. See
+unaffected and remains keyed to the dispatcher role set. See
 `GOV-SESSION-ROLE-AUTHORITY-001` (authority split) and
 `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives).
 
@@ -113,7 +114,7 @@ proposal author and reviewer share a harness ID; the disqualifying self-review
 condition is the same author and reviewer session context, or missing/unreadable
 author session metadata under dispatcher fail-closed rules.
 
-An interactive Prime Builder session must not reinterpret durable role
-assignment or headless-dispatch eligibility as permission to perform its own
+An interactive Prime Builder session must not reinterpret dispatcher/default
+role assignment or headless-dispatch eligibility as permission to perform its own
 Loyal Opposition review. The owner-declared resolved role for the current
 interactive session remains the behavior boundary.

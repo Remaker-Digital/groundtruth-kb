@@ -20,7 +20,7 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 
 ## Canonical Startup Load Order (both roles)
 
-1. **Role record** — resolve the durable operating role from the canonical
+1. **Role record** — resolve the dispatcher/default role from the canonical
    MemBase harness registry projection `harness-state/harness-registry.json`
    (per `REQ-HARNESS-REGISTRY-001`). Honor any interactive session-stated override
    (`::init gtkb pb|lo`) per `DCL-SESSION-ROLE-RESOLUTION-001`.

@@ -1,4 +1,4 @@
-# Durable Operating Role Assignment
+# Dispatcher/Default Role Assignment
 
 Owner directive date: 2026-05-05
 
@@ -12,7 +12,7 @@ The single source-of-truth role artifact is:
 
 This rule file is not a role record and must not contain an `active_role:`
 assignment. It exists only as human-readable startup guidance for the role
-assignment system. No markdown rule file can override the durable role
+assignment system. No markdown rule file can override the dispatcher/default role
 assignment map at `harness-state/harness-registry.json` (the canonical role
 registry per `gtkb-retire-role-assignments-mirror-slice-1-seed-repoint-008`
 VERIFIED).
@@ -64,7 +64,7 @@ change.
 - **Single-harness topology assignment:** when only one harness identity is
   recorded, its role set is `["prime-builder", "loyal-opposition"]`
   (multi-element) so the single harness can fulfill both roles via the
-  single-harness bridge dispatcher (per
+  retired scheduled bridge worker (per
   `ADR-SINGLE-HARNESS-OPERATING-MODE-001` +
   `SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001` +
   `DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`).
@@ -89,8 +89,8 @@ transient session.
 ## Role Set Schema (Active Authority)
 
 `harness-state/harness-registry.json` is the canonical SOT recording each
-harness ID's durable role as a JSON list (the wire representation of a role
-set). Runtime role reads should use
+harness ID's dispatcher/default role as a JSON list (the wire representation of
+a role set). Runtime role reads should use
 `groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under
 the `gt harness` CLI
 when code needs canonical state semantics. The role-set schema is the
@@ -107,7 +107,7 @@ when code needs canonical state semantics. The role-set schema is the
   `_role_set_to_json`, `is_prime_builder`, `is_loyal_opposition`.
 - **Readers** in `scripts/harness_roles.py`, `scripts/_kb_attribution.py`,
   `scripts/workstream_focus.py`, `scripts/session_self_initialization.py`,
-  and `scripts/cross_harness_bridge_trigger.py` use set-membership semantics
+  and `scripts/gtkb_dispatcher_daemon.py` use set-membership semantics
   (`role in role_set`), not scalar equality.
 - **Writers** always emit the wire list form.
 
@@ -141,25 +141,24 @@ Agents MUST use the deterministic mode-switch transaction component for role/top
 
 ## Bridge Substrate Transaction Component (Slice 1 of gtkb-bridge-mode-config-transactions-slice-1)
 
-Agents MUST use the deterministic bridge-substrate transaction component for bridge dispatch substrate changes rather than ad-hoc direct edits to `harness-state/bridge-substrate.json` or manual hook registration edits in `.claude/settings.json` or `.codex/hooks.json`. The CLI command is `gt mode set-bridge-substrate --substrate <cross_harness_trigger|single_harness_dispatcher|none> [--reason <text>] [--defer-to-next-session]`. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/bridge-substrate.json` or ad-hoc substrate registration edits are strictly prohibited, as they bypass the validator preflights and the audit-trail records.
+Agents MUST use the deterministic bridge-substrate transaction component for bridge dispatch substrate changes rather than ad-hoc direct edits to `harness-state/bridge-substrate.json`. The CLI command is `gt mode set-bridge-substrate --substrate <dispatcher_daemon|none> [--reason <text>] [--defer-to-next-session]`. `none` means manual owner assignment only; it is not an automated fallback. `--defer-to-next-session` queues the transaction in `.gtkb-state/mode-switches/pending/` for SessionStart-time application; the default is immediate apply. Direct edits to `harness-state/bridge-substrate.json` are strictly prohibited, as they bypass the validator preflights and the audit-trail records.
 
 ## Interactive Session Role Override
 
-The durable role assignment recorded in `harness-state/harness-registry.json`
-(canonical role registry) is the authority for **headless dispatch routing**: the cross-harness
-event-driven trigger (`scripts/cross_harness_bridge_trigger.py`) consults the
-durable role to choose the recipient harness and compose the dispatched init
-keyword, and the receiver-side `STRICT_DROP` gate enforces durable set
-membership for headless dispatch. This is unchanged.
+The dispatcher/default role assignment recorded in `harness-state/harness-registry.json`
+(canonical role registry) is the authority for **headless dispatch routing**:
+the dispatcher daemon consults the dispatcher role set to choose the recipient harness
+and compose the dispatched init keyword, and the receiver-side `STRICT_DROP`
+gate enforces dispatcher role-set membership for headless dispatch. This is unchanged.
 
 An **interactive session** (no `GTKB_BRIDGE_POLLER_RUN_ID` env-var) MAY override
-the durable role for in-session surfaces when the owner gives explicit role
+the dispatcher/default role metadata for in-session surfaces when the owner gives explicit role
 direction in the transcript, including the canonical init keyword
 `::init gtkb (pb|lo)` on an owner prompt. When declared, the transcript-defined
 role governs SessionStart disclosure rendering, the AXIS 2 Claude-native surface
 filter, the workstream-focus menu shape, MemBase `changed_by` attribution, and
 AUQ-keyed routing for the rest of the interactive context. An interactive
-session with no explicit role direction falls back to the durable role. See
+session with no explicit role direction falls back to the registry role. See
 `GOV-SESSION-ROLE-AUTHORITY-001` (authority split),
 `DCL-SESSION-ROLE-RESOLUTION-001` (deterministic resolution table),
 `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives),
@@ -170,7 +169,7 @@ The transcript-defined role persists across compaction, resume, and contiguous
 SessionStart-like boundaries within the same interactive context until the owner
 explicitly changes it. Runtime marker files such as
 `.claude/session/active-session-role.json` may cache the resolved role for hook
-plumbing, but they carry no durable role record and are not the authority.
-**This does not weaken the durable-assignment invariant above**: transcript role
-does not mutate the durable role assignment map, and durable role mutations
+plumbing, but they carry no dispatcher/default role record and are not the authority.
+**This does not weaken the dispatcher/default-assignment invariant above**: transcript role
+does not mutate the dispatcher/default role assignment map, and dispatcher/default role mutations
 still require the `gt mode set-role` transaction component.

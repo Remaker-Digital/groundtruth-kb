@@ -32,10 +32,10 @@ Callers that have an interactive session id should pass it so the resolver can
 prefer the per-session marker and validate the stored raw id. The session
 envelope/per-session marker authority survives compaction, resume, and
 contiguous SessionStart-like boundaries; headless dispatch remains outside this
-interactive resolver and continues to use durable registry routing.
+interactive resolver and continues to use dispatcher/default registry routing.
 
 The resolver is strictly READ-ONLY: it never writes the marker and never
-mutates the durable role map. The durable fallback is composed from the
+mutates the dispatcher/default role map. The registry fallback is composed from the
 lower-level identity/role primitives with ``bootstrap_missing=False`` so no
 identity-bootstrap or startup-self-correction write path is reachable.
 """
@@ -70,7 +70,7 @@ def session_role_marker_path(project_root: Path) -> Path:
 
 
 def _durable_role(project_root: Path, harness_name: str) -> str:
-    """Resolve the harness's durable operating role, READ-ONLY.
+    """Resolve the harness's dispatcher/default role, READ-ONLY.
 
     Returns ``"prime-builder"`` or ``"loyal-opposition"``. Composed from the
     lower-level primitives (``resolved_harness_id`` with
@@ -156,7 +156,7 @@ def resolve_interactive_session_role(
     ``durable_marker_invalid_role``, ``durable_marker_stale_session``. See the
     module docstring for the deterministic resolution table.
 
-    READ-ONLY: never writes the marker or the durable role map. Callers SHOULD
+    READ-ONLY: never writes the marker or the dispatcher/default role map. Callers SHOULD
     pass the RAW UserPromptSubmit payload ``session_id`` (not a sanitized cache
     key) as ``current_session_id`` so the comparison is like-for-like with the
     Slice 2 writer's stored raw id.
@@ -164,7 +164,7 @@ def resolve_interactive_session_role(
     durable = _durable_role(project_root, harness_name)
 
     # WI-4663: Load per-harness session envelope and prefer its role_resolved
-    # over the registry durable role if the envelope is status="open".
+    # over the registry fallback role if the envelope is status="open".
     envelope_path = project_root / "harness-state" / harness_name / "session-envelope.json"
     envelope_role = None
     if envelope_path.is_file():

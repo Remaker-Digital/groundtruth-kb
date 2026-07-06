@@ -511,7 +511,7 @@ def _resolve_go_implementation_eligibility(session_id: str, *, project_root: Pat
         role_set = reader.role_set_for_id(document, harness_id)
         eligible = bool(role_set & PRIME_ELIGIBLE_ROLES)
         roles_desc = ", ".join(sorted(role_set)) if role_set else "<harness id absent from registry>"
-        return eligible, f"dispatch harness {harness_id!r} durable role-set {{{roles_desc}}}"
+        return eligible, f"dispatch harness {harness_id!r} dispatcher role-set {{{roles_desc}}}"
     marker_role = _interactive_marker_role(project_root, session_id)
     eligible = marker_role == "prime-builder"
     return eligible, f"interactive session marker role {marker_role!r}"
@@ -560,7 +560,7 @@ def acquire(
             values = _claim_values(slug, session_id, ttl_seconds=ttl_seconds, project_root=project_root, now=now)
             if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
                 # WI-4534 Slice A: registry-authoritative role-eligibility guard.
-                # Only a durably prime-builder (or compat acting-prime-builder)
+                # Only a registry-prime-builder (or compat acting-prime-builder)
                 # harness — or an owner-declared interactive Prime session — may
                 # hold a go_implementation claim. Draft (non-GO) claims are
                 # unaffected because this branch only fires for GO-latest threads.

@@ -132,6 +132,23 @@ owner_role = "automated_only"
 notes = "Historical assertion execution records; retention governed by assertion-runs-retention.toml."
 
 # =========================================================================
+# Owner-managed local runtime state
+# =========================================================================
+
+[[artifacts]]
+id = "owner-local-env"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = ".env.local"
+authority_spec_id = "GOV-ENV-LOCAL-AUTHORITY-001"
+mutation_api = "owner-managed local file; GT-KB records path authority only"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "gitignored_runtime"
+health_check_function = ""
+owner_role = "owner_only"
+notes = ".env.local is an owner-managed local credential/config artifact. The registry preserves path authority and cleanup essentiality only; credential values are not serialized or managed by GT-KB."
+
+# =========================================================================
 # Narrative authority files
 # =========================================================================
 
@@ -159,7 +176,7 @@ versioning_policy = "git_tracked"
 backup_policy = "git_tracked"
 health_check_function = "_check_canonical_terminology"
 owner_role = "shared"
-notes = "Codex-side startup contract; durable-role disclosure."
+notes = "Codex-side startup contract; dispatcher/default role disclosure."
 
 [[artifacts]]
 id = "rule-canonical-terminology"
@@ -218,7 +235,7 @@ owner_role = "shared"
 notes = "Canonical bridge workflow state; both agents read/write."
 
 [[artifacts]]
-id = "bridge-versioned-files"
+id = "bridge-dir"
 domain = "bridge_protocol"
 lifecycle = "active"
 storage_path = "bridge/"
@@ -249,12 +266,12 @@ domain = "bridge_protocol"
 lifecycle = "active"
 storage_path = ".gtkb-state/bridge-poller/dispatch-state.json"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
-mutation_api = "scripts/cross_harness_bridge_trigger.py (PostToolUse + Stop hooks)"
+mutation_api = "gt bridge dispatch daemon"
 versioning_policy = "overwrite_single_writer"
 backup_policy = "gitignored_runtime"
 health_check_function = "_check_bridge_dispatch_liveness"
 owner_role = "automated_only"
-notes = "Per-recipient dispatch state for cross-harness event-driven trigger."
+notes = "Per-recipient dispatch state for the dispatcher daemon."
 
 # =========================================================================
 # Harness state
@@ -296,7 +313,7 @@ authority_spec_id = "ADR-SINGLE-HARNESS-OPERATING-MODE-001"
 mutation_api = "gt mode set-bridge-substrate (transaction component)"
 versioning_policy = "overwrite_single_writer"
 backup_policy = "git_tracked"
-health_check_function = "_check_cross_harness_trigger"
+health_check_function = "_check_dispatcher_only_bridge_automation"
 owner_role = "owner_only"
 forbidden_substitutes = [".claude/rules/bridge-essential.md"]
 notes = "Bridge dispatch substrate selection. forbidden_substitutes per DELIB-20260670 Instance 1: rule-file prose describes design, not live substrate state."
@@ -343,3 +360,20 @@ backup_policy = "git_tracked"
 health_check_function = "_check_managed_artifact_drift"
 owner_role = "shared"
 notes = "Scaffolded-artifact lifecycle registry (67 records, 3 lifecycle axes); precedent pattern for this registry."
+
+# =========================================================================
+# Retired/archived SoT classes
+# =========================================================================
+
+[[artifacts]]
+id = "bridge-index"
+domain = "retired"
+lifecycle = "archive"
+storage_path = "bridge/INDEX.md"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = ""
+versioning_policy = "immutable_archive"
+backup_policy = "git_tracked"
+health_check_function = ""
+owner_role = "shared"
+notes = "Retired bridge index; replaced by direct versioned files discovery."

@@ -16,8 +16,8 @@ Spec map (DCL-ROLE-RESOLUTION-DECLARED-AUTHORITY-001 rules R1-R5 plus its four
 declared machine-checkable assertions):
 
 - R1 (envelope hint authoritative) / assertion 2 -> the session marker wins over
-  a mismatched durable role.
-- R2 (registry fallback only)                     -> the durable registry role is
+  a mismatched registry fallback role.
+- R2 (registry fallback only)                     -> the dispatcher/default registry role is
   consulted only when there is no valid marker hint.
 - R3 (dispatcher registry-authoritative) / assn 3 -> the dispatcher daemon
   routes via the registry projection and never the interactive marker.
@@ -142,17 +142,17 @@ def _r5_registry_mismatch_invalidation_hits(src: str) -> list[tuple[int, str]]:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# R1 — envelope-hint marker wins over a mismatched durable role (assertion 2)
+# R1 - envelope-hint marker wins over a mismatched registry fallback role (assertion 2)
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_r1_marker_role_wins_over_mismatched_durable(tmp_path: Path) -> None:
-    """R1 (behavioral): the session marker overrides the durable role.
+    """R1 (behavioral): the session marker overrides the registry fallback role.
 
-    Derive the durable baseline dynamically (no marker -> durable fallback), then
+    Derive the registry baseline dynamically (no marker -> registry fallback), then
     write a marker carrying the OPPOSITE role with a matching session_id. The
     resolver MUST return ``(opposite_role, "marker")``, proving marker-WINS
-    semantics over a mismatched durable role — not mere read order.
+    semantics over a mismatched registry fallback role - not mere read order.
     """
     mod = _load_resolver()
     baseline_role, baseline_source = mod.resolve_interactive_session_role(
@@ -179,7 +179,7 @@ def test_r1_resolver_reads_marker_before_durable_fallback() -> None:
     documented marker-absent / invalid-role / stale-session branches.
     """
     body = _extract_function(_read(RESOLVER_PATH), "resolve_interactive_session_role")
-    assert "_read_marker(" in body, "resolver must consult the marker before the durable role."
+    assert "_read_marker(" in body, "resolver must consult the marker before the registry fallback role."
     assert 'return role, "marker"' in body, "resolver missing the marker-wins return (R1 regressed)."
     for source_tag in (
         "durable_marker_absent",
@@ -312,7 +312,7 @@ def test_r5_no_gate_invalidates_on_registry_mismatch_alone() -> None:
         )
 
     # Anchor the revised behavior: the dispatch keyword checker may resolve and
-    # audit the durable role set, but it must not use STRICT_DROP for mismatch.
+    # audit the dispatcher role set, but it must not use STRICT_DROP for mismatch.
     core = _read(CORE_PATH)
     core_body = _extract_function(core, "_bridge_dispatch_keyword_check")
     assert "StartupDecision.STRICT_DROP" not in core_body, (
@@ -320,7 +320,7 @@ def test_r5_no_gate_invalidates_on_registry_mismatch_alone() -> None:
         "on a registry-vs-declared role mismatch."
     )
     assert "own_role_set" in core_body and "_audit_log_misdirected_dispatch" in core_body, (
-        "expected durable-role mismatch to remain auditable while prompt keyword authorization proceeds."
+        "expected dispatcher-role mismatch to remain auditable while prompt keyword authorization proceeds."
     )
 
 
@@ -384,7 +384,7 @@ def test_gov_session_role_authority_001_dispatcher_only() -> None:
     assert "dispatcher-authoritative only" in description, (
         "GOV-SESSION-ROLE-AUTHORITY-001 description missing 'dispatcher-authoritative only' language (DELIB-20265878)."
     )
-    assert "MUST NOT use the registry role as an authority surface" in description, (
+    assert "MUST NOT fresh-read the registry role to decide" in description, (
         "GOV-SESSION-ROLE-AUTHORITY-001 description missing MUST NOT enforcement gate language."
     )
 

@@ -68,7 +68,7 @@ _MODE_TO_ROLE_PROFILE = {
     "pb": "prime-builder",
     "lo": "loyal-opposition",
 }
-# Audit log for dispatch keyword / durable role mismatches. Shared with the
+# Audit log for dispatch keyword / dispatcher role-set mismatches. Shared with the
 # trigger's dispatch-failures path so investigators see all dispatch-related
 # failures in one location.
 DISPATCH_FAILURES_PATH = PROJECT_ROOT / ".gtkb-state" / "bridge-poller" / "dispatch-failures.jsonl"
@@ -293,7 +293,7 @@ def _bridge_auto_dispatch_context() -> str | None:
             "Do not treat the initial prompt as a discarded owner session-start stimulus.",
             "Treat the initial prompt as the active bridge auto-dispatch task.",
             "Read current TAFE/dispatcher bridge state and status-bearing numbered bridge files before acting; do not require or recreate retired aggregate queue state.",
-            "Process only entries whose live latest status is actionable for the durable role.",
+            "Process only entries whose live latest status is actionable for the dispatcher-routing role.",
             "Preserve the bridge protocol audit trail.",
         ]
     )
@@ -330,7 +330,7 @@ def _role_modes_from_field(raw_role: object) -> frozenset[str]:
 
 
 def _resolve_own_role_set(project_root: Path = PROJECT_ROOT) -> frozenset[str]:
-    """Resolve this harness's durable role set as canonical modes.
+    """Resolve this harness's dispatcher role set as canonical modes.
 
     Authority (per DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001 receiver clause;
     WI-3342 IP-4): migrated from the two-step
@@ -639,11 +639,11 @@ def _write_role_scoped_startup_relay_caches(additional_context: str) -> None:
         _write_startup_relay_cache(body, role_mode=primary_mode)
     # Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2 and
     # DCL-SESSION-ROLE-RESOLUTION-001: both the -pb and -lo startup-disclosure
-    # caches are generated unconditionally, regardless of this harness's durable
-    # role set, so the UserPromptSubmit init-keyword matcher's keyword-keyed
+    # caches are generated unconditionally, regardless of this harness's
+    # dispatcher/default role set, so the UserPromptSubmit init-keyword matcher's keyword-keyed
     # cache lookup succeeds for either role when the owner declares a
-    # session-stated role via ``::init gtkb (pb|lo)``. The durable role set is
-    # NOT consulted here; durable role remains the authority for headless
+    # session-stated role via ``::init gtkb (pb|lo)``. The dispatcher/default
+    # role set is NOT consulted here; registry role remains the authority for headless
     # dispatch routing only.
     for mode in sorted(_MODE_TO_ROLE_PROFILE):
         if mode == primary_mode:

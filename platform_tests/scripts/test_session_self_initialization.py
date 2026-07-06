@@ -1197,7 +1197,10 @@ def test_loyal_opposition_role_profile_reports_active_bridge() -> None:
     assert "Commit and push to GitHub" not in report
     assert "Default session purpose: process Prime Builder reviews and verifications on the file bridge." not in report
     assert "Session-focus menu: not presented in Loyal Opposition mode" not in report
-    assert "Bridge/poller distinction: the file bridge is the durable role handoff and review mechanism" not in report
+    assert (
+        "Bridge/dispatch distinction: the file bridge is the Prime Builder/Loyal Opposition "
+        "handoff and review mechanism"
+    ) not in report
     assert (
         "Bridge startup rule: check the file bridge in both Prime Builder and Loyal Opposition startup." not in report
     )
@@ -3409,7 +3412,7 @@ def test_t_compat_4_role_profiles_enumeration_retains_acting_prime_builder() -> 
     assert profile["role_mapping_source"] == ".claude/rules/acting-prime-builder.md", (
         "acting-prime-builder profile must continue to reference its rule file "
         "for narrative continuity (the rule file is the historical authority "
-        "record; the durable role record is harness-state/role-assignments.json)."
+        "record; the dispatcher/default role record is harness-state/role-assignments.json)."
     )
 
 

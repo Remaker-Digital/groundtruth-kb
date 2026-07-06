@@ -8,9 +8,9 @@ Governing specifications:
 
 - ``ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001`` Decision 2: both the ``-pb`` and
   ``-lo`` startup-disclosure caches are generated unconditionally regardless of
-  the harness's durable role set, so the UserPromptSubmit init-keyword matcher's
+  the harness's dispatcher/default role set, so the UserPromptSubmit init-keyword matcher's
   keyword-keyed cache lookup succeeds for either role.
-- ``DCL-SESSION-ROLE-RESOLUTION-001``: durable role is the authority for headless
+- ``DCL-SESSION-ROLE-RESOLUTION-001``: registry role is the authority for headless
   dispatch routing only; it is NOT consulted when generating interactive
   startup-disclosure caches. Assertion 8 requires the Claude and Codex
   SessionStart dispatchers to implement the same behavior.
@@ -88,7 +88,7 @@ def _isolate(
 
     ``durable_roles`` seeds what ``_resolve_own_role_set`` would return. The
     Slice 1 change must IGNORE it for cache generation; stubbing it to a
-    singleton is how the tests prove the writer no longer consults durable role.
+    singleton is how the tests prove the writer no longer consults registry role.
     """
     tmp_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(module, "OUT_DIR", tmp_dir)
@@ -113,7 +113,7 @@ def test_both_role_caches_written_regardless_of_durable_role(
     monkeypatch: pytest.MonkeyPatch,
     durable_roles: frozenset[str],
 ) -> None:
-    """Both -pb and -lo caches exist no matter what the durable role set is.
+    """Both -pb and -lo caches exist no matter what the dispatcher/default role set is.
 
     Core proof of the Slice 1 fix: with ``durable_roles == {pb}`` (harness B's
     singleton), the old loop never produced the ``-lo`` cache. The new loop

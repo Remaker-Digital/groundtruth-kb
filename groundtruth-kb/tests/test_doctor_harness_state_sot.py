@@ -155,9 +155,9 @@ def test_l2_does_not_flag_harness_projection_module(tmp_path: Path) -> None:
 
 
 def test_role_authority_boundary_passes_when_registry_is_dispatcher_qualified(tmp_path: Path) -> None:
-    """Dispatcher-qualified durable-registry wording is allowed."""
+    """Dispatcher-qualified registry wording is allowed."""
     (tmp_path / "CLAUDE.md").write_text(
-        "Durable registry fallback applies only to headless dispatch routing and interactive fallback.\n",
+        "Dispatcher role set applies only to headless dispatch routing and registry fallback.\n",
         encoding="utf-8",
     )
 
@@ -170,6 +170,21 @@ def test_role_authority_boundary_fails_on_behavior_authority_wording(tmp_path: P
     """Behavior-authority claims about the durable registry are doctor failures."""
     (tmp_path / "CLAUDE.md").write_text(
         "If markdown differs, the durable map wins for hook behavior.\n",
+        encoding="utf-8",
+    )
+
+    result = _check_role_authority_boundary(tmp_path)
+
+    assert result.status == "fail"
+    assert "CLAUDE.md:1" in result.message
+
+
+def test_role_authority_boundary_fails_on_dispatcher_default_behavior_authority(
+    tmp_path: Path,
+) -> None:
+    """Behavior-authority claims about dispatcher/default metadata are failures."""
+    (tmp_path / "CLAUDE.md").write_text(
+        "The dispatcher/default role controls hook behavior and file authority.\n",
         encoding="utf-8",
     )
 

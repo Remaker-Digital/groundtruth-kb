@@ -48,7 +48,7 @@ def require_benchmark_mode(benchmark_mode: str) -> str:
     if mode is None:
         raise ValueError(f"unknown benchmark_mode: {benchmark_mode!r}")
     if mode.durable_role_changes_allowed:
-        raise ValueError("benchmark modes must not allow durable role changes")
+        raise ValueError("benchmark modes must not allow dispatcher/default role changes")
     return mode.id
 
 

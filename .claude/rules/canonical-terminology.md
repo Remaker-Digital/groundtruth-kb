@@ -786,14 +786,16 @@ compliance with this artifact's text.
 
 ### operating role
 
-**Definition:** The authority-bearing harness role recorded for an active
-harness ID in `harness-state/harness-registry.json`. Canonical values are
-`prime-builder` (implementing authority) and `loyal-opposition` (reviewing
-authority). The legacy value `acting-prime-builder` is READ-accepted for
-backward compatibility but SET-rejected (cannot be assigned as a new role)
+**Definition:** The resolved behavior role for a GT-KB session or harness
+context. Interactive sessions resolve from an owner-declared session-stated
+role when present, otherwise from the dispatcher/default role metadata recorded
+for the active harness ID in `harness-state/harness-registry.json`. Canonical
+values are `prime-builder` (implementing authority) and `loyal-opposition`
+(reviewing authority). The legacy value `acting-prime-builder` is READ-accepted
+for backward compatibility but SET-rejected (cannot be assigned as a new role)
 per the Acting-Prime Compatibility Contract.
 
-**Canonical alias:** durable operating role; harness role.
+**Canonical alias:** resolved session role; harness role; dispatcher/default role when specifically referring to registry fallback or headless dispatch routing.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-role).*
 
@@ -802,7 +804,7 @@ per the Acting-Prime Compatibility Contract.
 **Definition:** A non-authority work classification used to organize the
 current session's focus, distinct from the operating role. Lanes inherit
 authority from the current operating role; they do not grant new permissions
-or change the durable role assignment. Examples: research, architecture,
+or change the dispatcher/default role assignment. Examples: research, architecture,
 implementation, quality engineering, operations/release, documentation,
 governance stewardship.
 
@@ -835,15 +837,15 @@ by owner commands at session start.
 
 **Definition:** A transcript-defined role declared by the owner via the
 canonical init keyword `::init gtkb (pb|lo)` on an interactive owner prompt. It
-overrides the durable operating role for in-session surfaces — SessionStart
+overrides dispatcher/default role metadata for in-session surfaces — SessionStart
 disclosure rendering, the AXIS 2 Claude-native surface filter, the
 workstream-focus menu shape, MemBase `changed_by` attribution, and AUQ-keyed
 routing — for the rest of the contiguous interactive context. It persists
 across compaction, resume, and contiguous SessionStart-like boundaries until
 the owner explicitly changes it. Runtime marker files such as
 `.claude/session/active-session-role.json` and per-session `role-*.json` files
-are cache/state only and carry no durable role authority; the legacy single-file
-marker may be invalidated at SessionStart, but the transcript-defined
+are cache/state only and carry no dispatcher/default role authority; the legacy
+single-file marker may be invalidated at SessionStart, but the transcript-defined
 interactive role persists through the per-session marker/envelope authority.
 
 **Canonical alias:** interactive session role; session-scoped role.
@@ -892,10 +894,10 @@ dispatch health, target-selection, or bridge-state authority.
 
 ### role set
 
-**Canonical alias:** role-set; durable role set.
+**Canonical alias:** role-set; dispatcher role set.
 
-**Definition:** The wire form of a harness's durable operating-role
-assignment recorded in ``harness-state/harness-registry.json``. The role set
+**Definition:** The wire form of a harness's dispatcher/default role assignment
+recorded in ``harness-state/harness-registry.json``. The role set
 is a JSON list of role tokens drawn from ``{prime-builder, loyal-opposition}``.
 Singleton lists represent the multi-harness case (one role per harness ID);
 multi-element lists represent the single-harness case (one harness ID holds
