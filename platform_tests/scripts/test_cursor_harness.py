@@ -159,15 +159,39 @@ def test_resolve_agent_command_falls_back_to_windows_wrapper_without_direct_curs
     assert harness._resolve_agent_command() == [str(wrapper)]
 
 
-def test_resolve_agent_command_accepts_cursor_agent_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_agent_command_rejects_cursor_gui_override_without_probe(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")
-    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: True)
+    calls: list[str] = []
 
-    assert harness._resolve_agent_command() == [
-        "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe",
-        "agent",
-    ]
+    def fake_probe(path: str) -> bool:
+        calls.append(path)
+        return True
+
+    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", fake_probe)
+
+    with pytest.raises(harness.CursorHarnessError, match="Cursor GUI launcher"):
+        harness._resolve_agent_command()
+    assert calls == []
+
+
+def test_cursor_agent_subcommand_support_refuses_gui_launcher_without_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    harness = _load_harness()
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="Subcommands\n  agent        Start the Cursor agent in your terminal.\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness._cursor_supports_agent_subcommand("C:/Tools/cursor.cmd") is False
+    assert calls == []
 
 
 def test_cursor_agent_subcommand_support_requires_headless_help(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -185,8 +209,8 @@ def test_cursor_agent_subcommand_support_requires_headless_help(monkeypatch: pyt
 
     monkeypatch.setattr(harness.subprocess, "run", fake_run)
 
-    assert harness._cursor_supports_agent_subcommand("C:/Tools/cursor.cmd") is False
-    assert calls[0][0] == ["C:/Tools/cursor.cmd", "agent", "--help"]
+    assert harness._cursor_supports_agent_subcommand("C:/Tools/agent.exe") is False
+    assert calls[0][0] == ["C:/Tools/agent.exe", "agent", "--help"]
     assert calls[0][1]["creationflags"] if harness.os.name == "nt" else "creationflags" not in calls[0][1]
 
 
@@ -203,31 +227,33 @@ def test_cursor_agent_subcommand_support_accepts_headless_help(monkeypatch: pyte
 
     monkeypatch.setattr(harness.subprocess, "run", fake_run)
 
-    assert harness._cursor_supports_agent_subcommand("C:/Tools/cursor.cmd") is True
+    assert harness._cursor_supports_agent_subcommand("C:/Tools/agent.exe") is True
 
 
 def test_resolve_agent_command_rejects_cursor_override_without_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.setenv("CURSOR_AGENT_BIN", "C:/Users/mike/AppData/Local/Programs/Cursor/cursor.exe")
-    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: False)
 
-    with pytest.raises(harness.CursorHarnessError, match="without an unambiguous headless `agent` subcommand"):
+    with pytest.raises(harness.CursorHarnessError, match="Cursor GUI launcher"):
         harness._resolve_agent_command()
 
 
-def test_resolve_agent_command_falls_back_to_cursor_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_agent_command_does_not_probe_cursor_gui_launcher_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
     monkeypatch.setattr(harness, "_windows_cursor_agent_direct_commands", lambda: ())
     monkeypatch.setattr(harness, "_windows_cursor_agent_candidates", lambda: ())
+    which_calls: list[str] = []
 
     def fake_which(name: str) -> str | None:
+        which_calls.append(name)
         return "C:/Tools/cursor.cmd" if name == "cursor" else None
 
     monkeypatch.setattr(harness.shutil, "which", fake_which)
-    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: True)
 
-    assert harness._resolve_agent_command() == ["C:/Tools/cursor.cmd", "agent"]
+    with pytest.raises(harness.CursorHarnessError, match="Cursor Agent CLI not found"):
+        harness._resolve_agent_command()
+    assert which_calls == ["agent", "cursor-agent"]
 
 
 def test_resolve_agent_command_rejects_cursor_without_agent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -240,7 +266,6 @@ def test_resolve_agent_command_rejects_cursor_without_agent(monkeypatch: pytest.
         return "C:/Tools/cursor.exe" if name == "cursor" else None
 
     monkeypatch.setattr(harness.shutil, "which", fake_which)
-    monkeypatch.setattr(harness, "_cursor_supports_agent_subcommand", lambda _path: False)
 
     with pytest.raises(harness.CursorHarnessError, match="Cursor Agent CLI not found"):
         harness._resolve_agent_command()

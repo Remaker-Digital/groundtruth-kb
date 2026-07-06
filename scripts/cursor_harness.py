@@ -32,6 +32,14 @@ _SKILL_ROUTE_ALIASES = {
 }
 _CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
 _STANDALONE_AGENT_NAMES = ("agent", "cursor-agent")
+_STANDALONE_AGENT_EXECUTABLE_NAMES = {
+    "agent",
+    "agent.cmd",
+    "agent.exe",
+    "cursor-agent",
+    "cursor-agent.cmd",
+    "cursor-agent.exe",
+}
 _CURSOR_AGENT_PROCESS_NAMES = {"agent", "agent.exe", "cursor-agent", "cursor-agent.exe"}
 _WINDOWS_SHELL_WRAPPER_SUFFIXES = {".bat", ".cmd", ".ps1"}
 _CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
@@ -49,6 +57,11 @@ def _windows_no_window_creationflags() -> int:
 
 
 def _cursor_supports_agent_subcommand(cursor_executable: str) -> bool:
+    executable_name = Path(cursor_executable).name.lower()
+    if executable_name in _CURSOR_GUI_LAUNCHER_NAMES:
+        return False
+    if executable_name not in _STANDALONE_AGENT_EXECUTABLE_NAMES:
+        return False
     try:
         run_kwargs = {
             "capture_output": True,
@@ -125,12 +138,9 @@ def _resolve_agent_command() -> list[str]:
     explicit = os.environ.get("CURSOR_AGENT_BIN")
     if explicit:
         if Path(explicit).name.lower() in _CURSOR_GUI_LAUNCHER_NAMES:
-            if _cursor_supports_agent_subcommand(explicit):
-                return [explicit, "agent"]
             raise CursorHarnessError(
-                "Cursor Agent CLI not found. CURSOR_AGENT_BIN points at a Cursor launcher without an "
-                "unambiguous headless `agent` subcommand; set it to a standalone `agent` executable or "
-                "a Cursor CLI that supports `cursor agent --print --output-format`."
+                "Cursor Agent CLI not found. CURSOR_AGENT_BIN points at a Cursor GUI launcher; set it to "
+                "a standalone `agent` or `cursor-agent` executable."
             )
         return [explicit]
     wrapper_fallbacks: list[str] = []
@@ -148,13 +158,9 @@ def _resolve_agent_command() -> list[str]:
     for candidate in _windows_cursor_agent_candidates():
         if candidate.is_file():
             return [str(candidate)]
-    for cursor_name in ("cursor", "cursor.cmd", "cursor.exe"):
-        cursor_candidate = shutil.which(cursor_name)
-        if cursor_candidate and _cursor_supports_agent_subcommand(cursor_candidate):
-            return [cursor_candidate, "agent"]
     raise CursorHarnessError(
-        "Cursor Agent CLI not found. Ensure standalone `agent` is on PATH, install a Cursor CLI that supports "
-        "`cursor agent --print --output-format`, or set CURSOR_AGENT_BIN."
+        "Cursor Agent CLI not found. Ensure standalone `agent` or `cursor-agent` is on PATH, or set "
+        "CURSOR_AGENT_BIN to a standalone agent executable."
     )
 
 
@@ -343,6 +349,12 @@ def _cursor_agent_env() -> dict[str, str]:
             env[key] = value
     env.setdefault("GTKB_HARNESS_NAME", "cursor")
     env.setdefault("GTKB_HARNESS_ID", "E")
+    env.setdefault("GTKB_AUTHOR_MODEL", "Composer")
+    env.setdefault("GTKB_AUTHOR_MODEL_VERSION", "cursor-agent")
+    env.setdefault(
+        "GTKB_AUTHOR_MODEL_CONFIGURATION",
+        "Cursor headless dispatch; cursor_harness.py; bridge author metadata runtime envelope",
+    )
     return env
 
 
