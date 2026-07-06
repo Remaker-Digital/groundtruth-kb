@@ -138,6 +138,8 @@ class ModelMetadata:
     model_version: str
     endpoint: str
     route_key: str
+    model_configuration: str | None = None
+    requested_model_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -370,6 +372,45 @@ Stay within E:\\GT-KB. Preserve guard decisions exactly; if a guarded tool is de
 denial and do not invent a successful bridge action."""
 
 
+def _metadata_configuration(
+    metadata: ModelMetadata,
+    *,
+    response_model_id: str | None = None,
+) -> str:
+    if metadata.model_configuration:
+        return metadata.model_configuration
+    if response_model_id:
+        requested_model = metadata.requested_model_id or metadata.model_id
+        override = "true" if response_model_id != requested_model else "false"
+        return (
+            f"OpenRouter endpoint={metadata.endpoint}; route={metadata.route_key}; "
+            f"requested_model={requested_model}; model_source=response.model; "
+            f"account_override={override}"
+        )
+    return f"OpenRouter endpoint={metadata.endpoint}; routing=static .api-harness/routing.toml"
+
+
+def _response_model_id(response: Mapping[str, Any]) -> str | None:
+    model = response.get("model")
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
+
+
+def _metadata_from_response(metadata: ModelMetadata, response: Mapping[str, Any]) -> ModelMetadata:
+    response_model_id = _response_model_id(response)
+    if response_model_id is None:
+        return metadata
+    return ModelMetadata(
+        model_id=response_model_id,
+        model_version=infer_model_version(response_model_id),
+        endpoint=metadata.endpoint,
+        route_key=metadata.route_key,
+        model_configuration=_metadata_configuration(metadata, response_model_id=response_model_id),
+        requested_model_id=metadata.requested_model_id or metadata.model_id,
+    )
+
+
 def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
     return {
         "type": "function",
@@ -545,11 +586,62 @@ def _relative_path_or_none(project_root: Path, path: Path) -> str | None:
         return None
 
 
+def _is_bridge_markdown_path(project_root: Path, path: Path) -> bool:
+    rel = _relative_path_or_none(project_root, path)
+    return bool(rel and rel.startswith("bridge/") and rel.endswith(".md"))
+
+
+def _first_nonblank_line(content: str) -> str:
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _content_status_token(content: str) -> str:
+    parts = _first_nonblank_line(content).split(maxsplit=1)
+    return parts[0].upper() if parts else ""
+
+
+def _normalize_bridge_author_model_metadata(
+    content: str,
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    path: Path,
+) -> str:
+    if not _is_bridge_markdown_path(project_root, path):
+        return content
+    if _content_status_token(content) not in {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}:
+        return content
+
+    replacements = {
+        "author_model": model_metadata.model_id,
+        "author_model_version": model_metadata.model_version,
+        "author_model_configuration": _metadata_configuration(model_metadata),
+    }
+    lines = content.splitlines()
+    changed = False
+    for index, line in enumerate(lines):
+        key, separator, _value = line.partition(":")
+        normalized_key = key.strip().lower()
+        if separator and normalized_key in replacements:
+            lines[index] = f"{normalized_key}: {replacements[normalized_key]}"
+            changed = True
+    if not changed:
+        return content
+    normalized = "\n".join(lines)
+    if content.endswith("\n"):
+        normalized += "\n"
+    return normalized
+
+
 def set_author_metadata_env(
     env: Mapping[str, str],
     model_id: str,
     model_version: str,
     endpoint: str = DEFAULT_ENDPOINT,
+    model_configuration: str | None = None,
 ) -> dict[str, str]:
     updated = dict(env)
     session_id = resolve_openrouter_session_id(env)
@@ -559,7 +651,8 @@ def set_author_metadata_env(
             "GTKB_AUTHOR_HARNESS_ID": AUTHOR_HARNESS_ID,
             "GTKB_AUTHOR_MODEL": model_id,
             "GTKB_AUTHOR_MODEL_VERSION": model_version,
-            "GTKB_AUTHOR_MODEL_CONFIGURATION": f"OpenRouter endpoint={endpoint}; routing=static .api-harness/routing.toml",
+            "GTKB_AUTHOR_MODEL_CONFIGURATION": model_configuration
+            or f"OpenRouter endpoint={endpoint}; routing=static .api-harness/routing.toml",
         }
     )
     if session_id:
@@ -663,7 +756,11 @@ def invoke_guard_adapter(
     paths = tuple(guard_paths) if guard_paths is not None else _guard_paths_for(tool_name, tool_input, project_root)
     runner = guard_runner or _default_guard_runner
     env = set_author_metadata_env(
-        os.environ, model_metadata.model_id, model_metadata.model_version, model_metadata.endpoint
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        model_metadata.endpoint,
+        model_metadata.model_configuration,
     )
     payload = {
         "tool_name": tool_name,
@@ -752,6 +849,7 @@ def _dispatch_write(
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     content = str(arguments.get("content", ""))
+    content = _normalize_bridge_author_model_metadata(content, model_metadata, project_root, path)
     invoke_guard_adapter(
         "Write", {"path": str(path), "content": content}, model_metadata, project_root, guard_runner=guard_runner
     )
@@ -895,7 +993,11 @@ def _dispatch_bash(
         raise OpenRouterHarnessError(bridge_denial)
     invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, guard_runner=guard_runner)
     env = set_author_metadata_env(
-        os.environ, model_metadata.model_id, model_metadata.model_version, model_metadata.endpoint
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        model_metadata.endpoint,
+        model_metadata.model_configuration,
     )
     runner = command_runner or _default_command_runner
     try:
@@ -1011,7 +1113,13 @@ def run_tool_loop(
 
     schemas = build_tool_schemas(model_route.allowed_tools)
     chat = chat_func or call_openrouter_chat
-    metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
+    metadata = ModelMetadata(
+        model_route.model_id,
+        model_route.model_version,
+        endpoint,
+        model_route.key,
+        requested_model_id=model_route.model_id,
+    )
     session_deadline = time.monotonic() + session_timeout
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0
@@ -1033,6 +1141,7 @@ def run_tool_loop(
             error_message = error_details.get("message") if isinstance(error_details, dict) else str(error_details)
             raise OpenRouterHarnessError(f"OpenRouter API returned error: {error_message}")
 
+        metadata = _metadata_from_response(metadata, response)
         message = _message_from_response(response)
         tool_calls = message.get("tool_calls") or []
 

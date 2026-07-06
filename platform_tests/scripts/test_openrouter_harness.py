@@ -266,6 +266,118 @@ def test_author_metadata_env_is_passed_to_bridge_write_guard(tmp_path: Path, mon
     assert payload["session_id"] == "dispatch-run"
 
 
+def test_tool_loop_uses_response_model_metadata_for_bridge_write(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+    served_model = "moonshotai/kimi-k2.7-code"
+    records: list[tuple[str, dict, dict]] = []
+    payloads: list[dict] = []
+
+    stale_content = "\n".join(
+        [
+            "NEW",
+            "author_model: deepseek/fixture-model",
+            "author_model_version: fixture-model",
+            "author_model_configuration: stale",
+            "",
+            "body",
+            "",
+        ]
+    )
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {
+                "model": served_model,
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_write",
+                                    "function": {
+                                        "name": "Write",
+                                        "arguments": orh.json.dumps(
+                                            {"path": "bridge/example-001.md", "content": stale_content}
+                                        ),
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ],
+            }
+        return {"model": served_model, "choices": [{"message": {"content": "done"}}]}
+
+    assert (
+        orh.run_tool_loop(
+            "write",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            3,
+            root,
+            chat_func=chat,
+            guard_runner=allow_runner(records),
+        )
+        == "done"
+    )
+
+    written = (root / "bridge" / "example-001.md").read_text(encoding="utf-8")
+    assert "author_model: moonshotai/kimi-k2.7-code" in written
+    assert "author_model_version: kimi-k2.7-code" in written
+    assert "model_source=response.model" in written
+    assert f"requested_model={FIXTURE_MODEL_ID}" in written
+    assert "account_override=true" in written
+    assert payloads[0]["model"] == FIXTURE_MODEL_ID
+
+    guard_env = records[0][2]
+    assert guard_env["GTKB_AUTHOR_MODEL"] == served_model
+    assert guard_env["GTKB_AUTHOR_MODEL_VERSION"] == "kimi-k2.7-code"
+    assert "model_source=response.model" in guard_env["GTKB_AUTHOR_MODEL_CONFIGURATION"]
+    assert f"requested_model={FIXTURE_MODEL_ID}" in guard_env["GTKB_AUTHOR_MODEL_CONFIGURATION"]
+
+
+def test_response_model_metadata_falls_back_to_routing_metadata_when_missing():
+    original = metadata()
+
+    updated = orh._metadata_from_response(original, {"choices": [{"message": {"content": "done"}}]})
+
+    assert updated == original
+
+
+def test_bridge_metadata_normalization_handles_blank_and_non_target_content(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "bridge").mkdir()
+
+    assert orh._content_status_token("") == ""
+    assert orh._content_status_token(" \n\t\n") == ""
+    assert orh._normalize_bridge_author_model_metadata("", metadata(), root, root / "bridge" / "blank.md") == ""
+    assert (
+        orh._normalize_bridge_author_model_metadata(" \n\t\n", metadata(), root, root / "bridge" / "blank.md")
+        == " \n\t\n"
+    )
+
+    non_bridge_content = "NEW\nauthor_model: stale\n"
+    assert (
+        orh._normalize_bridge_author_model_metadata(non_bridge_content, metadata(), root, root / "notes.md")
+        == non_bridge_content
+    )
+
+    non_status_content = "not-a-status\nauthor_model: stale\n"
+    assert (
+        orh._normalize_bridge_author_model_metadata(
+            non_status_content,
+            metadata(),
+            root,
+            root / "bridge" / "example-001.md",
+        )
+        == non_status_content
+    )
+
+
 def test_bridge_bash_file_write_is_denied_before_guards_or_subprocess(tmp_path: Path):
     root = make_root(tmp_path)
     (root / "bridge").mkdir()
