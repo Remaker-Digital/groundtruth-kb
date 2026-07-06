@@ -11,7 +11,6 @@ import contextlib
 import datetime as dt
 import importlib.util
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -164,17 +163,6 @@ def _watchdog_heartbeat_path(project_root: Path) -> Path:
     return project_root.resolve() / WATCHDOG_HEARTBEAT_RELATIVE_PATH
 
 
-def _parse_heartbeat_threshold(line: str) -> float:
-    match = re.search(r"\bthreshold=(?P<value>\d+(?:\.\d+)?)\b", line)
-    if match is None:
-        return DEFAULT_HEARTBEAT_STALE_SECONDS
-    try:
-        value = float(match.group("value"))
-    except ValueError:
-        return DEFAULT_HEARTBEAT_STALE_SECONDS
-    return value if value > 0 else DEFAULT_HEARTBEAT_STALE_SECONDS
-
-
 def _read_watchdog_heartbeat(project_root: Path, *, now: dt.datetime | None = None) -> dict[str, Any]:
     path = _watchdog_heartbeat_path(project_root)
     payload: dict[str, Any] = {
@@ -196,7 +184,6 @@ def _read_watchdog_heartbeat(project_root: Path, *, now: dt.datetime | None = No
     payload["present"] = True
     payload["raw"] = line
     token = line.split()[0] if line.split() else ""
-    payload["stale_seconds"] = _parse_heartbeat_threshold(line)
     try:
         parsed = dt.datetime.fromisoformat(token.replace("Z", "+00:00"))
     except ValueError:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -190,3 +191,50 @@ def test_cli_complex_start_stop_dispatch_only_daemon(monkeypatch) -> None:
     assert start.exit_code == 0, start.output
     assert stop.exit_code == 0, stop.output
     assert calls == ["start:7", "stop"]
+
+
+def _write_watchdog_heartbeat(project_root: Path, *, heartbeat_at: dt.datetime) -> None:
+    from groundtruth_kb.dispatcher_complex import WATCHDOG_HEARTBEAT_RELATIVE_PATH
+
+    heartbeat_path = project_root / WATCHDOG_HEARTBEAT_RELATIVE_PATH
+    heartbeat_path.parent.mkdir(parents=True)
+    heartbeat_path.write_text(
+        f"{heartbeat_at.isoformat()} codex=11 family=24 wrapped=6 threshold=15 mode=liveness-aware",
+        encoding="utf-8",
+    )
+
+
+def test_watchdog_heartbeat_threshold_process_count_does_not_override_freshness(tmp_path: Path) -> None:
+    from groundtruth_kb.dispatcher_complex import (
+        DEFAULT_HEARTBEAT_STALE_SECONDS,
+        _read_watchdog_heartbeat,
+    )
+
+    now = dt.datetime(2026, 7, 6, 12, 0, tzinfo=dt.UTC)
+    _write_watchdog_heartbeat(tmp_path, heartbeat_at=now - dt.timedelta(seconds=120))
+
+    payload = _read_watchdog_heartbeat(tmp_path, now=now)
+
+    assert payload["fresh"] is True
+    assert payload["finding"] is None
+    assert payload["stale_seconds"] == DEFAULT_HEARTBEAT_STALE_SECONDS
+    assert payload["age_seconds"] == 120
+
+
+def test_watchdog_heartbeat_above_freshness_window_stays_stale(tmp_path: Path) -> None:
+    from groundtruth_kb.dispatcher_complex import (
+        DEFAULT_HEARTBEAT_STALE_SECONDS,
+        _read_watchdog_heartbeat,
+    )
+
+    now = dt.datetime(2026, 7, 6, 12, 0, tzinfo=dt.UTC)
+    _write_watchdog_heartbeat(
+        tmp_path,
+        heartbeat_at=now - dt.timedelta(seconds=DEFAULT_HEARTBEAT_STALE_SECONDS + 1),
+    )
+
+    payload = _read_watchdog_heartbeat(tmp_path, now=now)
+
+    assert payload["fresh"] is False
+    assert payload["stale_seconds"] == DEFAULT_HEARTBEAT_STALE_SECONDS
+    assert payload["finding"] == "watchdog heartbeat is stale (181.0s > 180.0s)"
