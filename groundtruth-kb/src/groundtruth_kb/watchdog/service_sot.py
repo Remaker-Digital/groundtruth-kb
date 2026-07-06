@@ -205,6 +205,7 @@ def _artifact_probe(artifact: SoTArtifact, project_root: Path) -> dict[str, Any]
         "storage_path": artifact.storage_path,
         "domain": artifact.domain,
         "lifecycle": artifact.lifecycle,
+        "restore_action": artifact.restore_action,
         "health_check_function": function_name,
         **probe,
     }
