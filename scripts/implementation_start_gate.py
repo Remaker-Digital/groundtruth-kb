@@ -106,7 +106,7 @@ except ImportError:  # pragma: no cover - direct script execution path
         protected_path_classification as _controlled_path_classification,
     )
 
-DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"
+DISPATCHER_CONFIG_CLI_ONLY_BLOCK_ID = "GTKB-DISPATCHER-CONFIG-CLI-ONLY"  # config/dispatcher/rules.toml CLI-only guard
 EMERGENCY_BRIDGE_REPAIR_ENV_VAR = "GTKB_EMERGENCY_BRIDGE_REPAIR"
 BRIDGE_FUNCTION_EXACT = {
     ".claude/settings.json",

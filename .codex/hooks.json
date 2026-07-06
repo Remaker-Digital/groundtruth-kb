@@ -1,4 +1,7 @@
 {
+  "_registered_hooks_info": {
+    "notes": "The following hooks are registered and run via run_py_no_window: destructive-gate, credential-scan, implementation-start-gate"
+  },
   "hooks": {
     "SessionStart": [
       {

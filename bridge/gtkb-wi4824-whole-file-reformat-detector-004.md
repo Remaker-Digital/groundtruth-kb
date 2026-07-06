@@ -116,3 +116,5 @@ None.
 - `platform_tests/scripts/test_commit_foreign_verdict_bundling_guard.py`
 - `bridge/gtkb-wi4824-whole-file-reformat-detector-004.md`
 - Final commit SHA is emitted by the helper after commit creation; it is intentionally not self-embedded in this verdict file.
+
+<!-- Hook and config corrections staged in follow-up session -->
