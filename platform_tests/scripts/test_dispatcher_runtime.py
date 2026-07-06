@@ -4232,6 +4232,55 @@ def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytes
     assert trigger._document_lease_ttl_seconds("loyal-opposition", lifetime_seconds=4200) == 4500
 
 
+def test_ollama_worker_lifetime_profile_derives_from_routing_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.delenv("GTKB_WORKER_LIFETIME_HARNESS_D_SECONDS", raising=False)
+    routing_dir = tmp_path / ".api-harness"
+    routing_dir.mkdir()
+    (routing_dir / "routing.toml").write_text(
+        """
+schema_version = 1
+
+[routing.ollama]
+default_model = "deepseek-v4-pro-cloud"
+timeout_seconds = 3600
+""".lstrip(),
+        encoding="utf-8",
+    )
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={
+            "headless": {
+                "argv": [
+                    "groundtruth-kb/.venv/Scripts/python.exe",
+                    "scripts/ollama_harness.py",
+                    "-p",
+                    "{{PROMPT}}",
+                    "--skill",
+                    "bridge-review",
+                    "--model",
+                    "deepseek-v4-pro-cloud",
+                ]
+            }
+        },
+    )
+
+    profile = trigger.worker_lifetime_profile(target, project_root=tmp_path)
+
+    assert profile["seconds"] == 3960
+    assert profile["source"] == "routing.ollama.timeout_seconds"
+    assert profile["role_fallback_seconds"] == 3600
+    assert profile["model_hint"] == "deepseek-v4-pro-cloud"
+    assert profile["routing_timeout_seconds"] == 3600
+    assert profile["session_timeout_grace_seconds"] == 60
+    assert profile["worker_lifetime_margin_seconds"] == 300
+
+
 def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
     trigger = _load_trigger()
     target = trigger.DispatchTarget(
@@ -4371,6 +4420,75 @@ def test_spawn_harness_passes_target_lifetime_to_status_wrapper(
     env = captured["kwargs"]["env"]
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] == str(expected_seconds)
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] == expected_source
+
+
+def test_spawn_harness_applies_ollama_routing_lifetime_to_wrapper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.delenv("GTKB_WORKER_LIFETIME_HARNESS_D_SECONDS", raising=False)
+    routing_dir = tmp_path / ".api-harness"
+    routing_dir.mkdir()
+    (routing_dir / "routing.toml").write_text(
+        """
+schema_version = 1
+
+[routing.ollama]
+default_model = "deepseek-v4-pro-cloud"
+timeout_seconds = 3600
+""".lstrip(),
+        encoding="utf-8",
+    )
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="D",
+        command_handle="ollama",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+    )
+    item = SimpleNamespace(
+        document_name="gtkb-ollama-lifetime",
+        top_status="NEW",
+        top_file="bridge/gtkb-ollama-lifetime-001.md",
+        dispatchable=True,
+    )
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-ollama-lifetime",
+    )
+
+    assert meta["launched"] is True
+    assert meta["worker_lifetime_seconds"] == 3960
+    assert meta["worker_lifetime_source"] == "routing.ollama.timeout_seconds"
+    assert meta["routing_timeout_seconds"] == 3600
+    wrapped = captured["args"][0]
+    lifetime_index = wrapped.index("--lifetime")
+    assert wrapped[lifetime_index + 1] == "3960"
+    assert lifetime_index < wrapped.index(meta["status_file_path"])
+    env = captured["kwargs"]["env"]
+    assert env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] == "3960"
+    assert env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] == "routing.ollama.timeout_seconds"
+    assert env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_TIMEOUT_SECONDS"] == "3600.0"
 
 
 def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(

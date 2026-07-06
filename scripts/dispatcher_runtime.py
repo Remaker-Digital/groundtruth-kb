@@ -41,6 +41,7 @@ import contextlib
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -3365,6 +3366,9 @@ PB_IMPL_WORKER_LIFETIME_SECONDS = 5400  # 90 min: PB implementation default
 LO_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_LO_SECONDS"
 PB_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_PB_SECONDS"
 HARNESS_WORKER_LIFETIME_ENV_PREFIX = "GTKB_WORKER_LIFETIME_HARNESS_"
+OLLAMA_ROUTING_CONFIG_REL = Path(".api-harness") / "routing.toml"
+OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS = 60
+OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS = 300
 # WI-4986/WI-5003: start with generous harness/model-aware caps, then tighten
 # from measured telemetry. Codex-A PB implementation keeps the existing 90 min
 # PB floor; B/C/D LO targets inherit the Opus-class review floor.
@@ -3441,7 +3445,54 @@ def _dispatch_target_model_hint(target: Any) -> str | None:
     return None
 
 
-def worker_lifetime_profile(target: Any) -> dict[str, Any]:
+def _positive_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        parsed = float(value)
+    elif isinstance(value, str):
+        try:
+            parsed = float(value)
+        except ValueError:
+            return None
+    else:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _ollama_routing_timeout_seconds(project_root: Path) -> float | None:
+    path = project_root / OLLAMA_ROUTING_CONFIG_REL
+    try:
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    routing = raw.get("routing")
+    if not isinstance(routing, dict):
+        return None
+    ollama = routing.get("ollama")
+    if not isinstance(ollama, dict):
+        return None
+    return _positive_float(ollama.get("timeout_seconds"))
+
+
+def _ollama_worker_lifetime_from_routing(project_root: Path) -> dict[str, Any] | None:
+    timeout_seconds = _ollama_routing_timeout_seconds(project_root)
+    if timeout_seconds is None:
+        return None
+    return {
+        "seconds": math.ceil(
+            timeout_seconds + OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS + OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS
+        ),
+        "source": "routing.ollama.timeout_seconds",
+        "routing_timeout_seconds": timeout_seconds,
+        "session_timeout_grace_seconds": OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS,
+        "worker_lifetime_margin_seconds": OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS,
+    }
+
+
+def worker_lifetime_profile(target: Any, project_root: Path | None = None) -> dict[str, Any]:
     """Return the effective worker lifetime profile for a dispatch target."""
     harness_id = str(getattr(target, "harness_id", "") or "").strip().upper()
     role_label = getattr(target, "needed_role_label", None)
@@ -3464,9 +3515,28 @@ def worker_lifetime_profile(target: Any) -> dict[str, Any]:
                     "role_fallback_seconds": role_fallback,
                     "model_hint": _dispatch_target_model_hint(target),
                 }
+    routed_profile = (
+        _ollama_worker_lifetime_from_routing(project_root) if harness_id == "D" and project_root is not None else None
+    )
     if harness_id in HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS:
+        harness_default = HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS[harness_id]
+        if routed_profile is not None:
+            routed_seconds = int(routed_profile["seconds"])
+            seconds = max(harness_default, routed_seconds)
+            source = str(routed_profile["source"]) if seconds == routed_seconds else f"harness_default:{harness_id}"
+            return {
+                "seconds": seconds,
+                "source": source,
+                "profile": profile_key,
+                "env_var": env_var,
+                "role_fallback_seconds": role_fallback,
+                "model_hint": _dispatch_target_model_hint(target),
+                "routing_timeout_seconds": routed_profile["routing_timeout_seconds"],
+                "session_timeout_grace_seconds": routed_profile["session_timeout_grace_seconds"],
+                "worker_lifetime_margin_seconds": routed_profile["worker_lifetime_margin_seconds"],
+            }
         return {
-            "seconds": HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS[harness_id],
+            "seconds": harness_default,
             "source": f"harness_default:{harness_id}",
             "profile": profile_key,
             "env_var": env_var,
@@ -4540,12 +4610,16 @@ def _spawn_harness(
     # Explicitly strip in case the parent has either set:
     env.pop(LOOP_PREVENTION_ENV_VAR, None)
     env.pop(DISPATCHER_DAEMON_DISABLED_ENV_VAR, None)
-    lifetime_profile = worker_lifetime_profile(target)
+    lifetime_profile = worker_lifetime_profile(target, project_root=project_root)
     _worker_lifetime = lifetime_profile.get("seconds")
     if _worker_lifetime is not None:
         env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] = str(_worker_lifetime)
         env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] = str(lifetime_profile.get("source") or "")
         env["GTKB_DISPATCH_WORKER_LIFETIME_PROFILE"] = str(lifetime_profile.get("profile") or "")
+    if lifetime_profile.get("routing_timeout_seconds") is not None:
+        env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_TIMEOUT_SECONDS"] = str(
+            lifetime_profile.get("routing_timeout_seconds")
+        )
     wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()
 
     selected = _selected_oldest_first(items, max_items)
@@ -4592,6 +4666,13 @@ def _spawn_harness(
     }
     if lifetime_profile.get("model_hint"):
         meta["worker_lifetime_model_hint"] = lifetime_profile.get("model_hint")
+    for key in (
+        "routing_timeout_seconds",
+        "session_timeout_grace_seconds",
+        "worker_lifetime_margin_seconds",
+    ):
+        if key in lifetime_profile:
+            meta[key] = lifetime_profile[key]
     try:
         try:
             process = subprocess.Popen(
@@ -5019,6 +5100,9 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                     "worker_lifetime_env_var",
                     "worker_lifetime_role_fallback_seconds",
                     "worker_lifetime_model_hint",
+                    "routing_timeout_seconds",
+                    "session_timeout_grace_seconds",
+                    "worker_lifetime_margin_seconds",
                     "elapsed_seconds",
                     "timeout_source",
                     "configured_lifetime_seconds",
@@ -5848,7 +5932,9 @@ def run_dispatch_cycle(
                                     state_dir=state_dir,
                                     dispatch_id=dispatch_id,
                                     dry_run=dry_run,
-                                    lifetime_seconds=worker_lifetime_profile(target).get("seconds"),
+                                    lifetime_seconds=worker_lifetime_profile(target, project_root=project_root).get(
+                                        "seconds"
+                                    ),
                                 )
                                 if acquired_document_leases or lease_held_items:
                                     recipient_state["document_lease_acquired_count"] = len(acquired_document_leases)
