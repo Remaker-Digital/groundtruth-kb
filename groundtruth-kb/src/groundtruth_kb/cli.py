@@ -75,7 +75,7 @@ from groundtruth_kb.coherence import (
     run_all as run_coherence_checks,
 )
 from groundtruth_kb.config import GTConfig
-from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.db import DeliberationSearchDegradedError, KnowledgeDB
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot
 from groundtruth_kb.gates import GateRegistry
 from groundtruth_kb.hygiene import (
@@ -8001,34 +8001,29 @@ def deliberations_search(
     ChromaDB is used when available, otherwise SQLite LIKE fallback. Use
     ``--semantic-only`` to opt into a stricter contract that refuses fallback.
     """
-    # Per Codex Condition 3: enforce --semantic-only as an explicit
-    # no-fallback mode. We check the module-level HAS_CHROMADB flag because the
-    # DB method's own contract is to *always* fall back; we filter the CLI
-    # layer to match the opt-in promise.
-    if semantic_only:
-        from groundtruth_kb import db as _db_mod
-
-        if not getattr(_db_mod, "HAS_CHROMADB", False):
-            click.echo(
-                "Error: --semantic-only requires ChromaDB. Install it into the gt venv with:\n"
-                '  pip install "groundtruth-kb[search]"'
-            )
-            raise SystemExit(1)
-
     config = _resolve_config(ctx)
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
-    rows = db.search_deliberations(query, limit=limit)
+    try:
+        rows = db.search_deliberations(query, limit=limit, require_semantic=semantic_only)
+    except DeliberationSearchDegradedError as exc:
+        reason = exc.status.get("degradation_reason") or "unknown"
+        click.echo(
+            "Error: --semantic-only could not run semantic search; "
+            f"ChromaDB degraded to SQLite LIKE fallback (reason: {reason})."
+        )
+        raise SystemExit(1) from exc
 
     if semantic_only:
+        status = db._deliberation_search_status()
+        rows = [r for r in rows if r.get("search_method") == "semantic"]
+    elif not json_output:
         status = db._deliberation_search_status()
         if status.get("semantic_degraded"):
             reason = status.get("degradation_reason") or "unknown"
             click.echo(
-                "Error: --semantic-only could not run semantic search; "
-                f"ChromaDB degraded to SQLite LIKE fallback (reason: {reason})."
+                f"Warning: semantic deliberation search degraded; SQLite LIKE results are partial (reason: {reason}).",
+                err=True,
             )
-            raise SystemExit(1)
-        rows = [r for r in rows if r.get("search_method") == "semantic"]
 
     if json_output:
         click.echo(json.dumps(rows, indent=2, default=str))

@@ -125,6 +125,15 @@ _CHROMA_STALE_SEGMENT_ERROR_PATTERNS = (
     "error querying knn",
 )
 
+
+class DeliberationSearchDegradedError(RuntimeError):
+    """Raised when required semantic deliberation search degrades."""
+
+    def __init__(self, message: str, *, status: dict[str, Any]):
+        super().__init__(message)
+        self.status = dict(status)
+
+
 # WI-4453: the index/record path (collection.add) triggers the SAME first-embed
 # DefaultEmbeddingFunction model load as the query path, so `gt deliberations
 # record` and any `gt bridge propose` that indexes a deliberation could hang
@@ -1528,6 +1537,87 @@ class KnowledgeDB:
     def _deliberation_search_status(self) -> dict[str, Any]:
         """Return metadata for the most recent ``search_deliberations`` call."""
         return dict(self._last_deliberation_search_status)
+
+    def deliberation_search_backend_status(self) -> dict[str, Any]:
+        """Inspect semantic deliberation-search backend health without writing.
+
+        The canonical SQLite deliberation rows remain the source of truth. The
+        ChromaDB store is a rebuildable index, so this check reports whether the
+        optional dependency is available, whether the canonical on-disk store and
+        collection can be opened, and whether the indexed deliberation ids cover
+        the current SQLite population.
+        """
+        conn = self._get_conn()
+        current_deliberation_count = int(conn.execute("SELECT COUNT(*) FROM current_deliberations").fetchone()[0])
+        chroma_path = getattr(self, "_chroma_path", None)
+        if chroma_path is None:
+            chroma_path = self.db_path.parent / self._canonical_chroma_dirname()
+        chroma_path = Path(chroma_path)
+        status: dict[str, Any] = {
+            "chromadb_importable": bool(HAS_CHROMADB),
+            "canonical_chroma_path": str(chroma_path),
+            "index_path_exists": chroma_path.exists(),
+            "collection_available": False,
+            "indexed_chunk_count": 0,
+            "indexed_deliberation_count": 0,
+            "current_deliberation_count": current_deliberation_count,
+            "fresh": current_deliberation_count == 0,
+            "healthy": False,
+            "degraded": True,
+            "degradation_reason": None,
+        }
+        if not HAS_CHROMADB:
+            status["degradation_reason"] = "chromadb_unavailable"
+            return status
+
+        if current_deliberation_count == 0 and not chroma_path.exists():
+            status.update({"fresh": True, "healthy": True, "degraded": False})
+            return status
+
+        if not chroma_path.exists():
+            status["degradation_reason"] = "index_path_missing"
+            return status
+
+        _chromadb = _load_chromadb()
+        if _chromadb is None:
+            status["degradation_reason"] = "chromadb_import_failed"
+            return status
+
+        try:
+            client = _chromadb.PersistentClient(path=str(chroma_path))
+            collection = client.get_collection(name=_CHROMA_COLLECTION_NAME)
+        except Exception as exc:  # intentional-catch: optional semantic index probe
+            status["degradation_reason"] = "collection_unavailable"
+            status["error"] = str(exc)
+            return status
+
+        status["collection_available"] = True
+        try:
+            status["indexed_chunk_count"] = int(collection.count())
+        except Exception as exc:  # intentional-catch: optional semantic index probe
+            status["degradation_reason"] = "index_count_unavailable"
+            status["error"] = str(exc)
+            return status
+
+        try:
+            raw = collection.get(include=["metadatas"])
+        except Exception as exc:  # intentional-catch: optional semantic index probe
+            status["degradation_reason"] = "index_metadata_unavailable"
+            status["error"] = str(exc)
+            return status
+
+        metadatas = raw.get("metadatas") if isinstance(raw, dict) else None
+        indexed_ids = {
+            metadata.get("delib_id")
+            for metadata in metadatas or []
+            if isinstance(metadata, dict) and isinstance(metadata.get("delib_id"), str)
+        }
+        status["indexed_deliberation_count"] = len(indexed_ids)
+        if current_deliberation_count == 0 or len(indexed_ids) >= current_deliberation_count:
+            status.update({"fresh": True, "healthy": True, "degraded": False, "degradation_reason": None})
+        else:
+            status["degradation_reason"] = "index_stale"
+        return status
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -8854,7 +8944,13 @@ class KnowledgeDB:
                 }
         return seen_delib_ids
 
-    def search_deliberations(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
+    def search_deliberations(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        require_semantic: bool = False,
+    ) -> list[dict[str, Any]]:
         """Search deliberations via ChromaDB semantic search merged with an
         always-on SQLite LIKE pass.
 
@@ -8880,6 +8976,12 @@ class KnowledgeDB:
           - score: float (L2 distance, lower=better) | None for text_match
           - matched_chunk_id: str | None
           - matched_chunk_preview: str | None (first 200 chars of matched chunk)
+
+        Set ``require_semantic=True`` for governance paths where SQLite LIKE
+        fallback must not masquerade as a complete semantic search. In that
+        mode, unavailable or degraded ChromaDB raises
+        :class:`DeliberationSearchDegradedError` before LIKE results are
+        returned.
         """
         # Semantic pass — bounded so chroma contention degrades to an empty
         # semantic set (FAB-17 / HYG-048) instead of crashing (the count() probe
@@ -8891,9 +8993,17 @@ class KnowledgeDB:
             "semantic_succeeded": False,
             "semantic_degraded": False,
             "degradation_reason": None,
+            "semantic_required": require_semantic,
         }
         self._last_deliberation_search_status = semantic_status
         semantic_results: list[dict[str, Any]] = []
+        if require_semantic and not semantic_status["semantic_expected"]:
+            semantic_status["semantic_degraded"] = True
+            semantic_status["degradation_reason"] = "chromadb_unavailable"
+            raise DeliberationSearchDegradedError(
+                "Semantic deliberation search is required, but ChromaDB is unavailable.",
+                status=semantic_status,
+            )
         collection = self._get_chroma_collection()
         if collection is None and semantic_status["semantic_expected"]:
             semantic_status["semantic_degraded"] = True
@@ -8955,6 +9065,13 @@ class KnowledgeDB:
                         row["matched_chunk_id"] = match_info["matched_chunk_id"]
                         row["matched_chunk_preview"] = match_info["matched_chunk_preview"]
                         semantic_results.append(row)
+
+        if require_semantic and not semantic_status["semantic_succeeded"]:
+            reason = semantic_status.get("degradation_reason") or "semantic_search_unavailable"
+            raise DeliberationSearchDegradedError(
+                f"Semantic deliberation search is required, but search degraded ({reason}).",
+                status=semantic_status,
+            )
 
         # Always-on SQLite LIKE pass (WI-4519). Runs on every call — not only as
         # a fallback — so fresh-but-unindexed deliberations are never crowded out

@@ -197,13 +197,21 @@ def pre_populate_prior_deliberations(
         active_db = db
 
     search_results: list[dict[str, Any]] = []
+    search_degradation: str | None = None
     if active_db is not None:
         try:
             query = topic_slug.replace("-", " ")
+            raw = active_db.search_deliberations(query, limit=limit, require_semantic=True) or []
+            search_results = [r for r in raw if isinstance(r, dict)]
+        except TypeError:
+            query = topic_slug.replace("-", " ")
             raw = active_db.search_deliberations(query, limit=limit) or []
             search_results = [r for r in raw if isinstance(r, dict)]
-        except Exception:  # noqa: BLE001 - graceful degradation
+        except Exception as exc:  # noqa: BLE001 - fail-loud degradation note
             search_results = []
+            status = getattr(exc, "status", {}) if exc is not None else {}
+            reason = status.get("degradation_reason") if isinstance(status, dict) else None
+            search_degradation = reason or str(exc) or "semantic_search_degraded"
 
     seen: set[str] = set(seed_ids)
     search_records_to_add: list[dict[str, Any]] = []
@@ -228,6 +236,8 @@ def pre_populate_prior_deliberations(
                         "glossary_seed_ids": seed_ids,
                         "search_result_ids": [r.get("id", "") for r in search_records_to_add],
                         "semantic_search_attempted": active_db is not None,
+                        "semantic_search_degraded": search_degradation is not None,
+                        "semantic_degradation_reason": search_degradation,
                         "limit": limit,
                         "threshold": threshold,
                         "candidate_count": len(seed_ids) + len(search_records_to_add),
@@ -241,11 +251,20 @@ def pre_populate_prior_deliberations(
         except OSError:
             pass
 
+    degradation_line = ""
+    if search_degradation:
+        degradation_line = (
+            f"_Deliberation semantic search degraded ({search_degradation}); "
+            "do not treat this section as an authoritative empty search result._\n"
+        )
+
     if not seed_ids and not search_records_to_add:
-        placeholder_block = NO_PRIOR_DELIBS_PLACEHOLDER + "\n"
+        placeholder_block = degradation_line + NO_PRIOR_DELIBS_PLACEHOLDER + "\n"
         return _insert_prior_deliberations_block(body, placeholder_block)
 
     entries: list[str] = []
+    if degradation_line:
+        entries.append(degradation_line.rstrip())
     for sid in seed_ids:
         entries.append(_format_helper_entry(sid, source="glossary"))
     for r in search_records_to_add:

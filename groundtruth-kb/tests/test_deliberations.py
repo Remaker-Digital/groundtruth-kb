@@ -160,7 +160,7 @@ class TestRedaction:
     """Tests for credential/PII redaction."""
 
     def test_api_key_redacted(self, db):
-        content = "Found bug. api_key=sk_live_abc123def456ghi789 in config."
+        content = "Found bug. api_key=sk_live_abc123def456ghi789 in config."  # example:
         result = db.insert_deliberation(
             id="DELIB-0001",
             source_type="report",
@@ -219,7 +219,7 @@ class TestRedaction:
         assert "[REDACTED:email]" in result["content"]
 
     def test_connection_string_redacted(self, db):
-        content = "DB URI: mongodb://admin:pass@host:27017/db"
+        content = "DB URI: mongodb://admin:pass@host:27017/db"  # example:
         result = db.insert_deliberation(
             id="DELIB-0001",
             source_type="report",
@@ -276,7 +276,7 @@ class TestRedaction:
         """Content hash is computed from pre-redaction text."""
         import hashlib
 
-        raw = "Secret: api_key=sk_live_abc123def456ghi789"
+        raw = "Secret: api_key=sk_live_abc123def456ghi789"  # example:
         expected_hash = hashlib.sha256(raw.encode()).hexdigest()
         result = db.insert_deliberation(
             id="DELIB-0001",
@@ -290,7 +290,7 @@ class TestRedaction:
         assert result["content_hash"] == expected_hash
 
     def test_redact_content_classmethod(self):
-        text = "key: api_key=AKIA1234567890ABCDEF and phone +15551234567"
+        text = "key: api_key=AKIA1234567890ABCDEF and phone +15551234567"  # example:
         redacted, notes = KnowledgeDB.redact_content(text)
         assert "AKIA1234567890ABCDEF" not in redacted
         assert "+15551234567" not in redacted
@@ -325,7 +325,7 @@ class TestRedaction:
         conn_str = (
             "Endpoint=sb://example.servicebus.windows.net/;"
             "SharedAccessKeyName=RootManageSharedAccessKey;"
-            "SharedAccessKey=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789+/ABCDEFGHIJKL1234567890+/=="
+            "SharedAccessKey=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789+/ABCDEFGHIJKL1234567890+/=="  # example:
         )
         redacted, notes = KnowledgeDB.redact_content(conn_str)
         # The raw key value must not survive
@@ -801,6 +801,19 @@ class TestSearchResultContract:
         assert results[0]["score"] is None
         assert results[0]["matched_chunk_id"] is None
         assert results[0]["matched_chunk_preview"] is None
+
+    def test_required_semantic_search_raises_on_degradation(self, db, monkeypatch):
+        """Required semantic callers must not silently accept LIKE fallback rows."""
+        import groundtruth_kb.db as _db_mod
+
+        monkeypatch.setattr(_db_mod, "HAS_CHROMADB", True)
+        monkeypatch.setattr(db, "_get_chroma_collection", lambda: None)
+
+        with pytest.raises(_db_mod.DeliberationSearchDegradedError) as exc:
+            db.search_deliberations("mandatory governance search", require_semantic=True)
+
+        assert exc.value.status["semantic_degraded"] is True
+        assert exc.value.status["degradation_reason"] == "collection_unavailable"
 
 
 class TestChunking:
