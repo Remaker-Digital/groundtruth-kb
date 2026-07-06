@@ -13,6 +13,7 @@ Loader-enforced invariants (:class:`InvalidSoTRecord` on violation):
 
 - All 10 required fields present.
 - ``domain``, ``lifecycle``, ``versioning_policy``, ``backup_policy``,
+  ``restore_action``,
   ``owner_role`` values are in their respective enums.
 - ``lifecycle='generated'`` rows have a non-trivial ``mutation_api`` (acts as
   generator pointer).
@@ -66,6 +67,16 @@ BackupPolicy = Literal[
     "external_backup",
 ]
 
+RestoreAction = Literal[
+    "manual",
+    "visibility_only",
+    "git_restore",
+    "membase_export_restore",
+    "regenerate_from_source",
+    "ensure_alive",
+    "noop",
+]
+
 OwnerRole = Literal[
     "prime_builder",
     "loyal_opposition",
@@ -111,9 +122,23 @@ _VALID_BACKUP: frozenset[str] = frozenset(
     }
 )
 
+_VALID_RESTORE_ACTIONS: frozenset[str] = frozenset(
+    {
+        "manual",
+        "visibility_only",
+        "git_restore",
+        "membase_export_restore",
+        "regenerate_from_source",
+        "ensure_alive",
+        "noop",
+    }
+)
+
 _VALID_OWNER_ROLES: frozenset[str] = frozenset(
     {"prime_builder", "loyal_opposition", "owner_only", "shared", "automated_only"}
 )
+
+_DEFAULT_RESTORE_ACTION = "manual"
 
 _REQUIRED_FIELDS: frozenset[str] = frozenset(
     {
@@ -130,7 +155,7 @@ _REQUIRED_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-_OPTIONAL_FIELDS: frozenset[str] = frozenset({"depends_on", "forbidden_substitutes", "notes"})
+_OPTIONAL_FIELDS: frozenset[str] = frozenset({"restore_action", "depends_on", "forbidden_substitutes", "notes"})
 
 _ALL_KNOWN_FIELDS: frozenset[str] = _REQUIRED_FIELDS | _OPTIONAL_FIELDS
 
@@ -167,6 +192,7 @@ class SoTArtifact:
     backup_policy: BackupPolicy
     health_check_function: str | None
     owner_role: OwnerRole
+    restore_action: RestoreAction = _DEFAULT_RESTORE_ACTION
     depends_on: tuple[str, ...] = ()
     forbidden_substitutes: tuple[str, ...] = ()
     notes: str = ""
@@ -241,6 +267,12 @@ def _parse_record(record: dict[str, Any]) -> SoTArtifact:
     _validate_enum(record, "versioning_policy", _VALID_VERSIONING, record_id)
     _validate_enum(record, "backup_policy", _VALID_BACKUP, record_id)
     _validate_enum(record, "owner_role", _VALID_OWNER_ROLES, record_id)
+    restore_action = record.get("restore_action", _DEFAULT_RESTORE_ACTION)
+    if restore_action not in _VALID_RESTORE_ACTIONS:
+        raise InvalidSoTRecord(
+            f"record {record_id!r} field restore_action={restore_action!r}: "
+            f"not in enum {sorted(_VALID_RESTORE_ACTIONS)}"
+        )
 
     health_check = record["health_check_function"]
     if health_check is not None and not isinstance(health_check, str):
@@ -264,6 +296,7 @@ def _parse_record(record: dict[str, Any]) -> SoTArtifact:
         backup_policy=record["backup_policy"],
         health_check_function=health_check,
         owner_role=record["owner_role"],
+        restore_action=restore_action,
         depends_on=_coerce_str_tuple(record.get("depends_on"), record_id, "depends_on"),
         forbidden_substitutes=_coerce_str_tuple(
             record.get("forbidden_substitutes"), record_id, "forbidden_substitutes"
@@ -386,12 +419,15 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
     conn = sqlite3.connect(str(db_path))
     try:
         cur = conn.cursor()
+        cur.execute("PRAGMA table_info(sot_artifacts)")
+        columns = {row[1] for row in cur.fetchall()}
+        restore_expr = "restore_action" if "restore_action" in columns else f"'{_DEFAULT_RESTORE_ACTION}'"
         # Tolerate fresh DBs where the view doesn't yet exist.
         try:
             cur.execute(
                 "SELECT id, domain, lifecycle, storage_path, authority_spec_id, "
                 "mutation_api, versioning_policy, backup_policy, "
-                "health_check_function, owner_role, depends_on, "
+                f"health_check_function, owner_role, {restore_expr}, depends_on, "
                 "forbidden_substitutes, notes "
                 "FROM current_sot_artifacts ORDER BY id"
             )
@@ -402,8 +438,8 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
         conn.close()
     records: list[SoTArtifact] = []
     for row in rows:
-        depends_on = tuple(json.loads(row[10])) if row[10] else ()
-        forbidden = tuple(json.loads(row[11])) if row[11] else ()
+        depends_on = tuple(json.loads(row[11])) if row[11] else ()
+        forbidden = tuple(json.loads(row[12])) if row[12] else ()
         records.append(
             SoTArtifact(
                 id=row[0],
@@ -416,12 +452,22 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
                 backup_policy=row[7],
                 health_check_function=row[8],
                 owner_role=row[9],
+                restore_action=row[10],
                 depends_on=depends_on,
                 forbidden_substitutes=forbidden,
-                notes=row[12] or "",
+                notes=row[13] or "",
             )
         )
     return records
+
+
+def _ensure_restore_action_column(cur: Any) -> None:
+    cur.execute("PRAGMA table_info(sot_artifacts)")
+    columns = {row[1] for row in cur.fetchall()}
+    if "restore_action" not in columns:
+        cur.execute(
+            f"ALTER TABLE sot_artifacts ADD COLUMN restore_action TEXT NOT NULL DEFAULT '{_DEFAULT_RESTORE_ACTION}'"
+        )
 
 
 def sync_projection(
@@ -450,6 +496,7 @@ def sync_projection(
     conn = sqlite3.connect(str(db_path))
     try:
         cur = conn.cursor()
+        _ensure_restore_action_column(cur)
         for rec in toml_records:
             existing = proj_by_id.get(rec.id)
             if existing is not None:
@@ -470,9 +517,10 @@ def sync_projection(
                     id, version, domain, lifecycle, storage_path,
                     authority_spec_id, mutation_api, versioning_policy,
                     backup_policy, health_check_function, owner_role,
+                    restore_action,
                     depends_on, forbidden_substitutes, notes,
                     changed_by, changed_at, change_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     rec.id,
@@ -486,6 +534,7 @@ def sync_projection(
                     rec.backup_policy,
                     rec.health_check_function,
                     rec.owner_role,
+                    rec.restore_action,
                     json.dumps(list(rec.depends_on)) if rec.depends_on else None,
                     json.dumps(list(rec.forbidden_substitutes)) if rec.forbidden_substitutes else None,
                     rec.notes or None,

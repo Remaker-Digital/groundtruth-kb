@@ -1684,6 +1684,161 @@ def bridge_dispatch_daemon_watchdog_uninstall_cmd(
     click.echo(result.get("stdout") or f"Watchdog uninstall complete (dry_run={dry_run}).")
 
 
+@main.group("watchdog")
+def watchdog_group() -> None:
+    """Platform watchdog commands."""
+
+
+@watchdog_group.group("service-sot")
+def service_sot_watchdog_group() -> None:
+    """Detection-only service and SoT availability watchdog."""
+
+
+def _emit_service_sot_task_status(ctx: click.Context, *, task_name: str, json_output: bool) -> None:
+    from groundtruth_kb.watchdog.service_sot import collect_task_status
+
+    config = _resolve_config(ctx)
+    payload = collect_task_status(config.project_root, task_name=task_name)
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Service/SoT watchdog platform: {payload.get('platform')}")
+    click.echo(f"Task: {payload.get('task_name')}")
+    click.echo(f"Registered: {payload.get('registered')}")
+    click.echo(f"State: {payload.get('state')}")
+    click.echo(f"Healthy: {payload.get('healthy')}")
+    status_output = payload.get("status_output")
+    if isinstance(status_output, dict):
+        click.echo(f"Last run: {status_output.get('overall_status') or '(none)'}")
+    for item in payload.get("findings") or []:
+        click.echo(f"Finding: {item}")
+
+
+@service_sot_watchdog_group.command("run")
+@click.option("--component", "components", multiple=True, help="Limit gt-status probing to one component.")
+@click.option("--no-write", is_flag=True, default=False, help="Print JSON without writing runtime status.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def service_sot_watchdog_run_cmd(
+    ctx: click.Context,
+    components: tuple[str, ...],
+    no_write: bool,
+    json_output: bool,
+) -> None:
+    """Run the service/SoT watchdog once."""
+    from groundtruth_kb.watchdog.service_sot import run_service_sot_watchdog
+
+    config = _resolve_config(ctx)
+    payload = run_service_sot_watchdog(
+        config.project_root,
+        components=components or None,
+        write=not no_write,
+    )
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Service/SoT watchdog: {payload.get('overall_status')}")
+        if payload.get("output_path"):
+            click.echo(f"Output: {payload['output_path']}")
+        for item in payload.get("findings") or []:
+            click.echo(f"Finding: {item}")
+    if payload.get("overall_status") == "FAIL":
+        ctx.exit(1)
+
+
+@service_sot_watchdog_group.command("status")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def service_sot_watchdog_status_cmd(ctx: click.Context, task_name: str, json_output: bool) -> None:
+    """Report service/SoT watchdog scheduled-task health."""
+    _emit_service_sot_task_status(ctx, task_name=task_name, json_output=json_output)
+
+
+@service_sot_watchdog_group.command("install")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--interval-minutes", type=int, default=5, show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def service_sot_watchdog_install_cmd(
+    ctx: click.Context,
+    task_name: str,
+    interval_minutes: int,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Register and enable the service/SoT watchdog task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, install_task
+
+    config = _resolve_config(ctx)
+    try:
+        result = install_task(
+            config.project_root,
+            task_name=task_name,
+            interval_minutes=interval_minutes,
+            dry_run=dry_run,
+        )
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Service/SoT watchdog install complete (dry_run={dry_run}).")
+
+
+@service_sot_watchdog_group.command("enable")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def service_sot_watchdog_enable_cmd(task_name: str, json_output: bool) -> None:
+    """Enable the service/SoT watchdog scheduled task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, enable_task
+
+    try:
+        result = enable_task(task_name=task_name)
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Enabled service/SoT watchdog task {task_name}.")
+
+
+@service_sot_watchdog_group.command("disable")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def service_sot_watchdog_disable_cmd(task_name: str, json_output: bool) -> None:
+    """Disable the service/SoT watchdog scheduled task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, disable_task
+
+    try:
+        result = disable_task(task_name=task_name)
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(f"Disabled service/SoT watchdog task {task_name}.")
+
+
+@service_sot_watchdog_group.command("uninstall")
+@click.option("--task-name", default="GTKB-ServiceSoTWatchdog", show_default=True)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def service_sot_watchdog_uninstall_cmd(task_name: str, dry_run: bool, json_output: bool) -> None:
+    """Unregister the service/SoT watchdog scheduled task."""
+    from groundtruth_kb.watchdog.service_sot import ServiceSoTWatchdogError, uninstall_task
+
+    try:
+        result = uninstall_task(task_name=task_name, dry_run=dry_run)
+    except ServiceSoTWatchdogError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+        return
+    click.echo(result.get("stdout") or f"Service/SoT watchdog uninstall complete (dry_run={dry_run}).")
+
+
 @bridge_dispatch_daemon_group.command("start")
 @click.option("--interval", type=int, default=30, show_default=True, help="Tick interval in seconds.")
 @click.pass_context
@@ -5101,6 +5256,11 @@ def projects_link_bridge(
 @click.option("--include-spec", "included_spec_ids", multiple=True, help="Explicitly included spec.")
 @click.option("--exclude-spec", "excluded_spec_ids", multiple=True, help="Explicitly excluded spec.")
 @click.option("--expires-at", default=None, help="Optional ISO-8601 expiration timestamp.")
+@click.option(
+    "--plan-incomplete",
+    is_flag=True,
+    help="Record a keep-open completion guard so this authorization can complete without retiring the project.",
+)
 @click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
 @click.option("--change-reason", required=True, help="History reason for the authorization version.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -5119,6 +5279,7 @@ def projects_authorize(
     included_spec_ids: tuple[str, ...],
     excluded_spec_ids: tuple[str, ...],
     expires_at: str | None,
+    plan_incomplete: bool,
     changed_by: str,
     change_reason: str,
     json_output: bool,
@@ -5139,6 +5300,7 @@ def projects_authorize(
             included_spec_ids=list(included_spec_ids) or None,
             excluded_spec_ids=list(excluded_spec_ids) or None,
             expires_at=expires_at,
+            plan_incomplete=plan_incomplete,
             changed_by=changed_by,
             change_reason=change_reason,
         )
@@ -5153,7 +5315,8 @@ def projects_authorize(
     if json_output:
         click.echo(json.dumps(authorization, indent=2, sort_keys=True))
         return
-    click.echo(f"Authorized project {authorization['project_id']} with {authorization['id']}.")
+    suffix = " Plan-incomplete keep-open guard recorded." if plan_incomplete else ""
+    click.echo(f"Authorized project {authorization['project_id']} with {authorization['id']}.{suffix}")
 
 
 @projects_cmd.command("authorizations")

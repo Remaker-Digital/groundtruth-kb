@@ -4820,6 +4820,65 @@ def _check_dispatcher_daemon_watchdog_task(
     )
 
 
+def _check_service_sot_watchdog(
+    target: Path,
+    load_task_status: Callable[[Path], dict[str, Any]] | None = None,
+) -> ToolCheck:
+    """Warn when the platform service/SoT watchdog task is absent or stale."""
+    check_name = "Service/SoT watchdog task"
+    registry_path = target / "config" / "registry" / "sot-artifacts.toml"
+    if not registry_path.is_file():
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="Service/SoT watchdog skipped outside a platform SoT-registry workspace",
+        )
+    if os.name != "nt":
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="Service/SoT watchdog task check is Windows-only; skipped on this host",
+        )
+
+    try:
+        if load_task_status is None:
+            from groundtruth_kb.watchdog.service_sot import collect_task_status
+
+            status = collect_task_status(target)
+        else:
+            status = load_task_status(target)
+    except Exception as exc:  # noqa: BLE001 - doctor checks fail soft
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=False,
+            status="warning",
+            message=f"Service/SoT watchdog status unavailable: {exc}",
+        )
+
+    if status.get("healthy"):
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message="GTKB-ServiceSoTWatchdog is registered, enabled, hidden, fresh, and detection-only",
+        )
+    findings = status.get("findings") or []
+    detail = "; ".join(str(item) for item in findings) or "service/SoT watchdog unhealthy"
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=bool(status.get("registered")),
+        status="warning",
+        message=(f"{detail}. Install/enable with: gt watchdog service-sot install"),
+    )
+
+
 def _dispatcher_daemon_task_skip_check(target: Path, *, check_name: str, component_label: str) -> ToolCheck | None:
     """Return a completed skip/warning check when the component probe is not applicable."""
     from groundtruth_kb.mode_switch.validation import DISPATCHER_DAEMON_SUBSTRATE
@@ -6631,6 +6690,7 @@ def run_doctor(
         dispatcher_complex_health = _dispatcher_complex_health_reader(target)
         checks.append(_check_dispatcher_daemon_supervisor_task(target, dispatcher_complex_health))
         checks.append(_check_dispatcher_daemon_watchdog_task(target, dispatcher_complex_health))
+        checks.append(_check_service_sot_watchdog(target))
         checks.append(_check_lapsed_go_implementation_claims(target))
         checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
