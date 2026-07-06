@@ -692,6 +692,76 @@ def test_per_session_marker_written_on_explicit_role_hint(
     assert body["source"] == "prompt_explicit_role_hint"
 
 
+def test_mid_session_init_keyword_writes_session_markers(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """WI-4981: a mid-session canonical init keyword persists the session role."""
+    state = wsf._read_lifecycle_guard(tmp_path)
+    state["discard_next_user_prompt"] = False
+    wsf._write_lifecycle_guard(state, tmp_path)
+
+    response = wsf.handle_user_prompt("::init gtkb lo", tmp_path, session_id="mid-session-lo")
+
+    assert "Session role set to Loyal Opposition" in response["systemMessage"]
+    legacy_body = json.loads(_marker_path(tmp_path).read_text(encoding="utf-8"))
+    assert legacy_body["role"] == "loyal-opposition"
+    assert legacy_body["session_id"] == "mid-session-lo"
+    assert legacy_body["session_id_source"] == "payload"
+    assert legacy_body["source"] == "init_keyword"
+    per_session = _per_session_marker_path(tmp_path, "mid-session-lo")
+    assert per_session.is_file()
+    per_session_body = json.loads(per_session.read_text(encoding="utf-8"))
+    assert per_session_body["role"] == "loyal-opposition"
+    assert per_session_body["source"] == "init_keyword"
+    guard = wsf._read_lifecycle_guard(tmp_path)
+    assert guard["prompt_init_keyword_role"] == "loyal-opposition"
+    assert guard["prompt_init_keyword_session_id_source"] == "payload"
+    assert guard["prompt_init_keyword_per_session_markers_written"] == 1
+
+
+def test_mid_session_init_keyword_failsoft_when_no_session_id(
+    wsf: ModuleType,
+    tmp_path: Path,
+    clean_env: None,
+) -> None:
+    """WI-4981: exact canonical role-switch input fails visibly when no id exists."""
+    state = wsf._read_lifecycle_guard(tmp_path)
+    state["discard_next_user_prompt"] = False
+    wsf._write_lifecycle_guard(state, tmp_path)
+
+    response = wsf.handle_user_prompt("::init gtkb pb", tmp_path, session_id=None)
+
+    assert "no session id was available" in response["systemMessage"]
+    assert not _marker_path(tmp_path).exists()
+    guard = wsf._read_lifecycle_guard(tmp_path)
+    assert guard["prompt_init_keyword_role"] == "prime-builder"
+    assert guard["prompt_init_keyword_marker_failsoft_reason"] == "session_id_unresolved"
+
+
+def test_mid_session_init_keyword_not_written_under_headless_dispatch(
+    wsf: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    clean_env: None,
+) -> None:
+    """WI-4981: headless dispatch cannot acquire an interactive role marker."""
+    state = wsf._read_lifecycle_guard(tmp_path)
+    state["discard_next_user_prompt"] = False
+    wsf._write_lifecycle_guard(state, tmp_path)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "run-id-xyz")
+
+    response = wsf.handle_user_prompt("::init gtkb pb", tmp_path, session_id="should-not-matter")
+
+    assert "headless bridge dispatch" in response["systemMessage"]
+    assert not _marker_path(tmp_path).exists()
+    assert not _per_session_marker_path(tmp_path, "should-not-matter").exists()
+    guard = wsf._read_lifecycle_guard(tmp_path)
+    assert guard["prompt_init_keyword_role"] == "prime-builder"
+    assert guard["prompt_init_keyword_marker_skipped_reason"] == "headless_dispatch"
+
+
 def test_per_session_marker_not_written_under_headless_dispatch(
     wsf: ModuleType,
     tmp_path: Path,

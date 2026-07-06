@@ -1395,6 +1395,75 @@ def _record_explicit_role_hint_from_prompt(
     return True
 
 
+def _record_mid_session_init_keyword_role_from_prompt(
+    prompt: str,
+    state: dict[str, Any],
+    project_root: Path | None = None,
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any] | None:
+    role_mode = _startup_role_mode_from_prompt(prompt)
+    role_profile = _MODE_TO_ROLE_PROFILE.get(role_mode or "")
+    if not role_profile:
+        return None
+
+    state["prompt_init_keyword_role"] = role_profile
+    role_label = "Prime Builder" if role_profile == "prime-builder" else "Loyal Opposition"
+
+    if os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV):
+        state["prompt_init_keyword_marker_skipped_at"] = _now_iso()
+        state["prompt_init_keyword_marker_skipped_reason"] = "headless_dispatch"
+        return {
+            "systemMessage": (
+                f"Session role switch to {role_label} was ignored because this is a headless bridge dispatch; "
+                "no interactive session marker was written."
+            )
+        }
+
+    resolved_id, source_label = _resolve_session_id(session_id)
+    if resolved_id is None:
+        state["prompt_init_keyword_marker_failsoft_at"] = _now_iso()
+        state["prompt_init_keyword_marker_failsoft_reason"] = "session_id_unresolved"
+        return {
+            "systemMessage": (
+                f"Session role switch to {role_label} could not be persisted because no session id was available; "
+                "no interactive session marker was written."
+            )
+        }
+
+    wrote = _write_session_role_marker(
+        role_profile,
+        resolved_id,
+        source_label or "",
+        project_root,
+        source="init_keyword",
+    )
+    if wrote:
+        state["prompt_init_keyword_marker_written_at"] = _now_iso()
+        state["prompt_init_keyword_session_id_source"] = source_label
+    else:
+        state["prompt_init_keyword_marker_failsoft_at"] = _now_iso()
+        state["prompt_init_keyword_marker_failsoft_reason"] = "marker_write_oserror"
+
+    per_session_written = _write_per_session_role_markers(
+        role_profile,
+        _candidate_marker_session_ids(session_id),
+        project_root,
+        source="init_keyword",
+    )
+    if per_session_written:
+        state["prompt_init_keyword_per_session_markers_written"] = per_session_written
+
+    if wrote or per_session_written:
+        return {"systemMessage": f"Session role set to {role_label} for this interactive session."}
+    return {
+        "systemMessage": (
+            f"Session role switch to {role_label} could not be persisted because marker writes failed; "
+            "no interactive session marker was written."
+        )
+    }
+
+
 def _set_work_subject_from_init_match(
     init_match: InitKeywordMatch,
     project_root: Path | None = None,
@@ -2155,6 +2224,17 @@ def handle_user_prompt(
         return startup_gate_response
 
     state = _read_lifecycle_guard(project_root)
+    init_role_response = _record_mid_session_init_keyword_role_from_prompt(
+        prompt,
+        state,
+        project_root,
+        session_id=session_id,
+    )
+    if init_role_response is not None:
+        _write_lifecycle_guard(state, project_root)
+        _clear_startup_response_pending_for_followup(project_root)
+        return init_role_response
+
     if _record_explicit_role_hint_from_prompt(prompt, state, project_root, session_id=session_id):
         _write_lifecycle_guard(state, project_root)
 
