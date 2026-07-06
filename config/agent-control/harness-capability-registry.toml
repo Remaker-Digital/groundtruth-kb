@@ -453,6 +453,32 @@ surface = ".cursor/skills/harness-parity-review/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
+id = "skill.skill-governance-lifecycle"
+kind = "skill"
+canonical_name = "skill-governance-lifecycle"
+canonical_purpose = "Standardize GT-KB managed-skill creation and projection across canonical skills, Codex adapters, registry declarations, manifests, tests, and bridge evidence."
+canonical_source = ".claude/skills/skill-governance-lifecycle/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/skill-governance-lifecycle/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/skill-governance-lifecycle/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/skill-governance-lifecycle/SKILL.md"
+source_sha256 = "03062927d9c99e367f4510ae132f2b77ad779f3d3020716ad68e0efe3df608a4"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "WI-4839 authorizes only the canonical Claude source and generated Codex adapter; Antigravity projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-4839 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+[[capabilities]]
 id = "skill.kb-adr"
 kind = "skill"
 canonical_name = "kb-adr"
@@ -1729,6 +1755,10 @@ routing_schema_version = 1
 routing_multiple_model_rows_supported = true
 routing_skill_overrides_supported = true
 routing_advertised_model_inventory_check = true
+provider_readiness_contract = "local-inventory-live-dispatch"
+provider_readiness_credential_source = "no-api-key; local endpoint inventory"
+provider_readiness_default_test_mode = "mocked-routing-and-inventory"
+provider_readiness_failure_classes = ["provider_unreachable", "configured_model_not_advertised"]
 skill_adapter_generation_supported = true
 skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
 skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
@@ -1753,6 +1783,10 @@ routing_schema_version = 1
 routing_multiple_model_rows_supported = true
 routing_skill_overrides_supported = true
 routing_advertised_model_inventory_check = false
+provider_readiness_contract = "env-local-credential-live-dispatch"
+provider_readiness_credential_source = "OPENROUTER_API_KEY via process env or .env.local"
+provider_readiness_default_test_mode = "mocked-credential-and-provider-responses"
+provider_readiness_failure_classes = ["missing_credential", "invalid_credential", "provider_backpressure", "provider_outage"]
 skill_adapter_generation_supported = true
 skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
 skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"

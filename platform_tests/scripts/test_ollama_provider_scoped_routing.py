@@ -113,3 +113,18 @@ def test_unadvertised_ollama_model_still_raises(tmp_path: Path) -> None:
     root = make_root(tmp_path, mixed_provider_routing())
     with pytest.raises(oh.OllamaHarnessError):
         oh.load_routing_config(root, advertised_model_ids=[OLLAMA_MODEL_ID])  # missing ollama-legacy
+
+
+def test_ollama_live_inventory_provider_outage_is_mockable(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fake_urlopen(request, timeout: float):
+        calls.append(request.full_url)
+        raise oh.urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(oh.urllib.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(oh.OllamaHarnessError, match="model inventory request failed"):
+        oh.call_ollama_tags("http://ollama.test")
+
+    assert calls == ["http://ollama.test/api/tags"]

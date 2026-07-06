@@ -102,6 +102,58 @@ def test_env_local_loader_falls_back_from_in_root_release_worktree(tmp_path: Pat
     assert env_loader._default_env_local_path(worktree) == primary_env.resolve()
 
 
+def test_main_classifies_missing_openrouter_key_as_configuration_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = make_root(tmp_path)
+    monkeypatch.chdir(root)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr(env_loader, "load_env_local", lambda: {})
+
+    assert orh.main(["-p", "hello"]) == 1
+
+    captured = capsys.readouterr()
+    assert "OPENROUTER_API_KEY environment variable is not set" in captured.err
+
+
+def test_main_loads_env_local_key_before_live_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = make_root(tmp_path)
+    config = orh.load_routing_config(root)
+    monkeypatch.chdir(root)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    def fake_load_env_local() -> dict[str, str]:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "env-file-fixture-key")
+        return {"OPENROUTER_API_KEY": "env-file-fixture-key"}
+
+    def fake_run_tool_loop(
+        prompt: str,
+        model_route: orh.ModelRoute,
+        endpoint: str,
+        api_key: str,
+        max_turns: int,
+        project_root: Path,
+        **_kwargs,
+    ) -> str:
+        assert prompt == "hello"
+        assert api_key == "env-file-fixture-key"
+        assert project_root == root.resolve()
+        return "done"
+
+    monkeypatch.setattr(env_loader, "load_env_local", fake_load_env_local)
+    monkeypatch.setattr(orh, "load_routing_config", lambda _project_root: config)
+    monkeypatch.setattr(orh, "run_tool_loop", fake_run_tool_loop)
+
+    assert orh.main(["-p", "hello"]) == 0
+    assert capsys.readouterr().out.strip() == "done"
+
+
 def test_openrouter_reconfigures_output_streams_for_unicode_verdicts():
     class Stream:
         def __init__(self) -> None:
@@ -558,6 +610,16 @@ def test_wi4817_openrouter_fail_fast_on_non_transient(monkeypatch: pytest.Monkey
     _patch_openrouter_urlopen(monkeypatch, [_openrouter_http_error(401)], calls)
     with pytest.raises(orh.OpenRouterHarnessError, match="HTTP 401"):
         orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+    assert len(calls) == 1
+
+
+def test_invalid_openrouter_credential_is_not_retried(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    _patch_openrouter_urlopen(monkeypatch, [_openrouter_http_error(403)], calls)
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="HTTP 403"):
+        orh.call_openrouter_chat("https://openrouter.test", "bad-key", {"model": "m"})
+
     assert len(calls) == 1
 
 

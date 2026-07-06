@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -245,7 +246,7 @@ status = "active"
 def test_no_window_dimension_accepts_explicit_wrapper_evidence(tmp_path: Path) -> None:
     module = _load_module()
     _write_fixture(tmp_path)
-    (tmp_path / "scripts" / "cross_harness_bridge_trigger.py").write_text(
+    (tmp_path / "scripts" / "dispatcher_runtime.py").write_text(
         "import subprocess\ncreationflags = subprocess.CREATE_NO_WINDOW\n",
         encoding="utf-8",
     )
@@ -256,7 +257,7 @@ def test_no_window_dimension_accepts_explicit_wrapper_evidence(tmp_path: Path) -
         cell for cell in report["cells"] if cell["harness"] == "codex" and cell["dimension"] == "no_window_launch"
     ]
     assert target[0]["status"] == "supported"
-    assert "scripts/cross_harness_bridge_trigger.py" in target[0]["evidence"]
+    assert "scripts/dispatcher_runtime.py" in target[0]["evidence"]
 
 
 def test_cli_writes_json_and_markdown_outputs(tmp_path: Path) -> None:
@@ -293,3 +294,27 @@ def test_strict_mode_fails_on_unwaived_release_blocking_gap(tmp_path: Path) -> N
     _write_fixture(tmp_path)
 
     assert module.main(["--project-root", str(tmp_path), "--strict"]) == 1
+
+
+def test_wi4926_provider_readiness_contract_is_documented_and_registered() -> None:
+    docs = (REPO_ROOT / "docs" / "harness-parity-phase-2.md").read_text(encoding="utf-8")
+    matrix = (REPO_ROOT / "docs" / "harness-parity-phase-2-matrix.md").read_text(encoding="utf-8")
+    registry = tomllib.loads(
+        (REPO_ROOT / "config" / "agent-control" / "harness-capability-registry.toml").read_text(encoding="utf-8")
+    )
+
+    assert "WI-4926 Provider Readiness Contract" in docs
+    assert "OPENROUTER_API_KEY" in docs
+    assert "Missing `OPENROUTER_API_KEY` is configuration failure" in docs
+    assert "WI-4926 Provider Readiness Contract" in matrix
+    assert "WAIVER-P2-OLLAMA-EVENT-SOURCE" in matrix
+    assert "do not waive provider" in matrix
+
+    ollama = registry["harnesses"]["ollama"]
+    openrouter = registry["harnesses"]["openrouter"]
+    assert ollama["provider_readiness_contract"] == "local-inventory-live-dispatch"
+    assert ollama["provider_readiness_default_test_mode"] == "mocked-routing-and-inventory"
+    assert "configured_model_not_advertised" in ollama["provider_readiness_failure_classes"]
+    assert openrouter["provider_readiness_contract"] == "env-local-credential-live-dispatch"
+    assert openrouter["provider_readiness_default_test_mode"] == "mocked-credential-and-provider-responses"
+    assert "missing_credential" in openrouter["provider_readiness_failure_classes"]

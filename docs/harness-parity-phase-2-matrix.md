@@ -8,6 +8,20 @@
 - Bridge: gtkb-harness-parity-phase-2-codex-baseline-matrix
 - Counts: blocked: 4, needs_adapter: 13, supported: 43
 
+## WI-4926 Provider Readiness Contract
+
+| Harness | Credential source | Default readiness assertion | Live-probe boundary | Failure classification |
+| --- | --- | --- | --- | --- |
+| ollama | No API key is read from `.env.local`; the provider endpoint is the local Ollama HTTP service. | Provider-scoped routing validation is mocked and only validates Ollama rows from `.api-harness/routing.toml`. | Dispatch startup may call local `/api/tags`; no peer harness may be launched. | Unreachable local endpoint or missing advertised model is a provider/configuration readiness failure. |
+| openrouter | `OPENROUTER_API_KEY` is loaded from process environment or authoritative `.env.local` through `scripts._env.load_env_local()`. | Missing-key, retry, provider-backpressure, and invalid-response behavior is tested with mocks. | Dispatch startup may call OpenRouter chat completions after key loading; no peer harness may be launched. | Missing key is configuration failure; provider 401/403 is invalid credential/provider rejection; 429/5xx is provider outage/backpressure. |
+
+Relevant active Phase 2 waivers remain event-source or transcript-surface
+waivers only: `WAIVER-P2-OLLAMA-EVENT-SOURCE`,
+`WAIVER-P2-OPENROUTER-EVENT-SOURCE`,
+`WAIVER-P2-OLLAMA-FULL-TRANSCRIPT-ARCHIVE`, and
+`WAIVER-P2-OPENROUTER-FULL-TRANSCRIPT-ARCHIVE`. They do not waive provider
+readiness, credential-source, or live-probe classification assertions.
+
 ## Findings
 
 | Harness | Dimension | State | Release Blocking | Evidence | Disposition | Details |
