@@ -10,6 +10,7 @@ ignores, prunes, or mutates repository state.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import re
 import subprocess
@@ -18,6 +19,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from groundtruth_kb.project.sot_registry import InvalidSoTRecord, UnknownDomain, default_registry_path, load_toml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
@@ -269,6 +272,41 @@ def _is_scratch_junk(rel_path: str) -> bool:
     return "draft" in lowered and (lowered.endswith(".tmp") or "/draft" in lowered or "\\draft" in lowered)
 
 
+def _glob_has_magic(pattern: str) -> bool:
+    return any(ch in pattern for ch in "*?[")
+
+
+def _load_active_registry_records(root: Path) -> tuple[Any, ...]:
+    registry_path = default_registry_path(root)
+    if not registry_path.is_file():
+        return ()
+    try:
+        return tuple(record for record in load_toml(registry_path) if record.lifecycle == "active")
+    except (InvalidSoTRecord, UnknownDomain, OSError) as exc:
+        raise AutoResolveError(f"SoT artifact registry could not be loaded: {exc}") from exc
+
+
+def _registry_storage_path(record: Any) -> str:
+    return str(record.storage_path).strip().replace("\\", "/")
+
+
+def _registered_artifact_ids_for_path(rel_path: str, records: tuple[Any, ...]) -> tuple[str, ...]:
+    ids: list[str] = []
+    for record in records:
+        storage = _registry_storage_path(record)
+        if not storage or storage.startswith("membase:") or Path(storage).is_absolute():
+            continue
+        if _glob_has_magic(storage):
+            matched = fnmatch.fnmatch(rel_path, storage)
+        elif storage.endswith("/"):
+            matched = rel_path.startswith(storage.rstrip("/") + "/")
+        else:
+            matched = rel_path == storage
+        if matched:
+            ids.append(str(record.id))
+    return tuple(ids)
+
+
 def _action_fields(
     action: str,
     *,
@@ -314,7 +352,12 @@ def _bridge_action(status: str | None) -> tuple[str, str, str, str, tuple[str, .
     )
 
 
-def classify_entry(root: Path, entry: GitStatusEntry) -> dict[str, Any]:
+def classify_entry(
+    root: Path,
+    entry: GitStatusEntry,
+    *,
+    registered_artifacts: tuple[Any, ...] | None = None,
+) -> dict[str, Any]:
     """Classify one dirty path into a deterministic report-only action plan."""
     rel_path = entry.path
     item: dict[str, Any] = {
@@ -340,6 +383,26 @@ def classify_entry(root: Path, entry: GitStatusEntry) -> dict[str, Any]:
                     actuator_action,
                     apply_status=apply_status,
                     forbidden_operations=forbidden,
+                ),
+            }
+        )
+        return item
+
+    registered_artifact_ids = _registered_artifact_ids_for_path(
+        rel_path,
+        registered_artifacts if registered_artifacts is not None else _load_active_registry_records(root),
+    )
+    if registered_artifact_ids:
+        item.update(
+            {
+                "bucket": "registered_artifact",
+                "candidate_action": "preserve_registered_artifact",
+                "reason": "registered_sot_artifact_preserved",
+                "registered_artifact_ids": list(registered_artifact_ids),
+                **_action_fields(
+                    "skip",
+                    apply_status="preserved_registered_sot_artifact",
+                    forbidden_operations=("destructive_bulk_cleanup", "untracked_file_deletion"),
                 ),
             }
         )
@@ -419,7 +482,8 @@ def build_plan(root: Path) -> dict[str, Any]:
     """Return the read-only action plan for current dirty git state."""
     root = root.resolve()
     entries = collect_git_status(root)
-    items = [classify_entry(root, entry) for entry in entries]
+    registered_artifacts = _load_active_registry_records(root)
+    items = [classify_entry(root, entry, registered_artifacts=registered_artifacts) for entry in entries]
     buckets: dict[str, list[dict[str, Any]]] = {}
     actuator_counts = {action: 0 for action in ACTUATOR_ACTIONS}
     for item in items:

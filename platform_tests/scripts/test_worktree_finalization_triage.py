@@ -59,6 +59,28 @@ def _make_dirty_repo(repo: Path) -> None:
     (repo / "notes.txt").write_text("manual\n", encoding="utf-8")
 
 
+def _write_sot_registry(repo: Path, *, storage_path: str = ".gtkb-state/") -> None:
+    registry = repo / "config" / "registry" / "sot-artifacts.toml"
+    registry.parent.mkdir(parents=True)
+    registry.write_text(
+        f"""
+[[artifacts]]
+id = "owner-runtime-state"
+domain = "runtime_state"
+lifecycle = "active"
+storage_path = "{storage_path}"
+authority_spec_id = "SPEC-INTAKE-99a602"
+mutation_api = "owner-managed local runtime state; GT-KB records path authority only"
+versioning_policy = "overwrite_single_writer"
+backup_policy = "gitignored_runtime"
+health_check_function = ""
+owner_role = "owner_only"
+notes = "Registered runtime state is preserved by cleanup planning."
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+
 def _items_by_path(plan: dict) -> dict[str, dict]:
     return {item["path"]: item for item in plan["items"]}
 
@@ -120,6 +142,37 @@ def test_plan_does_not_mutate_git_status(tmp_path: Path) -> None:
     triage.build_plan(repo)
 
     assert _status(repo) == before
+
+
+def test_plan_preserves_registered_artifact_before_scratch_or_runtime_buckets(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _write_sot_registry(repo)
+    _git(repo, "add", "config/registry/sot-artifacts.toml")
+    _git(repo, "commit", "-q", "-m", "registry")
+
+    registered_runtime_scratch = ".gtkb-state/.temp_verdict_body"
+    assert auto_resolve._is_scratch_junk(registered_runtime_scratch)
+    assert auto_resolve._is_harness_runtime_projection(registered_runtime_scratch)
+
+    target = repo / registered_runtime_scratch
+    target.parent.mkdir(parents=True)
+    target.write_text("registered local state\n", encoding="utf-8")
+
+    plan = triage.build_plan(repo)
+    item = _items_by_path(plan)[registered_runtime_scratch]
+
+    assert item["bucket"] == "registered_artifact"
+    assert item["candidate_action"] == "preserve_registered_artifact"
+    assert item["actuator_action"] == "skip"
+    assert item["apply_status"] == "preserved_registered_sot_artifact"
+    assert item["registered_artifact_ids"] == ["owner-runtime-state"]
+    assert "destructive_bulk_cleanup" in item["forbidden_operations_enforced"]
+    assert "untracked_file_deletion" in item["forbidden_operations_enforced"]
+    assert plan["counts"]["actuator_actions"]["auto_ignore"] == 0
+    assert plan["counts"]["actuator_actions"]["auto_drop_byte_identical"] == 0
+    assert plan["counts"]["actuator_actions"]["skip"] == 1
 
 
 def test_cli_emits_json_and_markdown_without_mutation(tmp_path: Path, capsys) -> None:
