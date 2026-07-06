@@ -94,6 +94,16 @@ def _write_marker(root: Path, role: str, session_id: str = "marker-session") -> 
     _write_per_session_marker(root, role, session_id)
 
 
+def _write_shared_marker(root: Path, role: str, session_id: str) -> Path:
+    marker = root / ".claude" / "session" / "active-session-role.json"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(
+        json.dumps({"role": role, "session_id": session_id}),
+        encoding="utf-8",
+    )
+    return marker
+
+
 @pytest.fixture
 def env(monkeypatch):
     """Pin registry resolution to the test project_root (ignore ambient override)."""
@@ -179,6 +189,40 @@ def test_go_impl_allowed_for_uuid_session_with_prime_marker(tmp_path: Path, env)
     assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
     holder = env.current_holder("go-thread", project_root=tmp_path)
     assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_go_impl_survives_shared_marker_deletion_with_per_session_marker(tmp_path: Path, env) -> None:
+    """WI-4853: deleting the peer-clobberable shared marker cannot revoke current-session eligibility."""
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_index(tmp_path, {"go-thread": "GO"})
+    session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
+    _write_marker(tmp_path, "prime-builder", session_id=session_id)
+    shared_marker = _write_shared_marker(tmp_path, "prime-builder", session_id)
+    shared_marker.unlink()
+
+    assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
+    holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["acting_role"] == "prime-builder"
+    assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+
+
+def test_go_impl_ignores_unrelated_session_marker_overwrite(tmp_path: Path, env) -> None:
+    """WI-4853: an unrelated session marker cannot override the current session's Prime marker."""
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_index(tmp_path, {"go-thread": "GO"})
+    current_session = "26c2349e-1cd0-4024-acef-f934b35fea4e"
+    peer_session = "f7c20a94-cff7-48e4-87b4-3524f28f42df"
+    _write_marker(tmp_path, "prime-builder", session_id=current_session)
+    _write_marker(tmp_path, "loyal-opposition", session_id=peer_session)
+    _write_shared_marker(tmp_path, "loyal-opposition", peer_session)
+
+    assert env.acquire("go-thread", current_session, project_root=tmp_path) is True
+    holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["session_id"] == current_session
+    assert holder["acting_role"] == "prime-builder"
     assert holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
 
 
