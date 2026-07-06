@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from groundtruth_kb.activity.ops import render_ops_activity_context
-from groundtruth_kb.activity.profiles import ActivityProfileError, load_activity_profiles
+from groundtruth_kb.activity.profiles import ActivityProfile, ActivityProfileError, load_activity_profiles
 from groundtruth_kb.session.envelope import (
     TOPIC_TYPES,
     EnvelopeError,
@@ -25,6 +25,7 @@ TOPIC_OPEN_RE = re.compile(rf"^::open (?P<topic>{_TOPIC_TYPE_PATTERN})$")
 # Single-active (SPEC-TOPIC-ENVELOPE-ROUTER-001 v3 / DCL-TOPIC-ENVELOPE-ROUTING-001
 # v3 clause 7): bare ``::close`` and the typed ``::close <type>`` are both accepted.
 TOPIC_CLOSE_RE = re.compile(rf"^::close( (?P<topic>{_TOPIC_TYPE_PATTERN}))?$")
+_STARTUP_BRIEFING_STANCES = frozenset({"implement-within-scope"})
 
 
 @dataclass(frozen=True)
@@ -255,9 +256,41 @@ def _load_startup_module(project_root: Path):
     return startup
 
 
+def _activity_profile_for_operator_context(result: dict[str, object]) -> ActivityProfile | None:
+    topic_type = result.get("topic_type")
+    if result.get("action") != "open" or not isinstance(topic_type, str):
+        return None
+    try:
+        return load_activity_profiles().get(topic_type)
+    except ActivityProfileError:
+        return None
+
+
+def _uses_startup_briefing(profile: ActivityProfile | None) -> bool:
+    if profile is None:
+        return True
+    return profile.direction.get("stance") in _STARTUP_BRIEFING_STANCES
+
+
+def _render_activity_stance_operator_context(profile: ActivityProfile) -> str:
+    lines = [
+        "## Open Activity Operator Context",
+        "",
+        "- context_source: activity_disposition_profile",
+        f"- activity: {profile.name}",
+        f"- headless_eligibility: {profile.headless_eligibility}",
+    ]
+    lines.extend(_format_history_state(profile.history_state))
+    lines.extend(_format_direction(profile.direction))
+    return "\n".join(lines)
+
+
 def _render_open_operator_context(result: dict[str, object]) -> str:
     if result.get("action") != "open":
         return ""
+    profile = _activity_profile_for_operator_context(result)
+    if not _uses_startup_briefing(profile):
+        return _render_activity_stance_operator_context(profile)
     project_root = _project_root_from_result(result)
     if project_root is None:
         return "\n".join(
