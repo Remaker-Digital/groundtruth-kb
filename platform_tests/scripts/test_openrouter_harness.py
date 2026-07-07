@@ -781,6 +781,30 @@ def test_wi5060_openrouter_connection_reset_exhaustion_fails_closed(monkeypatch:
     assert len(calls) == orh.CHAT_MAX_ATTEMPTS
 
 
+def test_wi5060_openrouter_direct_timeout_retry_then_success(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    body = orh.json.dumps({"choices": [{"message": {"content": "ok"}}]})
+    timeout = TimeoutError("The read operation timed out")
+    _patch_openrouter_urlopen(monkeypatch, [timeout, body], calls)
+
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert result["choices"][0]["message"]["content"] == "ok"
+    assert len(calls) == 2
+
+
+def test_wi5060_openrouter_direct_timeout_exhaustion_fails_closed(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    timeout = TimeoutError("The read operation timed out")
+    behaviors = [timeout] * (orh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_openrouter_urlopen(monkeypatch, behaviors, calls)
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="request failed"):
+        orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert len(calls) == orh.CHAT_MAX_ATTEMPTS
+
+
 def test_wi4933_openrouter_429_retry_honors_retry_after(monkeypatch: pytest.MonkeyPatch):
     calls: list[str] = []
     sleeps: list[float] = []
