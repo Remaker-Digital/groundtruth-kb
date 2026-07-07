@@ -757,6 +757,30 @@ def test_wi4817_openrouter_retry_then_success(monkeypatch: pytest.MonkeyPatch):
     assert len(calls) == 2
 
 
+def test_wi5060_openrouter_connection_reset_retry_then_success(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    body = orh.json.dumps({"choices": [{"message": {"content": "ok"}}]})
+    reset = ConnectionResetError(10054, "An existing connection was forcibly closed by the remote host")
+    _patch_openrouter_urlopen(monkeypatch, [reset, body], calls)
+
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert result["choices"][0]["message"]["content"] == "ok"
+    assert len(calls) == 2
+
+
+def test_wi5060_openrouter_connection_reset_exhaustion_fails_closed(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    reset = ConnectionResetError(10054, "An existing connection was forcibly closed by the remote host")
+    behaviors = [reset] * (orh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_openrouter_urlopen(monkeypatch, behaviors, calls)
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="request failed"):
+        orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert len(calls) == orh.CHAT_MAX_ATTEMPTS
+
+
 def test_wi4933_openrouter_429_retry_honors_retry_after(monkeypatch: pytest.MonkeyPatch):
     calls: list[str] = []
     sleeps: list[float] = []

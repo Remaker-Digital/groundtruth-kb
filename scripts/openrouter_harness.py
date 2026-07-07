@@ -526,7 +526,7 @@ def call_openrouter_chat(
             raise OpenRouterHarnessError(
                 f"OpenRouter completions request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
             ) from exc
-        except urllib.error.URLError as exc:
+        except (urllib.error.URLError, ConnectionError) as exc:
             last_error = exc
             if attempt < CHAT_MAX_ATTEMPTS:
                 _sleep_with_budget(
