@@ -13,6 +13,12 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import windows_subprocess as ws  # noqa: E402
 
 
+class _FakeStartupInfo:
+    def __init__(self) -> None:
+        self.dwFlags = 0
+        self.wShowWindow = None
+
+
 def test_no_window_subprocess_kwargs_sets_create_no_window_on_windows() -> None:
     if sys.platform != "win32":
         return
@@ -20,6 +26,21 @@ def test_no_window_subprocess_kwargs_sets_create_no_window_on_windows() -> None:
     assert kwargs.get("creationflags", 0) & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
     startupinfo = kwargs.get("startupinfo")
     assert startupinfo is not None
+    assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+    assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
+
+
+def test_no_window_subprocess_kwargs_force_windows_returns_hidden_startupinfo(monkeypatch) -> None:
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001, raising=False)
+    monkeypatch.setattr(subprocess, "SW_HIDE", 0, raising=False)
+    monkeypatch.setattr(subprocess, "STARTUPINFO", _FakeStartupInfo, raising=False)
+
+    kwargs = ws.no_window_subprocess_kwargs(force_windows=True)
+
+    assert kwargs.get("creationflags", 0) & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    startupinfo = kwargs.get("startupinfo")
+    assert isinstance(startupinfo, _FakeStartupInfo)
     assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
     assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
 

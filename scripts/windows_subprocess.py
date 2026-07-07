@@ -19,7 +19,7 @@ def no_window_subprocess_kwargs(*, force_windows: bool = False) -> dict[str, obj
     flags = windows_no_window_creationflags(force_windows=force_windows)
     if flags:
         kwargs["creationflags"] = flags
-    startupinfo = hidden_startupinfo()
+    startupinfo = hidden_startupinfo(force_windows=force_windows)
     if startupinfo is not None:
         kwargs["startupinfo"] = startupinfo
     return kwargs
@@ -49,9 +49,9 @@ def windows_hidden_process_creationflags(*, new_process_group: bool = False, det
     return flags
 
 
-def hidden_startupinfo() -> object | None:
+def hidden_startupinfo(*, force_windows: bool = False) -> object | None:
     """Return STARTUPINFO configured to hide any Windows child window."""
-    if os.name != "nt":
+    if os.name != "nt" and not force_windows:
         return None
     startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
     if startupinfo_cls is None:
