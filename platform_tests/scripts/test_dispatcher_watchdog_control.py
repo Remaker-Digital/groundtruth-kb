@@ -14,6 +14,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT / "groundtruth-kb" / "src") not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "groundtruth-kb" / "src"))
 
+from groundtruth_kb import dispatcher_watchdog as watchdog_mod  # noqa: E402
 from groundtruth_kb.dispatcher_watchdog import (  # noqa: E402
     _ps_quote,
     _script_path,
@@ -202,6 +203,33 @@ def test_enable_disable_uninstall_watchdog_call_powershell(monkeypatch):
     assert "Disable-ScheduledTask" in captured[1]
     assert "Unregister-ScheduledTask" in captured[2]
     assert all("GTKB-HarnessStormWatchdog-Test" in item for item in captured)
+
+
+def test_watchdog_powershell_probe_runs_headless_on_windows(monkeypatch):
+    expected_no_window = 0x08000000
+    captured: dict[str, object] = {}
+
+    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(watchdog_mod.os, "name", "nt")
+    monkeypatch.setattr(watchdog_mod.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(watchdog_mod.subprocess, "run", _fake_run)
+
+    watchdog_mod._run_powershell("Get-Date")
+    args = captured["args"]
+    kwargs = captured["kwargs"]
+    assert args[0] == "powershell.exe"
+    assert kwargs["capture_output"] is True
+    assert kwargs["text"] is True
+    assert int(kwargs["creationflags"]) & expected_no_window
+    startupinfo = kwargs.get("startupinfo")
+    if sys.platform == "win32":
+        assert startupinfo is not None
+        assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+        assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
 
 
 def test_uninstall_watchdog_dry_run_skips_powershell(monkeypatch):

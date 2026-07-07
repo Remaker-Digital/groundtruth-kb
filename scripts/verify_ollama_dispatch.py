@@ -32,6 +32,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from windows_subprocess import no_window_subprocess_kwargs
+
 # Allow running from repo root or scripts/
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent if (_SCRIPT_DIR.parent / "groundtruth.toml").is_file() else Path.cwd()
@@ -134,7 +136,7 @@ $services = @(Get-Service | Where-Object {
 } | ConvertTo-Json -Compress
 """
     runner = command_runner or subprocess.run
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    no_window_kwargs = no_window_subprocess_kwargs(force_windows=command_runner is not None)
     try:
         completed = runner(
             [
@@ -152,7 +154,7 @@ $services = @(Get-Service | Where-Object {
             text=True,
             timeout=timeout,
             check=False,
-            creationflags=creationflags,
+            **no_window_kwargs,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {

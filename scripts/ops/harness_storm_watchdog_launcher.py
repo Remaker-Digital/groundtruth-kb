@@ -17,6 +17,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WATCHDOG_PS1 = ROOT / "scripts" / "ops" / "harness_storm_watchdog.ps1"
+SCRIPTS_DIR = ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 
 def main() -> int:
@@ -31,7 +36,7 @@ def main() -> int:
         "stderr": subprocess.DEVNULL,
     }
     if os.name == "nt":
-        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        popen_kwargs.update(no_window_subprocess_kwargs())
 
     completed = subprocess.run(
         [

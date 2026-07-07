@@ -132,6 +132,11 @@ def test_autostart_probe_detects_windows_task(verify_module) -> None:
     kwargs = captured["kwargs"]
     assert kwargs["stdin"] is subprocess.DEVNULL
     assert kwargs["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    startupinfo = kwargs.get("startupinfo")
+    if sys.platform == "win32":
+        assert startupinfo is not None
+        assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+        assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
 
 
 def test_autostart_probe_warns_when_no_task_or_service(verify_module) -> None:
@@ -352,10 +357,15 @@ def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
     assert verify_module.OLLAMA_DISPATCH_REQUIRED_TOOLS == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
-def test_deepseek_v4_pro_cloud_route_can_be_selected_explicitly(ollama_harness_module, tmp_path) -> None:
+def test_default_ollama_bridge_review_route_uses_kimi_k2_7_code_cloud(ollama_harness_module, tmp_path) -> None:
     (tmp_path / ".api-harness").mkdir()
     (tmp_path / ".api-harness" / "routing.toml").write_text(
         "schema_version = 1\n"
+        "[models.kimi-k2-7-code-cloud]\n"
+        'model_id = "kimi-k2.7-code:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[models.deepseek-v4-pro-cloud]\n"
         'model_id = "deepseek-v4-pro:cloud"\n'
         'provider = "ollama"\n'
@@ -367,18 +377,20 @@ def test_deepseek_v4_pro_cloud_route_can_be_selected_explicitly(ollama_harness_m
         "tool_calling_supported = true\n"
         'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[routing.ollama]\n"
-        'default_model = "deepseek-v4-pro-cloud"\n'
+        'default_model = "kimi-k2-7-code-cloud"\n'
         "timeout_seconds = 3600\n"
         "[routing.ollama.skills]\n"
-        'bridge-review = "deepseek-v4-pro-cloud"\n',
+        'bridge-review = "kimi-k2-7-code-cloud"\n'
+        'verification = "kimi-k2-7-code-cloud"\n'
+        'implementation = "kimi-k2-7-code-cloud"\n',
         encoding="utf-8",
     )
 
     config = ollama_harness_module.load_routing_config(tmp_path)
-    route = ollama_harness_module.resolve_model(config, "deepseek-v4-pro-cloud", skill="bridge-review")
+    route = ollama_harness_module.resolve_model(config, None, skill="bridge-review")
 
-    assert route.key == "deepseek-v4-pro-cloud"
-    assert route.model_id == "deepseek-v4-pro:cloud"
+    assert route.key == "kimi-k2-7-code-cloud"
+    assert route.model_id == "kimi-k2.7-code:cloud"
     assert config.timeout_seconds == 3600
     assert ollama_harness_module.derive_session_timeout_from_route_timeout(config.timeout_seconds) == 3660
 

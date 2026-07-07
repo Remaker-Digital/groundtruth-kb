@@ -174,6 +174,41 @@ def test_storm_watchdog_launcher_runs_powershell_headless_on_windows(monkeypatch
     assert kwargs["stdout"] == subprocess.DEVNULL
     assert kwargs["stderr"] == subprocess.DEVNULL
     assert int(kwargs["creationflags"]) & expected_no_window
+    startupinfo = kwargs.get("startupinfo")
+    if sys.platform == "win32":
+        assert startupinfo is not None
+        assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+        assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
+
+
+def test_dispatcher_supervisor_powershell_probe_runs_headless_on_windows(monkeypatch):
+    """The supervisor status probe must invoke PowerShell without a console."""
+    from groundtruth_kb import dispatcher_supervisor as supervisor
+
+    expected_no_window = 0x08000000
+    captured: dict[str, object] = {}
+
+    def _fake_run(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(supervisor.os, "name", "nt")
+    monkeypatch.setattr(supervisor.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(supervisor.subprocess, "run", _fake_run)
+
+    supervisor._run_powershell("Get-Date")
+    args = captured["args"]
+    kwargs = captured["kwargs"]
+    assert args[0] == "powershell.exe"
+    assert kwargs["capture_output"] is True
+    assert kwargs["text"] is True
+    assert int(kwargs["creationflags"]) & expected_no_window
+    startupinfo = kwargs.get("startupinfo")
+    if sys.platform == "win32":
+        assert startupinfo is not None
+        assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+        assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
 
 
 # --- Persistent log + diagnosability -----------------------------------------

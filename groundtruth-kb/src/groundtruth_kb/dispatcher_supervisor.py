@@ -25,6 +25,20 @@ class DispatcherSupervisorError(RuntimeError):
     """Raised when a supervisor operation fails."""
 
 
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name != "nt":
+        return kwargs
+    kwargs["creationflags"] = int(getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+    startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
+    if startupinfo_cls is not None:
+        startupinfo = startupinfo_cls()
+        startupinfo.dwFlags |= int(getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001))
+        startupinfo.wShowWindow = int(getattr(subprocess, "SW_HIDE", 0))
+        kwargs["startupinfo"] = startupinfo
+    return kwargs
+
+
 def _scripts_dir(project_root: Path) -> Path:
     return project_root.resolve() / "scripts"
 
@@ -52,6 +66,7 @@ def _run_powershell(command: str, *, timeout: int = 120) -> subprocess.Completed
         text=True,
         timeout=timeout,
         check=False,
+        **_no_window_subprocess_kwargs(),
     )
 
 
@@ -216,7 +231,14 @@ def _run_installer_script(
         cmd.append("-DryRun")
     if extra_args:
         cmd.extend(extra_args)
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+        **_no_window_subprocess_kwargs(),
+    )
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()
         raise DispatcherSupervisorError(detail or f"{script_name} failed (exit {proc.returncode})")
