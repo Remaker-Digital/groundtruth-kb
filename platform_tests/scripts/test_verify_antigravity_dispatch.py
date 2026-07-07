@@ -13,6 +13,7 @@ from scripts.verify_antigravity_dispatch import (
     _resolve_executable_for_host,
     build_dispatch_command,
     evaluate_readiness,
+    inspect_verdict_anchor_guard,
     run_verification,
     sanitize_capture,
 )
@@ -304,6 +305,49 @@ def test_sanitize_capture_redacts_credential_shapes():
     assert "abc123456789xyz" not in sanitized
     assert "AIza123456789012345678901234567890" not in sanitized
     assert "[REDACTED]" in sanitized
+
+
+def _write_guarded_verdict_helper(root: Path, rel_path: str) -> None:
+    helper = root / rel_path
+    helper.parent.mkdir(parents=True, exist_ok=True)
+    helper.write_text(
+        "from scripts.verdict_evidence_anchor_preflight import validate_verdict_evidence_anchors\n"
+        "\n"
+        "def _assert_verdict_evidence_anchors():\n"
+        "    return validate_verdict_evidence_anchors\n",
+        encoding="utf-8",
+    )
+
+
+def test_inspect_verdict_anchor_guard_detects_helper_coverage(tmp_path):
+    validator = tmp_path / "scripts" / "verdict_evidence_anchor_preflight.py"
+    validator.parent.mkdir(parents=True, exist_ok=True)
+    validator.write_text("# fixture\n", encoding="utf-8")
+    _write_guarded_verdict_helper(tmp_path, ".codex/skills/verify/helpers/write_verdict.py")
+
+    result = inspect_verdict_anchor_guard(tmp_path)
+
+    assert result["ok"] is True
+    assert result["validator"]["exists"] is True
+    assert ".codex/skills/verify/helpers/write_verdict.py" in result["guarded_helpers"]
+
+
+def test_evaluate_readiness_reports_verdict_anchor_guard(tmp_path, monkeypatch):
+    _write_registry(tmp_path, _antigravity_record(can_receive_dispatch=True))
+    monkeypatch.setattr(
+        "scripts.verify_antigravity_dispatch.shutil.which",
+        lambda exe: "/fake/path/agy.cmd" if exe == "agy" else None,
+    )
+    validator = tmp_path / "scripts" / "verdict_evidence_anchor_preflight.py"
+    validator.parent.mkdir(parents=True, exist_ok=True)
+    validator.write_text("# fixture\n", encoding="utf-8")
+    _write_guarded_verdict_helper(tmp_path, ".claude/skills/verify/helpers/write_verdict.py")
+
+    result = evaluate_readiness(project_root=tmp_path, recipient="C")
+
+    assert result["ready"] is True
+    assert result["verdict_anchor_guard"]["ok"] is True
+    assert ".claude/skills/verify/helpers/write_verdict.py" in result["verdict_anchor_guard"]["guarded_helpers"]
 
 
 def test_readiness_fails_closed_for_legacy_gemini_registry(tmp_path):

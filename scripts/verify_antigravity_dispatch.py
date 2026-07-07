@@ -9,10 +9,12 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,15 @@ CREDENTIAL_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
 )
 AGY_EXECUTABLE_NAMES = ("agy", "agy.exe", "agy.cmd", "agy.ps1")
+AGY_RESPONSE_STEP_TYPE = 15
+AGY_RECOVERY_LOOKBACK_SECONDS = 10.0
+PRINTABLE_BYTES_RE = re.compile(rb"[ -~]{4,}")
+VERDICT_ANCHOR_HELPER_PATHS = (
+    ".codex/skills/verify/helpers/write_verdict.py",
+    ".claude/skills/verify/helpers/write_verdict.py",
+)
+VERDICT_ANCHOR_VALIDATOR_PATH = "scripts/verdict_evidence_anchor_preflight.py"
+VERDICT_ANCHOR_GUARD_TOKENS = ("validate_verdict_evidence_anchors", "_assert_verdict_evidence_anchors")
 
 
 class VerificationError(RuntimeError):
@@ -133,6 +144,44 @@ def _role_tokens(record: dict[str, Any]) -> set[str]:
     return set()
 
 
+def inspect_verdict_anchor_guard(project_root: Path) -> dict[str, Any]:
+    """Return audit evidence that hook-less verdict paths have helper guard coverage."""
+
+    validator = project_root / VERDICT_ANCHOR_VALIDATOR_PATH
+    helpers: list[dict[str, Any]] = []
+    for rel_path in VERDICT_ANCHOR_HELPER_PATHS:
+        helper = project_root / rel_path
+        try:
+            text = helper.read_text(encoding="utf-8")
+        except OSError as exc:
+            helpers.append(
+                {
+                    "path": rel_path,
+                    "exists": helper.is_file(),
+                    "guarded": False,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            )
+            continue
+        missing_tokens = [token for token in VERDICT_ANCHOR_GUARD_TOKENS if token not in text]
+        helpers.append(
+            {
+                "path": rel_path,
+                "exists": True,
+                "guarded": not missing_tokens,
+                "missing_tokens": missing_tokens,
+            }
+        )
+    guarded_helpers = [helper["path"] for helper in helpers if helper.get("guarded")]
+    return {
+        "ok": validator.is_file() and bool(guarded_helpers),
+        "validator": {"path": VERDICT_ANCHOR_VALIDATOR_PATH, "exists": validator.is_file()},
+        "helpers": helpers,
+        "guarded_helpers": guarded_helpers,
+        "required_tokens": list(VERDICT_ANCHOR_GUARD_TOKENS),
+    }
+
+
 def _first_failed_detail(checks: list[dict[str, Any]]) -> str:
     for check in checks:
         if not check.get("passed"):
@@ -154,13 +203,92 @@ def _is_legacy_gemini_command(command: list[str]) -> bool:
     return "gemini" in _command_head_name(command)
 
 
+def _antigravity_conversations_dir() -> Path:
+    return Path.home() / ".gemini" / "antigravity-cli" / "conversations"
+
+
+def _sentinel_live_prompt(prompt: str, sentinel: str) -> str:
+    base = prompt.strip()
+    if not base or base == DEFAULT_LIVE_PROMPT:
+        return f"Reply with exactly: READY {sentinel}"
+    return f"{base}\n\nFor this readiness probe, include this exact final line: READY {sentinel}"
+
+
+def _printable_blob_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return "\n".join(match.decode("utf-8", errors="ignore") for match in PRINTABLE_BYTES_RE.findall(value))
+    return str(value)
+
+
+def _recover_agy_print_response(
+    *,
+    sentinel: str,
+    started_at: float,
+    conversations_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    """Recover agy print-mode output from Antigravity's local response store.
+
+    Current Windows agy builds can complete successfully while writing no
+    stdout, even though the model response is persisted in the conversation DB.
+    This recovery path is intentionally narrow: it only accepts recent bot
+    response steps containing the run-unique sentinel.
+    """
+
+    root = conversations_dir or _antigravity_conversations_dir()
+    if not root.is_dir():
+        return None
+    threshold = started_at - AGY_RECOVERY_LOOKBACK_SECONDS
+    try:
+        db_paths = sorted(
+            (path for path in root.glob("*.db") if path.stat().st_mtime >= threshold),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return None
+    checked = 0
+    for db_path in db_paths:
+        checked += 1
+        try:
+            uri = db_path.resolve().as_uri() + "?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=1.0) as connection:
+                rows = connection.execute(
+                    """
+                    SELECT idx, step_type, metadata, error_details, task_details, render_info, step_payload
+                    FROM steps
+                    ORDER BY idx DESC
+                    LIMIT 80
+                    """
+                ).fetchall()
+        except (OSError, sqlite3.DatabaseError):
+            continue
+        for idx, step_type, *blobs in rows:
+            if step_type != AGY_RESPONSE_STEP_TYPE:
+                continue
+            text = sanitize_capture("\n".join(part for value in blobs if (part := _printable_blob_text(value))))
+            if sentinel in text and "READY" in text:
+                return {
+                    "checked_databases": checked,
+                    "source": str(db_path),
+                    "step_idx": idx,
+                    "stdout": f"READY {sentinel}\n",
+                }
+    return None
+
+
 def _run_live_probe(
     command: list[str],
     *,
     project_root: Path,
+    sentinel: str | None,
     timeout: float,
     runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
 ) -> dict[str, Any]:
+    started_at = time.time()
     active_runner = runner or subprocess.run
     completed = active_runner(
         command,
@@ -174,9 +302,16 @@ def _run_live_probe(
     )
     stdout = sanitize_capture(completed.stdout or "")
     stderr = sanitize_capture(completed.stderr or "")
+    recovery = None
+    if completed.returncode == 0 and not stdout.strip() and sentinel:
+        recovery = _recover_agy_print_response(sentinel=sentinel, started_at=started_at)
+        if recovery:
+            stdout = recovery["stdout"]
     return {
         "command": command,
         "ok": completed.returncode == 0 and bool(stdout.strip()),
+        "output_recovered": bool(recovery),
+        "recovery": recovery,
         "returncode": completed.returncode,
         "stderr_bytes": len(stderr.encode("utf-8")),
         "stdout_bytes": len(stdout.encode("utf-8")),
@@ -207,12 +342,15 @@ def evaluate_readiness(
         f"name={record.get('harness_name')!r}; type={record.get('harness_type')!r}",
     )
 
+    live_sentinel = f"GTKB_AGY_READY_{uuid.uuid4().hex}" if require_live else None
+    dispatch_prompt = _sentinel_live_prompt(live_prompt, live_sentinel) if live_sentinel else live_prompt
+
     command: list[str] = []
     command_ok = False
     command_detail = ""
     if record_ok:
         try:
-            command = build_dispatch_command(project_root, recipient, live_prompt)
+            command = build_dispatch_command(project_root, recipient, dispatch_prompt)
             command_ok = bool(command)
             if _is_legacy_gemini_command(command):
                 command_ok = False
@@ -244,6 +382,7 @@ def evaluate_readiness(
             live_probe = _run_live_probe(
                 resolved_command,
                 project_root=project_root,
+                sentinel=live_sentinel,
                 timeout=timeout,
                 runner=live_runner,
             )
@@ -276,6 +415,7 @@ def evaluate_readiness(
         "role": sorted(roles),
         "status": record.get("status"),
         "can_receive_dispatch": bool(record.get("can_receive_dispatch")),
+        "verdict_anchor_guard": inspect_verdict_anchor_guard(project_root),
     }
 
 
@@ -394,6 +534,7 @@ def run_verification(
         "stdout_bytes": len(stdout.encode("utf-8")),
         "substrate_ok": substrate_ok,
         "timestamp": dt.datetime.now(dt.UTC).isoformat(),
+        "verdict_anchor_guard": inspect_verdict_anchor_guard(project_root),
     }
     _write_text(evidence_dir / "argv.json", json.dumps(argv_payload, indent=2, sort_keys=True) + "\n")
     _write_text(evidence_dir / "result.json", json.dumps(result_payload, indent=2, sort_keys=True) + "\n")

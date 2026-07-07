@@ -12,6 +12,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFY_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
+CODEX_VERIFY_HELPER_PATH = REPO_ROOT / ".codex" / "skills" / "verify" / "helpers" / "write_verdict.py"
 PROPOSE_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
 
 
@@ -155,3 +156,41 @@ def test_novel_verdict_topic_gets_explicit_placeholder(verify_helper, tmp_path):
 
     assert verify_helper.pre_populate_prior_deliberations.__module__ == "groundtruth_kb.bridge.prior_deliberations"
     assert "_No prior deliberations: <fill in reason before filing>._" in seeded
+
+
+@pytest.mark.parametrize(
+    ("helper_name", "helper_path"),
+    (
+        ("claude", VERIFY_HELPER_PATH),
+        ("codex", CODEX_VERIFY_HELPER_PATH),
+    ),
+)
+def test_verdict_helper_rejects_fabricated_anchor_even_when_prepopulation_is_disabled(
+    helper_name,
+    helper_path,
+    tmp_path,
+):
+    helper = _load_module(f"verify_write_verdict_{helper_name}_anchor_guard", helper_path)
+    operative = tmp_path / "bridge" / "anchor-fixture-001.md"
+    operative.parent.mkdir(parents=True, exist_ok=True)
+    operative.write_text("NEW\n\n## Implementation Plan\nreal content\n", encoding="utf-8")
+    body = (
+        "NO-GO\n"
+        "Responds to: bridge/anchor-fixture-001.md\n\n"
+        'F1: line 3 reads "Helper-suggested candidates placeholder".\n'
+        "\n"
+        "## Prior Deliberations\n\n"
+        "## Specifications Carried Forward\n\n"
+        "- `GOV-SAMPLE-001`\n"
+    )
+
+    with pytest.raises(helper.VerifiedFinalizationError, match="evidence anchors"):
+        helper.seed_prior_deliberations(
+            "anchor-fixture",
+            body,
+            db=False,
+            glossary_path=_glossary(tmp_path),
+            log_path=False,
+            pre_populate=False,
+            project_root=tmp_path,
+        )

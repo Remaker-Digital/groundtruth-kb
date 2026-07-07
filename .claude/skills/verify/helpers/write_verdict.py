@@ -37,6 +37,10 @@ from scripts.bridge_author_metadata import (  # noqa: E402
     extract_author_metadata,
     is_synthetic_session_context_id,
 )
+from scripts.verdict_evidence_anchor_preflight import (  # noqa: E402
+    validate_verdict_evidence_anchors,
+    violation_summary,
+)
 
 DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-prepopulation.json")
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
@@ -113,21 +117,38 @@ def seed_prior_deliberations(
     glossary_path: Path | None = None,
     log_path: Path | bool | None = DEFAULT_VERDICT_PREPOPULATION_LOG,
     pre_populate: bool = True,
+    project_root: Path | None = None,
 ) -> str:
     """Seed a verdict body's ``## Prior Deliberations`` section."""
-    if not pre_populate:
-        return body
-    return pre_populate_prior_deliberations(
-        slug,
-        body,
-        db=db,
-        glossary_path=glossary_path,
-        log_path=log_path,
+    seeded = (
+        pre_populate_prior_deliberations(
+            slug,
+            body,
+            db=db,
+            glossary_path=glossary_path,
+            log_path=log_path,
+        )
+        if pre_populate
+        else body
     )
+    _assert_verdict_evidence_anchors(seeded, project_root=project_root)
+    return seeded
 
 
 def _project_root_from_arg(value: Path | None) -> Path:
     return (value or PROJECT_ROOT).resolve()
+
+
+def _assert_verdict_evidence_anchors(body: str, *, project_root: Path | None = None) -> None:
+    """Fail closed when a gated verdict carries fabricated operative anchors."""
+    root = _project_root_from_arg(project_root)
+    violations = validate_verdict_evidence_anchors(body, project_root=root)
+    if violations:
+        raise VerifiedFinalizationError(
+            "verdict evidence anchors are invalid: "
+            + violation_summary(violations)
+            + ". Fix the citation, or mark the finding [inference] / [no exact anchor] / [absent]."
+        )
 
 
 def _bridge_versions(slug: str, project_root: Path) -> list[BridgeVersion]:
@@ -256,6 +277,7 @@ def validate_verified_body(body: str, *, project_root: Path | None = None) -> No
     _reject_unresolved_placeholders(body)
     _reject_failed_preflight_evidence(body)
     _reject_out_of_root_evidence_paths(body, root)
+    _assert_verdict_evidence_anchors(body, project_root=root)
 
 
 def _normalize_repo_path(project_root: Path, path_text: str) -> str:
@@ -341,7 +363,8 @@ def _claimed_paths_from_report(report_text: str, project_root: Path) -> tuple[st
         for match in REPORT_PATH_TOKEN_RE.finditer(section):
             candidate = match.group("code") or match.group("plain") or ""
             if _looks_like_claimed_repo_path(candidate):
-                paths.append(candidate)
+                if "*" not in candidate and not candidate.strip().endswith("/"):
+                    paths.append(candidate)
     return _unique_paths(project_root, paths)
 
 
@@ -657,6 +680,7 @@ def finalize_verified_commit(
         glossary_path=glossary_path,
         log_path=log_path,
         pre_populate=pre_populate,
+        project_root=root,
     )
     validate_verified_body(body_to_write, project_root=root)
     body_to_write = _append_commit_finalization_evidence(
@@ -809,6 +833,7 @@ def main(argv: list[str] | None = None) -> int:
         db=False if args.no_semantic_search else None,
         log_path=log_path,
         pre_populate=not args.no_prepopulate,
+        project_root=args.project_root,
     )
     sys.stdout.write(seeded)
     return 0
