@@ -7,6 +7,21 @@ import signal
 import subprocess
 import sys
 
+try:
+    from windows_subprocess import (
+        hidden_startupinfo,
+        no_window_subprocess_kwargs,
+        prefer_pythonw_executable,
+        windows_hidden_process_creationflags,
+    )
+except ImportError:  # pragma: no cover - package import path used by tests
+    from .windows_subprocess import (
+        hidden_startupinfo,
+        no_window_subprocess_kwargs,
+        prefer_pythonw_executable,
+        windows_hidden_process_creationflags,
+    )
+
 # Phase 0 reliability fix (WI-4806, GO at bridge/gtkb-run-with-status-worker-lifetime-timeout-002.md):
 # a bare p.wait() let a hung wrapped harness (cloud non-JSON body, HTTP 502, stuck socket)
 # leave this wrapper immortal, accumulating into the storm-watchdog threshold (WI-4670 root cause).
@@ -19,16 +34,7 @@ TERMINATE_GRACE_SECONDS = 10
 
 def _prefer_windows_gui_python(command: str) -> str:
     """Return sibling pythonw.exe for Windows python.exe commands when present."""
-    if os.name != "nt":
-        return command
-    last_backslash = command.rfind("\\")
-    last_slash = command.rfind("/")
-    split_at = max(last_backslash, last_slash)
-    executable_name = command[split_at + 1 :] if split_at >= 0 else command
-    if executable_name.lower() != "python.exe":
-        return command
-    candidate = f"{command[: split_at + 1]}pythonw.exe" if split_at >= 0 else "pythonw.exe"
-    return candidate if os.path.isfile(candidate) else command
+    return prefer_pythonw_executable(command)
 
 
 def _terminate_process_tree(proc: subprocess.Popen) -> None:
@@ -48,7 +54,7 @@ def _terminate_process_tree(proc: subprocess.Popen) -> None:
                 ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                **no_window_subprocess_kwargs(),
             )
         except Exception:
             try:
@@ -158,19 +164,20 @@ def main(argv: list[str] | None = None) -> None:
         elif cmd_args:
             cmd_args[0] = _prefer_windows_gui_python(cmd_args[0])
 
-        # On Windows, suppress the per-child console window. Without this flag
-        # the wrapped harness — which lives for the entire dispatched run —
-        # allocates an empty console window (stdout/stderr are redirected to
-        # log files). Mirrors the cross-harness trigger's outer Popen sites
-        # (scripts/cross_harness_bridge_trigger.py). No-op (0) off Windows.
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
-
         popen_kwargs: dict[str, object] = {
             "stdin": stdin_fh,
             "stdout": out_fh,
             "stderr": err_fh,
-            "creationflags": creationflags,
         }
+        popen_kwargs.update(no_window_subprocess_kwargs())
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = windows_hidden_process_creationflags(
+                new_process_group=True,
+                detached=True,
+            )
+            startupinfo = hidden_startupinfo()
+            if startupinfo is not None:
+                popen_kwargs["startupinfo"] = startupinfo
         if os.name != "nt":
             # New POSIX session/process group so the whole tree can be reaped via
             # os.killpg on a lifetime timeout. No-op on Windows (taskkill /T walks

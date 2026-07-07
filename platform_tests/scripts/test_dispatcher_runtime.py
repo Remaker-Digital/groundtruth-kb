@@ -4172,8 +4172,19 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
         captured["kwargs"] = kwargs
         return FakeProcess()
 
+    class FakeStartupInfo:
+        dwFlags = 0x00000001
+        wShowWindow = 0
+
     monkeypatch.setattr(trigger, "prefer_pythonw_executable", lambda executable: "pythonw.exe")
-    monkeypatch.setattr(trigger, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+    monkeypatch.setattr(
+        trigger,
+        "hidden_process_popen_kwargs",
+        lambda *, new_process_group=False, detached=False: {
+            "creationflags": 0x08000000 | (0x00000200 if new_process_group else 0) | (0x00000008 if detached else 0),
+            "startupinfo": FakeStartupInfo(),
+        },
+    )
     monkeypatch.setattr(trigger.os, "name", "nt")
     monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
     monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
@@ -4197,6 +4208,10 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
     creationflags = captured["kwargs"]["creationflags"]
     assert creationflags & 0x08000000
     assert creationflags & 0x00000200
+    assert creationflags & 0x00000008
+    startupinfo = captured["kwargs"]["startupinfo"]
+    assert startupinfo.dwFlags & 0x00000001
+    assert startupinfo.wShowWindow == 0
 
 
 def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4540,7 +4555,13 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
 
     monkeypatch.setattr(trigger, "_normalize_argv_head", lambda head, project_root: head)
     monkeypatch.setattr(trigger, "prefer_pythonw_executable", lambda executable: "pythonw.exe")
-    monkeypatch.setattr(trigger, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+    monkeypatch.setattr(
+        trigger,
+        "hidden_process_popen_kwargs",
+        lambda *, new_process_group=False, detached=False: {
+            "creationflags": 0x08000000 | (0x00000200 if new_process_group else 0) | (0x00000008 if detached else 0)
+        },
+    )
     monkeypatch.setattr(trigger.os, "name", "nt")
     monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
     monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)

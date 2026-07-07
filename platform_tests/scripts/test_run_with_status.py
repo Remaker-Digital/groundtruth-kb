@@ -3,9 +3,9 @@
 
 Spec linkage: GOV-SOURCE-OF-TRUTH-FRESHNESS-001 (the spawn decision derives from a
 fresh os.name check at spawn time) + REQ-HARNESS-REGISTRY-001 (the wrapper carries
-the registry-defined argv vector through to the child). The wrapper must pass
-creationflags=CREATE_NO_WINDOW on Windows so dispatched harness runs do not flash
-an empty console window, and must pass 0 (a no-op) off Windows.
+the registry-defined argv vector through to the child). The wrapper must pass a
+hidden Windows launch contract so dispatched harness runs do not flash an empty
+console window, and must omit Windows-only launch kwargs off Windows.
 """
 
 from __future__ import annotations
@@ -20,7 +20,9 @@ import pytest
 
 from scripts import run_with_status
 
-EXPECTED_WINDOWS_FLAG = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+EXPECTED_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+EXPECTED_CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+EXPECTED_DETACHED_PROCESS = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
 
 
 class _RecordingProcess:
@@ -67,9 +69,15 @@ def test_popen_uses_create_no_window_on_windows_via_monkeypatch(
 
     kwargs = captured["kwargs"]
     assert "creationflags" in kwargs, "wrapper must pass creationflags to Popen"
-    assert kwargs["creationflags"] == EXPECTED_WINDOWS_FLAG
-    # CREATE_NO_WINDOW bit must be set.
-    assert kwargs["creationflags"] & 0x08000000 == 0x08000000
+    creationflags = int(kwargs["creationflags"])
+    assert creationflags & EXPECTED_CREATE_NO_WINDOW
+    assert creationflags & EXPECTED_CREATE_NEW_PROCESS_GROUP
+    assert creationflags & EXPECTED_DETACHED_PROCESS
+    if sys.platform == "win32":
+        startupinfo = kwargs.get("startupinfo")
+        assert startupinfo is not None
+        assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+        assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
     assert captured["exit_code"] == 0
 
 
@@ -77,7 +85,8 @@ def test_popen_uses_no_creationflags_off_windows(monkeypatch: pytest.MonkeyPatch
     captured = _invoke(monkeypatch, tmp_path, "posix")
 
     kwargs = captured["kwargs"]
-    assert kwargs.get("creationflags") == 0, "off Windows creationflags must be a no-op (0)"
+    assert "creationflags" not in kwargs, "off Windows creationflags must be omitted"
+    assert "startupinfo" not in kwargs, "off Windows startupinfo must be omitted"
     assert captured["exit_code"] == 0
 
 
@@ -246,7 +255,7 @@ def test_dispatch_lo_gets_review_lifetime() -> None:
     """SPEC-CENTRALIZED-DISPATCH-SERVICE-001 (LO budget routing): the dispatcher routes the
     longer review lifetime to Loyal Opposition / verification dispatches and the bounded
     implementation lifetime to Prime Builder dispatches."""
-    from scripts import cross_harness_bridge_trigger as trigger
+    from scripts import dispatcher_runtime as trigger
 
     assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
     assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS

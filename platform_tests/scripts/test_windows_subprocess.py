@@ -20,6 +20,20 @@ def test_no_window_subprocess_kwargs_sets_create_no_window_on_windows() -> None:
     assert kwargs.get("creationflags", 0) & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 
 
+def test_hidden_process_popen_kwargs_hides_and_detaches_on_windows() -> None:
+    if sys.platform != "win32":
+        return
+    kwargs = ws.hidden_process_popen_kwargs(new_process_group=True, detached=True)
+    creationflags = int(kwargs.get("creationflags", 0))
+    assert creationflags & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    assert creationflags & getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+    assert creationflags & getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+    startupinfo = kwargs.get("startupinfo")
+    assert startupinfo is not None
+    assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+    assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
+
+
 def test_prefer_pythonw_executable_rewrites_python_exe() -> None:
     if sys.platform != "win32":
         return

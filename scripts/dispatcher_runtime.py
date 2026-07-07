@@ -114,13 +114,7 @@ def _run_with_status_wrapper_executable() -> str:
 
 def _run_with_status_wrapper_popen_kwargs() -> dict[str, object]:
     """Return Popen kwargs for the outer status-wrapper process."""
-    kwargs = dict(no_window_subprocess_kwargs())
-    if os.name == "nt":
-        creationflags = int(kwargs.get("creationflags", 0))
-        creationflags |= getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-        kwargs["creationflags"] = creationflags
-    return kwargs
+    return hidden_process_popen_kwargs(new_process_group=True, detached=True)
 
 
 def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, Any] | None:
@@ -164,7 +158,7 @@ from bridge_work_intent_registry import (  # noqa: E402, I001
     release as release_work_intent,
     same_role_project_holder,
 )
-from windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402, I001
+from windows_subprocess import hidden_process_popen_kwargs, no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402, I001
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     create_authorization_packet,
@@ -2892,11 +2886,6 @@ def _post_dispatch_poll(
         "--post-dispatch-timestamp",
         str(dispatch_ts),
     ]
-    if os.name == "nt":
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-    else:
-        creationflags = 0
     try:
         subprocess.Popen(
             command,
@@ -2904,8 +2893,8 @@ def _post_dispatch_poll(
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            creationflags=creationflags,
             close_fds=True,
+            **hidden_process_popen_kwargs(new_process_group=True, detached=True),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         _record_dispatch_failure(
