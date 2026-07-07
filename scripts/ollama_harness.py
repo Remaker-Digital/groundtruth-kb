@@ -107,6 +107,7 @@ class RoutingConfig:
     default_model: str
     skill_routes: dict[str, str]
     timeout_seconds: float | None = None
+    max_turns: int | None = None
 
 
 @dataclass(frozen=True)
@@ -189,6 +190,22 @@ def _as_optional_positive_float(value: Any, *, field: str) -> float | None:
         raise OllamaHarnessError(f"{field} must be a positive number")
     if parsed <= 0:
         raise OllamaHarnessError(f"{field} must be a positive number")
+    return parsed
+
+
+def _as_optional_positive_int(value: Any, *, field: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise OllamaHarnessError(f"{field} must be a positive integer")
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        parsed = int(value.strip())
+    else:
+        raise OllamaHarnessError(f"{field} must be a positive integer")
+    if parsed <= 0:
+        raise OllamaHarnessError(f"{field} must be a positive integer")
     return parsed
 
 
@@ -311,6 +328,10 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
         timeout_seconds=_as_optional_positive_float(
             routing.get("timeout_seconds"),
             field="routing.ollama.timeout_seconds",
+        ),
+        max_turns=_as_optional_positive_int(
+            routing.get("max_turns"),
+            field="routing.ollama.max_turns",
         ),
     )
     if advertised_model_ids is not None:
@@ -1098,6 +1119,16 @@ def resolve_runtime_timeouts(
     return operation_timeout, session_timeout
 
 
+def resolve_runtime_max_turns(
+    args: argparse.Namespace,
+    config: RoutingConfig,
+    argv: Sequence[str],
+) -> int:
+    if config.max_turns is None or _flag_was_supplied(argv, "--max-turns"):
+        return int(args.max_turns)
+    return config.max_turns
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ensure_utf8_output_streams()
     raw_argv = list(sys.argv[1:] if argv is None else argv)
@@ -1107,6 +1138,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         config = load_routing_config(project_root)
         operation_timeout, session_timeout = resolve_runtime_timeouts(args, config, raw_argv)
+        max_turns = resolve_runtime_max_turns(args, config, raw_argv)
         advertised_model_ids = call_ollama_tags(args.endpoint, operation_timeout)
         validate_advertised_models(config, advertised_model_ids)
         model_route = resolve_model(config, args.model, skill=args.skill)
@@ -1115,7 +1147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.prompt,
             model_route,
             args.endpoint,
-            args.max_turns,
+            max_turns,
             project_root,
             system_prompt=system_prompt,
             timeout=operation_timeout,

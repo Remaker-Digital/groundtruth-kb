@@ -54,6 +54,17 @@ def set_ollama_timeout(root: Path, timeout_seconds: float | str) -> None:
     )
 
 
+def set_ollama_max_turns(root: Path, max_turns: int | float | str) -> None:
+    config_path = root / oh.ROUTING_CONFIG_PATH
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace(
+            '[routing.ollama]\ndefault_model = "fixture-full"',
+            f'[routing.ollama]\ndefault_model = "fixture-full"\nmax_turns = {max_turns}',
+        ),
+        encoding="utf-8",
+    )
+
+
 def route(root: Path) -> oh.ModelRoute:
     return oh.resolve_model(oh.load_routing_config(root), None)
 
@@ -94,6 +105,7 @@ def test_load_routing_config_parses_selected_model(tmp_path: Path):
     assert selected.model_version == FIXTURE_MODEL_VERSION
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
     assert config.timeout_seconds is None
+    assert config.max_turns is None
 
 
 def test_load_routing_config_parses_ollama_timeout_seconds(tmp_path: Path):
@@ -110,6 +122,31 @@ def test_load_routing_config_rejects_non_positive_ollama_timeout(tmp_path: Path)
     set_ollama_timeout(root, 0)
 
     with pytest.raises(oh.OllamaHarnessError, match="routing.ollama.timeout_seconds"):
+        oh.load_routing_config(root)
+
+
+def test_load_routing_config_parses_ollama_max_turns(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 200)
+
+    config = oh.load_routing_config(root)
+
+    assert config.max_turns == 200
+
+
+def test_load_routing_config_rejects_non_positive_ollama_max_turns(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 0)
+
+    with pytest.raises(oh.OllamaHarnessError, match="routing.ollama.max_turns"):
+        oh.load_routing_config(root)
+
+
+def test_load_routing_config_rejects_fractional_ollama_max_turns(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 42.5)
+
+    with pytest.raises(oh.OllamaHarnessError, match="routing.ollama.max_turns"):
         oh.load_routing_config(root)
 
 
@@ -159,6 +196,28 @@ def test_runtime_timeouts_preserve_default_session_when_timeout_override_is_expl
 
     assert operation_timeout == pytest.approx(10.0)
     assert session_timeout == pytest.approx(oh.DEFAULT_SESSION_TIMEOUT_SECONDS)
+
+
+def test_runtime_max_turns_use_routing_config_when_cli_uses_default(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 200)
+    raw_argv = ["-p", "hello"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    max_turns = oh.resolve_runtime_max_turns(args, oh.load_routing_config(root), raw_argv)
+
+    assert max_turns == 200
+
+
+def test_runtime_max_turns_preserve_explicit_cli_override(tmp_path: Path):
+    root = make_root(tmp_path)
+    set_ollama_max_turns(root, 200)
+    raw_argv = ["-p", "hello", "--max-turns", "5"]
+    args = oh.build_arg_parser().parse_args(raw_argv)
+
+    max_turns = oh.resolve_runtime_max_turns(args, oh.load_routing_config(root), raw_argv)
+
+    assert max_turns == 5
 
 
 def test_routing_rejects_noncanonical_tool(tmp_path: Path):

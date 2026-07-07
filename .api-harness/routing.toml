@@ -52,6 +52,7 @@ allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 [routing.ollama]
 default_model = "kimi-k2-7-code-cloud"
 timeout_seconds = 3600
+max_turns = 200
 
 [routing.ollama.skills]
 bridge-review = "kimi-k2-7-code-cloud"
