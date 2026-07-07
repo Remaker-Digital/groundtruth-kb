@@ -201,6 +201,24 @@ def _load_trigger() -> ModuleType:
     return module
 
 
+def _write_codex_no_window_verification(root: Path) -> Path:
+    verification_path = root / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
+    verification_path.parent.mkdir(parents=True, exist_ok=True)
+    verification_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "result": "pass",
+                "visible_window_detected": False,
+                "verified_at": "2999-01-01T00:00:00Z",
+                "probe": "pytest_synthetic_codex_no_window",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return verification_path
+
+
 def test_wi5032_runtime_fallback_randomizes_equal_precedence_ties(monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     shuffled_groups: list[list[str]] = []
@@ -291,6 +309,7 @@ def _make_synthetic_project(root: Path) -> Path:
         ),
         encoding="utf-8",
     )
+    _write_codex_no_window_verification(root)
     return root
 
 
@@ -4351,6 +4370,102 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
     assert startupinfo.wShowWindow == 0
 
 
+def test_codex_windows_dispatch_requires_no_window_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.os, "name", "nt")
+
+    result = trigger._evaluate_harness_dispatch_readiness("codex", tmp_path)
+
+    assert result["ready"] is False
+    assert result["reason"] == "missing_codex_no_window_verification"
+    assert result["verification_path"].endswith(".gtkb-state/bridge-poller/codex-no-window-verification.json")
+
+
+def test_codex_windows_dispatch_accepts_fresh_clean_no_window_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    verification_path = tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
+    verification_path.parent.mkdir(parents=True, exist_ok=True)
+    verification_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "result": "pass",
+                "visible_window_detected": False,
+                "verified_at": "2999-01-01T00:00:00Z",
+                "probe": "dispatcher_codex_no_window_smoke",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = trigger._evaluate_harness_dispatch_readiness("codex", tmp_path)
+
+    assert result["ready"] is True
+    assert result["reason"] == "codex_no_window_verification_current"
+    assert result["verification"]["visible_window_detected"] is False
+
+
+def test_prime_builder_falls_back_from_unverified_windows_codex_to_openrouter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _write_registry(
+        root,
+        [
+            _rec(
+                "A",
+                "codex",
+                ["prime-builder"],
+                "active",
+                _CODEX_INVOCATION_SURFACES,
+                reviewer_precedence=10,
+                dispatch_quality=90,
+                dispatch_cost=10,
+                dispatch_availability=90,
+            ),
+            _rec(
+                "F",
+                "openrouter",
+                ["prime-builder"],
+                "active",
+                {"headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]}},
+                reviewer_precedence=20,
+                dispatch_quality=80,
+                dispatch_cost=20,
+                dispatch_availability=90,
+            ),
+        ],
+    )
+    _write_index(root, _index_with_one_go(root))
+    _write_codex_no_window_verification(root).unlink()
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.os, "name", "nt")
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
+
+    result = summary["results"]["prime-builder"]
+    assert result["reason"] == "dry_run"
+    assert result["selected_candidate"]["harness_id"] == "F"
+    assert result["fallback_skipped_candidates"] == [
+        {
+            "recipient": "prime-builder:A",
+            "needed_role_label": "prime-builder",
+            "harness_id": "A",
+            "command_handle": "codex",
+            "reason": "codex_dispatch_not_ready",
+        }
+    ]
+    state = summary["dispatch_state"]["recipients"]
+    assert state["prime-builder:A"]["last_result"] == "codex_dispatch_not_ready"
+
+
 def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     trigger = _load_trigger()
     target = trigger.DispatchTarget(
@@ -4969,6 +5084,10 @@ def _write_registry(root: Path, records: list[dict]) -> None:
         ),
         encoding="utf-8",
     )
+    if any(
+        str(record.get("harness_type") or record.get("harness_name") or "").lower() == "codex" for record in records
+    ):
+        _write_codex_no_window_verification(root)
 
 
 def _rec(

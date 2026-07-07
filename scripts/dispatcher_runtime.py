@@ -169,6 +169,18 @@ from implementation_authorization import (  # noqa: E402
     write_packet,
 )
 
+CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH: tuple[str, ...] = (
+    ".gtkb-state",
+    "bridge-poller",
+    "codex-no-window-verification.json",
+)
+CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
+DISPATCHER_DISABLE_GUARD_RELATIVE_PATH: tuple[str, ...] = (
+    ".gtkb-state",
+    "watchdog",
+    "dispatcher-disable-guard.json",
+)
+
 # WI-4480 Slice A: per-entry dispatch-starvation telemetry (observational).
 # Guarded so a telemetry-module import failure can never break trigger import
 # or dispatch; the call site is additionally exception-swallowed.
@@ -3976,11 +3988,107 @@ def _evaluate_ollama_dispatch_readiness(project_root: Path) -> dict[str, Any]:
         raise RuntimeError(f"Failed to evaluate dispatch readiness for harness type 'ollama': {exc}") from exc
 
 
+def _parse_utc_timestamp(value: object) -> dt.datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone(dt.UTC) if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
+
+
+def _active_dispatcher_disable_guard(project_root: Path) -> dict[str, Any] | None:
+    guard_path = project_root.joinpath(*DISPATCHER_DISABLE_GUARD_RELATIVE_PATH)
+    try:
+        guard = json.loads(guard_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+    if not isinstance(guard, dict):
+        return None
+    status = str(guard.get("status") or "").strip().lower()
+    active = guard.get("active") is True or status == "active"
+    if not active:
+        return None
+    expires_at = _parse_utc_timestamp(guard.get("expires_at"))
+    if expires_at is not None and expires_at <= dt.datetime.now(dt.UTC):
+        return None
+    return guard
+
+
+def _codex_no_window_verification_path(project_root: Path) -> Path:
+    return project_root.joinpath(*CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH)
+
+
+def _load_codex_no_window_verification(project_root: Path) -> dict[str, Any] | None:
+    path = _codex_no_window_verification_path(project_root)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _valid_codex_no_window_verification(project_root: Path) -> tuple[bool, dict[str, Any] | None, str]:
+    payload = _load_codex_no_window_verification(project_root)
+    if payload is None:
+        return False, None, "missing_codex_no_window_verification"
+    if payload.get("visible_window_detected") is not False:
+        return False, payload, "codex_no_window_probe_detected_visible_window"
+    result = str(payload.get("result") or "").strip().lower()
+    if result not in {"pass", "passed", "clean"}:
+        return False, payload, "codex_no_window_probe_not_passing"
+    now = dt.datetime.now(dt.UTC)
+    expires_at = _parse_utc_timestamp(payload.get("expires_at"))
+    if expires_at is not None:
+        if expires_at <= now:
+            return False, payload, "codex_no_window_verification_expired"
+        return True, payload, "codex_no_window_verification_current"
+    verified_at = _parse_utc_timestamp(payload.get("verified_at"))
+    if verified_at is None:
+        return False, payload, "codex_no_window_verification_missing_timestamp"
+    age_seconds = (now - verified_at).total_seconds()
+    if age_seconds > CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS:
+        return False, payload, "codex_no_window_verification_stale"
+    return True, payload, "codex_no_window_verification_current"
+
+
+def _evaluate_codex_dispatch_readiness(project_root: Path) -> dict[str, Any]:
+    """Fail closed on Windows Codex auto-dispatch until no-window evidence exists."""
+    if os.name != "nt":
+        return {"ready": True}
+
+    valid, verification, reason = _valid_codex_no_window_verification(project_root)
+    if valid:
+        return {
+            "ready": True,
+            "reason": reason,
+            "verification_path": _codex_no_window_verification_path(project_root).as_posix(),
+            "verification": verification,
+        }
+
+    result: dict[str, Any] = {
+        "ready": False,
+        "reason": reason,
+        "verification_path": _codex_no_window_verification_path(project_root).as_posix(),
+    }
+    if verification is not None:
+        result["verification"] = verification
+    guard = _active_dispatcher_disable_guard(project_root)
+    if guard is not None:
+        result["dispatcher_disable_guard"] = guard
+    return result
+
+
 def _evaluate_harness_dispatch_readiness(harness_type: str, project_root: Path) -> dict[str, Any]:
     """Evaluate harness-specific dispatch substrate if a helper exists, fail-closed on errors, default to ready."""
     harness_type = str(harness_type or "").strip().lower()
     if not harness_type:
         return {"ready": True}
+
+    if harness_type == "codex":
+        return _evaluate_codex_dispatch_readiness(project_root)
 
     if harness_type == "ollama":
         return _evaluate_ollama_dispatch_readiness(project_root)

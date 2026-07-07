@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-07T19:20:24Z",
+  "generated_at": "2026-07-07T20:08:48Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -120,7 +120,7 @@
     {
       "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
@@ -138,7 +138,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": true,
+          "can_receive_dispatch": false,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_quality": 90,
@@ -174,12 +174,12 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 35
+      "version": 36
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -199,7 +199,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": true,
+          "can_receive_dispatch": false,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 2,
@@ -229,7 +229,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 30
+      "version": 31
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -297,7 +297,7 @@
       "dispatch_quality": 90.0,
       "dispatch_tags": [
         "low-cost",
-        "prime-builder"
+        "loyal-opposition"
       ],
       "event_driven_hooks": false,
       "full_transcript_archive_required": false,
@@ -313,7 +313,7 @@
           "dispatch_quality": 90,
           "dispatch_tags": [
             "low-cost",
-            "prime-builder"
+            "loyal-opposition"
           ],
           "event_driven_hooks": false
         },
@@ -324,9 +324,9 @@
             "-p",
             "{{PROMPT}}",
             "--skill",
-            "implementation",
+            "bridge-review",
             "--max-turns",
-            "80",
+            "200",
             "--session-timeout",
             "5400"
           ]
@@ -334,10 +334,10 @@
       },
       "reviewer_precedence": 20,
       "role": [
-        "prime-builder"
+        "loyal-opposition"
       ],
       "status": "active",
-      "version": 32
+      "version": 35
     }
   ],
   "schema_version": 1,

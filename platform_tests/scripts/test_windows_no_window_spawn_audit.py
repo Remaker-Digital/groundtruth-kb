@@ -115,6 +115,27 @@ def test_no_window_kwargs_helper_call_is_compliant(tmp_path: Path) -> None:
     assert findings[0].no_window is True
 
 
+def test_no_window_helper_assignment_is_compliant_for_dispatcher_runtime(tmp_path: Path) -> None:
+    audit = _load_audit()
+    path = _write(
+        tmp_path,
+        "scripts/dispatcher_runtime.py",
+        (
+            "import subprocess\n"
+            "def _run_with_status_wrapper_popen_kwargs():\n"
+            "    return {'creationflags': subprocess.CREATE_NO_WINDOW}\n"
+            "def launch():\n"
+            "    wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()\n"
+            "    subprocess.Popen(['pythonw.exe', 'scripts/run_with_status.py'], **wrapper_popen_kwargs)\n"
+        ),
+    )
+
+    findings = audit.scan_file(path, root=tmp_path)
+
+    assert findings[0].state == "compliant_no_window"
+    assert findings[0].no_window is True
+
+
 def test_test_paths_are_classified_non_release(tmp_path: Path) -> None:
     audit = _load_audit()
     path = _write(

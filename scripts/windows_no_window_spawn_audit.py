@@ -22,8 +22,10 @@ from pathlib import Path
 
 NO_WINDOW_KEYWORDS = {"creationflags", "startupinfo"}
 NO_WINDOW_KWARGS_HELPERS = {
+    "_run_with_status_wrapper_popen_kwargs",
     "_no_window_run_kwargs",
     "_no_window_subprocess_kwargs",
+    "hidden_process_popen_kwargs",
     "no_window_subprocess_kwargs",
 }
 LAUNCH_CALLS = {
@@ -60,6 +62,7 @@ RELEASE_RUNTIME_FILES = {
     "scripts/codex_mcp_worker_guard.py",
     "scripts/cross_harness_bridge_trigger.py",
     "scripts/cursor_harness.py",
+    "scripts/dispatcher_runtime.py",
     "scripts/ensure_dispatcher_daemon.py",
     "scripts/gtkb_dispatcher_daemon.py",
     "scripts/ollama_harness.py",
@@ -175,7 +178,7 @@ class _NoWindowAssignmentCollector(ast.NodeVisitor):
         self.names: set[str] = set()
 
     def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
-        if _dict_has_no_window_key(node.value):
+        if _dict_has_no_window_key(node.value) or _is_no_window_kwargs_helper_call(node.value):
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     self.names.add(target.id)
@@ -184,7 +187,11 @@ class _NoWindowAssignmentCollector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:  # noqa: N802
-        if isinstance(node.target, ast.Name) and node.value is not None and _dict_has_no_window_key(node.value):
+        if (
+            isinstance(node.target, ast.Name)
+            and node.value is not None
+            and (_dict_has_no_window_key(node.value) or _is_no_window_kwargs_helper_call(node.value))
+        ):
             self.names.add(node.target.id)
         self._visit_target(node.target)
         self.generic_visit(node)
