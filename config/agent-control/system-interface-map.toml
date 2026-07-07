@@ -279,7 +279,7 @@ authoritative_source = "Codex app thread automation config (external; lives in C
 generated_or_authoritative = "external_runtime"
 read_method = "Inspect via Codex app UI; runtime trace at .codex/gtkb-hooks/last-wrapup-trigger-input.json shows the injected <heartbeat> UserPromptSubmit prompt."
 mutation_method = "Owner-managed via Codex app UI. Not modifiable from within E:/GT-KB."
-role_permissions = "Historical/deprecated Codex-side automation. It must not be used as a live GT-KB bridge reader and must not read or recreate retired aggregate queue artifacts."
+role_permissions = "Historical/deprecated Codex-side automation. It must not be used as a live GT-KB bridge reader and must not read or recreate retired aggregate queue artifacts. When its Codex UserPromptSubmit hook handles topic or wrap commands, it must use the shared interactive session-role resolver to latch hook-created envelopes; durable registry role reads remain dispatcher-owned or identity/provenance-only."
 startup_visibility = "none"
 dashboard_visibility = "none"
 harness_caveats = "Historical/deprecated supplemental Codex-side bridge monitoring; NOT a component of the dispatcher daemon (id = 'bridge-dispatch'). It is retained here only as inventory/disposition history and must not be treated as active GT-KB bridge infrastructure."
