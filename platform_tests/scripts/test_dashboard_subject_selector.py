@@ -135,12 +135,10 @@ def test_model_object_carries_current_work_subject(tmp_path: Path) -> None:
 # --------------------- 4: end-to-end writer integration -------------------
 
 
-# The end-to-end writer runs the real startup preflight, whose
-# ``_check_bridge_inflight`` scans every file in ``bridge/`` (8,000+); on slower
-# machines that exceeds the global 30s pytest-timeout (WI-3433 LO NO-GO -004 F2).
-# Bound it generously here until the follow-on O(n)-scan optimization (WI-4808)
-# lands; this test asserts the writer field contract, not bridge-scan latency.
-@pytest.mark.timeout(120)
+# The end-to-end writer runs the real startup preflight. WI-4808 keeps the
+# bridge in-flight scan bounded to latest version files, so this field-contract
+# test should fit comfortably inside the normal local-test timeout envelope.
+@pytest.mark.timeout(30)
 def test_dashboard_data_json_carries_work_subject(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``write_dashboard_and_report()`` writes the field at all three locations."""
     monkeypatch.setattr(
