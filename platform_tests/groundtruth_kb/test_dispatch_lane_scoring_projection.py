@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +21,8 @@ from groundtruth_kb.dispatcher.lane_scoring import (  # noqa: E402
     lanes_from_harness_projection,
     projection_is_compact,
 )
+
+from scripts.benchmarks import fixture_corpus, harness_quality_runner, harness_quality_scoring  # noqa: E402
 
 
 def _projection() -> dict[str, object]:
@@ -57,6 +60,34 @@ def _projection() -> dict[str, object]:
     }
 
 
+def _quality_snapshot(*, generated_at: str, ttl_seconds: int = 86_400) -> tuple[dict[str, object], dict[str, object]]:
+    fixture = fixture_corpus.require_valid_fixture_corpus()[0]
+    target = harness_quality_runner.BenchmarkHarnessTarget(
+        harness_id="A",
+        provider="codex",
+        model="gpt-5-codex",
+        author_model_configuration="codex desktop synthetic benchmark",
+    )
+    record = dict(
+        harness_quality_runner.build_dry_run_evidence_records(
+            run_id="run-quality-input",
+            harness_targets=(target,),
+            benchmark_mode="prime_builder",
+            started_at=generated_at,
+            ended_at=generated_at,
+            fixtures=(fixture,),
+        )[0]
+    )
+    record["failure_class"] = fixture.failure_classes[0]
+    snapshot = harness_quality_scoring.build_dispatch_quality_snapshot(
+        (record,),
+        fixtures=(fixture,),
+        generated_at=generated_at,
+        ttl_seconds=ttl_seconds,
+    )
+    return snapshot, record
+
+
 def test_schema_creates_lane_scoring_tables_and_current_views(tmp_path: Path) -> None:
     db = KnowledgeDB(tmp_path / "groundtruth.db")
     try:
@@ -92,6 +123,45 @@ def test_seed_lane_matrix_from_non_retired_harness_roles_and_activities() -> Non
     assert {"prime-builder", "loyal-opposition"} == {lane.role for lane in lanes}
     assert all(lane.dispatch_enabled is False for lane in lanes)
     assert any(lane.shadow_enabled for lane in lanes if lane.harness_id == "A")
+
+
+def test_benchmark_quality_snapshot_overrides_lane_quality_without_raw_evidence() -> None:
+    snapshot, record = _quality_snapshot(generated_at="2026-07-07T00:00:00Z")
+
+    lane = next(
+        lane
+        for lane in lanes_from_harness_projection(_projection(), quality_snapshot=snapshot)
+        if lane.harness_id == "A" and lane.role == "prime-builder" and lane.activity_type == "build"
+    )
+    projection = build_compact_projection([lane], as_of="2026-07-02T00:00:01+00:00")
+
+    compact_lane = projection["effective_ranked_lanes"]["prime-builder"]["build"][0]
+    assert compact_lane["utility_components"]["quality"] == 100.0
+    assert compact_lane["evidence_ref_count"] == 1
+    assert projection_is_compact(projection)
+    rendered = json.dumps(projection, sort_keys=True)
+    assert str(record["fixture_id"]) not in rendered
+    assert "artifact_links" not in rendered
+
+
+def test_stale_benchmark_quality_snapshot_blocks_production_lane() -> None:
+    snapshot, _record = _quality_snapshot(generated_at="2020-01-01T00:00:00Z", ttl_seconds=1)
+    lane = next(
+        lane
+        for lane in lanes_from_harness_projection(_projection(), quality_snapshot=snapshot)
+        if lane.harness_id == "A" and lane.role == "prime-builder" and lane.activity_type == "build"
+    )
+    lane = replace(lane, lifecycle="approved", dispatch_enabled=True)
+
+    projection = build_compact_projection(
+        [lane],
+        production=True,
+        as_of="2026-07-02T00:00:00+00:00",
+        required_evidence=("benchmark",),
+    )
+
+    assert projection["effective_ranked_lanes"] == {}
+    assert "stale_benchmark_quality" in projection["blocked_lanes"][0]["reasons"]
 
 
 def test_compact_projection_keeps_lifecycle_first_metadata_without_raw_evidence() -> None:

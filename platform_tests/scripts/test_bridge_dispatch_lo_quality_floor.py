@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -78,6 +79,33 @@ rules = []
     )
 
 
+def _quality_snapshot(
+    harness_id: str,
+    *,
+    role: str = "loyal-opposition",
+    quality: float = 88.0,
+    status: str = "fresh",
+    expires_at: str = "2099-01-01T00:00:00Z",
+) -> dict:
+    return {
+        "schema_version": 1,
+        "snapshot_type": "dispatch_quality_inputs",
+        "generated_at": "2026-07-07T00:00:00Z",
+        "quality_inputs": [
+            {
+                "harness_id": harness_id,
+                "role": role,
+                "activity_type": "*",
+                "dispatch_quality": quality,
+                "status": status,
+                "captured_at": "2026-07-07T00:00:00Z",
+                "expires_at": expires_at,
+                "evidence_ref": f"benchmark-quality:{harness_id}:{role}:test",
+            }
+        ],
+    }
+
+
 def test_lo_quality_floor_excludes_explicit_subfloor_candidates_before_cost_ranking() -> None:
     records = [
         _record("F", cost=20.0, quality=72.0),
@@ -108,6 +136,48 @@ def test_lo_quality_floor_ignores_deprecated_config_dispatch_quality() -> None:
         records,
         config,
         DispatchContext(required_role="loyal-opposition"),
+    )
+
+    assert selected == []
+
+
+def test_lo_quality_floor_uses_governed_benchmark_quality_snapshot() -> None:
+    records = [_record("F", cost=20.0, quality=72.0)]
+
+    selected = select_dispatch_candidates(
+        records,
+        _dispatch_config(),
+        DispatchContext(required_role="loyal-opposition"),
+        quality_snapshot=_quality_snapshot("F", quality=88.0),
+    )
+
+    assert [row["id"] for row in selected] == ["F"]
+    assert selected[0]["dispatch_quality"] == 88.0
+    assert selected[0]["dispatch_quality_evidence_status"] == "fresh"
+
+
+def test_lo_quality_floor_fails_closed_when_benchmark_quality_snapshot_is_missing() -> None:
+    records = [_record("A", cost=20.0, quality=95.0)]
+
+    selected = select_dispatch_candidates(
+        records,
+        _dispatch_config(),
+        DispatchContext(required_role="loyal-opposition"),
+        quality_snapshot={"schema_version": 1, "quality_inputs": []},
+    )
+
+    assert selected == []
+
+
+def test_lo_quality_floor_fails_closed_when_benchmark_quality_snapshot_is_stale() -> None:
+    records = [_record("A", cost=20.0, quality=95.0)]
+
+    selected = select_dispatch_candidates(
+        records,
+        _dispatch_config(),
+        DispatchContext(required_role="loyal-opposition"),
+        quality_snapshot=_quality_snapshot("A", quality=95.0, expires_at="2020-01-01T00:00:00Z"),
+        now=dt.datetime(2026, 7, 7, tzinfo=dt.UTC),
     )
 
     assert selected == []

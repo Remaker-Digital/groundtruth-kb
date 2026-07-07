@@ -20,6 +20,7 @@ from groundtruth_kb.bridge_dispatch_rules import DispatchContext, DispatchRule
 
 DISPATCH_CONFIG_RELATIVE_PATH = Path("config") / "dispatcher" / "rules.toml"
 DISPATCH_STATE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "dispatch-state.json"
+DISPATCH_QUALITY_INPUT_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "dispatch-quality-inputs.json"
 DISPATCH_RUNS_RELATIVE_PATH = DISPATCH_STATE_RELATIVE_PATH.parent / "dispatch-runs"
 OPERATOR_QUIESCE_RELATIVE_PATH = DISPATCH_STATE_RELATIVE_PATH.parent / "operator-quiesce.json"
 
@@ -616,12 +617,57 @@ def apply_dispatch_config_to_record(
     return updated
 
 
+def apply_dispatch_quality_input_to_record(
+    record: dict[str, Any],
+    quality_snapshot: dict[str, Any] | None,
+    context: DispatchContext,
+    *,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Overlay governed benchmark-derived quality input onto a candidate record.
+
+    When a WI-4791 quality snapshot is supplied, it is authoritative for
+    ``dispatch_quality``. Missing, stale, or malformed inputs fail closed by
+    removing the quality value; the existing LO quality floor then rejects the
+    candidate when quality participates in ranking.
+    """
+
+    if quality_snapshot is None:
+        return record
+    updated = dict(record)
+    row = _quality_input_for_record(updated, quality_snapshot, context)
+    if row is None:
+        updated["dispatch_quality"] = None
+        updated["dispatch_quality_evidence_status"] = "missing"
+        updated["dispatch_quality_block_reason"] = "missing_benchmark_quality"
+        return updated
+    quality = _optional_float(row.get("dispatch_quality"))
+    if quality is None:
+        updated["dispatch_quality"] = None
+        updated["dispatch_quality_evidence_status"] = "malformed"
+        updated["dispatch_quality_block_reason"] = "malformed_benchmark_quality"
+        return updated
+    status = str(row.get("status") or "stale").strip().lower()
+    if status not in {"fresh", "ok", "verified"} or _quality_input_expired(row, now=now):
+        updated["dispatch_quality"] = None
+        updated["dispatch_quality_evidence_status"] = status or "stale"
+        updated["dispatch_quality_block_reason"] = "stale_benchmark_quality"
+        return updated
+    updated["dispatch_quality"] = max(0.0, min(100.0, quality))
+    updated["dispatch_quality_evidence_status"] = status
+    if row.get("evidence_ref"):
+        updated["dispatch_quality_evidence_ref"] = row.get("evidence_ref")
+    return updated
+
+
 def select_dispatch_candidates(
     records: list[dict[str, Any]],
     config: BridgeDispatchConfig,
     context: DispatchContext,
     *,
     rng: Any | None = None,
+    quality_snapshot: dict[str, Any] | None = None,
+    now: dt.datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Return active, dispatchable records admitted by ``context``, ranked."""
     candidates: list[dict[str, Any]] = []
@@ -630,6 +676,7 @@ def select_dispatch_candidates(
         if not isinstance(raw, dict):
             continue
         record = apply_dispatch_config_to_record(dict(raw), config)
+        record = apply_dispatch_quality_input_to_record(record, quality_snapshot, context, now=now)
         if _record_status(record) != "active":
             continue
         roles = _record_roles(record)
@@ -651,6 +698,7 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     """Collect the current dispatch config and harness eligibility state."""
     root = project_root.resolve()
     config = load_bridge_dispatch_config(root)
+    quality_snapshot, quality_findings = _load_dispatch_quality_snapshot(root)
     projection = _load_projection(root)
     raw_records = [record for record in projection.get("harnesses", []) if isinstance(record, dict)]
     records = tuple(apply_dispatch_config_to_record(dict(record), config) for record in raw_records)
@@ -662,6 +710,7 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
     if config.errors:
         findings.extend(f"config error: {error}" for error in config.errors)
     findings.extend(f"dispatch budget config warning: {error}" for error in config.budget.errors)
+    findings.extend(quality_findings)
     findings.extend(consistency_findings)
     if quiesce.get("active"):
         findings.append(
@@ -673,7 +722,7 @@ def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
         findings.append(f"dispatch operator quiesce state invalid: {quiesce.get('warning')}")
     for role in DISPATCH_ROLES:
         context = DispatchContext(required_role=role)
-        selected = select_dispatch_candidates(list(records), config, context)
+        selected = select_dispatch_candidates(list(records), config, context, quality_snapshot=quality_snapshot)
         selected_by_role[role] = [_candidate_summary(record) for record in selected]
         role_holders = [
             record for record in records if _record_status(record) == "active" and role in _record_roles(record)
@@ -1781,6 +1830,55 @@ def _dispatch_config_consistency_findings(
     return findings
 
 
+def _load_dispatch_quality_snapshot(project_root: Path) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
+    path = project_root / DISPATCH_QUALITY_INPUT_RELATIVE_PATH
+    if not path.is_file():
+        return None, ()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, (f"dispatch quality input warning: cannot read {path}: {exc}",)
+    if not isinstance(payload, dict):
+        return None, (f"dispatch quality input warning: {path} is not a JSON object",)
+    if not isinstance(payload.get("quality_inputs"), list):
+        return payload, (f"dispatch quality input warning: {path} has no quality_inputs list",)
+    return payload, ()
+
+
+def _quality_input_for_record(
+    record: dict[str, Any],
+    quality_snapshot: dict[str, Any],
+    context: DispatchContext,
+) -> dict[str, Any] | None:
+    rows = quality_snapshot.get("quality_inputs")
+    if not isinstance(rows, list):
+        return None
+    harness_id = str(record.get("id") or "").strip()
+    role = context.required_role.strip().lower()
+    activity = str(getattr(context, "activity", "") or "*").strip().lower() or "*"
+    wildcard: dict[str, Any] | None = None
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("harness_id") or "").strip() != harness_id:
+            continue
+        if str(row.get("role") or "").strip().lower() != role:
+            continue
+        row_activity = str(row.get("activity_type") or "*").strip().lower() or "*"
+        if row_activity == activity:
+            return row
+        if row_activity == "*":
+            wildcard = row
+    return wildcard
+
+
+def _quality_input_expired(row: dict[str, Any], *, now: dt.datetime | None) -> bool:
+    expires_at = _parse_iso_datetime(row.get("expires_at"))
+    if expires_at is None:
+        return False
+    return expires_at <= _coerce_utc(now or _now_utc())
+
+
 def _candidate_summary(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": record.get("id"),
@@ -1796,6 +1894,8 @@ def _candidate_summary(record: dict[str, Any]) -> dict[str, Any]:
         "dispatch_quality": record.get("dispatch_quality"),
         "dispatch_availability": record.get("dispatch_availability"),
         "dispatch_max_items": record.get("dispatch_max_items"),
+        "dispatch_quality_evidence_status": record.get("dispatch_quality_evidence_status"),
+        "dispatch_quality_evidence_ref": record.get("dispatch_quality_evidence_ref"),
     }
 
 

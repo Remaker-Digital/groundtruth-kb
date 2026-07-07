@@ -57,6 +57,7 @@ def lanes_from_harness_projection(
     projection: Mapping[str, Any],
     *,
     activity_types: Sequence[str] = DEFAULT_ACTIVITY_TYPES,
+    quality_snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[DispatchLane, ...]:
     """Seed advisory role/activity lanes from a harness registry projection.
 
@@ -66,6 +67,7 @@ def lanes_from_harness_projection(
     """
 
     lanes: list[DispatchLane] = []
+    quality_index = _quality_snapshot_index(quality_snapshot)
     for harness in _projection_harnesses(projection):
         status = _normalize_token(harness.get("status") or "registered")
         if status in RETIRED_HARNESS_STATUSES:
@@ -82,6 +84,18 @@ def lanes_from_harness_projection(
         for role in roles:
             for activity_type in activity_types:
                 activity = _normalize_token(activity_type)
+                quality, benchmark_evidence, quality_blockages = _quality_for_lane(
+                    harness,
+                    role=role,
+                    activity_type=activity,
+                    quality_index=quality_index,
+                )
+                blockage_reasons = tuple(quality_blockages)
+                if not shadow_enabled:
+                    blockage_reasons = blockage_reasons + ("harness_not_dispatch_ready",)
+                evidence_refs: dict[str, EvidenceRef] = {}
+                if benchmark_evidence is not None:
+                    evidence_refs["benchmark"] = benchmark_evidence
                 lane_id = lane_identity(
                     harness_id=harness_id,
                     provider=provider,
@@ -101,13 +115,14 @@ def lanes_from_harness_projection(
                         dispatch_enabled=False,
                         shadow_enabled=shadow_enabled,
                         route_selectable=False,
-                        blockage_reasons=() if shadow_enabled else ("harness_not_dispatch_ready",),
+                        blockage_reasons=tuple(dict.fromkeys(blockage_reasons)),
                         score_components={
-                            "quality": _float_or_zero(harness.get("dispatch_quality")),
+                            "quality": quality,
                             "availability": _float_or_zero(harness.get("dispatch_availability")),
                             "cost": _float_or_zero(harness.get("dispatch_cost")),
                         },
                         caps=_lane_caps(harness),
+                        evidence_refs=evidence_refs,
                     )
                 )
     return tuple(lanes)
@@ -287,6 +302,60 @@ def _lane_caps(harness: Mapping[str, Any]) -> dict[str, Any]:
     return caps
 
 
+def _quality_snapshot_index(
+    quality_snapshot: Mapping[str, Any] | None,
+) -> dict[tuple[str, str, str], Mapping[str, Any]] | None:
+    if quality_snapshot is None:
+        return None
+    rows = quality_snapshot.get("quality_inputs")
+    if not isinstance(rows, list):
+        return {}
+    index: dict[tuple[str, str, str], Mapping[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        harness_id = str(row.get("harness_id") or "").strip()
+        role = _normalize_token(row.get("role"))
+        activity_type = _normalize_token(row.get("activity_type") or "*")
+        if harness_id and role:
+            index[(harness_id, role, activity_type or "*")] = row
+    return index
+
+
+def _quality_for_lane(
+    harness: Mapping[str, Any],
+    *,
+    role: str,
+    activity_type: str,
+    quality_index: dict[tuple[str, str, str], Mapping[str, Any]] | None,
+) -> tuple[float, EvidenceRef | None, tuple[str, ...]]:
+    if quality_index is None:
+        return _float_or_zero(harness.get("dispatch_quality")), None, ()
+
+    harness_id = str(harness.get("id") or "").strip()
+    row = quality_index.get((harness_id, role, activity_type)) or quality_index.get((harness_id, role, "*"))
+    if row is None:
+        return 0.0, None, ("missing_benchmark_quality",)
+
+    quality = _float_or_none(row.get("dispatch_quality"))
+    if quality is None:
+        return 0.0, None, ("malformed_benchmark_quality",)
+
+    status = _normalize_token(row.get("status") or "stale")
+    evidence = EvidenceRef(
+        "benchmark",
+        status,
+        ref=str(row.get("evidence_ref") or "") or None,
+        captured_at=str(row.get("captured_at") or "") or None,
+        expires_at=str(row.get("expires_at") or "") or None,
+    )
+    if status not in FRESH_EVIDENCE_STATUSES:
+        return 0.0, evidence, ("stale_benchmark_quality",)
+    if evidence.expires_at and _is_expired(evidence.expires_at, as_of=None):
+        return 0.0, evidence, ("stale_benchmark_quality",)
+    return max(0.0, min(100.0, quality)), evidence, ()
+
+
 def _compact_lane(lane: DispatchLane) -> dict[str, Any]:
     utility_components = {key: float(value) for key, value in lane.score_components.items()}
     utility = _utility_score(utility_components)
@@ -341,6 +410,13 @@ def _float_or_zero(value: object) -> float:
         return float(value) if value is not None else 0.0
     except (TypeError, ValueError):
         return 0.0
+
+
+def _float_or_none(value: object) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _is_expired(expires_at: str, *, as_of: str | None) -> bool:
