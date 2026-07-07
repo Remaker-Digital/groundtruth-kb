@@ -643,6 +643,47 @@ def test_repository_registry_has_no_unclassified_missing_rows() -> None:
     assert report.overall_status != "FAIL"
 
 
+def test_advisory_skill_parity_rows_are_enforced_when_surfaces_exist() -> None:
+    module = _load_module()
+    skill_names = ("advisory-proposal", "advisory-intake")
+    registry, _ = module.load_registry(REPO_ROOT)
+    capabilities = {
+        str(item.get("canonical_name")): item
+        for item in registry.get("capabilities", [])
+        if isinstance(item, dict) and item.get("kind") == "skill"
+    }
+    implemented = [
+        name
+        for name in skill_names
+        if (REPO_ROOT / ".claude" / "skills" / name / "SKILL.md").is_file()
+        or (REPO_ROOT / ".codex" / "skills" / name / "SKILL.md").is_file()
+    ]
+
+    if not implemented and not any(name in capabilities for name in skill_names):
+        for slug, test_id in (
+            ("gtkb-wi5055-advisory-proposal-skill", "TEST-11293"),
+            ("gtkb-wi5056-prime-advisory-intake-skill", "TEST-11294"),
+        ):
+            proposal = (REPO_ROOT / "bridge" / f"{slug}-001.md").read_text(encoding="utf-8")
+            verdict = (REPO_ROOT / "bridge" / f"{slug}-002.md").read_text(encoding="utf-8")
+            assert verdict.lstrip().startswith("GO")
+            assert f"Linked manual test: {test_id}" in proposal
+        return
+
+    missing_registry = [name for name in implemented if name not in capabilities]
+    assert not missing_registry, f"implemented advisory skills missing registry rows: {missing_registry}"
+
+    report = module.check_harness_parity(REPO_ROOT, harness="codex", include_all=True)
+    results = {
+        result.capability_name: result
+        for result in report.results
+        if result.capability_name in set(implemented) and result.harness == "codex"
+    }
+    assert set(results) == set(implemented)
+    non_pass = {name: result for name, result in results.items() if result.state != "PASS"}
+    assert not non_pass, f"advisory skill Codex parity must pass: {non_pass}"
+
+
 # WI-4317 / WI-4318 capability-floor mode tests (Child 1 foundation per
 # bridge/gtkb-ollama-integration-phase-1-foundation-010.md GO).
 

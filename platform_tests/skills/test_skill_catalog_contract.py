@@ -39,12 +39,34 @@ import check_harness_parity as chp  # noqa: E402  (path injected above)
 
 _SCENARIOS = _REPO_ROOT / "config" / "agent-control" / "skill-scenarios.toml"
 
+_ADVISORY_SKILL_BRIDGES = {
+    "advisory-proposal": (
+        "gtkb-wi5055-advisory-proposal-skill",
+        "TEST-11293",
+        ".claude/skills/advisory-proposal/SKILL.md",
+    ),
+    "advisory-intake": (
+        "gtkb-wi5056-prime-advisory-intake-skill",
+        "TEST-11294",
+        ".claude/skills/advisory-intake/SKILL.md",
+    ),
+}
+
 
 def _skill_capabilities() -> list[dict]:
     """Return the ``kind == 'skill'`` capability records from the registry."""
     registry, _ = chp.load_registry(_REPO_ROOT)
     capabilities = registry.get("capabilities") or []
     return [c for c in capabilities if c.get("kind") == "skill"]
+
+
+def _assert_advisory_skill_pending_go(skill_name: str) -> None:
+    slug, test_id, target_path = _ADVISORY_SKILL_BRIDGES[skill_name]
+    proposal = (_REPO_ROOT / "bridge" / f"{slug}-001.md").read_text(encoding="utf-8")
+    verdict = (_REPO_ROOT / "bridge" / f"{slug}-002.md").read_text(encoding="utf-8")
+    assert verdict.lstrip().startswith("GO")
+    assert f"Linked manual test: {test_id}" in proposal
+    assert target_path in proposal
 
 
 def test_every_skill_has_valid_frontmatter() -> None:
@@ -77,7 +99,7 @@ def test_skill_dirs_match_registry_no_orphans() -> None:
 
     # Direction 1: no unregistered project skills (orphans / extras).
     extras = chp._extra_project_skills(_REPO_ROOT, capabilities)
-    assert not extras, f"project skills present on disk but absent from the registry: {[e.skill_name for e in extras]}"
+    assert not extras, f"project skills present on disk but absent from the registry: {[e.name for e in extras]}"
 
     # Direction 2: every registered skill name (dir name or canonical_name)
     # has a backing project skill inventory entry.
@@ -130,3 +152,29 @@ def test_scenario_skill_names_resolve() -> None:
         "skill-scenarios.toml references skill names that do not resolve to a "
         f"registered skill (dead advisory suggestions): {unresolved}"
     )
+
+
+def test_advisory_intake_skills_are_cataloged_after_implementation() -> None:
+    """WI-5059: advisory skills cannot appear without registry and adapter coverage.
+
+    The sibling WI-5055/WI-5056 surfaces may still be only latest-GO when this
+    meta-test lands. Once either skill exists, this test hard-checks that the
+    production skill catalog and Codex adapter parity surface cover it.
+    """
+    implemented = [
+        skill_name
+        for skill_name in _ADVISORY_SKILL_BRIDGES
+        if (_REPO_ROOT / ".claude" / "skills" / skill_name / "SKILL.md").is_file()
+    ]
+    if not implemented:
+        for skill_name in _ADVISORY_SKILL_BRIDGES:
+            _assert_advisory_skill_pending_go(skill_name)
+        return
+
+    capabilities = {str(c.get("canonical_name")): c for c in _skill_capabilities()}
+    for skill_name in implemented:
+        capability = capabilities.get(skill_name)
+        assert capability is not None, f"{skill_name} skill must be registered"
+        assert capability.get("canonical_source") == f".claude/skills/{skill_name}/SKILL.md"
+        codex_result = chp._status_for_surface(_REPO_ROOT, capability, "codex")
+        assert codex_result.state == "PASS", codex_result
