@@ -117,6 +117,84 @@ def test_plan_groups_dirty_paths_and_blocks_forbidden_actions(tmp_path: Path) ->
     assert plan["counts"]["actuator_actions"]["safe_commit"] == 1
 
 
+def test_cursor_runtime_projection_detection_keeps_durable_hooks_visible(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    cursor_hooks = repo / ".cursor" / "gtkb-hooks"
+    cursor_hooks.mkdir(parents=True)
+    (cursor_hooks / "last-session-start.json").write_text("{}\n", encoding="utf-8")
+    (cursor_hooks / "last-user-visible-startup-pb.md").write_text("cache\n", encoding="utf-8")
+    (cursor_hooks / "last-user-visible-startup-pb.meta.json").write_text("{}\n", encoding="utf-8")
+    (cursor_hooks / "session_start_dispatch.py").write_text("# durable dispatcher\n", encoding="utf-8")
+    (cursor_hooks / "cursor-hook-env.cmd").write_text("@echo off\n", encoding="utf-8")
+
+    plan = triage.build_plan(repo)
+    by_path = _items_by_path(plan)
+
+    assert by_path[".cursor/gtkb-hooks/last-session-start.json"]["bucket"] == "harness_runtime_projection"
+    assert by_path[".cursor/gtkb-hooks/last-user-visible-startup-pb.md"]["actuator_action"] == "auto_ignore"
+    assert by_path[".cursor/gtkb-hooks/last-user-visible-startup-pb.meta.json"]["actuator_action"] == "auto_ignore"
+    assert by_path[".cursor/gtkb-hooks/session_start_dispatch.py"]["bucket"] == "manual_owner_review"
+    assert by_path[".cursor/gtkb-hooks/cursor-hook-env.cmd"]["bucket"] == "manual_owner_review"
+    assert plan["counts"]["actuator_actions"]["auto_ignore"] == 3
+    assert plan["counts"]["actuator_actions"]["manual_owner_review"] == 2
+
+
+def test_cursor_runtime_projection_gitignore_patterns_are_exact(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    (repo / ".gitignore").write_text(
+        "\n".join(
+            (
+                ".cursor/gtkb-hooks/last-session-start*",
+                ".cursor/gtkb-hooks/last-user-visible-startup*",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-q", "-m", "ignore cursor runtime caches")
+
+    cursor_hooks = repo / ".cursor" / "gtkb-hooks"
+    cursor_hooks.mkdir(parents=True)
+    for name in (
+        "last-session-start.json",
+        "last-session-start.err",
+        "last-user-visible-startup-pb.md",
+        "last-user-visible-startup-pb.meta.json",
+        "session_start_dispatch.py",
+        "cursor-hook-env.cmd",
+    ):
+        (cursor_hooks / name).write_text("content\n", encoding="utf-8")
+
+    ignored = _git(
+        repo,
+        "check-ignore",
+        ".cursor/gtkb-hooks/last-session-start.json",
+        ".cursor/gtkb-hooks/last-session-start.err",
+        ".cursor/gtkb-hooks/last-user-visible-startup-pb.md",
+        ".cursor/gtkb-hooks/last-user-visible-startup-pb.meta.json",
+    )
+    visible = _git(
+        repo,
+        "check-ignore",
+        ".cursor/gtkb-hooks/session_start_dispatch.py",
+        ".cursor/gtkb-hooks/cursor-hook-env.cmd",
+    )
+    plan = triage.build_plan(repo)
+    by_path = _items_by_path(plan)
+
+    assert ignored.returncode == 0
+    assert visible.returncode == 1
+    assert ".cursor/gtkb-hooks/last-session-start.json" not in by_path
+    assert ".cursor/gtkb-hooks/last-user-visible-startup-pb.md" not in by_path
+    assert by_path[".cursor/gtkb-hooks/session_start_dispatch.py"]["bucket"] == "manual_owner_review"
+    assert by_path[".cursor/gtkb-hooks/cursor-hook-env.cmd"]["bucket"] == "manual_owner_review"
+
+
 def test_plan_is_json_serializable_and_stably_sorted(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()

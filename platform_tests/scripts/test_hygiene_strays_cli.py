@@ -187,8 +187,15 @@ def test_parse_stash_entries_uses_epoch_timestamp() -> None:
 
 def test_hygiene_auto_resolve_cli_reports_plan_and_refuses_apply_without_mutation(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
-    (repo / ".cursor" / "gtkb-hooks").mkdir(parents=True)
-    (repo / ".cursor" / "gtkb-hooks" / "last-session-start.json").write_text("{}\n", encoding="utf-8")
+    cursor_hooks = repo / ".cursor" / "gtkb-hooks"
+    cursor_hooks.mkdir(parents=True)
+    for name in (
+        "last-session-start.json",
+        "last-session-start.err",
+        "last-user-visible-startup-pb.md",
+        "last-user-visible-startup-pb.meta.json",
+    ):
+        (cursor_hooks / name).write_text("{}\n", encoding="utf-8")
     before = _status(repo)
 
     result = CliRunner().invoke(
@@ -200,8 +207,14 @@ def test_hygiene_auto_resolve_cli_reports_plan_and_refuses_apply_without_mutatio
     payload = json.loads(result.output)
     assert payload["read_only"] is True
     assert payload["candidate_actions_only"] is True
-    assert payload["counts"]["actuator_actions"]["auto_ignore"] == 1
-    assert payload["items"][0]["actuator_action"] == "auto_ignore"
+    assert payload["counts"]["actuator_actions"]["auto_ignore"] == 4
+    assert {item["path"] for item in payload["items"]} == {
+        ".cursor/gtkb-hooks/last-session-start.err",
+        ".cursor/gtkb-hooks/last-session-start.json",
+        ".cursor/gtkb-hooks/last-user-visible-startup-pb.md",
+        ".cursor/gtkb-hooks/last-user-visible-startup-pb.meta.json",
+    }
+    assert {item["actuator_action"] for item in payload["items"]} == {"auto_ignore"}
 
     refused = CliRunner().invoke(
         main,

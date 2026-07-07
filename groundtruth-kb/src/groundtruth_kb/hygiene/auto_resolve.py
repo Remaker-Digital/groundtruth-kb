@@ -109,14 +109,15 @@ HARNESS_RUNTIME_PREFIXES = (
     ".api-harness/",
     ".claude/session/",
     ".claude/worktrees/",
-    ".cursor/gtkb-hooks/",
     ".gtkb-state/",
 )
 
-HARNESS_RUNTIME_NAMES = (
-    "last-session-start.json",
-    "last-user-visible-startup",
-    "workstream-focus.cmd",
+HARNESS_RUNTIME_PATTERNS = (
+    ".claude/hooks/last-*",
+    ".codex/gtkb-hooks/last-*",
+    ".codex/gtkb-hooks/session-lifecycle-guard.json",
+    ".cursor/gtkb-hooks/last-session-start*",
+    ".cursor/gtkb-hooks/last-user-visible-startup*",
 )
 
 SCRATCH_NAME_MARKERS = (
@@ -259,8 +260,7 @@ def _is_protected_path(rel_path: str) -> bool:
 def _is_harness_runtime_projection(rel_path: str) -> bool:
     if rel_path.startswith(HARNESS_RUNTIME_PREFIXES):
         return True
-    name = Path(rel_path).name
-    return any(name == marker or name.startswith(marker) for marker in HARNESS_RUNTIME_NAMES)
+    return any(fnmatch.fnmatch(rel_path, pattern) for pattern in HARNESS_RUNTIME_PATTERNS)
 
 
 def _is_scratch_junk(rel_path: str) -> bool:
