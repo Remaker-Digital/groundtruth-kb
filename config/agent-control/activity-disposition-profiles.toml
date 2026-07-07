@@ -63,6 +63,7 @@ skills = [
     "decision-capture",
     "spec-intake",
     "kb-spec",
+    "advisory-proposal",
 ]
 terminology = [
     "requirement",
@@ -110,6 +111,7 @@ skills = [
     "verify",
     "kb-work-item",
     "kb-spec",
+    "advisory-intake",
 ]
 terminology = [
     "implementation proposal",
