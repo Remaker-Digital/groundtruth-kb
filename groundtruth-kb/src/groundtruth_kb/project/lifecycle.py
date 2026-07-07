@@ -27,8 +27,17 @@ _WORK_ITEM_LINE_RE = re.compile(
     r"^Work Item:\s*`?(WI-AUTO-[A-Z0-9-]+|WI-\d+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)`?\s*$",
     re.MULTILINE,
 )
+_PROJECT_LINE_RE = re.compile(r"^Project:\s*`?([^`\r\n]+)`?\s*$", re.MULTILINE)
+_PROJECT_AUTHORIZATION_LINE_RE = re.compile(
+    r"^Project Authorization:\s*`?([^`\r\n]+)`?\s*$",
+    re.MULTILINE,
+)
+_PROJECT_RETIREMENT_BLOCKING_BRIDGE_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
 _COMPLETION_GUARD_RELATIONSHIP = "plan_incomplete"
-_COMPLETION_GUARD_ARTIFACT_TYPES = ("completion_guard", "bridge_thread")
+_COMPLETION_KEEP_OPEN_ARTIFACT_TYPE = "completion_guard"
+_COMPLETION_BLOCKING_ARTIFACT_TYPE = "bridge_thread"
+_COMPLETION_GUARD_ARTIFACT_TYPES = (_COMPLETION_KEEP_OPEN_ARTIFACT_TYPE, _COMPLETION_BLOCKING_ARTIFACT_TYPE)
+_COMPLETION_KEEP_OPEN_SUFFIX = "-keepopen"
 _RETIRE_ITEM_DISALLOWED_STATUSES = frozenset({"", "active", "removed"})
 
 
@@ -97,6 +106,10 @@ def _require_nonempty(value: str, field_name: str) -> str:
     if not normalized:
         raise ProjectLifecycleError(f"{field_name} is required")
     return normalized
+
+
+def _authorization_keep_open_guard_ref(authorization_id: str) -> str:
+    return f"{_require_nonempty(authorization_id, 'authorization_id')}{_COMPLETION_KEEP_OPEN_SUFFIX}"
 
 
 def _retire_item_action_for_status(status: str) -> str:
@@ -561,6 +574,7 @@ class ProjectLifecycleService:
         included_spec_ids: list[str] | None = None,
         excluded_spec_ids: list[str] | None = None,
         expires_at: str | None = None,
+        plan_incomplete: bool = False,
     ) -> dict[str, Any]:
         try:
             authorization = self.db.insert_project_authorization(
@@ -590,6 +604,26 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(message) from exc
         if authorization is None:
             raise ProjectLifecycleError("Project authorization insert did not return a current authorization")
+        if plan_incomplete:
+            authorization_id_for_guard = str(authorization.get("id") or "")
+            try:
+                self.db.add_project_artifact_link(
+                    str(authorization.get("project_id") or project_id),
+                    _COMPLETION_KEEP_OPEN_ARTIFACT_TYPE,
+                    _authorization_keep_open_guard_ref(authorization_id_for_guard),
+                    _require_nonempty(changed_by, "changed_by"),
+                    (
+                        f"{_require_nonempty(change_reason, 'change_reason')} "
+                        f"(plan-incomplete keep-open guard for {authorization_id_for_guard})"
+                    ),
+                    relationship=_COMPLETION_GUARD_RELATIONSHIP,
+                    notes=(
+                        f"Authorization {authorization_id_for_guard} elected plan-incomplete keep-open; "
+                        "complete the authorization without retiring the project, then deactivate this guard."
+                    ),
+                )
+            except ValueError as exc:
+                raise ProjectLifecycleError(str(exc)) from exc
         return authorization
 
     def list_project_authorizations(
@@ -699,15 +733,19 @@ class ProjectLifecycleService:
         guard_refs = self._project_completion_guard_refs(normalized_project_id)
         keep_open_elected = self._project_keep_open_elected(normalized_project_id)
         non_verified_implements: list[str] = []
+        open_project_authorization_threads: list[str] = []
         unverified_bridge_member_ids: list[str] = []
         if project_root is not None:
             non_verified_implements = sorted(
                 self._non_verified_implements_threads_by_project(project_root).get(normalized_project_id, set())
             )
+            open_project_authorization_threads = sorted(
+                self._open_project_authorization_threads_by_project(project_root).get(normalized_project_id, set())
+            )
             verified = self._verified_work_items_by_project(project_root).get(normalized_project_id, set())
             unverified_bridge_member_ids = [work_item_id for work_item_id in member_ids if work_item_id not in verified]
         verified_bridge_ready = project_root is None or (
-            not non_verified_implements and not unverified_bridge_member_ids
+            not non_verified_implements and not open_project_authorization_threads and not unverified_bridge_member_ids
         )
         completion_ready = (
             bool(member_ids)
@@ -727,6 +765,8 @@ class ProjectLifecycleService:
             exclusion_reasons.append("keep_open_election")
         if non_verified_implements:
             exclusion_reasons.append("non_verified_implements_bridge_threads")
+        if open_project_authorization_threads:
+            exclusion_reasons.append("open_project_authorization_bridge_threads")
         if unverified_bridge_member_ids:
             exclusion_reasons.append("missing_verified_bridge_evidence")
 
@@ -742,6 +782,7 @@ class ProjectLifecycleService:
             "verified_bridge_evidence_required": project_root is not None,
             "verified_bridge_evidence_ready": verified_bridge_ready,
             "non_verified_implements_bridge_threads": non_verified_implements,
+            "open_project_authorization_bridge_threads": open_project_authorization_threads,
             "unverified_bridge_work_item_ids": unverified_bridge_member_ids,
             "completion_ready": completion_ready,
             "exclusion_reasons": exclusion_reasons,
@@ -757,6 +798,7 @@ class ProjectLifecycleService:
         verified_for_project: set[str],
         guarded_project_ids: set[str] | None = None,
         non_verified_implements_by_project: dict[str, set[str]] | None = None,
+        open_project_authorization_threads_by_project: dict[str, set[str]] | None = None,
     ) -> bool:
         """True when ``authorization`` is active and every gating work item is in
         ``verified_for_project`` and every active addressing thread is VERIFIED.
@@ -783,30 +825,40 @@ class ProjectLifecycleService:
             return False
         if non_verified_implements_by_project and non_verified_implements_by_project.get(project_id):
             return False
+        if open_project_authorization_threads_by_project and open_project_authorization_threads_by_project.get(
+            project_id
+        ):
+            return False
         included = self._project_membership_work_item_ids(project_id)
         return bool(included) and all(work_item in verified_for_project for work_item in included)
 
-    def _completion_guards_by_project(self) -> dict[str, list[dict[str, Any]]]:
+    def _completion_guards_by_project(
+        self,
+        artifact_types: tuple[str, ...] = _COMPLETION_GUARD_ARTIFACT_TYPES,
+    ) -> dict[str, list[dict[str, Any]]]:
         """Return active ``plan_incomplete`` completion guards keyed by project."""
+        if not artifact_types:
+            return {}
         rows = (
             self.db._get_conn()
             .execute(
-                "SELECT project_id, artifact_type, artifact_ref, relationship, notes "
+                "SELECT id, project_id, artifact_type, artifact_ref, relationship, notes "
                 "FROM current_project_artifact_links "
                 "WHERE status = 'active' "
                 "AND relationship = ? "
-                f"AND artifact_type IN ({', '.join('?' for _ in _COMPLETION_GUARD_ARTIFACT_TYPES)}) "
+                f"AND artifact_type IN ({', '.join('?' for _ in artifact_types)}) "
                 "ORDER BY project_id, artifact_type, artifact_ref",
-                (_COMPLETION_GUARD_RELATIONSHIP, *_COMPLETION_GUARD_ARTIFACT_TYPES),
+                (_COMPLETION_GUARD_RELATIONSHIP, *artifact_types),
             )
             .fetchall()
         )
         guards: dict[str, list[dict[str, Any]]] = {}
-        for project_id, artifact_type, artifact_ref, relationship, notes in rows:
+        for link_id, project_id, artifact_type, artifact_ref, relationship, notes in rows:
             if not project_id:
                 continue
             guards.setdefault(str(project_id), []).append(
                 {
+                    "id": str(link_id or ""),
                     "project_id": str(project_id),
                     "artifact_type": str(artifact_type or ""),
                     "artifact_ref": str(artifact_ref or ""),
@@ -816,8 +868,47 @@ class ProjectLifecycleService:
             )
         return guards
 
-    def _project_completion_guard_refs(self, project_id: str) -> list[dict[str, Any]]:
-        return self._completion_guards_by_project().get(project_id, [])
+    def _project_completion_guard_refs(
+        self,
+        project_id: str,
+        artifact_types: tuple[str, ...] = _COMPLETION_GUARD_ARTIFACT_TYPES,
+    ) -> list[dict[str, Any]]:
+        return self._completion_guards_by_project(artifact_types).get(project_id, [])
+
+    def _project_completion_blocker_refs(self, project_id: str) -> list[dict[str, Any]]:
+        return self._project_completion_guard_refs(project_id, (_COMPLETION_BLOCKING_ARTIFACT_TYPE,))
+
+    def _authorization_keep_open_guard_refs(self, project_id: str, authorization_id: str) -> list[dict[str, Any]]:
+        guard_ref = _authorization_keep_open_guard_ref(authorization_id)
+        return [
+            ref
+            for ref in self._project_completion_guard_refs(project_id, (_COMPLETION_KEEP_OPEN_ARTIFACT_TYPE,))
+            if ref.get("artifact_ref") == guard_ref
+        ]
+
+    def _deactivate_completion_guard_refs(
+        self,
+        guard_refs: list[dict[str, Any]],
+        *,
+        changed_by: str,
+        change_reason: str,
+    ) -> list[dict[str, Any]]:
+        deactivated: list[dict[str, Any]] = []
+        for ref in guard_refs:
+            link = self.db.add_project_artifact_link(
+                str(ref["project_id"]),
+                str(ref["artifact_type"]),
+                str(ref["artifact_ref"]),
+                changed_by,
+                change_reason,
+                relationship=str(ref["relationship"]),
+                status="inactive",
+                notes=ref.get("notes"),
+                id=str(ref.get("id") or "") or None,
+            )
+            if link is not None:
+                deactivated.append(link)
+        return deactivated
 
     def _implements_links_by_project(self) -> dict[str, set[str]]:
         """Return ``{project_id: {bridge_thread_slug}}`` for active implements links.
@@ -869,6 +960,54 @@ class ProjectLifecycleService:
             slug: status_from_bridge_file(max(versioned_files, key=lambda item: item[0])[1])
             for slug, versioned_files in grouped.items()
         }
+
+    def _open_project_authorization_threads_by_project(self, project_root: Path) -> dict[str, set[str]]:
+        """Return PAUTH-backed bridge threads that must keep their project active."""
+        from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
+
+        root = Path(project_root)
+        bridge_dir = root / "bridge"
+        if not bridge_dir.is_dir():
+            return {}
+        grouped: dict[str, list[tuple[int, Path]]] = {}
+        bridge_file_re = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+        for path in bridge_dir.glob("*.md"):
+            match = bridge_file_re.match(path.name)
+            if match is None:
+                continue
+            grouped.setdefault(match.group("slug"), []).append((int(match.group("version")), path))
+
+        blocked_by_project: dict[str, set[str]] = {}
+        for slug, versioned_files in grouped.items():
+            latest_path = max(versioned_files, key=lambda item: item[0])[1]
+            if status_from_bridge_file(latest_path) not in _PROJECT_RETIREMENT_BLOCKING_BRIDGE_STATUSES:
+                continue
+            project_ids: set[str] = set()
+            authorization_ids: set[str] = set()
+            for _version, file_path in sorted(versioned_files):
+                if not file_path.is_file():
+                    continue
+                text = file_path.read_text(encoding="utf-8", errors="replace")
+                project_ids.update(match.group(1).strip() for match in _PROJECT_LINE_RE.finditer(text))
+                authorization_ids.update(
+                    match.group(1).strip() for match in _PROJECT_AUTHORIZATION_LINE_RE.finditer(text)
+                )
+            if not project_ids or not authorization_ids:
+                continue
+            for authorization_id in authorization_ids:
+                authorization = self.db.get_project_authorization(authorization_id)
+                if authorization is None:
+                    continue
+                if authorization.get("status") != ACTIVE_PROJECT_AUTHORIZATION_STATUS:
+                    continue
+                authorization_project_id = str(authorization.get("project_id") or "").strip()
+                target_project_ids = set(project_ids)
+                if authorization_project_id:
+                    target_project_ids.add(authorization_project_id)
+                for project_id in target_project_ids:
+                    if project_id:
+                        blocked_by_project.setdefault(project_id, set()).add(slug)
+        return blocked_by_project
 
     def _non_verified_implements_threads_by_project(self, project_root: Path) -> dict[str, set[str]]:
         """Return active ``implements`` bridge threads whose latest status is not VERIFIED."""
@@ -1093,16 +1232,17 @@ class ProjectLifecycleService:
         # Step 2: readiness check - every gating work item must be VERIFIED.
         # The gating set is the project's active membership-linked work items
         # (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 "explicitly linked").
-        guard_refs = self._project_completion_guard_refs(project_id)
-        if guard_refs:
+        blocker_refs = self._project_completion_blocker_refs(project_id)
+        if blocker_refs:
             refs = ", ".join(
-                f"{ref['artifact_type']}:{ref['artifact_ref']} ({ref['relationship']})" for ref in guard_refs
+                f"{ref['artifact_type']}:{ref['artifact_ref']} ({ref['relationship']})" for ref in blocker_refs
             )
             raise ProjectLifecycleError(
                 f"Project {project_id} has an active plan_incomplete completion guard; "
                 f"authorization {norm_auth_id} cannot be completed until it is removed or superseded. "
                 f"Guard refs: {refs}."
             )
+        own_keep_open_guard_refs = self._authorization_keep_open_guard_refs(project_id, norm_auth_id)
         included = self._project_membership_work_item_ids(project_id)
         if not included:
             raise ProjectLifecycleError(
@@ -1116,6 +1256,14 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(
                 f"Project authorization {norm_auth_id} is not completion-ready; active implements "
                 f"bridge thread(s) are not VERIFIED: {', '.join(non_verified_implements)}."
+            )
+        open_project_authorization_threads = sorted(
+            self._open_project_authorization_threads_by_project(project_root).get(project_id, set())
+        )
+        if open_project_authorization_threads:
+            raise ProjectLifecycleError(
+                f"Project authorization {norm_auth_id} is not completion-ready; active project-authorization "
+                f"bridge thread(s) are not terminal: {', '.join(open_project_authorization_threads)}."
             )
         # Project-scoped verified set (v4 F1 fix): only THIS project's own
         # implements-linked VERIFIED threads count toward its completion.
@@ -1139,6 +1287,13 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(str(exc)) from exc
         if completed is None:
             raise ProjectLifecycleError("Project authorization completion did not return a current authorization")
+        deactivated_keep_open_guards = self._deactivate_completion_guard_refs(
+            own_keep_open_guard_refs,
+            changed_by=_require_nonempty(changed_by, "changed_by"),
+            change_reason=(
+                f"Deactivated plan-incomplete keep-open guard after authorization {norm_auth_id} completed."
+            ),
+        )
 
         # Step 4: retire the project iff no other active authorization remains,
         # and collectively retire the project's associated work items and
@@ -1148,9 +1303,14 @@ class ProjectLifecycleService:
         other_active = [
             a for a in self.db.list_project_authorizations(project_id, status="active") if a.get("id") != norm_auth_id
         ]
+        remaining_keep_open_guards = self._project_completion_guard_refs(
+            project_id,
+            (_COMPLETION_KEEP_OPEN_ARTIFACT_TYPE,),
+        )
+        keep_open_guard_elected = bool(own_keep_open_guard_refs)
         project_retired = False
         retired_work_items: list[str] = []
-        if retire_project and not other_active:
+        if retire_project and not other_active and not keep_open_guard_elected and not remaining_keep_open_guards:
             self.retire_project(
                 project_id,
                 changed_by=changed_by,
@@ -1170,6 +1330,7 @@ class ProjectLifecycleService:
             "authorization": completed,
             "project_retired": project_retired,
             "retired_work_items": retired_work_items,
+            "deactivated_completion_guards": deactivated_keep_open_guards,
         }
 
     def auto_complete_ready_authorizations(
@@ -1219,7 +1380,10 @@ class ProjectLifecycleService:
         # Project-scoped decision map (v4 F1 fix): {project_id: {verified WI}}.
         verified_by_project = self._verified_work_items_by_project(project_root)
         non_verified_implements_by_project = self._non_verified_implements_threads_by_project(project_root)
-        guards_by_project = self._completion_guards_by_project()
+        open_project_authorization_threads_by_project = self._open_project_authorization_threads_by_project(
+            project_root
+        )
+        guards_by_project = self._completion_guards_by_project((_COMPLETION_BLOCKING_ARTIFACT_TYPE,))
         guarded_project_ids = set(guards_by_project)
         # Global v3 baseline (over-broad, project-blind) used ONLY for the
         # fail-safe diagnostic — never for a completion decision.
@@ -1231,8 +1395,6 @@ class ProjectLifecycleService:
             project_id = str(project.get("id") or "")
             if not project_id:
                 continue
-            if project_id in guarded_project_ids:
-                continue
             project_verified = verified_by_project.get(project_id, set())
             for authorization in self.db.list_project_authorizations(project_id, status="active"):
                 authorization_id = str(authorization["id"])
@@ -1241,6 +1403,7 @@ class ProjectLifecycleService:
                     project_verified,
                     guarded_project_ids,
                     non_verified_implements_by_project,
+                    open_project_authorization_threads_by_project,
                 ):
                     result = self.complete_project_authorization(
                         authorization_id,
@@ -1273,6 +1436,7 @@ class ProjectLifecycleService:
                     verified_global_v3,
                     guarded_project_ids,
                     non_verified_implements_by_project,
+                    open_project_authorization_threads_by_project,
                 ):
                     continue
                 gating = self._project_membership_work_item_ids(project_id)

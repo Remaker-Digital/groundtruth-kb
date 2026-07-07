@@ -84,6 +84,61 @@ def _write_verified_threads(
         )
 
 
+def _seed_authorization(db: KnowledgeDB, *, project_id: str = "PROJECT-X") -> None:
+    db.insert_deliberation(
+        "DELIB-OPEN-PAUTH",
+        "owner_conversation",
+        "Owner approved",
+        "Owner approved the open PAUTH fixture.",
+        "{}",
+        "test",
+        "seed",
+        outcome="owner_decision",
+    )
+    db.insert_spec(
+        id="SPEC-OPEN-PAUTH", title="Open PAUTH spec", status="verified", changed_by="test", change_reason="seed"
+    )
+    db.insert_project_authorization(
+        project_id,
+        "Open PAUTH fixture",
+        "DELIB-OPEN-PAUTH",
+        "Bounded scope.",
+        "test",
+        "seed",
+        id="PAUTH-OPEN",
+        status="active",
+        included_work_item_ids=["WI-1", "WI-2"],
+        included_spec_ids=["SPEC-OPEN-PAUTH"],
+    )
+
+
+def _write_open_project_authorization_thread(
+    project_root: Path,
+    *,
+    project_id: str = "PROJECT-X",
+    authorization_id: str = "PAUTH-OPEN",
+    slug: str = "gtkb-auto-retire-resolve-open-pauth-fixture",
+) -> None:
+    bridge = project_root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / f"{slug}-001.md").write_text(
+        "\n".join(
+            [
+                "NEW",
+                "",
+                "# Fixture open PAUTH proposal",
+                "",
+                f"Project Authorization: {authorization_id}",
+                f"Project: {project_id}",
+                "Work Item: WI-OPEN-PAUTH",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (bridge / f"{slug}-002.md").write_text("GO\n\n# Fixture GO verdict\n", encoding="utf-8")
+
+
 def _seed_keep_open_authorization(db: KnowledgeDB, project_root: Path, *, project_id: str = "PROJECT-X") -> None:
     db.insert_deliberation(
         "DELIB-SEED",
@@ -125,6 +180,8 @@ def _mock_changed_by(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_resolve_last_terminal_member_retires_ready_project(tmp_path: Path) -> None:
     db = _seed_project(tmp_path, {"WI-1": "verified", "WI-2": "open"})
     try:
+        _write_verified_threads(tmp_path, db, ["WI-1", "WI-2"])
+
         result = update_backlog_item(_config(tmp_path), _resolve_request("WI-2"))
 
         assert [record["project_id"] for record in result["auto_retired_projects"]] == ["PROJECT-X"]
@@ -132,6 +189,24 @@ def test_resolve_last_terminal_member_retires_ready_project(tmp_path: Path) -> N
         assert db.list_project_work_items("PROJECT-X") == []
         assert db.get_work_item("WI-1")["resolution_status"] == "retired"
         assert db.get_work_item("WI-2")["resolution_status"] == "retired"
+    finally:
+        db.close()
+
+
+def test_resolve_does_not_retire_with_open_project_authorization_go_thread(tmp_path: Path) -> None:
+    db = _seed_project(tmp_path, {"WI-1": "verified", "WI-2": "open"})
+    try:
+        _seed_authorization(db)
+        _write_verified_threads(tmp_path, db, ["WI-1", "WI-2"])
+        _write_open_project_authorization_thread(tmp_path)
+
+        result = update_backlog_item(_config(tmp_path), _resolve_request("WI-2"))
+
+        assert result["auto_retired_projects"] == []
+        assert db.get_project("PROJECT-X")["status"] == "active"
+        status = ProjectLifecycleService(db).member_completion_status("PROJECT-X", project_root=tmp_path)
+        assert status["open_project_authorization_bridge_threads"] == ["gtkb-auto-retire-resolve-open-pauth-fixture"]
+        assert "open_project_authorization_bridge_threads" in status["exclusion_reasons"]
     finally:
         db.close()
 

@@ -581,6 +581,28 @@ def test_project_authorization_rejects_retired_project_without_retirement_reconc
         auth_module.create_authorization_packet(tmp_path, slug)
 
 
+def test_wi4870_retired_project_stranded_go_pauth_fails_closed(auth_module, tmp_path):
+    """WI-4870: a latest-GO PAUTH becomes unstartable if its project retires."""
+    slug = "project-auth-stranded-go"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, project_status="active", allowed_mutation_classes=["source"])
+
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    assert packet["project_authorization"]["id"] == "PAUTH-FIXTURE"
+
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute("UPDATE current_projects SET status = 'retired' WHERE id = 'PROJECT-FIXTURE'")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(auth_module.AuthorizationError, match="not attached to an active project"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
 def _seed_project_hierarchy(tmp_path: Path, *, included_work_item_ids: list[str] | None = None):
     """Seed a parent/sub-project hierarchy for WI-3350 validator tests.
 

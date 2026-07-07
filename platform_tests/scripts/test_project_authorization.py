@@ -7,7 +7,7 @@ import pytest
 from click.testing import CliRunner
 from groundtruth_kb.cli import main as cli_main
 from groundtruth_kb.db import KnowledgeDB
-from groundtruth_kb.project.lifecycle import ProjectLifecycleService
+from groundtruth_kb.project.lifecycle import ProjectLifecycleError, ProjectLifecycleService
 
 
 def _write_config(tmp_path: Path) -> Path:
@@ -89,6 +89,33 @@ def _write_verified_bridge(project_root: Path, work_item_id: str) -> None:
     )
 
 
+def _write_open_project_authorization_thread(
+    project_root: Path,
+    *,
+    project_id: str,
+    authorization_id: str,
+    slug: str = "gtkb-project-authorization-open-go",
+) -> None:
+    bridge = project_root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / f"{slug}-001.md").write_text(
+        "\n".join(
+            [
+                "NEW",
+                "",
+                "# Fixture open PAUTH proposal",
+                "",
+                f"Project Authorization: {authorization_id}",
+                f"Project: {project_id}",
+                "Work Item: WI-OPEN-PAUTH",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (bridge / f"{slug}-002.md").write_text("GO\n\n# Fixture GO verdict\n", encoding="utf-8")
+
+
 def _seed_completion_cli_env(tmp_path: Path, *, project_id: str, authorization_id: str, work_item_id: str) -> None:
     _write_verified_bridge(tmp_path, work_item_id)
     db = KnowledgeDB(tmp_path / "groundtruth.db")
@@ -139,6 +166,22 @@ def _seed_completion_cli_env(tmp_path: Path, *, project_id: str, authorization_i
             "test",
             "seed implements link",
             relationship="implements",
+        )
+    finally:
+        db.close()
+
+
+def _add_completion_guard(project_root: Path, *, project_id: str, authorization_id: str) -> None:
+    db = KnowledgeDB(project_root / "groundtruth.db")
+    try:
+        db.add_project_artifact_link(
+            project_id,
+            "completion_guard",
+            f"{authorization_id}-keepopen",
+            "test",
+            "seed plan-incomplete keep-open guard",
+            relationship="plan_incomplete",
+            notes="Fixture keep-open guard",
         )
     finally:
         db.close()
@@ -252,6 +295,68 @@ def test_project_authorization_cli_is_append_only_and_visible(tmp_path: Path) ->
     ]
 
 
+def test_project_authorization_cli_plan_incomplete_records_keep_open_guard(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    _seed_project_authorization_inputs(tmp_path)
+
+    _invoke_json(
+        config_path,
+        "projects",
+        "create",
+        "Scoped Implementation",
+        "--id",
+        "PROJECT-SCOPED-IMPL",
+        "--change-reason",
+        "create project",
+    )
+    _invoke_json(
+        config_path,
+        "projects",
+        "add-item",
+        "PROJECT-SCOPED-IMPL",
+        "WI-PROJECT-AUTH-001",
+        "--change-reason",
+        "link work item",
+    )
+    authorization = _invoke_json(
+        config_path,
+        "projects",
+        "authorize",
+        "PROJECT-SCOPED-IMPL",
+        "--id",
+        "PAUTH-SCOPED-IMPL",
+        "--owner-decision",
+        "DELIB-TEST-PROJECT-AUTH",
+        "--name",
+        "Scoped implementation approval",
+        "--scope",
+        "Implement one slice and keep the project open.",
+        "--include-work-item",
+        "WI-PROJECT-AUTH-001",
+        "--include-spec",
+        "SPEC-SCOPED-IMPL",
+        "--plan-incomplete",
+        "--change-reason",
+        "authorize implementation project",
+    )
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        links = db.list_project_artifact_links("PROJECT-SCOPED-IMPL")
+    finally:
+        db.close()
+
+    assert authorization["id"] == "PAUTH-SCOPED-IMPL"
+    guard = next(
+        link
+        for link in links
+        if link["artifact_type"] == "completion_guard"
+        and link["relationship"] == "plan_incomplete"
+        and link["artifact_ref"] == "PAUTH-SCOPED-IMPL-keepopen"
+    )
+    assert guard["status"] == "active"
+
+
 def test_complete_authorization_cli_keep_project_open(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
     _seed_completion_cli_env(
@@ -282,6 +387,46 @@ def test_complete_authorization_cli_keep_project_open(tmp_path: Path) -> None:
     try:
         assert db.get_project_authorization("PAUTH-COMPLETE-KEEP")["status"] == "completed"
         assert db.get_project("PROJECT-COMPLETE-KEEP")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_complete_authorization_cli_plan_incomplete_guard_keeps_project_open(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-COMPLETE-GUARD",
+        authorization_id="PAUTH-COMPLETE-GUARD",
+        work_item_id="WI-9001",
+    )
+    _add_completion_guard(tmp_path, project_id="PROJECT-COMPLETE-GUARD", authorization_id="PAUTH-COMPLETE-GUARD")
+
+    result = CliRunner().invoke(
+        cli_main,
+        [
+            "--config",
+            str(config_path),
+            "projects",
+            "complete-authorization",
+            "PAUTH-COMPLETE-GUARD",
+            "--change-reason",
+            "complete authorization",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Completed project authorization PAUTH-COMPLETE-GUARD." in result.output
+    assert "Project retired." not in result.output
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        assert db.get_project_authorization("PAUTH-COMPLETE-GUARD")["status"] == "completed"
+        assert db.get_project("PROJECT-COMPLETE-GUARD")["status"] == "active"
+        guard = next(
+            link
+            for link in db.list_project_artifact_links("PROJECT-COMPLETE-GUARD", include_inactive=True)
+            if link["artifact_ref"] == "PAUTH-COMPLETE-GUARD-keepopen"
+        )
+        assert guard["status"] == "inactive"
     finally:
         db.close()
 
@@ -340,6 +485,35 @@ def test_autocomplete_withheld_when_addressing_thread_not_verified(tmp_path: Pat
         assert service.auto_complete_ready_authorizations(project_root=tmp_path) == []
         assert db.get_project_authorization("PAUTH-AUTOCOMPLETE-WITHHELD")["status"] == "active"
         assert db.get_project("PROJECT-AUTOCOMPLETE-WITHHELD")["status"] == "active"
+    finally:
+        db.close()
+
+
+def test_complete_authorization_withheld_when_project_authorization_thread_open(tmp_path: Path) -> None:
+    _seed_completion_cli_env(
+        tmp_path,
+        project_id="PROJECT-COMPLETE-OPEN-GO",
+        authorization_id="PAUTH-COMPLETE-OPEN-GO",
+        work_item_id="WI-9006",
+    )
+
+    db = KnowledgeDB(tmp_path / "groundtruth.db")
+    try:
+        _write_open_project_authorization_thread(
+            tmp_path,
+            project_id="PROJECT-COMPLETE-OPEN-GO",
+            authorization_id="PAUTH-COMPLETE-OPEN-GO",
+        )
+        service = ProjectLifecycleService(db)
+
+        with pytest.raises(ProjectLifecycleError, match="active project-authorization bridge thread"):
+            service.complete_project_authorization(
+                "PAUTH-COMPLETE-OPEN-GO",
+                project_root=tmp_path,
+                change_reason="complete authorization",
+            )
+        assert db.get_project_authorization("PAUTH-COMPLETE-OPEN-GO")["status"] == "active"
+        assert db.get_project("PROJECT-COMPLETE-OPEN-GO")["status"] == "active"
     finally:
         db.close()
 
