@@ -23,6 +23,7 @@ MANIFEST_NAME = "MANIFEST.json"
 FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 RESOURCE_DIRECTORY_NAMES = ("references", "helpers")
 RESOURCE_EXCLUDED_DIRECTORY_NAMES = frozenset({"__pycache__"})
+RESOURCE_EXCLUDED_PREFIXES = ("_temp_", "tmp_", "draft-", "draft_")
 RESOURCE_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
 SLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude/skills/([^/\s`\"')]+)/helpers/")
 BACKSLASH_CANONICAL_HELPER_PATH_RE = re.compile(r"\.claude\\skills\\([^\\\s`\"')]+)\\helpers\\")
@@ -380,6 +381,8 @@ def _remove_empty_directories(path: Path, stop_at: Path) -> None:
 def _should_mirror_resource_file(path: Path) -> bool:
     if any(part in RESOURCE_EXCLUDED_DIRECTORY_NAMES for part in path.parts):
         return False
+    if path.name.startswith(RESOURCE_EXCLUDED_PREFIXES):
+        return False
     return path.suffix not in RESOURCE_EXCLUDED_SUFFIXES
 
 
@@ -403,7 +406,9 @@ def _sync_resource_mirror(project_root: Path, adapter: SkillAdapter, resource_na
                 changed.append(_relative_path(project_root, adapter_file))
 
     if adapter_resource_dir.is_dir():
-        for adapter_file in sorted(path for path in adapter_resource_dir.rglob("*") if path.is_file()):
+        for adapter_file in sorted(
+            path for path in adapter_resource_dir.rglob("*") if path.is_file() and _should_mirror_resource_file(path)
+        ):
             if adapter_file in expected_resource_files:
                 continue
             changed.append(_relative_path(project_root, adapter_file))
