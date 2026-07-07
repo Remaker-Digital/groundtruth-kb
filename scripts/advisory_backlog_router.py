@@ -425,6 +425,15 @@ def _existing_wi_for(db, source_key: str) -> str | None:
     return None if row is None else row[0]
 
 
+def is_live_advisory(db, status_map: dict[str, dict[str, Any]], source_key: str) -> bool:
+    """Check if an advisory is still live (not already promoted or rejected)."""
+    if source_key in status_map:
+        status = status_map[source_key].get("status")
+        if status in {"promoted", "rejected"}:
+            return False
+    return _existing_wi_for(db, source_key) is None
+
+
 def _candidate_store_path(project_root: Path) -> Path:
     return project_root / CANDIDATE_STORE_RELATIVE
 

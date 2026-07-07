@@ -299,3 +299,35 @@ def test_router_retention_policy_skips_expired_advisories(router, fake_project: 
     assert [row["source_key"] for row in result.staged] == ["INSIGHTS-2026-05-10-13-26-NEW.md"]
     events = _candidate_events(fake_project)
     assert [row["source_key"] for row in events] == ["INSIGHTS-2026-05-10-13-26-NEW.md"]
+
+
+def test_is_live_advisory(router, fake_project: Path, db_factory) -> None:
+    db = db_factory()
+    status_map = {
+        "INSIGHTS-staged.md": {"status": "staged"},
+        "INSIGHTS-promoted.md": {"status": "promoted"},
+        "INSIGHTS-rejected.md": {"status": "rejected"},
+    }
+
+    # Staged should be live
+    assert router.is_live_advisory(db, status_map, "INSIGHTS-staged.md") is True
+    # Absent from candidate map should be live
+    assert router.is_live_advisory(db, status_map, "INSIGHTS-absent.md") is True
+
+    # Promoted and Rejected should not be live
+    assert router.is_live_advisory(db, status_map, "INSIGHTS-promoted.md") is False
+    assert router.is_live_advisory(db, status_map, "INSIGHTS-rejected.md") is False
+
+    # Already in work items should not be live, even if status says staged
+    db.insert_work_item(
+        id="WI-9999",
+        title="Promoted advisory in DB",
+        origin="hygiene",
+        component="backlog",
+        resolution_status="open",
+        changed_by="test",
+        change_reason="promote advisory",
+        source_spec_id="GOV-STANDING-BACKLOG-001",
+        related_deliberation_ids="INSIGHTS-staged.md",
+    )
+    assert router.is_live_advisory(db, status_map, "INSIGHTS-staged.md") is False
