@@ -43,6 +43,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import re
 import shutil
 import sqlite3
@@ -3895,11 +3896,33 @@ _LABEL_TO_CANONICAL_MODE = {
 
 
 def _reviewer_precedence_for_record(record: dict[str, object]) -> int:
-    """Return deterministic LO reviewer order; missing or invalid sorts last."""
+    """Return reviewer precedence; missing or invalid sorts last."""
     try:
         return int(record.get("reviewer_precedence"))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 1_000_000
+
+
+def _rank_role_matching_targets_with_uniform_tiebreak(
+    targets: list[tuple[str, dict[str, object]]],
+) -> list[tuple[str, dict[str, object]]]:
+    ranked = sorted(targets, key=lambda item: _reviewer_precedence_for_record(item[1]))
+    if len(ranked) < 2:
+        return ranked
+
+    ranked_with_random_ties: list[tuple[str, dict[str, object]]] = []
+    index = 0
+    while index < len(ranked):
+        rank_key = _reviewer_precedence_for_record(ranked[index][1])
+        tied_group = [ranked[index]]
+        index += 1
+        while index < len(ranked) and _reviewer_precedence_for_record(ranked[index][1]) == rank_key:
+            tied_group.append(ranked[index])
+            index += 1
+        if len(tied_group) > 1:
+            random.shuffle(tied_group)
+        ranked_with_random_ties.extend(tied_group)
+    return ranked_with_random_ties
 
 
 def _dispatch_target_evidence(target: DispatchTarget) -> dict[str, Any]:
@@ -4261,15 +4284,9 @@ def _resolve_dispatch_targets(
         if ranked_ids or dispatch_config.rules:
             active_matching = [by_id[h_id] for h_id in ranked_ids if h_id in by_id]
         else:
-            active_matching = sorted(
-                active_matching,
-                key=lambda item: (_reviewer_precedence_for_record(item[1]), str(item[0])),
-            )
+            active_matching = _rank_role_matching_targets_with_uniform_tiebreak(active_matching)
     except Exception:
-        active_matching = sorted(
-            active_matching,
-            key=lambda item: (_reviewer_precedence_for_record(item[1]), str(item[0])),
-        )
+        active_matching = _rank_role_matching_targets_with_uniform_tiebreak(active_matching)
 
     if not active_matching:
         if state_dir is not None:

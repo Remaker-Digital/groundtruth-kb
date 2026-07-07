@@ -201,6 +201,27 @@ def _load_trigger() -> ModuleType:
     return module
 
 
+def test_wi5032_runtime_fallback_randomizes_equal_precedence_ties(monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    shuffled_groups: list[list[str]] = []
+
+    def _reverse_shuffle(values: list[tuple[str, dict[str, object]]]) -> None:
+        shuffled_groups.append([harness_id for harness_id, _record in values])
+        values.reverse()
+
+    monkeypatch.setattr(trigger.random, "shuffle", _reverse_shuffle)
+    targets = [
+        ("A", {"reviewer_precedence": 1}),
+        ("B", {"reviewer_precedence": 1}),
+        ("C", {"reviewer_precedence": 2}),
+    ]
+
+    ranked = trigger._rank_role_matching_targets_with_uniform_tiebreak(targets)
+
+    assert shuffled_groups == [["A", "B"]]
+    assert [harness_id for harness_id, _record in ranked] == ["B", "A", "C"]
+
+
 def _make_synthetic_project(root: Path) -> Path:
     """Create a minimal in-root synthetic GT-KB project with a bridge/ dir.
 

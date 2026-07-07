@@ -129,14 +129,24 @@ def test_cost_breaks_ties_only_within_equal_precedence() -> None:
     assert [candidate.harness_id for candidate in decision.ranked_candidates] == ["B", "A"]
 
 
-def test_harness_id_provides_deterministic_final_tie_break() -> None:
-    b = _candidate(harness_id="B", reviewer_precedence=1, cost=5.0)
+def test_fully_tied_candidates_use_injected_random_tiebreak() -> None:
+    class ReversingRng:
+        def __init__(self) -> None:
+            self.groups: list[list[str]] = []
+
+        def shuffle(self, values: list[DispatchCandidate]) -> None:
+            self.groups.append([candidate.harness_id for candidate in values])
+            values.reverse()
+
     a = _candidate(harness_id="A", reviewer_precedence=1, cost=5.0)
+    b = _candidate(harness_id="B", reviewer_precedence=1, cost=5.0)
+    rng = ReversingRng()
 
-    decision = select_dispatch_target(_need(), [b, a])
+    decision = select_dispatch_target(_need(), [a, b], rng=rng)
 
-    assert decision.selected == "A"
-    assert [candidate.harness_id for candidate in decision.ranked_candidates] == ["A", "B"]
+    assert rng.groups == [["A", "B"]]
+    assert decision.selected == "B"
+    assert [candidate.harness_id for candidate in decision.ranked_candidates] == ["B", "A"]
 
 
 def test_no_eligible_candidate_returns_none_with_breakdown() -> None:

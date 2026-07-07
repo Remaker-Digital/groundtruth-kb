@@ -6,6 +6,7 @@ import datetime as dt
 import importlib.util
 import json
 import os
+import random
 import re
 import sqlite3
 import sys
@@ -619,6 +620,8 @@ def select_dispatch_candidates(
     records: list[dict[str, Any]],
     config: BridgeDispatchConfig,
     context: DispatchContext,
+    *,
+    rng: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Return active, dispatchable records admitted by ``context``, ranked."""
     candidates: list[dict[str, Any]] = []
@@ -641,7 +644,7 @@ def select_dispatch_candidates(
         if not _passes_governance_grade_lo_quality_floor(record, context, order):
             continue
         candidates.append(record)
-    return sorted(candidates, key=lambda record: _rank_key(record, order))
+    return _rank_candidates_with_uniform_tiebreak(candidates, order, rng=rng)
 
 
 def collect_bridge_dispatch_status(project_root: Path) -> BridgeDispatchStatus:
@@ -1809,11 +1812,35 @@ def _rank_key(record: dict[str, Any], order: tuple[str, ...]) -> tuple[Any, ...]
         elif name == "reviewer_precedence":
             values.append(_int_value(record.get("reviewer_precedence"), default=1_000_000))
         elif name in {"harness_id", "id"}:
-            values.append(str(record.get("id") or ""))
+            continue
         else:
             values.append(str(record.get(name) or ""))
-    values.append(str(record.get("id") or ""))
     return tuple(values)
+
+
+def _rank_candidates_with_uniform_tiebreak(
+    candidates: list[dict[str, Any]],
+    order: tuple[str, ...],
+    *,
+    rng: Any | None = None,
+) -> list[dict[str, Any]]:
+    ranked = sorted(candidates, key=lambda record: _rank_key(record, order))
+    if len(ranked) < 2:
+        return ranked
+
+    ranked_with_random_ties: list[dict[str, Any]] = []
+    index = 0
+    while index < len(ranked):
+        rank_key = _rank_key(ranked[index], order)
+        tied_group = [ranked[index]]
+        index += 1
+        while index < len(ranked) and _rank_key(ranked[index], order) == rank_key:
+            tied_group.append(ranked[index])
+            index += 1
+        if len(tied_group) > 1:
+            (rng or random).shuffle(tied_group)
+        ranked_with_random_ties.extend(tied_group)
+    return ranked_with_random_ties
 
 
 def _passes_governance_grade_lo_quality_floor(

@@ -260,10 +260,10 @@ def test_wi4983_live_dispatch_config_routes_prime_no_go_only_to_prime() -> None:
         DispatchContext(required_role="loyal-opposition", status="NO-ACTION"),
     )
 
-    assert [row["id"] for row in prime_go] == ["A"]
-    assert [row["id"] for row in prime_no_go] == ["A"]
+    assert [row["id"] for row in prime_go] == ["F"]
+    assert [row["id"] for row in prime_no_go] == ["F"]
     assert prime_no_action == []
-    assert [row["id"] for row in lo_no_action] == ["B", "C"]
+    assert [row["id"] for row in lo_no_action] == ["D", "C"]
 
 
 def test_config_overlay_cannot_disable_registry_dispatchability(tmp_path: Path) -> None:
@@ -452,6 +452,63 @@ rules = []
     )
 
     assert [row["id"] for row in selected] == ["D", "C", "B", "A"]
+
+
+def test_fully_tied_dispatch_candidates_use_injected_random_tiebreak() -> None:
+    class ReversingRng:
+        def __init__(self) -> None:
+            self.groups: list[list[str]] = []
+
+        def shuffle(self, values: list[dict[str, object]]) -> None:
+            self.groups.append([str(row["id"]) for row in values])
+            values.reverse()
+
+    config = bridge_dispatch_config.BridgeDispatchConfig(
+        path=Path("config/dispatcher/rules.toml"),
+        exists=True,
+        schema_version=1,
+        selection_order=("quality", "cost", "availability", "harness_id"),
+    )
+    records = [
+        {
+            "id": "A",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 90,
+            "dispatch_cost": 20,
+            "dispatch_availability": 80,
+        },
+        {
+            "id": "B",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 90,
+            "dispatch_cost": 20,
+            "dispatch_availability": 80,
+        },
+        {
+            "id": "C",
+            "status": "active",
+            "role": ["prime-builder"],
+            "can_receive_dispatch": True,
+            "dispatch_quality": 70,
+            "dispatch_cost": 20,
+            "dispatch_availability": 80,
+        },
+    ]
+    rng = ReversingRng()
+
+    selected = select_dispatch_candidates(
+        records,
+        config,
+        DispatchContext(required_role="prime-builder"),
+        rng=rng,
+    )
+
+    assert rng.groups == [["A", "B"]]
+    assert [row["id"] for row in selected] == ["B", "A", "C"]
 
 
 # WI-4658 — collect_bridge_dispatch_status quarantined-thread health-finding tests.
