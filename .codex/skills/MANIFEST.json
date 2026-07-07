@@ -26,7 +26,7 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
+      "source_sha256": "178a1a3eb4e9080a575f7005c6fb5354542a5fea75fb3b27f6560d1e09518ccd"
     },
     {
       "adapter_relative_path": ".codex/skills/bridge-config/SKILL.md",
@@ -82,14 +82,14 @@
       "canonical_name": "lo-opportunity-radar",
       "capability_id": "skill.lo-opportunity-radar",
       "source_relative_path": ".claude/skills/lo-opportunity-radar/SKILL.md",
-      "source_sha256": "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+      "source_sha256": "f6541de2552662da17e914786ac9fbd24a2de3e4b0be2ea801e2bb50f7a95429"
     },
     {
       "adapter_relative_path": ".codex/skills/codex-report/SKILL.md",
       "canonical_name": "loyal-opposition-report",
       "capability_id": "skill.codex-report",
       "source_relative_path": ".claude/skills/codex-report/SKILL.md",
-      "source_sha256": "912b6bc5c661ecbf42c2687ce61ae37617d482f249588fd0d9cca630a04e9825"
+      "source_sha256": "3c46cefd9bb72f6e25c5285db6e5de06d19a1e0f6869b5c281ad758dbbae4502"
     },
     {
       "adapter_relative_path": ".codex/skills/decision-capture/SKILL.md",
@@ -103,7 +103,35 @@
       "canonical_name": "harness-parity-review",
       "capability_id": "skill.harness-parity-review",
       "source_relative_path": ".claude/skills/harness-parity-review/SKILL.md",
-      "source_sha256": "46d1ad941076a347c5d29cdd638c269a0fe0552064dbe977633f4452588659aa"
+      "source_sha256": "b4b0b96b112aa9952c372f189fb732008eb8b41304b6be1dcf1bf10cf7f0ba94"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/skill-governance-lifecycle/SKILL.md",
+      "canonical_name": "skill-governance-lifecycle",
+      "capability_id": "skill.skill-governance-lifecycle",
+      "source_relative_path": ".claude/skills/skill-governance-lifecycle/SKILL.md",
+      "source_sha256": "03062927d9c99e367f4510ae132f2b77ad779f3d3020716ad68e0efe3df608a4"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/advisory-disposition/SKILL.md",
+      "canonical_name": "advisory-disposition",
+      "capability_id": "skill.advisory-disposition",
+      "source_relative_path": ".claude/skills/advisory-disposition/SKILL.md",
+      "source_sha256": "56410b3b28a752001bec269aa03a7360e4ccfd2e5dc0a5a84d6df9c9085614be"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/advisory-proposal/SKILL.md",
+      "canonical_name": "advisory-proposal",
+      "capability_id": "skill.advisory-proposal",
+      "source_relative_path": ".claude/skills/advisory-proposal/SKILL.md",
+      "source_sha256": "7b84d9c531da94e4fbe05755a823607507b758c7e25669f298d60d7077d4ebf3"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/advisory-intake/SKILL.md",
+      "canonical_name": "advisory-intake",
+      "capability_id": "skill.advisory-intake",
+      "source_relative_path": ".claude/skills/advisory-intake/SKILL.md",
+      "source_sha256": "142e31d3c107afcef17a1161e7dd722b3b3ee3b47cd3467c46b8ef91196697f1"
     },
     {
       "adapter_relative_path": ".codex/skills/kb-adr/SKILL.md",
@@ -173,7 +201,7 @@
       "canonical_name": "projects",
       "capability_id": "skill.projects",
       "source_relative_path": ".claude/skills/projects/SKILL.md",
-      "source_sha256": "0ca28e18fbb6331cb19c0c04a3c69b0b1ce3045d1afaa92a5dcbc91a6c95f155"
+      "source_sha256": "b35a7e3cd6c2b4bd3976c15a2b0f78ec37b4663fbe2d5063047c77daf0c778c8"
     },
     {
       "adapter_relative_path": ".codex/skills/proposal-review/SKILL.md",
@@ -215,7 +243,7 @@
       "canonical_name": "gtkb-benchmarks",
       "capability_id": "skill.gtkb-benchmarks",
       "source_relative_path": ".claude/skills/gtkb-benchmarks/SKILL.md",
-      "source_sha256": "f456f8bf39cbd93300befe37e35a9ef9da2efccd4fe55e06d51d2636d9c36262"
+      "source_sha256": "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
     },
     {
       "adapter_relative_path": ".codex/skills/grill-me-for-clarification/SKILL.md",
@@ -250,7 +278,7 @@
       "canonical_name": "loyal-opposition-hygiene-assessment",
       "capability_id": "skill.loyal-opposition-hygiene-assessment",
       "source_relative_path": ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md",
-      "source_sha256": "c817927d765d25f1ba58c4bc6e8d3779c7c15177ae8d87ae13e0abcf1138a705"
+      "source_sha256": "a77cd8c11da39a0f6f0287883600cd5602a3dc66cd264844d756d254d8a6cb98"
     },
     {
       "adapter_relative_path": ".codex/skills/verify/SKILL.md",
@@ -258,6 +286,13 @@
       "capability_id": "skill.verify",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
       "source_sha256": "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/formal-artifact-packet-helper/SKILL.md",
+      "canonical_name": "formal-artifact-packet-helper",
+      "capability_id": "skill.formal-artifact-packet-helper",
+      "source_relative_path": ".claude/skills/formal-artifact-packet-helper/SKILL.md",
+      "source_sha256": "824af14f6ace58e6a3b3423b55ad1119d6874cb2ac2ff83e5c37734903ac3855"
     }
   ],
   "generated_by": "scripts/generate_codex_skill_adapters.py",

@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-07-06T01:12:32Z",
+  "generated_at": "2026-07-07T21:14:34Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -29,7 +29,7 @@
         "path": ".codex/hooks.json",
         "present": true
       },
-      "hooks_enabled": true,
+      "hooks_enabled": false,
       "session_start_configured": true
     },
     "identities": {
@@ -312,8 +312,11 @@
     },
     "skills": {
       "classification": "public_safe",
-      "count": 38,
+      "count": 42,
       "items": [
+        "advisory-disposition",
+        "advisory-intake",
+        "advisory-proposal",
         "alternatives-investigation",
         "arch-audit",
         "assertion-triage",
@@ -326,6 +329,7 @@
         "codex-report",
         "decision-capture",
         "dispatcher-control",
+        "formal-artifact-packet-helper",
         "grill-me-for-clarification",
         "gtkb-benchmarks",
         "gtkb-hygiene-investigation",
@@ -714,7 +718,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "26.1.2"
+      "version": "25.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -728,7 +732,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.0.2"
+      "version": "9.1.1"
     },
     "python": {
       "classification": "verified",
@@ -742,7 +746,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.5"
+      "version": "0.15.20"
     }
   },
   "verification": {

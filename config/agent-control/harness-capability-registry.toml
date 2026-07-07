@@ -133,7 +133,7 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
+source_sha256 = "178a1a3eb4e9080a575f7005c6fb5354542a5fea75fb3b27f6560d1e09518ccd"
 
 [capabilities.antigravity]
 surface = ".agent/skills/bridge/SKILL.md"
@@ -357,7 +357,7 @@ status = "native"
 surface = ".codex/skills/lo-opportunity-radar/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
-source_sha256 = "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+source_sha256 = "f6541de2552662da17e914786ac9fbd24a2de3e4b0be2ea801e2bb50f7a95429"
 
 [capabilities.antigravity]
 surface = ".agent/skills/lo-opportunity-radar/SKILL.md"
@@ -385,7 +385,7 @@ status = "native"
 surface = ".codex/skills/codex-report/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/codex-report/SKILL.md"
-source_sha256 = "912b6bc5c661ecbf42c2687ce61ae37617d482f249588fd0d9cca630a04e9825"
+source_sha256 = "3c46cefd9bb72f6e25c5285db6e5de06d19a1e0f6869b5c281ad758dbbae4502"
 
 [capabilities.antigravity]
 surface = ".agent/skills/codex-report/SKILL.md"
@@ -478,6 +478,103 @@ reason = "WI-4839 authorizes only the canonical Claude source and generated Code
 [capabilities.cursor]
 status = "unsupported"
 reason = "WI-4839 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+[[capabilities]]
+id = "skill.advisory-disposition"
+kind = "skill"
+canonical_name = "advisory-disposition"
+canonical_purpose = "Convert Loyal Opposition advisory findings into the correct governed next artifact path without treating advisory capture as implementation approval."
+canonical_source = ".claude/skills/advisory-disposition/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/advisory-disposition/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/advisory-disposition/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/advisory-disposition/SKILL.md"
+source_sha256 = "56410b3b28a752001bec269aa03a7360e4ccfd2e5dc0a5a84d6df9c9085614be"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "WI-4840 authorizes only the canonical Claude source and generated Codex adapter; Antigravity projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-4840 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[[capabilities]]
+id = "skill.advisory-proposal"
+kind = "skill"
+canonical_name = "advisory-proposal"
+canonical_purpose = "Draft Loyal Opposition ADVISORY bridge entries from reusable external or peer solutions while preserving owner confirmation and non-approval semantics."
+canonical_source = ".claude/skills/advisory-proposal/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/advisory-proposal/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/advisory-proposal/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/advisory-proposal/SKILL.md"
+source_sha256 = "7b84d9c531da94e4fbe05755a823607507b758c7e25669f298d60d7077d4ebf3"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "WI-5055 authorizes only the canonical Claude source and generated Codex adapter; Antigravity projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-5055 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.ollama]
+status = "unsupported"
+reason = "WI-5055 authorizes only the canonical Claude source and generated Codex adapter; Ollama projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.openrouter]
+status = "unsupported"
+reason = "WI-5055 authorizes only the canonical Claude source and generated Codex adapter; OpenRouter projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[[capabilities]]
+id = "skill.advisory-intake"
+kind = "skill"
+canonical_name = "advisory-intake"
+canonical_purpose = "Consume live ADVISORY entries through Prime Builder owner-grilling, explicit project/work-item approval, and child proposal filing without treating advisories as implementation approval."
+canonical_source = ".claude/skills/advisory-intake/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/advisory-intake/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/advisory-intake/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/advisory-intake/SKILL.md"
+source_sha256 = "142e31d3c107afcef17a1161e7dd722b3b3ee3b47cd3467c46b8ef91196697f1"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "WI-5056 authorizes only the canonical Claude source and generated Codex adapter; Antigravity projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-5056 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.ollama]
+status = "unsupported"
+reason = "WI-5056 authorizes only the canonical Claude source and generated Codex adapter; Ollama projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.openrouter]
+status = "unsupported"
+reason = "WI-5056 authorizes only the canonical Claude source and generated Codex adapter; OpenRouter projection requires a separate target-path-covered proposal or typed parity disposition."
+
 [[capabilities]]
 id = "skill.kb-adr"
 kind = "skill"
@@ -747,7 +844,7 @@ status = "native"
 surface = ".codex/skills/projects/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/projects/SKILL.md"
-source_sha256 = "0ca28e18fbb6331cb19c0c04a3c69b0b1ce3045d1afaa92a5dcbc91a6c95f155"
+source_sha256 = "b35a7e3cd6c2b4bd3976c15a2b0f78ec37b4663fbe2d5063047c77daf0c778c8"
 
 [capabilities.antigravity]
 surface = ".agent/skills/projects/SKILL.md"
@@ -975,7 +1072,7 @@ status = "native"
 surface = ".codex/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
-source_sha256 = "f456f8bf39cbd93300befe37e35a9ef9da2efccd4fe55e06d51d2636d9c36262"
+source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-benchmarks/SKILL.md"
@@ -1115,7 +1212,7 @@ status = "native"
 surface = ".codex/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
-source_sha256 = "c817927d765d25f1ba58c4bc6e8d3779c7c15177ae8d87ae13e0abcf1138a705"
+source_sha256 = "a77cd8c11da39a0f6f0287883600cd5602a3dc66cd264844d756d254d8a6cb98"
 
 [capabilities.antigravity]
 surface = ".agent/skills/loyal-opposition-hygiene-assessment/SKILL.md"
@@ -1905,6 +2002,14 @@ owner_approval_ref = "DELIB-20266285"
 review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
 
 [[parity_waivers]]
+capability_id = "hook.owner-decision-capture"
+harness = "codex"
+reason_class = "harness-surface-difference"
+rationale = "Claude PostToolUse owner-decision capture."
+owner_approval_ref = "DELIB-20266285"
+review_trigger = "Re-evaluate at the next cross-harness parity audit or when the affected harness's hook surface materially changes."
+
+[[parity_waivers]]
 capability_id = "hook.owner-decision-tracker"
 harness = "codex"
 reason_class = "harness-surface-difference"
@@ -1957,3 +2062,38 @@ fallback = "Codex UserPromptSubmit invokes spec-classifier as the practical spec
 surface = ".claude/hooks/spec-classifier.py"
 status = "fallback"
 fallback = "Cursor beforeSubmitPrompt invokes spec-classifier as the practical specification-intake fallback."
+
+[[capabilities]]
+id = "skill.formal-artifact-packet-helper"
+kind = "skill"
+canonical_name = "formal-artifact-packet-helper"
+canonical_purpose = "Generate and validate formal-artifact approval packets with stable LF normalization and the canonical required fields, referencing the live gate as sole authority."
+canonical_source = ".claude/skills/formal-artifact-packet-helper/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/formal-artifact-packet-helper/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/formal-artifact-packet-helper/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/formal-artifact-packet-helper/SKILL.md"
+source_sha256 = "824af14f6ace58e6a3b3423b55ad1119d6874cb2ac2ff83e5c37734903ac3855"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "WI-4842 authorizes only the canonical Claude source and generated Codex adapter; Antigravity projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-4842 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.ollama]
+status = "unsupported"
+reason = "Ollama is a provider harness and does not execute repo-local managed skill adapters in this WI-4842 slice."
+
+[capabilities.openrouter]
+status = "unsupported"
+reason = "OpenRouter is a provider harness and does not execute repo-local managed skill adapters in this WI-4842 slice."
