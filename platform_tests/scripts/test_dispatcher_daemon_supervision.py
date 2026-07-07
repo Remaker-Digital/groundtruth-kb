@@ -226,6 +226,19 @@ def test_logging_failure_does_not_break_tick(tmp_path):
 # --- D3: scheduled-task supervisor installer ---------------------------------
 
 
+def test_dispatcher_installer_registers_startup_and_interval_triggers():
+    """The supervisor task must recover after workstation startup and on interval."""
+    install = _SCRIPTS_DIR / "install_dispatcher_daemon_task.ps1"
+    body = install.read_text(encoding="utf-8")
+
+    assert "New-ScheduledTaskTrigger -AtStartup" in body
+    assert "New-ScheduledTaskTrigger -Once" in body
+    assert "$triggers = @($startupTrigger, $intervalTrigger)" in body
+    assert "-Trigger $triggers" in body
+    assert "-Force `" in body
+    assert "Unregister-ScheduledTask" not in body
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell installer is Windows-only")
 def test_install_task_dry_run_renders_command(tmp_path):
     """install_dispatcher_daemon_task.ps1 -DryRun renders the ensure-script

@@ -557,6 +557,14 @@ def _powershell_json(command: str) -> Any:
     return json.loads(raw)
 
 
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
 def _script_path(project_root: Path, script_name: str) -> Path:
     script = Path(script_name.replace("/", os.sep))
     if script.is_absolute():
@@ -630,6 +638,9 @@ def collect_task_status(
         "uses_pythonw": False,
         "uses_runner_script": False,
         "runner_script_present": False,
+        "triggers": [],
+        "has_startup_trigger": False,
+        "has_repetition_trigger": False,
         "status_output": status_output,
         "healthy": False,
         "findings": [],
@@ -646,10 +657,22 @@ def collect_task_status(
         f"$t = Get-ScheduledTask -TaskName {_ps_quote(task_name)} -ErrorAction SilentlyContinue; "
         "if ($null -eq $t) { @{ registered = $false } | ConvertTo-Json -Compress } "
         "else { "
+        "$triggers = @($t.Triggers); "
+        "$triggerDocs = @($triggers | ForEach-Object { "
+        "@{ class = [string]$_.CimClass.CimClassName; "
+        "start_boundary = [string]$_.StartBoundary; "
+        "repetition_interval = [string]$_.Repetition.Interval; "
+        "repetition_duration = [string]$_.Repetition.Duration; "
+        "enabled = [bool]$_.Enabled } }); "
         "@{ registered = $true; state = [string]$t.State; "
         "hidden = [bool]$t.Settings.Hidden; "
         "execute = [string]$t.Actions[0].Execute; "
-        "arguments = [string]$t.Actions[0].Arguments } | ConvertTo-Json -Compress }"
+        "arguments = [string]$t.Actions[0].Arguments; "
+        "triggers = $triggerDocs; "
+        "has_startup_trigger = [bool]($triggers | Where-Object { "
+        "$_.CimClass.CimClassName -eq 'MSFT_TaskBootTrigger' }); "
+        "has_repetition_trigger = [bool]($triggers | Where-Object { $_.Repetition -and $_.Repetition.Interval }) } "
+        "| ConvertTo-Json -Compress }"
     )
     try:
         doc = _powershell_json(query)
@@ -666,9 +689,12 @@ def collect_task_status(
     payload["hidden"] = doc.get("hidden")
     payload["execute"] = doc.get("execute")
     payload["arguments"] = doc.get("arguments")
+    payload["triggers"] = [item for item in _as_list(doc.get("triggers")) if isinstance(item, dict)]
+    payload["has_startup_trigger"] = bool(doc.get("has_startup_trigger"))
+    payload["has_repetition_trigger"] = bool(doc.get("has_repetition_trigger"))
     state = str(payload["state"] or "").strip()
     payload["enabled"] = state.lower() in {"ready", "running"}
-    execute = str(payload["execute"] or "")
+    execute = str(payload["execute"] or "").strip().strip('"')
     arguments = str(payload["arguments"] or "")
     payload["uses_pythonw"] = execute.lower().endswith("pythonw.exe")
     payload["uses_runner_script"] = RUNNER_SCRIPT.replace("/", "\\") in arguments or RUNNER_SCRIPT in arguments
@@ -681,6 +707,10 @@ def collect_task_status(
         payload["findings"].append(f"scheduled task does not invoke {RUNNER_SCRIPT}")
     if payload["hidden"] is False:
         payload["findings"].append("scheduled task is not hidden")
+    if not payload["has_startup_trigger"]:
+        payload["findings"].append("scheduled task lacks startup trigger coverage")
+    if not payload["has_repetition_trigger"]:
+        payload["findings"].append("scheduled task lacks repeating interval trigger coverage")
     if not status_output.get("fresh"):
         payload["findings"].append(str(status_output.get("finding") or "watchdog status output is not fresh"))
     elif status_output.get("overall_status") == "FAIL":
@@ -693,6 +723,8 @@ def collect_task_status(
         and payload["uses_pythonw"]
         and payload["uses_runner_script"]
         and payload["runner_script_present"]
+        and payload["has_startup_trigger"]
+        and payload["has_repetition_trigger"]
         and bool(status_output.get("fresh"))
         and status_output.get("overall_status") != "FAIL"
     )

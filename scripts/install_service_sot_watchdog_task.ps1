@@ -4,9 +4,10 @@
     Register the GTKB-ServiceSoTWatchdog Windows scheduled task.
 
 .DESCRIPTION
-    Registers the detection-only service/SoT watchdog runner as a hidden,
-    repeating Windows scheduled task. The task runs through pythonw.exe so Task
-    Scheduler does not allocate a visible console window.
+    Registers the detection-only service/SoT watchdog runner as a hidden Windows
+    scheduled task with startup and repeating trigger coverage. The task runs
+    through pythonw.exe so Task Scheduler does not allocate a visible console
+    window.
 
 .PARAMETER TaskName
     Task name. Default 'GTKB-ServiceSoTWatchdog'.
@@ -58,34 +59,32 @@ if ([string]::IsNullOrEmpty($PythonExe)) {
 $argString = "`"$runnerPath`" --project-root `"$ProjectRoot`""
 
 if ($DryRun) {
-    Write-Output "WOULD REGISTER TaskName=$TaskName Execute=$PythonExe Arguments=$argString"
+    Write-Output "WOULD REGISTER TaskName=$TaskName IntervalMinutes=$IntervalMinutes StartupTrigger=True RepetitionTrigger=True Force=True Execute=$PythonExe Arguments=$argString"
     exit 0
 }
 
 $action = New-ScheduledTaskAction -Execute $PythonExe -Argument $argString -WorkingDirectory $ProjectRoot
 
 $startTime = (Get-Date).AddSeconds(60)
-$trigger = New-ScheduledTaskTrigger -Once -At $startTime `
+$startupTrigger = New-ScheduledTaskTrigger -AtStartup
+$intervalTrigger = New-ScheduledTaskTrigger -Once -At $startTime `
     -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
-$trigger.Repetition.Duration = ""
+$intervalTrigger.Repetition.Duration = ""
+$triggers = @($startupTrigger, $intervalTrigger)
 
 $settings = New-ScheduledTaskSettingsSet -Hidden `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable
 
-if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
-    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-}
-
 Register-ScheduledTask -TaskName $TaskName `
     -Action $action `
-    -Trigger $trigger `
+    -Trigger $triggers `
     -Settings $settings `
     -RunLevel Limited `
+    -Force `
     -Description "GroundTruth-KB detection-only service and SoT availability watchdog." | Out-Null
 
 Enable-ScheduledTask -TaskName $TaskName | Out-Null
 
-Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes Execute=$PythonExe RunnerPath=$runnerPath Enabled=True"
-
+Write-Output "Registered TaskName=$TaskName IntervalMinutes=$IntervalMinutes StartupTrigger=True RepetitionTrigger=True Execute=$PythonExe RunnerPath=$runnerPath Enabled=True"

@@ -245,6 +245,12 @@ def test_collect_task_status_marks_healthy_when_task_and_output_are_fresh(monkey
         "hidden": True,
         "execute": r"E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe",
         "arguments": r'"E:\GT-KB\scripts\gtkb_service_sot_watchdog.py" --project-root "E:\GT-KB"',
+        "has_startup_trigger": True,
+        "has_repetition_trigger": True,
+        "triggers": [
+            {"class": "MSFT_TaskBootTrigger"},
+            {"class": "MSFT_TaskTimeTrigger", "repetition_interval": "PT5M"},
+        ],
     }
 
     def _fake_powershell(command: str, *, timeout: int = 120):
@@ -265,6 +271,54 @@ def test_collect_task_status_marks_healthy_when_task_and_output_are_fresh(monkey
     assert status["uses_pythonw"] is True
     assert status["uses_runner_script"] is True
     assert status["findings"] == []
+
+
+def test_collect_task_status_requires_startup_trigger(monkeypatch, tmp_path):
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "gtkb_service_sot_watchdog.py").write_text("# stub\n", encoding="utf-8")
+    service_sot.default_status_path(tmp_path).parent.mkdir(parents=True)
+    service_sot.default_status_path(tmp_path).write_text(
+        json.dumps({"captured_at": datetime.now(UTC).isoformat(), "overall_status": "PASS"}),
+        encoding="utf-8",
+    )
+    task_payload = {
+        "registered": True,
+        "state": "Ready",
+        "hidden": True,
+        "execute": r"E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe",
+        "arguments": r'"E:\GT-KB\scripts\gtkb_service_sot_watchdog.py" --project-root "E:\GT-KB"',
+        "has_startup_trigger": False,
+        "has_repetition_trigger": True,
+        "triggers": [{"class": "MSFT_TaskTimeTrigger", "repetition_interval": "PT5M"}],
+    }
+
+    def _fake_powershell(command: str, *, timeout: int = 120):
+        class _Proc:
+            returncode = 0
+            stdout = json.dumps(task_payload)
+            stderr = ""
+
+        return _Proc()
+
+    monkeypatch.setattr(service_sot.os, "name", "nt")
+    monkeypatch.setattr(service_sot, "_run_powershell", _fake_powershell)
+
+    status = service_sot.collect_task_status(tmp_path)
+
+    assert status["healthy"] is False
+    assert any("startup trigger" in item for item in status["findings"])
+
+
+def test_service_sot_installer_registers_startup_and_interval_triggers():
+    install = _REPO_ROOT / "scripts" / "install_service_sot_watchdog_task.ps1"
+    body = install.read_text(encoding="utf-8")
+
+    assert "New-ScheduledTaskTrigger -AtStartup" in body
+    assert "New-ScheduledTaskTrigger -Once" in body
+    assert "$triggers = @($startupTrigger, $intervalTrigger)" in body
+    assert "-Trigger $triggers" in body
+    assert "-Force `" in body
+    assert "Unregister-ScheduledTask" not in body
 
 
 def test_doctor_service_sot_watchdog_reports_platform_task_health(monkeypatch, tmp_path):

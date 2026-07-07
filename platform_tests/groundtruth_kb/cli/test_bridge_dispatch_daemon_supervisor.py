@@ -31,6 +31,12 @@ def test_collect_supervisor_status_marks_healthy_task(tmp_path, monkeypatch):
         "hidden": True,
         "execute": r"E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe",
         "arguments": r'"E:\GT-KB\scripts\ensure_dispatcher_daemon.py" --project-root "E:\GT-KB"',
+        "has_startup_trigger": True,
+        "has_repetition_trigger": True,
+        "triggers": [
+            {"class": "MSFT_TaskBootTrigger"},
+            {"class": "MSFT_TaskTimeTrigger", "repetition_interval": "PT1M"},
+        ],
     }
 
     def _fake_powershell(command: str):
@@ -60,6 +66,12 @@ def test_collect_supervisor_status_accepts_running_task(tmp_path, monkeypatch):
         "hidden": True,
         "execute": r"E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe",
         "arguments": r'"E:\GT-KB\scripts\ensure_dispatcher_daemon.py"',
+        "has_startup_trigger": True,
+        "has_repetition_trigger": True,
+        "triggers": [
+            {"class": "MSFT_TaskBootTrigger"},
+            {"class": "MSFT_TaskTimeTrigger", "repetition_interval": "PT1M"},
+        ],
     }
 
     def _fake_powershell(command: str):
@@ -78,6 +90,36 @@ def test_collect_supervisor_status_accepts_running_task(tmp_path, monkeypatch):
     status = collect_supervisor_status(tmp_path)
     assert status["healthy"] is True
     assert status["enabled"] is True
+
+
+def test_collect_supervisor_status_requires_startup_trigger(tmp_path, monkeypatch):
+    payload = {
+        "registered": True,
+        "state": "Ready",
+        "hidden": True,
+        "execute": r"E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe",
+        "arguments": r'"E:\GT-KB\scripts\ensure_dispatcher_daemon.py"',
+        "has_startup_trigger": False,
+        "has_repetition_trigger": True,
+        "triggers": [{"class": "MSFT_TaskTimeTrigger", "repetition_interval": "PT1M"}],
+    }
+
+    def _fake_powershell(command: str):
+        class _Proc:
+            returncode = 0
+            stdout = json.dumps(payload)
+            stderr = ""
+
+        return _Proc()
+
+    monkeypatch.setattr("groundtruth_kb.dispatcher_supervisor.os.name", "nt")
+    monkeypatch.setattr("groundtruth_kb.dispatcher_supervisor._run_powershell", _fake_powershell)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "ensure_dispatcher_daemon.py").write_text("# stub\n", encoding="utf-8")
+
+    status = collect_supervisor_status(tmp_path)
+    assert status["healthy"] is False
+    assert any("startup trigger" in item for item in status["findings"])
 
 
 def test_collect_supervisor_status_warns_when_disabled(tmp_path, monkeypatch):
