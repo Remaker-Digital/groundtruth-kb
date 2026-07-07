@@ -99,27 +99,3 @@ evidence = "harness-state/harness-registry.json; scripts/openrouter_harness.py; 
 review_trigger = "Revisit if OpenRouter is promoted from receive-only provider harness to an event-source harness."
 evaluator_behavior = "waive"
 status = "active"
-
-[[waivers]]
-id = "WAIVER-P2-OLLAMA-FULL-TRANSCRIPT-ARCHIVE"
-harness = "ollama"
-dimension = "full_transcript_archive"
-reason_class = "vendor_limitation"
-rationale = "Ollama is an API/provider harness and does not own a full interactive transcript archive equivalent to desktop harnesses; parity is assessed through compact dispatch/result/session envelopes."
-owner_decision = "DELIB-20260701-ENVELOPE-SHARDING-EXECUTE-RETIRE"
-evidence = "config/agent-control/harness-capability-registry.toml::[harnesses.ollama]; bridge/gtkb-envelope-sharding-harness-projection-parity-002.md"
-review_trigger = "Revisit if Ollama gains a first-class interactive transcript/archive surface or is promoted beyond provider-harness operation."
-evaluator_behavior = "waive"
-status = "active"
-
-[[waivers]]
-id = "WAIVER-P2-OPENROUTER-FULL-TRANSCRIPT-ARCHIVE"
-harness = "openrouter"
-dimension = "full_transcript_archive"
-reason_class = "vendor_limitation"
-rationale = "OpenRouter is an API/provider harness and does not own a full interactive transcript archive equivalent to desktop harnesses; parity is assessed through compact dispatch/result/session envelopes."
-owner_decision = "DELIB-20260701-ENVELOPE-SHARDING-EXECUTE-RETIRE"
-evidence = "config/agent-control/harness-capability-registry.toml::[harnesses.openrouter]; bridge/gtkb-envelope-sharding-harness-projection-parity-002.md"
-review_trigger = "Revisit if OpenRouter gains a first-class interactive transcript/archive surface or is promoted beyond provider-harness operation."
-evaluator_behavior = "waive"
-status = "active"
