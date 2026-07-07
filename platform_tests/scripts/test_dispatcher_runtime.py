@@ -1450,6 +1450,73 @@ def test_failed_launch_exit_processing_clears_dispatch_dedupe_signals(tmp_path: 
     assert retried_state["last_launch"]["signature"] == signature
 
 
+def test_wi5035_exit_zero_no_verdict_is_previous_launch_failure() -> None:
+    trigger = _load_trigger()
+
+    failure = trigger._detect_previous_launch_failure(
+        {
+            "last_launch": {
+                "dispatch_id": "prior-exit-zero-no-verdict",
+                "recipient": "loyal-opposition:D",
+                "launched": True,
+                "exit_code": 0,
+                "exit_code_processed": True,
+                "exit_failure_reason": "no_verdict_produced",
+                "signature": "same-signature",
+            }
+        },
+        recipient="loyal-opposition:D",
+        signature="same-signature",
+    )
+
+    assert failure is not None
+    assert failure["reason"] == "previous_launch_failed"
+    assert failure["error_type"] == "missing_bridge_verdict"
+    assert failure["exit_code"] == 0
+    assert failure["matched_markers"] == [
+        {
+            "field": "last_launch.exit_failure_reason",
+            "marker": "no_verdict_produced",
+            "label": "no_verdict_produced",
+        }
+    ]
+
+
+def test_wi5035_exit_zero_no_verdict_backoff_records_previous_failure(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    now = datetime.now(UTC)
+    prior = {
+        "failure_count": 1,
+        "last_launch": {
+            "dispatch_id": "prior-exit-zero-no-verdict",
+            "recipient": "loyal-opposition:D",
+            "launched": True,
+            "exit_code": 0,
+            "exit_code_processed": True,
+            "exit_failure_reason": "no_verdict_produced",
+            "signature": "same-signature",
+            "completed_at": (now - timedelta(seconds=10)).isoformat(),
+            "launched_at": (now - timedelta(seconds=20)).isoformat(),
+        },
+    }
+
+    skip = trigger._provider_failure_backoff_skip(
+        prior=prior,
+        recipient="loyal-opposition:D",
+        signature="same-signature",
+        state_dir=tmp_path,
+    )
+
+    assert skip is not None
+    assert skip["reason"] == "provider_failure_backoff_active"
+    assert skip["backoff_source"] == "retry_delay_enforced"
+    assert skip["failure_class"] == "no_verdict_produced"
+    assert skip["previous_launch_failed"]["error_type"] == "missing_bridge_verdict"
+    assert skip["previous_launch_failed"]["matched_markers"][0]["label"] == "no_verdict_produced"
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-2-dispatch-state-idempotence
 # ──────────────────────────────────────────────────────────────────────────

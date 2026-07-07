@@ -1493,6 +1493,28 @@ def _detect_previous_launch_failure(
         }
 
     exit_code = launch.get("exit_code")
+    exit_failure_reason = str(launch.get("exit_failure_reason") or "")
+    if exit_code == 0 and exit_failure_reason == "no_verdict_produced":
+        return {
+            "ts": _now_iso(),
+            "dispatch_id": _now_iso() + "-previous-launch-failed",
+            "recipient": recipient,
+            "launched": False,
+            "reason": "previous_launch_failed",
+            "error_type": "missing_bridge_verdict",
+            "exit_code": exit_code,
+            "prior_dispatch_id": launch.get("dispatch_id"),
+            "prior_launched_at": launch.get("launched_at"),
+            "signature": signature,
+            "matched_markers": [
+                {
+                    "field": "last_launch.exit_failure_reason",
+                    "marker": "no_verdict_produced",
+                    "label": "no_verdict_produced",
+                }
+            ],
+        }
+
     if isinstance(exit_code, int) and exit_code != 0:
         error_type = "process_terminated_abruptly" if exit_code == 4294967295 else "subprocess_execution_failed"
         return {
