@@ -38,6 +38,25 @@ def test_release_runtime_subprocess_without_no_window_is_violation(tmp_path: Pat
     assert [(finding.call, finding.state) for finding in findings] == [("subprocess.run", "violation")]
 
 
+def test_missing_tracked_python_file_is_skipped(tmp_path: Path) -> None:
+    audit = _load_audit()
+
+    assert audit.scan_file(tmp_path / "platform_tests" / "scripts" / "missing.py", root=tmp_path) == []
+
+
+def test_codex_mcp_worker_guard_is_release_runtime(tmp_path: Path) -> None:
+    audit = _load_audit()
+    path = _write(
+        tmp_path,
+        "scripts/codex_mcp_worker_guard.py",
+        "import subprocess\nsubprocess.run(['powershell.exe', '-NoProfile'])\n",
+    )
+
+    findings = audit.scan_file(path, root=tmp_path)
+
+    assert [(finding.call, finding.state) for finding in findings] == [("subprocess.run", "violation")]
+
+
 def test_direct_creationflags_is_compliant(tmp_path: Path) -> None:
     audit = _load_audit()
     path = _write(

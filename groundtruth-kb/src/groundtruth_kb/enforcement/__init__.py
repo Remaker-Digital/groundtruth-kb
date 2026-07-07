@@ -58,11 +58,24 @@ _DIRECT_HARNESS_SCRIPT_SHIMS = frozenset(
         "openrouter_harness.py",
     }
 )
+_DIRECT_GTKB_HELPER_SCRIPT_MARKERS = (
+    ".claude/hooks/",
+    ".claude/skills/",
+    ".codex/gtkb-hooks/",
+    ".codex/skills/",
+    ".cursor/skills/",
+)
 _PYTHON_COMMANDS = frozenset({"py", "python", "python3", "pythonw"})
 _DIRECT_HARNESS_DENIAL = (
     "Direct harness-to-harness launch is prohibited by SPEC-INTAKE-21c5b3 / "
     "DELIB-20260703-DIRECT-HARNESS-INVOKE-BAN; use bridge files, `gt bridge dispatch` "
     "control-plane status/config surfaces, or independent owner/manual harness operation."
+)
+_DIRECT_HELPER_SCRIPT_DENIAL = (
+    "Direct GT-KB Python helper script execution is prohibited by SPEC-INTAKE-21c5b3 / "
+    "DELIB-20260703-DIRECT-HARNESS-INVOKE-BAN because Windows file association can launch "
+    "a GUI harness. Invoke helper scripts through an explicit Python executable or governed "
+    "no-window wrapper instead."
 )
 
 
@@ -138,6 +151,17 @@ def _module_or_script_name(token: str) -> str:
     return basename
 
 
+def _is_direct_gtkb_helper_script(token: str) -> bool:
+    normalized = token.strip().strip("\"'`").lstrip("&").strip("\"'`").replace("\\", "/").lower()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    if not normalized.endswith(".py"):
+        return False
+    return any(
+        normalized.startswith(marker) or f"/{marker}" in normalized for marker in _DIRECT_GTKB_HELPER_SCRIPT_MARKERS
+    )
+
+
 def _python_invokes_direct_harness_shim(tokens: list[str]) -> bool:
     index = 1
     while index < len(tokens):
@@ -182,6 +206,8 @@ def _direct_harness_launch_reason(command: str) -> str | None:
         if not tokens:
             continue
         head = _command_name(tokens[0])
+        if _is_direct_gtkb_helper_script(tokens[0]):
+            return _DIRECT_HELPER_SCRIPT_DENIAL
         if head in _DIRECT_HARNESS_COMMANDS:
             return _DIRECT_HARNESS_DENIAL
         if head == _DIRECT_CODEX_COMMAND and len(tokens) > 1 and _token_starts_with_exec(tokens[1]):
@@ -191,6 +217,8 @@ def _direct_harness_launch_reason(command: str) -> str | None:
         if head == "start-process":
             target, rest = _start_process_target(tokens[1:])
             target_head = _command_name(target)
+            if _is_direct_gtkb_helper_script(target):
+                return _DIRECT_HELPER_SCRIPT_DENIAL
             if target_head in _DIRECT_HARNESS_COMMANDS:
                 return _DIRECT_HARNESS_DENIAL
             if target_head == _DIRECT_CODEX_COMMAND and _codex_exec_requested(rest):

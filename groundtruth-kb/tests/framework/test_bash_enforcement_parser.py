@@ -54,6 +54,30 @@ def test_bash_parser_blocks_direct_harness_launches() -> None:
         assert "SPEC-INTAKE-21c5b3" in reason
 
 
+def test_bash_parser_blocks_direct_gtkb_helper_script_file_association() -> None:
+    blocked_commands = [
+        ".claude/skills/verify/helpers/write_verdict.py --slug demo",
+        "& .codex/skills/verify/helpers/write_verdict.py --slug demo",
+        r"Start-Process E:\GT-KB\.cursor\skills\verify\helpers\write_verdict.py",
+    ]
+
+    for command in blocked_commands:
+        allowed, reason = check_bash_command(command, REPO_ROOT)
+        assert allowed is False, command
+        assert "Direct GT-KB Python helper script execution is prohibited" in reason
+        assert "SPEC-INTAKE-21c5b3" in reason
+
+
+def test_bash_parser_allows_explicit_python_helper_invocation() -> None:
+    allowed, reason = check_bash_command(
+        "python .claude/skills/verify/helpers/write_verdict.py --slug demo --body-file draft.md",
+        REPO_ROOT,
+    )
+
+    assert allowed is True
+    assert reason == ""
+
+
 def test_bash_parser_allows_harness_name_mentions() -> None:
     allowed_commands = [
         "gt bridge show gtkb-wi4988-direct-harness-launch-guard",

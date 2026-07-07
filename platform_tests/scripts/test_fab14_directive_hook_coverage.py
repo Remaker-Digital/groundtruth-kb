@@ -114,6 +114,25 @@ def test_codex_bash_direct_harness_launch_blocks_and_logs(tmp_path: Path) -> Non
     assert record["pattern_id"] == "root-boundary-command"
 
 
+def test_codex_bash_direct_gtkb_helper_script_blocks_and_logs(tmp_path: Path) -> None:
+    telemetry = tmp_path / "denials.jsonl"
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": ".claude/skills/verify/helpers/write_verdict.py --slug demo"},
+        "cwd": str(_ROOT),
+    }
+
+    result = _run_hook(_CODEX_ADAPTER, payload, telemetry)
+
+    reason = result["hookSpecificOutput"]["permissionDecisionReason"]
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "Direct GT-KB Python helper script execution is prohibited" in reason
+    assert "SPEC-INTAKE-21c5b3" in reason
+    record = json.loads(telemetry.read_text(encoding="utf-8").splitlines()[0])
+    assert record["gate"] == "codex-directive-enforcement"
+    assert record["pattern_id"] == "root-boundary-command"
+
+
 def test_codex_bash_allows_governed_gt_provider_mentions(tmp_path: Path) -> None:
     payload = {
         "tool_name": "Bash",
@@ -143,6 +162,22 @@ def test_claude_powershell_direct_harness_launch_blocks(tmp_path: Path) -> None:
     record = json.loads(telemetry.read_text(encoding="utf-8").splitlines()[0])
     assert record["gate"] == "directive-enforcement-claude-adapter"
     assert record["pattern_id"] == "root-boundary-command"
+
+
+def test_claude_powershell_direct_gtkb_helper_script_blocks(tmp_path: Path) -> None:
+    telemetry = tmp_path / "denials.jsonl"
+    payload = {
+        "tool_name": "PowerShell",
+        "tool_input": {"command": "Start-Process -FilePath .codex/skills/verify/helpers/write_verdict.py"},
+        "cwd": str(_ROOT),
+    }
+
+    result = _run_hook(_CLAUDE_ADAPTER, payload, telemetry)
+
+    reason = result["hookSpecificOutput"]["permissionDecisionReason"]
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "Direct GT-KB Python helper script execution is prohibited" in reason
+    assert "SPEC-INTAKE-21c5b3" in reason
 
 
 def test_claude_powershell_allows_governed_gt_provider_mentions(tmp_path: Path) -> None:
