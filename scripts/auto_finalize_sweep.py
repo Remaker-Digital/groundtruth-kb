@@ -45,6 +45,11 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 AUDIT_DIR = PROJECT_ROOT / ".gtkb-state" / "auto-finalize-sweep"
 AUDIT_LOG = AUDIT_DIR / "sweep.jsonl"
@@ -74,6 +79,7 @@ def _git(args: list[str], *, env: dict | None = None) -> subprocess.CompletedPro
         capture_output=True,
         text=True,
         env=env,
+        **no_window_subprocess_kwargs(),
     )
 
 
@@ -150,7 +156,16 @@ def _is_path_committed(path: str) -> bool:
     result = _git(["status", "--porcelain", "--", path])
     if result.returncode != 0:
         return False
-    return result.stdout.strip() == ""
+    status_lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if not status_lines:
+        return True
+    if any(line[:2] != " M" for line in status_lines):
+        return False
+    # Windows/autocrlf can surface CR-at-EOL-only noise in temp repos; keep
+    # rejecting every other status form and require both diffs to be clean.
+    unstaged = _git(["diff", "--quiet", "--ignore-cr-at-eol", "--", path])
+    cached = _git(["diff", "--cached", "--quiet", "--ignore-cr-at-eol", "--", path])
+    return unstaged.returncode == 0 and cached.returncode == 0
 
 
 def _independent(verdict_content: str, report_rel: str) -> tuple[bool, str]:

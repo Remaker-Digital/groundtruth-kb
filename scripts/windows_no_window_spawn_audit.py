@@ -21,7 +21,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 NO_WINDOW_KEYWORDS = {"creationflags", "startupinfo"}
-NO_WINDOW_KWARGS_HELPERS = {"_no_window_run_kwargs", "_no_window_subprocess_kwargs"}
+NO_WINDOW_KWARGS_HELPERS = {
+    "_no_window_run_kwargs",
+    "_no_window_subprocess_kwargs",
+    "no_window_subprocess_kwargs",
+}
 LAUNCH_CALLS = {
     "subprocess.Popen",
     "subprocess.run",
@@ -52,6 +56,7 @@ RELEASE_RUNTIME_FILES = {
     "groundtruth-kb/src/groundtruth_kb/bridge/poller.py",
     "groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py",
     "groundtruth-kb/src/groundtruth_kb/bridge/worker.py",
+    "scripts/auto_finalize_sweep.py",
     "scripts/cross_harness_bridge_trigger.py",
     "scripts/cursor_harness.py",
     "scripts/ensure_dispatcher_daemon.py",
@@ -298,6 +303,12 @@ def scan_file(path: Path, *, root: Path | None = None) -> list[SpawnFinding]:
     rel_path = _normalize_path(path, root)
     try:
         text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # A tracked-but-missing path (e.g. a file removed from the working tree
+        # but still listed by ``git ls-files``) cannot be scanned; skip it rather
+        # than crashing the whole audit, which would silently disable the
+        # no-window enforcement guard.
+        return []
     except UnicodeDecodeError:
         text = path.read_text(encoding="utf-8-sig")
     tree = ast.parse(text, filename=rel_path)
