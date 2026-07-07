@@ -3246,6 +3246,55 @@ def test_reset_recipient_fails_fast_when_guard_held(
     assert recipient["circuit_breaker_tripped"] is True
 
 
+def test_reset_recipient_without_state_dir_targets_bridge_poller_not_legacy(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """WI-4702: default reset-recipient must target the live dispatcher state dir."""
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    live_state_dir = root / ".gtkb-state" / "bridge-poller"
+    legacy_state_dir = root / ".gtkb-state" / "cross-harness-trigger"
+    live_state_dir.mkdir(parents=True, exist_ok=True)
+    legacy_state_dir.mkdir(parents=True, exist_ok=True)
+    trigger._write_dispatch_state(
+        live_state_dir,
+        {
+            "recipients": {
+                "loyal-opposition:A": {
+                    "failure_count": 4,
+                    "circuit_breaker_tripped": True,
+                    "updated_at": "2026-07-05T00:00:00+00:00",
+                }
+            },
+            "schema_version": 1,
+        },
+    )
+    trigger._write_dispatch_state(
+        legacy_state_dir,
+        {
+            "recipients": {
+                "loyal-opposition:A": {
+                    "failure_count": 8,
+                    "circuit_breaker_tripped": True,
+                    "updated_at": "2026-07-05T00:00:00+00:00",
+                }
+            },
+            "schema_version": 1,
+        },
+    )
+
+    assert trigger.main(["--project-root", str(root), "--reset-recipient", "loyal-opposition"]) == 0
+    assert "updated 1 entries" in capsys.readouterr().out
+
+    live_recipient = trigger._load_dispatch_state(live_state_dir, root)["recipients"]["loyal-opposition:A"]
+    legacy_recipient = trigger._load_dispatch_state(legacy_state_dir, root)["recipients"]["loyal-opposition:A"]
+    assert live_recipient["failure_count"] == 0
+    assert live_recipient["circuit_breaker_tripped"] is False
+    assert legacy_recipient["failure_count"] == 8
+    assert legacy_recipient["circuit_breaker_tripped"] is True
+
+
 def test_reset_recipient_clears_stale_last_launch_and_signature(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
