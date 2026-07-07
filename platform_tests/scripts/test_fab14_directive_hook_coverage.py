@@ -114,6 +114,18 @@ def test_codex_bash_direct_harness_launch_blocks_and_logs(tmp_path: Path) -> Non
     assert record["pattern_id"] == "root-boundary-command"
 
 
+def test_codex_bash_allows_governed_gt_provider_mentions(tmp_path: Path) -> None:
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": 'gt bridge dispatch status --json | Select-String "openrouter routing"',
+        },
+        "cwd": str(_ROOT),
+    }
+
+    assert _run_hook(_CODEX_ADAPTER, payload, tmp_path / "denials.jsonl") == {}
+
+
 def test_claude_powershell_direct_harness_launch_blocks(tmp_path: Path) -> None:
     telemetry = tmp_path / "denials.jsonl"
     payload = {
@@ -131,3 +143,15 @@ def test_claude_powershell_direct_harness_launch_blocks(tmp_path: Path) -> None:
     record = json.loads(telemetry.read_text(encoding="utf-8").splitlines()[0])
     assert record["gate"] == "directive-enforcement-claude-adapter"
     assert record["pattern_id"] == "root-boundary-command"
+
+
+def test_claude_powershell_allows_governed_gt_provider_mentions(tmp_path: Path) -> None:
+    payload = {
+        "tool_name": "PowerShell",
+        "tool_input": {
+            "command": 'gt deliberations record --title "OpenRouter routing behavior" --content "OpenRouter routing diagnostics only"',
+        },
+        "cwd": str(_ROOT),
+    }
+
+    assert _run_hook(_CLAUDE_ADAPTER, payload, tmp_path / "denials.jsonl") == {}

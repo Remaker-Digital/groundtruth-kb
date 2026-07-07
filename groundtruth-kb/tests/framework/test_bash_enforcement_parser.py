@@ -57,6 +57,9 @@ def test_bash_parser_blocks_direct_harness_launches() -> None:
 def test_bash_parser_allows_harness_name_mentions() -> None:
     allowed_commands = [
         "gt bridge show gtkb-wi4988-direct-harness-launch-guard",
+        'gt bridge dispatch status --json | Select-String "openrouter routing"',
+        'gt deliberations record --title "OpenRouter routing behavior" --content "OpenRouter routing diagnostics only"',
+        'gt backlog list --contains "provider routing openrouter" --json',
         "python scripts/verify_codex_dispatch.py",
         "rg claude bridge/",
         "Write-Output 'claude codex ollama cursor'",
