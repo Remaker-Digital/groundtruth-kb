@@ -52,6 +52,7 @@ ROUTING_CONFIG_PATH = Path(".api-harness") / "routing.toml"
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
+MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
@@ -957,6 +958,13 @@ def _message_from_response(response: Mapping[str, Any]) -> dict[str, Any]:
     return dict(message)
 
 
+def _final_text_from_message(message: Mapping[str, Any]) -> str:
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise OllamaHarnessError("assistant final message must contain nonblank text content")
+    return content
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -983,6 +991,9 @@ def run_tool_loop(
     chat = chat_func or call_ollama_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
     session_deadline = time.monotonic() + session_timeout
+    previous_tool_signature: str | None = None
+    repeated_tool_signature_turns = 0
+
     for _turn in range(max_turns):
         payload = {"model": model_route.model_id, "messages": messages, "tools": schemas, "stream": False}
         operation_timeout = min(
@@ -993,12 +1004,19 @@ def run_tool_loop(
         message = _message_from_response(response)
         tool_calls = message.get("tool_calls") or response.get("tool_calls") or []
         if not tool_calls:
-            content = message.get("content")
-            if not isinstance(content, str):
-                raise OllamaHarnessError("assistant final message must contain text content")
-            return content
+            return _final_text_from_message(message)
         if not isinstance(tool_calls, list):
             raise OllamaHarnessError("tool_calls must be a list")
+
+        tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
+        if tool_signature == previous_tool_signature:
+            repeated_tool_signature_turns += 1
+        else:
+            previous_tool_signature = tool_signature
+            repeated_tool_signature_turns = 1
+        if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
+            raise OllamaHarnessError("repeated no-progress tool loop before final assistant text")
+
         messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": tool_calls})
         for index, call in enumerate(tool_calls):
             tool_name, arguments, call_id = _tool_call_parts(call, index)

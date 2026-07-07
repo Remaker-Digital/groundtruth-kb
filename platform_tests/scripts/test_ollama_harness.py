@@ -375,6 +375,37 @@ def test_tool_loop_fail_closed_on_max_turns(tmp_path: Path):
         oh.run_tool_loop("loop", route(root), oh.DEFAULT_ENDPOINT, 1, root, chat_func=chat)
 
 
+@pytest.mark.parametrize("content", ["", "   \r\n\t"])
+def test_tool_loop_rejects_blank_final_text(tmp_path: Path, content: str):
+    root = make_root(tmp_path)
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        return {"message": {"content": content}}
+
+    with pytest.raises(oh.OllamaHarnessError, match="nonblank text content"):
+        oh.run_tool_loop("return blank", route(root), oh.DEFAULT_ENDPOINT, 1, root, chat_func=chat)
+
+
+def test_tool_loop_stops_repeated_no_progress_calls(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "note.txt").write_text("hello", encoding="utf-8")
+    calls: list[dict] = []
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        calls.append(payload)
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [{"id": "c1", "function": {"name": "Read", "arguments": {"path": "note.txt"}}}],
+            }
+        }
+
+    with pytest.raises(oh.OllamaHarnessError, match="repeated no-progress tool loop"):
+        oh.run_tool_loop("loop", route(root), oh.DEFAULT_ENDPOINT, 20, root, chat_func=chat)
+
+    assert len(calls) == oh.MAX_REPEATED_TOOL_SIGNATURE_TURNS + 1
+
+
 def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = make_root(tmp_path)
     (root / "note.txt").write_text("hello", encoding="utf-8")

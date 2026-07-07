@@ -71,6 +71,37 @@ def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
     assert selected.model_id == FIXTURE_MODEL_ID
     assert selected.model_version == FIXTURE_MODEL_VERSION
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
+    assert selected.omit_payload_model is False
+
+
+def test_load_routing_config_parses_openrouter_cloud_default_omit_model(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / orh.ROUTING_CONFIG_PATH).write_text(
+        """
+schema_version = 1
+
+[models.openrouter-cloud-default]
+model_id = "moonshotai/kimi-k2.7-code"
+provider = "openrouter"
+tool_calling_supported = true
+allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+omit_payload_model = true
+
+[routing.openrouter]
+default_model = "openrouter-cloud-default"
+
+[routing.openrouter.skills]
+implementation = "openrouter-cloud-default"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    selected = orh.resolve_model(orh.load_routing_config(root), None, skill="implementation")
+
+    assert selected.key == "openrouter-cloud-default"
+    assert selected.model_id == "moonshotai/kimi-k2.7-code"
+    assert selected.omit_payload_model is True
 
 
 def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -509,6 +540,56 @@ def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkey
             chat_func=chat,
             timeout=10.0,
             session_timeout=1.0,
+        )
+
+
+def test_tool_loop_omits_model_for_openrouter_cloud_default_route(tmp_path: Path):
+    root = make_root(tmp_path)
+    model_route = orh.ModelRoute(
+        key="openrouter-cloud-default",
+        model_id="moonshotai/kimi-k2.7-code",
+        model_version="kimi-k2.7-code",
+        tool_calling_supported=True,
+        allowed_tools=("Read", "Write", "Edit", "Grep", "Glob", "Bash"),
+        omit_payload_model=True,
+    )
+    payloads: list[dict] = []
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        payloads.append(payload)
+        return {"model": "moonshotai/kimi-k2.7-code", "choices": [{"message": {"content": "OK"}}]}
+
+    assert (
+        orh.run_tool_loop(
+            "say OK",
+            model_route,
+            "https://openrouter.test",
+            "key",
+            1,
+            root,
+            chat_func=chat,
+        )
+        == "OK"
+    )
+    assert "model" not in payloads[0]
+
+
+@pytest.mark.parametrize("content", ["", "   \r\n\t"])
+def test_tool_loop_rejects_blank_final_text(tmp_path: Path, content: str):
+    root = make_root(tmp_path)
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        return {"choices": [{"message": {"content": content}}]}
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="nonblank text content"):
+        orh.run_tool_loop(
+            "return blank",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            1,
+            root,
+            chat_func=chat,
         )
 
 

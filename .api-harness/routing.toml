@@ -36,6 +36,13 @@ provider = "openrouter"
 tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
+[models.openrouter-cloud-default]
+model_id = "moonshotai/kimi-k2.7-code"
+provider = "openrouter"
+tool_calling_supported = true
+allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+omit_payload_model = true
+
 [models.deepseek-v4-flash]
 model_id = "deepseek/deepseek-v4-flash"
 provider = "openrouter"
@@ -43,19 +50,19 @@ tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing.ollama]
-default_model = "deepseek-v4-pro-cloud"
+default_model = "kimi-k2-7-code-cloud"
 timeout_seconds = 3600
 
 [routing.ollama.skills]
-bridge-review = "deepseek-v4-pro-cloud"
-verification = "deepseek-v4-pro-cloud"
-implementation = "deepseek-v4-pro-cloud"
+bridge-review = "kimi-k2-7-code-cloud"
+verification = "kimi-k2-7-code-cloud"
+implementation = "kimi-k2-7-code-cloud"
 
 [routing.openrouter]
-default_model = "deepseek-v4-pro"
+default_model = "openrouter-cloud-default"
 timeout_seconds = 240
 
 [routing.openrouter.skills]
-bridge-review = "deepseek-v4-pro"
-verification = "deepseek-v4-pro"
-implementation = "deepseek-v4-pro"
+bridge-review = "openrouter-cloud-default"
+verification = "openrouter-cloud-default"
+implementation = "openrouter-cloud-default"

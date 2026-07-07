@@ -122,6 +122,7 @@ class ModelRoute:
     model_version: str
     tool_calling_supported: bool
     allowed_tools: tuple[str, ...]
+    omit_payload_model: bool = False
 
 
 @dataclass(frozen=True)
@@ -221,6 +222,14 @@ def _as_non_empty_string(value: Any, *, field: str) -> str:
     return value
 
 
+def _as_bool(value: Any, *, field: str, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise OpenRouterHarnessError(f"{field} must be a boolean")
+    return value
+
+
 def infer_model_version(model_id: str) -> str:
     """Return the tag or version portion from a model identifier."""
     if ":" in model_id:
@@ -285,7 +294,8 @@ def load_routing_config(project_root: Path) -> RoutingConfig:
         unknown_tools = sorted(set(allowed_tools) - CANONICAL_TOOLS)
         if unknown_tools:
             raise OpenRouterHarnessError(f"models.{key}.allowed_tools contains noncanonical tools: {unknown_tools}")
-        models[key] = ModelRoute(key, model_id, model_version, True, allowed_tools)
+        omit_payload_model = _as_bool(row.get("omit_payload_model"), field=f"models.{key}.omit_payload_model")
+        models[key] = ModelRoute(key, model_id, model_version, True, allowed_tools, omit_payload_model)
 
     routing = raw.get("routing", {}).get("openrouter")
     if not isinstance(routing, dict):
@@ -1087,6 +1097,13 @@ def _message_from_response(response: Mapping[str, Any]) -> dict[str, Any]:
     return dict(message)
 
 
+def _final_text_from_message(message: Mapping[str, Any]) -> str:
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise OpenRouterHarnessError("assistant final message must contain nonblank text content")
+    return content
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -1125,7 +1142,9 @@ def run_tool_loop(
     repeated_tool_signature_turns = 0
 
     for _turn in range(max_turns):
-        payload = {"model": model_route.model_id, "messages": messages, "stream": False}
+        payload = {"messages": messages, "stream": False}
+        if not model_route.omit_payload_model:
+            payload["model"] = model_route.model_id
         if schemas:
             payload["tools"] = schemas
 
@@ -1146,10 +1165,7 @@ def run_tool_loop(
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
-            content = message.get("content")
-            if not isinstance(content, str):
-                raise OpenRouterHarnessError("assistant final message must contain text content")
-            return content
+            return _final_text_from_message(message)
 
         if not isinstance(tool_calls, list):
             raise OpenRouterHarnessError("tool_calls must be a list")
