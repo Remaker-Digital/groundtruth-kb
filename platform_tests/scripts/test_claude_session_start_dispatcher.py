@@ -206,14 +206,17 @@ def test_diagnostic_files_land_in_claude_hooks_dir() -> None:
     assert "hookSpecificOutput" in content
 
 
-def test_session_start_timeout_alignment() -> None:
-    """`.claude/settings.json` SessionStart timeout matches `.codex/hooks.json`.
+def test_session_start_timeout_budget_contract() -> None:
+    """SessionStart timeouts satisfy the current per-harness budget contract.
 
-    Both must be 60 s (Codex's existing value); this prevents Claude-side
-    truncation under load.
+    WI-4564 raised the shared inner startup-service timeout to 150 s under the
+    180 s Codex async timeout. Claude still uses the shorter 60 s hook timeout,
+    so the live contract is no longer equality; both hooks must expose positive
+    startup timeouts, and Codex must leave headroom over the shared inner bound.
     """
     claude = json.loads(CLAUDE_SETTINGS.read_text(encoding="utf-8"))
     codex = json.loads(CODEX_HOOKS.read_text(encoding="utf-8"))
+    hook = _load_claude_hook_isolated("timeout_budget")
 
     def _session_start_timeout(settings: dict) -> int:
         for entry in settings.get("hooks", {}).get("SessionStart", []):
@@ -226,7 +229,8 @@ def test_session_start_timeout_alignment() -> None:
     codex_timeout = _session_start_timeout(codex)
     assert claude_timeout > 0, "Claude settings has no SessionStart timeout"
     assert codex_timeout > 0, "Codex hooks has no SessionStart timeout"
-    assert claude_timeout == codex_timeout, f"Claude SessionStart timeout {claude_timeout}s != Codex {codex_timeout}s"
+    assert claude_timeout >= 60
+    assert codex_timeout > hook.STARTUP_SERVICE_TIMEOUT_SECONDS
 
 
 def test_harness_parity_import_repaired() -> None:
@@ -479,6 +483,22 @@ def test_dispatch_authorized_when_role_record_is_multi_role_set(
     assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
 
+def test_dispatch_authorized_for_subject_only_keyword_with_run_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var + subject-only canonical keyword -> DISPATCH_AUTHORIZED via fallback."""
+    _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
+    hook = _load_claude_hook_isolated("dispatch_subject_only")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-claude-subject-only")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init application")
+
+    decision, reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
+    assert "subject-only canonical dispatch keyword" in reason
+    assert "resolver fallback" in reason
+
+
 def test_spoof_fallback_when_keyword_without_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """keyword present, env-var absent -> SPOOF_FALLBACK (Claude side).
 
@@ -605,7 +625,7 @@ def test_claude_hook_has_envelope_parity_constants() -> None:
     exposes (regex, env var names, decision enum, dispatch-failures path).
     """
     hook = _load_claude_hook_isolated("envelope_parity")
-    assert hook._CANONICAL_KEYWORD_RE.pattern == r"^::init gtkb (pb|lo)$"
+    assert hook._CANONICAL_KEYWORD_RE.pattern == (r"^::init (?P<subject>gtkb|application)(?: (?P<role_mode>pb|lo))?$")
     assert hook._BRIDGE_DISPATCH_RUN_ID_ENV == "GTKB_BRIDGE_POLLER_RUN_ID"
     assert hook._BRIDGE_DISPATCH_KEYWORD_ENV == "GTKB_BRIDGE_DISPATCH_KEYWORD"
     assert hook._LABEL_TO_CANONICAL_MODE == {

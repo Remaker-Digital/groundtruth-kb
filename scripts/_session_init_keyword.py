@@ -1,11 +1,17 @@
-"""Init-keyword matcher for session-startup symmetry contract.
+"""Init-keyword matchers for the session-startup symmetry contract.
 
 Authority: bridge `gtkb-loyal-opposition-startup-symmetry-001` GO at -008.
 Specs: DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001,
 SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001,
 DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
 
-Init keyword grammar (canonical):
+Canonical machine/init grammar:
+- Exact regex: ``^::init (gtkb|application)( (pb|lo))?$``.
+- Subject is mandatory: ``gtkb`` or ``application``.
+- Role mode is optional: ``pb`` or ``lo``.
+- Strict lowercase, spacing, and no synonyms.
+
+Compatibility alias grammar (owner-facing startup relay):
 - Verb forms: ``init``, ``initialize``, ``start``, ``begin``, ``open``.
 - Object (mandatory after a verb): one of ``session`` | ``gtkb`` | ``gt-kb`` |
   ``groundtruth-kb`` | ``agent_red`` | ``agent-red`` | ``agent red``.
@@ -27,6 +33,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+
+CANONICAL_INIT_KEYWORD_REGEX = re.compile(r"^::init (?P<subject>gtkb|application)(?: (?P<role_mode>pb|lo))?$")
 
 # Canonical regex (case-insensitive). Object is mandatory after verbs; bare
 # verbs do not match. Standalone form: ``GT-KB startup`` / ``GroundTruth-KB
@@ -53,8 +61,16 @@ INIT_KEYWORD_REGEX = re.compile(
 
 
 @dataclass(frozen=True)
+class CanonicalInitKeywordMatch:
+    """Strict v3 canonical init-keyword match."""
+
+    subject: str
+    role_mode: str | None
+
+
+@dataclass(frozen=True)
 class InitKeywordMatch:
-    """Resolved init-keyword match.
+    """Resolved compatibility init-keyword match.
 
     Attributes:
         app_scope: Canonical app-scope key derived from the object. ``None``
@@ -83,8 +99,26 @@ def _normalize_object(raw_obj: str) -> str | None:
     return None
 
 
+def match_canonical_init_keyword(prompt: str) -> CanonicalInitKeywordMatch | None:
+    """Return a strict v3 canonical init-keyword match.
+
+    This is the machine/receiver parser for
+    ``SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001``. It deliberately does not trim,
+    case-fold, accept punctuation, or accept compatibility aliases.
+    """
+    if not prompt:
+        return None
+    match = CANONICAL_INIT_KEYWORD_REGEX.match(prompt)
+    if match is None:
+        return None
+    return CanonicalInitKeywordMatch(
+        subject=match.group("subject"),
+        role_mode=match.group("role_mode"),
+    )
+
+
 def match_init_keyword(prompt: str) -> InitKeywordMatch | None:
-    """Return an ``InitKeywordMatch`` if ``prompt`` is a canonical init keyword.
+    """Return a compatibility ``InitKeywordMatch`` for owner-facing aliases.
 
     Returns ``None`` for non-matching prompts (treated as normal task by the
     UserPromptSubmit gate; disclosure not relayed).

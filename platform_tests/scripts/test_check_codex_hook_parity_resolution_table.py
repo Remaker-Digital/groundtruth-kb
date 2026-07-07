@@ -241,7 +241,7 @@ def test_canonical_init_keyword_regex_diverges(tmp_path: Path) -> None:
     project_root = _stage_relevant_files(tmp_path)
     _mutate_replace(
         project_root / _CORE,
-        '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")',
+        "_CANONICAL_KEYWORD_RE = CANONICAL_INIT_KEYWORD_REGEX",
         '_CANONICAL_KEYWORD_RE = re.compile(r"^::init drift$")',
     )
     errors = parity._resolution_table_parity_errors(project_root)

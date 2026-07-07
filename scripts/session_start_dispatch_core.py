@@ -32,7 +32,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -40,6 +39,15 @@ from enum import Enum
 from pathlib import Path
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
+sys.path.insert(0, str(PROJECT_ROOT))
+from scripts._session_init_keyword import (  # noqa: E402
+    CANONICAL_INIT_KEYWORD_REGEX,
+    match_canonical_init_keyword,
+)
+from scripts.harness_identity import resolved_harness_id  # noqa: E402
+from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
+from scripts.windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402
+
 # Per-harness configuration. The thin wrappers
 # (.claude/hooks/session_start_dispatch.py, .codex/gtkb-hooks/session_start_dispatch.py)
 # override HARNESS_NAME and OUT_DIR in their own module namespace and rebind
@@ -54,9 +62,9 @@ STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0
 # Parity marker for tests: Role: Prime Builder
 
 # IP-4: canonical init-keyword recognition (receiver side).
-# Per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001: regex matches the first-line
-# activator emitted by the dispatcher runtime; closed vocabulary {pb, lo}.
-_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")
+# Per SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001 v3: the shared parser accepts
+# ``::init (gtkb|application)`` with optional role mode ``pb|lo``.
+_CANONICAL_KEYWORD_RE = CANONICAL_INIT_KEYWORD_REGEX
 _BRIDGE_DISPATCH_RUN_ID_ENV = "GTKB_BRIDGE_POLLER_RUN_ID"
 _BRIDGE_DISPATCH_KEYWORD_ENV = "GTKB_BRIDGE_DISPATCH_KEYWORD"
 _LABEL_TO_CANONICAL_MODE = {
@@ -87,12 +95,6 @@ class StartupDecision(Enum):
     SPOOF_FALLBACK = "spoof_fallback"
     LEGACY_FALLBACK = "legacy_fallback"
     STRICT_DROP = "strict_drop"
-
-
-sys.path.insert(0, str(PROJECT_ROOT))
-from scripts.harness_identity import resolved_harness_id  # noqa: E402
-from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
-from scripts.windows_subprocess import no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402
 
 
 def _now_iso() -> str:
@@ -311,7 +313,7 @@ def _read_first_prompt_line() -> str | None:
     raw = os.environ.get(_BRIDGE_DISPATCH_KEYWORD_ENV)
     if raw is None:
         return None
-    return raw.strip() or None
+    return raw or None
 
 
 def _role_modes_from_field(raw_role: object) -> frozenset[str]:
@@ -436,11 +438,12 @@ def _bridge_dispatch_keyword_check(
     present       absent     n/a                   LEGACY_FALLBACK      warn; normal startup; do NOT bypass
     present       present    yes                   DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted
     present       present    no                    DISPATCH_AUTHORIZED  bridge auto-dispatch context emitted; audit log
+    present       subject    n/a                   DISPATCH_AUTHORIZED  subject-only keyword; resolver fallback
     ============  =========  ====================  ===================  ====================================================
     """
     run_id = os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV)
     first_line = _read_first_prompt_line() or ""
-    keyword_match = _CANONICAL_KEYWORD_RE.match(first_line)
+    keyword_match = match_canonical_init_keyword(first_line)
 
     if not run_id and not keyword_match:
         return (StartupDecision.NORMAL_STARTUP, "no markers; standard fresh-session")
@@ -457,7 +460,12 @@ def _bridge_dispatch_keyword_check(
 
     # Both present.
     assert keyword_match is not None  # narrow for type checker
-    keyword_mode = keyword_match.group(1)
+    keyword_mode = keyword_match.role_mode
+    if keyword_mode is None:
+        return (
+            StartupDecision.DISPATCH_AUTHORIZED,
+            f"subject-only canonical dispatch keyword {keyword_match.subject!r}; resolver fallback",
+        )
     try:
         own_role_set = _resolve_own_role_set(project_root=project_root)
     except (FileNotFoundError, OSError, json.JSONDecodeError, KeyError, ValueError) as exc:

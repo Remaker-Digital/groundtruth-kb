@@ -82,7 +82,7 @@ _STARTUP_DECISION_MEMBER_LITERALS = (
 )
 
 # Canonical init-keyword regex per ``SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001``.
-_CANONICAL_KEYWORD_RE_LITERAL = '_CANONICAL_KEYWORD_RE = re.compile(r"^::init gtkb (pb|lo)$")'
+_CANONICAL_KEYWORD_RE_LITERAL = "_CANONICAL_KEYWORD_RE = CANONICAL_INIT_KEYWORD_REGEX"
 
 # Audit-log primitives (Slice 4 VERIFIED + prompt-role authority revision).
 _AUDIT_LOG_KIND_LITERAL = '"dispatch_role_mismatch_authorized"'

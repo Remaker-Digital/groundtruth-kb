@@ -366,7 +366,7 @@ def test_startup_gate_no_match_passes_prompt_through(tmp_path, monkeypatch) -> N
     assert guard_state["startup_gate_no_match_passed_through"] is True
 
 
-def test_sessionstart_plus_dispatch_prompt_without_marker_processes_bridge_task(tmp_path, monkeypatch) -> None:
+def test_sessionstart_plus_daemon_dispatch_prompt_without_marker_processes_bridge_task(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
     guard_path = tmp_path / "guard.json"
@@ -383,9 +383,9 @@ def test_sessionstart_plus_dispatch_prompt_without_marker_processes_bridge_task(
     )
     dispatch_prompt = """::init gtkb pb
 
-Single-harness bridge dispatcher notification (Slice 2 scheduled task).
+Dispatcher daemon bridge dispatch notification.
 
-This is an automated bridge dispatch from the single-harness dispatcher, not a fresh-session owner stimulus;
+This is an automated bridge dispatch from the dispatcher daemon, not a fresh-session owner stimulus;
 do not wait for another owner message before processing the selected entries.
 
 Read bridge/INDEX.md directly before acting.
@@ -407,7 +407,7 @@ Read bridge/INDEX.md directly before acting.
     assert guard_state["startup_prompt_discarded"] is False
     assert guard_state["startup_response_pending"] is False
     assert guard_state["startup_gate_no_match_passed_through"] is True
-    assert guard_state["startup_prompt_preview"].startswith("::init gtkb pb Single-harness bridge dispatcher")
+    assert guard_state["startup_prompt_preview"].startswith("::init gtkb pb Dispatcher daemon bridge dispatch")
 
 
 def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None:
@@ -441,6 +441,41 @@ def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None
     guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
     assert guard_state["current_subject"] == module.SUBJECT_APPLICATION
     assert guard_state["startup_init_app_scope"] == "agent_red"
+
+
+def test_startup_gate_canonical_application_subject_sets_application_scope(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    canonical, _ = _isolate_state(monkeypatch, tmp_path)
+    guard_path = tmp_path / "guard.json"
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": True,
+                "startup_guard_id": "test-guard",
+                "startup_response_pending": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.handle_hook_payload(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "::init application",
+        },
+        REPO_ROOT,
+    )
+
+    assert "(init-keyword match)" in response["systemMessage"]
+    state = json.loads(canonical.read_text(encoding="utf-8"))
+    assert state["current_subject"] == module.SUBJECT_APPLICATION
+    assert state["application_id"] is None
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["current_subject"] == module.SUBJECT_APPLICATION
+    assert guard_state["startup_init_app_scope"] == "application"
+    assert "startup_session_role_marker_written_at" not in guard_state
+    assert "startup_session_role_per_session_markers_written" not in guard_state
 
 
 def _write_startup_gate_guard(tmp_path: Path) -> None:

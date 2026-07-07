@@ -23,7 +23,12 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts._session_init_keyword import InitKeywordMatch, match_init_keyword
+    from scripts._session_init_keyword import (
+        CANONICAL_INIT_KEYWORD_REGEX,
+        InitKeywordMatch,
+        match_canonical_init_keyword,
+        match_init_keyword,
+    )
     from scripts.harness_roles import (
         DEFAULT_HARNESS_IDS,
         ROLE_ACTING_PRIME_BUILDER,
@@ -44,7 +49,12 @@ try:
         resolved_harness_id as _resolved_harness_id_from_roles,
     )
 except ImportError:  # pragma: no cover - direct script execution path
-    from _session_init_keyword import InitKeywordMatch, match_init_keyword  # type: ignore[no-redef]
+    from _session_init_keyword import (  # type: ignore[no-redef]
+        CANONICAL_INIT_KEYWORD_REGEX,
+        InitKeywordMatch,
+        match_canonical_init_keyword,
+        match_init_keyword,
+    )
     from harness_roles import (  # type: ignore[no-redef]
         DEFAULT_HARNESS_IDS,
         ROLE_ACTING_PRIME_BUILDER,
@@ -1061,7 +1071,7 @@ def system_message_for_state(state: dict[str, Any], *, changed: bool = False) ->
     )
 
 
-_CANONICAL_DISPATCH_INIT_RE = re.compile(r"^::init\s+gtkb\s+(?P<role_mode>pb|lo)\s*$", re.IGNORECASE)
+_CANONICAL_DISPATCH_INIT_RE = CANONICAL_INIT_KEYWORD_REGEX
 
 _PROMPT_EXPLICIT_ROLE_HINTS = (
     (
@@ -1096,19 +1106,20 @@ _PROMPT_EXPLICIT_ROLE_HINTS = (
 
 
 def _match_startup_init_keyword(prompt: str) -> InitKeywordMatch | None:
+    canonical = match_canonical_init_keyword(prompt)
+    if canonical is not None:
+        return InitKeywordMatch(app_scope=canonical.subject, mode="default")
     match = match_init_keyword(prompt)
     if match is not None:
         return match
-    if _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip()):
-        return InitKeywordMatch(app_scope="gtkb", mode="default")
     return None
 
 
 def _startup_role_mode_from_prompt(prompt: str) -> str | None:
-    match = _CANONICAL_DISPATCH_INIT_RE.match(prompt.strip())
+    match = match_canonical_init_keyword(prompt)
     if match is None:
         return None
-    return match.group("role_mode").lower()
+    return match.role_mode
 
 
 def _explicit_role_hint_mode_from_prompt(prompt: str) -> str | None:
@@ -1476,6 +1487,14 @@ def _set_work_subject_from_init_match(
             source="startup init keyword",
         )
         return FOCUS_GTKB_INFRASTRUCTURE
+    if init_match.app_scope == "application":
+        save_state(
+            FOCUS_APPLICATION,
+            project_root,
+            updated_by="startup_init_keyword",
+            source="startup init keyword",
+        )
+        return FOCUS_APPLICATION
     if init_match.app_scope == "agent_red":
         save_state(
             FOCUS_APPLICATION,

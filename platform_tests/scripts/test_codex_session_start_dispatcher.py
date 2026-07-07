@@ -172,6 +172,22 @@ def test_dispatch_authorized_when_role_record_is_multi_role_set(
     assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
 
 
+def test_dispatch_authorized_for_subject_only_keyword_with_run_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env-var + subject-only canonical keyword -> DISPATCH_AUTHORIZED via fallback."""
+    _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
+    hook = _load_codex_hook("dispatch_subject_only")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "test-run-codex-subject-only")
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init application")
+
+    decision, reason = hook._bridge_dispatch_keyword_check(project_root=tmp_path)
+
+    assert decision == hook.StartupDecision.DISPATCH_AUTHORIZED
+    assert "subject-only canonical dispatch keyword" in reason
+    assert "resolver fallback" in reason
+
+
 def test_spoof_fallback_when_keyword_without_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """keyword present, env-var absent -> SPOOF_FALLBACK.
 
@@ -312,7 +328,7 @@ def test_codex_hook_has_envelope_parity_constants() -> None:
     """
     hook = _load_codex_hook("envelope_parity")
     # Regex compiled with the canonical pattern.
-    assert hook._CANONICAL_KEYWORD_RE.pattern == r"^::init gtkb (pb|lo)$"
+    assert hook._CANONICAL_KEYWORD_RE.pattern == (r"^::init (?P<subject>gtkb|application)(?: (?P<role_mode>pb|lo))?$")
     # Env var name constants.
     assert hook._BRIDGE_DISPATCH_RUN_ID_ENV == "GTKB_BRIDGE_POLLER_RUN_ID"
     assert hook._BRIDGE_DISPATCH_KEYWORD_ENV == "GTKB_BRIDGE_DISPATCH_KEYWORD"
