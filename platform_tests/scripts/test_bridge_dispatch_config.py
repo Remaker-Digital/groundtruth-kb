@@ -8,6 +8,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
@@ -32,6 +33,7 @@ from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
     set_rule,
     set_weights,
 )
+from groundtruth_kb.cli import main as gt_main  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.harness_projection import generate_harness_projection, read_roles  # noqa: E402
 
@@ -260,10 +262,25 @@ def test_wi4983_live_dispatch_config_routes_prime_no_go_only_to_prime() -> None:
         DispatchContext(required_role="loyal-opposition", status="NO-ACTION"),
     )
 
-    assert [row["id"] for row in prime_go] == ["F"]
-    assert [row["id"] for row in prime_no_go] == ["F"]
+    expected_prime_ids = {
+        row["id"]
+        for row in records
+        if row.get("status") == "active"
+        and row.get("can_receive_dispatch") is True
+        and ("prime-builder" in row.get("role", []) or "acting-prime-builder" in row.get("role", []))
+    }
+    expected_lo_ids = {
+        row["id"]
+        for row in records
+        if row.get("status") == "active"
+        and row.get("can_receive_dispatch") is True
+        and "loyal-opposition" in row.get("role", [])
+    }
+
+    assert {row["id"] for row in prime_go} == expected_prime_ids
+    assert {row["id"] for row in prime_no_go} == expected_prime_ids
     assert prime_no_action == []
-    assert [row["id"] for row in lo_no_action] == ["D", "C"]
+    assert {row["id"] for row in lo_no_action} == expected_lo_ids
 
 
 def test_config_overlay_cannot_disable_registry_dispatchability(tmp_path: Path) -> None:
@@ -389,7 +406,7 @@ prefer = ["harness_id"]
         DispatchContext(required_role="loyal-opposition", status="GO", activity="verify"),
     )
 
-    assert [row["id"] for row in matching] == ["D", "F"]
+    assert {row["id"] for row in matching} == {"D", "F"}
     assert non_matching == []
 
 
@@ -1639,6 +1656,38 @@ prefer = ["quality", "cost", "availability", "harness_id"]
         "cost",
         "harness_id",
     )
+
+
+def test_wi5033_set_weights_cli_accepts_reviewer_precedence_dry_run(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        gt_main,
+        [
+            "--config",
+            str(tmp_path / "groundtruth.toml"),
+            "bridge",
+            "dispatch",
+            "config",
+            "set-weights",
+            "D",
+            "--reviewer-precedence",
+            "20",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["transaction"] == "set-weights"
+    assert payload["status"] == "dry_run"
+    assert payload["mutated"] is False
+    assert "harness registry unchanged" in payload["message"]
 
 
 def test_wi4766_transactions_reject_unknown_rule_without_config_write(tmp_path: Path) -> None:

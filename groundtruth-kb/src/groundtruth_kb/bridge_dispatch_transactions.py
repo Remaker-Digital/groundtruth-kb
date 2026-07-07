@@ -135,10 +135,16 @@ def set_weights(
     dispatch_quality: float | None,
     dispatch_cost: float | None,
     dispatch_availability: float | None,
+    reviewer_precedence: int | None = None,
     dry_run: bool = False,
     defer_to_next_session: bool = False,
 ) -> DispatchConfigTransactionResult:
-    if dispatch_quality is None and dispatch_cost is None and dispatch_availability is None:
+    if (
+        dispatch_quality is None
+        and dispatch_cost is None
+        and dispatch_availability is None
+        and reviewer_precedence is None
+    ):
         raise DispatchConfigTransactionError("at least one weight field must be provided")
     return _apply_registry_metadata_transaction(
         project_root,
@@ -148,6 +154,7 @@ def set_weights(
             "dispatch_quality": dispatch_quality,
             "dispatch_cost": dispatch_cost,
             "dispatch_availability": dispatch_availability,
+            "reviewer_precedence": reviewer_precedence,
         },
         lambda harness_ops, db: harness_ops.set_dispatch_metadata(
             db,
@@ -155,6 +162,7 @@ def set_weights(
             dispatch_quality=dispatch_quality,
             dispatch_cost=dispatch_cost,
             dispatch_availability=dispatch_availability,
+            reviewer_precedence=reviewer_precedence,
             changed_by="gt-bridge-dispatch-config-cli",
             change_reason="set dispatch ranking weights via gt bridge dispatch config",
         ),

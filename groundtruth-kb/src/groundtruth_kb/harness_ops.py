@@ -548,6 +548,7 @@ def set_dispatch_metadata(
     dispatch_quality: float | None = None,
     dispatch_cost: float | None = None,
     dispatch_availability: float | None = None,
+    reviewer_precedence: int | None = None,
     dispatch_max_items: int | None = None,
     dispatch_tags: list[str] | tuple[str, ...] | None = None,
     changed_by: str,
@@ -592,23 +593,37 @@ def set_dispatch_metadata(
         if value is not None:
             updated_dispatch[field] = _validate_dispatch_score(field, value)
             changed = True
+    dispatch_changed = False
     if dispatch_max_items is not None:
         updated_dispatch["dispatch_max_items"] = _validate_dispatch_max_items(dispatch_max_items)
         changed = True
+        dispatch_changed = True
     if dispatch_tags is not None:
         updated_dispatch["dispatch_tags"] = _validate_dispatch_tags(dispatch_tags)
+        changed = True
+        dispatch_changed = True
+    if reviewer_precedence is not None:
+        reviewer_precedence = _validate_reviewer_precedence(reviewer_precedence)
         changed = True
     if not changed:
         raise HarnessOperationError("at least one dispatch metadata field must be provided")
 
-    updated_surfaces["dispatch"] = updated_dispatch
-    return _append_version(
-        db,
-        current,
-        changed_by=changed_by,
-        change_reason=change_reason,
-        invocation_surfaces=updated_surfaces,
-    )
+    overrides: dict[str, Any] = {}
+    if dispatch_changed or any(
+        value is not None
+        for value in (
+            can_receive_dispatch,
+            can_fire_events,
+            dispatch_quality,
+            dispatch_cost,
+            dispatch_availability,
+        )
+    ):
+        updated_surfaces["dispatch"] = updated_dispatch
+        overrides["invocation_surfaces"] = updated_surfaces
+    if reviewer_precedence is not None:
+        overrides["reviewer_precedence"] = reviewer_precedence
+    return _append_version(db, current, changed_by=changed_by, change_reason=change_reason, **overrides)
 
 
 def _validate_dispatch_score(name: str, value: float) -> float | int:
@@ -628,6 +643,16 @@ def _validate_dispatch_max_items(value: int) -> int:
         raise HarnessOperationError("dispatch_max_items must be an integer") from exc
     if parsed < 1:
         raise HarnessOperationError("dispatch_max_items must be at least 1")
+    return parsed
+
+
+def _validate_reviewer_precedence(value: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HarnessOperationError("reviewer_precedence must be an integer") from exc
+    if parsed < 0:
+        raise HarnessOperationError("reviewer_precedence must be non-negative")
     return parsed
 
 

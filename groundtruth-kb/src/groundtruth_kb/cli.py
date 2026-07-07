@@ -1012,6 +1012,7 @@ def bridge_dispatch_config_set_eligibility_cmd(
 @click.option(
     "--availability", "dispatch_availability", type=float, default=None, help="Set dispatch availability, 0-100."
 )
+@click.option("--reviewer-precedence", type=int, default=None, help="Set reviewer precedence for dispatch ranking.")
 @click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
 @click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -1022,6 +1023,7 @@ def bridge_dispatch_config_set_weights_cmd(
     dispatch_quality: float | None,
     dispatch_cost: float | None,
     dispatch_availability: float | None,
+    reviewer_precedence: int | None,
     dry_run: bool,
     defer_to_next_session: bool,
     json_output: bool,
@@ -1037,6 +1039,7 @@ def bridge_dispatch_config_set_weights_cmd(
             dispatch_quality=dispatch_quality,
             dispatch_cost=dispatch_cost,
             dispatch_availability=dispatch_availability,
+            reviewer_precedence=reviewer_precedence,
             dry_run=dry_run,
             defer_to_next_session=defer_to_next_session,
         ),

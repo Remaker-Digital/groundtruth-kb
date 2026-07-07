@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-07T01:28:39Z",
+  "generated_at": "2026-07-07T19:20:24Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -60,7 +60,7 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 50
+      "version": 52
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -69,10 +69,10 @@
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
-      "dispatch_availability": 75.0,
+      "dispatch_availability": 90.0,
       "dispatch_cost": 60.0,
       "dispatch_max_items": 3,
-      "dispatch_quality": 95.0,
+      "dispatch_quality": 90.0,
       "dispatch_tags": [
         "loyal-opposition"
       ],
@@ -85,10 +85,10 @@
         "dispatch": {
           "can_fire_events": false,
           "can_receive_dispatch": false,
-          "dispatch_availability": 75,
+          "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 3,
-          "dispatch_quality": 95,
+          "dispatch_quality": 90,
           "dispatch_tags": [
             "loyal-opposition"
           ],
@@ -110,12 +110,12 @@
           ]
         }
       },
-      "reviewer_precedence": 10,
+      "reviewer_precedence": 20,
       "role": [
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 46
+      "version": 47
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -124,9 +124,9 @@
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
-      "dispatch_availability": 80.0,
-      "dispatch_cost": 30.0,
-      "dispatch_quality": 80.0,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 60.0,
+      "dispatch_quality": 90.0,
       "dispatch_tags": [
         "loyal-opposition"
       ],
@@ -139,9 +139,9 @@
         "dispatch": {
           "can_fire_events": false,
           "can_receive_dispatch": true,
-          "dispatch_availability": 80,
-          "dispatch_cost": 30,
-          "dispatch_quality": 80,
+          "dispatch_availability": 90,
+          "dispatch_cost": 60,
+          "dispatch_quality": 90,
           "dispatch_tags": [
             "loyal-opposition"
           ],
@@ -169,12 +169,12 @@
           "name": "Antigravity IDE"
         }
       },
-      "reviewer_precedence": 30,
+      "reviewer_precedence": 20,
       "role": [
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 34
+      "version": 35
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
@@ -183,10 +183,10 @@
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
-      "dispatch_availability": 95.0,
-      "dispatch_cost": 25.0,
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 60.0,
       "dispatch_max_items": 2,
-      "dispatch_quality": 92.0,
+      "dispatch_quality": 90.0,
       "dispatch_tags": [
         "low-cost",
         "loyal-opposition"
@@ -200,10 +200,10 @@
         "dispatch": {
           "can_fire_events": false,
           "can_receive_dispatch": true,
-          "dispatch_availability": 95,
-          "dispatch_cost": 25,
+          "dispatch_availability": 90,
+          "dispatch_cost": 60,
           "dispatch_max_items": 2,
-          "dispatch_quality": 92,
+          "dispatch_quality": 90,
           "dispatch_tags": [
             "low-cost",
             "loyal-opposition"
@@ -224,12 +224,12 @@
           "max_items": 1
         }
       },
-      "reviewer_precedence": 10,
+      "reviewer_precedence": 20,
       "role": [
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 29
+      "version": 30
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -239,9 +239,9 @@
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
       "dispatch_availability": 90.0,
-      "dispatch_cost": 20.0,
+      "dispatch_cost": 60.0,
       "dispatch_max_items": 3,
-      "dispatch_quality": 80.0,
+      "dispatch_quality": 90.0,
       "dispatch_tags": [
         "prime-builder"
       ],
@@ -255,9 +255,9 @@
           "can_fire_events": false,
           "can_receive_dispatch": false,
           "dispatch_availability": 90,
-          "dispatch_cost": 20,
+          "dispatch_cost": 60,
           "dispatch_max_items": 3,
-          "dispatch_quality": 80,
+          "dispatch_quality": 90,
           "dispatch_tags": [
             "prime-builder"
           ],
@@ -278,12 +278,12 @@
           "name": "Cursor IDE"
         }
       },
-      "reviewer_precedence": 15,
+      "reviewer_precedence": 20,
       "role": [
         "loyal-opposition"
       ],
       "status": "suspended",
-      "version": 15
+      "version": 16
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
@@ -293,8 +293,8 @@
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
       "dispatch_availability": 90.0,
-      "dispatch_cost": 20.0,
-      "dispatch_quality": 80.0,
+      "dispatch_cost": 60.0,
+      "dispatch_quality": 90.0,
       "dispatch_tags": [
         "low-cost",
         "prime-builder"
@@ -309,8 +309,8 @@
           "can_fire_events": false,
           "can_receive_dispatch": true,
           "dispatch_availability": 90,
-          "dispatch_cost": 20,
-          "dispatch_quality": 80,
+          "dispatch_cost": 60,
+          "dispatch_quality": 90,
           "dispatch_tags": [
             "low-cost",
             "prime-builder"
@@ -337,7 +337,7 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 31
+      "version": 32
     }
   ],
   "schema_version": 1,

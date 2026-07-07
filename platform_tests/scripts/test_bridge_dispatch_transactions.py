@@ -43,6 +43,7 @@ _AUTHORITATIVE_FIELDS = {
     "dispatch_cost",
     "dispatch_quality",
     "dispatch_availability",
+    "reviewer_precedence",
 }
 
 _RULES_TOML = """\
@@ -184,17 +185,45 @@ def test_set_weights_updates_registry_projection_without_rules_authority(tmp_pat
     root = tmp_path / "project"
     _seed(root)
 
-    result = set_weights(root, "D", dispatch_quality=88, dispatch_cost=24, dispatch_availability=91)
+    result = set_weights(
+        root,
+        "D",
+        dispatch_quality=88,
+        dispatch_cost=24,
+        dispatch_availability=91,
+        reviewer_precedence=12,
+    )
 
     assert result.status == "applied"
     projection = _projection_record(root, "D")
     assert projection["dispatch_quality"] == 88.0
     assert projection["dispatch_cost"] == 24.0
     assert projection["dispatch_availability"] == 91.0
+    assert projection["reviewer_precedence"] == 12
     dispatch = _db_dispatch_surface(root, "D")
     assert dispatch["dispatch_quality"] == 88
     assert dispatch["dispatch_cost"] == 24
     assert dispatch["dispatch_availability"] == 91
+    _assert_rules_policy_only(root, "D")
+
+
+def test_set_weights_can_update_reviewer_precedence_without_rewriting_dispatch_surface(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    _seed(root)
+    before_dispatch = _db_dispatch_surface(root, "D")
+
+    result = set_weights(
+        root,
+        "D",
+        dispatch_quality=None,
+        dispatch_cost=None,
+        dispatch_availability=None,
+        reviewer_precedence=20,
+    )
+
+    assert result.status == "applied"
+    assert _projection_record(root, "D")["reviewer_precedence"] == 20
+    assert _db_dispatch_surface(root, "D") == before_dispatch
     _assert_rules_policy_only(root, "D")
 
 
