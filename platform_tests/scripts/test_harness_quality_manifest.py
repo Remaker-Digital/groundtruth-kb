@@ -58,6 +58,8 @@ def test_evidence_schema_has_required_fields() -> None:
         "dispatch_envelope_id",
         "fixture_id",
         "run_tier",
+        "adaptation_id",
+        "adaptation_label",
         "started_at",
         "ended_at",
         "duration_ms",

@@ -48,6 +48,8 @@ def test_cadence_report_separates_smoke_full_and_adjudicated_tiers() -> None:
     assert tiers["full_quality"]["record_count"] == 0
     assert tiers["adjudicated_calibration"]["includes_adjudication"] is True
     assert tiers["smoke"]["estimated_cost"] == 0.02
+    assert tiers["smoke"]["adaptation_ids"] == ["adaptation-default"]
+    assert report["summary"]["adaptation_count"] == 1
 
 
 def test_report_consumes_scoring_and_telemetry_payloads_without_mutation() -> None:
@@ -102,6 +104,7 @@ def test_render_markdown_contains_tier_table_and_bridge_topics() -> None:
 
     assert "# Harness quality cadence report run-md" in markdown
     assert "| `smoke` | 1 |" in markdown
+    assert "Adaptations" in markdown
     assert "candidate bridge" in markdown
 
 

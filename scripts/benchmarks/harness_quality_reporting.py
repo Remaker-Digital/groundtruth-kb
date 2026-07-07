@@ -131,6 +131,12 @@ def _tier_summary(
         "telemetry_record_count": len(tier_telemetry),
         "harness_count": len({str(record.get("harness_id")) for record in tier_records if record.get("harness_id")}),
         "fixture_count": len({str(record.get("fixture_id")) for record in tier_records if record.get("fixture_id")}),
+        "adaptation_count": len(
+            {str(record.get("adaptation_id")) for record in tier_records if record.get("adaptation_id")}
+        ),
+        "adaptation_ids": sorted(
+            {str(record.get("adaptation_id")) for record in tier_records if record.get("adaptation_id")}
+        ),
         "benchmark_modes": sorted(
             {str(record.get("benchmark_mode")) for record in tier_records if record.get("benchmark_mode")}
         ),
@@ -274,6 +280,9 @@ def build_cadence_report(
             "record_count": len(current_records),
             "telemetry_record_count": len(telemetry_records),
             "tier_count": len(tier_summaries),
+            "adaptation_count": len(
+                {str(record.get("adaptation_id")) for record in current_records if record.get("adaptation_id")}
+            ),
             "suggestion_count": len(_remediation_suggestions(tier_summaries)),
         },
     }
@@ -290,18 +299,19 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         "",
         "## Tier Summary",
         "",
-        "| Tier | Records | Harnesses | Fixtures | Avg deterministic | Avg adjudication | Cost |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Tier | Records | Harnesses | Fixtures | Adaptations | Avg deterministic | Avg adjudication | Cost |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for tier in report.get("tiers", ()):
         deterministic = tier.get("average_deterministic_score")
         adjudication = tier.get("average_adjudication_score")
         lines.append(
-            "| `{tier}` | {records} | {harnesses} | {fixtures} | {det} | {adj} | {cost} |".format(
+            "| `{tier}` | {records} | {harnesses} | {fixtures} | {adaptations} | {det} | {adj} | {cost} |".format(
                 tier=tier.get("tier_id"),
                 records=tier.get("record_count"),
                 harnesses=tier.get("harness_count"),
                 fixtures=tier.get("fixture_count"),
+                adaptations=tier.get("adaptation_count"),
                 det="-" if deterministic is None else deterministic,
                 adj="-" if adjudication is None else adjudication,
                 cost=tier.get("estimated_cost"),

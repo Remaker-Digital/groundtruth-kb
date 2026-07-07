@@ -48,12 +48,22 @@ def test_evidence_record_is_manifest_complete_and_exact() -> None:
     assert set(record) == set(manifest.REQUIRED_EVIDENCE_FIELDS)
     assert record["dispatch_envelope_id"].startswith("bench-env-")
     assert record["failure_class"] == "unscored"
+    assert record["adaptation_id"] == manifest.DEFAULT_ADAPTATION_ID
+    assert record["adaptation_label"] == manifest.DEFAULT_ADAPTATION_LABEL
 
 
 def test_author_model_configuration_propagates_from_dispatch_envelope() -> None:
+    target = runner.BenchmarkHarnessTarget(
+        harness_id="A",
+        provider="codex",
+        model="gpt-5-codex",
+        author_model_configuration="codex desktop synthetic benchmark",
+        adaptation_id="adapt-codex-baseline",
+        adaptation_label="codex-baseline",
+    )
     records = runner.build_dry_run_evidence_records(
         run_id="run-configuration",
-        harness_targets=(_target(),),
+        harness_targets=(target,),
         benchmark_mode="prime_builder",
         started_at="2026-06-30T08:00:00Z",
         ended_at="2026-06-30T08:00:01Z",
@@ -64,6 +74,8 @@ def test_author_model_configuration_propagates_from_dispatch_envelope() -> None:
     assert records[0]["author_model_configuration"] == "codex desktop synthetic benchmark"
     assert records[0]["provider"] == "codex"
     assert records[0]["model"] == "gpt-5-codex"
+    assert records[0]["adaptation_id"] == "adapt-codex-baseline"
+    assert records[0]["adaptation_label"] == "codex-baseline"
 
 
 def test_failure_class_is_closed_taxonomy() -> None:

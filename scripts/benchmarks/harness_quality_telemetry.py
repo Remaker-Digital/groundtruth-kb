@@ -52,6 +52,7 @@ def idempotency_key_for(record: dict[str, Any]) -> str:
         "fixture_id": validated["fixture_id"],
         "harness_id": validated["harness_id"],
         "benchmark_mode": validated["benchmark_mode"],
+        "adaptation_id": validated["adaptation_id"],
     }
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return "bench-telemetry-" + hashlib.sha256(blob).hexdigest()[:24]
@@ -86,6 +87,8 @@ def to_tafe_stage_attempt(record: dict[str, Any]) -> dict[str, Any]:
             "author_model_configuration": validated["author_model_configuration"],
             "dispatch_envelope_id": validated["dispatch_envelope_id"],
             "run_tier": validated["run_tier"],
+            "adaptation_id": validated["adaptation_id"],
+            "adaptation_label": validated["adaptation_label"],
             "outcome": validated["outcome"],
             "verdict": validated["verdict"],
             "failure_class": validated["failure_class"],
@@ -107,6 +110,8 @@ def to_benchmark_result_record(record: dict[str, Any]) -> dict[str, Any]:
         "fixture_id": validated["fixture_id"],
         "dispatch_envelope_id": validated["dispatch_envelope_id"],
         "run_tier": validated["run_tier"],
+        "adaptation_id": validated["adaptation_id"],
+        "adaptation_label": validated["adaptation_label"],
         "provider": validated["provider"],
         "model": validated["model"],
         "author_model_configuration": validated["author_model_configuration"],

@@ -65,6 +65,8 @@ def test_failure_class_preserved_in_tafe_metadata_and_result_record() -> None:
 
     assert mapped["tafe_stage_attempt"]["metadata"]["failure_class"] == record["failure_class"]
     assert mapped["benchmark_result"]["failure_class"] == record["failure_class"]
+    assert mapped["tafe_stage_attempt"]["metadata"]["adaptation_id"] == record["adaptation_id"]
+    assert mapped["benchmark_result"]["adaptation_id"] == record["adaptation_id"]
 
 
 def test_token_cost_reconciliation_is_deterministic() -> None:

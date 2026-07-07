@@ -125,13 +125,17 @@ def _run_live_probe(
 def _run_auth_probe(
     agent_command: list[str],
     *,
+    project_root: Path,
     runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
     timeout: float = 10.0,
 ) -> dict[str, Any]:
     command = [*agent_command, "status", "--format", "json"]
     active_runner = runner or subprocess.run
+    env = cursor_harness._cursor_agent_env()
     completed = active_runner(
         command,
+        cwd=project_root,
+        env=env,
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
@@ -156,6 +160,7 @@ def _run_auth_probe(
     return {
         "authenticated": authenticated,
         "command": command,
+        "cursor_api_key_available": bool(env.get("CURSOR_API_KEY")),
         "message": message,
         "returncode": completed.returncode,
         "status": status,
@@ -213,9 +218,17 @@ def evaluate_readiness(
     auth_ok = False
     if agent_ok:
         try:
-            auth_probe = _run_auth_probe(agent_command, runner=auth_runner, timeout=min(timeout, 10.0))
+            auth_probe = _run_auth_probe(
+                agent_command,
+                project_root=project_root,
+                runner=auth_runner,
+                timeout=min(timeout, 10.0),
+            )
             auth_ok = bool(auth_probe["authenticated"])
-            auth_detail = f"status={auth_probe['status']}; message={auth_probe['message']}"
+            auth_detail = (
+                f"status={auth_probe['status']}; message={auth_probe['message']}; "
+                f"cursor_api_key_available={auth_probe['cursor_api_key_available']}"
+            )
         except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired) as exc:
             auth_probe = {"authenticated": False, "error": f"{type(exc).__name__}: {exc}"}
             auth_detail = auth_probe["error"]
@@ -253,6 +266,7 @@ def evaluate_readiness(
     return {
         "agent_command": agent_command,
         "auth_probe": auth_probe,
+        "cursor_adaptation": cursor_harness.cursor_adaptation_metadata(project_root),
         "checks": checks,
         "dispatchable_now": dispatchable_now,
         "first_failed_check": _first_failed_detail(checks),
@@ -267,7 +281,20 @@ def evaluate_readiness(
     }
 
 
+def _load_project_env_local() -> None:
+    try:
+        from scripts._env import load_env_local
+    except ImportError:
+        from _env import load_env_local  # type: ignore[import-not-found]
+
+    load_env_local()
+
+
 def main(argv: list[str] | None = None) -> int:
+    try:
+        _load_project_env_local()
+    except Exception:  # noqa: BLE001 - missing/unreadable .env.local must not block readiness probe
+        pass
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recipient", default=HARNESS_ID)
     parser.add_argument("--project-root", default=PROJECT_ROOT, type=Path)

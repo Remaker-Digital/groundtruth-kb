@@ -28,6 +28,8 @@ class BenchmarkDispatchEnvelope:
     author_model_configuration: str
     run_tier: str
     fixture_id: str
+    adaptation_id: str
+    adaptation_label: str
 
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
@@ -82,6 +84,8 @@ def create_benchmark_dispatch_envelope(
     author_model_configuration: str,
     run_tier: str,
     fixture_id: str,
+    adaptation_id: str = manifest.DEFAULT_ADAPTATION_ID,
+    adaptation_label: str = manifest.DEFAULT_ADAPTATION_LABEL,
 ) -> BenchmarkDispatchEnvelope:
     """Build a validated synthetic envelope for one fixture/harness run."""
 
@@ -97,6 +101,8 @@ def create_benchmark_dispatch_envelope(
         ),
         "run_tier": require_run_tier(run_tier),
         "fixture_id": _require_nonblank(fixture_id, label="fixture_id"),
+        "adaptation_id": _require_nonblank(adaptation_id, label="adaptation_id"),
+        "adaptation_label": _require_nonblank(adaptation_label, label="adaptation_label"),
     }
     return BenchmarkDispatchEnvelope(
         dispatch_envelope_id=envelope_id_for(payload),

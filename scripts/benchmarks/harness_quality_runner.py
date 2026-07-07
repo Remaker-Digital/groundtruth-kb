@@ -38,6 +38,8 @@ class BenchmarkHarnessTarget:
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODEL
     author_model_configuration: str = DEFAULT_MODEL_CONFIGURATION
+    adaptation_id: str = manifest.DEFAULT_ADAPTATION_ID
+    adaptation_label: str = manifest.DEFAULT_ADAPTATION_LABEL
 
 
 def _require_failure_class(failure_class: str) -> str:
@@ -111,6 +113,8 @@ def build_evidence_record(
         "dispatch_envelope_id": envelope.dispatch_envelope_id,
         "fixture_id": fixture.fixture_id,
         "run_tier": envelope.run_tier,
+        "adaptation_id": envelope.adaptation_id,
+        "adaptation_label": envelope.adaptation_label,
         "started_at": started_at,
         "ended_at": ended_at,
         "duration_ms": _require_nonnegative_int(duration_ms, label="duration_ms"),
@@ -154,6 +158,8 @@ def enumerate_benchmark_envelopes(
                     author_model_configuration=target.author_model_configuration,
                     run_tier=run_tier,
                     fixture_id=fixture.fixture_id,
+                    adaptation_id=target.adaptation_id,
+                    adaptation_label=target.adaptation_label,
                 )
             )
     return tuple(envelopes)

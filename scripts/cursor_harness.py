@@ -44,6 +44,7 @@ _CURSOR_AGENT_PROCESS_NAMES = {"agent", "agent.exe", "cursor-agent", "cursor-age
 _WINDOWS_SHELL_WRAPPER_SUFFIXES = {".bat", ".cmd", ".ps1"}
 _CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
 _CURSOR_AUTH_ENV_KEYS = ("CURSOR_API_KEY",)
+_CURSOR_ADAPTATION_VERSION = "cursor-skill-route-v1"
 _PROVENANCE_DIR = Path(".gtkb-state") / "ops" / "dispatch-provenance"
 _PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
 
@@ -185,6 +186,33 @@ def _build_prompt(user_prompt: str, skill: str | None) -> str:
     return (
         f"Follow the GT-KB skill contract below, then execute the user task.\n\n{system_prompt}\n\n---\n\n{user_prompt}"
     )
+
+
+def _sha256_file(path: Path) -> str:
+    try:
+        return "sha256:" + __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return "missing"
+
+
+def cursor_adaptation_metadata(project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
+    """Return compact Cursor/E adaptation metadata for benchmark evidence."""
+
+    shim_path = project_root / Path("scripts") / "cursor_harness.py"
+    return {
+        "harness_id": "E",
+        "adaptation_label": "cursor-skill-route-readiness",
+        "adaptation_version": _CURSOR_ADAPTATION_VERSION,
+        "skill_route_aliases": dict(sorted(_SKILL_ROUTE_ALIASES.items())),
+        "input_fingerprints": {
+            "scripts/cursor_harness.py": _sha256_file(shim_path),
+            "skill-route-aliases": "sha256:"
+            + __import__("hashlib")
+            .sha256(json.dumps(_SKILL_ROUTE_ALIASES, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+            .hexdigest(),
+        },
+        "raw_prompt_included": False,
+    }
 
 
 def _build_command(prompt: str, project_root: Path, *, output_format: str) -> list[str]:

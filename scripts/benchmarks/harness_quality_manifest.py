@@ -33,6 +33,8 @@ REQUIRED_EVIDENCE_FIELDS: tuple[str, ...] = (
     "dispatch_envelope_id",
     "fixture_id",
     "run_tier",
+    "adaptation_id",
+    "adaptation_label",
     "started_at",
     "ended_at",
     "duration_ms",
@@ -75,6 +77,9 @@ SCORING_DIMENSIONS: tuple[str, ...] = (
     "adjudicated",
     "telemetry",
 )
+
+DEFAULT_ADAPTATION_ID = "adaptation-default"
+DEFAULT_ADAPTATION_LABEL = "unspecified"
 
 
 @dataclass(frozen=True)
@@ -425,6 +430,8 @@ def manifest_to_dict(manifest: HarnessQualityManifest = HARNESS_QUALITY_MANIFEST
 __all__ = [
     "BENCHMARK_MODES",
     "CHALLENGE_FAMILIES",
+    "DEFAULT_ADAPTATION_ID",
+    "DEFAULT_ADAPTATION_LABEL",
     "DISPATCHER_BRIDGE_CLI_REQUIREMENTS",
     "FAILURE_CLASSES",
     "HARNESS_QUALITY_MANIFEST",

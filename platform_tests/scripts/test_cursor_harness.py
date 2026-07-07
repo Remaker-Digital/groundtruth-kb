@@ -65,6 +65,18 @@ def test_skill_route_none_returns_none() -> None:
     assert harness._skill_system_prompt(None) is None
 
 
+def test_cursor_adaptation_metadata_is_compact_and_alias_aware() -> None:
+    harness = _load_harness()
+    payload = harness.cursor_adaptation_metadata()
+
+    assert payload["harness_id"] == "E"
+    assert payload["adaptation_label"] == "cursor-skill-route-readiness"
+    assert payload["skill_route_aliases"]["bridge-review"] == "bridge"
+    assert payload["raw_prompt_included"] is False
+    assert all(value.startswith("sha256:") for value in payload["input_fingerprints"].values())
+    assert "Follow the GT-KB skill contract" not in repr(payload)
+
+
 def test_resolve_agent_command_uses_standalone_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     monkeypatch.delenv("CURSOR_AGENT_BIN", raising=False)
