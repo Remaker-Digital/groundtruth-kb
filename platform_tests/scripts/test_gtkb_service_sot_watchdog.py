@@ -173,6 +173,70 @@ def test_watchdog_executes_safe_restore_and_records_payload(monkeypatch, tmp_pat
     assert artifact["pre_restore_probe"]["status"] == "WARN"
 
 
+def test_watchdog_clears_retry_debt_after_fresh_healthy_probe(tmp_path):
+    artifact = _artifact(
+        "dispatcher-supervisor-task",
+        "_check_dispatcher_daemon_supervisor_task",
+        restore_action="ensure_alive",
+    )
+    retry_state = {
+        "schema_version": 1,
+        "attempts": {
+            "dispatcher-supervisor-task:ensure_alive": {
+                "artifact_id": "dispatcher-supervisor-task",
+                "restore_action": "ensure_alive",
+                "attempts": 3,
+            }
+        },
+    }
+    probe = {"name": "supervisor", "status": "PASS", "detail": "task ready", "fresh": True}
+
+    evaluated, executed, deferred = service_sot._evaluate_restore_for_artifact(
+        artifact,
+        probe,
+        tmp_path,
+        retry_state,
+    )
+
+    assert executed == []
+    assert deferred == []
+    assert retry_state["attempts"] == {}
+    assert evaluated["restore_decision"]["reason_code"] == "probe_not_failed"
+    assert evaluated["restore_retry_reset"]["attempts_cleared"] == 3
+    assert evaluated["restore_retry_reset"]["reason_code"] == "healthy_probe"
+
+
+def test_watchdog_keeps_retry_exhaustion_for_failing_probe(tmp_path):
+    artifact = _artifact(
+        "dispatcher-supervisor-task",
+        "_check_dispatcher_daemon_supervisor_task",
+        restore_action="ensure_alive",
+    )
+    retry_state = {
+        "schema_version": 1,
+        "attempts": {
+            "dispatcher-supervisor-task:ensure_alive": {
+                "artifact_id": "dispatcher-supervisor-task",
+                "restore_action": "ensure_alive",
+                "attempts": 3,
+            }
+        },
+    }
+    probe = {"name": "supervisor", "status": "WARN", "detail": "task disabled", "fresh": True}
+
+    evaluated, executed, deferred = service_sot._evaluate_restore_for_artifact(
+        artifact,
+        probe,
+        tmp_path,
+        retry_state,
+    )
+
+    assert executed == []
+    assert deferred[0]["reason_code"] == "retry_exhausted"
+    assert evaluated["restore_decision"]["kind"] == "escalate"
+    assert retry_state["attempts"]["dispatcher-supervisor-task:ensure_alive"]["attempts"] == 3
+
+
 def test_watchdog_defers_safe_restore_when_disable_guard_active(monkeypatch, tmp_path):
     from groundtruth_kb.dispatcher_disable_guard import record_guarded_disable
 

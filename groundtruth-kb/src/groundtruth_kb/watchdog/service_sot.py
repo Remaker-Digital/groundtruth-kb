@@ -353,6 +353,21 @@ def _evaluate_restore_for_artifact(
     decision = decide_artifact_restoration(artifact, probe, retry_attempts=retry_attempts)
     decision_payload = decision.to_json_dict()
     probe["restore_decision"] = decision_payload
+    if (
+        retry_attempts > 0
+        and decision_payload.get("kind") == "no_restore"
+        and decision_payload.get("reason_code") == "probe_not_failed"
+        and probe.get("fresh", True) is not False
+    ):
+        reset_payload = {
+            "artifact_id": artifact.id,
+            "restore_action": artifact.restore_action,
+            "attempts_cleared": retry_attempts,
+            "reason_code": "healthy_probe",
+            "detail": "fresh healthy probe cleared stale restore retry state",
+        }
+        _set_retry_attempts(retry_state, artifact, attempts=0, result=reset_payload)
+        probe["restore_retry_reset"] = reset_payload
     if not isinstance(decision, AutoRestoreAction):
         if decision.kind == "escalate":
             return (
