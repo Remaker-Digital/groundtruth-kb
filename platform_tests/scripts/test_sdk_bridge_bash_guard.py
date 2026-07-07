@@ -85,6 +85,34 @@ def test_bridge_mutation_shapes_are_denied(command: str) -> None:
     assert "guarded Write/Edit" in reason
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        'python scripts/ollama_harness.py -p "review"',
+        'groundtruth-kb/.venv/Scripts/python.exe scripts/openrouter_harness.py -p "review"',
+        r'& "E:\GT-KB\groundtruth-kb\.venv\Scripts\pythonw.exe" scripts\ollama_harness.py -p "review"',
+    ],
+)
+def test_sdk_harness_self_invocation_is_denied(command: str) -> None:
+    reason = bridge_bash_mutation_reason(command)
+
+    assert reason is not None
+    assert "Bash SDK harness self-invocation denied" in reason
+    assert "scripts/" in reason
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "Get-Content scripts/ollama_harness.py",
+        "python -c \"print('scripts/ollama_harness.py')\"",
+        "rg ollama_harness scripts",
+    ],
+)
+def test_sdk_harness_benign_references_are_allowed(command: str) -> None:
+    assert bridge_bash_mutation_reason(command) is None
+
+
 def test_protected_paths_are_deduplicated_and_preserve_first_spelling() -> None:
     paths = protected_bridge_paths("type bridge\\example-001.md; echo x > bridge/example-001.md")
 

@@ -34,6 +34,14 @@ _SCRIPT_MUTATION_RE = re.compile(
     r"|\.(?:unlink|rename|replace|touch)\s*\(",
     re.IGNORECASE | re.DOTALL,
 )
+_SDK_HARNESS_SELF_INVOCATION_RE = re.compile(
+    r"(?:^|[\s;&|])"
+    r"(?:&\s*)?"
+    r"['\"]?(?:[^\s'\";&|]+[\\/])?pythonw?(?:\.exe)?['\"]?"
+    r"\s+['\"]?(?P<harness>(?:\.?[\\/])?scripts[\\/](?:ollama_harness|openrouter_harness)\.py)"
+    r"(?:\b|['\"\s])",
+    re.IGNORECASE,
+)
 
 
 def protected_bridge_paths(command: str) -> tuple[str, ...]:
@@ -50,6 +58,13 @@ def protected_bridge_paths(command: str) -> tuple[str, ...]:
 
 def bridge_bash_mutation_reason(command: str) -> str | None:
     """Return a denial reason when ``command`` mutates bridge artifacts."""
+    self_invocation = _SDK_HARNESS_SELF_INVOCATION_RE.search(command or "")
+    if self_invocation:
+        harness = self_invocation.group("harness").strip("\"'`").replace("\\", "/").lstrip("./")
+        return (
+            f"Bash SDK harness self-invocation denied for {harness}. "
+            "Use Read/Grep/Glob or governed gt/helper commands instead of launching a nested SDK harness."
+        )
     paths = protected_bridge_paths(command)
     if not paths:
         return None
