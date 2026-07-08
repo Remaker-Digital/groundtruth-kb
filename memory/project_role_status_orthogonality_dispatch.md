@@ -71,12 +71,12 @@ the ADR-renamed `inactive`) — contradicting ADR-ROLE-STATUS-ORTHOGONALITY-001 
   projection from the DB → C=registered/role=[] → resolver resolves prime-builder→B
   (no multi-active raise); `test_single_prime_fallback_resolves_to_claude` heals.
   Read-only `build_projection` preview confirms the target state. target_paths =
-  `harness-state/harness-registry.json` + bridge + INDEX (no groundtruth.db).
+  `harness-state/harness-registry.json` plus bridge thread files and state (no groundtruth.db).
 - Commit type: `chore` (projection regen, no code).
 - **AUQ-2 (suspend) superseded** by the corrected premise — flagged to owner.
-- **Bridge-integrity note:** the landing-reconciliation INDEX entry VANISHED
-  (parallel-session INDEX rewrite; INDEX is 1171 lines, heavily contended).
-  Restored full chain (NEW -001 / NO-GO -002 / REVISED -003) at INDEX top. Files
+- **Bridge-integrity note:** the landing-reconciliation aggregate queue entry vanished
+  during a parallel-session rewrite of the heavily contended retired queue surface.
+  Restored full chain (NEW -001 / NO-GO -002 / REVISED -003) through governed bridge state. Files
   were intact on disk (append-only).
 - `harness-state/role-assignments.json` also stale (off resolver read path; broader
   parity = `gtkb-harness-registry-parity-sweep` thread). WI-3512 unaffected.
@@ -93,7 +93,7 @@ Proposal: `bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver-001.m
 (NEW). Both preflights PASS (applicability `preflight_passed: true`; clause
 EXIT 0). `target_paths` machine-line authorizes: `scripts/cross_harness_bridge_trigger.py`,
 `scripts/_kb_attribution.py`, `platform_tests/scripts/test_cross_harness_bridge_trigger.py`,
-`platform_tests/scripts/test_kb_attribution.py`, the bridge thread glob, `bridge/INDEX.md`.
+`platform_tests/scripts/test_kb_attribution.py`, and the bridge thread glob/state surfaces.
 
 Implements DCL assertions 1-7, 10, 11 (8-9 = Slice 6 doctor; the doctor half of
 6 = Slice 6, resolver half = here).

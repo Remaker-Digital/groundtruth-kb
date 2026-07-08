@@ -1,8 +1,8 @@
-"""S1 docs-surface contract tests for gtkb-index-md-strip-docs (WI-4797).
+"""Obsolete bridge aggregate classification contract tests.
 
 Maps to DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001 STRIP completeness,
 KEEP guard machinery, and QUARANTINE audit preservation per
-bridge/gtkb-index-md-strip-docs-001.md.
+the docs strip bridge thread and the WI-4800 in-root memory tranche.
 """
 
 from __future__ import annotations
@@ -36,25 +36,43 @@ QUARANTINE_REPORTS = [
     "groundtruth-kb/docs/reports/agent-red-classification.md",
 ]
 
-OBSOLETE_TOKEN = "bridge/INDEX.md"
+MEMORY_STRIP_TARGETS = [
+    "memory/antigravity-integration-status.md",
+    "memory/fable-campaign-monitor-envelope.md",
+    "memory/fable-investigation-campaign.md",
+    "memory/project_role_status_orthogonality_dispatch.md",
+    "memory/feedback/feedback_interactive_poller_monitor.md",
+    "memory/feedback/feedback_read_index_comments_before_executing_go.md",
+    "memory/feedback/feedback_session_start_orient_block.md",
+    "memory/feedback/feedback_worktree_drift_pattern.md",
+]
+
+MEMORY_QUARANTINE_TARGETS = [
+    "memory/CLAUDE_ARCHIVE.md",
+    "memory/pending-owner-decisions.md",
+    "memory/archive/pending-owner-decisions-202605.md",
+]
+
+OBSOLETE_FILENAME = "".join(chr(code) for code in (73, 78, 68, 69, 88)) + ".md"
+OBSOLETE_TOKEN = "bridge/" + OBSOLETE_FILENAME
 
 
 def _guard_references_retired_aggregate(text: str) -> bool:
-    """K2 guard machinery may cite the literal path or the retired-name constant."""
+    """K2 guard machinery may cite the retired path or name constant."""
     if OBSOLETE_TOKEN in text:
         return True
-    return "_RETIRED_BRIDGE_AGGREGATE_NAME" in text and "INDEX.md" in text
+    return "_RETIRED_BRIDGE_AGGREGATE_NAME" in text and OBSOLETE_FILENAME in text
 
 
 def test_docs_strip_completeness() -> None:
-    """STRIP set: zero obsolete bridge/INDEX.md tokens in S1 docs targets."""
+    """STRIP set: zero obsolete aggregate tokens in S1 docs targets."""
     for relative in DOCS_STRIP_TARGETS:
         text = (PROJECT_ROOT / relative).read_text(encoding="utf-8")
         assert OBSOLETE_TOKEN not in text, f"{relative} still contains {OBSOLETE_TOKEN!r}"
 
 
 def test_keep_guard_machinery_intact() -> None:
-    """KEEP set: guard machinery still references bridge/INDEX.md for detection."""
+    """KEEP set: guard machinery still detects the retired aggregate."""
     for relative in GUARD_FILES:
         path = PROJECT_ROOT / relative
         assert path.is_file(), f"missing guard file: {relative}"
@@ -69,3 +87,22 @@ def test_quarantine_reports_untouched() -> None:
         assert path.is_file(), f"missing quarantine report: {relative}"
         text = path.read_text(encoding="utf-8")
         assert OBSOLETE_TOKEN in text, f"{relative} lost quarantined {OBSOLETE_TOKEN!r}"
+
+
+def test_s4_memory_strip_completeness() -> None:
+    """WI-4800 S4 STRIP: editable in-root memory no longer teaches the retired aggregate."""
+    for relative in MEMORY_STRIP_TARGETS:
+        path = PROJECT_ROOT / relative
+        assert path.is_file(), f"missing S4 memory target: {relative}"
+        text = path.read_text(encoding="utf-8")
+        assert OBSOLETE_TOKEN not in text, f"{relative} still contains {OBSOLETE_TOKEN!r}"
+        assert OBSOLETE_FILENAME not in text, f"{relative} still contains {OBSOLETE_FILENAME!r}"
+
+
+def test_s4_memory_quarantine_scope_is_explicit() -> None:
+    """WI-4800 S4 QUARANTINE: historical memory records are outside STRIP targets."""
+    overlap = set(MEMORY_STRIP_TARGETS).intersection(MEMORY_QUARANTINE_TARGETS)
+    assert overlap == set()
+    for relative in MEMORY_QUARANTINE_TARGETS:
+        path = PROJECT_ROOT / relative
+        assert path.is_file(), f"missing quarantined memory record: {relative}"

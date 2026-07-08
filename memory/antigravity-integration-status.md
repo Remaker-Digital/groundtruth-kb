@@ -6,7 +6,7 @@
 Integration work cold.
 
 > **Source-of-truth note.** This file is a *derived operational view* (ADR-0001
-> notepad tier). Canonical truth is MemBase (`groundtruth.db`) + `bridge/INDEX.md`.
+> notepad tier). Canonical truth is MemBase (`groundtruth.db`) plus dispatcher/TAFE bridge state and numbered bridge files.
 > Where this file and MemBase disagree, MemBase wins -- but note that as of
 > 2026-05-18 the MemBase `work_items.stage` field is itself stale for this project
 > (see section 6). A bridge-proposed status truth-up is authorized (owner AUQ
@@ -170,7 +170,7 @@ multiple threads in review at once).
   proxy-attribution precedent.
 
 - 2026-05-18 -- File created by Prime Builder. Initial status reconciliation
-  across MemBase, `bridge/INDEX.md`, on-disk bridge files, and git history.
+  across MemBase, dispatcher/TAFE bridge state, on-disk bridge files, and git history.
   Owner AUQ authorized the "Tracker file + truth-up" approach.
 - 2026-05-18 -- Owner directed completion-first sequencing (truth-up deferred
   behind WI-3342/WI-3343). WI-3342 found implementation-complete in the working
@@ -184,7 +184,7 @@ multiple threads in review at once).
   DECISION-0655 bundle precedent applies if clean isolation is not possible).
 - 2026-05-18 -- WI-3342 post-implementation report filed at
   `bridge/gtkb-harness-registry-reader-migration-008.md` (NEW). A pre-review
-  clause preflight caught a missing CLAUSE-INDEX-IS-CANONICAL evidence line in
+  clause preflight caught a missing retired aggregate canonicality evidence line in
   the first attempt `-007`; `-008` is the corrected version and `-007` is
   retained in the version chain as the append-only audit trail. Applicability +
   clause preflights green against `-008`. Thread awaits Codex VERIFIED at `-009`,
@@ -216,7 +216,7 @@ multiple threads in review at once).
   in the chain as the append-only audit trail.
 - 2026-05-18 -- REVISED PROPOSAL filed at
   `bridge/gtkb-harness-registry-reader-migration-010.md` (status REVISED in
-  `bridge/INDEX.md`), responding to the Codex NO-GO `-009`. `-010` is a
+  the retired aggregate bridge queue), responding to the Codex NO-GO `-009`. `-010` is a
   REVISED *proposal* (not a revised report): NO-GO F2 is a scope defect, so
   the proposal's `target_paths` must be re-approved before the MCP test file
   can be lawfully edited under a fresh impl-auth packet. `-010` amends the

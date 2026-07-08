@@ -7,7 +7,7 @@ author_model_configuration: interactive owner session, ::init gtkb pb
 
 # PROJECT-FABLE-INVESTIGATION — Cross-Session Monitor Envelope
 
-Operational notepad (not canonical). Canonical state = `bridge/INDEX.md` + MemBase.
+Operational notepad (not canonical). Canonical state = dispatcher/TAFE bridge state plus MemBase.
 Companion: `memory/fable-investigation-campaign.md` (filing playbook, cheap-draft recipe,
 per-cluster status, the consolidated gate lessons) and
 `bridge/gtkb-fable-investigation-advisory-001.md` (charter, Q1-Q7, per-FAB WI/findings table).
@@ -36,7 +36,7 @@ it concludes.
 Resume the PROJECT-FABLE-INVESTIGATION standing monitor. READ FIRST:
 memory/fable-campaign-monitor-envelope.md (this file — the monitor arrangement + live status),
 memory/fable-investigation-campaign.md (filing playbook + gate lessons),
-bridge/gtkb-fable-investigation-advisory-001.md (charter), bridge/INDEX.md (live queue).
+bridge/gtkb-fable-investigation-advisory-001.md (charter), and current dispatcher/TAFE bridge state.
 Standing scope = FULL CONCLUSION (act on Codex GO/NO-GO + finish FAB-20..23). Take on
 PB-addressable work (latest GO/NO-GO in the FAB threads) as it appears; pause only for
 genuine owner-gated AUQ batches.
@@ -44,7 +44,7 @@ genuine owner-gated AUQ batches.
 
 ## Per-Session / Per-Tick Monitor Procedure
 
-1. Read live `bridge/INDEX.md` (cheap: scan the FAB-* and campaign entries' top status lines).
+1. Read current dispatcher/TAFE bridge state (cheap: scan the FAB-* and campaign entries' latest status lines).
 2. Identify PB-addressable entries = latest status `GO` or `NO-GO` on a FAB-* or campaign thread.
    (Do NOT act on NEW/REVISED/VERIFIED/ADVISORY as Prime.)
 3. For each, check the work-intent claim (`.gtkb-state/work-intent/<slug>.json`) and the
@@ -52,7 +52,7 @@ genuine owner-gated AUQ batches.
    take it; if actively held by another session, skip and note.
 4. On `GO`: `python scripts/implementation_authorization.py begin --bridge-id <slug>` →
    implement within target_paths + PAUTH bounds → verify (tests/ruff/guard) → file post-impl
-   report (NEW) → INDEX prepend. On `NO-GO`: read findings → revise → file REVISED → INDEX prepend.
+   report (NEW) through the governed bridge writer. On `NO-GO`: read findings → revise → file REVISED through the governed bridge writer.
 5. When no FAB verdict work is available, advance FAB-20..23 filing (owner-gated; AUQ batch first).
 6. When everything currently available is drained, go idle: ScheduleWakeup (~20-25 min) to
    re-check for the next Codex verdict. Work continuously while work exists; sleep only when idle.
@@ -82,10 +82,10 @@ genuine owner-gated AUQ batches.
 - **Filed NEW, awaiting Codex review:** FAB-04, FAB-06..FAB-19 (the rest of the NEW queue).
 - **Remaining to file:** FAB-20 (hygiene-investigation skill), FAB-21 (startup load-cost),
   FAB-22 (architecture — owner-heavy/grill-me), FAB-23 (demoted near-miss batch).
-- **NEW WORKSTREAM (owner-directed 2026-06-11 AUQ): bridge INDEX prune.** INDEX is ~1,880 lines
-  (~9× the ~200-line `file-bridge-protocol.md` §Index Maintenance guidance). Owner authorized a
+- **NEW WORKSTREAM (owner-directed 2026-06-11 AUQ): retired aggregate queue prune.** The retired aggregate queue was ~1,880 lines
+  (~9x the ~200-line historical maintenance guidance). Owner authorized a
   **deterministic prune tool + archive via bridge**: move terminal-status threads (latest =
-  VERIFIED/WITHDRAWN) into `bridge/INDEX-ARCHIVE.md`; keep actionable (NEW/REVISED/GO/NO-GO/
+  VERIFIED/WITHDRAWN) into an archive surface; keep actionable (NEW/REVISED/GO/NO-GO/
   ADVISORY/DEFERRED) live; never touch bridge `*.md` files on disk; repeatable. Governing spec
   `GOV-FILE-BRIDGE-AUTHORITY-001`. To file as a prime_proposal → needs Project/WI/PAUTH.
 - **Codex (Loyal Opposition, harness A) is ACTIVE** and churning the NEW queue fast (a wave of
