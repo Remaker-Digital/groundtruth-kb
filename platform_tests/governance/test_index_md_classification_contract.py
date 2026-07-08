@@ -53,6 +53,15 @@ MEMORY_QUARANTINE_TARGETS = [
     "memory/archive/pending-owner-decisions-202605.md",
 ]
 
+WI5067_TEST_STRIP_TARGETS = [
+    "platform_tests/scripts/test_dispatcher_runtime.py",
+    "platform_tests/scripts/test_gtkb_dispatcher_daemon.py",
+    "platform_tests/scripts/test_bridge_dispatch_config.py",
+    "platform_tests/scripts/test_scan_bridge.py",
+    "platform_tests/scripts/test_show_thread_bridge.py",
+    "groundtruth-kb/tests/adopter/test_registry_entry_present_for_every_scaffolded_file.py",
+]
+
 OBSOLETE_FILENAME = "".join(chr(code) for code in (73, 78, 68, 69, 88)) + ".md"
 OBSOLETE_TOKEN = "bridge/" + OBSOLETE_FILENAME
 
@@ -106,3 +115,13 @@ def test_s4_memory_quarantine_scope_is_explicit() -> None:
     for relative in MEMORY_QUARANTINE_TARGETS:
         path = PROJECT_ROOT / relative
         assert path.is_file(), f"missing quarantined memory record: {relative}"
+
+
+def test_wi5067_active_test_strip_completeness() -> None:
+    """WI-5067 STRIP: active dispatcher/bridge/registry tests no longer materialize
+    or read the retired bridge aggregate as live state (numbered-file discovery only)."""
+    for relative in WI5067_TEST_STRIP_TARGETS:
+        path = PROJECT_ROOT / relative
+        assert path.is_file(), f"missing WI-5067 STRIP target: {relative}"
+        text = path.read_text(encoding="utf-8")
+        assert OBSOLETE_FILENAME not in text, f"{relative} still contains {OBSOLETE_FILENAME!r}"

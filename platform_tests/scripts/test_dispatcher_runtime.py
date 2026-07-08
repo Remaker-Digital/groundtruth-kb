@@ -253,7 +253,7 @@ def _make_synthetic_project(root: Path) -> Path:
     """Create a minimal in-root synthetic GT-KB project with a bridge/ dir.
 
     Returns ``root``. Creates ``groundtruth.toml`` so resolver is satisfied,
-    ``bridge/INDEX.md`` for the trigger to read, and ``harness-state/*.json``
+    an empty ``bridge/`` dir for numbered-file discovery, and ``harness-state/*.json``
     fixtures required by IP-3b's _resolve_dispatch_target (default fixture:
     claude=B=prime-builder, codex=A=loyal-opposition).
     """
@@ -320,10 +320,6 @@ def _make_synthetic_project(root: Path) -> Path:
     )
     _write_codex_no_window_verification(root)
     return root
-
-
-def _write_index(root: Path, body: str) -> None:
-    (root / "bridge" / "INDEX.md").write_text(body, encoding="utf-8")
 
 
 def _write_current_work_items(root: Path, rows: dict[str, str]) -> None:
@@ -783,7 +779,7 @@ def test_application_subject_suppresses_prime_dispatch_before_acquire_or_spawn(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _write_authorized_go_thread(root, "selected-thread"))
+    _write_authorized_go_thread(root, "selected-thread")
     _write_work_subject(root, "application")
 
     trigger = _load_trigger()
@@ -825,7 +821,7 @@ def test_gtkb_subject_allows_cross_harness_dispatch_negative_control(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     _write_work_subject(root, "gtkb_infrastructure")
 
     trigger = _load_trigger()
@@ -908,23 +904,6 @@ def test_run_dispatch_cycle_filters_held_prime_items_before_spawn(
 
     _write_authorized_go_thread(root, "held-thread")
     _write_authorized_go_thread(root, "open-thread")
-    _write_index(
-        root,
-        "\n".join(
-            [
-                "# bridge index",
-                "",
-                "Document: open-thread",
-                "GO: bridge/open-thread-002.md",
-                "NEW: bridge/open-thread.md",
-                "",
-                "Document: held-thread",
-                "GO: bridge/held-thread-002.md",
-                "NEW: bridge/held-thread.md",
-                "",
-            ]
-        ),
-    )
     assert registry.acquire("held-thread", holder_session, project_root=root)
     captured_documents: list[str] = []
 
@@ -960,10 +939,6 @@ def test_run_dispatch_cycle_filters_owner_hold_prime_no_go_before_spawn(
         root,
         f"{doc}-002.md",
         "NO-GO\n\n## Required Revisions\n\n1. **Hold for Owner Decision:** wait for the topology decision.\n",
-    )
-    _write_index(
-        root,
-        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
     )
 
     def _forbid_spawn(**_kwargs: object) -> dict[str, object]:
@@ -1004,10 +979,6 @@ def test_run_dispatch_cycle_filters_headless_ineligible_prime_no_go_before_spawn
                 "Do not re-dispatch to Codex headless for this specific task until ACL remediation is confirmed.",
             ]
         ),
-    )
-    _write_index(
-        root,
-        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
     )
 
     def _forbid_spawn(**_kwargs: object) -> dict[str, object]:
@@ -1112,10 +1083,6 @@ prefer = ["availability", "quality", "cost"]
     )
     _write_bridge_file(root, f"{doc}-001.md", "NEW\n\nbridge_kind: implementation_proposal\n")
     _write_bridge_file(root, f"{doc}-002.md", "NO-GO\n\nFixture requires Prime revision.\n")
-    _write_index(
-        root,
-        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
-    )
     captured: list[tuple[str, list[str]]] = []
 
     def _fake_spawn_harness(**kwargs: object) -> dict[str, object]:
@@ -1152,7 +1119,7 @@ def test_signature_computation_is_deterministic_per_recipient(tmp_path: Path) ->
     Maps to ``_signature`` byte-equivalence with smart-poller normalization.
     """
     root = _make_synthetic_project(tmp_path)
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     state_dir_a = tmp_path / "state-a"
@@ -1184,14 +1151,13 @@ def test_uncommitted_index_edit_triggers_dispatch(tmp_path: Path) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
 
-    # Empty INDEX → no dispatch.
-    _write_index(root, "# empty\n")
+    # Empty bridge state → no dispatch.
     trigger = _load_trigger()
     summary_empty = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert summary_empty["results"]["loyal-opposition"]["reason"] == "no_pending"
 
     # Add a NEW entry (uncommitted edit) → dispatch fires.
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     summary_new = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # dry_run=True → "launched" stays False, but reason is "dry_run" not "no_pending"
     # which proves the dispatch path was entered.
@@ -1213,7 +1179,7 @@ def test_unchanged_signature_does_not_replay(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
 
@@ -1227,7 +1193,7 @@ def test_unchanged_signature_does_not_replay(tmp_path: Path) -> None:
 def test_wi5002_prime_unchanged_clears_stale_failure_fields(tmp_path: Path) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_go(root, doc="wi5002-stale-health"))
+    _index_with_one_go(root, doc="wi5002-stale-health")
 
     trigger = _load_trigger()
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1272,7 +1238,6 @@ def test_terminal_work_item_go_suppressed_before_prime_dispatch(tmp_path: Path) 
         "NEW\n\nbridge_kind: implementation_proposal\nWork Item: WI-5002\n",
     )
     _write_bridge_file(root, f"{doc}-002.md", "GO\n\nWork Item: WI-5002\n")
-    _write_index(root, f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n")
     _write_current_work_items(root, {"WI-5002": "retired"})
 
     summary = _load_trigger().run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1298,7 +1263,7 @@ def test_previous_fatal_worker_output_retries_same_signature(tmp_path: Path) -> 
     """A failed prior worker must not permanently dedupe the same selected batch."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1346,7 +1311,7 @@ def test_retry_delay_clears_after_launch_window_elapses(tmp_path: Path) -> None:
 
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1397,7 +1362,7 @@ def test_retry_delay_enforced_within_launch_window(tmp_path: Path) -> None:
 
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1439,7 +1404,7 @@ def test_failed_launch_exit_processing_clears_dispatch_dedupe_signals(tmp_path: 
 
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1561,7 +1526,7 @@ def test_dispatch_state_idempotent_writes_on_unchanged_signature(tmp_path: Path)
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1591,7 +1556,7 @@ def test_dispatch_fires_on_signature_change(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1600,7 +1565,7 @@ def test_dispatch_fires_on_signature_change(tmp_path: Path) -> None:
     assert first["results"]["prime-builder"]["reason"] in {"no_pending", "no_pending_after_filter"}
 
     # Promote NEW → GO (top of stack).
-    _write_index(root, _index_with_one_go(root))
+    _index_with_one_go(root)
     second = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # Second fire: prime actionable (GO), codex not.
     assert second["results"]["prime-builder"]["reason"] == "dry_run"
@@ -1628,7 +1593,7 @@ def test_manual_disable_env_var_no_ops(tmp_path: Path, monkeypatch: pytest.Monke
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     monkeypatch.setenv("GTKB_DISPATCHER_DAEMON_DISABLED", "1")
     trigger = _load_trigger()
@@ -1647,7 +1612,7 @@ def test_main_rejects_dispatch_entrypoint_without_dispatch(tmp_path: Path, capsy
     """dispatcher_runtime.py is daemon-owned, not a hook dispatch entrypoint."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     rc = trigger.main(
@@ -1688,7 +1653,7 @@ def test_dispatch_state_schema_matches_smart_poller_signature_scheme(tmp_path: P
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -1696,9 +1661,9 @@ def test_dispatch_state_schema_matches_smart_poller_signature_scheme(tmp_path: P
     from groundtruth_kb.bridge.detector import parse_index  # type: ignore
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
 
-    # Reproduce the smart-poller's signature scheme for the same INDEX state.
+    # Reproduce the smart-poller's signature scheme for the same bridge state.
     parse_result = parse_index(
-        (root / "bridge" / "INDEX.md").read_text(encoding="utf-8"),
+        trigger._read_bridge_state_live(root),
         project_root=root,
     )
     _, codex_items = compute_actionable_pending(parse_result, project_root=root)
@@ -1754,7 +1719,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_three_new(root))
+    _index_with_three_new(root)
 
     trigger = _load_trigger()
     summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
@@ -1763,7 +1728,7 @@ def test_signature_uses_selected_batch_not_full_list_with_max_items_2(
     from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
 
     parse_result = parse_index(
-        (root / "bridge" / "INDEX.md").read_text(encoding="utf-8"),
+        trigger._read_bridge_state_live(root),
         project_root=root,
     )
     _, codex_items = compute_actionable_pending(parse_result, project_root=root)
@@ -1823,7 +1788,7 @@ def test_ollama_lo_dispatch_caps_selected_batch_to_one(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_three_new(root))
+    _index_with_three_new(root)
 
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda _root: {"ready": True})
@@ -1868,7 +1833,7 @@ def test_ranked_lo_targets_after_exhausted_batch_clear_stale_state(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps(
@@ -1927,7 +1892,7 @@ def test_spawn_gate_skips_unlaunchable_harness_with_distinct_failure(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     # Clear the ambient loop-prevention var so the gate is exercised regardless
@@ -1983,7 +1948,7 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
 
@@ -2066,7 +2031,7 @@ def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     doc = "prime-implementation"
-    _write_index(root, _write_authorized_go_thread(root, doc))
+    _write_authorized_go_thread(root, doc)
     state_dir = tmp_path / "state"
     trigger = _load_trigger()
     captured_envs: list[dict[str, str]] = []
@@ -2132,7 +2097,6 @@ def test_prime_spawn_fails_closed_when_dispatch_authorization_fails(
     doc = "malformed-implementation"
     _write_bridge_file(root, f"{doc}.md", "# Missing implementation packet metadata\n")
     _write_bridge_file(root, f"{doc}-002.md", "GO\n\nFixture GO.\n")
-    _write_index(root, f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n")
     state_dir = tmp_path / "state"
     trigger = _load_trigger()
     popen_calls: list[object] = []
@@ -2335,10 +2299,6 @@ def test_spawn_harness_dispatches_no_go_only_batch(tmp_path: Path, monkeypatch: 
     doc = "revise-no-go-thread"
     _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
     _write_bridge_file(root, f"{doc}-002.md", "NO-GO\n\nFixture NO-GO.\n")
-    _write_index(
-        root,
-        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
-    )
 
     state_dir = tmp_path / "state"
     trigger = _load_trigger()
@@ -2480,7 +2440,7 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
 
@@ -2495,7 +2455,7 @@ def test_reciprocal_dispatch_new_to_go_round_trip(tmp_path: Path) -> None:
     assert s2["results"]["loyal-opposition"]["reason"] == "unchanged"
 
     # Step 3: simulate Codex writing GO. INDEX top is now GO (Prime-actionable).
-    _write_index(root, _index_with_one_go(root))
+    _index_with_one_go(root)
     s3 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     # Reciprocal dispatch: Prime is now actionable; trigger fires.
     assert s3["results"]["prime-builder"]["reason"] == "dry_run", (
@@ -2518,7 +2478,7 @@ def test_stop_hook_flag_is_not_a_dispatch_entrypoint(tmp_path: Path, capsys: pyt
     """Legacy hook flags must not reactivate dispatcher_runtime.py as a hook path."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     rc = trigger.main(
@@ -2543,7 +2503,7 @@ def test_stop_hook_verbose_still_rejects_dispatch_entrypoint(
     """Verbose legacy hook invocation is still inert."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     rc = trigger.main(
@@ -2567,7 +2527,7 @@ def test_stop_hook_does_not_mutate_existing_dispatch_state(tmp_path: Path, capsy
     """Legacy Stop invocation must not perform reconciliation or dispatch."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -2598,13 +2558,12 @@ def test_stop_hook_does_not_dispatch_on_changed_signature(tmp_path: Path, capsys
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
 
-    _write_index(root, "# empty\n")
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     state_path = state_dir / "dispatch-state.json"
     state_before = json.loads(state_path.read_text(encoding="utf-8"))
 
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     capsys.readouterr()
     rc = trigger.main(
@@ -2630,7 +2589,7 @@ def test_stop_hook_inert_path_does_not_enter_detection(
     """Legacy Stop invocation must not call dispatcher detection."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
 
@@ -2684,7 +2643,7 @@ def test_stop_reconciliation_preserves_existing_output_contract(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     rc = _load_trigger().main(["--project-root", str(root), "--state-dir", str(state_dir), "--stop-hook", "--dry-run"])
     assert rc == 2
@@ -2703,7 +2662,7 @@ def test_overlap_state_shared_path_reads_existing_dispatch_state(tmp_path: Path)
     state_dir = tmp_path / "shared-bridge-poller-state"
     state_dir.mkdir(parents=True)
 
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     trigger = _load_trigger()
 
@@ -2783,7 +2742,7 @@ def test_multi_role_harness_can_receive_lo_dispatch_when_registered_active(tmp_p
         ),
         encoding="utf-8",
     )
-    _write_index(tmp_path, _index_with_one_new(tmp_path))
+    _index_with_one_new(tmp_path)
     state_dir = tmp_path / "state"
 
     trigger = _load_trigger()
@@ -2804,7 +2763,7 @@ def test_dispatcher_runtime_inactive_substrate_records_state_without_failure_spa
 ) -> None:
     """WI-4253: configured-inert substrate is state-only diagnostic evidence."""
     root = _make_synthetic_project(tmp_path)
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     (root / "harness-state" / "bridge-substrate.json").write_text(
         json.dumps({"substrate": "none"}),
         encoding="utf-8",
@@ -3003,7 +2962,7 @@ def test_diagnose_treats_terminal_bridge_residue_as_healthy_history(
 ) -> None:
     """WI-4935: historical failures for VERIFIED bridge docs are not live degradation."""
     root = _make_synthetic_project(tmp_path)
-    _write_index(root, _index_with_one_verified(root, "done-thread"))
+    _index_with_one_verified(root, "done-thread")
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     state = {
@@ -3046,7 +3005,7 @@ def test_dispatch_cycle_clears_terminal_bridge_failover_residue(
 ) -> None:
     """WI-4935: a dispatcher tick clears stale pending/failure fields for terminal docs."""
     root = _make_synthetic_project(tmp_path)
-    _write_index(root, _index_with_one_verified(root, "done-thread"))
+    _index_with_one_verified(root, "done-thread")
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / "dispatch-state.json").write_text(
@@ -3106,7 +3065,6 @@ def test_dispatch_cycle_clears_terminal_work_item_failover_residue(
     doc = "retired-work-item-thread"
     _write_bridge_file(root, f"{doc}-001.md", "NEW\n\nbridge_kind: implementation_proposal\nWork Item: WI-5002\n")
     _write_bridge_file(root, f"{doc}-002.md", "NO-GO\n\nWork Item: WI-5002\n")
-    _write_index(root, f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n")
     _write_current_work_items(root, {"WI-5002": "retired"})
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -3630,7 +3588,7 @@ def test_diagnostic_emitted_per_invocation(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
 
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -3652,7 +3610,7 @@ def test_diagnostic_classifies_document_lease_held(tmp_path: Path) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     # Acquire a lease on example-thread (loyal-opposition recipient)
     handle = acquire_lease("example-thread", action="test-harness", state_dir=state_dir)
@@ -3676,7 +3634,7 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
 
     handle = acquire_lease("example-thread", action="test-worker", state_dir=state_dir)
     assert handle is not None
@@ -3716,7 +3674,7 @@ def test_lo_live_spawn_acquires_document_lease_or_suppresses_duplicate(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     calls: list[list[str]] = []
 
@@ -3756,7 +3714,7 @@ def test_diagnostic_classifies_dispatched(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
@@ -3772,7 +3730,7 @@ def test_diagnostic_classifies_no_change(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -3790,7 +3748,7 @@ def test_diagnostic_classifies_selected_batch(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=0, dry_run=True)
 
@@ -3806,7 +3764,7 @@ def test_diagnostic_jsonl_parseable(tmp_path: Path) -> None:
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
@@ -3845,7 +3803,7 @@ def test_dispatch_decision_unchanged_with_instrumentation(tmp_path: Path) -> Non
     """
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
 
     # NEW present -> loyal-opposition dispatched, prime-builder idle.
@@ -3858,7 +3816,7 @@ def test_dispatch_decision_unchanged_with_instrumentation(tmp_path: Path) -> Non
     assert s2["results"]["loyal-opposition"]["reason"] == "unchanged"
 
     # Promote NEW -> GO -> prime-builder dispatched, loyal-opposition idle.
-    _write_index(root, _index_with_one_go(root))
+    _index_with_one_go(root)
     s3 = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
     assert s3["results"]["prime-builder"]["reason"] == "dry_run"
     assert s3["results"]["loyal-opposition"]["reason"] in {"no_pending", "no_pending_after_filter"}
@@ -3876,7 +3834,7 @@ def test_unchanged_signature_preserves_last_launch_metadata(tmp_path: Path) -> N
     """A deduped unchanged run keeps prior launch log paths available."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
 
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -3895,7 +3853,7 @@ def test_unchanged_signature_with_previous_fatal_worker_log_retries(tmp_path: Pa
     """A prior fatal worker marker makes the same signature retryable."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
 
     first = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
@@ -4568,7 +4526,7 @@ def test_prime_builder_falls_back_from_unverified_windows_codex_to_openrouter(
             ),
         ],
     )
-    _write_index(root, _index_with_one_go(root))
+    _index_with_one_go(root)
     _write_codex_no_window_verification(root).unlink()
     trigger = _load_trigger()
     monkeypatch.setattr(trigger.os, "name", "nt")
@@ -5320,7 +5278,7 @@ def test_ollama_loyal_opposition_dispatch_caps_selected_batch_to_one(
             _rec("B", "claude", ["prime-builder"], "inactive", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_new_threads(root, ["newest-thread", "middle-thread", "oldest-thread"]))
+    _index_with_new_threads(root, ["newest-thread", "middle-thread", "oldest-thread"])
     state_dir = tmp_path / "state"
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda project_root: {"ready": True})
@@ -5366,7 +5324,7 @@ def test_lo_provider_failure_backoff_falls_back_after_max_turn_marker(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
@@ -5463,7 +5421,7 @@ def test_long_running_ollama_timeout_backs_off_from_completion_time(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
@@ -5688,7 +5646,7 @@ def test_lo_provider_failure_backoff_retries_preferred_after_retry_window(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
@@ -5762,7 +5720,7 @@ def test_lo_gemini_ineligible_tier_demotes_candidate_with_cleared_signature(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
@@ -5855,7 +5813,7 @@ def test_lo_exit_zero_without_verdict_backs_off_and_falls_back(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
@@ -6428,7 +6386,7 @@ def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 
@@ -6525,7 +6483,7 @@ prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_three_new(root))
+    _index_with_three_new(root)
     trigger = _load_trigger()
     monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
@@ -6573,7 +6531,7 @@ def test_lo_ordered_fallback_skips_not_ready_preferred_target(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
 
     def _readiness(kind: str, _project_root: Path) -> dict[str, object]:
@@ -6632,7 +6590,7 @@ def test_lo_ordered_fallback_allows_same_harness_author_different_session(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     _write_bridge_file(
         root,
         "example-thread-001.md",
@@ -6687,7 +6645,7 @@ def test_lo_ordered_fallback_all_candidates_unavailable_records_no_ready(
             _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
         ],
     )
-    _write_index(root, _index_with_one_new(root))
+    _index_with_one_new(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": False})
 
@@ -6736,7 +6694,7 @@ def test_prime_builder_multi_active_selects_dispatchable_candidate(
             ),
         ],
     )
-    _write_index(root, _index_with_one_go(root))
+    _index_with_one_go(root)
     trigger = _load_trigger()
     monkeypatch.setattr(trigger, "_evaluate_harness_dispatch_readiness", lambda _kind, _root: {"ready": True})
 

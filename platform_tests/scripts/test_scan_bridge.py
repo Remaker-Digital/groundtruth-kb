@@ -286,8 +286,7 @@ def test_terminal_kind_go_excluded_from_prime(helper, tmp_path) -> None:
         "NO-GO: bridge/gtkb-gov-nogo-002.md\n"
         "NEW: bridge/gtkb-gov-nogo-001.md\n"
     )
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text(index, encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     prime = helper.scan(role="prime-builder", index_text=index, index_path=index_path)
     prime_docs = {t["document"] for t in prime["actionable"]}
@@ -305,8 +304,7 @@ def test_template_terminal_work_item_go_moved_to_blocked_bucket(tmp_path) -> Non
     _write_work_item_bridge_thread(bridge_dir, "gtkb-terminal-wi", "NO-GO", "WI-5002")
     _write_current_work_items(tmp_path, {"WI-5002": "retired"})
     index = "Document: gtkb-terminal-wi\nNO-GO: bridge/gtkb-terminal-wi-002.md\nNEW: bridge/gtkb-terminal-wi-001.md\n"
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text(index, encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     result = template_helper.scan(role="prime-builder", index_text=index, index_path=index_path)
 
@@ -323,8 +321,7 @@ def test_terminal_kind_does_not_affect_lo(helper, tmp_path) -> None:
     bridge_dir.mkdir()
     _write_bridge_thread(bridge_dir, "gtkb-gov", "governance_review", "NEW")
     index = "Document: gtkb-gov\nNEW: bridge/gtkb-gov-001.md\n"
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text(index, encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     lo = helper.scan(role="loyal-opposition", index_text=index, index_path=index_path)
     assert {t["document"] for t in lo["actionable"]} == {"gtkb-gov"}
@@ -336,8 +333,7 @@ def test_unreadable_operative_go_stays_actionable(helper, tmp_path) -> None:
     bridge_dir.mkdir()
     # No operative file written -> classification fails open to actionable.
     index = "Document: gtkb-ghost\nGO: bridge/gtkb-ghost-002.md\nNEW: bridge/gtkb-ghost-001.md\n"
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text(index, encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     prime = helper.scan(role="prime-builder", index_text=index, index_path=index_path)
     assert {t["document"] for t in prime["actionable"]} == {"gtkb-ghost"}
@@ -444,8 +440,7 @@ def test_dispatch_terminal_go_still_filtered_before_activatability(helper, monke
     bridge_dir.mkdir()
     _write_bridge_thread(bridge_dir, "gtkb-gov", "governance_review", "GO")
     index = "Document: gtkb-gov\nGO: bridge/gtkb-gov-002.md\nNEW: bridge/gtkb-gov-001.md\n"
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text(index, encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     def should_not_run(_root, _bridge_id):
         raise AssertionError("terminal GO should not reach activatability")

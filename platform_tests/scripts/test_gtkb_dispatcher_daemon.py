@@ -1635,10 +1635,6 @@ def test_daemon_execute_live_spawns_reconciles_terminal_bridge_residue(tmp_path:
     state_dir = daemon._bridge_poller_state_dir(root)
     _write_bridge(root, "done-thread", "NEW", 1)
     _write_bridge(root, "done-thread", "VERIFIED", 2)
-    (root / "bridge" / "INDEX.md").write_text(
-        "# bridge index\n\nDocument: done-thread\nVERIFIED: bridge/done-thread-002.md\nNEW: bridge/done-thread-001.md\n",
-        encoding="utf-8",
-    )
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps(
@@ -1698,10 +1694,6 @@ def test_daemon_live_skips_owner_hold_prime_no_go(
         "NO-GO\n\n## Required Revisions\n\n1. **Hold for Owner Decision:** wait for the topology decision.\n",
         encoding="utf-8",
     )
-    (root / "bridge" / "INDEX.md").write_text(
-        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
-        encoding="utf-8",
-    )
     runtime = daemon._load_dispatch_runtime()
     spawn_calls: list[dict] = []
 
@@ -1746,10 +1738,6 @@ def test_daemon_live_skips_headless_ineligible_prime_no_go(
                 "Do not re-dispatch to Codex headless for this specific task until ACL remediation is confirmed.",
             ]
         ),
-        encoding="utf-8",
-    )
-    (root / "bridge" / "INDEX.md").write_text(
-        f"# bridge index\n\nDocument: {doc}\nNO-GO: bridge/{doc}-002.md\nNEW: bridge/{doc}-001.md\n",
         encoding="utf-8",
     )
     runtime = daemon._load_dispatch_runtime()

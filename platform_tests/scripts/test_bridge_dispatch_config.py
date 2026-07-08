@@ -1715,8 +1715,7 @@ slug = "archived-new"
     )
     (bridge_dir / "archived-new-001.md").write_text("NEW\n\n# Archived thread\n", encoding="utf-8")
     (bridge_dir / "live-new-001.md").write_text("NEW\n\n# Live thread\n", encoding="utf-8")
-    index_path = bridge_dir / "INDEX.md"
-    index_path.write_text("", encoding="utf-8")
+    index_path = bridge_dir / "state.md"
 
     helper = _load_scan_helper()
     result = helper.scan(role="loyal-opposition", index_path=index_path)
