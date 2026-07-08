@@ -24,6 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "spec-classifier.py"
 TRACKED_SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
 CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
+SCRIPTS_PATH = REPO_ROOT / "scripts"
+if str(SCRIPTS_PATH) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_PATH))
 
 
 def _run_hook(prompt: str) -> dict:
@@ -193,18 +196,14 @@ def test_hook_registered_in_codex_hooks_json():
     """`.codex/hooks.json` registers spec-classifier.py under UserPromptSubmit.
 
     Forward-compatible parity per ADR-CODEX-HOOK-PARITY-FALLBACK-001 + Codex
-    -006 F1. Currently disabled on Windows (Codex hook parity not yet live);
-    active when parity activates.
+    -006 F1. Codex may register the hook directly or via the governed
+    ``run_py_no_window --batch user-prompt-submit`` fan-out.
     """
+    import parity_discovery_diff
+
     config = json.loads(CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
-    user_prompt_hooks = config.get("hooks", {}).get("UserPromptSubmit", [])
-    found = False
-    for group in user_prompt_hooks:
-        for h in group.get("hooks", []):
-            cmd = h.get("command", "")
-            if "spec-classifier.py" in cmd:
-                found = True
-                break
-    assert found, (
-        f"spec-classifier.py not registered under UserPromptSubmit in {CODEX_HOOKS_PATH}. Settings: {user_prompt_hooks}"
+    surfaces = parity_discovery_diff.enumerate_hook_surfaces(config, project_root=REPO_ROOT)
+    assert "spec-classifier" in surfaces, (
+        f"spec-classifier.py not registered under UserPromptSubmit in {CODEX_HOOKS_PATH}. "
+        f"Discovered surfaces: {sorted(surfaces)}"
     )

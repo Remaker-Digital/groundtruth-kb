@@ -3399,6 +3399,8 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         path = rec.storage_path
         if path.startswith("membase:"):
             continue
+        if path.startswith("windows-scheduled-task:"):
+            continue
         if any(ch in path for ch in "*?[]"):
             # Glob/pattern storage paths are not point-resolvable; skip.
             continue

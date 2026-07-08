@@ -259,11 +259,12 @@ def test_check_warning_message_includes_record_count(tmp_path: Path) -> None:
     "lifecycle,storage_path",
     [
         ("active", "membase:foo"),
+        ("active", "windows-scheduled-task:GTKB-DispatcherDaemon"),
         ("archive", "anywhere"),
     ],
 )
 def test_check_does_not_assert_storage_path_for_non_concrete(tmp_path: Path, lifecycle: str, storage_path: str) -> None:
-    """Archive lifecycle + membase: storage paths are not asserted on disk."""
+    """Archive lifecycle + non-file storage paths are not asserted on disk."""
     body = _minimal_valid_record("rec-1", storage_path).replace('lifecycle = "active"', f'lifecycle = "{lifecycle}"')
     _write_registry(tmp_path, body)
     db_path = tmp_path / "groundtruth.db"

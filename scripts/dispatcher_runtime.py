@@ -37,6 +37,7 @@ only automated owner of these helpers; fallback work assignment is manual.
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import datetime as dt
 import hashlib
@@ -118,6 +119,50 @@ def _run_with_status_wrapper_popen_kwargs() -> dict[str, object]:
     return hidden_process_popen_kwargs(new_process_group=True, detached=True)
 
 
+RUN_WITH_STATUS_CONFIG_ENV_VAR = "GTKB_RUN_WITH_STATUS_CONFIG_B64"
+API_HARNESS_RUNNER_CONFIG_ENV_VAR = "GTKB_API_HARNESS_RUNNER_CONFIG_B64"
+API_HARNESS_RUNNER_CODE = (
+    "import base64,json,os,runpy,sys;"
+    f"p=json.loads(base64.b64decode(os.environ.pop('{API_HARNESS_RUNNER_CONFIG_ENV_VAR}')).decode('utf-8'));"
+    "sys.argv=p['argv'];"
+    "runpy.run_module(p['module'],run_name='__main__')"
+)
+API_HARNESS_SCRIPT_MODULES = {
+    "scripts/ollama_harness.py": "scripts.ollama_harness",
+    "scripts/openrouter_harness.py": "scripts.openrouter_harness",
+}
+
+
+def _b64_json(data: dict[str, Any]) -> str:
+    raw = json.dumps(data, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.b64encode(raw).decode("ascii")
+
+
+def _project_relative_posix(path_text: str, project_root: Path) -> str:
+    candidate = Path(os.path.normpath(path_text))
+    if candidate.is_absolute():
+        try:
+            return candidate.resolve().relative_to(project_root.resolve()).as_posix()
+        except ValueError:
+            return candidate.as_posix()
+    return candidate.as_posix()
+
+
+def _opaque_api_harness_command(command: list[str], project_root: Path, env: dict[str, str]) -> list[str]:
+    """Hide in-root API harness script argv behind an opaque Python runner.
+
+    The live child command line becomes ``python -c <runner>``; the original
+    script argv is reconstructed from an env payload inside the child process.
+    """
+    if len(command) < 2:
+        return command
+    module = API_HARNESS_SCRIPT_MODULES.get(_project_relative_posix(command[1], project_root))
+    if module is None:
+        return command
+    env[API_HARNESS_RUNNER_CONFIG_ENV_VAR] = _b64_json({"module": module, "argv": command[1:]})
+    return [command[0], "-c", API_HARNESS_RUNNER_CODE]
+
+
 def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, Any] | None:
     """Return work-subject suppression metadata when application subject is active.
 
@@ -175,6 +220,7 @@ CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH: tuple[str, ...] = (
     "codex-no-window-verification.json",
 )
 CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
+CODEX_WINDOWS_SANDBOX_SETUP_STATUS = "0xc0000142"
 DISPATCHER_DISABLE_GUARD_RELATIVE_PATH: tuple[str, ...] = (
     ".gtkb-state",
     "watchdog",
@@ -315,6 +361,9 @@ FATAL_WORKER_OUTPUT_MARKERS = (
     ("Ollama model inventory request failed", "provider_failure"),
     ("OpenRouter completions request failed", "provider_failure"),
     ("OpenRouter API returned error", "provider_failure"),
+    ("OpenRouter provider transport failure", "provider_failure"),
+    ("SSLV3_ALERT_BAD_RECORD_MAC", "provider_failure"),
+    ("sslv3 alert bad record mac", "provider_failure"),
     ("OPENROUTER_API_KEY environment variable is not set", "provider_configuration_failure"),
     ("Cursor Agent CLI not found", "cursor_headless_cli_unavailable"),
     ("IneligibleTierError", "harness_unavailable_tier"),
@@ -338,6 +387,7 @@ FAST_TRIP_FAILURE_CLASSES = frozenset(
     }
 )
 NON_RETRYABLE_WORKER_FAILURE_CLASSES = frozenset({"harness_unavailable_tier"})
+GIT_COMMAND = "git"
 NON_LAUNCHED_FAILURE_REASONS = frozenset(
     {
         "all_impl_auth_quarantined",
@@ -2817,11 +2867,11 @@ def _find_dispatch_verdict(
 def _git_commit_containing_path(project_root: Path, rel_path: str) -> str | None:
     """Return latest commit containing ``rel_path``, or None when uncommitted."""
 
-    if shutil.which("git") is None:
+    if shutil.which(GIT_COMMAND) is None:
         return None
     try:
         log_result = subprocess.run(
-            ["git", "log", "-1", "--format=%H", "--", rel_path],
+            [GIT_COMMAND, "log", "-1", "--format=%H", "--", rel_path],
             cwd=str(project_root),
             capture_output=True,
             text=True,
@@ -2837,7 +2887,7 @@ def _git_commit_containing_path(project_root: Path, rel_path: str) -> str | None
         return None
     try:
         cat_result = subprocess.run(
-            ["git", "cat-file", "-e", f"{commit_sha}:{rel_path}"],
+            [GIT_COMMAND, "cat-file", "-e", f"{commit_sha}:{rel_path}"],
             cwd=str(project_root),
             capture_output=True,
             text=True,
@@ -3393,14 +3443,17 @@ HARNESS_WORKER_LIFETIME_ENV_PREFIX = "GTKB_WORKER_LIFETIME_HARNESS_"
 OLLAMA_ROUTING_CONFIG_REL = Path(".api-harness") / "routing.toml"
 OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS = 60
 OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS = 300
+OPENROUTER_WORKER_LIFETIME_SECONDS = 900
 # WI-4986/WI-5003: start with generous harness/model-aware caps, then tighten
 # from measured telemetry. Codex-A PB implementation keeps the existing 90 min
-# PB floor; B/C/D LO targets inherit the Opus-class review floor.
+# PB floor; B/C/D LO targets inherit the Opus-class review floor. OpenRouter-F
+# uses the bounded WI-5066 silent-stall cap proven by direct headless dispatch.
 HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS = {
     "A": PB_IMPL_WORKER_LIFETIME_SECONDS,
     "B": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
     "C": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
     "D": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
+    "F": OPENROUTER_WORKER_LIFETIME_SECONDS,
 }
 _MODEL_HINT_FLAGS = ("--model", "-m")
 
@@ -4030,6 +4083,23 @@ def _load_codex_no_window_verification(project_root: Path) -> dict[str, Any] | N
     return payload if isinstance(payload, dict) else None
 
 
+def _codex_verification_text(payload: dict[str, Any] | None) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    return "\n".join(
+        str(payload.get(field) or "")
+        for field in ("stderr_preview", "stdout_preview", "error", "message", "status_exit_code")
+    )
+
+
+def _codex_no_window_failure_class(payload: dict[str, Any] | None, reason: str) -> str:
+    if CODEX_WINDOWS_SANDBOX_SETUP_STATUS in _codex_verification_text(payload).lower():
+        return "codex_windows_sandbox_setup_failed_0xc0000142"
+    if reason == "codex_no_window_probe_detected_visible_window":
+        return "codex_no_window_visible_window_detected"
+    return reason
+
+
 def _valid_codex_no_window_verification(project_root: Path) -> tuple[bool, dict[str, Any] | None, str]:
     payload = _load_codex_no_window_verification(project_root)
     if payload is None:
@@ -4064,6 +4134,8 @@ def _evaluate_codex_dispatch_readiness(project_root: Path) -> dict[str, Any]:
         return {
             "ready": True,
             "reason": reason,
+            "live_headless_ready": True,
+            "live_headless_reason": reason,
             "verification_path": _codex_no_window_verification_path(project_root).as_posix(),
             "verification": verification,
         }
@@ -4071,6 +4143,9 @@ def _evaluate_codex_dispatch_readiness(project_root: Path) -> dict[str, Any]:
     result: dict[str, Any] = {
         "ready": False,
         "reason": reason,
+        "live_headless_failure_class": _codex_no_window_failure_class(verification, reason),
+        "live_headless_ready": False,
+        "live_headless_reason": reason,
         "verification_path": _codex_no_window_verification_path(project_root).as_posix(),
     }
     if verification is not None:
@@ -4756,6 +4831,9 @@ def _spawn_harness(
         env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_TIMEOUT_SECONDS"] = str(
             lifetime_profile.get("routing_timeout_seconds")
         )
+    original_command = list(command)
+    command = _opaque_api_harness_command(command, project_root, env)
+    worker_command_mode = "opaque_python_module" if command != original_command else "direct"
     wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()
 
     selected = _selected_oldest_first(items, max_items)
@@ -4764,22 +4842,25 @@ def _spawn_harness(
     wrapped_command = [
         _run_with_status_wrapper_executable(),
         str(project_root / "scripts" / "run_with_status.py"),
-        "--stdout",
-        str(stdout_path),
-        "--stderr",
-        str(stderr_path),
+        "--config-env",
     ]
+    stdin_path: Path | None = None
     if prompt_via_stdin:
         stdin_path = runs_dir / f"{dispatch_id}.stdin.log"
         try:
             stdin_path.write_text(prompt, encoding="utf-8")
         except OSError:
             pass
-        wrapped_command.extend(["--stdin", str(stdin_path)])
-    if _worker_lifetime is not None:
-        wrapped_command.extend(["--lifetime", str(_worker_lifetime)])
-    wrapped_command.append(str(status_file_path))
-    wrapped_command += command
+    env[RUN_WITH_STATUS_CONFIG_ENV_VAR] = _b64_json(
+        {
+            "stdin_path": str(stdin_path) if stdin_path is not None else None,
+            "stdout_path": str(stdout_path),
+            "stderr_path": str(stderr_path),
+            "lifetime_seconds": _worker_lifetime,
+            "status_file_path": str(status_file_path),
+            "cmd_args": command,
+        }
+    )
 
     meta: dict[str, Any] = {
         "dispatch_id": dispatch_id,
@@ -4799,6 +4880,8 @@ def _spawn_harness(
         "worker_lifetime_profile": lifetime_profile.get("profile"),
         "worker_lifetime_env_var": lifetime_profile.get("env_var"),
         "worker_lifetime_role_fallback_seconds": lifetime_profile.get("role_fallback_seconds"),
+        "status_wrapper_config_mode": "env",
+        "worker_command_mode": worker_command_mode,
     }
     if lifetime_profile.get("model_hint"):
         meta["worker_lifetime_model_hint"] = lifetime_profile.get("model_hint")
@@ -5172,6 +5255,9 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             failure_error_type = "fatal_worker_output_marker"
             failure_extra.update(inspected_paths)
             failure_extra["matched_markers"] = matched_markers
+        if failure_reason is None and exit_code == 124 and not post_verdict_exit_reconciled:
+            failure_reason = "worker_timeout"
+            failure_error_type = "worker_timeout"
 
         if last_launch.get("document_lease_handles") and not last_launch.get("document_leases_released_on_exit"):
             last_launch["document_leases_released_on_exit"] = _release_document_lease_records(

@@ -267,15 +267,15 @@ notes = "Append-only versioned bridge files (NEW/REVISED/GO/NO-GO/VERIFIED/ADVIS
 id = "bridge-work-intent-claims"
 domain = "bridge_protocol"
 lifecycle = "active"
-storage_path = ".gtkb-state/work-intent/"
+storage_path = "membase:work_intent_claims"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = "scripts/bridge_claim_cli.py claim/release"
 versioning_policy = "overwrite_single_writer"
-backup_policy = "gitignored_runtime"
+backup_policy = "membase_export"
 restore_action = "noop"
 health_check_function = ""
 owner_role = "automated_only"
-notes = "Single-writer claims with TTL; transient runtime state."
+notes = "Single-writer claims with TTL; transient runtime state in the MemBase work_intent_claims table."
 
 [[artifacts]]
 id = "bridge-dispatch-state"
