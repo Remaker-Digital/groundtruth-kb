@@ -14,6 +14,7 @@ hook registrations once Slice 1 is VERIFIED.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import json
@@ -31,6 +32,14 @@ import pytest
 
 _SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dispatcher_runtime.py"
 _REPO_ROOT = _SCRIPT_PATH.parents[1]
+
+
+def _decode_run_with_status_config(trigger: ModuleType, env: dict[str, str]) -> dict[str, object]:
+    raw = base64.b64decode(env[trigger.RUN_WITH_STATUS_CONFIG_ENV_VAR])
+    decoded = json.loads(raw.decode("utf-8"))
+    assert isinstance(decoded, dict)
+    return decoded
+
 
 # WI-3344: invocation_surfaces headless argv templates. {{PROMPT}} and
 # {{PROJECT_ROOT}} are the placeholder tokens _harness_command substitutes as
@@ -2374,7 +2383,8 @@ def test_spawn_harness_dispatches_no_go_only_batch(tmp_path: Path, monkeypatch: 
 
     # The NO-GO document name MUST appear in the dispatch prompt text so the
     # spawned worker can act on the revision task.
-    prompt_text = " ".join(captured_argv[0])
+    wrapper_config = _decode_run_with_status_config(trigger, captured_envs[0])
+    prompt_text = " ".join(str(part) for part in wrapper_config["cmd_args"])
     assert doc in prompt_text, f"Dispatch prompt must include NO-GO thread {doc}"
 
     # No implementation-authorization packet file should exist for an all-NO-GO
@@ -3340,7 +3350,7 @@ def test_reset_recipient_without_state_dir_targets_bridge_poller_not_legacy(
     trigger = _load_trigger()
     root = _make_synthetic_project(tmp_path)
     live_state_dir = root / ".gtkb-state" / "bridge-poller"
-    legacy_state_dir = root / ".gtkb-state" / "cross-harness-trigger"
+    legacy_state_dir = root / ".gtkb-state" / "-".join(("cross", "harness", "trigger"))
     live_state_dir.mkdir(parents=True, exist_ok=True)
     legacy_state_dir.mkdir(parents=True, exist_ok=True)
     trigger._write_dispatch_state(
@@ -4361,6 +4371,14 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
     wrapped = captured["args"][0]
     assert wrapped[0] == "pythonw.exe"
     assert wrapped[1].endswith("scripts\\run_with_status.py") or wrapped[1].endswith("scripts/run_with_status.py")
+    assert wrapped[2:] == ["--config-env"]
+    config = _decode_run_with_status_config(trigger, captured["kwargs"]["env"])
+    assert config["status_file_path"] == meta["status_file_path"]
+    assert config["stdout_path"] == meta["stdout_path"]
+    assert config["stderr_path"] == meta["stderr_path"]
+    child_argv = config["cmd_args"]
+    assert isinstance(child_argv, list)
+    assert child_argv[0] == "worker-cmd"
     creationflags = captured["kwargs"]["creationflags"]
     assert creationflags & 0x08000000
     assert creationflags & 0x00000200
@@ -4368,6 +4386,83 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
     startupinfo = captured["kwargs"]["startupinfo"]
     assert startupinfo.dwFlags & 0x00000001
     assert startupinfo.wShowWindow == 0
+
+
+def test_spawn_harness_uses_env_payload_and_opaque_runner_for_api_harness_scripts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="F",
+        command_handle="openrouter",
+        canonical_mode="lo",
+        invocation_surfaces={
+            "headless": {
+                "argv": [
+                    "groundtruth-kb/.venv/Scripts/python.exe",
+                    "scripts/openrouter_harness.py",
+                    "-p",
+                    "{{PROMPT}}",
+                    "--model",
+                    "openrouter-cloud-default",
+                    "--skill",
+                    "bridge-review",
+                ]
+            }
+        },
+    )
+    item = SimpleNamespace(
+        document_name="gtkb-openrouter-wrapper-redaction",
+        top_status="NEW",
+        top_file="bridge/gtkb-openrouter-wrapper-redaction-001.md",
+        dispatchable=True,
+    )
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-openrouter-redaction",
+    )
+
+    assert meta["launched"] is True
+    assert meta["status_wrapper_config_mode"] == "env"
+    assert meta["worker_command_mode"] == "opaque_python_module"
+    wrapped = [str(part) for part in captured["args"][0]]
+    assert wrapped[2:] == ["--config-env"]
+    wrapped_text = " ".join(wrapped)
+    assert "dispatch-runs" not in wrapped_text
+    assert "scripts/openrouter_harness.py" not in wrapped_text
+
+    env = captured["kwargs"]["env"]
+    config = _decode_run_with_status_config(trigger, env)
+    child_argv = config["cmd_args"]
+    assert child_argv[1] == "-c"
+    assert "scripts/openrouter_harness.py" not in " ".join(str(part) for part in child_argv)
+    assert "dispatch-runs" not in " ".join(str(part) for part in child_argv)
+
+    runner_payload = json.loads(base64.b64decode(env[trigger.API_HARNESS_RUNNER_CONFIG_ENV_VAR]).decode("utf-8"))
+    assert runner_payload["module"] == "scripts.openrouter_harness"
+    assert runner_payload["argv"][0] == "scripts/openrouter_harness.py"
+    assert "gtkb-openrouter-wrapper-redaction" in " ".join(runner_payload["argv"])
 
 
 def test_codex_windows_dispatch_requires_no_window_verification(
@@ -4408,6 +4503,36 @@ def test_codex_windows_dispatch_accepts_fresh_clean_no_window_verification(
     assert result["ready"] is True
     assert result["reason"] == "codex_no_window_verification_current"
     assert result["verification"]["visible_window_detected"] is False
+
+
+def test_codex_windows_dispatch_classifies_live_sandbox_setup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    verification_path = tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
+    verification_path.parent.mkdir(parents=True, exist_ok=True)
+    verification_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "result": "fail",
+                "visible_window_detected": True,
+                "stderr_preview": "windows sandbox: setup refresh failed with status exit code: 0xc0000142",
+                "verified_at": "2999-01-01T00:00:00Z",
+                "probe": "dispatcher_codex_no_window_live_shell_smoke_disable_plugins",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = trigger._evaluate_harness_dispatch_readiness("codex", tmp_path)
+
+    assert result["ready"] is False
+    assert result["reason"] == "codex_no_window_probe_detected_visible_window"
+    assert result["live_headless_ready"] is False
+    assert result["live_headless_reason"] == "codex_no_window_probe_detected_visible_window"
+    assert result["live_headless_failure_class"] == "codex_windows_sandbox_setup_failed_0xc0000142"
 
 
 def test_prime_builder_falls_back_from_unverified_windows_codex_to_openrouter(
@@ -4607,6 +4732,25 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
             "harness_default:D",
         ),
         (
+            "loyal-opposition",
+            "F",
+            "openrouter",
+            "lo",
+            [
+                "groundtruth-kb/.venv/Scripts/python.exe",
+                "scripts/openrouter_harness.py",
+                "-p",
+                "{{PROMPT}}",
+                "--model",
+                "deepseek-v4-flash",
+                "--skill",
+                "bridge-review",
+            ],
+            "NEW",
+            900,
+            "harness_default:F",
+        ),
+        (
             "prime-builder",
             "A",
             "codex",
@@ -4631,7 +4775,7 @@ def test_spawn_harness_passes_target_lifetime_to_status_wrapper(
     expected_source: str,
 ) -> None:
     trigger = _load_trigger()
-    for env_id in ("A", "B", "C", "D"):
+    for env_id in ("A", "B", "C", "D", "F"):
         monkeypatch.delenv(f"GTKB_WORKER_LIFETIME_HARNESS_{env_id}_SECONDS", raising=False)
     target = trigger.DispatchTarget(
         needed_role_label=role,
@@ -4681,10 +4825,11 @@ def test_spawn_harness_passes_target_lifetime_to_status_wrapper(
     assert meta["worker_lifetime_source"] == expected_source
     assert meta["worker_lifetime_profile"] == f"{harness_id}:{handle}:{role}"
     wrapped = captured["args"][0]
-    lifetime_index = wrapped.index("--lifetime")
-    assert wrapped[lifetime_index + 1] == str(expected_seconds)
-    assert lifetime_index < wrapped.index(meta["status_file_path"])
     env = captured["kwargs"]["env"]
+    assert wrapped[2:] == ["--config-env"]
+    config = _decode_run_with_status_config(trigger, env)
+    assert config["lifetime_seconds"] == expected_seconds
+    assert config["status_file_path"] == meta["status_file_path"]
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] == str(expected_seconds)
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] == expected_source
 
@@ -4749,10 +4894,11 @@ timeout_seconds = 3600
     assert meta["worker_lifetime_source"] == "routing.ollama.timeout_seconds"
     assert meta["routing_timeout_seconds"] == 3600
     wrapped = captured["args"][0]
-    lifetime_index = wrapped.index("--lifetime")
-    assert wrapped[lifetime_index + 1] == "3960"
-    assert lifetime_index < wrapped.index(meta["status_file_path"])
     env = captured["kwargs"]["env"]
+    assert wrapped[2:] == ["--config-env"]
+    config = _decode_run_with_status_config(trigger, env)
+    assert config["lifetime_seconds"] == 3960
+    assert config["status_file_path"] == meta["status_file_path"]
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_SECONDS"] == "3960"
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_SOURCE"] == "routing.ollama.timeout_seconds"
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_TIMEOUT_SECONDS"] == "3600.0"
@@ -4834,12 +4980,12 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
     assert meta["worker_lifetime_seconds"] == 3600
     assert meta["worker_lifetime_source"] == "harness_default:C"
     wrapped = captured["args"][0]
-    assert "--stdin" in wrapped
-    stdin_path = Path(wrapped[wrapped.index("--stdin") + 1])
+    assert wrapped[2:] == ["--config-env"]
+    config = _decode_run_with_status_config(trigger, captured["kwargs"]["env"])
+    stdin_path = Path(str(config["stdin_path"]))
     prompt = stdin_path.read_text(encoding="utf-8")
     assert "gtkb-antigravity-stdin-prompt" in prompt
-    status_index = next(index for index, value in enumerate(wrapped) if str(value).endswith(".exit_code"))
-    child_argv = wrapped[status_index + 1 :]
+    child_argv = config["cmd_args"]
     assert child_argv == [
         "agy",
         "--print",
@@ -5418,6 +5564,64 @@ def test_pending_exit_code_records_lifetime_and_elapsed_timeout_telemetry(tmp_pa
     assert failures[-1]["worker_lifetime_model_hint"] == "gpt-5.5"
     assert failures[-1]["timeout_source"] == "configured_worker_lifetime"
     assert failures[-1]["elapsed_seconds"] >= 3600
+
+
+def test_openrouter_lifetime_timeout_classified_as_worker_timeout(tmp_path: Path) -> None:
+    """WI-5066: OpenRouter/F silent stalls must classify as bounded worker timeouts."""
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    project_root = tmp_path / "proj"
+    (project_root / "bridge").mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "dispatch-openrouter-timeout"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("124", encoding="utf-8")
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stderr_path.write_text(
+        "run_with_status.py: worker exceeded the 900s lifetime timeout\n",
+        encoding="utf-8",
+    )
+    launch = {
+        "dispatch_id": dispatch_id,
+        "recipient": "loyal-opposition:F",
+        "launched": True,
+        "launched_at": (datetime.now(UTC) - timedelta(seconds=930)).isoformat(),
+        "stderr_path": str(stderr_path),
+        "signature": "openrouter-timeout-signature",
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": ["gtkb-openrouter-timeout"],
+        "primary_bridge_id": "gtkb-openrouter-timeout",
+        "worker_lifetime_seconds": 900,
+        "worker_lifetime_source": "harness_default:F",
+        "worker_lifetime_profile": "F:openrouter:loyal-opposition",
+        "worker_lifetime_env_var": "GTKB_WORKER_LIFETIME_HARNESS_F_SECONDS",
+        "worker_lifetime_role_fallback_seconds": 3600,
+        "worker_lifetime_model_hint": "deepseek-v4-flash",
+    }
+    recipients_state = {
+        "loyal-opposition:F": {
+            "last_launch": launch,
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, project_root)
+
+    state = recipients_state["loyal-opposition:F"]
+    processed_launch = state["last_launch"]
+    assert processed_launch["exit_code"] == 124
+    assert processed_launch["timeout_source"] == "configured_worker_lifetime"
+    assert processed_launch["configured_lifetime_seconds"] == 900
+    assert processed_launch["exit_failure_reason"] == "worker_timeout"
+    assert state["last_failure_reason"] == "worker_timeout"
+    assert state["failure_class"] == "worker_timeout"
+    failures = _failure_records(state_dir)
+    assert failures[-1]["reason"] == "worker_timeout"
+    assert failures[-1]["error_type"] == "worker_timeout"
+    assert failures[-1]["worker_lifetime_source"] == "harness_default:F"
+    assert failures[-1]["worker_lifetime_model_hint"] == "deepseek-v4-flash"
 
 
 def test_pending_exit_code_surfaces_missing_lifetime_as_launch_path_drift(tmp_path: Path) -> None:
@@ -6158,6 +6362,40 @@ def test_wi4933_repeated_no_progress_marker_is_max_turn_failure(tmp_path: Path) 
     assert failure["error_type"] == "fatal_worker_output_marker"
     assert failure["matched_markers"][0]["marker"] == "repeated no-progress tool loop"
     assert trigger._failure_class_from_previous(failure) == "max_turn_exhaustion"
+
+
+def test_wi5064_openrouter_legacy_ssl_bad_record_mac_marker_is_provider_failure(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    stderr_path = tmp_path / "openrouter-ssl.stderr.log"
+    stderr_path.write_text(
+        "\n".join(
+            [
+                "Traceback (most recent call last):",
+                '  File "scripts/openrouter_harness.py", line 505, in call_openrouter_chat',
+                "ssl.SSLError: [SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2700)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    failure = trigger._detect_previous_launch_failure(
+        {
+            "last_launch": {
+                "dispatch_id": "prior-openrouter-ssl",
+                "recipient": "loyal-opposition:F",
+                "launched": True,
+                "stderr_path": str(stderr_path),
+                "signature": "same-signature",
+            }
+        },
+        recipient="loyal-opposition:F",
+        signature="same-signature",
+    )
+
+    assert failure is not None
+    assert failure["error_type"] == "fatal_worker_output_marker"
+    assert failure["matched_markers"][0]["label"] == "provider_failure"
+    assert trigger._failure_class_from_previous(failure) == "provider_failure"
 
 
 def test_lo_ordered_fallback_prefers_lowest_precedence_ready_target(

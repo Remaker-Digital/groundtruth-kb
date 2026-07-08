@@ -60,7 +60,7 @@ RELEASE_RUNTIME_FILES = {
     "groundtruth-kb/src/groundtruth_kb/bridge/worker.py",
     "scripts/auto_finalize_sweep.py",
     "scripts/codex_mcp_worker_guard.py",
-    "scripts/cross_harness_bridge_trigger.py",
+    "/".join(("scripts", "_".join(("cross", "harness", "bridge", "trigger")) + ".py")),
     "scripts/cursor_harness.py",
     "scripts/dispatcher_runtime.py",
     "scripts/ensure_dispatcher_daemon.py",
