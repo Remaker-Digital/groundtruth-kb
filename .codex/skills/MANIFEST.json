@@ -96,7 +96,7 @@
       "canonical_name": "gtkb-decision-capture",
       "capability_id": "skill.decision-capture",
       "source_relative_path": ".claude/skills/decision-capture/SKILL.md",
-      "source_sha256": "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
+      "source_sha256": "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
     },
     {
       "adapter_relative_path": ".codex/skills/harness-parity-review/SKILL.md",
