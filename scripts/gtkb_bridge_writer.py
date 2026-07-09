@@ -20,6 +20,7 @@ from scripts.verdict_evidence_anchor_preflight import (
     validate_verdict_evidence_anchors,
     violation_summary,
 )
+from scripts.windows_subprocess import no_window_subprocess_kwargs
 
 
 def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
@@ -40,6 +41,7 @@ def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
             cwd=str(project_root),
             capture_output=True,
             timeout=5,
+            **no_window_subprocess_kwargs(),
         )
         return bool(result.stdout.strip())
     except Exception:

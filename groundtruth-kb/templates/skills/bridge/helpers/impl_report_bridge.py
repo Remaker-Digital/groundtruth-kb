@@ -38,6 +38,7 @@ _bridge_writer = importlib.import_module("scripts.gtkb_bridge_writer")
 WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
+no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
 
 
 class BridgeImplReportError(RuntimeError):
@@ -238,6 +239,7 @@ def _git_lines(args: list[str], *, cwd: Path) -> tuple[str, ...]:
         errors="replace",
         timeout=30,
         check=False,
+        **no_window_subprocess_kwargs(),
     )
     if result.returncode != 0:
         return ()
