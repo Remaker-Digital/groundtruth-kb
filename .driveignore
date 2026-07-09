@@ -61,6 +61,16 @@ prime_bridge.db
 .codex/gtkb-hooks/*.err
 *.lock
 
+# --- Codex harness dir: stop Drive re-materializing foreign-SID ACEs (WI-5065) ---
+# Google Drive re-syncs .codex files carrying Deny ACEs from a FOREIGN machine's
+# SID authority. One is inheritable, so it propagates through the tree and breaks
+# the Codex workspace-write sandbox setup (Windows 0xc0000142). A one-shot ACL
+# repair does not persist because the next Drive sync re-adds the foreign ACE.
+# The durable backup for tracked .codex content is git, so exclude the tree from
+# Drive entirely -- same rationale as .git/ and .gtkb-state/ above. .codex still
+# lives physically in E:\GT-KB (root boundary satisfied); only cloud sync stops.
+.codex/
+
 # --- Drive's own staging directory (Drive normally hides this; redundant) ---
 .tmp.driveupload/
 
