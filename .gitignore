@@ -656,3 +656,35 @@ bridge/draft-verdict-*.txt
 harness-state/*.tmp.*
 # Throwaway test scaffold directory (swept in by S20260625 worktree sweep).
 tmp_test/
+
+# --- WI-5114 (PROJECT-GTKB-TREE-STABILIZATION) Phase 0: previously-unignored scratch ---
+# Pytest basetemps + work scratch (.harness-tmp/ alone held 2593 untracked files).
+.harness-tmp/
+work_area/
+.loyal-opposition/
+# Verify/bridge skill-helper scratch: draft bodies, seeded bodies, writer I/O logs,
+# throwaway writer scripts (canonical helpers stay tracked; these are pre-write scratch).
+.claude/skills/*/helpers/_tmp_*
+.claude/skills/*/helpers/_temp_*
+.claude/skills/*/helpers/draft_*
+.claude/skills/*/helpers/seeded_*
+.claude/skills/*/helpers/*_stderr.txt
+.claude/skills/*/helpers/*_stdout.txt
+.claude/skills/*/helpers/writer_script.py
+.codex/skills/*/helpers/_tmp_*
+.codex/skills/*/helpers/_temp_*
+.codex/skills/*/helpers/draft_*
+.codex/skills/*/helpers/draft-*
+.codex/skills/*/helpers/seeded_*
+.codex/skills/*/helpers/*_stderr.txt
+.codex/skills/*/helpers/*_stdout.txt
+.codex/skills/*/helpers/writer_script.py
+# Repo-root loose verdict/draft/review scratch.
+/__TEMP_DRAFT*.md
+/.temp_verdict_*
+/.tmp_verdict_*
+/_temp_wi*
+/_temp_draft_*.txt
+/*-review-package.md
+/backlog_status_utf8.txt
+/bridge-scan.json
