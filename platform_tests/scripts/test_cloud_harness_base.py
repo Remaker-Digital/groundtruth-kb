@@ -17,6 +17,7 @@ require:
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import pytest
@@ -268,6 +269,62 @@ def test_openai_chat_exhaustion_uses_provider_label(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(base.CloudHarnessError, match=r"TestCloud completions request failed .*HTTP 500"):
         base.openai_chat_completion("https://test.cloud/api/v1", "key", {"model": "m"}, label="TestCloud")
+
+
+# --- WI-5066: DNS / wall-clock bound on the provider call ---
+
+
+def test_wall_clock_bound_returns_result_when_call_completes() -> None:
+    assert base._call_with_wall_clock_bound(lambda: "ok", 5.0, label="TestCloud", noun="completions") == "ok"
+
+
+def test_wall_clock_bound_reraises_call_error() -> None:
+    def _boom() -> str:
+        raise ValueError("provider parse error")
+
+    with pytest.raises(ValueError, match="provider parse error"):
+        base._call_with_wall_clock_bound(_boom, 5.0, label="TestCloud", noun="completions")
+
+
+def test_wall_clock_bound_times_out_on_stall_and_is_retryable() -> None:
+    release = threading.Event()
+
+    def _stall() -> str:
+        release.wait(timeout=5.0)  # simulates an unbounded getaddrinfo/DNS stall
+        return "late"
+
+    try:
+        with pytest.raises(base._ProviderCallTimeout) as excinfo:
+            base._call_with_wall_clock_bound(_stall, 0.05, label="TestCloud", noun="completions")
+    finally:
+        release.set()
+    # The synthetic timeout must be a TimeoutError the transport-retry classifier absorbs.
+    assert isinstance(excinfo.value, TimeoutError)
+    assert base._is_retryable_provider_transport_error(excinfo.value)
+
+
+def test_openai_chat_dns_stall_is_bounded_and_raises_classified_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5066: a urlopen that never returns (DNS stall) is bounded, retried, and finally
+    fails with a classified CloudHarnessError instead of blocking the worker forever."""
+    release = threading.Event()
+    calls: list[int] = []
+
+    def fake_urlopen(request, timeout: float):
+        calls.append(1)
+        release.wait(timeout=5.0)  # never resolves within the per-attempt wall-clock bound
+        return _Resp("{}")
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(base.time, "sleep", lambda _s: None)
+
+    try:
+        with pytest.raises(base.CloudHarnessError, match=r"TestCloud completions request"):
+            base.openai_chat_completion(
+                "https://test.cloud/api/v1", "key", {"model": "m"}, timeout=0.3, label="TestCloud"
+            )
+    finally:
+        release.set()
+    assert calls  # the transport was attempted at least once before the bound fired
 
 
 # --- Framework-free tool loop ---

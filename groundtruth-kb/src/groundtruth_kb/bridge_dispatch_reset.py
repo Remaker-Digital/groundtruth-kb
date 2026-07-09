@@ -83,6 +83,8 @@ class DrainResult:
     drained_pids: list[int] = field(default_factory=list)
     terminated_pids: list[int] = field(default_factory=list)
     drain_markers_written: int = 0
+    dead_lease_locks_removed: int = 0
+    stale_dispatch_runs_pruned: int = 0
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +92,8 @@ class DrainResult:
             "drained_pids": list(self.drained_pids),
             "terminated_pids": list(self.terminated_pids),
             "drain_markers_written": self.drain_markers_written,
+            "dead_lease_locks_removed": self.dead_lease_locks_removed,
+            "stale_dispatch_runs_pruned": self.stale_dispatch_runs_pruned,
         }
 
 
@@ -571,6 +575,58 @@ def _clear_drain_markers(state_dirs: DispatchStateDirs, *, dry_run: bool) -> Non
         _remove_path(dispatch_dir / DRAIN_MARKER_FILENAME, dry_run=dry_run)
 
 
+def _lease_record_worker_alive(record: dict[str, Any] | None) -> bool:
+    """True when a lease record names a currently-alive worker PID."""
+    if not isinstance(record, dict):
+        return False
+    pid = record.get("pid")
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    return _dispatch_run_pid_alive(pid)
+
+
+def _prune_dead_lease_locks(dispatch_dir: Path, *, dry_run: bool) -> int:
+    """Remove orphaned document-lease locks with no live worker (WI-5066).
+
+    A lease lock is dead residue only when BOTH its heartbeat is stale
+    (``_lease_is_live`` is False) AND its recorded worker PID is not alive. A
+    lease that is live by heartbeat OR still backed by a live PID is preserved,
+    so an in-flight (even hung-but-not-yet-reaped) worker's lease is never
+    dropped. Never touches bridge files, PAUTH/project state, or quality
+    surfaces. Returns the count of dead lease locks removed.
+    """
+    lease_dir = dispatch_dir / LEASES_DIR_NAME
+    if not lease_dir.is_dir():
+        return 0
+    now = datetime.now(UTC)
+    removed = 0
+    for path in sorted(lease_dir.glob("*.lock")):
+        record = _parse_lease_record(path)
+        heartbeat_live = record is not None and _lease_is_live(record, now=now)
+        if heartbeat_live or _lease_record_worker_alive(record):
+            continue
+        if _remove_path(path, dry_run=dry_run):
+            removed += 1
+    return removed
+
+
+def _drain_residue_cleanup(state_dirs: DispatchStateDirs, *, dry_run: bool) -> tuple[int, int]:
+    """Prune no-live-worker lease locks and stale dispatch-run sidecars (WI-5066).
+
+    Returns ``(dead_lease_locks_removed, stale_dispatch_runs_pruned)`` summed
+    across every dispatcher state dir, so drain leaves the same clean state a
+    soft reset does. Reuses ``_prune_stale_dispatch_runs`` (its own PID/exit-code
+    liveness rule) and never touches recipient/quiesce state, bridge files,
+    PAUTH/project state, or quality surfaces.
+    """
+    dead_leases = 0
+    stale_runs = 0
+    for dispatch_dir in state_dirs.dispatch_dirs:
+        dead_leases += _prune_dead_lease_locks(dispatch_dir, dry_run=dry_run)
+        stale_runs += _prune_stale_dispatch_runs(dispatch_dir, dry_run=dry_run)
+    return dead_leases, stale_runs
+
+
 def drain(
     state_dirs: DispatchStateDirs,
     *,
@@ -586,6 +642,9 @@ def drain(
     if dry_run:
         live = read_live_workers(state_dirs)
         result.drained_pids = [lease.pid for lease in live]
+        result.dead_lease_locks_removed, result.stale_dispatch_runs_pruned = _drain_residue_cleanup(
+            state_dirs, dry_run=True
+        )
         return result
 
     markers_written = 0
@@ -600,6 +659,9 @@ def drain(
         if not live:
             result.drained_pids = []
             _clear_drain_markers(state_dirs, dry_run=False)
+            result.dead_lease_locks_removed, result.stale_dispatch_runs_pruned = _drain_residue_cleanup(
+                state_dirs, dry_run=False
+            )
             return result
         time.sleep(min(poll_interval, max(0.0, deadline - clock())))
 
@@ -611,4 +673,7 @@ def drain(
     result.terminated_pids = terminated
     result.drained_pids = []
     _clear_drain_markers(state_dirs, dry_run=False)
+    result.dead_lease_locks_removed, result.stale_dispatch_runs_pruned = _drain_residue_cleanup(
+        state_dirs, dry_run=False
+    )
     return result

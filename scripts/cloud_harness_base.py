@@ -41,6 +41,7 @@ import re
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -81,6 +82,14 @@ RETRYABLE_PROVIDER_TRANSPORT_MARKERS = frozenset(
         "sslv3_alert_bad_record_mac",
     }
 )
+# WI-5066: hard wall-clock grace (seconds) added when bounding a provider call on
+# a worker thread. urlopen(timeout=) bounds socket connect/read but NOT
+# getaddrinfo (DNS resolution), which runs before the socket exists, so the
+# socket timeout can never fire during a DNS stall. Each attempt runs on a daemon
+# worker thread joined for a hard wall-clock bound; the socket timeout is set this
+# much shorter than the bound so a genuine socket stall raises an
+# accurately-classified URLError before the join synthesizes a DNS-stall timeout.
+PROVIDER_CALL_WALL_CLOCK_GRACE_SECONDS = 5.0
 DEFAULT_MAX_TURNS = 40
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
@@ -168,6 +177,17 @@ class FileScanLimitExceeded(CloudHarnessError):
     def __init__(self, limit: int) -> None:
         super().__init__(f"scan truncated after {limit} entries; narrow the path or pattern")
         self.limit = limit
+
+
+class _ProviderCallTimeout(TimeoutError):
+    """A provider call exceeded its hard wall-clock bound (WI-5066).
+
+    Subclasses ``TimeoutError`` so the existing transport-retry classifier
+    (:func:`_is_retryable_provider_transport_error`) treats it as retryable and
+    the bounded-retry loop absorbs it. Raised when the worker thread running a
+    provider request is still alive after the wall-clock join elapses -- the
+    signature of a DNS/connect stall that ``urlopen(timeout=)`` cannot bound.
+    """
 
 
 @dataclass(frozen=True)
@@ -544,6 +564,50 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
     return [schemas[name] for name in allowed]
 
 
+def _call_with_wall_clock_bound(
+    func: Callable[[], Any],
+    bound_seconds: float,
+    *,
+    label: str,
+    noun: str,
+) -> Any:
+    """Run ``func`` on a daemon worker thread bounded by a hard wall clock (WI-5066).
+
+    ``urllib.request.urlopen(timeout=...)`` bounds socket connect/read but NOT
+    ``getaddrinfo`` (DNS resolution), which runs before the socket exists. A DNS
+    stall therefore escapes the socket timeout and blocks the caller with no
+    socket and no output. Running the call on a worker thread and joining for a
+    hard wall-clock bound caps the whole call (DNS + connect + TLS + read).
+
+    On expiry a :class:`_ProviderCallTimeout` (a ``TimeoutError``) is raised so the
+    caller's bounded-retry classifier treats it as retryable transport; the
+    orphaned worker thread is a daemon and never blocks interpreter exit. Any
+    exception raised inside ``func`` is re-raised to the caller unchanged.
+    """
+    result_box: list[Any] = []
+    error_box: list[BaseException] = []
+
+    def _runner() -> None:
+        try:
+            result_box.append(func())
+        except BaseException as exc:  # noqa: BLE001 - propagated to the caller thread
+            error_box.append(exc)
+
+    worker = threading.Thread(target=_runner, name=f"{label}-{noun}-call", daemon=True)
+    worker.start()
+    worker.join(bound_seconds)
+    if worker.is_alive():
+        raise _ProviderCallTimeout(
+            f"{label} {noun} call exceeded {bound_seconds:.1f}s wall-clock bound "
+            "(DNS/connect/TLS stall not covered by the socket timeout)"
+        )
+    if error_box:
+        raise error_box[0]
+    if not result_box:
+        raise CloudHarnessError(f"{label} {noun} call returned no result")
+    return result_box[0]
+
+
 def _post_json_with_bounded_retry(
     url: str,
     payload: dict[str, Any],
@@ -560,20 +624,27 @@ def _post_json_with_bounded_retry(
     dialects share one transport while keeping dialect-accurate error text.
     """
     deadline = time.monotonic() + timeout
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=dict(headers),
-        method="POST",
-    )
+    body = json.dumps(payload).encode("utf-8")
+    request_headers = dict(headers)
     last_error: Exception | None = None
     for attempt in range(1, CHAT_MAX_ATTEMPTS + 1):
+        remaining = _remaining_timeout(deadline, f"{label} {noun} request timed out")
+        # WI-5066: run the whole call (DNS + connect + TLS + read) under a hard
+        # wall-clock bound so a getaddrinfo stall -- which urlopen(timeout=) cannot
+        # bound -- becomes a bounded, retryable timeout. The socket timeout is set
+        # a grace shorter than the wall-clock join so a genuine socket stall raises
+        # an accurately-classified URLError before the join synthesizes a timeout.
+        socket_timeout = max(0.1, remaining - PROVIDER_CALL_WALL_CLOCK_GRACE_SECONDS)
+
+        def _urlopen_read(_timeout: float = socket_timeout) -> str:
+            # Fresh Request per attempt so an orphaned worker thread from a prior
+            # attempt (still stuck in getaddrinfo) never shares mutable Request state.
+            request = urllib.request.Request(url, data=body, headers=dict(request_headers), method="POST")
+            with urllib.request.urlopen(request, timeout=_timeout) as response:  # noqa: S310
+                return response.read().decode("utf-8")
+
         try:
-            with urllib.request.urlopen(
-                request,
-                timeout=_remaining_timeout(deadline, f"{label} {noun} request timed out"),
-            ) as response:  # noqa: S310
-                data = response.read().decode("utf-8")
+            data = _call_with_wall_clock_bound(_urlopen_read, remaining, label=label, noun=noun)
         except urllib.error.HTTPError as exc:
             last_error = exc
             if exc.code in RETRYABLE_HTTP_STATUS and attempt < CHAT_MAX_ATTEMPTS:

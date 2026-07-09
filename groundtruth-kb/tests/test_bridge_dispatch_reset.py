@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -74,6 +74,16 @@ def _write_live_dispatch_run(
     runs_dir.mkdir(parents=True, exist_ok=True)
     (runs_dir / f"{dispatch_id}.pid").write_text(str(pid), encoding="utf-8")
     (runs_dir / f"{dispatch_id}.create_time_epoch").write_text(f"{create_time_epoch:.6f}", encoding="utf-8")
+
+
+def _write_lease(lease_dir: Path, name: str, *, pid: int, heartbeat: str, ttl: int = 300) -> Path:
+    lease_dir.mkdir(parents=True, exist_ok=True)
+    path = lease_dir / f"{name}.lock"
+    path.write_text(
+        json.dumps({"doc_slug": name, "pid": pid, "heartbeat_at": heartbeat, "ttl_seconds": ttl}),
+        encoding="utf-8",
+    )
+    return path
 
 
 def test_soft_reset_clears_transient_preserves_audit(project_dir: Path) -> None:
@@ -245,6 +255,69 @@ def test_drain_terminates_live_dispatch_run_workers(
     assert result.terminated_pids == [8001]
     assert result.drain_markers_written == 1
     assert (state_dir / DRAIN_MARKER_FILENAME).exists() is False
+
+
+# WI5066_DRAIN_RESIDUE_TESTS
+def test_drain_prunes_dead_lease_and_preserves_hung_worker_lease(
+    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-5066: drain removes a no-live-worker lease (stale heartbeat + dead PID) but
+    preserves a stalled-but-alive worker's lease even when its heartbeat is stale."""
+    state_dirs = _seed_state_dirs(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    lease_dir = state_dir / "leases"
+    stale = (datetime.now(UTC) - timedelta(seconds=3600)).isoformat()
+    dead = _write_lease(lease_dir, "doc-dead", pid=9100, heartbeat=stale)
+    hung = _write_lease(lease_dir, "doc-hung", pid=9200, heartbeat=stale)
+    # doc-dead's worker is gone; doc-hung's worker is still alive (stalled).
+    monkeypatch.setattr(reset_module, "_dispatch_run_pid_alive", lambda pid: int(pid) == 9200)
+
+    terminated: list[int] = []
+    result = drain(
+        state_dirs,
+        timeout_seconds=0.0,
+        now_fn=lambda: 0.0,
+        terminate_fn=terminated.append,
+        poll_interval=0.0,
+    )
+
+    assert terminated == []  # both leases are stale-by-heartbeat, so neither is a live straggler
+    assert result.dead_lease_locks_removed == 1
+    assert not dead.exists()
+    assert hung.exists()
+
+
+def test_drain_prunes_stale_dispatch_run_residue(project_dir: Path) -> None:
+    """WI-5066: drain prunes an exited-worker dispatch-run sidecar left as residue."""
+    state_dirs = _seed_state_dirs(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    dispatch_id = "2026-07-09T00-00-00Z-loyal-opposition-F-stalled"
+    _write_live_dispatch_run(state_dir, dispatch_id)
+    runs_dir = state_dir / "dispatch-runs"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("124", encoding="utf-8")
+
+    result = drain(state_dirs, timeout_seconds=0.0, now_fn=lambda: 0.0, terminate_fn=lambda _p: None, poll_interval=0.0)
+
+    assert result.stale_dispatch_runs_pruned == 1
+    assert not (runs_dir / f"{dispatch_id}.pid").exists()
+    assert not (runs_dir / f"{dispatch_id}.exit_code").exists()
+
+
+def test_drain_dry_run_reports_dead_lease_residue_without_removing(
+    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-5066: dry-run drain reports the residue count but mutates nothing."""
+    state_dirs = _seed_state_dirs(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    lease_dir = state_dir / "leases"
+    stale = (datetime.now(UTC) - timedelta(seconds=3600)).isoformat()
+    dead = _write_lease(lease_dir, "doc-dead", pid=9100, heartbeat=stale)
+    monkeypatch.setattr(reset_module, "_dispatch_run_pid_alive", lambda pid: False)
+
+    result = drain(state_dirs, dry_run=True)
+
+    assert result.dead_lease_locks_removed == 1
+    assert dead.exists()  # dry-run reports but never removes
 
 
 # WI4793_DRY_RUN_TEST
