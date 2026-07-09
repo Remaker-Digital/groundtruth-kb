@@ -65,14 +65,21 @@ def _init_verified_repo(tmp_path: Path) -> Path:
     _git(repo, "commit", "-m", "chore: seed bridge thread")
     _write(
         repo / "bridge" / "parity-fixture-003.md",
-        "NEW\nauthor_identity: prime-builder/test\nauthor_harness_id: T\nauthor_session_context_id: test-prime-session\n\n# Implementation report\n",
+        "NEW\n"
+        "author_identity: prime-builder/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: test-prime-session\n"
+        "\n# Implementation report\n",
     )
     _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
     return repo
 
 
+_THIS_TEST = "platform_tests/skills/test_auto_retire_actuation_helper_parity.py"
+
+
 def _verified_body() -> str:
-    return """VERIFIED
+    return f"""VERIFIED
 author_identity: loyal-opposition/test
 author_harness_id: T
 author_session_context_id: test-session-parity
@@ -80,16 +87,21 @@ author_model: test-model
 author_model_version: test-version
 author_model_configuration: test-config
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: parity-fixture
 Version: 004
 Recommended commit type: test
+
+## Applicability Preflight
+
+- packet_hash: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+- missing_required_specs: []
 
 ## Prior Deliberations
 
 _No prior deliberations: parity fixture._
 
-## Specifications Carried Forward
+## Specification Links
 
 - `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`
 
@@ -97,7 +109,7 @@ _No prior deliberations: parity fixture._
 
 | Specification | Test or Verification Command | Executed | Result |
 | --- | --- | --- | --- |
-| `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` | `pytest platform_tests/skills/test_auto_retire_actuation_helper_parity.py` | yes | PASS |
+| `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` | `pytest {_THIS_TEST}` | yes | PASS |
 
 ## Positive Confirmations
 

@@ -20,6 +20,7 @@ def _load_gate() -> ModuleType:
 
 _GATE = _load_gate()
 _PACKET_HASH = "packet_hash: sha256:" + "0" * 64
+_THIS_TEST = "platform_tests/hooks/test_bridge_compliance_gate_finalization_evidence.py"
 
 
 def _verified_body(*, finalization_evidence: bool) -> str:
@@ -46,7 +47,7 @@ missing_required_specs: []
 
 | Specification | Test or Verification Command | Executed | Result |
 | --- | --- | --- | --- |
-| GOV-FILE-BRIDGE-AUTHORITY-001 | pytest platform_tests/hooks/test_bridge_compliance_gate_finalization_evidence.py | yes | PASS |
+| GOV-FILE-BRIDGE-AUTHORITY-001 | pytest {_THIS_TEST} | yes | PASS |
 
 ## Commands Executed
 

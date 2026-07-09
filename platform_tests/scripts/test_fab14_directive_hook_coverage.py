@@ -184,7 +184,10 @@ def test_claude_powershell_allows_governed_gt_provider_mentions(tmp_path: Path) 
     payload = {
         "tool_name": "PowerShell",
         "tool_input": {
-            "command": 'gt deliberations record --title "OpenRouter routing behavior" --content "OpenRouter routing diagnostics only"',
+            "command": (
+                'gt deliberations record --title "OpenRouter routing behavior" '
+                '--content "OpenRouter routing diagnostics only"'
+            ),
         },
         "cwd": str(_ROOT),
     }

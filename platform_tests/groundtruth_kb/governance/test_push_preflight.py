@@ -33,7 +33,8 @@ def test_existing_branch_update_runs_redacted_range_scan(monkeypatch, tmp_path: 
 
     evidence = push_preflight.run_push_preflight(
         tmp_path,
-        "refs/heads/main aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/heads/main bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+        "refs/heads/main aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+        "refs/heads/main bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
         python_bin="python",
     )
 

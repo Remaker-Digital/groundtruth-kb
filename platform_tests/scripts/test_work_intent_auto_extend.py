@@ -49,7 +49,10 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
         lines.extend([f"Document: {slug}", f"{status}: bridge/{slug}-{version}.md", ""])
         # Also write the versioned file containing the status as its first line
         (bridge / f"{slug}-{version}.md").write_text(
-            f"{status}\nauthor_session_context_id: test-prime-session\nauthor_identity: prime-builder/test\nauthor_harness_id: T\n",
+            f"{status}\n"
+            "author_session_context_id: test-prime-session\n"
+            "author_identity: prime-builder/test\n"
+            "author_harness_id: T\n",
             encoding="utf-8",
         )
     (bridge / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")

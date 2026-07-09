@@ -31,7 +31,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TRIGGER_PATH = PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+TRIGGER_PATH = PROJECT_ROOT / "scripts" / "dispatcher_runtime.py"
 CLAUDE_HOOK_PATH = PROJECT_ROOT / ".claude" / "hooks" / "session_start_dispatch.py"
 CODEX_HOOK_PATH = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
 
@@ -49,7 +49,7 @@ def _load_module(name: str, path: Path) -> ModuleType:
 
 
 def _load_trigger() -> ModuleType:
-    return _load_module("cross_harness_bridge_trigger_govspec", TRIGGER_PATH)
+    return _load_module("dispatcher_runtime_govspec", TRIGGER_PATH)
 
 
 def _load_claude_hook_isolated(name_suffix: str) -> ModuleType:
@@ -325,7 +325,7 @@ def test_no_keyword_on_idle_signature(tmp_path: Path, monkeypatch: pytest.Monkey
     work waits, never when idle. With an empty INDEX, no
     ``_dispatch_prompt`` call happens and no keyword is emitted.
 
-    Test exercises ``run_trigger`` end-to-end with an empty INDEX and
+    Test exercises ``run_dispatch_cycle`` end-to-end with an empty INDEX and
     asserts (a) no spawn launched, (b) reason indicates idle, (c) keyword
     env var would NOT be set because spawn did not happen.
     """
@@ -339,9 +339,9 @@ def test_no_keyword_on_idle_signature(tmp_path: Path, monkeypatch: pytest.Monkey
     (tmp_path / "bridge" / "INDEX.md").write_text("# empty\n", encoding="utf-8")
     _write_harness_state(tmp_path, claude_role="prime-builder", codex_role="loyal-opposition")
 
-    monkeypatch.delenv("GTKB_NO_CROSS_HARNESS_TRIGGER", raising=False)
+    monkeypatch.delenv("GTKB_DISPATCHER_DAEMON_DISABLED", raising=False)
     state_dir = tmp_path / "state"
-    summary = trigger.run_trigger(project_root=tmp_path, state_dir=state_dir, dry_run=True)
+    summary = trigger.run_dispatch_cycle(project_root=tmp_path, state_dir=state_dir, dry_run=True)
 
     # No actionable -> no dispatch path entered for either recipient.
     for recipient in ("prime-builder", "loyal-opposition"):
@@ -413,7 +413,7 @@ def test_misdirected_dispatch_writes_audit_log(tmp_path: Path, monkeypatch: pyte
     assert failures_path.is_file(), (
         "Role mismatch must leave an audit-log entry at the dispatch-failures path; no file was created."
     )
-    lines = [l for l in failures_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [line for line in failures_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert lines, "dispatch-failures.jsonl was empty after role mismatch"
     record = json.loads(lines[-1])
     assert record["kind"] == "dispatch_role_mismatch_authorized"

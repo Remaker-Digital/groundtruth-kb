@@ -78,8 +78,8 @@ def test_ops_context_uses_project_progress_snapshot_for_health_and_scale(tmp_pat
     assert "| health | attention | release_gate_status=red; open_p0_p1=2;" in rendered
     assert "| scale | watch | deployment_success_rate_30d=88.6;" in rendered
     assert (
-        "project progress snapshot: available at `independent-progress-assessments/artifacts/project-progress/latest.json`"
-        in rendered
+        "project progress snapshot: available at "
+        "`independent-progress-assessments/artifacts/project-progress/latest.json`" in rendered
     )
 
 

@@ -61,6 +61,10 @@ CREATE TABLE current_work_items (id TEXT, resolution_status TEXT, title TEXT, co
 CREATE TABLE current_tests (id TEXT, status TEXT, title TEXT, component TEXT, file_paths TEXT);
 CREATE TABLE current_deliberations (id TEXT, outcome TEXT, title TEXT);
 CREATE TABLE test_procedures (id TEXT);
+CREATE TABLE current_projects (id TEXT, name TEXT);
+CREATE TABLE current_project_work_item_memberships (
+    id TEXT, work_item_id TEXT, project_id TEXT, membership_role TEXT, membership_order INTEGER, status TEXT
+);
 """
 
 BASE_TOML = textwrap.dedent(

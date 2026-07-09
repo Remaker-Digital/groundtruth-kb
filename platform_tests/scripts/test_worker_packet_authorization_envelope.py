@@ -37,6 +37,11 @@ def _write_proposal(project_root: Path, slug: str, target_paths: list[str]) -> N
     path.write_text(
         "\n".join(
             [
+                "NEW",
+                "author_identity: prime-builder/test",
+                "author_harness_id: T",
+                "author_session_context_id: test-prime-session",
+                "",
                 f"# Fixture proposal {slug}",
                 "",
                 f"target_paths: {json.dumps(target_paths)}",
@@ -58,7 +63,14 @@ def _write_proposal(project_root: Path, slug: str, target_paths: list[str]) -> N
         ),
         encoding="utf-8",
     )
-    (project_root / "bridge" / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+    (project_root / "bridge" / f"{slug}-002.md").write_text(
+        "GO\n"
+        "author_identity: loyal-opposition/test\n"
+        "author_harness_id: T\n"
+        "author_session_context_id: test-lo-session\n"
+        "\nFixture GO.\n",
+        encoding="utf-8",
+    )
 
 
 def _setup_go(project_root: Path, slug: str, target_paths: list[str]) -> None:

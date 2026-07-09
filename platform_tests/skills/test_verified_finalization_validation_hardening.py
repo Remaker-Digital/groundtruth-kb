@@ -50,6 +50,9 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
+_THIS_TEST = "platform_tests/skills/test_verified_finalization_validation_hardening.py"
+
+
 def _verified_body_base(*, extra_sections: str = "") -> str:
     return f"""VERIFIED
 author_identity: loyal-opposition/test
@@ -59,7 +62,7 @@ author_model: test-model
 author_model_version: test-version
 author_model_configuration: test-config
 
-bridge_kind: verification_verdict
+bridge_kind: lo_verdict
 Document: validation-hardening-fixture
 Version: 004
 Recommended commit type: test
@@ -76,7 +79,7 @@ _No prior deliberations: validation hardening fixture._
 
 | Specification | Test or Verification Command | Executed | Result |
 | --- | --- | --- | --- |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `pytest platform_tests/skills/test_verified_finalization_validation_hardening.py` | yes | PASS |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `pytest {_THIS_TEST}` | yes | PASS |
 
 ## Positive Confirmations
 
@@ -255,6 +258,48 @@ Owner-approved by-reference waiver captured at `DELIB-TEST-BY-REFERENCE-WAIVER`.
 
 
 @pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
+def test_report_claim_include_check_ignores_target_paths_envelope(
+    harness_name: str,
+    tmp_path: Path,
+) -> None:
+    helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_target_paths")
+    repo = _init_finalize_repo(tmp_path, commit_predecessors=True)
+    _write(
+        repo / "bridge" / "chain-fixture-003.md",
+        """NEW
+
+# Implementation report
+
+target_paths: ["scripts/feature.py", "scripts/unrelated_authorized.py"]
+
+## Files Changed
+
+- `scripts/feature.py`
+""",
+    )
+
+    helper._assert_include_set_covers_report_claims(
+        slug="chain-fixture",
+        project_root=repo,
+        latest_report_rel_path="bridge/chain-fixture-003.md",
+        include_paths=["scripts/feature.py", "bridge/chain-fixture-003.md"],
+    )
+
+
+@pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
+def test_target_paths_only_report_does_not_create_claims(harness_name: str) -> None:
+    helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_target_only")
+    report = """NEW
+
+# Implementation report
+
+target_paths: ["scripts/feature.py", "scripts/unrelated_authorized.py"]
+"""
+
+    assert helper._claimed_paths_from_report(report, REPO_ROOT) == ()
+
+
+@pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
 def test_claimed_repo_path_parser_preserves_dot_directories(harness_name: str) -> None:
     helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_dot_paths")
 
@@ -263,6 +308,43 @@ def test_claimed_repo_path_parser_preserves_dot_directories(harness_name: str) -
     assert helper._looks_like_claimed_repo_path(".cursor/skills/verify/helpers/write_verdict.py,")
     assert helper._looks_like_claimed_repo_path(".github/workflows/test.yml")
     assert helper._looks_like_claimed_repo_path(".githooks/pre-commit")
+
+    report = """NEW
+
+# Implementation report
+
+## Files Changed
+
+- .codex/skills/verify/helpers/write_verdict.py
+- ./.claude/skills/verify/helpers/write_verdict.py
+- .cursor/skills/verify/helpers/write_verdict.py,
+"""
+    assert helper._claimed_paths_from_report(report, REPO_ROOT) == (
+        ".codex/skills/verify/helpers/write_verdict.py",
+        ".claude/skills/verify/helpers/write_verdict.py",
+        ".cursor/skills/verify/helpers/write_verdict.py",
+    )
+
+
+@pytest.mark.parametrize("harness_name", list(HELPER_COPIES))
+def test_claimed_repo_path_parser_does_not_extract_subpath_suffix(harness_name: str) -> None:
+    helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_subpath")
+    report = """NEW
+
+# Implementation report
+
+## Files Changed
+
+- `platform_tests/scripts/test_bridge_dispatch_config.py`
+
+```text
+.../scripts/test_bridge_dispatch_config.py         | 97 +++++++++++++++++++++-
+```
+"""
+
+    assert helper._claimed_paths_from_report(report, REPO_ROOT) == (
+        "platform_tests/scripts/test_bridge_dispatch_config.py",
+    )
 
 
 @pytest.mark.parametrize("harness_name", list(HELPER_COPIES))

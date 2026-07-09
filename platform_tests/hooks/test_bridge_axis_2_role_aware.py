@@ -16,7 +16,8 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -38,11 +39,23 @@ def _load_hook() -> ModuleType:
     return module
 
 
-class _Item:
+class _Item(SimpleNamespace):
     def __init__(self, name: str, status: str, top_file: str) -> None:
-        self.document_name = name
-        self.top_status = status
-        self.top_file = top_file
+        super().__init__(
+            document_name=name,
+            top_status=status,
+            top_file=top_file,
+            dispatchable=True,
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, (SimpleNamespace, _Item)):
+            return False
+        return (
+            self.document_name == getattr(other, "document_name", None)
+            and self.top_status == getattr(other, "top_status", None)
+            and self.top_file == getattr(other, "top_file", None)
+        )
 
 
 _PRIME_ITEMS = [_Item("doc-go", "GO", "bridge/doc-go-002.md")]
@@ -54,18 +67,30 @@ _CODEX_ITEMS = [
 
 @pytest.fixture
 def hook(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    """Load the hook and stub the canonical parser + actionable computation.
+    """Load the hook and stub the dynamic scan bridge helper.
 
-    The hook imports parse_index / compute_actionable_pending locally inside
-    _compute_actionable_for_role, so monkeypatching the source-module attributes
-    is picked up at call time.
+    The hook imports scan_bridge helper locally inside _compute_actionable_for_role,
+    so monkeypatching _load_scan_bridge_helper is picked up at call time.
     """
     module = _load_hook()
-    import groundtruth_kb.bridge.detector as detector
-    import groundtruth_kb.bridge.notify as notify
 
-    monkeypatch.setattr(detector, "parse_index", lambda *a, **k: object())
-    monkeypatch.setattr(notify, "compute_actionable_pending", lambda *a, **k: (_PRIME_ITEMS, _CODEX_ITEMS))
+    class MockScanner:
+        @staticmethod
+        def scan(role: str, *args, **kwargs) -> dict[str, Any]:
+            if role == module.ROLE_PRIME:
+                return {
+                    "actionable": [{"document": "doc-go", "latest_status": "GO", "latest_path": "bridge/doc-go-002.md"}]
+                }
+            elif role == module.ROLE_LO:
+                return {
+                    "actionable": [
+                        {"document": "doc-new", "latest_status": "NEW", "latest_path": "bridge/doc-new-001.md"},
+                        {"document": "doc-rev", "latest_status": "REVISED", "latest_path": "bridge/doc-rev-003.md"},
+                    ]
+                }
+            return {"actionable": []}
+
+    monkeypatch.setattr(module, "_load_scan_bridge_helper", lambda: MockScanner)
     return module
 
 
