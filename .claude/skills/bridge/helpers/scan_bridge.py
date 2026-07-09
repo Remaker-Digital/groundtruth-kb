@@ -14,8 +14,8 @@ Filter rules (per ``.claude/rules/file-bridge-protocol.md``):
   implementation follow-up, so it is excluded from the Prime actionable list.
   A latest ``NO-GO`` always stays Prime-actionable regardless of kind (Prime
   must revise).
-- ``loyal-opposition`` acts on latest ``NEW`` and latest ``REVISED`` (review),
-  unaffected by terminal-kind classification.
+- ``loyal-opposition`` acts on latest ``NEW``, latest ``REVISED``, and latest
+  ``NO-ACTION`` (review), unaffected by terminal-kind classification.
 - ``ADVISORY`` is actionable for ``prime-builder`` only (advisory disposition
   requires Prime owner-deliberation/UAQ work); it is non-actionable for
   ``loyal-opposition`` and is non-dispatchable for headless dispatch (see the
@@ -81,7 +81,7 @@ TERMINAL_STATUSES = MATRIX_VERIFIED_CONTEXT_STATUSES
 # Prime-authored proposal statuses. ``bridge_kind`` metadata lives on the
 # operative Prime proposal (latest NEW/REVISED), NOT on the Codex GO verdict.
 _PRIME_VERSION_STATUSES = frozenset({"NEW", "REVISED"})
-_NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO"})
+_NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION"})
 
 # Terminal-kind ``bridge_kind`` substring tokens. MIRROR of
 # ``groundtruth_kb.bridge.notify._KIND_TERMINAL_TOKENS``. A latest-``GO`` whose
@@ -95,13 +95,13 @@ _KIND_TERMINAL_TOKENS = MATRIX_BRIDGE_KIND_TERMINAL_TOKENS
 _HEADER_READ_BUDGET_BYTES = 4096
 
 _STATUS_LINE_RE = re.compile(
-    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
+    r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|NO-ACTION|ACCEPTED|BLOCKED):\s*(bridge/.+\.md)\s*$"
 )
 _DOCUMENT_LINE_RE = re.compile(r"^Document:\s*(\S+)\s*$")
 _BRIDGE_KIND_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.MULTILINE)
 _VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3})\.md$")
 _FILE_STATUS_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|NO-ACTION|ACCEPTED|BLOCKED)\b",
     re.IGNORECASE,
 )
 
