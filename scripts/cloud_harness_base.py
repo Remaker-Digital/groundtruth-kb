@@ -12,14 +12,19 @@ Adopters supply only the varying axes via an :class:`AdopterProfile`:
 * ``endpoint`` — the direct-cloud base URL (no local-service bridge).
 * ``auth_env_key`` — token auth via an Authorization header keyed on an env var NAME
   (``GOV-ENV-LOCAL-AUTHORITY-001``); the token value is never embedded in source.
-* ``dialect`` — one of ``openai-chat`` (implemented in slice 2), ``ollama-native``, or
-  ``anthropic-messages`` (slice-3 seam points that raise :class:`NotImplementedError`).
+* ``dialect`` — ``openai-chat`` (slice 2) and ``anthropic-messages`` (slice 3) are
+  implemented concretely; ``ollama-native`` is the remaining seam point (implemented with
+  the Ollama re-base in slice 4) and raises :class:`NotImplementedError` if selected.
 * ``model`` routing — the adopter's ``.api-harness/routing.toml`` provider key.
-* ``hook_tier`` — ``guard-adapter-floor`` (this slice) vs native full hooks (slice 3).
+* ``hook_tier`` — ``guard-adapter-floor`` (the enforced mechanism) or ``native-full-hooks``
+  (slice-3 validated seam/flag; the floor is still enforced for this tier, and the concrete
+  full-hook lifecycle is wired against a live Anthropic adopter in slice 4).
 
-Slice-2 scope: the base + the ``openai-chat`` dialect concretely; the OpenRouter harness
-re-bases onto this module as the first-adopter proof. ``ollama-native`` and
-``anthropic-messages`` are defined seam points; selecting them raises the slice-3 sentinel.
+The dialect abstraction (slice 3) makes ``run_tool_loop`` dialect-agnostic: each dialect
+strategy owns request-build, tool-schema shaping, and response-parse, while the loop's
+control flow, tool dispatch, fail-closed guard enforcement, and session-timeout are shared.
+OpenRouter (openai-chat) re-bases onto this module as the first-adopter proof; Alibaba Cloud
+Studio and Ollama (anthropic-messages / ollama-native) adopt in slice 4.
 
 Framework-free: standard library (``urllib``/``ssl``/``json``/``subprocess``) plus existing
 GT-KB helpers only — no heavyweight agent framework, per ``ADR-OLLAMA-HARNESS-ADOPTION-001``.
@@ -100,16 +105,30 @@ LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
 
-# --- Dialect seam (slice 2: openai-chat concrete; the other two are slice-3 seam points) ---
+# --- Dialect seam (slice 2: openai-chat; slice 3: + anthropic-messages; slice 4: + ollama-native) ---
 DIALECT_OPENAI_CHAT = "openai-chat"
 DIALECT_OLLAMA_NATIVE = "ollama-native"
 DIALECT_ANTHROPIC_MESSAGES = "anthropic-messages"
 SUPPORTED_DIALECTS = frozenset({DIALECT_OPENAI_CHAT, DIALECT_OLLAMA_NATIVE, DIALECT_ANTHROPIC_MESSAGES})
-SLICE3_DIALECT_SEAM = frozenset({DIALECT_OLLAMA_NATIVE, DIALECT_ANTHROPIC_MESSAGES})
+# After slice 3, anthropic-messages is implemented concretely; ollama-native remains the
+# lone seam point (implemented with the Ollama re-base in slice 4).
+SLICE4_DIALECT_SEAM = frozenset({DIALECT_OLLAMA_NATIVE})
 
-# --- Hook tiers ---
+# --- Auth styles (anthropic-messages dialect; per Ollama upstream issue #16922 some
+# Anthropic-compatible cloud endpoints reject x-api-key and require Authorization: Bearer) ---
+AUTH_STYLE_AUTHORIZATION_BEARER = "authorization-bearer"
+AUTH_STYLE_X_API_KEY = "x-api-key"
+SUPPORTED_AUTH_STYLES = frozenset({AUTH_STYLE_AUTHORIZATION_BEARER, AUTH_STYLE_X_API_KEY})
+
+# --- Hook tiers (slice 3: native-full-hooks is a validated seam/flag; the fail-closed
+# guard-adapter floor stays the enforced mechanism for all tiers until slice 4 wires
+# the concrete full-hook lifecycle against a live Anthropic adopter — DELIB-20260708-
+# CLOUD-HARNESS-TEMPLATE-SLICE3-NATIVE-HOOK-SCOPE) ---
 HOOK_TIER_GUARD_ADAPTER_FLOOR = "guard-adapter-floor"
 HOOK_TIER_NATIVE_FULL = "native-full-hooks"
+SUPPORTED_HOOK_TIERS = frozenset({HOOK_TIER_GUARD_ADAPTER_FLOOR, HOOK_TIER_NATIVE_FULL})
+DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
+DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
 # Generic GT-KB guard-adapter sequences (shared across adopters; not adopter-specific).
 BRIDGE_WRITE_GUARDS = (
@@ -201,10 +220,22 @@ class AdopterProfile:
     dialect: str = DIALECT_OPENAI_CHAT
     hook_tier: str = HOOK_TIER_GUARD_ADAPTER_FLOOR
     extra_headers: Mapping[str, str] = field(default_factory=dict)
+    # anthropic-messages dialect axes (ignored by the openai-chat dialect; openai-safe defaults):
+    auth_style: str = AUTH_STYLE_AUTHORIZATION_BEARER
+    anthropic_version: str = DEFAULT_ANTHROPIC_VERSION
+    max_tokens: int = DEFAULT_ANTHROPIC_MAX_TOKENS
 
     def __post_init__(self) -> None:
         if self.dialect not in SUPPORTED_DIALECTS:
             raise CloudHarnessError(f"unknown dialect {self.dialect!r}; expected one of {sorted(SUPPORTED_DIALECTS)}")
+        if self.hook_tier not in SUPPORTED_HOOK_TIERS:
+            raise CloudHarnessError(
+                f"unknown hook_tier {self.hook_tier!r}; expected one of {sorted(SUPPORTED_HOOK_TIERS)}"
+            )
+        if self.auth_style not in SUPPORTED_AUTH_STYLES:
+            raise CloudHarnessError(
+                f"unknown auth_style {self.auth_style!r}; expected one of {sorted(SUPPORTED_AUTH_STYLES)}"
+            )
         # Slice 2 direct-cloud invariant (SPEC-INTAKE-9ec893): an adopter must declare a
         # direct-cloud endpoint; the base has no local-service bridge path.
         if not self.default_endpoint or not str(self.default_endpoint).strip():
@@ -513,32 +544,26 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
     return [schemas[name] for name in allowed]
 
 
-def openai_chat_completion(
-    endpoint: str,
-    api_key: str,
+def _post_json_with_bounded_retry(
+    url: str,
     payload: dict[str, Any],
-    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    timeout: float,
     *,
     label: str,
-    extra_headers: Mapping[str, str] | None = None,
+    noun: str,
+    headers: Mapping[str, str],
 ) -> dict[str, Any]:
-    """The ``openai-chat`` dialect strategy: POST to ``<endpoint>/chat/completions`` with bounded retry.
+    """Shared framework-free POST-JSON transport with bounded retry/backoff.
 
-    ``label`` names the provider in error messages (e.g. ``"OpenRouter"``); token auth is
-    sent via an ``Authorization`` header, keyed on the caller-supplied ``api_key`` value.
+    ``label`` names the provider and ``noun`` names the endpoint kind (``"completions"``
+    for the openai-chat dialect, ``"messages"`` for anthropic-messages) so the two
+    dialects share one transport while keeping dialect-accurate error text.
     """
-    url = endpoint.rstrip("/") + "/chat/completions"
     deadline = time.monotonic() + timeout
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + api_key,
-    }
-    if extra_headers:
-        headers.update(extra_headers)
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
+        headers=dict(headers),
         method="POST",
     )
     last_error: Exception | None = None
@@ -546,7 +571,7 @@ def openai_chat_completion(
         try:
             with urllib.request.urlopen(
                 request,
-                timeout=_remaining_timeout(deadline, f"{label} completions request timed out"),
+                timeout=_remaining_timeout(deadline, f"{label} {noun} request timed out"),
             ) as response:  # noqa: S310
                 data = response.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
@@ -555,7 +580,7 @@ def openai_chat_completion(
                 _sleep_with_budget(
                     _http_retry_delay_seconds(exc, attempt),
                     deadline,
-                    f"{label} completions request timed out before retry",
+                    f"{label} {noun} request timed out before retry",
                 )
                 continue
             if exc.code == 429:
@@ -566,7 +591,7 @@ def openai_chat_completion(
                     f"after {attempt} attempt(s){retry_after_suffix}: {exc}"
                 ) from exc
             raise CloudHarnessError(
-                f"{label} completions request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
+                f"{label} {noun} request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
             ) from exc
         except (urllib.error.URLError, ConnectionError, TimeoutError, ssl.SSLError) as exc:
             last_error = exc
@@ -575,7 +600,7 @@ def openai_chat_completion(
                 _sleep_with_budget(
                     CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
                     deadline,
-                    f"{label} completions request timed out before retry",
+                    f"{label} {noun} request timed out before retry",
                 )
                 continue
             if isinstance(exc, ssl.SSLError):
@@ -583,7 +608,7 @@ def openai_chat_completion(
                 raise CloudHarnessError(
                     f"{label} provider transport failure after {attempt} attempt(s): {summary}"
                 ) from exc
-            raise CloudHarnessError(f"{label} completions request failed after {attempt} attempt(s): {exc}") from exc
+            raise CloudHarnessError(f"{label} {noun} request failed after {attempt} attempt(s): {exc}") from exc
         try:
             parsed = json.loads(data)
         except json.JSONDecodeError as exc:
@@ -592,39 +617,257 @@ def openai_chat_completion(
                 _sleep_with_budget(
                     CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
                     deadline,
-                    f"{label} completions request timed out before retry",
+                    f"{label} {noun} request timed out before retry",
                 )
                 continue
             snippet = data[:200].replace("\n", " ")
             raise CloudHarnessError(
-                f"{label} completions response was not JSON after {attempt} attempt(s) "
-                f"(body snippet: {snippet!r}): {exc}"
+                f"{label} {noun} response was not JSON after {attempt} attempt(s) (body snippet: {snippet!r}): {exc}"
             ) from exc
         if not isinstance(parsed, dict):
-            raise CloudHarnessError(f"{label} completions response must be a JSON object")
+            raise CloudHarnessError(f"{label} {noun} response must be a JSON object")
         return parsed
-    raise CloudHarnessError(f"{label} completions request failed after {CHAT_MAX_ATTEMPTS} attempt(s): {last_error}")
+    raise CloudHarnessError(f"{label} {noun} request failed after {CHAT_MAX_ATTEMPTS} attempt(s): {last_error}")
+
+
+def openai_chat_completion(
+    endpoint: str,
+    api_key: str,
+    payload: dict[str, Any],
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    *,
+    label: str,
+    extra_headers: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """The ``openai-chat`` dialect transport: POST to ``<endpoint>/chat/completions``.
+
+    ``label`` names the provider in error messages (e.g. ``"OpenRouter"``); token auth is
+    sent via an ``Authorization`` header, keyed on the caller-supplied ``api_key`` value.
+    """
+    url = endpoint.rstrip("/") + "/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + api_key,
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+    return _post_json_with_bounded_retry(url, payload, timeout, label=label, noun="completions", headers=headers)
+
+
+def anthropic_messages_completion(
+    endpoint: str,
+    api_key: str,
+    payload: dict[str, Any],
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    *,
+    label: str,
+    extra_headers: Mapping[str, str] | None = None,
+    auth_style: str = AUTH_STYLE_AUTHORIZATION_BEARER,
+    anthropic_version: str = DEFAULT_ANTHROPIC_VERSION,
+) -> dict[str, Any]:
+    """The ``anthropic-messages`` dialect transport: POST to ``<endpoint>/messages``.
+
+    Token auth is configurable by ``auth_style``: native Anthropic uses ``x-api-key``;
+    Anthropic-compatible cloud endpoints that reject it (Ollama upstream issue #16922)
+    use ``Authorization: Bearer``. The token value is keyed on the caller-supplied
+    ``api_key`` (referenced by env-key NAME upstream, per GOV-ENV-LOCAL-AUTHORITY-001).
+    """
+    url = endpoint.rstrip("/") + "/messages"
+    headers = {
+        "Content-Type": "application/json",
+        "anthropic-version": anthropic_version,
+    }
+    if auth_style == AUTH_STYLE_X_API_KEY:
+        headers["x-api-key"] = api_key
+    else:
+        headers["Authorization"] = "Bearer " + api_key
+    if extra_headers:
+        headers.update(extra_headers)
+    return _post_json_with_bounded_retry(url, payload, timeout, label=label, noun="messages", headers=headers)
+
+
+def _openai_build_payload(
+    messages: list[dict[str, Any]], model_route: ModelRoute, tool_schemas: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """openai-chat request payload (byte-identical to the slice-2 inline build)."""
+    payload: dict[str, Any] = {"messages": messages, "stream": False}
+    if not model_route.omit_payload_model:
+        payload["model"] = model_route.model_id
+    if tool_schemas:
+        payload["tools"] = tool_schemas
+    return payload
+
+
+def _anthropic_build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
+    """Anthropic tool schema: the same tool definitions under ``input_schema`` (no function wrapper)."""
+    return [
+        {
+            "name": schema["function"]["name"],
+            "description": schema["function"]["description"],
+            "input_schema": schema["function"]["parameters"],
+        }
+        for schema in build_tool_schemas(allowed_tools)
+    ]
+
+
+def _anthropic_build_payload(
+    messages: list[dict[str, Any]],
+    model_route: ModelRoute,
+    tool_schemas: list[dict[str, Any]],
+    *,
+    max_tokens: int,
+) -> dict[str, Any]:
+    """Translate the internal (openai-shaped) message history into an Anthropic Messages payload.
+
+    system → top-level ``system``; assistant ``tool_calls`` → ``tool_use`` blocks; ``tool``
+    results are coalesced into a following user message of ``tool_result`` blocks.
+    """
+    system_text: str | None = None
+    out_messages: list[dict[str, Any]] = []
+    pending_tool_results: list[dict[str, Any]] = []
+
+    def _flush_tool_results() -> None:
+        nonlocal pending_tool_results
+        if pending_tool_results:
+            out_messages.append({"role": "user", "content": pending_tool_results})
+            pending_tool_results = []
+
+    for message in messages:
+        role = message.get("role")
+        if role == "system":
+            system_text = message.get("content") or ""
+            continue
+        if role == "tool":
+            content = message.get("content")
+            pending_tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": message.get("tool_call_id") or "",
+                    "content": content if isinstance(content, str) else str(content),
+                }
+            )
+            continue
+        _flush_tool_results()
+        if role == "user":
+            out_messages.append({"role": "user", "content": message.get("content") or ""})
+        elif role == "assistant":
+            blocks: list[dict[str, Any]] = []
+            text = message.get("content")
+            if text:
+                blocks.append({"type": "text", "text": text})
+            for tool_call in message.get("tool_calls") or []:
+                function = tool_call.get("function") or {}
+                arguments = function.get("arguments")
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments or "{}")
+                    except json.JSONDecodeError:
+                        arguments = {}
+                if not isinstance(arguments, dict):
+                    arguments = {}
+                blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": tool_call.get("id") or "",
+                        "name": function.get("name") or "",
+                        "input": arguments,
+                    }
+                )
+            out_messages.append({"role": "assistant", "content": blocks})
+    _flush_tool_results()
+
+    payload: dict[str, Any] = {
+        "model": model_route.model_id,
+        "max_tokens": max_tokens,
+        "messages": out_messages,
+    }
+    if system_text:
+        payload["system"] = system_text
+    if tool_schemas:
+        payload["tools"] = tool_schemas
+    return payload
+
+
+def _anthropic_parse_message(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize an Anthropic Messages response into the internal ``{content, tool_calls}`` shape."""
+    content_blocks = response.get("content")
+    if not isinstance(content_blocks, list):
+        raise CloudHarnessError("Anthropic response missing content block list")
+    text_parts: list[str] = []
+    tool_calls: list[dict[str, Any]] = []
+    for index, block in enumerate(content_blocks):
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        if block_type == "text":
+            text = block.get("text")
+            if isinstance(text, str):
+                text_parts.append(text)
+        elif block_type == "tool_use":
+            name = block.get("name")
+            if not isinstance(name, str) or not name:
+                raise CloudHarnessError("Anthropic tool_use block missing name")
+            tool_calls.append(
+                {
+                    "id": str(block.get("id") or f"tool_use_{index}"),
+                    "function": {"name": name, "arguments": block.get("input") or {}},
+                }
+            )
+    return {"content": "".join(text_parts), "tool_calls": tool_calls}
+
+
+@dataclass(frozen=True)
+class DialectStrategy:
+    """Per-dialect request-build / tool-schema / response-parse / transport bundle."""
+
+    build_tool_schemas: Callable[[Iterable[str]], list[dict[str, Any]]]
+    build_payload: Callable[[list[dict[str, Any]], ModelRoute, list[dict[str, Any]]], dict[str, Any]]
+    parse_message: Callable[[Mapping[str, Any]], dict[str, Any]]
+    chat: ChatFunc
+
+
+def resolve_dialect_strategy(profile: AdopterProfile) -> DialectStrategy:
+    """Return the full dialect strategy for the profile's dialect.
+
+    Slice 2 implemented ``openai-chat``; slice 3 adds ``anthropic-messages``. ``ollama-native``
+    remains the lone seam point (implemented with the Ollama re-base in slice 4) and raises an
+    explicit sentinel so a misconfigured adopter fails loudly rather than silently no-op.
+    """
+    if profile.dialect == DIALECT_OPENAI_CHAT:
+        return DialectStrategy(
+            build_tool_schemas=build_tool_schemas,
+            build_payload=_openai_build_payload,
+            parse_message=_message_from_response,
+            chat=functools.partial(
+                openai_chat_completion,
+                label=profile.display_name,
+                extra_headers=dict(profile.extra_headers),
+            ),
+        )
+    if profile.dialect == DIALECT_ANTHROPIC_MESSAGES:
+        return DialectStrategy(
+            build_tool_schemas=_anthropic_build_tool_schemas,
+            build_payload=functools.partial(_anthropic_build_payload, max_tokens=profile.max_tokens),
+            parse_message=_anthropic_parse_message,
+            chat=functools.partial(
+                anthropic_messages_completion,
+                label=profile.display_name,
+                extra_headers=dict(profile.extra_headers),
+                auth_style=profile.auth_style,
+                anthropic_version=profile.anthropic_version,
+            ),
+        )
+    if profile.dialect == DIALECT_OLLAMA_NATIVE:
+        raise NotImplementedError(
+            "dialect 'ollama-native' is a slice-4 seam point (implemented with the Ollama "
+            "re-base in slice 4); not implemented in slice 3"
+        )
+    raise CloudHarnessError(f"unknown dialect {profile.dialect!r}")
 
 
 def resolve_dialect_chat_func(profile: AdopterProfile) -> ChatFunc:
-    """Return the chat strategy for the profile's dialect.
-
-    Slice 2 implements ``openai-chat`` concretely; the ``ollama-native`` and
-    ``anthropic-messages`` seam points raise an explicit slice-3 sentinel so a
-    misconfigured adopter fails loudly rather than silently no-op.
-    """
-    if profile.dialect == DIALECT_OPENAI_CHAT:
-        return functools.partial(
-            openai_chat_completion,
-            label=profile.display_name,
-            extra_headers=dict(profile.extra_headers),
-        )
-    if profile.dialect in SLICE3_DIALECT_SEAM:
-        raise NotImplementedError(
-            f"dialect {profile.dialect!r} is a slice-3 seam point (ADR-CLOUD-HARNESS-TEMPLATE-001 "
-            "Consequences); only 'openai-chat' is implemented in slice 2"
-        )
-    raise CloudHarnessError(f"unknown dialect {profile.dialect!r}")
+    """Return only the transport for the profile's dialect (compat shim over the strategy)."""
+    return resolve_dialect_strategy(profile).chat
 
 
 def _resolve_tool_path(project_root: Path, path_text: str, *, allow_missing: bool) -> Path:
@@ -1216,10 +1459,12 @@ def run_tool_loop(
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
 ) -> str:
-    """Framework-free tool-call loop shared across cloud harnesses.
+    """Framework-free tool-call loop shared across cloud harnesses (dialect-agnostic).
 
-    ``chat_func`` is the dialect strategy; when omitted it is resolved from the
-    profile's dialect via :func:`resolve_dialect_chat_func`.
+    The dialect strategy (resolved from the profile via :func:`resolve_dialect_strategy`)
+    owns request-build, tool-schema shaping, and response-parse; ``chat_func`` overrides
+    only the transport (used by tests). The loop's control flow, tool dispatch, guard
+    enforcement, no-progress dedup, and session-timeout are shared across dialects.
     """
     if max_turns < 1:
         raise CloudHarnessError("max_turns must be at least 1")
@@ -1230,8 +1475,9 @@ def run_tool_loop(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
-    schemas = build_tool_schemas(model_route.allowed_tools)
-    chat = chat_func or resolve_dialect_chat_func(profile)
+    strategy = resolve_dialect_strategy(profile)
+    schemas = strategy.build_tool_schemas(model_route.allowed_tools)
+    chat = chat_func or strategy.chat
     metadata = ModelMetadata(
         model_route.model_id,
         model_route.model_version,
@@ -1244,11 +1490,7 @@ def run_tool_loop(
     repeated_tool_signature_turns = 0
 
     for _turn in range(max_turns):
-        payload = {"messages": messages, "stream": False}
-        if not model_route.omit_payload_model:
-            payload["model"] = model_route.model_id
-        if schemas:
-            payload["tools"] = schemas
+        payload = strategy.build_payload(messages, model_route, schemas)
 
         operation_timeout = min(
             timeout,
@@ -1262,7 +1504,7 @@ def run_tool_loop(
             raise CloudHarnessError(f"provider API returned error: {error_message}")
 
         metadata = metadata_from_response(metadata, response, profile)
-        message = _message_from_response(response)
+        message = strategy.parse_message(response)
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:

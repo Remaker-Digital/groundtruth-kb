@@ -130,10 +130,19 @@ def test_openai_chat_dialect_resolves_to_callable() -> None:
     assert callable(chat)
 
 
-@pytest.mark.parametrize("dialect", [base.DIALECT_OLLAMA_NATIVE, base.DIALECT_ANTHROPIC_MESSAGES])
-def test_slice3_dialects_raise_not_implemented_sentinel(dialect: str) -> None:
-    with pytest.raises(NotImplementedError, match="slice-3"):
-        base.resolve_dialect_chat_func(_profile(dialect=dialect))
+def test_ollama_native_dialect_raises_slice4_sentinel() -> None:
+    # anthropic-messages is implemented in slice 3; ollama-native is the lone remaining
+    # seam point (implemented with the Ollama re-base in slice 4).
+    with pytest.raises(NotImplementedError, match="slice-4"):
+        base.resolve_dialect_chat_func(_profile(dialect=base.DIALECT_OLLAMA_NATIVE))
+
+
+def test_anthropic_messages_dialect_resolves_to_strategy() -> None:
+    strategy = base.resolve_dialect_strategy(_profile(dialect=base.DIALECT_ANTHROPIC_MESSAGES))
+    assert callable(strategy.chat)
+    assert callable(strategy.build_payload)
+    assert callable(strategy.parse_message)
+    assert callable(strategy.build_tool_schemas)
 
 
 # --- Config-driven routing (cross-provider isolation) ---
@@ -284,3 +293,207 @@ def test_run_tool_loop_rejects_blank_final_text(tmp_path: Path) -> None:
 
     with pytest.raises(base.CloudHarnessError, match="nonblank text content"):
         base.run_tool_loop("hello", route, "https://test.cloud/api/v1", "key", 1, root, _profile(), chat_func=chat)
+
+
+# --- Slice 3: hook-tier + auth-style validation (native-hook seam is a flag; floor stays enforced) ---
+
+
+def _anthropic_profile(**overrides) -> base.AdopterProfile:
+    return _profile(dialect=base.DIALECT_ANTHROPIC_MESSAGES, **overrides)
+
+
+def test_profile_rejects_unknown_hook_tier() -> None:
+    with pytest.raises(base.CloudHarnessError, match="unknown hook_tier"):
+        _profile(hook_tier="webhook-callbacks")
+
+
+def test_profile_rejects_unknown_auth_style() -> None:
+    with pytest.raises(base.CloudHarnessError, match="unknown auth_style"):
+        _profile(auth_style="oauth2")
+
+
+def test_profile_accepts_native_full_hooks_tier() -> None:
+    profile = _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL)
+    assert profile.hook_tier == base.HOOK_TIER_NATIVE_FULL
+
+
+def test_native_full_hooks_tier_still_enforces_guard_floor(tmp_path: Path) -> None:
+    # Owner AUQ (DELIB-20260708-CLOUD-HARNESS-TEMPLATE-SLICE3-NATIVE-HOOK-SCOPE): the
+    # native-full-hooks tier is a validated seam/flag; the fail-closed guard-adapter floor
+    # remains the enforced mechanism regardless of tier.
+    root = _root(tmp_path)
+    (root / "fake_guard.py").write_text("print('{}')\n", encoding="utf-8")
+    profile = _anthropic_profile(hook_tier=base.HOOK_TIER_NATIVE_FULL)
+
+    def deny(path: Path, payload: dict, env: dict, timeout: float) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(returncode=0, stdout='{"decision": "block", "reason": "nope"}')
+
+    with pytest.raises(base.CloudHarnessError, match="guard denied"):
+        base.invoke_guard_adapter(
+            "Write",
+            {"path": "bridge/example-001.md", "content": "NEW\n"},
+            _meta(),
+            root,
+            profile,
+            guard_runner=deny,
+            guard_paths=[Path("fake_guard.py")],
+        )
+
+
+# --- Slice 3: anthropic-messages dialect ---
+
+
+def test_anthropic_build_tool_schemas_uses_input_schema() -> None:
+    strategy = base.resolve_dialect_strategy(_anthropic_profile())
+    schemas = strategy.build_tool_schemas(["Read", "Write"])
+    assert [s["name"] for s in schemas] == ["Read", "Write"]
+    for s in schemas:
+        assert "input_schema" in s
+        assert "function" not in s  # not the OpenAI wrapper shape
+        assert s["input_schema"]["type"] == "object"
+
+
+def test_anthropic_build_payload_translates_system_tooluse_and_toolresult() -> None:
+    strategy = base.resolve_dialect_strategy(_anthropic_profile())
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    messages = [
+        {"role": "system", "content": "sys-prompt"},
+        {"role": "user", "content": "hello"},
+        {
+            "role": "assistant",
+            "content": "thinking",
+            "tool_calls": [{"id": "tu1", "function": {"name": "Read", "arguments": {"path": "note.txt"}}}],
+        },
+        {"role": "tool", "tool_call_id": "tu1", "content": "file contents"},
+    ]
+    payload = strategy.build_payload(messages, route, strategy.build_tool_schemas(["Read"]))
+
+    assert payload["system"] == "sys-prompt"
+    assert payload["max_tokens"] == base.DEFAULT_ANTHROPIC_MAX_TOKENS
+    assert payload["model"] == "testvendor/tc-model"
+    # user, assistant(text+tool_use), user(tool_result)
+    assert [m["role"] for m in payload["messages"]] == ["user", "assistant", "user"]
+    assistant_blocks = payload["messages"][1]["content"]
+    assert {b["type"] for b in assistant_blocks} == {"text", "tool_use"}
+    tool_use = next(b for b in assistant_blocks if b["type"] == "tool_use")
+    assert tool_use["id"] == "tu1" and tool_use["name"] == "Read" and tool_use["input"] == {"path": "note.txt"}
+    tool_result = payload["messages"][2]["content"][0]
+    assert tool_result["type"] == "tool_result" and tool_result["tool_use_id"] == "tu1"
+    assert tool_result["content"] == "file contents"
+
+
+def test_anthropic_parse_message_extracts_text_and_tool_use() -> None:
+    strategy = base.resolve_dialect_strategy(_anthropic_profile())
+    response = {
+        "model": "m",
+        "stop_reason": "tool_use",
+        "content": [
+            {"type": "text", "text": "let me read that"},
+            {"type": "tool_use", "id": "tu9", "name": "Read", "input": {"path": "x.txt"}},
+        ],
+    }
+    message = strategy.parse_message(response)
+    assert message["content"] == "let me read that"
+    assert message["tool_calls"] == [{"id": "tu9", "function": {"name": "Read", "arguments": {"path": "x.txt"}}}]
+
+
+def test_anthropic_auth_style_x_api_key_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict = {}
+    body = base.json.dumps({"content": [{"type": "text", "text": "ok"}]})
+
+    def fake_urlopen(request, timeout: float):
+        captured["request"] = request
+        return _Resp(body)
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+    base.anthropic_messages_completion(
+        "https://alibaba.test/v1",
+        "secret-token",
+        {"model": "m"},
+        label="TestCloud",
+        auth_style=base.AUTH_STYLE_X_API_KEY,
+    )
+    headers = captured["request"].headers
+    assert headers.get("X-api-key") == "secret-token"
+    assert "Authorization" not in headers
+    assert captured["request"].full_url == "https://alibaba.test/v1/messages"
+
+
+def test_anthropic_auth_style_authorization_bearer_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict = {}
+    body = base.json.dumps({"content": [{"type": "text", "text": "ok"}]})
+
+    def fake_urlopen(request, timeout: float):
+        captured["request"] = request
+        return _Resp(body)
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+    base.anthropic_messages_completion(
+        "https://alibaba.test/v1",
+        "secret-token",
+        {"model": "m"},
+        label="TestCloud",
+        auth_style=base.AUTH_STYLE_AUTHORIZATION_BEARER,
+    )
+    headers = captured["request"].headers
+    assert headers.get("Authorization") == "Bearer secret-token"
+    assert "X-api-key" not in headers
+
+
+def test_anthropic_retry_parity_transient_then_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[int] = []
+    body = base.json.dumps({"content": [{"type": "text", "text": "ok"}]})
+
+    def fake_urlopen(request, timeout: float):
+        calls.append(1)
+        if len(calls) == 1:
+            raise base.urllib.error.HTTPError("https://alibaba.test/v1/messages", 502, "e", {}, None)
+        return _Resp(body)
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(base.time, "sleep", lambda _s: None)
+    result = base.anthropic_messages_completion("https://alibaba.test/v1", "key", {"model": "m"}, label="TestCloud")
+    assert result["content"][0]["text"] == "ok"
+    assert len(calls) == 2
+
+
+def test_anthropic_exhaustion_uses_messages_noun(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request, timeout: float):
+        raise base.urllib.error.HTTPError("https://alibaba.test/v1/messages", 500, "e", {}, None)
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(base.time, "sleep", lambda _s: None)
+    with pytest.raises(base.CloudHarnessError, match=r"TestCloud messages request failed .*HTTP 500"):
+        base.anthropic_messages_completion("https://alibaba.test/v1", "key", {"model": "m"}, label="TestCloud")
+
+
+def test_run_tool_loop_anthropic_round_trip(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / "note.txt").write_text("file body", encoding="utf-8")
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    turns: list[dict] = []
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {
+                "model": "m",
+                "stop_reason": "tool_use",
+                "content": [{"type": "tool_use", "id": "tu1", "name": "Read", "input": {"path": "note.txt"}}],
+            }
+        return {"model": "m", "content": [{"type": "text", "text": "done"}]}
+
+    result = base.run_tool_loop(
+        "read the note", route, "https://alibaba.test/v1", "key", 3, root, _anthropic_profile(), chat_func=chat
+    )
+    assert result == "done"
+    # first payload is anthropic-shaped (top-level system absent here, messages list present, max_tokens set)
+    assert turns[0]["max_tokens"] == base.DEFAULT_ANTHROPIC_MAX_TOKENS
+    assert turns[0]["messages"][0]["role"] == "user"
+    # second turn carried the tool_use + tool_result translation
+    assert any(
+        block.get("type") == "tool_result"
+        for message in turns[1]["messages"]
+        if isinstance(message.get("content"), list)
+        for block in message["content"]
+    )
