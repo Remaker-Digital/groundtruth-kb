@@ -552,6 +552,21 @@ Loyal Opposition (Antigravity/lo role) aligned the capability registry, generate
 
 Loyal Opposition (Antigravity/lo role) processed all actionable bridge review and verification entries, clearing the active queue.
 
+---
+
+### 2026-07-03 - ~S535 (LO interactive) - Bridge verification, work-tree hygiene recommendation, Claude Code role/hook diagnostic
+
+Loyal Opposition (Claude / harness B, interactive `::init gtkb lo`). Full evidence: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-03-05-44.md`. Session remained mechanically LO throughout; only governed `gt backlog add` captures + this log entry + the INSIGHTS report were written (no KB promotion, MEMORY.md edit, commit, or push).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Bridge | Two post-impl reports verified-on-merits (WI-4964 model-pinning, WI-4957 NO-ACTION). A PARALLEL Claude-B LO session (901d970b) VERIFIED+committed both mid-review, landing the `rules.toml` storm-flag scope-bleed the owner's hold meant to avoid. | commits `36a3f239`, `34b87b4e`; verdicts `-006`/`-012`. | An owner-decision hold in one session does not gate a sibling session on the same queue - governance gap. | Open (parallel finalized) |
+| Process | Work-tree dirt is not a missing system: WI-4356 hygiene Slices A-C VERIFIED; `gt hygiene strays` triages 324/324 stale to `owner_review` (zero auto-resolve); Slice D blocked on owner packet, Slice E never built. | live `gt hygiene strays` 2026-07-03. | Ratify Slice D (owner packet); build Slice E actuator (WI-4979); gitignore runtime files (WI-4980). | Open - WI-4979/4980 filed |
+| Technical | Mid-session `::init gtkb (pb\|lo)` role switch silently no-ops: `workstream_focus.py::handle_hook_payload` matches the keyword but never persists the per-session role marker. | throwaway-session hook run; marker written = False. | Wire `_write_per_session_role_marker` into the mid-session canonical-init branch, or fail loud. | Open - WI-4981 filed |
+| Technical | Divergent dual init-keyword grammars (`_session_init_keyword.py` old vs `workstream_focus.py` canonical). | scripts inspection. | Consolidate to one canonical matcher + parity test. | Open - WI-4982 filed |
+| Environment | Owner-reported Claude Code behavior change since 7/1 14:00 PT: repo-side hooks present (46/46), tracked, dep-sound - most likely a client update. | hook existence check; `python -c import groundtruth_kb` OK on `C:\Python314`. | Owner: check `claude --version` vs the 7/1 refresh (client-side; not a repo fix). | Open - owner verification |
+| Blocked | Slice D + WI-4944 dispatch-unblock are Prime Builder actions; this session is LO and the mid-session role switch (WI-4981) prevented `::init gtkb pb`. | role marker stayed LO. | Fresh PB session with `::init gtkb pb` as first message; 3-message kickoff provided to owner. | Deferred to PB |
+
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Process | Actionable bridge entries were outstanding: `gtkb-inventory-string-scan-admin-cli` implementation report (v007), `gtkb-harness-c-governance-gate-parity-gap` revised blocker (v009), `agent-disposition-wi4588-protected-mutation-guard-slice1` implementation report (v003), and `gtkb-no-index-skill-template-doc-cleanout` implementation report (v015). | Bridge directory scan; preflight and clause preflight runs; test suite runs. | Author verdicts for all threads. Result: v008 (VERIFIED), v010 (NO-GO blocker confirmed), v004 (VERIFIED), and v016 (VERIFIED) successfully written to `bridge/`. All tests (scaffold, harness, quality manifest, and protected mutation guard) pass cleanly. | Resolved |
@@ -860,3 +875,730 @@ Loyal Opposition (Antigravity/lo role) reviewed and issued a `GO` verdict for th
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Technical | Bridge verdicts and proposals across harnesses carry inconsistent or corrupt author metadata. | `bridge/gtkb-wi4938-bridge-author-metadata-audit-scanner-001.md`. | Deliver a read-only deterministic audit scanner as the regression baseline and repair-queue input before write-time hardening. Approved at version -002. | Resolved |
+### 2026-07-04 - WI-5002 Codex Headless Add-Dir Invocation Review (NO-GO)
+
+Loyal Opposition (Antigravity/lo role) evaluated the post-implementation report and issued a `NO-GO` verdict for `gtkb-wi5002-codex-headless-add-dir-invocation-003.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report helper-copy write-denial remains blocked in current worker context; four path parser tests fail in `test_verified_finalization_validation_hardening.py`. | pytest traceback; `bridge/gtkb-wi5002-codex-headless-add-dir-invocation-003.md`. | Re-run Codex Prime Builder with updated command-line arguments (including `--add-dir .codex`) to copy the helper, fix the path parser regressions, and submit a revised report (Version 005). Rejected at version -004. | Open |
+
+---
+
+### 2026-07-04 - WI-5002 Codex Headless Add-Dir Invocation Blocker Review (NO-GO)
+
+Loyal Opposition (Antigravity/lo role) evaluated the revised post-implementation report and issued a `NO-GO` verdict for `gtkb-wi5002-codex-headless-add-dir-invocation-005.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Codex Prime Builder is still blocked from writing `.codex/skills/verify/helpers/write_verdict.py` due to sandbox constraints and explicit Deny ACLs. | `Get-Acl` and `apply_patch` write-denial; `bridge/gtkb-wi5002-codex-headless-add-dir-invocation-005.md` | Propose a new sandbox/ACL correction plan or local `gt.exe` shim instead of retrying the add-dir route directly. Rejected at version -006. | Open |
+
+---
+
+### 2026-07-04 - WI-4804 Stale Dispatch Kill-Switch Test Leak
+
+Loyal Opposition (Antigravity/lo role) identified an orphaned test file following the cross-harness trigger purge in WI-4885.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `platform_tests/scripts/test_doctor_kill_switch_staleness.py` is orphaned and causes an `ImportError` during pytest collection because its target check was purged from `doctor.py`. | pytest collection failure; [test_doctor_kill_switch_staleness.py](file:///e:/GT-KB/platform_tests/scripts/test_doctor_kill_switch_staleness.py) | Delete the obsolete test file to restore clean test suite collection. | Open |
+
+---
+
+### 2026-07-04 - WI-5002 Codex Dotdir ACL Correction Investigation
+
+Loyal Opposition (Antigravity/lo role) investigated why the script-based ACL repair fails for the specific raw SID from the Codex sandbox.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `icacls` fails silently to remove Deny ACEs with raw SIDs because it expects SIDs to be prefixed with an asterisk (`*`). | `repair_codex_dotdir_acl.ps1` Invoke-Icacls call; persistent Deny rules in `verify_codex_dispatch.py` | Refactor `Remove-RepairableDenyRules` to use native .NET `$Acl.PurgeAccessRules` and `Set-AccessOnlyAcl` on the DACL-only Access section to bypass local SID resolution limits and SeSecurityPrivilege. | Open |
+
+---
+
+### 2026-07-04 - WI-4984 Deterministic Bridge State-Report CLI Proposal Review
+
+Loyal Opposition (Antigravity/lo role) evaluated the pre-implementation proposal for the `gt bridge state-report` CLI and issued a `GO` verdict.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The implementation proposal for WI-4984 is sound, well-defined, and passes all preflight checks. | [gtkb-wi4984-bridge-state-report-cli-001.md](file:///E:/E:/GT-KB/bridge/gtkb-wi4984-bridge-state-report-cli-001.md), `DELIB-202665301` | Proceed with Prime Builder implementation under active project authorization. Approved at version -002. | Resolved |
+
+---
+
+### 2026-07-04 - WI-4975 Direct-Thread Reconciliation Verification
+
+Loyal Opposition (Antigravity/lo role) evaluated the post-implementation reconciliation report for WI-4975 and issued a `VERIFIED` verdict.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The direct-thread reconciliation is sufficient to close the WI-4975 bridge chain against the already-VERIFIED finalization-tooling batch evidence. All 16 focused regression tests pass, and cross-harness byte-identical parity is verified. | [gtkb-wi4975-claimed-path-subpath-overmatch-013.md](file:///E:/GT-KB/bridge/gtkb-wi4975-claimed-path-subpath-overmatch-013.md), commit `fdad4c49` | Commit the terminal VERIFIED verdict and close the thread (Version 014). | Resolved |
+
+---
+
+### 2026-07-04 - WI-4944 Release Dispatcher LO Dispatch Unblock Verification
+
+Loyal Opposition (Antigravity/lo role) evaluated the revised blocker response and implementation report for WI-4944 and issued a `VERIFIED` verdict.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The git-tracked predecessor finalization blocker was resolved by committing the predecessor bridge chain in commit `2727e2d3e3cfedf82786dc3ba49ef076d28232c8`. RETEST and status checks confirm the dispatcher daemon and health checks pass cleanly. | [gtkb-wi4944-release-dispatcher-lo-dispatch-unblock-050.md](file:///E:/GT-KB/bridge/gtkb-wi4944-release-dispatcher-lo-dispatch-unblock-050.md), commit `d827cd2a` | Commit the terminal VERIFIED verdict and close the thread (Version 051). | Resolved |
+---
+
+### 2026-07-04 - SQLite3 Connection Locking Flakiness in Tests and Health Check
+
+Loyal Opposition (Antigravity/lo role) identified an intermittent test and health-check failure caused by unclosed SQLite3 connections on Windows.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Testing | `test_terminal_work_item_dispatch_residue_is_health_pass` fails intermittently under parallel test execution or due to garbage collection timing because the sqlite3 write connection in the test helper and read connection in `_work_item_resolution_status` are not closed properly. | `E:\GT-KB\groundtruth-kb\src\groundtruth_kb\bridge_dispatch_config.py` lines 1519-1525, `platform_tests\scripts\test_bridge_dispatch_config.py` lines 66-72 | Wrap sqlite3 connections in `closing` or call `con.close()` explicitly to ensure they are released immediately. | Open |
+
+---
+
+### 2026-07-04 - WI-4909 LAN Authority Service Adversarial Review
+
+Loyal Opposition (Antigravity/lo role) evaluated the candidate Architecture Decision Packet and issued a `GO` verdict at version `-002.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The candidate Architecture Decision Packet for the LAN Authority Service has multiple high-severity risks, including a dual-writer split-brain risk in CLI local fallback, plaintext communication on LAN/Wi-Fi, and a lack of a rollback/reconciliation plan. | [gtkb-wi4909-lan-authority-service-adversarial-review-002.md](file:///E:/GT-KB/bridge/gtkb-wi4909-lan-authority-service-adversarial-review-002.md), [INSIGHTS-2026-07-04-15-37-lan-authority-service-architecture-decision-packet.md](file:///E:/GT-KB/independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-04-15-37-lan-authority-service-architecture-decision-packet.md) | Proceed to owner grilling (`WI-4910`) and formal specification candidate drafting (`WI-4911`), using the logged findings and grilling questions to shape those phases. | Resolved |
+
+---
+
+### 2026-07-04 - WI-4455 Platform Tests Spec-Before-Code Policy Review
+
+Loyal Opposition (Antigravity/lo role) evaluated the policy review request and issued a `GO` verdict at version `-002.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Option A (bridge-derived coverage) is the most robust policy path as it avoids duplicate mapping drift and leverages existing bridge mapping metadata. | `bridge/gtkb-wi4455-platform-tests-spec-before-code-policy-review-001.md`, `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-04-16-11-wi4455-platform-tests-spec-before-code-decision-packet.md` | Proceed with Prime Builder implementation proposal for Option A under active project/PAUTH authorization. | Resolved |
+
+---
+
+### 2026-07-04 - WI-4455 Platform Tests Bridge-Derived Spec-Before-Code Proposal Review
+
+Loyal Opposition (Antigravity/lo role) evaluated the pre-implementation proposal for the `spec-before-code` hook coverage and issued a `GO` verdict.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The implementation proposal for WI-4455 (Option A) is well-scoped, satisfies all preflight checks, and addresses the platform test spec-before-code policy gap. | `bridge/gtkb-wi4455-platform-tests-bridge-derived-spec-before-code-001.md` | Proceed with Prime Builder implementation under active project authorization. Approved at version -002. | Resolved |
+
+---
+
+### 2026-07-04 - WI-4455 Platform Tests Bridge-Derived Spec-Before-Code Verification
+
+Loyal Opposition (Antigravity/lo role) evaluated the post-implementation report and issued a `VERIFIED` verdict.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | The post-implementation report and verification suite are sound and pass all preflight checks. Direct tests assert both positive and negative platform_tests/ coverage outcomes. | `bridge/gtkb-wi4455-platform-tests-bridge-derived-spec-before-code-003.md`, commit `242f6039` | Commit the terminal VERIFIED verdict and close the thread (Version 004). | Resolved |
+
+
+
+
+---
+
+### 2026-07-04 (S539) - Interactive LO loop session: WI-4967 VERIFIED, dispatch-attribute advisory, SoT-singleton principle + WI-5011
+
+Loyal Opposition (Claude/B, interactive ::init gtkb lo) ran a recurring /loop bridge/dispatcher/harness monitor and handled two owner-directed threads. Full wrap: independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-04-22-27-S539-lo-session-wrap.md.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | WI-4967 controlled-artifact direct-mutation guard verified end-to-end (independence B!=A, scope=10 target paths, ruff clean, both preflights pass, pytest 246 passed, classifier fail-closed order read) and finalized after clearing a stale .git/index.lock. | bridge/gtkb-wi4967-controlled-artifact-direct-mutation-guard-004.md, commit e43dc79e | Terminal VERIFIED; thread closed. | Resolved |
+| Process | Dispatch selection uses three disconnected orderings (global selection_order, rule prefer, shadow lane_scoring utility); the live path sorts by reviewer_precedence+harness_id, NOT by the placeholder dispatch_* attributes. Corrected my own earlier availability-based explanation. | config/dispatcher/rules.toml, scripts/dispatcher_runtime.py active_matching, groundtruth_kb/dispatcher/lane_scoring.py | PB umbrella project (advisory INSIGHTS-2026-07-04-19-08) WI-1 = selection-binding + SoT-consolidation audit. | Open (advisory filed) |
+| Architecture | Five dispatch fields (can_fire_events, can_receive_dispatch, dispatch_availability/cost/quality) duplicated across harness-registry.json (state SoT) + rules.toml (policy) - violates the owner-stated SoT-singleton principle. | GOV-HARNESS-STATE-SOT-CONSOLIDATION-001; doctor config-drift WARN (owner hand-edit 2026-07-04) | WI-5011 (P1) captured: formalize SoT-singleton GOV + platform-wide duplication audit; owner to assign to PB. | Open (WI-5011) |
+| Operational | LO headless redundancy thin: D config-quiesced for-cause (deepseek provider-failure burst 15:12-15:24), C near-single headless LO, B dispatchable-but-out-ranked (interactive-only in practice). | .gtkb-state/bridge-poller/dispatch-failures.jsonl; gt bridge dispatch health | Re-enable D once deepseek recovers (owner/config decision). | Open |
+
+---
+
+### 2026-07-05 - WI-5011 SoT Singleton Completeness Umbrella Verification
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched). Full wrap: [INSIGHTS-2026-07-05-00-15.md](file:///E:/GT-KB/independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-05-00-15.md).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `gtkb-sot-singleton-completeness-umbrella` report verified and committed. The parent WI-5011 planning phase is complete, and the first child proposal (WI-5013) is filed. | bridge/gtkb-sot-singleton-completeness-umbrella-003.md, commit 6b3ee48b6d0a0103e7ebad0d3434e85aa3fc74a1 | Terminal VERIFIED; thread closed. Next LO action: review child proposal WI-5013. | Resolved |
+
+---
+
+### 2026-07-05 - WI-5017 and WI-5018 Proposals Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched). Full wrap: [INSIGHTS-2026-07-05-00-20.md](file:///E:/GT-KB/independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-05-00-20.md).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposals for `gtkb-sot-singleton-harness-control-audit` (WI-5017) and `gtkb-sot-singleton-bridge-runtime-cache-audit` (WI-5018) verified clean; all preflight checks passed with zero gaps. | `bridge/gtkb-sot-singleton-harness-control-audit-002.md`, `bridge/gtkb-sot-singleton-bridge-runtime-cache-audit-002.md` | Issued `GO` verdicts at version `-002.md` for both threads to authorize Prime Builder implementation. | Resolved |
+
+---
+
+### 2026-07-05 (S540) - WI-5017 Harness and Control-Surface SoT Audit Report Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Implementation report for WI-5017 lacks a recognized `Specification Links` heading, causing the mechanical preflight to fail. The report has been rejected with a `NO-GO` verdict (Version 004). | `bridge/gtkb-sot-singleton-harness-control-audit-003.md`, `bridge/gtkb-sot-singleton-harness-control-audit-004.md` | Prime Builder must add a recognized `Specification Links` heading listing the required specifications and re-submit. | Open |
+
+---
+
+### 2026-07-05 - WI-5012 Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-dispatch-selection-binding-sot-consolidation` (WI-5012) verified clean; all preflight and clause preflight checks passed with zero gaps. | `bridge/gtkb-dispatch-selection-binding-sot-consolidation-001.md`, `bridge/gtkb-dispatch-selection-binding-sot-consolidation-002.md` | Issued `GO` verdict at version `-002.md` to authorize Prime Builder implementation. | Resolved |
+
+---
+
+### 2026-07-05 - WI-5029 Dispatch Cap Reconciliation Proposal Review (stood down; peer GO)
+
+Loyal Opposition (Claude/harness B, auto-dispatched; session `2026-07-05T08-57-57Z-loyal-opposition-B-d6ed85`).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Auto-dispatched to review `gtkb-wi5029-dispatch-cap-reconciliation-001` (NEW); a peer LO (harness C / Antigravity) filed **GO** at `-002` mid-review. Stood down from a competing verdict (append-only would thrash; peer independently adjudicated). | `bridge/gtkb-wi5029-dispatch-cap-reconciliation-002.md` (peer GO) | Did not mutate the bridge. GO stands. | Resolved |
+| Technical | My independent review reached NO-GO on substance the GO missed: WI-3375's slot module (`bridge_dispatch_concurrency.py`) targeted the now-**retired** `cross_harness_bridge_trigger.py` (purged in `d2da67de`); "wire it in" is a fresh integration into a different substrate + removal of the working CA9165 cap, not P3 hygiene. Proposal also omits ~12 relevant DELIBs and defers the disposition. | `INSIGHTS-2026-07-05-09-18.md`; DELIB-2182 / DELIB-20263848; commit `d2da67de` | Verifier of the WI-5029 post-impl report must confirm which disposition Prime implemented; treat a live cap change (Option A) as exceeding the "hygiene/P3" authorization absent fresh owner-decision evidence. | Open (deferred to verification) |
+
+---
+
+### 2026-07-05 - WI-5024 Dispatcher Daemon Complex CLI Command Group Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-dispatcher-complex-command-group` (WI-5024) verified clean; all preflight and clause preflight checks passed with zero gaps. | `bridge/gtkb-dispatcher-complex-command-group-001.md`, `bridge/gtkb-dispatcher-complex-command-group-002.md` | Issued `GO` verdict at version `-002.md` to authorize Prime Builder implementation. | Resolved |
+
+
+
+---
+
+### 2026-07-05 - WI-4990 Terminal Dispatch Reconciliation Closure Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for gtkb-wi4990-terminal-dispatch-reconciliation-closure (WI-4990) verified clean; all preflight and clause preflight checks passed with zero gaps. |  bridge/gtkb-wi4990-terminal-dispatch-reconciliation-closure-001.md,  bridge/gtkb-wi4990-terminal-dispatch-reconciliation-closure-002.md | Issued GO verdict at version -002.md to authorize Prime Builder implementation. | Resolved |
+
+---
+
+### 2026-07-05 - WI-4990 Terminal Dispatch Reconciliation Closure Blocker Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched; session `2026-07-05T14-48-14Z-loyal-opposition-C-a14e43`).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Prime Builder's `REVISED` response (`005.md`) records the owner-decision finalization blocker identified in `-004.md`. We confirmed no source/test/backlog metadata rework was performed or needed, and that the closure substance is correct. The thread remains blocked pending an interactive owner choice. | `bridge/gtkb-wi4990-terminal-dispatch-reconciliation-closure-005.md`, `bridge/gtkb-wi4990-terminal-dispatch-reconciliation-closure-006.md` | Issued `NO-GO` verdict at version `-006.md` to preserve the blocker status and stop. | Resolved via owner decision 2026-07-05 (see below): DELIB-20260705-WI4990-FINALIZATION-WAIVER |
+
+---
+
+### 2026-07-05 — Bridge backlog audit + dispatcher concurrency (interactive LO, harness B)
+
+Interactive Loyal Opposition (Claude, harness B; session `689f575f-a1a8-4d43-bd92-7bcae23c16f8`). Full report: `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-05-10-46-bridge-backlog-audit-and-dispatcher-concurrency.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | WI-4990 finalization blocker (prior Open item, above) — owner decided the finalization policy. | AUQ 2026-07-05; `DELIB-20260705-WI4990-FINALIZATION-WAIVER` | By-Reference Waiver approved: Prime files REVISED `-007` w/ waiver section → LO finalizes VERIFIED `-008` (bridge chain only). | Owner-decided; pending Prime REVISED |
+| Process | 3 "stale" NO-GO threads are superseded (work VERIFIED under variant slugs / later slices), not stuck — slug-variant-collision. | `slice2a-visibility` vs `slice2c-integration`; `owner-decision-tracker-pattern-bounds` vs `-001` chain; `startup-trigger-awareness` vs `-001` chain; `DELIB-20260705-RETIRE-3-SUPERSEDED-NOGO-THREADS` | Retire as WITHDRAWN citing superseding thread (owner-approved). Dormant ~19d — may need reconciliation pass. | Owner-decided; pending retirement |
+| Technical | Two divergent per-role dispatch concurrency caps; only CA9165 flat-3 wired, WI-3375 slot module (LO=3/Prime=2) unwired. | `scripts/dispatcher_runtime.py:2216,4250`; `scripts/bridge_dispatch_concurrency.py` | WI-5029 (consideration). | Open (backlog) |
+| Technical | No live dispatch capacity test; caps 8/3/4 are incident+directive-derived, not measured. SQLite has no `busy_timeout` tuning. | `dispatch_chaos_harness.py` (stub), `benchmark_dispatch_envelope.py` (synthetic); `db.py:1531-1540` | WI-5030 (capacity benchmark) + WI-5031 (busy_timeout). | Open (backlog) |
+| Process | 9 UNKNOWN-bucket threads audited — all benign (8 pre-rule VERIFIED headings grandfathered + 1 incident note); 0 stuck/misrouted. | `gt bridge state-report`; Body Status-Token Rule grandfathering | Accept as-is; no remediation. | Resolved (no action) |
+
+---
+
+### 2026-07-05 - WI-4535 Reconciler Advisory-Link Resolution Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for gtkb-wi4535-reconciler-advisory-link-resolution (WI-4535) verified clean; all preflight and clause preflight checks passed with zero gaps. | bridge/gtkb-wi4535-reconciler-advisory-link-resolution-001.md, bridge/gtkb-wi4535-reconciler-advisory-link-resolution-002.md | Issued GO verdict at version -002.md to authorize Prime Builder implementation. | Resolved |
+
+---
+
+### 2026-07-05 - WI-4802 Reconciler Duplicate Disposition Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for gtkb-wi4802-reconciler-duplicate-disposition (WI-4802) verified clean; the defect is a duplicate of the already-implemented and VERIFIED WI-4535 reconciler advisory-link resolution. Both preflight and clause preflight checks passed with zero gaps. | bridge/gtkb-wi4802-reconciler-duplicate-disposition-001.md, bridge/gtkb-wi4802-reconciler-duplicate-disposition-002.md | Issued GO verdict at version -002.md to authorize backlog resolution implementation. | Resolved |
+
+---
+
+### 2026-07-05 - WI-4837 Post-VERIFIED Finalization Recovery Blocker Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Blocker report for gtkb-wi4837-post-verified-finalization-recovery (WI-4837) verified valid; the thread is blocked at the proposal stage awaiting the owner's policy decision (F3 requirement-disambiguation) to choose between automatic finalization parity and per-instance waiver. Both preflight and clause preflight checks passed with zero gaps. | bridge/gtkb-wi4837-post-verified-finalization-recovery-003.md, bridge/gtkb-wi4837-post-verified-finalization-recovery-004.md | Issued NO-GO verdict at version -004.md to record the blocker and halt unattended dispatch. | Open (blocked; pending owner decision) |
+
+---
+
+### 2026-07-05 - WI-4802 Verification Finalization & Repository Hygiene Overview
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report for gtkb-wi4802-reconciler-duplicate-disposition (WI-4802) verified clean; the implementation successfully marked the duplicate work item resolved in the backlog without source changes. | bridge/gtkb-wi4802-reconciler-duplicate-disposition-003.md, bridge/gtkb-wi4802-reconciler-duplicate-disposition-004.md | Issued VERIFIED verdict at version -004.md, finalizing the work item. | Resolved |
+| Process | Repository overview hygiene scan identified multiple issues: (1) 14.3% Conflict Quarantine rate in Deliberation Archive; (2) 5 files with unparsed verdict signals; (3) stale python bytecode remnants (`pyc_without_source`); (4) legacy project root references in active scripts. | `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-05-22-11-LO-HYGIENE-ASSESSMENT-overview.md` | Filed standard overview report in drop box for Prime Builder action plan. | Open |
+
+
+---
+
+
+
+---
+
+### 2026-07-05 - WI-4784 Role Authority Terminology Purge Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Process | Pre-implementation proposal for gtkb-wi4784-role-authority-terminology-purge (WI-4784) is well-formed, correctly scoped, and passes all mandatory preflights and clause checks. | bridge/gtkb-wi4784-role-authority-terminology-purge-001.md, bridge/gtkb-wi4784-role-authority-terminology-purge-002.md | Issued GO verdict at version -002.md to authorize the implementation of the terminology cleanup. | Resolved |
+
+---
+
+### 2026-07-05 - WI-4725 Stale Failure Health Current-State Disposition Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for gtkb-wi4725-stale-failure-health-disposition (WI-4725) is well-formed, correctly scoped, and passes all preflight and clause checks. Legacy trigger scripts are verified as purged and active tests verify the stale-failure cleanup logic. | bridge/gtkb-wi4725-stale-failure-health-disposition-001.md, bridge/gtkb-wi4725-stale-failure-health-disposition-002.md | Issued GO verdict at version -002.md to authorize the current-state disposition and resolved backlog transition. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4968 Envelope Equivalence Evidence Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi4968-envelope-equivalence-evidence` (WI-4968) is well-formed, correctly scoped, and passes all preflight and clause checks. | bridge/gtkb-wi4968-envelope-equivalence-evidence-001.md, bridge/gtkb-wi4968-envelope-equivalence-evidence-002.md | Issued GO verdict at version -002.md to authorize the implementation of the equivalence evidence helper. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4965 Skill Effectiveness by Activity Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi4965-skill-effectiveness-by-activity` (WI-4965) is well-formed, correctly scoped, and passes all preflight and clause checks. | bridge/gtkb-wi4965-skill-effectiveness-by-activity-001.md, bridge/gtkb-wi4965-skill-effectiveness-by-activity-002.md | Issued GO verdict at version -002.md to authorize the implementation of the skill effectiveness audit helper and tests. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4962 Ollama-D Dispatch Reliability Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi4962-ollama-d-dispatch-reliability` (WI-4962) targeting Ollama-D subprocess execution and session-budget timeouts is well-formed and passes all preflight and clause checks. Circuit-breaker reset sequencing is conditioned on validation of launch/timeout fixes. | bridge/gtkb-wi4962-ollama-d-dispatch-reliability-001.md, bridge/gtkb-wi4962-ollama-d-dispatch-reliability-002.md | Issued GO verdict at version -002.md to authorize the implementation of launch and timeout fixes. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4961 Session Kickoff Prompt Sequencing Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Revised pre-implementation proposal for `gtkb-wi4961-session-kickoff-prompt-sequencing` (WI-4961) expands scope to cover all template and fixture surfaces, resolving the previous substantive scope objections in version 002. Preflight and clause preflight checks passed with zero gaps. | bridge/gtkb-wi4961-session-kickoff-prompt-sequencing-003.md, bridge/gtkb-wi4961-session-kickoff-prompt-sequencing-004.md | Issued GO verdict at version -004.md to authorize the expanded implementation of session kickoff prompt sequencing. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4853 Session Role Marker Claim Eligibility Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi4853-session-role-marker-claim-eligibility` (WI-4853) to transition `go_implementation` eligibility checks from the shared marker to the per-session marker is well-formed, correctly scoped, and passes all preflight and clause checks. | bridge/gtkb-wi4853-session-role-marker-claim-eligibility-001.md, bridge/gtkb-wi4853-session-role-marker-claim-eligibility-002.md | Issued GO verdict at version -002.md to authorize the implementation of the per-session marker claim eligibility. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4968 Envelope Equivalence Evidence Verification
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report for `gtkb-wi4968-envelope-equivalence-evidence` (WI-4968) is verified clean and complies with all root boundary, linkage, backlog, and verification requirements. All tests pass, and ruff formatting is verified. | bridge/gtkb-wi4968-envelope-equivalence-evidence-003.md, bridge/gtkb-wi4968-envelope-equivalence-evidence-004.md | Issued VERIFIED verdict at version -004.md and committed the changes under commit `dcc206ee9782b628e3bcec0b351d928d2d4f32f3`. | Resolved |
+
+---
+
+### 2026-07-06 - Dispatcher watch: 5 findings advised, 1-hour clean window met
+
+Loyal Opposition (Claude/harness B, interactive + self-paced watch). Full report: `CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-06-02-24-dispatcher-watch-session-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Dispatcher | F (OpenRouter) exhausts its agentic bridge-review turn budget (max-turn, 0 verdicts); guardrail hypothesis superseded, root cause is F model/agentic-loop. | WI-5034; bridge/gtkb-wi5034-f-agentic-turn-budget-advisory-001.md; DELIB-F-MAXTURN-PERSISTS-REDISABLE-20260706 | F re-disabled (can_receive_dispatch=false). PB: convert advisory to impl proposal; keep F disabled until a verified fix produces a verdict. | Open |
+| Dispatcher | No backoff on repeated no-verdict launches (tight ~15s retry loop). | WI-5035; bridge/gtkb-wi5035-no-verdict-retry-backoff-advisory-001.md | PB: exponential backoff / bounded retries / circuit-breaker. | Open |
+| Dispatcher | Expired document leases never reaped (wi4996 ~10h; locks 13->34). | WI-5036; bridge/gtkb-wi5036-stale-lease-reaping-advisory-001.md | PB: periodic reap of expired locks. | Open |
+| Hooks | DIRECT-HARNESS-INVOKE-BAN false-positives on governed gt commands naming a provider near a routing verb (3x this session). | WI-5037; bridge/gtkb-wi5037-invoke-ban-false-positive-advisory-001.md | PB: narrow matcher to actual process spawns. | Open |
+| Dispatcher | Watchdog heartbeat persistently exceeds 15s SLA (oscillating 28-48s, not frozen). Sole strict health=PASS gap. | WI-5039; bridge/gtkb-wi5039-watchdog-heartbeat-stale-advisory-001.md; DELIB-WI5039-WATCHDOG-OSCILLATES-CORRECTION-20260706 | PB: verify intended cadence vs SLA; likely SLA tuning. | Open |
+| Docs | SKILL.md + example advisory reference the rejected bridge_kind `loyal_opposition_advisory` (enum requires `governance_advisory`). | .claude/skills/bridge-propose/SKILL.md; bridge/gtkb-ollama-cloud-routing-sot-drift-advisory-001.md | PB: update doc references to governance_advisory. | Open |
+| Config | Owner-directed: dispatch ranking values are hand-assigned (not derived); decision to normalize + uniform-random tiebreak. | WI-5032/5033; DELIB-DISPATCH-RANKING-NORMALIZATION-20260705 | PB: implement uniform-random tiebreak (gating), then flatten values. | Open |
+
+Outcome: goal met on primary criterion (64.2 min clean since last failure 01:00:56Z; F out; B/C/D exit-0). WI-5039 sole residual strict-PASS item.
+
+---
+
+### 2026-07-06 - WI-4926 Provider Readiness Contract Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi4926-provider-readiness-contract` (WI-4926) is well-formed, correctly scoped, and passes all preflight and clause checks. | bridge/gtkb-wi4926-provider-readiness-contract-001.md, bridge/gtkb-wi4926-provider-readiness-contract-002.md | Issued GO verdict at version -002.md to authorize the implementation of the readiness contract and tests. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4971 Evidence Freshness Boundaries Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Revised pre-implementation proposal for `gtkb-wi4971-evidence-freshness-boundaries` (WI-4971) successfully addresses the previous specification-linkage gap by integrating canonical freshness governance (`GOV-SOURCE-OF-TRUTH-FRESHNESS-001`, `GOV-PLATFORM-SOT-REGISTRY-001`, `DCL-SOT-READ-HOOK-CONTRACT-001`, `.claude/rules/sot-read-discipline.md`, and `config/registry/sot-artifacts.toml`), describing the relationship to the existing SoT registry, and including targeted freshness assertions. All preflight checks passed with zero gaps. | bridge/gtkb-wi4971-evidence-freshness-boundaries-003.md, bridge/gtkb-wi4971-evidence-freshness-boundaries-004.md | Issued GO verdict at version -004.md to authorize implementation. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4791 Quality KPI Dispatch Feed Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for gtkb-wi4791-quality-kpi-dispatch-feed (WI-4791) is well-formed, correctly scoped, and passes all preflight and clause checks. Target paths are fully aligned with the active PAUTH, and the verification plan maps spec-derived testing requirements to tests. | bridge/gtkb-wi4791-quality-kpi-dispatch-feed-001.md, bridge/gtkb-wi4791-quality-kpi-dispatch-feed-002.md | Issued GO verdict at version -002.md to authorize implementation of the Quality-KPI subsystem. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4978 Helper Compliance Audit Blocker Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | WI-4978 post-implementation report blocker is confirmed active. The cross-harness adapter parity test remains failing due to write restrictions (ACL DENY) on the `.codex` directory and generator script pycache/draft pollution. | bridge/gtkb-wi4978-helper-compliance-audit-chokepoint-010.md | Issued NO-GO verdict at version -010.md to maintain the blocker state until owner waiver or correction is provided. | Open |
+
+---
+
+### 2026-07-06 - WI-4702 Dispatcher Reset Recipient State Directory Alignment Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi4702-dispatch-reset-recipient-state-dir` (WI-4702) to align the operator-facing reset paths to the canonical state directory resolved by health and status reporting is well-formed, correctly scoped, and passes all preflight and clause checks. | bridge/gtkb-wi4702-dispatch-reset-recipient-state-dir-001.md, bridge/gtkb-wi4702-dispatch-reset-recipient-state-dir-002.md | Issued GO verdict at version -002.md to authorize implementation of the state directory reset alignment. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4850 Verdict Claim Release Verification
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report for `gtkb-wi4850-verdict-claim-release` (WI-4850) has been verified as NO-ACTION. Prime Builder filed NO-ACTION because of OS ACL permissions (unresolved deny ACEs inside the sandbox context) preventing writes to the `.codex` helper target. Target paths were confirmed unmodified and verdict helper copies remain byte-identical. | bridge/gtkb-wi4850-verdict-claim-release-003.md, bridge/gtkb-wi4850-verdict-claim-release-004.md | Issued VERIFIED verdict at version -004.md, closing the bridge thread as VERIFIED with no net changes. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4978 Verification Treadmill — Mechanical Break Needed (record-and-stop, no verdict)
+
+Loyal Opposition (Claude/lo role, harness B, auto-dispatched; session 2026-07-06T12-05-14Z-loyal-opposition-B-ad9883).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance (P1) | The `gtkb-wi4978-helper-compliance-audit-chokepoint` thread is a runaway NO-GO↔REVISED treadmill (v024) across 3 harnesses (A=Codex Prime, B=Claude LO, C=Antigravity LO). The core WI-4978 fix is already verified-correct at -004; the sole blocker is a pre-existing, pollution-dominated, owner-gated `.codex` parity failure that WI-4978 did not create. Continuing to issue NO-GO verdicts (e.g., -010, -024) is loop-fuel, not progress — every verdict re-arms the dispatcher. | bridge/gtkb-wi4978-helper-compliance-audit-chokepoint-004.md (canonical adjudication), -024 (latest NO-GO, peer), CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-06-12-05-wi4978-treadmill-mechanical-break.md | STOP filing verdicts on this thread. Owner mechanical break: DEFER/WITHDRAW the thread + prioritize already-filed WI-5041 (dispatcher backoff), WI-5038 (parity-scan pollution), WI-5042 (capability-aware `.codex` routing). This dispatch filed no verdict and recorded to the dropbox. | Open (owner decision needed) |
+
+---
+
+### 2026-07-06 - WI-4840 advisory-disposition skill scaffold — `.codex` write-boundary treadmill (record-and-stop, no verdict)
+
+Loyal Opposition (Claude/lo role, harness B, auto-dispatched; session 2026-07-06T14-09-46Z-loyal-opposition-B-1fcc6c).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance (P1) | The `gtkb-wi4840-advisory-disposition-skill-scaffold` thread is the same-class `.codex` write-boundary treadmill as WI-4842/WI-4978: GO (-002, Ollama-D) → blocked Codex report (-003) → NO-GO (-004, Antigravity-C, demanded remediation Codex structurally cannot perform) → blocked continuation (-005, NEW). Verified: `.claude/skills/advisory-disposition/SKILL.md` present (7988 B); `.codex/skills/advisory-disposition/SKILL.md` genuinely absent; `.codex` is WRITABLE from Claude-B (Deny-ACE is scoped to the Codex sandbox SID). Root cause already filed as WI-5042 (capability/writability-aware IMPLEMENTATION routing); intended producer of the generated `.codex` adapter is a non-Codex (Claude) Prime context. NO-GO is loop-fuel; VERIFIED impossible (missing files, RED tests, no waiver). | bridge/gtkb-wi4840-advisory-disposition-skill-scaffold-001..-005; CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-06-14-17-wi4840-codex-write-treadmill-record-and-stop.md; WI-5042/5041/5040 | Owner mechanical break: DEFER this thread (+ sibling `gtkb-wi4842-formal-artifact-packet-helper-scaffold`) OR route completion to a Claude Prime session that can write `.codex` under the operative GO (-002) OR land WI-5042/5041. This dispatch filed no verdict and recorded to the dropbox. | Open (owner decision needed) |
+
+---
+
+### 2026-07-06 - WI-4839 skill-governance-lifecycle-scaffold — `.codex` write-boundary blocker
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched; session C-2026-07-03T23-07-28Z).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report for `gtkb-wi4839-skill-governance-lifecycle-scaffold` (WI-4839) remains blocked. Prime Builder filed a blocked continuation report because of OS ACL permissions (unresolved deny ACEs inside the sandbox context) preventing writes to the `.codex` helper target. Target paths were confirmed unmodified, and the required Codex adapter and manifest entry are absent. Both mechanical preflights passed with zero gaps. | bridge/gtkb-wi4839-skill-governance-lifecycle-scaffold-005.md, bridge/gtkb-wi4839-skill-governance-lifecycle-scaffold-006.md | Issued NO-GO verdict at version -006.md to maintain the blocker state until owner waiver, sandbox/ACL adjustment, or Claude-driven projection is provided. | Open |
+
+---
+
+### 2026-07-06 - WI-5043 Service and SoT Watchdog Runner Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi5043-service-sot-watchdog-runner` (WI-5043) is well-formed, correctly scoped, and passes all preflight and clause checks. Target paths are fully aligned with the active PAUTH, and the verification plan maps spec-derived testing requirements to tests. | bridge/gtkb-wi5043-service-sot-watchdog-runner-001.md, bridge/gtkb-wi5043-service-sot-watchdog-runner-002.md | Issued GO verdict at version -002.md to authorize implementation of the platform service/SoT availability watchdog detection-only runner. | Resolved |
+
+---
+
+### 2026-07-06 - WI-5045 Watchdog Tiered Restoration Policy Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi5045-watchdog-tiered-restoration-policy` (WI-5045) is well-formed, correctly scoped, and passes all preflight and clause checks. Target paths are fully aligned with the active PAUTH, and the verification plan maps spec-derived testing requirements to tests. | bridge/gtkb-wi5045-watchdog-tiered-restoration-policy-001.md, bridge/gtkb-wi5045-watchdog-tiered-restoration-policy-002.md | Issued GO verdict at version -002.md to authorize implementation of the tiered restoration policy decision matrix. | Resolved |
+
+---
+
+### 2026-07-06 - WI-5044 Watchdog Restore-Action Registry Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi5044-watchdog-restore-action-registry` (WI-5044) is well-formed, correctly scoped, and passes all preflight and clause checks. Target paths are fully aligned with the active PAUTH, and the verification plan maps spec-derived testing requirements to tests. | bridge/gtkb-wi5044-watchdog-restore-action-registry-001.md, bridge/gtkb-wi5044-watchdog-restore-action-registry-002.md | Issued GO verdict at version -002.md to authorize implementation of the restore-action metadata registry extensions. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4842 formal-artifact-packet-helper scaffold — .codex write-boundary blocker
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report for `gtkb-wi4842-formal-artifact-packet-helper-scaffold` (WI-4842) remains blocked. Prime Builder filed a blocked continuation report because of OS ACL permissions (unresolved deny ACEs inside the sandbox context) preventing writes to the `.codex` helper target. Target paths were confirmed unmodified, and the required Codex adapter and manifest entry are absent. Both mechanical preflights passed with zero gaps. | bridge/gtkb-wi4842-formal-artifact-packet-helper-scaffold-018.md, bridge/gtkb-wi4842-formal-artifact-packet-helper-scaffold-019.md | Issued NO-GO verdict at version -019.md to maintain the blocker state until owner waiver, sandbox/ACL adjustment, or Claude-driven projection is provided. | Open |
+
+---
+
+### 2026-07-06 - WI-5050 OpenRouter author-model provenance review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal for `gtkb-wi5050-openrouter-author-model-provenance-actual-model` (WI-5050) is well-formed, correctly scoped, and passes all preflight and clause checks. The proposed fix correctly retrieves the actual served model from the Chat Completions response object, satisfying `GOV-DOCUMENT-AUTHOR-PROVENANCE-001`. | bridge/gtkb-wi5050-openrouter-author-model-provenance-actual-model-001.md, bridge/gtkb-wi5050-openrouter-author-model-provenance-actual-model-002.md | Issued GO verdict at version -002.md to authorize implementation of the OpenRouter served model provenance stamp. | Resolved |
+
+---
+
+### 2026-07-06 - WI-4978 helper-compliance-audit-chokepoint — .codex write-boundary blocker (Continuation)
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report (blocker report) for `gtkb-wi4978-helper-compliance-audit-chokepoint` (WI-4978) remains blocked. Prime Builder filed a blocked continuation report because of sandbox/ACL write-boundary restrictions preventing updates to `.codex/` files and directories, and the cross-harness skill adapter check (`test_codex_skill_adapter_parity_check`) remains red. Both preflights passed with zero gaps. | bridge/gtkb-wi4978-helper-compliance-audit-chokepoint-037.md, bridge/gtkb-wi4978-helper-compliance-audit-chokepoint-038.md | Issued NO-GO verdict at version -038.md to maintain the blocker state until owner waiver, sandbox/ACL adjustment, or Claude-driven projection is provided. | Open |
+
+---
+
+### 2026-07-06 - WI-4842 formal-artifact-packet-helper scaffold — .codex write-boundary blocker (Continuation)
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Post-implementation report (blocker report) for `gtkb-wi4842-formal-artifact-packet-helper-scaffold` (WI-4842) remains blocked. Prime Builder filed a blocked continuation report because of access denied errors when trying to create `.codex/skills/formal-artifact-packet-helper/` or update `.codex/skills/MANIFEST.json`. Both preflights passed with zero gaps. | bridge/gtkb-wi4842-formal-artifact-packet-helper-scaffold-020.md, bridge/gtkb-wi4842-formal-artifact-packet-helper-scaffold-021.md | Issued NO-GO verdict at version -021.md to maintain the blocker state until owner waiver, sandbox/ACL adjustment, or Claude-driven projection is provided. | Open |
+
+---
+
+### 2026-07-06 - WI-4563 Deliberation Search Fail-Loud Verification (Stale Queue Entry)
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Selected dispatch entry `gtkb-wi4563-delib-search-fail-loud-003.md` (NEW) is no longer actionable because the terminal VERIFIED verdict (`gtkb-wi4563-delib-search-fail-loud-004.md`) was already written, signed, and committed to git in commit `4004cc54`. All spec-derived tests pass cleanly. | bridge/gtkb-wi4563-delib-search-fail-loud-003.md, bridge/gtkb-wi4563-delib-search-fail-loud-004.md, commit `4004cc54` | Mark the dispatch entry as stale/already resolved and exit without further action. | Resolved |
+
+---
+
+### 2026-07-06 - gtkb-advisory-proposal-intake-workflow (Umbrella GO Verdict)
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW project-inception umbrella proposal at version 002. It correctly scopes work to database/metadata and bridge updates only (safe `target_paths`), with no changes to protected source files. All preflight checks passed with zero gaps. | bridge/gtkb-advisory-proposal-intake-workflow-002.md, bridge/gtkb-advisory-proposal-intake-workflow-003.md | Issued GO verdict at version 003. Prime Builder may proceed with metadata creation and child work-item registration after implementation-start authorization. | Resolved |
+
+---
+
+### 2026-07-06 - WI-5051 OpenRouter SSL Bad Record MAC Authorization
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal `gtkb-wi5051-openrouter-ssl-bad-record-mac-authorization-001.md` is well-formed and passes all preflight checks. Evidence from `WI-5060` indicates the SSL failure was a transient network or provider TLS blip that has since resolved. | bridge/gtkb-wi5051-openrouter-ssl-bad-record-mac-authorization-001.md, bridge/gtkb-wi5051-openrouter-ssl-bad-record-mac-authorization-002.md | Issued GO verdict at version -002.md to authorize verification-only backlog resolution. | Resolved |
+
+---
+
+### 2026-07-06 - WI-5047 Dispatcher Model Transaction Unblock
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal `gtkb-wi5047-dispatch-config-model-transaction-unblock-001.md` correctly specifies target files to implement a governed model transaction under `DCL-DISPATCHER-CONFIG-CLI-ONLY-001`. All preflight checks passed with zero gaps. | bridge/gtkb-wi5047-dispatch-config-model-transaction-unblock-001.md, bridge/gtkb-wi5047-dispatch-config-model-transaction-unblock-002.md | Issued GO verdict at version -002.md to approve implementation of the transaction. Prime Builder must obtain a matching new/expanded PAUTH covering source/CLI changes before implementation begins. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5062 Post-Reboot Dispatcher Supervisor Recovery Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal `gtkb-wi5062-post-reboot-dispatcher-supervisor-recovery-001.md` is well-formed, correctly scopes the reboot recovery gap, and passes all mechanical preflights and clause-applicability gates. The trigger and status extensions satisfy `DCL-DISPATCHER-DAEMON-SUPERVISION-CONTRACT-001` and watchdog safety policies. | bridge/gtkb-wi5062-post-reboot-dispatcher-supervisor-recovery-001.md, bridge/gtkb-wi5062-post-reboot-dispatcher-supervisor-recovery-002.md | Issued GO verdict at version -002.md to authorize scheduled task triggers and status extensions under WI-5062. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5063 Adapter Generator Transient Exclusions Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal `gtkb-wi5063-adapter-generator-transient-exclusions-001.md` is well-formed, correctly scopes the transient file exclusion gap, and passes all mechanical preflights and clause-applicability gates. Filtering gitignored transient file prefixes (like `_temp_`, `tmp_`, `draft-`, `draft_`) from reference/helper mirroring prevents false-positive parity check failures. | bridge/gtkb-wi5063-adapter-generator-transient-exclusions-001.md, bridge/gtkb-wi5063-adapter-generator-transient-exclusions-002.md | Issued GO verdict at version -002.md to authorize implementation of prefix exclusions in `scripts/generate_codex_skill_adapters.py`. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5062 No-Window Service Probes Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5062-no-window-service-probes-001.md`. While the substance is sound, a target paths mismatch exists where `target_paths` contains non-existent files: `platform_tests/scripts/test_dispatcher_supervisor.py` and `platform_tests/scripts/test_dispatcher_watchdog.py`. Under the strict implementation start gate, this mismatch will block Prime Builder from modifying the actual test files. | bridge/gtkb-wi5062-no-window-service-probes-001.md, bridge/gtkb-wi5062-no-window-service-probes-002.md | Issued NO-GO verdict at version -002.md. Prime Builder must replace the non-existent test filenames in target_paths with the correct ones and file a REVISED proposal. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5060 OpenRouter Connection Reset Retry Hardening Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5060-openrouter-connection-reset-retry-001.md`. The proposal is well-formed, correctly scopes the OpenRouter completions connection-reset retry hardening gap, and passes all mechanical preflights and clause-applicability gates. Catching connection/socket errors and retrying within `call_openrouter_chat` improves the reliability of the cloud completions default route. | bridge/gtkb-wi5060-openrouter-connection-reset-retry-001.md, bridge/gtkb-wi5060-openrouter-connection-reset-retry-002.md | Issued GO verdict at version -002.md to authorize implementation of retry and fail-closed handling in `scripts/openrouter_harness.py`. | Resolved |
+
+---
+
+### 2026-07-07 - Harness Parity and Bridge Verification
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Parity | Static catalog check shows `skill.formal-artifact-packet-helper` is missing capability mapping entries for `antigravity`, `cursor`, `ollama`, and `openrouter` in the capability matrix. | config/agent-control/harness-capability-registry.toml lines 1996-2013 | Update the registry to define the surfaces for all active harnesses to clear catalog drift checks. | Open |
+| Parity | Phase 2 checks show two invalid waivers because they use the undefined dimension `full_transcript_archive` which does not match the allowed Phase 2 dimensions. | config/harness-parity/phase2-waivers.toml lines 103-126 | Align the waiver dimensions with the validator's schema or retire the redundant waivers. | Open |
+
+---
+
+### 2026-07-07 - WI-4901 Retire invalid full-transcript Phase 2 waivers Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Pre-implementation proposal `gtkb-wi4901-invalid-full-transcript-waiver-cleanup-001.md` correctly scopes the retirement/removal of invalid `full_transcript_archive` waivers for Ollama and OpenRouter. All preflight checks passed with zero gaps. | bridge/gtkb-wi4901-invalid-full-transcript-waiver-cleanup-001.md, bridge/gtkb-wi4901-invalid-full-transcript-waiver-cleanup-002.md | Issued GO verdict at version -002.md to authorize configuration cleanup in `config/harness-parity/phase2-waivers.toml`. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5057 Live ADVISORY Scanner And Summarizer Helper Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5057-advisory-scanner-helper-001.md`. The proposal is well-formed, correctly scopes implementing a live ADVISORY scanner and summarizer helper under WI-5057, and passes all mechanical preflights and clause-applicability gates. The scanner deterministically selects live ADVISORY entries with adopt/adapt classification and the Required Prime Builder Owner-Grilling Gate section. | bridge/gtkb-wi5057-advisory-scanner-helper-001.md, bridge/gtkb-wi5057-advisory-scanner-helper-002.md | Issued GO verdict at version -002.md to authorize implementation of the scanner helper. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5056 Prime Builder Advisory Intake Skill Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5056-prime-advisory-intake-skill-001.md`. The proposal is well-formed, correctly scopes implementing the Prime Builder advisory-intake skill under WI-5056, and passes all mechanical preflights and clause-applicability gates. The skill consumes live ADVISORY entries only after owner-grilling answers, explicit project/work-item approval, and child proposal filing are present. | bridge/gtkb-wi5056-prime-advisory-intake-skill-001.md, bridge/gtkb-wi5056-prime-advisory-intake-skill-002.md | Issued GO verdict at version -002.md to authorize implementation of the advisory-intake skill. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5055 Deliberation-Side Advisory Proposal Skill Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5055-advisory-proposal-skill-001.md`. The proposal is well-formed, correctly scopes implementing the Loyal Opposition/advisory-side skill workflow for drafting ADVISORY bridge entries from reusable external or peer solutions under WI-5055, and passes all mechanical preflights and clause-applicability gates. | bridge/gtkb-wi5055-advisory-proposal-skill-001.md, bridge/gtkb-wi5055-advisory-proposal-skill-002.md | Issued GO verdict at version -002.md to authorize implementation of the advisory-proposal skill. | Resolved |
+
+---
+
+### 2026-07-07 - WI-5033 Dispatch Ranking Flatten Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5033-dispatch-ranking-flatten-001.md`. The proposal is well-formed, correctly scopes flattening the dispatcher ranking values and precedence to a single Codex baseline under WI-5033, and passes all mechanical preflights and clause-applicability gates. The changes are bounded and covered by active project authorization. | bridge/gtkb-wi5033-dispatch-ranking-flatten-001.md, bridge/gtkb-wi5033-dispatch-ranking-flatten-002.md | Issued GO verdict at version -002.md to authorize implementation of the dispatch ranking flattening. | Resolved |
+
+---
+
+### 2026-07-09 - NO-ACTION correction drive + bridge auto-processing (LO Claude/B, session d38aabe5)
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-09-01-21-LOYAL-OPPOSITION-WRAP.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance | NO-ACTION status was being misused to close ADVISORY threads (five threads WI-5034/5035/5036/5037/5039), flipping Prime-actionable ADVISORY into LO-actionable NO-ACTION with no prior verdict to correct. Owner corrected the canonical semantics (PB rejection of an LO GO/NO-GO verdict). | routing.py:24-26, disposition.py:126-127/132-133; INSIGHTS-2026-07-08-22-31-no-action-semantics-misuse.md; DCL-NO-ACTION-STATUS-SEMANTICS-001 | Slice 1 (WI-5081 docs) VERIFIED; Slice 2a (WI-5082 mechanical guard) GO'd, awaiting Prime impl; Slice 2b must remediate the five existing misused threads to a terminal status (WITHDRAWN/keep-ADVISORY). | Open (Slice 2b + WI-5082 impl pending) |
+| Infrastructure | Recurring stale `.git/index.lock` (two occurrences this session; plus stale index.stash/next-index locks) blocked all repo commits. Cleared both under owner AUQ (guarded: >60s + no git process). | Two finalize failures on index.lock; owner AUQ "Clear it now". | Prime backlog item to find the root cause (what leaves git locks behind mid-commit). Not tracked as a WI. | Open |
+| Infrastructure | dev-environment-inventory drift (harnesses/role_by_harness_compatibility) blocked WI-5081's protected-narrative (.claude/rules) finalize at the pre-commit release_blocker gate; confirmed it fires only on protected-narrative artifacts, not config/src. | WI-5081 finalize block; config/governance/protected-artifact-inventory-drift.toml | Owner directed Prime to reconcile the baseline; Prime did (commit 224524e6), unblocking WI-5081 (VERIFIED 66e73829). | Resolved |
+
+---
+
+### 2026-07-09 - Bridge auto-processing continuation (LO Claude/B, session cbd57087)
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-09-08-13.md`. Continues the peer session d38aabe5 entry above; took WI-5082 past its GO through to VERIFIED.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance | Drained the LO queue across 3 refill cycles: VERIFIED WI-5081/WI-3407/WI-5082/WI-4555 (me); concurred-and-stood-down on peer verdicts for WI-5070/WI-4840/cloud-harness. | Commits 66e73829, 1c94a5e9, 2d430ca6, 30752de1. | None — verdicts final. | Resolved |
+| Governance | WI-5082 NO-GO'd (-004) for a placeholder path token (`bridge/...-00N.md`) in the report `## Files Changed` scope note that trips the finalize coverage extractor; owner chose ceremony-default reword; Prime re-filed -005; re-VERIFIED (-006, 2d430ca6). | write_verdict.py `_claimed_paths_from_report` abort. | Prime hygiene fix filed as WI-5096 (extractor should skip `-NNN.md` placeholders). | Open (WI-5096) |
+| Hygiene | Committed hook `.claude/hooks/bridge-compliance-gate.py` and its groundtruth-kb template are byte-identical LF after WI-5082 finalize (parity preserved) — but WI-5081's finalize landed a whole-file LF→CRLF flip on `.claude/rules/file-bridge-protocol.md` + `canonical-terminology.md`. | `git ls-files --eol`; committed-blob CR counts; only 2 rule files now `i/crlf`. | Prime: `git add --renormalize` + regen narrative packets (WI-5090). | Open (WI-5090) |
+| Tooling | `/verify` skill template heading `## Specifications Carried Forward` is rejected by the bridge-compliance gate (needs `## Specification Links`). | WI-5081 finalize BridgeComplianceError until renamed. | Prime: align template/regex (WI-5091). | Open (WI-5091) |
+| Observability | `gt bridge state-report` DISPATCHER "Health: PASS" is misleading — the daemon is intentionally quiesced (owner AUQ) with heartbeat ~22.5h stale and GTKB-DispatcherDaemon/HarnessStormWatchdog scheduled tasks Disabled; `gt bridge dispatch health` correctly reports WARN. Last live dispatches failed on every headless LO target (WI-5064 OpenRouter SSL, WI-5065 Codex sandbox). | dispatch daemon status --json; dispatch-failures.jsonl. | Prime: relabel state-report health (WI-5092). Do not re-enable daemon until WI-5064/5065 fixed. | Open (WI-5092) |
+| Infrastructure | Cleared one stale `.git/index.lock` (~28 min old, peer-crash residue) blocking the WI-5082 finalize — third occurrence noted across LO sessions today (see d38aabe5 entry). | index.lock age 1716s; removed under LO bridge-repair authority (>300s staleness guard). | Recurring root-cause investigation warranted (what leaves locks mid-commit under multi-session load). Not yet a WI. | Open |
+| Provenance | WI-4840 commit aab69116 swept in WI-5082's uncommitted advisory-disposition No-op amendment (shared SKILL.md, hash e1fdb32d). Owner accepted as self-resolving; recorded for audit. | git show aab69116; WI-5082 -005 transparency notes. | None — end state correct; provenance noted. | Resolved (noted) |
+| Queue | LO-actionable queue NOT empty at wrap (refilled during wrap): `gtkb-antigravity-supported-skill-target-parity-alignment` (NEW), `gtkb-wi5068-no-action-scan-helper-parser` (REVISED -008). | state-report at 08:13Z. | Next LO drain cycle / peer LOs. | Open |
+
+---
+
+### 2026-07-09 - Resource Registry Pointer Drift and CI Defect
+
+Loyal Opposition (Antigravity/lo role, interactive session fded4ac9).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-09-10-09-resource-registry-pointer-drift.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | `.claude/rules/project-resource-aliases.toml` is missing, causing `validate_pointer` and CLI resource resolution tests to fail and generating a `pointer=missing` WARN in `gt status`. | `resolve_project_resource.py:L118-131`, `test_project_resource_aliases.py`, `.gitignore` ignoring the file. | Restore the pointer file and un-ignore it in `.gitignore` so it is tracked by Git. | Open |
+
+---
+
+### 2026-07-09 - WI-5083 Startup Input Gate Rearm Fix Verification
+
+Loyal Opposition (Antigravity/lo role, session 13ff6cfb).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-09-VERIFICATION-WI-5083.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the post-implementation report `bridge/gtkb-wi5083-startup-input-gate-rearm-fix-004.md` and finalized the `VERIFIED` verdict. Bypassing startup arming on continuation is correct; tests show the gate remains inactive for resume/compact while fresh starts block correctly. All tests pass cleanly. | bridge/gtkb-wi5083-startup-input-gate-rearm-fix-005.md, commits 7fe58355 + b584d0d4 | Verdict finalized and committed with 8 implementation/test paths. | Resolved |
