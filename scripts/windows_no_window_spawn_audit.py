@@ -69,6 +69,9 @@ RELEASE_RUNTIME_FILES = {
     "scripts/openrouter_harness.py",
     "scripts/run_with_status.py",
     "scripts/single_harness_bridge_dispatcher.py",
+    "scripts/verify_claude_dispatch.py",
+    "scripts/verify_codex_dispatch.py",
+    "scripts/verify_cursor_dispatch.py",
     "scripts/verify_ollama_dispatch.py",
 }
 
@@ -76,6 +79,7 @@ RELEASE_RUNTIME_PREFIXES = (
     ".claude/hooks/",
     ".codex/gtkb-hooks/",
     "groundtruth-kb/src/groundtruth_kb/dispatcher/",
+    "groundtruth-kb/src/groundtruth_kb/watchdog/",
 )
 
 INTERACTIVE_TOOL_PREFIXES = (

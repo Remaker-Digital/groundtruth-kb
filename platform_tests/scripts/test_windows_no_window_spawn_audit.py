@@ -165,3 +165,25 @@ def test_os_system_in_operator_script_is_interactive_allowlist(tmp_path: Path) -
     findings = audit.scan_file(path, root=tmp_path)
 
     assert findings[0].state == "interactive_allowlist"
+
+
+def test_real_tree_has_no_no_window_violations() -> None:
+    """WI-5071 reintroduction guard: no release-runtime launch site in the
+    git-tracked tree may lack a Windows no-window disposition.
+
+    This runs the audit over the real repository tree (not a fixture) so the
+    extended RELEASE_RUNTIME_FILES / RELEASE_RUNTIME_PREFIXES allowlist is
+    exercised against the actual sources. Because platform_tests runs in CI, a
+    regression that reintroduces an unguarded console spawn on a release-runtime
+    surface fails here (and in the release-candidate gate) rather than silently
+    shipping.
+    """
+    audit = _load_audit()
+    tracked = audit._tracked_python_files(_REPO_ROOT)
+    findings = audit.scan_paths(tracked, root=_REPO_ROOT)
+    violations = [(finding.path, finding.line, finding.call) for finding in findings if finding.state == "violation"]
+
+    assert violations == [], (
+        "release-runtime launch sites must carry a Windows no-window disposition "
+        f"(creationflags/startupinfo); violations found: {violations}"
+    )

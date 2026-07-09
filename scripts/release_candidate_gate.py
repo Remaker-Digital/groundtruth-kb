@@ -330,6 +330,16 @@ def _check_isolation_program_backstop() -> None:
     _run([sys.executable, "scripts/isolation_program_backstop.py"], timeout=60)
 
 
+def _check_no_window_spawn_audit() -> None:
+    script_path = PROJECT_ROOT / "scripts" / "windows_no_window_spawn_audit.py"
+    if not script_path.is_file():
+        raise GateFailure("No-window spawn audit script is missing: scripts/windows_no_window_spawn_audit.py")
+    # WI-5071 reintroduction guard (DELIB-20260707): the audit exits 1 when any
+    # release-runtime launch site lacks a Windows no-window disposition, which
+    # _run() converts into a GateFailure.
+    _run([sys.executable, "scripts/windows_no_window_spawn_audit.py"], timeout=120)
+
+
 def _python_gates(skip_pip_audit: bool = False) -> None:
     _run(
         [
@@ -501,6 +511,7 @@ def main() -> int:
         _check_project_resource_registry()
         _check_standing_backlog_health()
         _check_agent_red_app_root_minimization()
+        _check_no_window_spawn_audit()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         # Narrative-artifact evidence rollup runs BEFORE the inventory-drift check

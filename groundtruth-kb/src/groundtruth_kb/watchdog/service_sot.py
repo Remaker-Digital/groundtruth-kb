@@ -775,7 +775,13 @@ def _run_installer_script(
         cmd.append("-DryRun")
     if extra_args:
         cmd.extend(extra_args)
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
+    # WI-5071: the scheduled-task installer runner must stay headless, mirroring
+    # this module's own ``_run_powershell`` no-window disposition; otherwise the
+    # powershell child pops a visible console when the watchdog installs its task.
+    run_kwargs: dict[str, Any] = {"capture_output": True, "text": True, "timeout": 180, "check": False}
+    if os.name == "nt":
+        run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    proc = subprocess.run(cmd, **run_kwargs)
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()
         raise ServiceSoTWatchdogError(detail or f"{script_name} failed (exit {proc.returncode})")

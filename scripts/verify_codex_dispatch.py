@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
+from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 HARNESS_ID = "A"
 HARNESS_NAME = "codex"
@@ -147,6 +148,10 @@ def _check_codex_dotdir_acl(project_root: Path, *, repair: bool = False) -> dict
                 errors="replace",
                 timeout=30,
                 check=False,
+                # WI-5071: the .codex ACL repair powershell runner must stay
+                # headless; every peer dispatch verifier applies the no-window
+                # disposition.
+                **no_window_subprocess_kwargs(),
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return _normalize_acl_check({"ok": False, "error": str(exc)}, returncode=None)
