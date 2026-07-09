@@ -17,6 +17,7 @@ import contextlib
 import json
 import os
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,7 +25,11 @@ from typing import Any
 
 from groundtruth_kb.mode_switch.audit import write_transaction_record
 from groundtruth_kb.mode_switch.derive import topology_from_role_map
-from groundtruth_kb.mode_switch.invariants import RolePartitionViolation, verify_role_document_partition
+from groundtruth_kb.mode_switch.invariants import (
+    RolePartitionViolation,
+    interactive_prime_builder_session_id,
+    verify_role_document_partition,
+)
 from groundtruth_kb.mode_switch.validation import (
     validate_bridge_artifact,
     validate_role_artifact,
@@ -122,6 +127,9 @@ def _apply_active_role_assignment(
     *,
     target_id: str,
     requested_role: str,
+    project_root: Path,
+    interactive_prime_builder_session: str | None,
+    environ: Mapping[str, str] | None,
 ) -> tuple[str, ...]:
     """Apply one target role update and validate the whole candidate map."""
     record = harnesses.get(target_id)
@@ -135,7 +143,12 @@ def _apply_active_role_assignment(
         )
     record["role"] = [requested_role]
     try:
-        verify_role_document_partition({"harnesses": harnesses})
+        verify_role_document_partition(
+            {"harnesses": harnesses},
+            project_root=project_root,
+            interactive_prime_builder_session=interactive_prime_builder_session,
+            environ=environ,
+        )
     except RolePartitionViolation as exc:
         raise TransactionValidationError(
             str(exc),
@@ -230,6 +243,8 @@ def apply_role_switch(
     *,
     change_reason: str,
     applied_at: datetime | None = None,
+    interactive_prime_builder_session: str | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> TransactionResult:
     """Apply an immediate role-switch transaction.
 
@@ -243,7 +258,9 @@ def apply_role_switch(
     5. Resolve harness id-or-name to harness id.
     6. Read the role map from the DB-backed registry projection; apply only
        the requested harness role metadata update in candidate state; validate
-       the whole active role partition before any durable write.
+       the whole lane-coverage map before any durable write. If the candidate
+       has no active durable Prime Builder, validation may use a readable
+       owner-declared interactive Prime Builder marker for the current session.
     7. Write audit-trail record FIRST (per failure-leaves-no-state-mutation
        invariant).
     8. WI-3342 IP-5: the transitional legacy-JSON role write is
@@ -277,6 +294,12 @@ def apply_role_switch(
             axis="role",
         )
 
+    interactive_prime_session = interactive_prime_builder_session_id(
+        project_root,
+        session_id=interactive_prime_builder_session,
+        environ=environ,
+    )
+
     # Step 5-6: Resolve harness, compute new role set.
     # WI-3342 IP-5: the current role map is read from the DB-backed registry
     # projection (harness-state/harness-registry.json), not the retired role
@@ -303,12 +326,15 @@ def apply_role_switch(
         previous_role_set = ()
 
     # Candidate role update: mutate only the requested harness record, then
-    # validate the whole active partition. No complementary holder selection or
-    # unrelated active-harness suspension happens here.
+    # validate the whole lane-coverage map. No complementary holder selection
+    # or unrelated active-harness suspension happens here.
     new_role_set = _apply_active_role_assignment(
         harnesses,
         target_id=harness_id,
         requested_role=role,
+        project_root=project_root,
+        interactive_prime_builder_session=interactive_prime_session,
+        environ=environ,
     )
 
     # Derive new topology.

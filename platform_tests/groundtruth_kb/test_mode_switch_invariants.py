@@ -44,6 +44,12 @@ def _write_role_map(root: Path, harnesses: dict) -> None:
     path.write_text(json.dumps({"harnesses": records}), encoding="utf-8")
 
 
+def _write_session_role_marker(root: Path, session_id: str, role: str = "prime-builder") -> None:
+    marker = root / ".claude" / "session" / f"role-{session_id}.json"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps({"role": role, "session_id": session_id}), encoding="utf-8")
+
+
 def test_prime_builder_ids_single() -> None:
     doc = {
         "harnesses": {
@@ -117,6 +123,26 @@ def test_verify_role_document_partition_rejects_invalid_candidate_document() -> 
         verify_role_document_partition(candidate)
 
 
+def test_verify_role_document_partition_allows_interactive_prime_builder_anchor(tmp_path: Path) -> None:
+    session_id = "sess-pb-anchor"
+    _write_session_role_marker(tmp_path, session_id)
+    summary = verify_role_document_partition(
+        {
+            "harnesses": {
+                "A": {"role": ["loyal-opposition"], "status": "active"},
+                "B": {"role": ["loyal-opposition"], "status": "active"},
+            }
+        },
+        project_root=tmp_path,
+        interactive_prime_builder_session=session_id,
+    )
+    assert summary.prime_builder_id == f"interactive-prime-builder:{session_id}"
+    assert summary.prime_builder_ids == ()
+    assert summary.prime_builder_coverage_source == "interactive-session-marker"
+    assert summary.interactive_prime_builder_session_id == session_id
+    assert summary.loyal_opposition_ids == ("A", "B")
+
+
 def test_verify_role_partition_rejects_zero_prime_builder(tmp_path: Path) -> None:
     _write_role_map(
         tmp_path,
@@ -127,6 +153,35 @@ def test_verify_role_partition_rejects_zero_prime_builder(tmp_path: Path) -> Non
     )
     with pytest.raises(RolePartitionViolation, match="at least one prime-builder"):
         verify_role_partition(tmp_path)
+
+
+def test_verify_role_partition_allows_interactive_prime_builder_anchor(tmp_path: Path) -> None:
+    session_id = "sess-pb-anchor"
+    _write_role_map(
+        tmp_path,
+        {
+            "A": {"role": ["loyal-opposition"]},
+            "B": {"role": ["loyal-opposition"]},
+        },
+    )
+    _write_session_role_marker(tmp_path, session_id)
+    assert (
+        verify_role_partition(tmp_path, interactive_prime_builder_session=session_id)
+        == f"interactive-prime-builder:{session_id}"
+    )
+
+
+def test_verify_role_partition_rejects_stale_interactive_prime_builder_anchor(tmp_path: Path) -> None:
+    _write_role_map(
+        tmp_path,
+        {
+            "A": {"role": ["loyal-opposition"]},
+            "B": {"role": ["loyal-opposition"]},
+        },
+    )
+    _write_session_role_marker(tmp_path, "old-session")
+    with pytest.raises(RolePartitionViolation, match="interactive Prime Builder anchor"):
+        verify_role_partition(tmp_path, interactive_prime_builder_session="new-session")
 
 
 def test_verify_role_partition_allows_multiple_prime_builders(tmp_path: Path) -> None:
