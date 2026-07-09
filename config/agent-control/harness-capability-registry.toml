@@ -495,7 +495,7 @@ status = "native"
 surface = ".codex/skills/advisory-disposition/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/advisory-disposition/SKILL.md"
-source_sha256 = "56410b3b28a752001bec269aa03a7360e4ccfd2e5dc0a5a84d6df9c9085614be"
+source_sha256 = "e1fdb32d6d071b32a0e0b56ba61c81c1723c8546063f34728d1f414ee7931df4"
 
 [capabilities.antigravity]
 status = "unsupported"
