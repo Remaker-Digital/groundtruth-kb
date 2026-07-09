@@ -49,6 +49,30 @@ def test_git_committed_check_spreads_no_window(monkeypatch, tmp_path):
     assert captured.get("creationflags") == _SENTINEL_FLAGS
 
 
+def test_compliance_audit_spreads_no_window(monkeypatch, tmp_path):
+    import json as _json
+
+    captured: dict = {}
+    monkeypatch.setattr(writer, "no_window_subprocess_kwargs", lambda: {"creationflags": _SENTINEL_FLAGS})
+
+    def fake_run(cmd, **kwargs):
+        captured.update(kwargs)
+        # The audit writes its verdict JSON to the --audit-output path; emulate a pass.
+        out_path = Path(cmd[cmd.index("--audit-output") + 1])
+        out_path.write_text(_json.dumps({"decision": "pass"}), encoding="utf-8")
+        return _FakeCompleted(stdout="", returncode=0)
+
+    monkeypatch.setattr(writer.subprocess, "run", fake_run)
+    # A gate path must exist for _bridge_compliance_gate_path resolution; point at any file.
+    gate = tmp_path / "gate.py"
+    gate.write_text("# stub gate\n", encoding="utf-8")
+    monkeypatch.setattr(writer, "_bridge_compliance_gate_path", lambda project_root: gate)
+    writer.run_bridge_compliance_audit(
+        file_path=tmp_path / "bridge" / "x-001.md", content="NEW\n", project_root=tmp_path
+    )
+    assert captured.get("creationflags") == _SENTINEL_FLAGS
+
+
 def test_revise_preflight_runner_spreads_no_window(monkeypatch, tmp_path):
     revise = importlib.import_module("revise_bridge")
     captured: dict = {}
