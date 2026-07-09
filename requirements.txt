@@ -72,7 +72,7 @@ python-docx>=1.1.0
 beautifulsoup4>=4.12.0
 
 # YAML parsing (config schema — R3)
-PyYAML>=6.0
+PyYAML>=6.0.3
 
 # Utilities
 pydantic>=2.10.0
