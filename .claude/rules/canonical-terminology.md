@@ -681,6 +681,27 @@ Opposition verdict and does not authorize implementation.
 
 *Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#go-no-go-verified-deferred).*
 
+### NO-ACTION
+
+**Definition:** A Prime Builder-authored bridge status: the Prime Builder
+response to a Loyal Opposition `GO` or `NO-GO` verdict, rejecting that verdict
+because it does not comply with applicable governance. A well-formed
+`NO-ACTION` sits on top of a prior Loyal Opposition verdict in the same thread,
+states in its reason what the reviewing role must fix, and routes the thread
+back to Loyal Opposition to re-issue a corrected verdict. It is
+Loyal-Opposition-actionable (`review_no_action`), not terminal, and not
+owner-visible.
+
+**Not to be confused with:** `DEFERRED` (owner-directed parking, not a response
+to a verdict); a Prime advisory disposition (which stays under `ADVISORY`).
+`NO-ACTION` MUST NOT be used to close an `ADVISORY` thread or record a Prime
+"no further action" -- doing so mis-routes the thread into the Loyal Opposition
+queue with no verdict to correct.
+
+**Source:** `DCL-NO-ACTION-STATUS-SEMANTICS-001`;
+`DELIB-20260708-NO-ACTION-CANONICAL-SEMANTICS` (owner decision, 2026-07-08);
+code of record `groundtruth_kb.bridge.routing` / `groundtruth_kb.bridge.disposition`.
+
 ### Loyal Opposition advisory
 
 **Definition:** A Codex-initiated bridge entry that delivers an advisory

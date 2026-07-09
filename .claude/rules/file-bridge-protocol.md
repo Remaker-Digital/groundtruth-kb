@@ -278,6 +278,7 @@ numbered bridge file.
 | VERIFIED | Loyal Opposition | Post-implementation verification passed |
 | ADVISORY | Loyal Opposition | Advisory report; actionable by Prime Builder in interactive sessions to trigger owner-deliberation / UAQ disposition; non-dispatchable for headless runs (`_derive_dispatchable` returns False). NOT awaiting GO/NO-GO/VERIFIED. |
 | DEFERRED | Owner | Owner-directed parked bridge state; non-actionable until the owner-directed clear/resume condition is met. |
+| NO-ACTION | Prime Builder | Prime Builder rejection of an LO GO/NO-GO verdict for governance non-compliance; the reason states what the reviewer must fix. Loyal-Opposition-actionable (routes back to LO to re-issue a corrected verdict); NOT terminal, NOT owner-visible. MUST NOT be used to dispose of an ADVISORY thread. See `DCL-NO-ACTION-STATUS-SEMANTICS-001`. |
 
 ## Review Independence Boundary
 
@@ -302,7 +303,7 @@ harness has a durable assignment or could be selected by headless dispatch.
 
 Versioned bridge files (`bridge/<slug>-NNN.md`) MUST begin with a canonical
 status token on the first non-blank line: one of `NEW`, `REVISED`, `GO`,
-`NO-GO`, `VERIFIED`, `ADVISORY`, `DEFERRED`, or `WITHDRAWN`. Headings and prose
+`NO-GO`, `VERIFIED`, `NO-ACTION`, `ADVISORY`, `DEFERRED`, or `WITHDRAWN`. Headings and prose
 follow the token. This keeps each bridge file self-describing and makes the
 first line a reliable routing signal.
 
@@ -321,11 +322,44 @@ Source: `GTKB-GOV-PROPOSAL-STANDARDS` Slice 1
 (`DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`; GO at
 `bridge/gtkb-gov-proposal-standards-slice1-025.md`).
 
+## NO-ACTION Status
+
+`NO-ACTION` is a **Prime Builder-authored** response to a Loyal Opposition
+`GO` or `NO-GO` verdict. It rejects that verdict because the verdict does not
+comply with applicable governance. A well-formed `NO-ACTION` entry:
+
+1. is authored by Prime Builder;
+2. sits on top of a prior Loyal Opposition `GO` or `NO-GO` verdict in the same
+   numbered bridge thread;
+3. states, in its reason, what the reviewing role must do to correct the
+   verdict; and
+4. routes the thread back to the reviewing (Loyal Opposition) role so it can
+   re-issue a corrected, governance-compliant verdict.
+
+`NO-ACTION` is Loyal-Opposition-actionable (reason `lo_no_action_review_required`,
+next-action `review_no_action` per `groundtruth_kb.bridge.disposition`) and is a
+Prime-authored routing act per `groundtruth_kb.bridge.routing` (`_PRIME_STATUSES`
+includes `NEW`, `REVISED`, `NO-ACTION`). It is **not** terminal and **not**
+owner-visible.
+
+`NO-ACTION` MUST NOT be used to dispose of an `ADVISORY` thread, and MUST NOT be
+used to record a Prime Builder "no further action" close. Advisory dispositions
+are Prime-actionable and remain under `ADVISORY`
+(`prime_advisory_disposition` / `owner_disposition`) or move to a terminal
+status (`WITHDRAWN`) with recorded rationale and a cited owner decision. Writing
+`NO-ACTION` on an advisory that has no prior Loyal Opposition verdict flips the
+thread from Prime-actionable `ADVISORY` into Loyal-Opposition-actionable
+`NO-ACTION` with no verdict to correct, mis-routing it permanently into the
+Loyal Opposition queue.
+
+Authority: `DCL-NO-ACTION-STATUS-SEMANTICS-001`; owner decision
+`DELIB-20260708-NO-ACTION-CANONICAL-SEMANTICS`.
+
 ## Advisory Reports
 
 **Purpose:** Advisory reports are first-class workflow state, not transport workarounds via `NO-GO@001`. They may be owner-initiated (owner asks LO to investigate a peer system) or LO-initiated (LO surfaces a finding during normal review).
 
-**Routing:** ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` includes `ADVISORY`, so `compute_actionable_pending` surfaces them in the Prime actionable list; the `_derive_dispatchable` invariant returns False for non-GO/NEW/REVISED/NO-GO statuses, so every headless dispatch surface (cross-harness trigger, single-harness dispatcher) filters them out before spawning. Manual `/bridge` scans show them; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
+**Routing:** ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs. `ACTIONABLE_STATUSES_FOR_PRIME` in `groundtruth_kb.bridge.notify` includes `ADVISORY`, so `compute_actionable_pending` surfaces them in the Prime actionable list; the `_derive_dispatchable` invariant returns False for non-GO/NEW/REVISED/NO-GO statuses, so every headless dispatch surface (dispatcher daemon, single-harness dispatcher) filters them out before spawning. Manual `/bridge` scans show them; `bridge-axis-2-surface.py` also filters non-dispatchable items, so AXIS-2 surfacing of ADVISORY status entries is a separate follow-on concern.
 
 **Authority:** Loyal Opposition (or owner-direction) authors ADVISORY entries; Prime Builder acknowledges in an interactive session and dispositions through owner-deliberation / UAQ flows, producing one of: (a) a normal NEW implementation proposal converting the advisory (`adopt` / `adapt`), (b) an explicit deferral with documented defer-trigger, or (c) a documented rejection (`reject`).
 
