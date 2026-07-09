@@ -1,0 +1,1319 @@
+#!/usr/bin/env python3
+# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+"""Shared, config-driven cloud-harness runtime base (GT-KB cloud-harness template, slice 2).
+
+Implements ``ADR-CLOUD-HARNESS-TEMPLATE-001``: a single framework-free base runtime
+that cloud harnesses instantiate by configuration, replacing the per-harness
+hand-rolled shims. The base owns connection/transport, bounded retry/backoff, the
+fail-closed guard-adapter enforcement (generalizing the ``DCL-OLLAMA-TOOL-PARITY-GATE-001``
+enforcement mechanism), author-metadata injection, and the framework-free tool-call loop.
+Adopters supply only the varying axes via an :class:`AdopterProfile`:
+
+* ``endpoint`` — the direct-cloud base URL (no local-service bridge).
+* ``auth_env_key`` — token auth via an Authorization header keyed on an env var NAME
+  (``GOV-ENV-LOCAL-AUTHORITY-001``); the token value is never embedded in source.
+* ``dialect`` — one of ``openai-chat`` (implemented in slice 2), ``ollama-native``, or
+  ``anthropic-messages`` (slice-3 seam points that raise :class:`NotImplementedError`).
+* ``model`` routing — the adopter's ``.api-harness/routing.toml`` provider key.
+* ``hook_tier`` — ``guard-adapter-floor`` (this slice) vs native full hooks (slice 3).
+
+Slice-2 scope: the base + the ``openai-chat`` dialect concretely; the OpenRouter harness
+re-bases onto this module as the first-adopter proof. ``ollama-native`` and
+``anthropic-messages`` are defined seam points; selecting them raises the slice-3 sentinel.
+
+Framework-free: standard library (``urllib``/``ssl``/``json``/``subprocess``) plus existing
+GT-KB helpers only — no heavyweight agent framework, per ``ADR-OLLAMA-HARNESS-ADOPTION-001``.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import fnmatch
+import functools
+import json
+import os
+import re
+import ssl
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from typing import Any
+
+try:
+    from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
+try:
+    from sdk_bridge_bash_guard import bridge_bash_mutation_reason
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.sdk_bridge_bash_guard import bridge_bash_mutation_reason
+
+try:
+    import tomllib
+except ImportError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
+
+
+DEFAULT_TIMEOUT_SECONDS = 240.0
+DEFAULT_SESSION_TIMEOUT_SECONDS = 540.0
+
+# Bounded retry for transient cloud transport failures so a dispatched worker
+# survives a transient hiccup and still produces output. Total backoff
+# (1+2+4 = 7s) stays far under the worker-lifetime cap.
+CHAT_MAX_ATTEMPTS = 3
+CHAT_RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)
+RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
+RETRYABLE_PROVIDER_TRANSPORT_MARKERS = frozenset(
+    {
+        "bad record mac",
+        "sslv3_alert_bad_record_mac",
+    }
+)
+DEFAULT_MAX_TURNS = 40
+MAX_TOOL_OUTPUT_CHARS = 6000
+MAX_GREP_RESULTS = 50
+MAX_GLOB_RESULTS = 100
+MAX_FILE_SCAN_ENTRIES = 5000
+MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
+SKIPPED_SCAN_DIR_NAMES = frozenset(
+    {
+        ".git",
+        ".gtkb-state",
+        ".venv",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "node_modules",
+        "dist",
+        "build",
+    }
+)
+LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
+CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
+MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
+
+# --- Dialect seam (slice 2: openai-chat concrete; the other two are slice-3 seam points) ---
+DIALECT_OPENAI_CHAT = "openai-chat"
+DIALECT_OLLAMA_NATIVE = "ollama-native"
+DIALECT_ANTHROPIC_MESSAGES = "anthropic-messages"
+SUPPORTED_DIALECTS = frozenset({DIALECT_OPENAI_CHAT, DIALECT_OLLAMA_NATIVE, DIALECT_ANTHROPIC_MESSAGES})
+SLICE3_DIALECT_SEAM = frozenset({DIALECT_OLLAMA_NATIVE, DIALECT_ANTHROPIC_MESSAGES})
+
+# --- Hook tiers ---
+HOOK_TIER_GUARD_ADAPTER_FLOOR = "guard-adapter-floor"
+HOOK_TIER_NATIVE_FULL = "native-full-hooks"
+
+# Generic GT-KB guard-adapter sequences (shared across adopters; not adopter-specific).
+BRIDGE_WRITE_GUARDS = (
+    Path(".claude/hooks/credential-scan.py"),
+    Path(".claude/hooks/scanner-safe-writer.py"),
+    Path(".claude/hooks/bridge-compliance-gate.py"),
+    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    Path("scripts/implementation_start_gate.py"),
+)
+BRIDGE_EDIT_GUARDS = (
+    Path(".claude/hooks/credential-scan.py"),
+    Path(".claude/hooks/scanner-safe-writer.py"),
+    Path(".claude/hooks/bridge-compliance-gate.py"),
+    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    Path("scripts/implementation_start_gate.py"),
+)
+WRITE_EDIT_GUARDS = (
+    Path(".claude/hooks/credential-scan.py"),
+    Path(".claude/hooks/scanner-safe-writer.py"),
+    Path(".claude/hooks/narrative-artifact-approval-gate.py"),
+    Path("scripts/implementation_start_gate.py"),
+)
+BASH_GUARDS = (
+    Path(".claude/hooks/destructive-gate.py"),
+    Path(".claude/hooks/formal-artifact-approval-gate.py"),
+    Path("scripts/implementation_start_gate.py"),
+)
+
+
+class CloudHarnessError(RuntimeError):
+    """Raised for fail-closed cloud-harness errors."""
+
+
+class FileScanLimitExceeded(CloudHarnessError):
+    """Raised when a bounded filesystem tool scan reaches its entry cap."""
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(f"scan truncated after {limit} entries; narrow the path or pattern")
+        self.limit = limit
+
+
+@dataclass(frozen=True)
+class ModelRoute:
+    key: str
+    model_id: str
+    model_version: str
+    tool_calling_supported: bool
+    allowed_tools: tuple[str, ...]
+    omit_payload_model: bool = False
+
+
+@dataclass(frozen=True)
+class RoutingConfig:
+    schema_version: int
+    models: dict[str, ModelRoute]
+    default_model: str
+    skill_routes: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ModelMetadata:
+    model_id: str
+    model_version: str
+    endpoint: str
+    route_key: str
+    model_configuration: str | None = None
+    requested_model_id: str | None = None
+
+
+@dataclass(frozen=True)
+class GuardExecutionResult:
+    returncode: int
+    stdout: str
+    stderr: str = ""
+    timed_out: bool = False
+
+
+@dataclass(frozen=True)
+class AdopterProfile:
+    """The varying-axes configuration a cloud harness supplies to the base runtime."""
+
+    display_name: str
+    author_identity: str
+    author_harness_id: str
+    default_endpoint: str
+    auth_env_key: str
+    provider_routing_key: str
+    routing_config_path: Path
+    dialect: str = DIALECT_OPENAI_CHAT
+    hook_tier: str = HOOK_TIER_GUARD_ADAPTER_FLOOR
+    extra_headers: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.dialect not in SUPPORTED_DIALECTS:
+            raise CloudHarnessError(f"unknown dialect {self.dialect!r}; expected one of {sorted(SUPPORTED_DIALECTS)}")
+        # Slice 2 direct-cloud invariant (SPEC-INTAKE-9ec893): an adopter must declare a
+        # direct-cloud endpoint; the base has no local-service bridge path.
+        if not self.default_endpoint or not str(self.default_endpoint).strip():
+            raise CloudHarnessError("adopter profile requires a non-empty direct-cloud endpoint")
+        if not self.auth_env_key or not str(self.auth_env_key).strip():
+            raise CloudHarnessError(
+                "adopter profile requires an auth_env_key (env-var NAME, per GOV-ENV-LOCAL-AUTHORITY-001)"
+            )
+
+
+GuardRunner = Callable[[Path, dict[str, Any], Mapping[str, str], float], GuardExecutionResult]
+ChatFunc = Callable[[str, str, dict[str, Any], float], dict[str, Any]]
+CommandRunner = Callable[[str, Path, Mapping[str, str], float], subprocess.CompletedProcess[str]]
+RelativePathFunc = Callable[[Path, Path], str]
+IterFilesFunc = Callable[..., Iterable[Path]]
+
+
+def _remaining_timeout(deadline: float, message: str) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise CloudHarnessError(message)
+    return remaining
+
+
+def _sleep_with_budget(delay: float, deadline: float, message: str) -> None:
+    if _remaining_timeout(deadline, message) < delay:
+        raise CloudHarnessError(message)
+    time.sleep(delay)
+
+
+def ensure_utf8_output_streams(stdout: Any | None = None, stderr: Any | None = None) -> None:
+    """Make harness output safe for Unicode verdict text on Windows consoles."""
+    for stream in (stdout or sys.stdout, stderr or sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
+def _retry_after_delay_seconds(exc: urllib.error.HTTPError) -> float | None:
+    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+    if not retry_after:
+        return None
+    try:
+        return max(0.0, float(retry_after))
+    except ValueError:
+        pass
+    try:
+        retry_at = parsedate_to_datetime(retry_after)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, retry_at.timestamp() - time.time())
+
+
+def _http_retry_delay_seconds(exc: urllib.error.HTTPError, attempt: int) -> float:
+    if exc.code == 429:
+        retry_after = _retry_after_delay_seconds(exc)
+        if retry_after is not None:
+            return retry_after
+    return CHAT_RETRY_BACKOFF_SECONDS[attempt - 1]
+
+
+def _provider_transport_error_summary(exc: BaseException) -> str:
+    return f"{type(exc).__module__}.{type(exc).__name__}: {exc}"
+
+
+def _is_retryable_provider_transport_error(exc: BaseException) -> bool:
+    if isinstance(exc, (urllib.error.URLError, ConnectionError, TimeoutError)):
+        return True
+    if isinstance(exc, ssl.SSLError):
+        text = str(exc).lower()
+        return any(marker in text for marker in RETRYABLE_PROVIDER_TRANSPORT_MARKERS)
+    return False
+
+
+def resolve_project_root(start: Path | None = None) -> Path:
+    current = (start or Path.cwd()).resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / "groundtruth.toml").is_file():
+            return candidate
+    return current
+
+
+def _as_list(value: Any, *, field: str) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise CloudHarnessError(f"{field} must be a list of strings")
+    return value
+
+
+def _as_non_empty_string(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise CloudHarnessError(f"{field} must be a non-empty string")
+    return value
+
+
+def _as_bool(value: Any, *, field: str, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise CloudHarnessError(f"{field} must be a boolean")
+    return value
+
+
+def infer_model_version(model_id: str) -> str:
+    """Return the tag or version portion from a model identifier."""
+    if ":" in model_id:
+        return model_id.rsplit(":", 1)[1] or "unversioned"
+    if "/" in model_id:
+        parts = model_id.split("/")
+        if len(parts) > 1 and parts[-1]:
+            return parts[-1]
+    return "unversioned"
+
+
+def _parse_skill_routes(routing: Mapping[str, Any], models: Mapping[str, ModelRoute]) -> dict[str, str]:
+    skills_raw = routing.get("skills") or {}
+    if not isinstance(skills_raw, dict):
+        raise CloudHarnessError("routing.skills must be a table when present")
+    skill_routes: dict[str, str] = {}
+    for skill_name, route_spec in skills_raw.items():
+        if not isinstance(skill_name, str) or not skill_name:
+            raise CloudHarnessError("routing.skills entries must use non-empty skill names")
+        if isinstance(route_spec, str):
+            route_key = route_spec
+        elif isinstance(route_spec, dict):
+            route_key = route_spec.get("model")
+        else:
+            raise CloudHarnessError(f"routing.skills.{skill_name} must name a configured model")
+        if not isinstance(route_key, str) or route_key not in models:
+            raise CloudHarnessError(f"routing.skills.{skill_name} must name a configured model")
+        skill_routes[skill_name] = route_key
+    return skill_routes
+
+
+def load_routing_config(project_root: Path, *, provider_key: str, config_path: Path) -> RoutingConfig:
+    """Load ``.api-harness/routing.toml`` for one provider (cross-provider rows are ignored)."""
+    resolved_config_path = project_root / config_path
+    try:
+        raw = tomllib.loads(resolved_config_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise CloudHarnessError(f"routing config is missing: {resolved_config_path}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise CloudHarnessError(f"routing config is invalid TOML: {exc}") from exc
+
+    if raw.get("schema_version") != 1:
+        raise CloudHarnessError("routing config schema_version must be 1")
+    models_raw = raw.get("models")
+    if not isinstance(models_raw, dict) or not models_raw:
+        raise CloudHarnessError("routing config must define [models.<key>] rows")
+
+    models: dict[str, ModelRoute] = {}
+    for key, row in models_raw.items():
+        if not isinstance(key, str) or not key or not isinstance(row, dict):
+            raise CloudHarnessError("model rows must be named TOML tables")
+
+        # Only process rows for this adopter's provider (cross-provider isolation).
+        if row.get("provider") != provider_key:
+            continue
+
+        model_id = _as_non_empty_string(row.get("model_id"), field=f"models.{key}.model_id")
+        model_version = infer_model_version(model_id)
+        allowed_tools = tuple(_as_list(row.get("allowed_tools"), field=f"models.{key}.allowed_tools"))
+        if row.get("tool_calling_supported") is not True:
+            raise CloudHarnessError(f"models.{key}.tool_calling_supported must be true")
+        unknown_tools = sorted(set(allowed_tools) - CANONICAL_TOOLS)
+        if unknown_tools:
+            raise CloudHarnessError(f"models.{key}.allowed_tools contains noncanonical tools: {unknown_tools}")
+        omit_payload_model = _as_bool(row.get("omit_payload_model"), field=f"models.{key}.omit_payload_model")
+        models[key] = ModelRoute(key, model_id, model_version, True, allowed_tools, omit_payload_model)
+
+    routing = raw.get("routing", {}).get(provider_key)
+    if not isinstance(routing, dict):
+        raise CloudHarnessError(f"routing config must define [routing.{provider_key}]")
+    default_model = routing.get("default_model")
+    if not isinstance(default_model, str) or default_model not in models:
+        raise CloudHarnessError(f"routing.{provider_key}.default_model must name a configured {provider_key} model")
+    return RoutingConfig(
+        schema_version=1,
+        models=models,
+        default_model=default_model,
+        skill_routes=_parse_skill_routes(routing, models),
+    )
+
+
+def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str | None = None) -> ModelRoute:
+    if skill is not None and not skill:
+        raise CloudHarnessError("skill route key must be a non-empty string")
+    route_key = requested_model or (config.skill_routes.get(skill) if skill else None) or config.default_model
+    try:
+        return config.models[route_key]
+    except KeyError as exc:
+        raise CloudHarnessError(f"unknown model route: {route_key}") from exc
+
+
+def resolve_harness_session_id(environ: Mapping[str, str] | None = None) -> str:
+    """Resolve the bridge work-intent session id used by guarded tools."""
+    return resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=environ)
+
+
+def _default_config_label(profile: AdopterProfile, endpoint: str) -> str:
+    return f"{profile.display_name} endpoint={endpoint}; routing=static {profile.routing_config_path.as_posix()}"
+
+
+def metadata_configuration(
+    metadata: ModelMetadata,
+    profile: AdopterProfile,
+    *,
+    response_model_id: str | None = None,
+) -> str:
+    if metadata.model_configuration:
+        return metadata.model_configuration
+    if response_model_id:
+        requested_model = metadata.requested_model_id or metadata.model_id
+        override = "true" if response_model_id != requested_model else "false"
+        return (
+            f"{profile.display_name} endpoint={metadata.endpoint}; route={metadata.route_key}; "
+            f"requested_model={requested_model}; model_source=response.model; "
+            f"account_override={override}"
+        )
+    return _default_config_label(profile, metadata.endpoint)
+
+
+def _response_model_id(response: Mapping[str, Any]) -> str | None:
+    model = response.get("model")
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
+
+
+def metadata_from_response(
+    metadata: ModelMetadata, response: Mapping[str, Any], profile: AdopterProfile
+) -> ModelMetadata:
+    response_model_id = _response_model_id(response)
+    if response_model_id is None:
+        return metadata
+    return ModelMetadata(
+        model_id=response_model_id,
+        model_version=infer_model_version(response_model_id),
+        endpoint=metadata.endpoint,
+        route_key=metadata.route_key,
+        model_configuration=metadata_configuration(metadata, profile, response_model_id=response_model_id),
+        requested_model_id=metadata.requested_model_id or metadata.model_id,
+    )
+
+
+def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
+def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
+    schemas = {
+        "Read": _schema(
+            "Read",
+            "Read a UTF-8 text file under the GT-KB project root.",
+            {"path": {"type": "string"}, "max_chars": {"type": "integer", "minimum": 1}},
+            ["path"],
+        ),
+        "Write": _schema(
+            "Write",
+            "Write a UTF-8 text file under the GT-KB project root after guard approval.",
+            {"path": {"type": "string"}, "content": {"type": "string"}},
+            ["path", "content"],
+        ),
+        "Edit": _schema(
+            "Edit",
+            "Replace exact text in a UTF-8 file under the GT-KB project root after guard approval.",
+            {"path": {"type": "string"}, "old_string": {"type": "string"}, "new_string": {"type": "string"}},
+            ["path", "old_string", "new_string"],
+        ),
+        "Grep": _schema(
+            "Grep",
+            "Search text files under the GT-KB project root with a regular expression.",
+            {"pattern": {"type": "string"}, "path": {"type": "string"}, "max_results": {"type": "integer"}},
+            ["pattern"],
+        ),
+        "Glob": _schema(
+            "Glob",
+            "List paths under the GT-KB project root that match a glob pattern.",
+            {"pattern": {"type": "string"}, "path": {"type": "string"}, "max_results": {"type": "integer"}},
+            ["pattern"],
+        ),
+        "Bash": _schema(
+            "Bash",
+            "Run a bounded local shell command after guards allow it; bridge artifact and retired-index mutations are denied.",
+            {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
+            ["command"],
+        ),
+    }
+    allowed = tuple(allowed_tools)
+    unknown = sorted(set(allowed) - CANONICAL_TOOLS)
+    if unknown:
+        raise CloudHarnessError(f"unknown allowed tools: {unknown}")
+    return [schemas[name] for name in allowed]
+
+
+def openai_chat_completion(
+    endpoint: str,
+    api_key: str,
+    payload: dict[str, Any],
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    *,
+    label: str,
+    extra_headers: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """The ``openai-chat`` dialect strategy: POST to ``<endpoint>/chat/completions`` with bounded retry.
+
+    ``label`` names the provider in error messages (e.g. ``"OpenRouter"``); token auth is
+    sent via an ``Authorization`` header, keyed on the caller-supplied ``api_key`` value.
+    """
+    url = endpoint.rstrip("/") + "/chat/completions"
+    deadline = time.monotonic() + timeout
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + api_key,
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    last_error: Exception | None = None
+    for attempt in range(1, CHAT_MAX_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=_remaining_timeout(deadline, f"{label} completions request timed out"),
+            ) as response:  # noqa: S310
+                data = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            if exc.code in RETRYABLE_HTTP_STATUS and attempt < CHAT_MAX_ATTEMPTS:
+                _sleep_with_budget(
+                    _http_retry_delay_seconds(exc, attempt),
+                    deadline,
+                    f"{label} completions request timed out before retry",
+                )
+                continue
+            if exc.code == 429:
+                retry_after = _retry_after_delay_seconds(exc)
+                retry_after_suffix = f"; retry_after_seconds={retry_after:g}" if retry_after is not None else ""
+                raise CloudHarnessError(
+                    f"{label} rate limited (HTTP 429 provider backpressure) "
+                    f"after {attempt} attempt(s){retry_after_suffix}: {exc}"
+                ) from exc
+            raise CloudHarnessError(
+                f"{label} completions request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
+            ) from exc
+        except (urllib.error.URLError, ConnectionError, TimeoutError, ssl.SSLError) as exc:
+            last_error = exc
+            retryable = _is_retryable_provider_transport_error(exc)
+            if retryable and attempt < CHAT_MAX_ATTEMPTS:
+                _sleep_with_budget(
+                    CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
+                    deadline,
+                    f"{label} completions request timed out before retry",
+                )
+                continue
+            if isinstance(exc, ssl.SSLError):
+                summary = _provider_transport_error_summary(exc)
+                raise CloudHarnessError(
+                    f"{label} provider transport failure after {attempt} attempt(s): {summary}"
+                ) from exc
+            raise CloudHarnessError(f"{label} completions request failed after {attempt} attempt(s): {exc}") from exc
+        try:
+            parsed = json.loads(data)
+        except json.JSONDecodeError as exc:
+            last_error = exc
+            if attempt < CHAT_MAX_ATTEMPTS:
+                _sleep_with_budget(
+                    CHAT_RETRY_BACKOFF_SECONDS[attempt - 1],
+                    deadline,
+                    f"{label} completions request timed out before retry",
+                )
+                continue
+            snippet = data[:200].replace("\n", " ")
+            raise CloudHarnessError(
+                f"{label} completions response was not JSON after {attempt} attempt(s) "
+                f"(body snippet: {snippet!r}): {exc}"
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise CloudHarnessError(f"{label} completions response must be a JSON object")
+        return parsed
+    raise CloudHarnessError(f"{label} completions request failed after {CHAT_MAX_ATTEMPTS} attempt(s): {last_error}")
+
+
+def resolve_dialect_chat_func(profile: AdopterProfile) -> ChatFunc:
+    """Return the chat strategy for the profile's dialect.
+
+    Slice 2 implements ``openai-chat`` concretely; the ``ollama-native`` and
+    ``anthropic-messages`` seam points raise an explicit slice-3 sentinel so a
+    misconfigured adopter fails loudly rather than silently no-op.
+    """
+    if profile.dialect == DIALECT_OPENAI_CHAT:
+        return functools.partial(
+            openai_chat_completion,
+            label=profile.display_name,
+            extra_headers=dict(profile.extra_headers),
+        )
+    if profile.dialect in SLICE3_DIALECT_SEAM:
+        raise NotImplementedError(
+            f"dialect {profile.dialect!r} is a slice-3 seam point (ADR-CLOUD-HARNESS-TEMPLATE-001 "
+            "Consequences); only 'openai-chat' is implemented in slice 2"
+        )
+    raise CloudHarnessError(f"unknown dialect {profile.dialect!r}")
+
+
+def _resolve_tool_path(project_root: Path, path_text: str, *, allow_missing: bool) -> Path:
+    if not path_text or not path_text.strip():
+        raise CloudHarnessError("tool path must be a non-empty string")
+    raw = Path(path_text)
+    candidate = raw if raw.is_absolute() else project_root / raw
+    try:
+        resolved = candidate.resolve(strict=not allow_missing)
+    except FileNotFoundError as exc:
+        if not allow_missing:
+            raise CloudHarnessError(f"file not found: {path_text}") from exc
+        resolved = candidate.resolve(strict=False)
+    except OSError as exc:
+        raise CloudHarnessError(f"tool path could not be resolved: {path_text}") from exc
+    _ensure_under_root(project_root, resolved, path_text)
+    return resolved
+
+
+def _ensure_under_root(project_root: Path, resolved: Path, original: str) -> None:
+    root = project_root.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise CloudHarnessError(f"tool path escapes project root: {original}")
+
+
+def _relative_path(project_root: Path, path: Path) -> str:
+    return path.resolve().relative_to(project_root.resolve()).as_posix()
+
+
+def _relative_path_or_none(
+    project_root: Path, path: Path, *, relative_path: RelativePathFunc = _relative_path
+) -> str | None:
+    try:
+        return relative_path(project_root, path)
+    except (OSError, ValueError):
+        return None
+
+
+def _is_bridge_markdown_path(project_root: Path, path: Path) -> bool:
+    rel = _relative_path_or_none(project_root, path)
+    return bool(rel and rel.startswith("bridge/") and rel.endswith(".md"))
+
+
+def _first_nonblank_line(content: str) -> str:
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _content_status_token(content: str) -> str:
+    parts = _first_nonblank_line(content).split(maxsplit=1)
+    return parts[0].upper() if parts else ""
+
+
+def normalize_bridge_author_model_metadata(
+    content: str,
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    path: Path,
+    profile: AdopterProfile,
+) -> str:
+    if not _is_bridge_markdown_path(project_root, path):
+        return content
+    if _content_status_token(content) not in {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"}:
+        return content
+
+    replacements = {
+        "author_model": model_metadata.model_id,
+        "author_model_version": model_metadata.model_version,
+        "author_model_configuration": metadata_configuration(model_metadata, profile),
+    }
+    lines = content.splitlines()
+    changed = False
+    for index, line in enumerate(lines):
+        key, separator, _value = line.partition(":")
+        normalized_key = key.strip().lower()
+        if separator and normalized_key in replacements:
+            lines[index] = f"{normalized_key}: {replacements[normalized_key]}"
+            changed = True
+    if not changed:
+        return content
+    normalized = "\n".join(lines)
+    if content.endswith("\n"):
+        normalized += "\n"
+    return normalized
+
+
+def set_author_metadata_env(
+    env: Mapping[str, str],
+    model_id: str,
+    model_version: str,
+    profile: AdopterProfile,
+    endpoint: str | None = None,
+    model_configuration: str | None = None,
+) -> dict[str, str]:
+    updated = dict(env)
+    effective_endpoint = endpoint or profile.default_endpoint
+    session_id = resolve_harness_session_id(env)
+    updated.update(
+        {
+            "GTKB_AUTHOR_IDENTITY": profile.author_identity,
+            "GTKB_AUTHOR_HARNESS_ID": profile.author_harness_id,
+            "GTKB_AUTHOR_MODEL": model_id,
+            "GTKB_AUTHOR_MODEL_VERSION": model_version,
+            "GTKB_AUTHOR_MODEL_CONFIGURATION": model_configuration
+            or _default_config_label(profile, effective_endpoint),
+        }
+    )
+    if session_id:
+        updated["GTKB_AUTHOR_SESSION_CONTEXT_ID"] = session_id
+    return updated
+
+
+def _default_guard_runner(
+    guard_path: Path,
+    payload: dict[str, Any],
+    env: Mapping[str, str],
+    timeout: float,
+) -> GuardExecutionResult:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(guard_path)],
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            cwd=str(payload.get("cwd") or Path.cwd()),
+            env=dict(env),
+            timeout=timeout,
+            check=False,
+            creationflags=creationflags,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return GuardExecutionResult(-1, exc.stdout or "", exc.stderr or "", timed_out=True)
+    return GuardExecutionResult(completed.returncode, completed.stdout, completed.stderr)
+
+
+def _decision_reason(data: dict[str, Any]) -> str | None:
+    decision = str(data.get("decision") or "").lower()
+    if decision in {"block", "deny", "ask", "checkpoint"}:
+        return str(data.get("reason") or data.get("permissionDecisionReason") or f"guard decision: {decision}")
+    hook = data.get("hookSpecificOutput")
+    if isinstance(hook, dict):
+        permission = str(hook.get("permissionDecision") or "").lower()
+        if permission in {"deny", "block", "ask", "checkpoint"}:
+            return str(
+                hook.get("permissionDecisionReason")
+                or hook.get("additionalContext")
+                or f"guard permission decision: {permission}"
+            )
+    return None
+
+
+def _guard_tool_input(tool_name: str, arguments: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
+    if tool_name == "Write":
+        path = _resolve_tool_path(
+            project_root, str(arguments.get("path") or arguments.get("file_path")), allow_missing=True
+        )
+        return {"file_path": str(path), "content": str(arguments.get("content", ""))}
+    if tool_name == "Edit":
+        path = _resolve_tool_path(
+            project_root, str(arguments.get("path") or arguments.get("file_path")), allow_missing=False
+        )
+        return {
+            "file_path": str(path),
+            "old_string": str(arguments.get("old_string", "")),
+            "new_string": str(arguments.get("new_string", "")),
+        }
+    if tool_name == "Bash":
+        return {"command": str(arguments.get("command", ""))}
+    raise CloudHarnessError(f"guard adapter does not support tool: {tool_name}")
+
+
+def _guard_paths_for(tool_name: str, tool_input: Mapping[str, Any], project_root: Path) -> tuple[Path, ...]:
+    if tool_name == "Bash":
+        return BASH_GUARDS
+    file_path = str(tool_input.get("file_path") or "")
+    rel = _relative_path(project_root, Path(file_path))
+    is_bridge_file = rel.startswith("bridge/") and rel.endswith(".md")
+    if tool_name == "Write" and is_bridge_file:
+        return BRIDGE_WRITE_GUARDS
+    if tool_name == "Edit" and is_bridge_file:
+        return BRIDGE_EDIT_GUARDS
+    if tool_name in {"Write", "Edit"}:
+        return WRITE_EDIT_GUARDS
+    raise CloudHarnessError(f"unsupported guarded tool: {tool_name}")
+
+
+def invoke_guard_adapter(
+    tool_name: str,
+    arguments: Mapping[str, Any],
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    *,
+    guard_runner: GuardRunner | None = None,
+    guard_paths: Sequence[Path] | None = None,
+    timeout: float = 10.0,
+) -> None:
+    """Fail-closed guard-adapter enforcement (generalized DCL-OLLAMA-TOOL-PARITY-GATE-001).
+
+    Runs the required guard sequence for a mutating tool; any guard denial, timeout,
+    nonzero exit, empty/malformed output, or missing guard script fails closed.
+    """
+    if tool_name not in MUTATING_TOOLS:
+        return
+    tool_input = _guard_tool_input(tool_name, arguments, project_root)
+    paths = tuple(guard_paths) if guard_paths is not None else _guard_paths_for(tool_name, tool_input, project_root)
+    runner = guard_runner or _default_guard_runner
+    env = set_author_metadata_env(
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        profile,
+        model_metadata.endpoint,
+        model_metadata.model_configuration,
+    )
+    payload = {
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "cwd": str(project_root),
+        "project_root": str(project_root),
+        "session_id": resolve_harness_session_id(os.environ),
+    }
+    for relative_guard_path in paths:
+        guard_path = relative_guard_path if relative_guard_path.is_absolute() else project_root / relative_guard_path
+        if not guard_path.is_file():
+            raise CloudHarnessError(f"guard script is missing: {relative_guard_path.as_posix()}")
+        result = runner(guard_path, payload, env, timeout)
+        if result.timed_out:
+            raise CloudHarnessError(f"guard timed out: {_relative_path(project_root, guard_path)}")
+        if result.returncode != 0:
+            raise CloudHarnessError(
+                f"guard exited nonzero: {_relative_path(project_root, guard_path)} ({result.returncode})"
+            )
+        stdout = (result.stdout or "").strip()
+        if not stdout:
+            raise CloudHarnessError(f"guard emitted empty output: {_relative_path(project_root, guard_path)}")
+        try:
+            data = json.loads(stdout)
+        except json.JSONDecodeError as exc:
+            raise CloudHarnessError(
+                f"guard emitted malformed JSON: {_relative_path(project_root, guard_path)}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise CloudHarnessError(f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}")
+        reason = _decision_reason(data)
+        if reason:
+            raise CloudHarnessError(f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}")
+
+
+def _require_string(arguments: Mapping[str, Any], *names: str) -> str:
+    for name in names:
+        value = arguments.get(name)
+        if isinstance(value, str) and value:
+            return value
+    raise CloudHarnessError(f"missing required argument: {'/'.join(names)}")
+
+
+def _positive_int_argument(arguments: Mapping[str, Any], name: str, default: int) -> int:
+    if name not in arguments:
+        return default
+
+    value = arguments[name]
+    parsed: int | None = None
+    if isinstance(value, bool):
+        parsed = None
+    elif isinstance(value, int):
+        parsed = value
+    elif isinstance(value, float):
+        parsed = int(value) if value.is_integer() else None
+    elif isinstance(value, str):
+        text = value.strip()
+        if re.fullmatch(r"\d+(?:\.0+)?", text):
+            parsed = int(text.split(".", 1)[0])
+
+    if parsed is None or parsed <= 0:
+        raise CloudHarnessError(f"{name} must be a positive integer")
+    return parsed
+
+
+def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
+    path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
+    max_chars = _positive_int_argument(arguments, "max_chars", MAX_TOOL_OUTPUT_CHARS)
+    try:
+        return path.read_text(encoding="utf-8")[:max_chars]
+    except FileNotFoundError:
+        return f"Read failed: file not found: {_relative_path(project_root, path)}"
+    except OSError as exc:
+        return f"Read failed: {_relative_path(project_root, path)}: {exc}"
+
+
+def _dispatch_write(
+    arguments: Mapping[str, Any],
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    guard_runner: GuardRunner | None,
+) -> str:
+    path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
+    content = str(arguments.get("content", ""))
+    content = normalize_bridge_author_model_metadata(content, model_metadata, project_root, path, profile)
+    invoke_guard_adapter(
+        "Write",
+        {"path": str(path), "content": content},
+        model_metadata,
+        project_root,
+        profile,
+        guard_runner=guard_runner,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return f"wrote {_relative_path(project_root, path)}"
+
+
+def _dispatch_edit(
+    arguments: Mapping[str, Any],
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    guard_runner: GuardRunner | None,
+) -> str:
+    path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=False)
+    old_string = _require_string(arguments, "old_string")
+    new_string = str(arguments.get("new_string", ""))
+    invoke_guard_adapter(
+        "Edit",
+        {"path": str(path), "old_string": old_string, "new_string": new_string},
+        model_metadata,
+        project_root,
+        profile,
+        guard_runner=guard_runner,
+    )
+    try:
+        content = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise CloudHarnessError(f"file not found: {_relative_path(project_root, path)}") from exc
+    except OSError as exc:
+        raise CloudHarnessError(f"failed to read file {_relative_path(project_root, path)}: {exc}") from exc
+
+    if old_string not in content:
+        raise CloudHarnessError(f"old_string not found in {_relative_path(project_root, path)}")
+
+    try:
+        path.write_text(content.replace(old_string, new_string, 1), encoding="utf-8")
+    except OSError as exc:
+        raise CloudHarnessError(f"failed to write file {_relative_path(project_root, path)}: {exc}") from exc
+    return f"edited {_relative_path(project_root, path)}"
+
+
+def _iter_bounded_paths(root: Path, *, max_entries: int = MAX_FILE_SCAN_ENTRIES) -> Iterable[Path]:
+    if root.is_file():
+        yield root
+        return
+    seen = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(name for name in dirnames if name not in SKIPPED_SCAN_DIR_NAMES)
+        for name in [*dirnames, *sorted(filenames)]:
+            seen += 1
+            if seen > max_entries:
+                raise FileScanLimitExceeded(max_entries)
+            yield Path(dirpath) / name
+
+
+def _iter_text_files(root: Path, *, max_entries: int = MAX_FILE_SCAN_ENTRIES) -> Iterable[Path]:
+    for path in _iter_bounded_paths(root, max_entries=max_entries):
+        try:
+            if path.is_file():
+                yield path
+        except OSError:
+            continue
+
+
+def _dispatch_grep(
+    arguments: Mapping[str, Any],
+    project_root: Path,
+    *,
+    relative_path: RelativePathFunc = _relative_path,
+    iter_text_files: IterFilesFunc = _iter_text_files,
+) -> str:
+    pattern = _require_string(arguments, "pattern")
+    base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
+    max_results = _positive_int_argument(arguments, "max_results", MAX_GREP_RESULTS)
+    regex = re.compile(pattern)
+    matches: list[str] = []
+    try:
+        for file_path in iter_text_files(base):
+            rel = _relative_path_or_none(project_root, file_path, relative_path=relative_path)
+            if rel is None:
+                continue
+            try:
+                for line_no, line in enumerate(
+                    file_path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
+                ):
+                    if regex.search(line):
+                        matches.append(f"{rel}:{line_no}:{line[:300]}")
+                        if len(matches) >= max_results:
+                            return "\n".join(matches)
+            except OSError:
+                continue
+    except FileScanLimitExceeded as exc:
+        matches.append(f"[{exc}]")
+    return "\n".join(matches)
+
+
+def _dispatch_glob(
+    arguments: Mapping[str, Any],
+    project_root: Path,
+    *,
+    relative_path: RelativePathFunc = _relative_path,
+    iter_bounded_paths: IterFilesFunc = _iter_bounded_paths,
+) -> str:
+    pattern = _require_string(arguments, "pattern")
+    base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
+    max_results = _positive_int_argument(arguments, "max_results", MAX_GLOB_RESULTS)
+    matches: list[str] = []
+    try:
+        for path in iter_bounded_paths(base):
+            rel = _relative_path_or_none(project_root, path, relative_path=relative_path)
+            if rel is None:
+                continue
+            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(path.name, pattern):
+                matches.append(rel)
+                if len(matches) >= max_results:
+                    break
+    except FileScanLimitExceeded as exc:
+        matches.append(f"[{exc}]")
+    return "\n".join(sorted(matches))
+
+
+def _default_command_runner(
+    command: str,
+    project_root: Path,
+    env: Mapping[str, str],
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+    return subprocess.run(
+        command,
+        text=True,
+        capture_output=True,
+        cwd=str(project_root),
+        env=dict(env),
+        timeout=timeout,
+        shell=True,
+        check=False,
+        creationflags=creationflags,
+    )
+
+
+def _dispatch_bash(
+    arguments: Mapping[str, Any],
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    guard_runner: GuardRunner | None,
+    command_runner: CommandRunner | None,
+) -> str:
+    command = _require_string(arguments, "command")
+    timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+    bridge_denial = bridge_bash_mutation_reason(command)
+    if bridge_denial:
+        raise CloudHarnessError(bridge_denial)
+    invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, profile, guard_runner=guard_runner)
+    env = set_author_metadata_env(
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        profile,
+        model_metadata.endpoint,
+        model_metadata.model_configuration,
+    )
+    runner = command_runner or _default_command_runner
+    try:
+        completed = runner(command, project_root, env, timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise CloudHarnessError(f"Bash command timed out: {command}") from exc
+    stdout = completed.stdout or ""
+    stderr = completed.stderr or ""
+    if completed.returncode != 0:
+        output = "\n".join(
+            [
+                f"Bash command exited with return code {completed.returncode}.",
+                f"Command: {command}",
+                "STDOUT:",
+                stdout,
+                "STDERR:",
+                stderr,
+            ]
+        )
+        return output[:MAX_TOOL_OUTPUT_CHARS]
+    return (stdout + stderr)[:MAX_TOOL_OUTPUT_CHARS]
+
+
+def dispatch_tool_call(
+    tool_name: str,
+    arguments: Mapping[str, Any],
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    *,
+    guard_runner: GuardRunner | None = None,
+    command_runner: CommandRunner | None = None,
+    relative_path: RelativePathFunc = _relative_path,
+    iter_text_files: IterFilesFunc = _iter_text_files,
+    iter_bounded_paths: IterFilesFunc = _iter_bounded_paths,
+) -> str:
+    if tool_name not in CANONICAL_TOOLS:
+        raise CloudHarnessError(f"unsupported tool: {tool_name}")
+    if tool_name == "Read":
+        return _dispatch_read(arguments, project_root)
+    if tool_name == "Write":
+        return _dispatch_write(arguments, model_metadata, project_root, profile, guard_runner)
+    if tool_name == "Edit":
+        return _dispatch_edit(arguments, model_metadata, project_root, profile, guard_runner)
+    if tool_name == "Grep":
+        return _dispatch_grep(arguments, project_root, relative_path=relative_path, iter_text_files=iter_text_files)
+    if tool_name == "Glob":
+        return _dispatch_glob(
+            arguments, project_root, relative_path=relative_path, iter_bounded_paths=iter_bounded_paths
+        )
+    if tool_name == "Bash":
+        return _dispatch_bash(arguments, model_metadata, project_root, profile, guard_runner, command_runner)
+    raise CloudHarnessError(f"unsupported tool: {tool_name}")
+
+
+def _tool_call_parts(call: Any, index: int) -> tuple[str, dict[str, Any], str]:
+    if not isinstance(call, dict):
+        raise CloudHarnessError("tool_call entries must be JSON objects")
+
+    call_id = str(call.get("id") or f"tool_call_{index}")
+    function = call.get("function")
+    if not isinstance(function, dict):
+        raise CloudHarnessError("tool_call is missing function details")
+
+    name = function.get("name")
+    if not isinstance(name, str) or not name:
+        raise CloudHarnessError("tool_call is missing function name")
+
+    raw_arguments = function.get("arguments", {})
+    if isinstance(raw_arguments, str):
+        try:
+            parsed = json.loads(raw_arguments or "{}")
+        except json.JSONDecodeError as exc:
+            raise CloudHarnessError("tool_call arguments string must be JSON") from exc
+        raw_arguments = parsed
+    if not isinstance(raw_arguments, dict):
+        raise CloudHarnessError("tool_call arguments must be an object")
+    return name, raw_arguments, call_id
+
+
+def _message_from_response(response: Mapping[str, Any]) -> dict[str, Any]:
+    choices = response.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise CloudHarnessError("provider response missing choices list")
+
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        raise CloudHarnessError("provider choice must be an object")
+
+    message = first_choice.get("message")
+    if not isinstance(message, dict):
+        raise CloudHarnessError("provider response missing message object in choices[0]")
+    return dict(message)
+
+
+def _final_text_from_message(message: Mapping[str, Any]) -> str:
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise CloudHarnessError("assistant final message must contain nonblank text content")
+    return content
+
+
+def run_tool_loop(
+    prompt: str,
+    model_route: ModelRoute,
+    endpoint: str,
+    api_key: str,
+    max_turns: int,
+    project_root: Path,
+    profile: AdopterProfile,
+    *,
+    system_prompt: str | None = None,
+    chat_func: ChatFunc | None = None,
+    guard_runner: GuardRunner | None = None,
+    command_runner: CommandRunner | None = None,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
+) -> str:
+    """Framework-free tool-call loop shared across cloud harnesses.
+
+    ``chat_func`` is the dialect strategy; when omitted it is resolved from the
+    profile's dialect via :func:`resolve_dialect_chat_func`.
+    """
+    if max_turns < 1:
+        raise CloudHarnessError("max_turns must be at least 1")
+    if session_timeout <= 0:
+        raise CloudHarnessError("session_timeout must be positive")
+    messages: list[dict[str, Any]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    schemas = build_tool_schemas(model_route.allowed_tools)
+    chat = chat_func or resolve_dialect_chat_func(profile)
+    metadata = ModelMetadata(
+        model_route.model_id,
+        model_route.model_version,
+        endpoint,
+        model_route.key,
+        requested_model_id=model_route.model_id,
+    )
+    session_deadline = time.monotonic() + session_timeout
+    previous_tool_signature: str | None = None
+    repeated_tool_signature_turns = 0
+
+    for _turn in range(max_turns):
+        payload = {"messages": messages, "stream": False}
+        if not model_route.omit_payload_model:
+            payload["model"] = model_route.model_id
+        if schemas:
+            payload["tools"] = schemas
+
+        operation_timeout = min(
+            timeout,
+            _remaining_timeout(session_deadline, "session timeout exceeded before provider chat turn"),
+        )
+        response = chat(endpoint, api_key, payload, operation_timeout)
+
+        if "error" in response:
+            error_details = response["error"]
+            error_message = error_details.get("message") if isinstance(error_details, dict) else str(error_details)
+            raise CloudHarnessError(f"provider API returned error: {error_message}")
+
+        metadata = metadata_from_response(metadata, response, profile)
+        message = _message_from_response(response)
+        tool_calls = message.get("tool_calls") or []
+
+        if not tool_calls:
+            return _final_text_from_message(message)
+
+        if not isinstance(tool_calls, list):
+            raise CloudHarnessError("tool_calls must be a list")
+
+        tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
+        if tool_signature == previous_tool_signature:
+            repeated_tool_signature_turns += 1
+        else:
+            previous_tool_signature = tool_signature
+            repeated_tool_signature_turns = 1
+        if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
+            raise CloudHarnessError("repeated no-progress tool loop before final assistant text")
+
+        assistant_message: dict[str, Any] = {
+            "role": "assistant",
+            "content": message.get("content") or "",
+            "tool_calls": tool_calls,
+        }
+        messages.append(assistant_message)
+
+        for index, call in enumerate(tool_calls):
+            tool_name, arguments, call_id = _tool_call_parts(call, index)
+            if tool_name == "Bash":
+                arguments = dict(arguments)
+                requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+                arguments["timeout_seconds"] = min(
+                    requested_timeout,
+                    _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
+                )
+            try:
+                result = dispatch_tool_call(
+                    tool_name,
+                    arguments,
+                    metadata,
+                    project_root,
+                    profile,
+                    guard_runner=guard_runner,
+                    command_runner=command_runner,
+                )
+            except CloudHarnessError as tool_err:
+                result = f"ERROR: {tool_err}"
+            messages.append(
+                {
+                    "role": "tool",
+                    "name": tool_name,
+                    "tool_call_id": call_id,
+                    "content": result[:MAX_TOOL_OUTPUT_CHARS],
+                }
+            )
+    raise CloudHarnessError("max-turn exhaustion before final assistant text")
