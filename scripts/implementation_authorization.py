@@ -450,6 +450,62 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
     raise AuthorizationError(f"No approved proposal file found under GO for {entry.bridge_id}")
 
 
+def finalization_target_paths_for_verified(project_root: Path, bridge_id: str) -> list[str]:
+    """Return approved-proposal ``target_paths`` for a terminal-``VERIFIED`` thread.
+
+    WI-4837 automatic-parity finalization clearance (owner decision
+    ``DELIB-WI4837-AUTOMATIC-PARITY-20260707``). Derives the approved path set
+    from the fresh bridge version files: the proposal that the latest GO
+    authorized, read ONLY when the thread's post-GO chain state is terminal
+    ``VERIFIED``. Fails closed (raises :class:`AuthorizationError`) when there is
+    no GO in the chain, when the post-GO state is not terminal ``VERIFIED``, when
+    no approved proposal file is found, when the proposal is unreadable, or when
+    the ``target_paths`` cannot be parsed.
+
+    This is a read-only authority derivation from fresh bridge files per
+    ``GOV-SOURCE-OF-TRUTH-FRESHNESS-001``. It does NOT mint a packet and does NOT
+    authorize ordinary implementation; it exposes the approved path set so the
+    implementation-start gate can clear a narrow post-``VERIFIED`` finalization
+    staging command. ``_validate_packet`` behavior is intentionally left
+    unchanged: terminal ``VERIFIED`` remains terminal for ordinary packets.
+    """
+    entry = bridge_entry(project_root, bridge_id)
+    go_index = next(
+        (index for index, (status, _) in enumerate(entry.versions) if status == "GO"),
+        None,
+    )
+    if go_index is None:
+        raise AuthorizationError(
+            "Finalization clearance requires a GO in the bridge chain for "
+            f"{entry.bridge_id}; found latest status {entry.latest_status}"
+        )
+    state = _post_go_chain_state([status for status, _ in entry.versions[:go_index]])
+    if state != "terminal":
+        raise AuthorizationError(
+            "Finalization clearance requires a terminal VERIFIED bridge chain for "
+            f"{entry.bridge_id}; post-GO chain state is {state!r} "
+            f"(latest status {entry.latest_status})."
+        )
+    approved_proposal_file = next(
+        (path for status, path in entry.versions[go_index + 1 :] if status in {"NEW", "REVISED"}),
+        None,
+    )
+    if approved_proposal_file is None:
+        raise AuthorizationError(f"No approved proposal file found under GO for {entry.bridge_id}")
+    try:
+        markdown = (project_root / approved_proposal_file).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise AuthorizationError(
+            f"Approved proposal file is unreadable for finalization clearance: {approved_proposal_file}"
+        ) from exc
+    target_paths = extract_target_paths(markdown)
+    if not target_paths:
+        raise AuthorizationError(
+            f"Approved proposal for {entry.bridge_id} declares no target_paths for finalization clearance"
+        )
+    return target_paths
+
+
 def _iter_sections(markdown: str):
     """Yield ``(heading, body)`` for each ``## `` section in the document."""
     matches = list(SECTION_RE.finditer(markdown))
@@ -1741,6 +1797,18 @@ def path_authorized(packet: dict[str, Any], relative_path: str) -> bool:
         if _target_pattern_authorizes_path(str(pattern), relative_path):
             return True
     return False
+
+
+def path_authorized_by_target_paths(target_paths: list[str], relative_path: str) -> bool:
+    """True when ``relative_path`` is authorized by any ``target_paths`` pattern.
+
+    Mirrors :func:`path_authorized` (which reads a packet's
+    ``target_path_globs``) but operates directly on a raw ``target_paths`` list,
+    so the implementation-start gate can check finalization-staging targets
+    against a terminal-``VERIFIED`` thread's approved proposal paths without
+    minting a packet.
+    """
+    return any(_target_pattern_authorizes_path(str(pattern), relative_path) for pattern in target_paths)
 
 
 def _unauthorized_targets(packet: dict[str, Any], normalized_targets: list[str]) -> list[str]:

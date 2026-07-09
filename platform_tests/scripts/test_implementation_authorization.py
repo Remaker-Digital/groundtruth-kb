@@ -1821,6 +1821,100 @@ def test_extract_spec_links_normal_section_returns_links(auth_module):
     ]
 
 
+# ---------------------------------------------------------------------------
+# WI-4837: post-VERIFIED finalization clearance -- authority derivation
+# ---------------------------------------------------------------------------
+
+
+def _write_verified_thread(
+    project_root: Path,
+    slug: str = "verified-fixture",
+    *,
+    target_paths: list[str] | None = None,
+) -> None:
+    """Build a terminal-VERIFIED chain: NEW at v1, GO at v2, VERIFIED at v3."""
+    _write_proposal(
+        project_root,
+        slug,
+        version=1,
+        target_paths=target_paths or ["scripts/sample.py", "platform_tests/scripts/test_sample.py"],
+    )
+    _write_verdict(project_root, slug, version=2, verdict="GO")
+    _write_verdict(project_root, slug, version=3, verdict="VERIFIED")
+
+
+def test_finalization_target_paths_for_verified_returns_approved_paths(auth_module, tmp_path):
+    """DELIB-WI4837-AUTOMATIC-PARITY-20260707: a terminal-VERIFIED thread yields
+    the GO'd proposal's target_paths for finalization staging clearance."""
+    _write_verified_thread(
+        tmp_path,
+        "verified-fixture",
+        target_paths=["scripts/implementation_authorization.py", "scripts/implementation_start_gate.py"],
+    )
+
+    result = auth_module.finalization_target_paths_for_verified(tmp_path, "verified-fixture")
+
+    assert result == [
+        "scripts/implementation_authorization.py",
+        "scripts/implementation_start_gate.py",
+    ]
+
+
+def test_finalization_target_paths_for_verified_fails_closed_when_not_terminal(auth_module, tmp_path):
+    """GOV-FILE-BRIDGE-AUTHORITY-001: a latest-GO (non-terminal) thread fails
+    closed -- finalization clearance requires terminal VERIFIED."""
+    _write_proposal(tmp_path, "go-only", version=1, target_paths=["scripts/sample.py"])
+    _write_verdict(tmp_path, "go-only", version=2, verdict="GO")
+
+    with pytest.raises(auth_module.AuthorizationError, match="terminal VERIFIED"):
+        auth_module.finalization_target_paths_for_verified(tmp_path, "go-only")
+
+
+def test_finalization_target_paths_for_verified_fails_closed_post_go_no_go(auth_module, tmp_path):
+    """A post-GO NO-GO (resumable, not terminal) fails closed for finalization."""
+    _write_proposal(tmp_path, "resumable", version=1, target_paths=["scripts/sample.py"])
+    _write_verdict(tmp_path, "resumable", version=2, verdict="GO")
+    _write_verdict(tmp_path, "resumable", version=3, verdict="NO-GO")
+
+    with pytest.raises(auth_module.AuthorizationError, match="terminal VERIFIED"):
+        auth_module.finalization_target_paths_for_verified(tmp_path, "resumable")
+
+
+def test_finalization_target_paths_for_verified_fails_closed_when_no_go(auth_module, tmp_path):
+    """PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001: a chain with no GO fails
+    closed -- no approved proposal means no approved target_paths."""
+    _write_proposal(tmp_path, "new-only", version=1, target_paths=["scripts/sample.py"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="requires a GO"):
+        auth_module.finalization_target_paths_for_verified(tmp_path, "new-only")
+
+
+def test_finalization_target_paths_for_verified_fails_closed_missing_target_paths(auth_module, tmp_path):
+    """GOV-SOURCE-OF-TRUTH-FRESHNESS-001: a terminal-VERIFIED thread whose GO'd
+    proposal declares no target_paths fails closed (no approved path set)."""
+    bridge = tmp_path / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "no-targets.md").write_text(
+        "NEW\n\nauthor_session_context_id: fixture-proposal-no-targets\n\n"
+        "# Fixture proposal without target_paths\n\n"
+        "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001 - bridge protocol.\n",
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, "no-targets", version=2, verdict="GO")
+    _write_verdict(tmp_path, "no-targets", version=3, verdict="VERIFIED")
+
+    with pytest.raises(auth_module.AuthorizationError):
+        auth_module.finalization_target_paths_for_verified(tmp_path, "no-targets")
+
+
+def test_path_authorized_by_target_paths_exact_and_glob(auth_module):
+    """The raw-target_paths authorization mirrors packet path_authorized semantics."""
+    assert auth_module.path_authorized_by_target_paths(["scripts/sample.py"], "scripts/sample.py")
+    assert auth_module.path_authorized_by_target_paths(["scripts/**"], "scripts/nested/deep.py")
+    assert not auth_module.path_authorized_by_target_paths(["scripts/sample.py"], "scripts/other.py")
+    assert not auth_module.path_authorized_by_target_paths([], "scripts/sample.py")
+
+
 def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_module, tmp_path):
     """T12 -- end-to-end: a GO'd proposal using the `## target_paths` heading
     form (not the inline JSON) yields a valid authorization packet."""

@@ -1646,3 +1646,144 @@ def test_impl_start_gate_genuine_redirect_still_mutating() -> None:
     assert gate._is_mutating_command("echo data > out.txt") is True
     assert gate._is_mutating_command("echo data>>out.txt") is True
     assert gate._is_mutating_command("Set-Content -Path scripts/sample.py -Value x") is True
+
+
+# ---------------------------------------------------------------------------
+# WI-4837: post-VERIFIED finalization staging clearance (automatic parity per
+# DELIB-WI4837-AUTOMATIC-PARITY-20260707). A `git add` of a terminal-VERIFIED
+# thread's own approved target_paths is cleared; ordinary mutation stays blocked.
+# ---------------------------------------------------------------------------
+
+
+def _write_verified_thread(
+    root: Path,
+    *,
+    bridge_id: str = "verified-impl",
+    target_paths: list[str] | None = None,
+) -> None:
+    """Build a terminal-VERIFIED chain: NEW at -001, GO at -002, VERIFIED at -003."""
+    bridge = root / "bridge"
+    bridge.mkdir(exist_ok=True)
+    (bridge / f"{bridge_id}-001.md").write_text(
+        _proposal(bridge_id=bridge_id, target_paths=target_paths), encoding="utf-8"
+    )
+    (bridge / f"{bridge_id}-002.md").write_text(_go_verdict_body(bridge_id), encoding="utf-8")
+    (bridge / f"{bridge_id}-003.md").write_text(
+        "VERIFIED\n\nauthor_session_context_id: fixture-verified-session\n\n# Verdict\n",
+        encoding="utf-8",
+    )
+
+
+def _git_add_payload(root: Path, command: str, session_id: str = "session-1") -> dict[str, object]:
+    return {
+        "cwd": str(root),
+        "session_id": session_id,
+        "tool_name": "bash",
+        "tool_input": {"command": command},
+    }
+
+
+def test_post_verified_finalization_git_add_approved_path_allowed(tmp_path: Path) -> None:
+    """DELIB-WI4837-AUTOMATIC-PARITY-20260707: `git add` of a terminal-VERIFIED
+    thread's own approved target path is cleared (no per-instance owner waiver),
+    identified by the session's work-intent claim."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(_git_add_payload(tmp_path, "git add scripts/sample.py"))
+
+    assert result == {}
+
+
+def test_post_verified_finalization_git_add_multiple_approved_paths_allowed(tmp_path: Path) -> None:
+    """Every staged target inside approved target_paths is cleared together."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(
+        _git_add_payload(tmp_path, "git add scripts/sample.py platform_tests/scripts/test_sample.py")
+    )
+
+    assert result == {}
+
+
+def test_post_verified_finalization_git_add_outside_target_paths_blocked(tmp_path: Path) -> None:
+    """GOV-WORK-TREE-HYGIENE-001: a staged path outside the approved target_paths
+    is not cleared; it falls through to the fail-closed authorization gate."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(_git_add_payload(tmp_path, "git add scripts/other.py"))
+
+    assert result["decision"] == "block"
+
+
+def test_post_verified_finalization_mixed_targets_blocked(tmp_path: Path) -> None:
+    """A single out-of-scope target disqualifies the whole staging command."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(_git_add_payload(tmp_path, "git add scripts/sample.py scripts/other.py"))
+
+    assert result["decision"] == "block"
+
+
+def test_post_verified_finalization_broad_git_add_blocked(tmp_path: Path) -> None:
+    """A broad/whole-tree `git add -A` is not clearable (targets not enumerable)."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(_git_add_payload(tmp_path, "git add -A"))
+
+    assert result["decision"] == "block"
+
+
+def test_post_verified_finalization_chained_command_not_cleared(tmp_path: Path) -> None:
+    """GOV-WORK-TREE-HYGIENE-001: a chained command disqualifies the fast
+    finalization clearance so the protected staging falls through and is blocked."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(_git_add_payload(tmp_path, "git add scripts/sample.py; rm -rf scripts"))
+
+    assert result["decision"] == "block"
+
+
+def test_post_verified_finalization_without_work_intent_claim_blocked(tmp_path: Path) -> None:
+    """PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001: with no work-intent claim
+    identifying the thread, the clearance cannot resolve a bridge and the staging
+    is blocked."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+
+    result = gate.gate_decision(_git_add_payload(tmp_path, "git add scripts/sample.py"))
+
+    assert result["decision"] == "block"
+
+
+def test_post_verified_ordinary_mutation_still_blocked(tmp_path: Path) -> None:
+    """_validate_packet is unchanged: an ordinary (non-`git add`) mutation of an
+    approved path after terminal VERIFIED still fails closed -- the clearance
+    covers only finalization staging, not resumed implementation."""
+    _write_verified_thread(tmp_path, bridge_id="verified-impl")
+    _claim_bridge(tmp_path, "verified-impl", "session-1")
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/sample.py"))
+
+    assert result["decision"] == "block"
+
+
+def test_finalization_git_add_targets_parses_and_rejects() -> None:
+    """The staging-command parser accepts a pure `git add` of explicit paths and
+    rejects chaining, flags, whole-tree, pathspec magic, and globs."""
+    assert gate._finalization_git_add_targets("git add scripts/a.py scripts/b.py") == [
+        "scripts/a.py",
+        "scripts/b.py",
+    ]
+    assert gate._finalization_git_add_targets("git add -- scripts/a.py") == ["scripts/a.py"]
+    assert gate._finalization_git_add_targets("git add -A") is None
+    assert gate._finalization_git_add_targets("git add .") is None
+    assert gate._finalization_git_add_targets("git add scripts/*.py") is None
+    assert gate._finalization_git_add_targets("git add :/") is None
+    assert gate._finalization_git_add_targets("git add a.py && rm b") is None
+    assert gate._finalization_git_add_targets("git commit -m x") is None
+    assert gate._finalization_git_add_targets("git rm scripts/a.py") is None

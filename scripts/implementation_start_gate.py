@@ -19,7 +19,9 @@ try:
         AuthorizationError,
         canonical_project_root,
         cross_claim_path_collision_reason,
+        finalization_target_paths_for_verified,
         normalize_relative_path,
+        path_authorized_by_target_paths,
         resolve_work_intent_session_id,
         validate_targets,
         work_intent_claim_block_reason,
@@ -29,11 +31,18 @@ except ImportError:  # pragma: no cover - direct script execution path
         AuthorizationError,
         canonical_project_root,
         cross_claim_path_collision_reason,
+        finalization_target_paths_for_verified,
         normalize_relative_path,
+        path_authorized_by_target_paths,
         resolve_work_intent_session_id,
         validate_targets,
         work_intent_claim_block_reason,
     )
+
+try:
+    from scripts import bridge_work_intent_registry
+except ImportError:  # pragma: no cover - direct script execution path
+    import bridge_work_intent_registry  # type: ignore[no-redef]
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -1119,6 +1128,127 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     return [], False
 
 
+def _finalization_git_add_targets(command: str) -> list[str] | None:
+    """Return the explicit path args of a pure ``git add`` staging command.
+
+    Returns ``None`` (disqualified) unless the command is a single-stage
+    ``git add`` of explicit file paths. Any of the following disqualifies the
+    fast finalization clearance so the command falls through to the normal
+    authorization gate: multiple pipeline stages / chaining, control or
+    command-substitution markers, a non-``git add`` verb, a broad or whole-tree
+    stage (``-A`` / ``--all`` / ``-u`` / ``.`` / any flag), pathspec magic
+    (``:/``, ``:(exclude)``), glob metacharacters, unparseable tokens, or no
+    explicit path argument. This mirrors the disqualifiers named in the WI-4837
+    proposal (chained protected writes, broad reset/checkout/rm, deletion,
+    cleanup, denied git flags, unparseable targets).
+    """
+    scan_command = command or ""
+    if _has_disqualifying_control_marker(scan_command):
+        return None
+    stages = _split_pipeline_stages(scan_command)
+    if len(stages) != 1:
+        return None
+    try:
+        raw_tokens = shlex.split(stages[0], posix=False)
+    except ValueError:
+        return None
+    tokens = [token for token in (_clean_shell_token(raw) for raw in raw_tokens) if token]
+    # Skip leading VAR=value env prefixes (mirror _classify_command_verb).
+    index = 0
+    while index < len(tokens):
+        tok = tokens[index]
+        if "=" in tok and not tok.startswith("-") and "/" not in tok and "\\" not in tok:
+            index += 1
+            continue
+        break
+    relevant = tokens[index:]
+    if len(relevant) < 3 or relevant[0].lower() != "git" or relevant[1].lower() != "add":
+        return None
+    paths: list[str] = []
+    for arg in relevant[2:]:
+        if arg == "--":
+            continue
+        if arg.startswith("-"):
+            return None  # any flag (incl. -A/--all/-u/-p/--patch) disqualifies
+        if arg.startswith(":"):
+            return None  # pathspec magic (:/, :(exclude)) disqualifies
+        if arg == ".":
+            return None  # whole-tree add disqualifies
+        if any(meta in arg for meta in ("*", "?", "[", "]")):
+            return None  # glob disqualifies (targets not concretely enumerable)
+        paths.append(arg)
+    if not paths:
+        return None
+    return paths
+
+
+def _post_verified_finalization_clearance(root: Path, payload: dict[str, Any]) -> str | None:
+    """Clear a narrow post-``VERIFIED`` finalization ``git add`` staging command.
+
+    WI-4837 automatic parity (owner decision
+    ``DELIB-WI4837-AUTOMATIC-PARITY-20260707``). After a bridge thread reaches
+    terminal ``VERIFIED`` the implementation phase is closed, so ordinary
+    implementation-start packets fail closed and a Prime-side ``git add`` that
+    stages the thread's own approved paths for a recovery finalization commit is
+    blocked. This mirrors the pre-commit gate, which already clears
+    terminal-``VERIFIED`` approved paths. The clearance is granted only when ALL
+    of the following hold:
+
+    - the command is a single-stage ``git add`` of explicit file paths (no
+      chaining, substitution, flags, pathspec magic, globs, or whole-tree add);
+    - the current work-intent/session context identifies one bridge thread;
+    - that thread's latest post-GO chain state is terminal ``VERIFIED``;
+    - every staged target is inside the thread's approved proposal
+      ``target_paths``.
+
+    Returns a human-readable reason string when the clearance is granted, or
+    ``None`` to fall through to the normal authorization gate (which fails
+    closed). Never raises: any lookup failure returns ``None``.
+    """
+    data = _tool_input(payload)
+    is_shell = _tool_name(payload).lower() in {"bash", "shell_command", "shell"} or (
+        isinstance(data, dict) and "command" in data
+    )
+    if not is_shell:
+        return None
+    command = str((data.get("command") if isinstance(data, dict) else None) or payload.get("command") or "")
+    targets = _finalization_git_add_targets(command)
+    if not targets:
+        return None
+    normalized_targets: list[str] = []
+    for target in targets:
+        cleaned = target.strip().strip("'\"`").replace("\\", "/")
+        if not cleaned or cleaned == ".":
+            return None
+        try:
+            rel = normalize_relative_path(root, cleaned)
+        except AuthorizationError:
+            return None  # target escapes project root -> fail closed
+        normalized_targets.append(rel)
+    session_id = resolve_work_intent_session_id(payload)
+    if not session_id:
+        return None
+    try:
+        bridge_id = bridge_work_intent_registry.current_claimed_bridge_id(session_id, project_root=root)
+    except Exception:  # noqa: BLE001 - registry failure must not clear the gate
+        return None
+    if not bridge_id:
+        return None
+    try:
+        approved_target_paths = finalization_target_paths_for_verified(root, bridge_id)
+    except AuthorizationError:
+        return None  # not terminal VERIFIED, or approved paths unparseable -> fall through
+    for rel in normalized_targets:
+        if not path_authorized_by_target_paths(approved_target_paths, rel):
+            return None  # a staged target is outside approved target_paths -> fall through
+    return (
+        f"post-VERIFIED finalization staging cleared for bridge {bridge_id!r}: "
+        f"staged targets {sorted(normalized_targets)} are all inside the approved "
+        "terminal-VERIFIED proposal target_paths "
+        "(automatic parity per DELIB-WI4837-AUTOMATIC-PARITY-20260707)."
+    )
+
+
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     root = _project_root(payload)
     paths, mutating = changed_paths(payload)
@@ -1151,6 +1281,22 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "emergency-bridge-repair",
             json.dumps(payload, sort_keys=True),
             "owner-authorized emergency bridge repair exemption",
+            protected,
+        )
+        return {}
+    # WI-4837: post-VERIFIED finalization staging clearance (automatic parity per
+    # DELIB-WI4837-AUTOMATIC-PARITY-20260707). A narrow `git add` of the thread's
+    # own approved target_paths, on a terminal-VERIFIED chain identified by the
+    # session's work-intent claim, is cleared here so the finalization commit can
+    # stage its verified paths. This runs BEFORE validate_targets (which fails
+    # closed for terminal VERIFIED) and leaves _validate_packet unchanged:
+    # ordinary post-VERIFIED mutation still falls through and is blocked below.
+    finalization_reason = _post_verified_finalization_clearance(root, payload)
+    if finalization_reason is not None:
+        _record_gate_exemption(
+            "post-verified-finalization-staging",
+            json.dumps(payload, sort_keys=True),
+            finalization_reason,
             protected,
         )
         return {}
