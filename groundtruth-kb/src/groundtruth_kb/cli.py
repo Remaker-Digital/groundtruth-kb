@@ -1078,6 +1078,37 @@ def bridge_dispatch_config_set_caps_cmd(
     )
 
 
+@bridge_dispatch_config_cmd.command("set-model")
+@click.argument("harness_id")
+@click.option("--model", required=True, help="Set the budget model label for one harness overlay.")
+@click.option("--dry-run", is_flag=True, help="Preview the transaction without writing files.")
+@click.option("--defer-to-next-session", is_flag=True, help="Record a pending transaction without changing config.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_config_set_model_cmd(
+    ctx: click.Context,
+    harness_id: str,
+    model: str,
+    dry_run: bool,
+    defer_to_next_session: bool,
+    json_output: bool,
+) -> None:
+    """Set the budget model label for one harness overlay."""
+    from groundtruth_kb.bridge_dispatch_transactions import set_model
+
+    _run_dispatch_transaction(
+        ctx,
+        lambda root: set_model(
+            root,
+            harness_id,
+            model=model,
+            dry_run=dry_run,
+            defer_to_next_session=defer_to_next_session,
+        ),
+        json_output=json_output,
+    )
+
+
 @bridge_dispatch_config_cmd.command("set-rule")
 @click.argument("rule_id")
 @click.option("--required-role", "required_roles", multiple=True, help="Replace required role selectors.")

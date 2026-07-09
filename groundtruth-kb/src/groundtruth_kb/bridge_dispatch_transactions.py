@@ -194,6 +194,42 @@ def set_caps(
     )
 
 
+def set_model(
+    project_root: Path,
+    harness_id: str,
+    *,
+    model: str,
+    dry_run: bool = False,
+    defer_to_next_session: bool = False,
+) -> DispatchConfigTransactionResult:
+    """Set the ``budget.harnesses.<id>.model`` label for one harness overlay.
+
+    WI-5070: the governed budget-model transaction backing the WI-5047 stale
+    harness-D label correction. It updates only the ``model`` field of the named
+    budget harness through the audited transaction path, preserving sibling
+    budget fields (``pricing``, ``estimated_usd_per_dispatch``). Fails closed
+    (``DispatchConfigTransactionError``) for an invalid harness id, an empty
+    model value, a missing ``[budget]`` table, or a missing budget harness row.
+    It performs no eligibility, weight, cap, rule, registry-authority, or other
+    dispatcher change.
+    """
+    validated_model = _validate_model(model)
+
+    def mutate(raw: dict[str, Any]) -> dict[str, Any]:
+        harness = _require_budget_harness(raw, harness_id)
+        harness["model"] = validated_model
+        return raw
+
+    return _apply_transaction(
+        project_root,
+        "set-model",
+        {"harness_id": _validate_harness_id(harness_id), "model": validated_model},
+        mutate,
+        dry_run=dry_run,
+        defer_to_next_session=defer_to_next_session,
+    )
+
+
 def set_rule(
     project_root: Path,
     rule_id: str,
@@ -527,6 +563,17 @@ def _require_harness(raw: dict[str, Any], harness_id: str) -> dict[str, Any]:
     return harnesses[validated_id]
 
 
+def _require_budget_harness(raw: dict[str, Any], harness_id: str) -> dict[str, Any]:
+    validated_id = _validate_harness_id(harness_id)
+    budget = _budget(raw)
+    if budget is None:
+        raise DispatchConfigTransactionError("dispatch config has no [budget] table")
+    harnesses = budget.get("harnesses")
+    if not isinstance(harnesses, dict) or validated_id not in harnesses:
+        raise DispatchConfigTransactionError(f"budget harness {validated_id!r} does not exist")
+    return harnesses[validated_id]
+
+
 def _require_rule(raw: dict[str, Any], rule_id: str) -> dict[str, Any]:
     validated_id = _validate_rule_id(rule_id)
     for row in _rules(raw):
@@ -560,6 +607,13 @@ def _validate_max_items(value: int) -> int:
     if int(value) < 1:
         raise DispatchConfigTransactionError("max_items must be at least 1")
     return int(value)
+
+
+def _validate_model(value: str) -> str:
+    candidate = str(value or "").strip()
+    if not candidate:
+        raise DispatchConfigTransactionError("model must be a non-empty string")
+    return candidate
 
 
 def _validate_roles(values: tuple[str, ...]) -> tuple[str, ...]:

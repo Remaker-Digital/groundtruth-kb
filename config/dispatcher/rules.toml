@@ -25,7 +25,7 @@ pricing = "priced"
 estimated_usd_per_dispatch = 0.0
 
 [budget.harnesses.D]
-model = "deepseek-v4-pro-cloud"
+model = "kimi-k2-7-code-cloud"
 pricing = "priced"
 estimated_usd_per_dispatch = 0.0
 

@@ -1804,3 +1804,90 @@ def test_wi4789_observed_defect_regression(tmp_path: Path) -> None:
     assert status.health_status == "WARN"
     assert [row["id"] for row in status.selected_by_role["prime-builder"]] == ["A"]
     assert any("dispatch runtime failure" in f for f in status.health_findings)
+
+
+# WI-5070: governed dispatcher budget-model setter CLI verb.
+
+_BUDGET_MODEL_RULES = """\
+schema_version = 1
+selection_order = ["reviewer_precedence", "harness_id"]
+rules = []
+
+[budget]
+enabled = false
+
+[budget.harnesses.D]
+model = "deepseek-v4-pro-cloud"
+pricing = "priced"
+estimated_usd_per_dispatch = 0.0
+"""
+
+
+def _write_budget_project(root: Path) -> None:
+    _write_project(root, rules=_BUDGET_MODEL_RULES)
+    (root / "groundtruth.toml").write_text(
+        '[groundtruth]\ndb_path = "./groundtruth.db"\nproject_root = "."\n',
+        encoding="utf-8",
+    )
+
+
+def test_wi5070_set_model_cli_updates_budget_model(tmp_path: Path) -> None:
+    """DCL-DISPATCHER-CONFIG-CLI-ONLY-001: the budget model change flows through
+    `gt bridge dispatch config set-model`, not a direct TOML edit."""
+    _write_budget_project(tmp_path)
+
+    result = CliRunner().invoke(
+        gt_main,
+        [
+            "--config",
+            str(tmp_path / "groundtruth.toml"),
+            "bridge",
+            "dispatch",
+            "config",
+            "set-model",
+            "D",
+            "--model",
+            "kimi-k2-7-code-cloud",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["transaction"] == "set-model"
+    assert payload["status"] == "applied"
+    assert payload["mutated"] is True
+    rules = tomllib.loads((tmp_path / "config" / "dispatcher" / "rules.toml").read_text(encoding="utf-8"))
+    assert rules["budget"]["harnesses"]["D"]["model"] == "kimi-k2-7-code-cloud"
+    assert rules["budget"]["harnesses"]["D"]["pricing"] == "priced"
+
+
+def test_wi5070_set_model_cli_dry_run_does_not_write(tmp_path: Path) -> None:
+    """A dry-run reports the projected model without writing the config file."""
+    _write_budget_project(tmp_path)
+    config_path = tmp_path / "config" / "dispatcher" / "rules.toml"
+    before_bytes = config_path.read_bytes()
+
+    result = CliRunner().invoke(
+        gt_main,
+        [
+            "--config",
+            str(tmp_path / "groundtruth.toml"),
+            "bridge",
+            "dispatch",
+            "config",
+            "set-model",
+            "D",
+            "--model",
+            "kimi-k2-7-code-cloud",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["transaction"] == "set-model"
+    assert payload["status"] == "dry_run"
+    assert payload["mutated"] is False
+    assert config_path.read_bytes() == before_bytes

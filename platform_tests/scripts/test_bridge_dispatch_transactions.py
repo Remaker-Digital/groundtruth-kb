@@ -31,6 +31,7 @@ from groundtruth_kb.bridge_dispatch_transactions import (  # noqa: E402
     DispatchConfigTransactionError,
     add_harness,
     set_eligibility,
+    set_model,
     set_rule,
     set_weights,
 )
@@ -267,3 +268,75 @@ def test_set_rule_accepts_no_action_status_for_lo_routing(tmp_path: Path) -> Non
     rule = next(row for row in result.config["rules"] if row["id"] == "bridge-loyal-opposition-default")
     assert rule["statuses"] == ["NEW", "REVISED", "NO-ACTION"]
     assert _rule_statuses(root, "bridge-loyal-opposition-default") == ["NEW", "REVISED"]
+
+
+# WI-5070: governed dispatcher budget-model setter (backs the WI-5047 stale
+# harness-D label correction; DELIB-20260706-OLLAMA-KIMI-K2-7-CODE-CLOUD).
+
+
+def test_set_model_updates_budget_model_and_preserves_siblings(tmp_path: Path) -> None:
+    """DCL-DISPATCHER-CONFIG-CLI-ONLY-001 / ADR-CROSS-HARNESS-PARITY-001: the
+    transaction updates only the budget model field and preserves siblings."""
+    root = tmp_path / "project"
+    _seed(root)
+    before = _budget_harness(root, "D")
+    assert before["model"] == "kimi-k2-7-code-cloud"
+
+    result = set_model(root, "D", model="deepseek-v4-pro-cloud")
+
+    assert result.status == "applied"
+    assert result.mutated is True
+    after = _budget_harness(root, "D")
+    assert after["model"] == "deepseek-v4-pro-cloud"
+    assert after["pricing"] == before["pricing"]
+    assert after["estimated_usd_per_dispatch"] == before["estimated_usd_per_dispatch"]
+
+
+def test_set_model_dry_run_does_not_write(tmp_path: Path) -> None:
+    """SPEC-DISPATCHER-CONTROL-SURFACE-001: dry-run returns the projected config
+    without writing the file."""
+    root = tmp_path / "project"
+    _seed(root)
+    config_path = root / "config" / "dispatcher" / "rules.toml"
+    before_bytes = config_path.read_bytes()
+
+    result = set_model(root, "D", model="some-other-model", dry_run=True)
+
+    assert result.status == "dry_run"
+    assert result.mutated is False
+    assert result.config is not None
+    assert result.config["budget"]["harnesses"]["D"]["model"] == "some-other-model"
+    assert config_path.read_bytes() == before_bytes
+    assert _budget_harness(root, "D")["model"] == "kimi-k2-7-code-cloud"
+
+
+def test_set_model_missing_budget_harness_fails_closed(tmp_path: Path) -> None:
+    """GOV-FILE-BRIDGE-AUTHORITY-001: a missing budget harness row fails closed
+    without writing the config."""
+    root = tmp_path / "project"
+    _seed(root)
+    config_path = root / "config" / "dispatcher" / "rules.toml"
+    before_bytes = config_path.read_bytes()
+
+    with pytest.raises(DispatchConfigTransactionError, match="budget harness 'A' does not exist"):
+        set_model(root, "A", model="gpt-5.5")
+
+    assert config_path.read_bytes() == before_bytes
+
+
+def test_set_model_empty_model_fails_closed(tmp_path: Path) -> None:
+    """An empty model value fails closed."""
+    root = tmp_path / "project"
+    _seed(root)
+
+    with pytest.raises(DispatchConfigTransactionError, match="model must be a non-empty string"):
+        set_model(root, "D", model="   ")
+
+
+def test_set_model_invalid_harness_id_fails_closed(tmp_path: Path) -> None:
+    """An invalid harness id fails closed."""
+    root = tmp_path / "project"
+    _seed(root)
+
+    with pytest.raises(DispatchConfigTransactionError, match="invalid harness id"):
+        set_model(root, "not a harness", model="gpt-5.5")
