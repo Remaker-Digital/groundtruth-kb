@@ -1,0 +1,78 @@
+WITHDRAWN
+
+author_identity: prime-builder/codex
+author_harness_id: A
+author_session_context_id: 019f2955-5185-7063-9b1c-de683358bf8a
+author_model: gpt-5
+author_model_version: 5
+author_model_configuration: Codex desktop interactive Prime Builder session; stale GO owner triage
+
+bridge_kind: advisory_disposition_closure
+Document: gtkb-lo-advisory-kpi-efficacy-metrics-disposition
+Version: 003
+Author: Prime Builder (Codex, harness A)
+Date: 2026-07-04 UTC
+Responds-To: bridge/gtkb-lo-advisory-kpi-efficacy-metrics-disposition-002.md
+Project Authorization: PAUTH-PROJECT-GTKB-LO-ADVISORY-ROUTING-LO-ADVISORY-ROUTING-BOUNDED-IMPLEMENTATION-2026-06-23
+Project Authorization Owner Decision: DELIB-20265586
+Owner Withdrawal Decision: DELIB-20260704-WITHDRAW-GTKB-LO-ADVISORY-KPI-EFFICACY-METRICS-DISPOSITION-GO
+Project: PROJECT-GTKB-LO-ADVISORY-ROUTING
+Work Item: WI-3408
+target_paths: ["bridge/gtkb-lo-advisory-kpi-efficacy-metrics-disposition-003.md"]
+allowed_mutation_classes: ["bridge_status_closure"]
+implementation_scope: none_withdraw_stale_go
+requires_review: false
+requires_verification: false
+kb_mutation_in_scope: true
+formal_artifact_mutation_in_scope: false
+owner_input_required: false
+
+---
+
+# WITHDRAWN - KPI and Efficacy Metrics Suite Advisory Disposition
+
+## Summary
+
+Owner decision `DELIB-20260704-WITHDRAW-GTKB-LO-ADVISORY-KPI-EFFICACY-METRICS-DISPOSITION-GO` withdraws the stale latest GO for this advisory-disposition thread.
+
+Prime Builder's original disposition classified WI-3408 as `adopted_covered`: the source advisory's core read-only measurement capability is already covered by the `gtkb-benchmarks` skill and benchmark glossary contract, while residual dashboard-KPI instrumentation remains tracked under `GTKB-DASHBOARD-002`. Loyal Opposition's `GO` in `-002.md` confirmed that terminal classification and did not authorize source, test, database, formal-artifact, release, deployment, credential, or new work-item implementation.
+
+This entry closes the thread as an audit/disposition artifact so it no longer remains latest-GO Prime-actionable.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001` - this closure preserves the append-only numbered bridge file chain and records the owner disposition in the canonical bridge audit surface.
+- `DCL-ADVISORY-ROUTING-001` - advisory input is routed through Prime disposition; this entry records the terminal owner disposition after LO confirmed `adopted_covered`.
+- `SPEC-ADVISORY-REPORT-TEMPLATE-001` - the source report remains advisory input, not implementation authority.
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` - this owner decision is preserved as durable governance context rather than lost in chat.
+
+## Owner Decisions / Input
+
+- `DELIB-20265586` - owner authorized bounded implementation for the advisory-routing snapshot member work items.
+- `DELIB-20260704-WITHDRAW-GTKB-LO-ADVISORY-KPI-EFFICACY-METRICS-DISPOSITION-GO` - owner selected `Withdraw stale GO` for this thread during stale-GO triage.
+
+## Prior Bridge Chain
+
+- `bridge/gtkb-lo-advisory-kpi-efficacy-metrics-disposition-001.md` - Prime Builder disposition proposal for WI-3408; classified the advisory as `adopted_covered` and requested no implementation.
+- `bridge/gtkb-lo-advisory-kpi-efficacy-metrics-disposition-002.md` - Loyal Opposition GO confirming the classification.
+
+## Withdrawal Rationale
+
+The latest GO is stale because it is terminal in practice: it approves no implementation and confirms only that the advisory is adopted/covered by the existing benchmark skill, glossary contract, and dashboard backlog. Leaving the thread at latest `GO` causes Prime Builder queue ambiguity and makes a non-implementation disposition look implementation-actionable.
+
+## Implementation Impact
+
+No implementation is authorized or performed by this withdrawal. The only changes are:
+
+- Deliberation Archive owner-decision capture for the withdrawal decision.
+- This append-only bridge status closure file.
+
+## Verification
+
+- Owner decision was captured as `DELIB-20260704-WITHDRAW-GTKB-LO-ADVISORY-KPI-EFFICACY-METRICS-DISPOSITION-GO`.
+- Work-intent claim was acquired for this thread before appending the closure.
+- After this file is written, the expected latest status is `WITHDRAWN` at version 003.
+
+## Result
+
+Thread withdrawn. No Prime implementation remains.
