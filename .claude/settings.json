@@ -7,27 +7,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-before-code.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-before-code.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/kb-not-markdown.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/kb-not-markdown.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-gate.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-gate.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/credential-scan.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/credential-scan.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/scanner-safe-writer.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/scanner-safe-writer.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/formal-artifact-approval-gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/formal-artifact-approval-gate.py\"",
             "timeout": 5
           }
         ]
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/document_author_provenance_gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/document_author_provenance_gate.py\"",
             "timeout": 5
           }
         ]
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
             "timeout": 5
           }
         ]
@@ -57,12 +57,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/lo-file-safety-gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/lo-file-safety-gate.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/implementation-start-gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/implementation-start-gate.py\"",
             "timeout": 5
           }
         ]
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/directive-enforcement-claude-adapter.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/directive-enforcement-claude-adapter.py\"",
             "timeout": 5
           }
         ]
@@ -82,27 +82,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-compliance-gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-compliance-gate.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-proposal-wi-id-collision-gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-proposal-wi-id-collision-gate.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/narrative-artifact-approval-gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/narrative-artifact-approval-gate.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/code-quality-baseline-proposal-check.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/code-quality-baseline-proposal-check.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/dispatch_blackbox_gate.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/dispatch_blackbox_gate.py\"",
             "timeout": 5
           }
         ]
@@ -112,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/sot-read-discipline.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/sot-read-discipline.py\"",
             "timeout": 5
           }
         ]
@@ -123,15 +123,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\" --startup-service \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --harness-name claude",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start_dispatch.py\" --startup-service \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --harness-name claude",
             "timeout": 60
           }
         ]
@@ -140,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
           }
         ]
       }
@@ -150,15 +150,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-tracker.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-tracker.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\"",
             "timeout": 5
           }
         ]
@@ -167,7 +167,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\""
           }
         ]
       },
@@ -175,7 +175,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-capture.py\""
           }
         ]
       },
@@ -184,7 +184,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 10
           }
         ]
@@ -194,7 +194,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 10
           }
         ]
@@ -205,32 +205,32 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode stop",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/bridge_verified_backlog_reconciler.py\" --apply --quiet --project-root \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/advisory-router-scan.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/advisory-router-scan.py\"",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/advisory_grilling_gate_lint.py\" --stop-hook",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/advisory_grilling_gate_lint.py\" --stop-hook",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/auto_finalize_sweep.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/auto_finalize_sweep.py\"",
             "timeout": 15
           }
         ]
@@ -241,49 +241,49 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/workstream-focus.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-gate.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/delib-search-gate.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode user-prompt-submit",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/owner-decision-tracker.py\" --mode user-prompt-submit",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-axis-2-surface.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/bridge-axis-2-surface.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-classifier.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-classifier.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/glossary-expansion.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/glossary-expansion.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/project-completion-surface.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/project-completion-surface.py\"",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-topic-envelope-router.py\"",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-topic-envelope-router.py\"",
             "timeout": 5
           }
         ]
@@ -292,7 +292,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake-classifier.py\""
           }
         ]
       },
@@ -300,7 +300,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/gov09-capture.py\""
           }
         ]
       }
