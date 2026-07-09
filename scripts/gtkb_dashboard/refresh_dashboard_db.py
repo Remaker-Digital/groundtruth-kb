@@ -1041,6 +1041,14 @@ def _write_model_to_db(
             "INSERT INTO current_metrics (metric_key, metric_label, value, status, description) VALUES (?, ?, ?, ?, ?)",
             _current_metric_rows(metrics, intelligence, release_health_findings),
         )
+        # GTKB-DORA-002: four-keys metrics derived from the authoritative
+        # deployment/incident telemetry ingested above (canonical manifests +
+        # incidents). Runs after _ingest_canonical_pipeline_manifests so
+        # canonical_deploy rows are present.
+        conn.executemany(
+            "INSERT INTO current_metrics (metric_key, metric_label, value, status, description) VALUES (?, ?, ?, ?, ?)",
+            _dora_four_keys_metric_rows(conn),
+        )
         conn.executemany(
             "INSERT INTO data_freshness (key, label, value) VALUES (?, ?, ?)",
             _data_freshness_rows(intelligence.get("data_freshness", {})),
@@ -2364,6 +2372,147 @@ def _current_metric_rows(
             "Actionable bridge/contention entries.",
         ),
         ("data_freshness", "Data Freshness", 1, "green", "Live probe freshness status."),
+    ]
+
+
+# GTKB-DORA-002: DORA four-keys consumer of the DORA-001 telemetry foundation.
+# Status is informational (the four keys are not simple good/bad counters); the
+# stat-panel color comes from the panel thresholds, not this column. A value of
+# None renders a null/annotated state per GOV-SESSION-SELF-INITIALIZATION-001 (no
+# fabricated telemetry) and the DORA-002 acceptance criteria.
+_DORA_PRESENT_STATUS = "green"
+_DORA_INSUFFICIENT_STATUS = "yellow"
+
+
+def _dora_deploy_kind_placeholders() -> tuple[str, tuple[str, ...]]:
+    """SQL ``IN`` placeholders + ordered params for authoritative deploy kinds."""
+    kinds = tuple(sorted(_DORA_DEPLOYMENT_EVENT_KINDS))
+    placeholders = ", ".join("?" for _ in kinds)
+    return placeholders, kinds
+
+
+def _dora_deployment_frequency(conn: sqlite3.Connection) -> int | None:
+    """Count authoritative deployment events (``canonical_deploy``).
+
+    Returns ``None`` when no authoritative deployment telemetry exists so the
+    dashboard renders a null/annotated state instead of a fabricated zero
+    (``_is_deployment_event`` defines the authoritative deploy kind set).
+    """
+    placeholders, kinds = _dora_deploy_kind_placeholders()
+    row = conn.execute(
+        f"SELECT COUNT(*) FROM delivery_timeline_events WHERE event_kind IN ({placeholders})",
+        kinds,
+    ).fetchone()
+    count = int(row[0]) if row and row[0] is not None else 0
+    return count if count > 0 else None
+
+
+def _dora_change_failure_rate(conn: sqlite3.Connection) -> float | None:
+    """Percent of deployed changes linked to a rollback, hotfix, or incident.
+
+    Denominator is the set of distinct ``deployable_change_id`` values on
+    authoritative deploy events; numerator is that set intersected with the
+    deploy ids referenced by rollback/hotfix linkage or incident causation.
+    Returns ``None`` when no attributable deployment telemetry exists.
+    """
+    placeholders, kinds = _dora_deploy_kind_placeholders()
+    deploy_ids = {
+        str(r[0]).strip()
+        for r in conn.execute(
+            f"SELECT deployable_change_id FROM delivery_timeline_events WHERE event_kind IN ({placeholders})",
+            kinds,
+        )
+        if str(r[0] or "").strip()
+    }
+    if not deploy_ids:
+        return None
+    reverted: set[str] = set()
+    for column in ("rollback_of_deploy_id", "hotfix_of_deploy_id"):
+        reverted |= {
+            str(r[0]).strip()
+            for r in conn.execute(f"SELECT {column} FROM delivery_timeline_events")
+            if str(r[0] or "").strip()
+        }
+    incident_ids = {
+        str(r[0]).strip() for r in conn.execute("SELECT caused_by_deploy_id FROM incidents") if str(r[0] or "").strip()
+    }
+    failed = deploy_ids & (reverted | incident_ids)
+    return round(100.0 * len(failed) / len(deploy_ids), 1)
+
+
+def _dora_mttr_hours(conn: sqlite3.Connection) -> float | None:
+    """Mean hours from incident detection to mitigation (falls back to closure).
+
+    Returns ``None`` when no incident carries both a detection timestamp and a
+    resolution timestamp, so the panel renders a null/annotated state.
+    """
+    durations: list[float] = []
+    for detected_at, mitigated_at, closed_at in conn.execute(
+        "SELECT detected_at, mitigated_at, closed_at FROM incidents"
+    ):
+        start = _timestamp_unix(detected_at)
+        end = _timestamp_unix(mitigated_at) or _timestamp_unix(closed_at)
+        if start and end and end >= start:
+            durations.append((end - start) / 3600.0)
+    if not durations:
+        return None
+    return round(sum(durations) / len(durations), 1)
+
+
+def _dora_four_keys_metric_rows(conn: sqlite3.Connection) -> list[tuple[Any, ...]]:
+    """Return the four DORA keys as ``current_metrics`` rows (GTKB-DORA-002).
+
+    Consumes the DORA-001 telemetry foundation persisted in
+    ``delivery_timeline_events`` + ``incidents``. Each metric renders a
+    null/annotated state when its underlying telemetry is insufficient, per the
+    DORA-002 acceptance criteria and ``GOV-SESSION-SELF-INITIALIZATION-001``.
+    Lead time is not yet computable because the foundation persists commit SHAs
+    (``commit_range_start`` / ``commit_range_end``) but not per-commit authored
+    timestamps; it is emitted null with an explanatory annotation rather than a
+    fabricated value.
+    """
+    deployment_frequency = _dora_deployment_frequency(conn)
+    change_failure_rate = _dora_change_failure_rate(conn)
+    mttr_hours = _dora_mttr_hours(conn)
+    lead_time_hours: float | None = None
+
+    def status_for(value: Any) -> str:
+        return _DORA_PRESENT_STATUS if value is not None else _DORA_INSUFFICIENT_STATUS
+
+    return [
+        (
+            "dora_deployment_frequency",
+            "Deployment Frequency",
+            deployment_frequency,
+            status_for(deployment_frequency),
+            "Authoritative canonical_deploy events in the retained delivery timeline "
+            "(DORA-001 foundation). Null when no deployment telemetry exists.",
+        ),
+        (
+            "dora_lead_time_hours",
+            "Lead Time for Changes (h)",
+            lead_time_hours,
+            status_for(lead_time_hours),
+            "Median hours from change to deployment. Null/annotated: the DORA-001 "
+            "timeline foundation persists commit SHAs but not per-commit authored "
+            "timestamps, so lead time is not yet computable.",
+        ),
+        (
+            "dora_change_failure_rate",
+            "Change Failure Rate (%)",
+            change_failure_rate,
+            status_for(change_failure_rate),
+            "Percent of deployed changes linked to a rollback, hotfix, or caused "
+            "incident. Null when no attributable deployment telemetry exists.",
+        ),
+        (
+            "dora_mttr_hours",
+            "MTTR (h)",
+            mttr_hours,
+            status_for(mttr_hours),
+            "Mean hours from incident detection to mitigation (falls back to "
+            "closure). Null when no resolved incidents exist.",
+        ),
     ]
 
 

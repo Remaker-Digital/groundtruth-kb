@@ -647,6 +647,30 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "Dispatcher Health Findings" in panel_titles
     assert "Bridge Actionability Findings" in panel_titles
     assert "README / Wiki Drift" in panel_titles
+    # GTKB-DORA-002: four-keys panels pinned in the generated dashboard JSON.
+    assert "DORA Four Keys (Delivery Performance)" in panel_titles
+    for _dora_title in ("Deployment Frequency", "Lead Time for Changes", "Change Failure Rate", "MTTR"):
+        assert _dora_title in panel_titles
+
+    def _flatten(panels: list[dict]) -> list[dict]:
+        out: list[dict] = []
+        for panel in panels:
+            out.append(panel)
+            out.extend(_flatten(panel.get("panels", [])))
+        return out
+
+    _panels_by_title = {panel["title"]: panel for panel in _flatten(dashboard_json["panels"])}
+    _dora_metric_keys = {
+        "Deployment Frequency": "dora_deployment_frequency",
+        "Lead Time for Changes": "dora_lead_time_hours",
+        "Change Failure Rate": "dora_change_failure_rate",
+        "MTTR": "dora_mttr_hours",
+    }
+    for _title, _metric_key in _dora_metric_keys.items():
+        _panel = _panels_by_title[_title]
+        assert _panel["type"] == "stat"
+        assert _panel["datasource"] == {"type": "frser-sqlite-datasource", "uid": "gtkb-dashboard-sqlite"}
+        assert f"metric_key = '{_metric_key}'" in _panel["targets"][0]["rawQueryText"]
     assert "start_local_dashboard.ps1" in readme_text
     assert "scripts/update_wiki_pages.py compare" in readme_text
     assert "--check" not in readme_text

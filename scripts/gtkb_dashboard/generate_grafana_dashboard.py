@@ -324,6 +324,60 @@ def _metric_query(metric_key: str) -> str:
     return f"SELECT value FROM current_metrics WHERE metric_key = '{metric_key}';"
 
 
+# GTKB-DORA-002: DORA four-keys are informational delivery-performance metrics,
+# not good/bad counters, so their stat panels use a single neutral threshold
+# step instead of the default green/yellow/red count coloring.
+_DORA_INFORMATIONAL_THRESHOLDS = {
+    "mode": "absolute",
+    "steps": [{"color": "blue", "value": None}],
+}
+
+
+def _dora_four_keys_panels(builder: PanelBuilder) -> list[dict[str, Any]]:
+    """Build the four DORA-keys stat panels (GTKB-DORA-002).
+
+    Each panel reads its value from ``current_metrics``; a null value renders a
+    null/annotated state (no fabricated telemetry). Titles and the SQLite data
+    source are pinned by the Grafana JSON tests.
+    """
+    return [
+        _stat_panel(
+            builder,
+            "Deployment Frequency",
+            _grid(0, 0, 6, 6),
+            _metric_query("dora_deployment_frequency"),
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+        _stat_panel(
+            builder,
+            "Lead Time for Changes",
+            _grid(6, 0, 6, 6),
+            _metric_query("dora_lead_time_hours"),
+            unit="h",
+            decimals=1,
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+        _stat_panel(
+            builder,
+            "Change Failure Rate",
+            _grid(12, 0, 6, 6),
+            _metric_query("dora_change_failure_rate"),
+            unit="percent",
+            decimals=1,
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+        _stat_panel(
+            builder,
+            "MTTR",
+            _grid(18, 0, 6, 6),
+            _metric_query("dora_mttr_hours"),
+            unit="h",
+            decimals=1,
+            thresholds=_DORA_INFORMATIONAL_THRESHOLDS,
+        ),
+    ]
+
+
 def build_dashboard() -> dict[str, Any]:
     builder = PanelBuilder()
     panels: list[dict[str, Any]] = []
@@ -861,6 +915,19 @@ def build_dashboard() -> dict[str, Any]:
         ),
     ]
     panels.append(_row(builder, "TAFE Observability", 73, collapsed=True, panels=tafe_details))
+
+    # GTKB-DORA-002: DORA four-keys delivery-performance panels. Appended as a
+    # collapsed detail row (matching the TAFE convention) so the existing
+    # top-of-dashboard panel order is unchanged.
+    panels.append(
+        _row(
+            builder,
+            "DORA Four Keys (Delivery Performance)",
+            74,
+            collapsed=True,
+            panels=_dora_four_keys_panels(builder),
+        )
+    )
 
     return {
         "annotations": {
