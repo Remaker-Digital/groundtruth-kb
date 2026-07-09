@@ -316,6 +316,41 @@ def _read_first_prompt_line() -> str | None:
     return raw or None
 
 
+def _read_session_start_source() -> str | None:
+    """Return the SessionStart hook input ``source`` field, or None.
+
+    WI-5083: Claude Code's SessionStart hook delivers a JSON payload on stdin
+    whose ``source`` field distinguishes a genuinely-fresh start (``startup``)
+    from a mid-session continuation (``resume`` / ``compact``) or context clear
+    (``clear``). The startup service consumes this (via ``--session-start-source``)
+    to avoid re-arming the startup-input gate on a mid-session boundary.
+
+    Fail-soft in every branch: a read/parse problem, a tty stdin (manual/test
+    invocation), or a payload without a string ``source`` all yield ``None``,
+    which the startup service treats as a genuinely-fresh start -- preserving
+    pre-WI-5083 behavior. Only the NORMAL_STARTUP / SPOOF_FALLBACK path reads
+    this; the auto-dispatch path returns earlier and never calls it.
+    """
+    try:
+        stream = sys.stdin
+        if stream is None or stream.isatty():
+            return None
+        raw = stream.read()
+    except (OSError, ValueError):
+        return None
+    if not raw or not raw.strip():
+        return None
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if isinstance(payload, dict):
+        source = payload.get("source")
+        if isinstance(source, str) and source.strip():
+            return source.strip()
+    return None
+
+
 def _role_modes_from_field(raw_role: object) -> frozenset[str]:
     if isinstance(raw_role, str):
         labels = [raw_role]
@@ -732,6 +767,13 @@ def main() -> int:
         "--harness-id",
         _persistent_harness_id(),
     ]
+    # WI-5083: thread the SessionStart 'source' so the startup service can skip
+    # re-arming the startup-input gate on a mid-session continuation. Read only
+    # on this normal-startup path (the auto-dispatch path returned above) and
+    # passed as a CLI arg. Absent source => arg omitted => treated as fresh.
+    session_start_source = _read_session_start_source()
+    if session_start_source:
+        command += ["--session-start-source", session_start_source]
     try:
         env = dict(os.environ)
         env["GTKB_STARTUP_REQUESTED_AT"] = request_started_at

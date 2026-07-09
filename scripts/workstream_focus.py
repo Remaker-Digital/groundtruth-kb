@@ -112,6 +112,21 @@ STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
 STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
 STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
 STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 2.0
+# WI-5083: SessionStart 'source' values that mark a mid-session continuation
+# (resume/compact). A startup-input gate armed under one of these is never a
+# legitimate fresh-start relay window. Duplicated (not imported) in
+# scripts/session_self_initialization.py and
+# .codex/gtkb-hooks/session_wrapup_trigger_dispatch.py to keep each hot path
+# import-light; a parity test asserts the copies stay equal.
+_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
+
+
+def _armed_source_is_session_continuation(state: dict[str, Any]) -> bool:
+    """WI-5083: True when the lifecycle-guard state records that the current
+    startup-input gate was armed under a mid-session continuation source."""
+    return str(state.get("armed_source") or "").strip().lower() in _SESSION_CONTINUATION_SOURCES
+
+
 HARNESS_LIFECYCLE_GUARDS = {
     "codex": GTKB_HARNESS_STATE_ROOT / "codex" / "session-lifecycle-guard.json",
     "claude": GTKB_HARNESS_STATE_ROOT / "claude" / "session-lifecycle-guard.json",
@@ -237,6 +252,18 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_PREFIXES = (
     ".codex/",
     ".groundtruth/",
     "bridge/",
+    # WI-5100: GT-KB platform config subdirs are governance surfaces, not
+    # application product. classify_root matches governance prefixes BEFORE
+    # the blanket ``config/`` APPLICATION_PREFIXES entry, so carving these out
+    # lets GT-KB-subject sessions edit platform config (dispatcher rules,
+    # governance preflight configs, SoT registry, agent-control config, etc.).
+    # Any ``config/<other>`` path still falls through to application_product.
+    "config/agent-control/",
+    "config/dispatcher/",
+    "config/governance/",
+    "config/harness-parity/",
+    "config/project-templates/",
+    "config/registry/",
     "docs/gtkb-dashboard/",
     "scripts/gtkb_dashboard/",
     "independent-progress-assessments/",
@@ -1986,6 +2013,22 @@ def _clear_startup_response_pending_for_followup(project_root: Path | None = Non
 def _startup_response_pending(project_root: Path | None = None) -> bool:
     state = _read_lifecycle_guard(project_root)
     if state.get("startup_response_pending") is not True:
+        return False
+    # WI-5083 belt-and-suspenders: a gate armed under a mid-session continuation
+    # source (resume/compact) is never a genuine fresh-start await. If such an
+    # arm ever leaks through (e.g., a harness/SessionStart path that did not
+    # thread the source), clear it and do not block. Fix (a) prevents the
+    # continuation arm at the source, so this branch is defense in depth.
+    if _armed_source_is_session_continuation(state):
+        state.update(
+            {
+                "startup_response_pending": False,
+                "stale_startup_response_pending_cleared": True,
+                "stale_startup_response_pending_cleared_at": _now_iso(),
+                "stale_startup_response_pending_cleared_reason": "session_continuation_armed_source",
+            }
+        )
+        _write_lifecycle_guard(state, project_root)
         return False
     started_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
     if started_at is None:

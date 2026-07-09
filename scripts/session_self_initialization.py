@@ -7291,12 +7291,32 @@ def _startup_guard_id() -> str:
     return os.environ.get("GTKB_STARTUP_GUARD_ID") or _utc_now_iso()
 
 
+# WI-5083: SessionStart 'source' values that mark a mid-session continuation
+# (resume/compact). On these the startup-input gate MUST NOT be (re-)armed: it
+# is cleared only by a subsequent UserPromptSubmit, so a mid-session re-arm
+# followed by a tool call / AUQ answer (neither a UserPromptSubmit) would leave
+# the gate armed and spuriously block tool use. Duplicated (not imported) in
+# scripts/workstream_focus.py and .codex/gtkb-hooks/session_wrapup_trigger_dispatch.py
+# to keep each hot path import-light; a parity test asserts the copies stay
+# equal (mirrors the existing _SESSION_ROLE_MARKER_NAME duplicate-with-parity
+# pattern already used by session_start_dispatch_core.py).
+_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
+
+
+def _is_session_continuation_source(session_start_source: str | None) -> bool:
+    """WI-5083: True when the threaded SessionStart source denotes a mid-session
+    continuation (resume/compact). Absent / unknown / 'startup' / 'clear' all
+    read as fresh (pre-WI-5083 behavior)."""
+    return (session_start_source or "").strip().lower() in _SESSION_CONTINUATION_SOURCES
+
+
 def _arm_startup_interaction_guard(
     path: Path,
     guard_id: str,
     *,
     suppress_next_wrapup: bool,
     current_subject: str | None = None,
+    armed_source: str | None = None,
 ) -> None:
     state = _read_lifecycle_guard(path)
     if (
@@ -7311,6 +7331,9 @@ def _arm_startup_interaction_guard(
     update: dict[str, Any] = {
         "armed_at": _utc_now_iso(),
         "armed_reason": "startup_first_owner_prompt_must_be_discarded",
+        # WI-5083: record which SessionStart source armed the gate so the
+        # readers can treat a continuation-armed gate as stale (fix b).
+        "armed_source": armed_source or "startup",
         "discard_next_user_prompt": True,
         "startup_prompt_discarded": False,
         "startup_response_pending": False,
@@ -7325,6 +7348,30 @@ def _arm_startup_interaction_guard(
         update["current_subject"] = current_subject
     state.update(update)
     _write_lifecycle_guard(path, state)
+
+
+def _maybe_arm_startup_interaction_guard(
+    path: Path,
+    guard_id: str,
+    *,
+    suppress_next_wrapup: bool,
+    current_subject: str | None = None,
+    session_start_source: str | None = None,
+) -> bool:
+    """WI-5083: arm the startup-input gate unless this SessionStart is a
+    mid-session continuation (resume/compact). Returns True if armed, False if
+    skipped. A skipped arm leaves any prior gate state untouched, so a session
+    that already consumed its fresh-start gate is not spuriously re-armed."""
+    if _is_session_continuation_source(session_start_source):
+        return False
+    _arm_startup_interaction_guard(
+        path,
+        guard_id,
+        suppress_next_wrapup=suppress_next_wrapup,
+        current_subject=current_subject,
+        armed_source=(session_start_source or "").strip().lower() or "startup",
+    )
+    return True
 
 
 def _consume_startup_wrapup_guard(path: Path) -> bool:
@@ -7447,6 +7494,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip startup archival/pruning of legacy VERIFIED bridge compatibility-view entries.",
     )
+    parser.add_argument(
+        "--session-start-source",
+        default=None,
+        help=(
+            "SessionStart hook 'source' (startup/resume/compact/clear) threaded "
+            "from the SessionStart dispatcher. WI-5083: 'resume'/'compact' mark "
+            "a mid-session continuation, so the startup-input gate is NOT "
+            "re-armed; absent/'startup'/'clear' is a genuinely-fresh start."
+        ),
+    )
     args = parser.parse_args(argv)
     if not args.project_root.is_absolute():
         # Per bridge/session-self-init-project-root-path-doubling-fix-2026-04-27-004.md (GO):
@@ -7559,11 +7616,15 @@ def main(argv: list[str] | None = None) -> int:
             )
         except Exception:
             current_subject_for_guard = None
-        _arm_startup_interaction_guard(
+        # WI-5083: skip arming on a mid-session continuation (resume/compact) so
+        # the startup-input gate is not spuriously re-armed after the session
+        # already consumed its fresh-start gate.
+        _maybe_arm_startup_interaction_guard(
             lifecycle_guard_path,
             _startup_guard_id(),
             suppress_next_wrapup=role_profile != "loyal-opposition",
             current_subject=current_subject_for_guard,
+            session_start_source=args.session_start_source,
         )
 
     if args.emit_wrapup and not args.force_wrapup and _consume_startup_wrapup_guard(lifecycle_guard_path):

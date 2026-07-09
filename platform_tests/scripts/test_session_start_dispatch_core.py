@@ -17,6 +17,8 @@ Spec linkage (per the GO'd proposal -003 verification plan):
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import sys
 from pathlib import Path
 
@@ -85,3 +87,39 @@ def test_timeout_non_positive_falls_back(monkeypatch, value) -> None:
     module = _load_module()
     monkeypatch.setenv(module.STARTUP_SERVICE_TIMEOUT_ENV, value)
     assert module._startup_service_timeout_seconds() == pytest.approx(150.0)
+
+
+def test_read_session_start_source_extracts_source(monkeypatch) -> None:
+    module = _load_module()
+    stream = io.StringIO(json.dumps({"source": "resume", "hook_event_name": "SessionStart"}))
+    stream.isatty = lambda: False  # type: ignore[method-assign]
+    monkeypatch.setattr(module.sys, "stdin", stream)
+    assert module._read_session_start_source() == "resume"
+
+
+def test_read_session_start_source_none_when_source_absent(monkeypatch) -> None:
+    module = _load_module()
+    stream = io.StringIO(json.dumps({"hook_event_name": "SessionStart"}))
+    stream.isatty = lambda: False  # type: ignore[method-assign]
+    monkeypatch.setattr(module.sys, "stdin", stream)
+    assert module._read_session_start_source() is None
+
+
+def test_read_session_start_source_none_on_tty_or_empty(monkeypatch) -> None:
+    module = _load_module()
+    tty = io.StringIO("")
+    tty.isatty = lambda: True  # type: ignore[method-assign]
+    monkeypatch.setattr(module.sys, "stdin", tty)
+    assert module._read_session_start_source() is None
+    empty = io.StringIO("")
+    empty.isatty = lambda: False  # type: ignore[method-assign]
+    monkeypatch.setattr(module.sys, "stdin", empty)
+    assert module._read_session_start_source() is None
+
+
+def test_read_session_start_source_none_on_bad_json(monkeypatch) -> None:
+    module = _load_module()
+    bad = io.StringIO("not json{")
+    bad.isatty = lambda: False  # type: ignore[method-assign]
+    monkeypatch.setattr(module.sys, "stdin", bad)
+    assert module._read_session_start_source() is None

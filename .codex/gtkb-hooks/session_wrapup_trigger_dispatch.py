@@ -143,12 +143,23 @@ def _lifecycle_guard_path() -> Path:
     return PROJECT_ROOT / "harness-state" / HARNESS_NAME / "session-lifecycle-guard.json"
 
 
+# WI-5083: SessionStart 'source' values that mark a mid-session continuation
+# (resume/compact). Kept in sync (parity test) with the same-named constant in
+# scripts/workstream_focus.py and scripts/session_self_initialization.py.
+_SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
+
+
 def _startup_input_gate_active() -> bool:
     try:
         state = json.loads(_lifecycle_guard_path().read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return False
     if not isinstance(state, dict):
+        return False
+    # WI-5083 belt-and-suspenders: a gate armed under a mid-session continuation
+    # source is never a legitimate fresh-start relay window; treat it as
+    # inactive rather than standing the topic router / wrap-trigger down.
+    if str(state.get("armed_source") or "").strip().lower() in _SESSION_CONTINUATION_SOURCES:
         return False
     return state.get("discard_next_user_prompt") is True or state.get("startup_response_pending") is True
 

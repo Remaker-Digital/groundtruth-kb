@@ -975,6 +975,28 @@ def test_classify_root_4_categories(tmp_path, monkeypatch) -> None:
     assert module.classify_root("README.md", REPO_ROOT) == module.ROOT_NEUTRAL
 
 
+def test_classify_root_config_platform_carveout() -> None:
+    # WI-5100: GT-KB platform config/ subdirs are governance surfaces, not
+    # application product, so GT-KB-subject sessions can edit them. classify_root
+    # matches governance prefixes BEFORE the blanket config/ APPLICATION_PREFIXES
+    # entry, so these carve-outs win.
+    module = _load_module()
+    platform_config_files = (
+        "config/agent-control/harness-capability-registry.toml",
+        "config/agent-control/SESSION-STARTUP-INDEX.md",
+        "config/dispatcher/rules.toml",
+        "config/governance/spec-applicability.toml",
+        "config/harness-parity/example.toml",
+        "config/project-templates/example.toml",
+        "config/registry/sot-artifacts.toml",
+    )
+    for path_text in platform_config_files:
+        assert module.classify_root(path_text, REPO_ROOT) == module.ROOT_CURRENT_REPO_BRIDGE_OR_GOVERNANCE, path_text
+    # Carve-out precision: a config/ path OUTSIDE the platform subdirs still
+    # classifies as application_product (the blanket config/ fallback preserved).
+    assert module.classify_root("config/app-settings.toml", REPO_ROOT) == module.ROOT_APPLICATION_PRODUCT
+
+
 def test_application_subject_blocks_gtkb_product_write(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
@@ -1930,3 +1952,67 @@ def test_startup_gate_no_self_heal_on_fresh_consistent_cache(tmp_path, monkeypat
     assert not called
     assert cache_file.read_text(encoding="utf-8") == body_text
     assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_continuation_armed_gate_does_not_block_tool_use(tmp_path, monkeypatch) -> None:
+    """WI-5083 belt-and-suspenders: a startup-input gate armed under a
+    mid-session continuation source must not block tool use, even inside the
+    30-min pending window."""
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(guard_path))
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": False,
+                "startup_prompt_discarded": True,
+                "startup_prompt_discarded_at": module._now_iso(),  # fresh, within window
+                "startup_response_pending": True,
+                "armed_source": "resume",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.guard_tool_use(
+        {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+        REPO_ROOT,
+    )
+
+    assert response == {}
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["stale_startup_response_pending_cleared"] is True
+    assert guard_state["stale_startup_response_pending_cleared_reason"] == "session_continuation_armed_source"
+
+
+def test_fresh_armed_gate_still_blocks_within_window(tmp_path, monkeypatch) -> None:
+    """A genuine fresh-start await (armed_source=startup, within window) still
+    blocks -- WI-5083 must not weaken the legitimate startup relay guard."""
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(guard_path))
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": False,
+                "startup_prompt_discarded": True,
+                "startup_prompt_discarded_at": module._now_iso(),
+                "startup_response_pending": True,
+                "armed_source": "startup",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    response = module.guard_tool_use(
+        {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+        REPO_ROOT,
+    )
+
+    assert response["decision"] == "block"
+    assert "GTKB-STARTUP-INPUT-GATE" in response["reason"]
