@@ -5329,6 +5329,47 @@ _HARNESS_SCRATCHPAD_NEGATION_RE = re.compile(
     r"do not|does not|is not|are not|forbids?|outside the scope)\b",
     re.IGNORECASE,
 )
+_CANONICAL_AUTHORITY_CONFIG_GLOBS = (
+    "config/**/*.toml",
+    "config/**/*.json",
+    "config/**/*.yaml",
+    "config/**/*.yml",
+)
+_CANONICAL_AUTHORITY_LABEL_RE = re.compile(
+    r"\b(?:authoritative(?:[_ -]?source)?|authority|canonical(?:[_ -]?source)?|"
+    r"source[_ -]?of[_ -]?truth)\b",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_MEMORY_PATH_RE = re.compile(r"\bmemory[\\/][^\"'`\s,\]}]+", re.IGNORECASE)
+_CANONICAL_AUTHORITY_NON_AUTHORITY_RE = re.compile(
+    r"\b(?:non[_ -]?authoritative|not authoritative|not canonical|not the source of truth|"
+    r"truth comes from|canonical .* lives in|governed in-root artifacts|"
+    r"human-readable companion)\b",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_SKILL_FRONTMATTER_KEY_RE = re.compile(
+    r"^\s*(?:name|description|allowed-tools|allowed_tools|tools|type)\s*:",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_FEEDBACK_TYPE_RE = re.compile(r"^\s*type\s*:\s*feedback\s*$", re.IGNORECASE | re.MULTILINE)
+_CANONICAL_AUTHORITY_RULE_HEADING_RE = re.compile(
+    r"^\s*#{1,3}\s+(?:rule|rules|instructions?|operating rule|how to apply)\b",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_IMPERATIVE_RE = re.compile(
+    r"\b(?:MUST|NEVER|ALWAYS|REQUIRED|FORBIDDEN|Do not|Never|Always|Before|When)\b"
+)
+_CANONICAL_AUTHORITY_SOURCE_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?(?:Source|Sources|Authority)\s*:\s*(?:\*\*)?\s*(.*)$",
+    re.IGNORECASE,
+)
+_CANONICAL_AUTHORITY_DELIB_RE = re.compile(r"\bDELIB-[A-Z0-9][A-Z0-9_-]*\b", re.IGNORECASE)
+_CANONICAL_AUTHORITY_CARRIER_RE = re.compile(
+    r"\b(?:ADR|DCL|GOV|SPEC)-[A-Z0-9][A-Z0-9_-]*\b|"
+    r"\bMEMBASE-[A-Z0-9][A-Z0-9_.-]*\b|"
+    r"\bgroundtruth\.db\b|\bbridge[\\/][^\s`'\"]+",
+    re.IGNORECASE,
+)
 
 
 def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
@@ -5389,6 +5430,173 @@ def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
         status="pass",
         message=f"scratchpad non-authority boundary declared and non-regressed in {docs}",
     )
+
+
+def _check_canonical_authority_drift(target: Path) -> ToolCheck:
+    """Flag recurrence of memory/DELIB-only canonical-authority drift patterns."""
+    check_name = "Canonical authority drift guard"
+    findings: list[str] = []
+
+    findings.extend(_canonical_authority_config_findings(target))
+    findings.extend(_canonical_authority_memory_findings(target))
+    findings.extend(_canonical_authority_rule_source_findings(target))
+
+    if findings:
+        head = findings[0]
+        extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(findings)} canonical-authority drift finding(s); first: {head}{extra}",
+        )
+
+    return ToolCheck(
+        name=check_name,
+        required=True,
+        found=True,
+        status="pass",
+        message=(
+            "No active config memory-authority labels, memory rule-shaped files, or DELIB-sole rule sources found"
+        ),
+    )
+
+
+def _canonical_authority_config_findings(target: Path) -> list[str]:
+    findings: list[str] = []
+    paths: set[Path] = set()
+    for pattern in _CANONICAL_AUTHORITY_CONFIG_GLOBS:
+        paths.update(path for path in target.glob(pattern) if path.is_file())
+
+    for path in sorted(paths, key=lambda item: item.as_posix()):
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            findings.append(f"{_rel_to_target(path, target)} unreadable: {exc}")
+            continue
+        for index, line in enumerate(lines):
+            if not _CANONICAL_AUTHORITY_MEMORY_PATH_RE.search(line):
+                continue
+            if not _CANONICAL_AUTHORITY_LABEL_RE.search(line):
+                continue
+            context = "\n".join(lines[max(0, index - 2) : min(len(lines), index + 5)])
+            if _CANONICAL_AUTHORITY_NON_AUTHORITY_RE.search(context):
+                continue
+            findings.append(f"{_rel_to_target(path, target)}:{index + 1} labels memory path as authority")
+    return findings
+
+
+def _canonical_authority_memory_findings(target: Path) -> list[str]:
+    memory_dir = target / "memory"
+    if not memory_dir.is_dir():
+        return []
+
+    findings: list[str] = []
+    for path in sorted(memory_dir.glob("*.md"), key=lambda item: item.as_posix()):
+        if path.name in {"MEMORY.md", "CLAUDE_ARCHIVE.md", "pending-owner-decisions.md"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            findings.append(f"{_rel_to_target(path, target)} unreadable: {exc}")
+            continue
+        if _memory_markdown_declares_non_authority(text):
+            continue
+        if _memory_markdown_has_skill_frontmatter(text):
+            findings.append(f"{_rel_to_target(path, target)} has skill-style frontmatter")
+            continue
+        if _memory_markdown_is_rule_shaped(text):
+            findings.append(f"{_rel_to_target(path, target)} has imperative rule-shaped content")
+    return findings
+
+
+def _memory_markdown_declares_non_authority(text: str) -> bool:
+    head = "\n".join(text.splitlines()[:40])
+    return bool(
+        _CANONICAL_AUTHORITY_NON_AUTHORITY_RE.search(head) or _CANONICAL_AUTHORITY_FEEDBACK_TYPE_RE.search(head)
+    )
+
+
+def _memory_markdown_has_skill_frontmatter(text: str) -> bool:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    keys: set[str] = set()
+    for line in lines[1:25]:
+        if line.strip() == "---":
+            break
+        if not _CANONICAL_AUTHORITY_SKILL_FRONTMATTER_KEY_RE.match(line):
+            continue
+        key = line.split(":", 1)[0].strip().lower().replace("_", "-")
+        keys.add(key)
+    return "name" in keys and "description" in keys
+
+
+def _memory_markdown_is_rule_shaped(text: str) -> bool:
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if not _CANONICAL_AUTHORITY_RULE_HEADING_RE.match(line):
+            continue
+        context = "\n".join(lines[index + 1 : min(len(lines), index + 8)])
+        if _CANONICAL_AUTHORITY_IMPERATIVE_RE.search(context):
+            return True
+    return False
+
+
+def _canonical_authority_rule_source_findings(target: Path) -> list[str]:
+    rules_dir = target / ".claude" / "rules"
+    if not rules_dir.is_dir():
+        return []
+
+    findings: list[str] = []
+    for path in sorted(rules_dir.glob("*.md"), key=lambda item: item.as_posix()):
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            findings.append(f"{_rel_to_target(path, target)} unreadable: {exc}")
+            continue
+        for line_number, block in _iter_rule_source_blocks(lines):
+            if not _CANONICAL_AUTHORITY_DELIB_RE.search(block):
+                continue
+            if _CANONICAL_AUTHORITY_CARRIER_RE.search(block):
+                continue
+            if _source_block_is_delib_only(block):
+                findings.append(f"{_rel_to_target(path, target)}:{line_number} cites DELIB as sole rule authority")
+    return findings
+
+
+def _iter_rule_source_blocks(lines: list[str]) -> list[tuple[int, str]]:
+    blocks: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        match = _CANONICAL_AUTHORITY_SOURCE_LINE_RE.match(line)
+        if not match:
+            continue
+        collected = [match.group(1)]
+        for continuation in lines[index + 1 : min(len(lines), index + 5)]:
+            stripped = continuation.strip()
+            if not stripped:
+                break
+            if stripped.startswith("#"):
+                break
+            if _CANONICAL_AUTHORITY_SOURCE_LINE_RE.match(continuation):
+                break
+            collected.append(stripped)
+        blocks.append((index + 1, " ".join(collected)))
+    return blocks
+
+
+def _source_block_is_delib_only(block: str) -> bool:
+    without_delibs = _CANONICAL_AUTHORITY_DELIB_RE.sub("", block)
+    remaining = re.sub(r"[`'\";:,().\s\-/]+", "", without_delibs)
+    return not remaining
+
+
+def _rel_to_target(path: Path, target: Path) -> str:
+    try:
+        return path.relative_to(target).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 _HARNESS_EXEC_SCAN_TARGETS = (
@@ -6793,6 +7001,7 @@ def run_doctor(
         # in the doctor rather than as a silent exit-127 in dispatch logs.
         checks.append(_check_harness_launchability(target))
         checks.append(_check_harness_local_scratchpad_boundary(target))
+        checks.append(_check_canonical_authority_drift(target))
         checks.append(_check_external_harness_exec_boundary(target))
         checks.append(_check_role_set_topology_consistency(target))
         checks.append(_check_role_authority_boundary(target))
