@@ -388,6 +388,7 @@ def test_shadow_decision_shrinks_remaining_items(tmp_path: Path, monkeypatch: py
         return []
 
     monkeypatch.setattr(runtime, "_resolve_dispatch_targets", _fake_resolve)
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
 
     decisions = daemon.compute_shadow_decisions(root, max_items=1)
     lo_decisions = [d for d in decisions if d.get("role") == "loyal-opposition" and d.get("would_dispatch")]
@@ -716,6 +717,49 @@ def test_daemon_live_honors_provider_backoff_skip(tmp_path: Path, monkeypatch: p
     assert result["mode"] == "live"
     assert not spawn_calls
     assert any(d.get("reason") == "provider_failure_backoff_active" for d in result["decisions"])
+
+
+def test_daemon_live_honors_thread_reoffer_backoff_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    (root / "harness-state" / "bridge-substrate.json").write_text(
+        json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
+        encoding="utf-8",
+    )
+    _write_bridge(root, "pb-go-thread", "GO", 2)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / runtime.DISPATCH_STATE_FILENAME).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recipients": {},
+                "thread_reoffers": {
+                    "pb-go-thread": {
+                        "count": runtime.DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD,
+                        "first_offered_at": "2026-07-10T00:00:00+00:00",
+                        "last_offered_at": runtime._now_iso(),
+                        "last_status": "GO",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    spawn_calls: list[dict] = []
+
+    monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *a, **k: True)
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_harness",
+        lambda **kwargs: spawn_calls.append(kwargs) or {"launched": True},
+    )
+    result = daemon.run_tick(root)
+    assert result["mode"] == "live"
+    assert not spawn_calls
+    assert any(d.get("spawn_reason") == runtime.THREAD_REOFFER_BACKOFF_RESULT for d in result["decisions"])
+    assert any(d.get("reason") == runtime.THREAD_REOFFER_BACKOFF_RESULT for d in result["spawn_results"])
 
 
 def test_daemon_reconciles_nonzero_exit_and_falls_back_to_next_lo(
@@ -1131,16 +1175,19 @@ def _spawn_target(runtime, role_label: str, mode: str):
     )
 
 
-def _capture_worker_command(runtime, target, tmp_path: Path, monkeypatch) -> list[str]:
+def _capture_worker_command(runtime, target, tmp_path: Path, monkeypatch) -> tuple[list[str], dict[str, str]]:
     """Invoke _spawn_harness with a fake Popen; return the worker command (the
     one wrapping run_with_status.py), robust against any secondary poll spawn."""
     calls: list[tuple] = []
+    envs: list[dict[str, str]] = []
 
     class _FakeProcess:
         pid = 4242
 
     def _fake_popen(*args, **kwargs):
         calls.append(args)
+        env = kwargs.get("env")
+        envs.append(dict(env) if isinstance(env, dict) else {})
         return _FakeProcess()
 
     monkeypatch.setattr(runtime, "_count_live_dispatched_processes", lambda runs_dir: 0)
@@ -1178,12 +1225,17 @@ def _capture_worker_command(runtime, target, tmp_path: Path, monkeypatch) -> lis
     )
     for args in calls:
         if args and isinstance(args[0], list) and any("run_with_status" in str(part) for part in args[0]):
-            return list(args[0])
-    return []
+            return list(args[0]), envs[calls.index(args)]
+    return [], {}
 
 
-def _lifetime_value(command: list[str]) -> str | None:
+def _lifetime_value(runtime, command: list[str], env: dict[str, str]) -> str | None:
     if "--lifetime" not in command:
+        if command[-1:] == ["--config-env"]:
+            encoded = env.get(runtime.RUN_WITH_STATUS_CONFIG_ENV_VAR)
+            if encoded:
+                config = json.loads(runtime.base64.b64decode(encoded).decode("utf-8"))
+                return str(config.get("lifetime_seconds"))
         return None
     return command[command.index("--lifetime") + 1]
 
@@ -1769,10 +1821,12 @@ def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pyte
 
     lo_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "loyal-opposition", "lo"), tmp_path, monkeypatch)
     assert runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS == 3600
-    assert _lifetime_value(lo_cmd) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS)
+    lo_command, lo_env = lo_cmd
+    assert _lifetime_value(runtime, lo_command, lo_env) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS)
 
     pb_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "prime-builder", "pb"), tmp_path, monkeypatch)
-    assert _lifetime_value(pb_cmd) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
+    pb_command, pb_env = pb_cmd
+    assert _lifetime_value(runtime, pb_command, pb_env) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
 
 
 def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1510,6 +1510,69 @@ def test_wi5035_exit_zero_no_verdict_backoff_records_previous_failure(tmp_path: 
     assert skip["previous_launch_failed"]["matched_markers"][0]["label"] == "no_verdict_produced"
 
 
+def test_thread_reoffer_backoff_skip_suppresses_within_window() -> None:
+    trigger = _load_trigger()
+    now = trigger.dt.datetime(2026, 7, 10, 0, 0, 0, tzinfo=trigger.dt.UTC)
+    thread_reoffers = {
+        "gtkb-looping-thread": {
+            "count": trigger.DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD,
+            "first_offered_at": (now - trigger.dt.timedelta(minutes=5)).isoformat(timespec="seconds"),
+            "last_offered_at": (now - trigger.dt.timedelta(seconds=30)).isoformat(timespec="seconds"),
+            "last_status": "REVISED",
+        }
+    }
+
+    skip = trigger._thread_reoffer_backoff_skip(
+        thread_reoffers=thread_reoffers,
+        document_slug="gtkb-looping-thread",
+        status="REVISED",
+        now=now,
+    )
+
+    assert skip["reason"] == trigger.THREAD_REOFFER_BACKOFF_RESULT
+    assert skip["count"] == trigger.DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD
+    assert skip["window_seconds"] == trigger.DEFAULT_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS
+
+
+def test_thread_reoffer_record_rearms_after_window() -> None:
+    trigger = _load_trigger()
+    first = trigger.dt.datetime(2026, 7, 10, 0, 0, 0, tzinfo=trigger.dt.UTC)
+    within = first + trigger.dt.timedelta(seconds=30)
+    after = within + trigger.dt.timedelta(seconds=trigger.DEFAULT_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS + 1)
+    thread_reoffers: dict[str, object] = {}
+
+    trigger._record_thread_reoffer(thread_reoffers, "gtkb-looping-thread", "NO-GO", now=first)
+    within_record = trigger._record_thread_reoffer(thread_reoffers, "gtkb-looping-thread", "REVISED", now=within)
+    after_record = trigger._record_thread_reoffer(thread_reoffers, "gtkb-looping-thread", "REVISED", now=after)
+
+    assert within_record["count"] == 2
+    assert after_record["count"] == 1
+    assert after_record["first_offered_at"] == after.isoformat(timespec="seconds")
+
+
+def test_thread_reoffer_state_round_trips_and_prunes_terminal_threads(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "recipients": {},
+        "thread_reoffers": {
+            "gtkb-live-thread": {"count": 1, "last_status": "REVISED"},
+            "gtkb-terminal-thread": {"count": 3, "last_status": "REVISED"},
+        },
+    }
+
+    trigger._write_dispatch_state(state_dir, payload)
+    loaded = trigger._load_dispatch_state(state_dir, root)
+    thread_reoffers = loaded["thread_reoffers"]
+    trigger._prune_thread_reoffers(thread_reoffers, {"gtkb-live-thread"})
+
+    assert "gtkb-live-thread" in thread_reoffers
+    assert "gtkb-terminal-thread" not in thread_reoffers
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # T-2-dispatch-state-idempotence
 # ──────────────────────────────────────────────────────────────────────────
@@ -3405,6 +3468,36 @@ def test_reset_recipient_clears_stale_last_launch_and_signature(
     assert recipient["circuit_breaker_tripped"] is False
     assert "circuit_breaker_tripped_at" not in recipient
     assert "circuit_breaker_half_open" not in recipient
+
+
+def test_reset_recipient_clears_thread_reoffer_state(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "recipients": {
+            "loyal-opposition:A": {
+                "last_result": "launched",
+                "failure_count": 1,
+                "last_dispatched_signature": "abc123",
+            }
+        },
+        "schema_version": 1,
+        "thread_reoffers": {
+            "gtkb-looping-thread": {
+                "count": trigger.DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD,
+                "last_status": "REVISED",
+            }
+        },
+    }
+    trigger._write_dispatch_state(state_dir, state)
+
+    status, reset_count, reap_count = trigger._reset_recipient_state(state_dir, root, "loyal-opposition")
+
+    assert (status, reset_count, reap_count) == ("reset", 1, 0)
+    state = trigger._load_dispatch_state(state_dir, root)
+    assert state["thread_reoffers"] == {}
 
 
 def test_reset_recipient_reaps_stale_alive_dispatch_pid(

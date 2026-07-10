@@ -281,6 +281,9 @@ DEFAULT_DISPATCH_SUPPRESSIONS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES
 WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"
 TARGET_PATH_OVERLAP_SELECTED_REASON = "target_path_overlap_selected"
 TARGET_PATH_OVERLAP_INFLIGHT_REASON = "target_path_overlap_inflight"
+THREAD_REOFFER_BACKOFF_RESULT = "thread_reoffer_backoff_active"
+DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD = 3
+DEFAULT_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS = 3600
 # WI-4396: expected, non-actionable lease/contention suppression reasons. These
 # are normal concurrency outcomes (launched: false with a holder), NOT actionable
 # dispatch failures, so the shared writer routes them to
@@ -296,6 +299,7 @@ EXPECTED_SUPPRESSION_REASONS = frozenset(
         TARGET_PATH_OVERLAP_SELECTED_REASON,
         TARGET_PATH_OVERLAP_INFLIGHT_REASON,
         WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
+        THREAD_REOFFER_BACKOFF_RESULT,
     }
 )
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
@@ -987,6 +991,7 @@ def _reset_recipient_state(
                         reap_count += 1
         if reset_count > 0:
             state["recipients"] = recipients_state
+            state["thread_reoffers"] = {}
             _write_dispatch_state(state_dir, state)
             return ("reset", reset_count, reap_count)
         return ("not_found", 0, 0)
@@ -1184,6 +1189,22 @@ def _dispatch_retry_delay_seconds() -> int:
         "GTKB_DISPATCH_RETRY_DELAY_SECONDS",
         "OLLAMA_RETRY_DELAY_SECONDS",
         DEFAULT_DISPATCH_RETRY_DELAY_SECONDS,
+    )
+
+
+def _thread_reoffer_backoff_threshold() -> int:
+    return _env_positive_int(
+        "GTKB_THREAD_REOFFER_BACKOFF_THRESHOLD",
+        "GTKB_DISPATCH_THREAD_REOFFER_BACKOFF_THRESHOLD",
+        DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD,
+    )
+
+
+def _thread_reoffer_backoff_window_seconds() -> int:
+    return _env_positive_int(
+        "GTKB_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS",
+        "GTKB_DISPATCH_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS",
+        DEFAULT_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS,
     )
 
 
@@ -1729,7 +1750,58 @@ def _filter_prime_selected_by_work_intent(
     """Drop Prime selected entries held by a different work-intent session."""
     unheld: list[Any] = []
     held_count = 0
+    state = _load_dispatch_state(state_dir, project_root)
+    recipients_state = state.get("recipients") if isinstance(state, dict) else {}
+    if not isinstance(recipients_state, dict):
+        recipients_state = {}
+    recipient_state = recipients_state.get(recipient)
+    if not isinstance(recipient_state, dict):
+        recipient_state = {}
+    thread_reoffers = state.get("thread_reoffers") if isinstance(state, dict) else {}
+    if not isinstance(thread_reoffers, dict):
+        thread_reoffers = {}
     for item in selected:
+        item_signature = _signature([item])
+        dispatched_by_document = recipient_state.get("last_dispatched_signatures_by_document")
+        if not isinstance(dispatched_by_document, dict):
+            dispatched_by_document = {}
+        quarantined_by_document = recipient_state.get("impl_auth_quarantined_signatures_by_document")
+        if not isinstance(quarantined_by_document, dict):
+            quarantined_by_document = {}
+        signature_already_handled = (
+            recipient_state.get("last_dispatched_signature") == item_signature
+            or dispatched_by_document.get(item.document_name) == item_signature
+            or quarantined_by_document.get(item.document_name) == item_signature
+        )
+        if not signature_already_handled:
+            reoffer_skip = _thread_reoffer_backoff_skip(
+                thread_reoffers=thread_reoffers,
+                document_slug=item.document_name,
+                status=item.top_status,
+            )
+            if reoffer_skip is not None:
+                _record_dispatch_suppression(
+                    state_dir,
+                    {
+                        "ts": _now_iso(),
+                        "dispatch_id": dispatch_id,
+                        "recipient": recipient,
+                        "launched": False,
+                        "reason": THREAD_REOFFER_BACKOFF_RESULT,
+                        "signature": item_signature,
+                        "selected_count": 1,
+                        "document_names": [item.document_name],
+                        "thread_reoffer_backoff": reoffer_skip,
+                    },
+                )
+                return {
+                    "ok": False,
+                    "reason": THREAD_REOFFER_BACKOFF_RESULT,
+                    "selected": [],
+                    "held_count": held_count,
+                    "thread_reoffer_backoff": reoffer_skip,
+                }
+
         try:
             holder = current_work_intent_holder(item.document_name, project_root=project_root)
         except WorkIntentRegistryError as exc:
@@ -4605,6 +4677,7 @@ def _spawn_harness(
     max_items: int,
     dry_run: bool,
     dispatch_id: str | None = None,
+    record_thread_reoffer: bool = True,
 ) -> dict[str, Any]:
     """Fire-and-forget dispatch a harness subprocess.
 
@@ -4911,6 +4984,23 @@ def _spawn_harness(
         meta.update({"launched": True, "pid": process.pid})
         if create_time_epoch is not None:
             meta[PID_CREATE_TIME_META_KEY] = create_time_epoch
+        if record_thread_reoffer:
+            try:
+                state = _load_dispatch_state(state_dir, project_root)
+                thread_reoffers = state.get("thread_reoffers") if isinstance(state, dict) else {}
+                if not isinstance(thread_reoffers, dict):
+                    thread_reoffers = {}
+                for item in selected:
+                    _record_thread_reoffer(
+                        thread_reoffers,
+                        item.document_name,
+                        item.top_status,
+                    )
+                state["thread_reoffers"] = thread_reoffers
+                state["updated_at"] = _now_iso()
+                _write_dispatch_state(state_dir, state)
+            except Exception:
+                pass
         if budget_decision.get("enabled") and budget_decision.get("estimated_usd") is not None:
             _record_dispatch_budget_ledger(
                 state_dir,
@@ -5518,6 +5608,88 @@ def _provider_failure_backoff_skip(
     return None
 
 
+def _thread_reoffer_backoff_skip(
+    *,
+    thread_reoffers: dict[str, Any],
+    document_slug: str,
+    status: str,
+    now: dt.datetime | None = None,
+) -> dict[str, Any] | None:
+    """Return skip evidence when a bridge thread is in re-offer backoff.
+
+    This is orthogonal to provider failure backoff: it counts successful re-offer
+    cycles for a document slug even when each new bridge version changes the
+    per-recipient actionable signature.
+    """
+    record = thread_reoffers.get(document_slug)
+    if not isinstance(record, dict):
+        return None
+    try:
+        count = int(record.get("count") or 0)
+    except (TypeError, ValueError):
+        count = 0
+    threshold = _thread_reoffer_backoff_threshold()
+    if count < threshold:
+        return None
+    last_offered_at = _parse_iso_timestamp(record.get("last_offered_at"))
+    if last_offered_at is None:
+        return None
+    now_dt = now or dt.datetime.now(dt.UTC)
+    elapsed_seconds = (now_dt - last_offered_at).total_seconds()
+    window_seconds = _thread_reoffer_backoff_window_seconds()
+    if elapsed_seconds >= window_seconds:
+        return None
+    return {
+        "reason": THREAD_REOFFER_BACKOFF_RESULT,
+        "document_name": document_slug,
+        "count": count,
+        "threshold": threshold,
+        "window_seconds": window_seconds,
+        "elapsed_seconds": elapsed_seconds,
+        "last_status": record.get("last_status") or status,
+        "last_offered_at": record.get("last_offered_at"),
+    }
+
+
+def _record_thread_reoffer(
+    thread_reoffers: dict[str, Any],
+    document_slug: str,
+    status: str,
+    *,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    now_dt = now or dt.datetime.now(dt.UTC)
+    now_iso = now_dt.isoformat(timespec="seconds")
+    prior = thread_reoffers.get(document_slug)
+    prior_record = prior if isinstance(prior, dict) else {}
+    last_offered_at = _parse_iso_timestamp(prior_record.get("last_offered_at"))
+    window_seconds = _thread_reoffer_backoff_window_seconds()
+    try:
+        prior_count = int(prior_record.get("count") or 0)
+    except (TypeError, ValueError):
+        prior_count = 0
+    if last_offered_at is None or (now_dt - last_offered_at).total_seconds() >= window_seconds:
+        count = 1
+        first_offered_at = now_iso
+    else:
+        count = prior_count + 1
+        first_offered_at = str(prior_record.get("first_offered_at") or now_iso)
+    record = {
+        "count": count,
+        "first_offered_at": first_offered_at,
+        "last_offered_at": now_iso,
+        "last_status": status,
+    }
+    thread_reoffers[document_slug] = record
+    return record
+
+
+def _prune_thread_reoffers(thread_reoffers: dict[str, Any], actionable_document_names: set[str]) -> None:
+    for document_slug in list(thread_reoffers):
+        if document_slug not in actionable_document_names:
+            thread_reoffers.pop(document_slug, None)
+
+
 def _seed_provider_failure_skip_state(
     recipients_state: dict[str, Any],
     target: DispatchTarget,
@@ -5665,6 +5837,11 @@ def run_dispatch_cycle(
         if not isinstance(recipients_state, dict):
             recipients_state = {}
         recipients_state = _migrate_recipients_state_keys(recipients_state, project_root)
+        thread_reoffers = state.get("thread_reoffers") if isinstance(state, dict) else {}
+        if not isinstance(thread_reoffers, dict):
+            thread_reoffers = {}
+        actionable_document_names = {item.document_name for item in [*actionable_for_prime, *actionable_for_codex]}
+        _prune_thread_reoffers(thread_reoffers, actionable_document_names)
         _process_pending_exit_codes(recipients_state, state_dir, project_root)
         _reconcile_terminal_bridge_recipient_state(recipients_state, project_root)
 
@@ -5945,6 +6122,48 @@ def run_dispatch_cycle(
                     recipient_state["selected_count"] = len(dispatched_selected)
                     recipient_state["pending_count"] = len(dispatched_filtered)
 
+                    if dispatched_selected and prior_dispatched != dispatched_signature:
+                        first_thread = dispatched_selected[0]
+                        reoffer_skip = _thread_reoffer_backoff_skip(
+                            thread_reoffers=thread_reoffers,
+                            document_slug=first_thread.document_name,
+                            status=first_thread.top_status,
+                        )
+                        if reoffer_skip is not None:
+                            if dispatch_id is None:
+                                dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                            recipient_state["last_result"] = THREAD_REOFFER_BACKOFF_RESULT
+                            recipient_state["last_suppressed_signature"] = dispatched_signature
+                            recipient_state["thread_reoffer_backoff"] = reoffer_skip
+                            result = {
+                                "launched": False,
+                                "reason": THREAD_REOFFER_BACKOFF_RESULT,
+                                "dispatch_id": dispatch_id,
+                                "document_name": first_thread.document_name,
+                                "count": reoffer_skip["count"],
+                                "threshold": reoffer_skip["threshold"],
+                                "window_seconds": reoffer_skip["window_seconds"],
+                            }
+                            _record_dispatch_suppression(
+                                state_dir,
+                                {
+                                    "ts": _now_iso(),
+                                    "dispatch_id": dispatch_id,
+                                    "recipient": recipient,
+                                    "launched": False,
+                                    "reason": THREAD_REOFFER_BACKOFF_RESULT,
+                                    "signature": dispatched_signature,
+                                    "selected_count": len(dispatched_selected),
+                                    "pending_count": len(dispatched_filtered),
+                                    "raw_pending_count": len(items),
+                                    "document_names": [it.document_name for it in dispatched_selected],
+                                    "thread_reoffer_backoff": reoffer_skip,
+                                },
+                            )
+                            results[recipient] = result
+                            recipients_state[recipient] = recipient_state
+                            continue
+
                     if target.needed_role_label == "prime-builder" and dispatched_selected:
                         dispatch_id = _new_dispatch_id(target.dispatch_state_key)
                         work_intent_session_id = _work_intent_session_id(dispatch_id)
@@ -6064,6 +6283,48 @@ def run_dispatch_cycle(
                                 results[recipient] = result
                                 recipients_state[recipient] = recipient_state
                                 continue
+
+                            if dispatched_selected:
+                                first_thread = dispatched_selected[0]
+                                reoffer_skip = _thread_reoffer_backoff_skip(
+                                    thread_reoffers=thread_reoffers,
+                                    document_slug=first_thread.document_name,
+                                    status=first_thread.top_status,
+                                )
+                                if reoffer_skip is not None:
+                                    if dispatch_id is None:
+                                        dispatch_id = _new_dispatch_id(target.dispatch_state_key)
+                                    recipient_state["last_result"] = THREAD_REOFFER_BACKOFF_RESULT
+                                    recipient_state["last_suppressed_signature"] = dispatched_signature
+                                    recipient_state["thread_reoffer_backoff"] = reoffer_skip
+                                    result = {
+                                        "launched": False,
+                                        "reason": THREAD_REOFFER_BACKOFF_RESULT,
+                                        "dispatch_id": dispatch_id,
+                                        "document_name": first_thread.document_name,
+                                        "count": reoffer_skip["count"],
+                                        "threshold": reoffer_skip["threshold"],
+                                        "window_seconds": reoffer_skip["window_seconds"],
+                                    }
+                                    _record_dispatch_suppression(
+                                        state_dir,
+                                        {
+                                            "ts": _now_iso(),
+                                            "dispatch_id": dispatch_id,
+                                            "recipient": recipient,
+                                            "launched": False,
+                                            "reason": THREAD_REOFFER_BACKOFF_RESULT,
+                                            "signature": dispatched_signature,
+                                            "selected_count": len(dispatched_selected),
+                                            "pending_count": len(dispatched_filtered),
+                                            "raw_pending_count": len(items),
+                                            "document_names": [it.document_name for it in dispatched_selected],
+                                            "thread_reoffer_backoff": reoffer_skip,
+                                        },
+                                    )
+                                    results[recipient] = result
+                                    recipients_state[recipient] = recipient_state
+                                    continue
 
                             # Dispatch path. Covers:
                             #   - first dispatch ever
@@ -6250,6 +6511,7 @@ def run_dispatch_cycle(
                                 max_items=target_max_items,
                                 dry_run=dry_run,
                                 dispatch_id=dispatch_id,
+                                record_thread_reoffer=False,
                             )
                             if launch.get("launched") and not dry_run:
                                 _post_dispatch_poll(
@@ -6284,6 +6546,13 @@ def run_dispatch_cycle(
                                 )
                             recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                             recipient_state["last_launch"] = launch
+                            if launch.get("launched") and not dry_run and dispatched_selected:
+                                first_thread = dispatched_selected[0]
+                                recipient_state["thread_reoffer"] = _record_thread_reoffer(
+                                    thread_reoffers,
+                                    first_thread.document_name,
+                                    first_thread.top_status,
+                                )
                             if dry_run or launch.get("launched"):
                                 recipient_state["last_suppressed_signature"] = None
                                 recipient_state["last_dispatched_signature"] = dispatched_signature
@@ -6317,11 +6586,15 @@ def run_dispatch_cycle(
                 if role_label not in compat_results:
                     compat_results[role_label] = val
 
-        payload = {
-            "schema_version": 1,
-            "updated_at": _now_iso(),
-            "recipients": compat_recipients_state,
-        }
+        payload = dict(state) if isinstance(state, dict) else {}
+        payload.update(
+            {
+                "schema_version": 1,
+                "updated_at": _now_iso(),
+                "recipients": compat_recipients_state,
+                "thread_reoffers": thread_reoffers,
+            }
+        )
         _write_dispatch_state(state_dir, payload)
 
         if invocation_source == "PostToolUse":
