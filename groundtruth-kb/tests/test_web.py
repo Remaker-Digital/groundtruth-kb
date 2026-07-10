@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import pytest
 
+pytest.importorskip("fastapi")
+
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.web.app import _darken_hex, _validate_hex_color, create_app
