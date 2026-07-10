@@ -204,7 +204,13 @@ from bridge_work_intent_registry import (  # noqa: E402, I001
     release as release_work_intent,
     same_role_project_holder,
 )
-from windows_subprocess import hidden_process_popen_kwargs, no_window_subprocess_kwargs, prefer_pythonw_executable  # noqa: E402, I001
+from windows_subprocess import (  # noqa: E402, I001
+    create_private_desktop_name,
+    hidden_process_popen_kwargs,
+    no_window_subprocess_kwargs,
+    prefer_pythonw_executable,
+    private_desktop_popen_kwargs,
+)
 from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     create_authorization_packet,
@@ -221,6 +227,9 @@ CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH: tuple[str, ...] = (
 )
 CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
 CODEX_WINDOWS_SANDBOX_SETUP_STATUS = "0xc0000142"
+CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION = 2
+CODEX_NO_WINDOW_MIN_RUNS = 2
+CODEX_NO_WINDOW_MIN_COMMAND_STEPS = 3
 DISPATCHER_DISABLE_GUARD_RELATIVE_PATH: tuple[str, ...] = (
     ".gtkb-state",
     "watchdog",
@@ -4172,12 +4181,54 @@ def _codex_no_window_failure_class(payload: dict[str, Any] | None, reason: str) 
     return reason
 
 
+def _codex_no_window_run_steps(run: object) -> list[dict[str, Any]]:
+    if not isinstance(run, dict):
+        return []
+    raw_steps = run.get("command_steps")
+    if raw_steps is None:
+        raw_steps = run.get("commands")
+    if not isinstance(raw_steps, list):
+        return []
+    return [step for step in raw_steps if isinstance(step, dict)]
+
+
+def _codex_no_window_step_has_marker_proof(step: dict[str, Any]) -> bool:
+    marker = str(step.get("marker") or step.get("expected_marker") or "").strip()
+    if not marker:
+        return False
+    returncode = step.get("returncode")
+    if returncode not in {0, "0"}:
+        return False
+    if step.get("stdout_contains_marker") is True:
+        return True
+    transcript = str(step.get("transcript_preview") or step.get("stdout_preview") or step.get("stdout") or "")
+    return marker in transcript
+
+
+def _codex_no_window_schema_failure(payload: dict[str, Any]) -> str | None:
+    if payload.get("schema_version") != CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION:
+        return "codex_no_window_verification_legacy_schema"
+    runs = payload.get("runs")
+    if not isinstance(runs, list) or len(runs) < CODEX_NO_WINDOW_MIN_RUNS:
+        return "codex_no_window_verification_insufficient_run_count"
+    for run in runs:
+        steps = _codex_no_window_run_steps(run)
+        if len(steps) < CODEX_NO_WINDOW_MIN_COMMAND_STEPS:
+            return "codex_no_window_verification_insufficient_command_count"
+        if not all(_codex_no_window_step_has_marker_proof(step) for step in steps):
+            return "codex_no_window_verification_missing_marker_chain"
+    return None
+
+
 def _valid_codex_no_window_verification(project_root: Path) -> tuple[bool, dict[str, Any] | None, str]:
     payload = _load_codex_no_window_verification(project_root)
     if payload is None:
         return False, None, "missing_codex_no_window_verification"
     if payload.get("visible_window_detected") is not False:
         return False, payload, "codex_no_window_probe_detected_visible_window"
+    schema_failure = _codex_no_window_schema_failure(payload)
+    if schema_failure is not None:
+        return False, payload, schema_failure
     result = str(payload.get("result") or "").strip().lower()
     if result not in {"pass", "passed", "clean"}:
         return False, payload, "codex_no_window_probe_not_passing"
@@ -4907,7 +4958,20 @@ def _spawn_harness(
     original_command = list(command)
     command = _opaque_api_harness_command(command, project_root, env)
     worker_command_mode = "opaque_python_module" if command != original_command else "direct"
-    wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()
+    containment_mode = "default_hidden_process"
+    containment_desktop_name: str | None = None
+    if target.command_handle == "codex" and os.name == "nt":
+        containment_desktop_name = create_private_desktop_name(f"gtkb-codex-{dispatch_id}")
+        wrapper_popen_kwargs = private_desktop_popen_kwargs(
+            desktop_name=containment_desktop_name,
+            new_process_group=True,
+            detached=True,
+        )
+        containment_mode = "windows_private_desktop"
+        env["GTKB_CODEX_NO_WINDOW_CONTAINMENT"] = containment_mode
+        env["GTKB_CODEX_NO_WINDOW_DESKTOP"] = containment_desktop_name
+    else:
+        wrapper_popen_kwargs = _run_with_status_wrapper_popen_kwargs()
 
     selected = _selected_oldest_first(items, max_items)
     sig = _signature(selected)
@@ -4955,7 +5019,10 @@ def _spawn_harness(
         "worker_lifetime_role_fallback_seconds": lifetime_profile.get("role_fallback_seconds"),
         "status_wrapper_config_mode": "env",
         "worker_command_mode": worker_command_mode,
+        "worker_containment_mode": containment_mode,
     }
+    if containment_desktop_name:
+        meta["worker_containment_desktop"] = containment_desktop_name
     if lifetime_profile.get("model_hint"):
         meta["worker_lifetime_model_hint"] = lifetime_profile.get("model_hint")
     for key in (

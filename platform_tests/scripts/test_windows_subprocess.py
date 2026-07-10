@@ -45,6 +45,34 @@ def test_no_window_subprocess_kwargs_force_windows_returns_hidden_startupinfo(mo
     assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
 
 
+def test_hidden_startupinfo_can_target_private_desktop(monkeypatch) -> None:
+    monkeypatch.setattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001, raising=False)
+    monkeypatch.setattr(subprocess, "SW_HIDE", 0, raising=False)
+    monkeypatch.setattr(subprocess, "STARTUPINFO", _FakeStartupInfo, raising=False)
+
+    startupinfo = ws.hidden_startupinfo(force_windows=True, desktop="gtkb-test-desktop")
+
+    assert isinstance(startupinfo, _FakeStartupInfo)
+    assert startupinfo.lpDesktop == "gtkb-test-desktop"
+    assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+    assert startupinfo.wShowWindow == 0
+
+
+def test_private_desktop_popen_kwargs_sets_lpdesktop(monkeypatch) -> None:
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001, raising=False)
+    monkeypatch.setattr(subprocess, "SW_HIDE", 0, raising=False)
+    monkeypatch.setattr(subprocess, "STARTUPINFO", _FakeStartupInfo, raising=False)
+    monkeypatch.setattr(ws, "ensure_private_desktop", lambda name: name)
+
+    kwargs = ws.private_desktop_popen_kwargs(desktop_name="gtkb-test-desktop")
+
+    assert kwargs.get("creationflags", 0) & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    startupinfo = kwargs.get("startupinfo")
+    assert isinstance(startupinfo, _FakeStartupInfo)
+    assert startupinfo.lpDesktop == "gtkb-test-desktop"
+
+
 def test_hidden_process_popen_kwargs_hides_and_detaches_on_windows() -> None:
     if sys.platform != "win32":
         return

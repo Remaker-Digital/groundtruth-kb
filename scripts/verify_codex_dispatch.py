@@ -36,6 +36,9 @@ CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH = (
 )
 CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
 CODEX_WINDOWS_SANDBOX_SETUP_STATUS = "0xc0000142"
+CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION = 2
+CODEX_NO_WINDOW_MIN_RUNS = 2
+CODEX_NO_WINDOW_MIN_COMMAND_STEPS = 3
 
 
 class VerificationError(RuntimeError):
@@ -222,6 +225,44 @@ def _codex_live_failure_class(payload: dict[str, Any] | None, reason: str) -> st
     return "codex_no_window_probe_not_passing" if reason == "codex_no_window_probe_not_passing" else reason
 
 
+def _codex_no_window_run_steps(run: object) -> list[dict[str, Any]]:
+    if not isinstance(run, dict):
+        return []
+    raw_steps = run.get("command_steps")
+    if raw_steps is None:
+        raw_steps = run.get("commands")
+    if not isinstance(raw_steps, list):
+        return []
+    return [step for step in raw_steps if isinstance(step, dict)]
+
+
+def _codex_no_window_step_has_marker_proof(step: dict[str, Any]) -> bool:
+    marker = str(step.get("marker") or step.get("expected_marker") or "").strip()
+    if not marker:
+        return False
+    if step.get("returncode") not in {0, "0"}:
+        return False
+    if step.get("stdout_contains_marker") is True:
+        return True
+    transcript = str(step.get("transcript_preview") or step.get("stdout_preview") or step.get("stdout") or "")
+    return marker in transcript
+
+
+def _codex_no_window_schema_failure(payload: dict[str, Any]) -> str | None:
+    if payload.get("schema_version") != CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION:
+        return "codex_no_window_verification_legacy_schema"
+    runs = payload.get("runs")
+    if not isinstance(runs, list) or len(runs) < CODEX_NO_WINDOW_MIN_RUNS:
+        return "codex_no_window_verification_insufficient_run_count"
+    for run in runs:
+        steps = _codex_no_window_run_steps(run)
+        if len(steps) < CODEX_NO_WINDOW_MIN_COMMAND_STEPS:
+            return "codex_no_window_verification_insufficient_command_count"
+        if not all(_codex_no_window_step_has_marker_proof(step) for step in steps):
+            return "codex_no_window_verification_missing_marker_chain"
+    return None
+
+
 def evaluate_live_headless_readiness(project_root: Path) -> dict[str, Any]:
     payload = _load_codex_no_window_verification(project_root)
     path = _codex_no_window_verification_path(project_root)
@@ -239,6 +280,16 @@ def evaluate_live_headless_readiness(project_root: Path) -> dict[str, Any]:
             "ready": False,
             "reason": reason,
             "failure_class": _codex_live_failure_class(payload, reason),
+            "verification": payload,
+            "verification_path": path.as_posix(),
+            "visible_window_detected": payload.get("visible_window_detected"),
+        }
+    schema_failure = _codex_no_window_schema_failure(payload)
+    if schema_failure is not None:
+        return {
+            "ready": False,
+            "reason": schema_failure,
+            "failure_class": _codex_live_failure_class(payload, schema_failure),
             "verification": payload,
             "verification_path": path.as_posix(),
             "visible_window_detected": payload.get("visible_window_detected"),

@@ -216,11 +216,24 @@ def _write_codex_no_window_verification(root: Path) -> Path:
     verification_path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "result": "pass",
                 "visible_window_detected": False,
                 "verified_at": "2999-01-01T00:00:00Z",
                 "probe": "pytest_synthetic_codex_no_window",
+                "runs": [
+                    {
+                        "command_steps": [
+                            {
+                                "marker": f"marker-{run}-{step}",
+                                "returncode": 0,
+                                "stdout_contains_marker": True,
+                            }
+                            for step in range(3)
+                        ]
+                    }
+                    for run in range(2)
+                ],
             }
         ),
         encoding="utf-8",
@@ -2108,6 +2121,9 @@ def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
 
     import subprocess as _subprocess
 
+    import implementation_authorization as _impl_auth
+
+    monkeypatch.setattr(_impl_auth, "_dirty_worktree_paths", lambda project_root: set())
     monkeypatch.setattr(_subprocess, "Popen", _fake_popen)
 
     fake_item = type(
@@ -4439,6 +4455,68 @@ def test_spawn_harness_uses_no_window_python_for_status_wrapper(
     assert startupinfo.wShowWindow == 0
 
 
+def test_spawn_harness_uses_private_desktop_for_windows_codex_wrapper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
+    )
+    item = SimpleNamespace(
+        document_name="gtkb-codex-private-desktop",
+        top_status="NEW",
+        top_file="bridge/gtkb-codex-private-desktop-001.md",
+        dispatchable=True,
+    )
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 12345
+
+    def fake_popen(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    monkeypatch.setattr(trigger, "create_private_desktop_name", lambda prefix: f"{prefix}-desktop")
+    monkeypatch.setattr(
+        trigger,
+        "private_desktop_popen_kwargs",
+        lambda *, desktop_name, new_process_group=False, detached=False: {
+            "creationflags": 0x08000000,
+            "startupinfo": SimpleNamespace(lpDesktop=desktop_name, dwFlags=1, wShowWindow=0),
+        },
+    )
+    monkeypatch.setattr(trigger, "_normalize_argv_head", lambda head, project_root: head)
+    monkeypatch.setattr(trigger, "_count_live_dispatched_processes", lambda runs_dir: 0)
+    monkeypatch.setattr(trigger, "_is_spawn_rate_limited", lambda runs_dir: False)
+    monkeypatch.setattr(trigger, "_pid_create_time_epoch", lambda pid: 123.0)
+    monkeypatch.setattr(trigger.subprocess, "Popen", fake_popen)
+
+    meta = trigger._spawn_harness(
+        target=target,
+        items=[item],
+        project_root=tmp_path,
+        state_dir=tmp_path / "state",
+        max_items=1,
+        dry_run=False,
+        dispatch_id="dispatch-codex-private-desktop",
+    )
+
+    assert meta["launched"] is True
+    assert meta["worker_containment_mode"] == "windows_private_desktop"
+    assert meta["worker_containment_desktop"] == "gtkb-codex-dispatch-codex-private-desktop-desktop"
+    env = captured["kwargs"]["env"]
+    assert env["GTKB_CODEX_NO_WINDOW_CONTAINMENT"] == "windows_private_desktop"
+    assert env["GTKB_CODEX_NO_WINDOW_DESKTOP"] == meta["worker_containment_desktop"]
+    assert captured["kwargs"]["startupinfo"].lpDesktop == meta["worker_containment_desktop"]
+
+
 def test_spawn_harness_uses_env_payload_and_opaque_runner_for_api_harness_scripts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4539,6 +4617,46 @@ def test_codex_windows_dispatch_accepts_fresh_clean_no_window_verification(
     verification_path.write_text(
         json.dumps(
             {
+                "schema_version": 2,
+                "result": "pass",
+                "visible_window_detected": False,
+                "verified_at": "2999-01-01T00:00:00Z",
+                "probe": "dispatcher_codex_no_window_smoke",
+                "runs": [
+                    {
+                        "command_steps": [
+                            {
+                                "marker": f"marker-{run}-{step}",
+                                "returncode": 0,
+                                "stdout_contains_marker": True,
+                            }
+                            for step in range(3)
+                        ]
+                    }
+                    for run in range(2)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = trigger._evaluate_harness_dispatch_readiness("codex", tmp_path)
+
+    assert result["ready"] is True
+    assert result["reason"] == "codex_no_window_verification_current"
+    assert result["verification"]["visible_window_detected"] is False
+
+
+def test_codex_windows_dispatch_rejects_legacy_clean_false_green_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    verification_path = tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
+    verification_path.parent.mkdir(parents=True, exist_ok=True)
+    verification_path.write_text(
+        json.dumps(
+            {
                 "schema_version": 1,
                 "result": "pass",
                 "visible_window_detected": False,
@@ -4551,9 +4669,9 @@ def test_codex_windows_dispatch_accepts_fresh_clean_no_window_verification(
 
     result = trigger._evaluate_harness_dispatch_readiness("codex", tmp_path)
 
-    assert result["ready"] is True
-    assert result["reason"] == "codex_no_window_verification_current"
-    assert result["verification"]["visible_window_detected"] is False
+    assert result["ready"] is False
+    assert result["reason"] == "codex_no_window_verification_legacy_schema"
+    assert result["live_headless_ready"] is False
 
 
 def test_codex_windows_dispatch_classifies_live_sandbox_setup_failure(
