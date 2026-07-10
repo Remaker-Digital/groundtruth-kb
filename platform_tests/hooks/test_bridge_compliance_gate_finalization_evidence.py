@@ -31,6 +31,7 @@ author_session_context_id: verifier-session
 author_model: test-model
 author_model_version: test-version
 author_model_configuration: test-config
+Responds to: bridge/test-finalization-003.md
 
 # Verification
 
@@ -69,10 +70,32 @@ missing_required_specs: []
     )
 
 
+def _write_reviewed_report(tmp_path: Path) -> Path:
+    fixture_root = tmp_path / ".gtkb-state" / "finalization-fixture"
+    bridge_dir = fixture_root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    (bridge_dir / "test-finalization-003.md").write_text(
+        """NEW
+author_identity: prime-builder/test
+author_harness_id: P
+author_session_context_id: prime-session
+author_model: test-model
+author_model_version: test-version
+author_model_configuration: test-config
+
+# Implementation Report
+""",
+        encoding="utf-8",
+    )
+    return fixture_root
+
+
 def test_verified_without_commit_finalization_evidence_is_blocked(tmp_path: Path) -> None:
+    fixture_root = _write_reviewed_report(tmp_path)
+
     reason = _GATE._deny_reason_for_content(
-        cwd_path=tmp_path,
-        file_path=str(tmp_path / "bridge" / "test-finalization-004.md"),
+        cwd_path=fixture_root,
+        file_path=str(fixture_root / "bridge" / "test-finalization-004.md"),
         content=_verified_body(finalization_evidence=False),
         run_pending_preflight=False,
     )
@@ -82,9 +105,11 @@ def test_verified_without_commit_finalization_evidence_is_blocked(tmp_path: Path
 
 
 def test_verified_with_commit_finalization_evidence_is_allowed(tmp_path: Path) -> None:
+    fixture_root = _write_reviewed_report(tmp_path)
+
     reason = _GATE._deny_reason_for_content(
-        cwd_path=tmp_path,
-        file_path=str(tmp_path / "bridge" / "test-finalization-004.md"),
+        cwd_path=fixture_root,
+        file_path=str(fixture_root / "bridge" / "test-finalization-004.md"),
         content=_verified_body(finalization_evidence=True),
         run_pending_preflight=False,
     )
