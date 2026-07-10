@@ -258,6 +258,13 @@
       "capability_id": "skill.verify",
       "source_relative_path": ".claude/skills/verify/SKILL.md",
       "source_sha256": "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
+    },
+    {
+      "adapter_relative_path": ".agent/skills/managed-skill-adoption-review/SKILL.md",
+      "canonical_name": "managed-skill-adoption-review",
+      "capability_id": "skill.managed-skill-adoption-review",
+      "source_relative_path": ".claude/skills/managed-skill-adoption-review/SKILL.md",
+      "source_sha256": "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
     }
   ],
   "generated_by": "scripts/generate_antigravity_skill_adapters.py",

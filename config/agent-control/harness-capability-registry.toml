@@ -2097,3 +2097,40 @@ reason = "Ollama is a provider harness and does not execute repo-local managed s
 [capabilities.openrouter]
 status = "unsupported"
 reason = "OpenRouter is a provider harness and does not execute repo-local managed skill adapters in this WI-4842 slice."
+
+[[capabilities]]
+id = "skill.managed-skill-adoption-review"
+kind = "skill"
+canonical_name = "managed-skill-adoption-review"
+canonical_purpose = "Structural review of managed-artifact proposals (skill, template, or adopter) for registry authority, target-path completeness, and stale-assumption detection before proposal filing."
+canonical_source = ".claude/skills/managed-skill-adoption-review/SKILL.md"
+required_for_roles = ["prime-builder", "loyal-opposition"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/managed-skill-adoption-review/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/managed-skill-adoption-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/managed-skill-adoption-review/SKILL.md"
+source_sha256 = "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
+
+[capabilities.antigravity]
+surface = ".agent/skills/managed-skill-adoption-review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/managed-skill-adoption-review/SKILL.md"
+source_sha256 = "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-4841 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal or typed parity disposition."
+
+[capabilities.ollama]
+status = "unsupported"
+reason = "Ollama is a provider harness and does not execute repo-local managed skill adapters in this WI-4841 slice."
+
+[capabilities.openrouter]
+status = "unsupported"
+reason = "OpenRouter is a provider harness and does not execute repo-local managed skill adapters in this WI-4841 slice."

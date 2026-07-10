@@ -293,6 +293,13 @@
       "capability_id": "skill.formal-artifact-packet-helper",
       "source_relative_path": ".claude/skills/formal-artifact-packet-helper/SKILL.md",
       "source_sha256": "824af14f6ace58e6a3b3423b55ad1119d6874cb2ac2ff83e5c37734903ac3855"
+    },
+    {
+      "adapter_relative_path": ".codex/skills/managed-skill-adoption-review/SKILL.md",
+      "canonical_name": "managed-skill-adoption-review",
+      "capability_id": "skill.managed-skill-adoption-review",
+      "source_relative_path": ".claude/skills/managed-skill-adoption-review/SKILL.md",
+      "source_sha256": "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
     }
   ],
   "generated_by": "scripts/generate_codex_skill_adapters.py",
