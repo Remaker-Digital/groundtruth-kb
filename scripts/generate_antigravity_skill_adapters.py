@@ -174,7 +174,8 @@ def update_registry(project_root: Path, adapters: list[SkillAdapter], *, check: 
         return False
     if not check:
         codex_gen._assert_no_trailing_whitespace(updated, registry_path.as_posix())
-        registry_path.write_text(updated, encoding="utf-8", newline="\n")
+        # WI-5117: atomic write; LF bytes preserve the registry's LF contract.
+        codex_gen._atomic_write_bytes(registry_path, updated.encode("utf-8"))
     return True
 
 

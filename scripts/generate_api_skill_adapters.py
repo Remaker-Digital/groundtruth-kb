@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+from _wrap_io import _atomic_write_bytes  # noqa: E402
+
 REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 API_SKILLS_RELATIVE_PATH = Path(".api-harness") / "skills"
 MANIFEST_NAME = "MANIFEST.json"
@@ -207,7 +212,8 @@ def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8", newline="\n")
+    # WI-5117: atomic write; encode to LF bytes so the LF-only contract survives.
+    _atomic_write_bytes(path, content.encode("utf-8"))
     return True
 
 

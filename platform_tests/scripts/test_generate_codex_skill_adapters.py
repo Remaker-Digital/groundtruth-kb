@@ -641,3 +641,47 @@ def test_adapter_source_sha256_stable_after_lf_correction(tmp_path: Path) -> Non
     manifest_after = json.loads((tmp_path / ".codex" / "skills" / "MANIFEST.json").read_text(encoding="utf-8"))
     sha256_after = manifest_after["adapters"][0]["source_sha256"]
     assert sha256_before == sha256_after, "source_sha256 must be stable after CRLF correction"
+
+
+def test_atomic_write_bytes_midwrite_failure_leaves_target_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-5117: a failed atomic replace must leave the existing target untouched."""
+    module = _load_module()
+    import _wrap_io
+
+    target = tmp_path / "adapter" / "SKILL.md"
+    target.parent.mkdir()
+    target.write_bytes(b"original\n")
+
+    def fail_replace(source: str | Path, destination: str | Path) -> None:
+        raise OSError(22, f"simulated replace failure: {source} -> {destination}")
+
+    monkeypatch.setattr(_wrap_io.os, "replace", fail_replace)
+
+    with pytest.raises(OSError):
+        module._atomic_write_bytes(target, b"replacement\n")
+
+    assert target.read_bytes() == b"original\n"
+    assert list(target.parent.glob("*.tmp")) == []
+
+
+def test_generate_routes_writes_through_atomic_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5117: generated adapter writes are routed through the atomic byte helper."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry(tmp_path)
+    calls: list[tuple[Path, bytes]] = []
+    original_write = module._atomic_write_bytes
+
+    def spy_atomic_write(path: str | Path, content: bytes) -> None:
+        calls.append((Path(path), content))
+        original_write(path, content)
+
+    monkeypatch.setattr(module, "_atomic_write_bytes", spy_atomic_write)
+
+    module.generate(tmp_path)
+
+    adapter_path = tmp_path / ".codex" / "skills" / "review" / "SKILL.md"
+    assert adapter_path in {path for path, _ in calls}
+    assert b"\r" not in adapter_path.read_bytes()

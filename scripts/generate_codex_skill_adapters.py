@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+from _wrap_io import _atomic_write_bytes  # noqa: E402
+
 REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 CODEX_SKILLS_RELATIVE_PATH = Path(".codex") / "skills"
 GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
@@ -258,7 +263,9 @@ def _write_if_changed(path: Path, content: str, *, check: bool) -> bool:
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8", newline="\n")
+    # WI-5117: atomic write; encode to LF bytes so the LF-only contract
+    # (WI-4701) survives the atomic path on Windows.
+    _atomic_write_bytes(path, content.encode("utf-8"))
     return True
 
 
@@ -269,7 +276,7 @@ def _write_bytes_if_changed(path: Path, content: bytes, *, check: bool) -> bool:
     if check:
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
+    _atomic_write_bytes(path, content)  # WI-5117: atomic write
     return True
 
 
@@ -350,7 +357,8 @@ def update_registry(project_root: Path, adapters: list[SkillAdapter], *, check: 
     if current == updated:
         return False
     if not check:
-        registry_path.write_text(updated, encoding="utf-8", newline="\n")
+        # WI-5117: atomic write; LF bytes preserve the registry's LF contract.
+        _atomic_write_bytes(registry_path, updated.encode("utf-8"))
     return True
 
 

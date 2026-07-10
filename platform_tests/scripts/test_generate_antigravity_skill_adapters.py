@@ -426,3 +426,25 @@ def test_antigravity_generated_output_is_lf_no_trailing_ws(tmp_path: Path) -> No
         changed.append("config/agent-control/harness-capability-registry.toml")
     for rel_path in changed:
         _assert_lf_clean_output(tmp_path / rel_path)
+
+
+def test_generate_routes_writes_through_atomic_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5117: Antigravity adapter writes are routed through the shared atomic byte helper."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_skill(tmp_path, "build")
+    _write_registry(tmp_path)
+    calls: list[tuple[Path, bytes]] = []
+    original_write = module.codex_gen._atomic_write_bytes
+
+    def spy_atomic_write(path: str | Path, content: bytes) -> None:
+        calls.append((Path(path), content))
+        original_write(path, content)
+
+    monkeypatch.setattr(module.codex_gen, "_atomic_write_bytes", spy_atomic_write)
+
+    module.generate(tmp_path)
+
+    adapter_path = tmp_path / ".agent" / "skills" / "review" / "SKILL.md"
+    assert adapter_path in {path for path, _ in calls}
+    assert b"\r" not in adapter_path.read_bytes()
