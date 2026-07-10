@@ -9,7 +9,7 @@ For application-scope guidance (Application Identity, Copyright, Adding Commerci
 > **📁 Application-scope reference** (Agent Red legal, pricing, infrastructure, AGNTCY rules): [`applications/Agent_Red/CLAUDE-REFERENCE.md`](applications/Agent_Red/CLAUDE-REFERENCE.md) — read on demand when working on Agent Red.
 > **📁 Application-scope architecture** (Agent Red project structure, module inventory): [`applications/Agent_Red/CLAUDE-ARCHITECTURE.md`](applications/Agent_Red/CLAUDE-ARCHITECTURE.md) — read on demand.
 > **📁 Application-scope historical archive** (Agent Red session logs, technical decisions): [`applications/Agent_Red/CLAUDE_ARCHIVE.md`](applications/Agent_Red/CLAUDE_ARCHIVE.md) — read when investigating Agent Red historical decisions.
-> **📁 Platform session memory** (operational patterns, lessons): `memory/MEMORY.md` — the in-repo GT-KB notepad is authoritative; home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
+> **📁 Platform session memory** (state and bootstrap): `memory/MEMORY.md` — the in-repo GT-KB notepad preserves session state and artifact access hints; authoritative project knowledge lives in MemBase and governed in-root artifacts. Home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
 
 ### Canonical Terminology
 
