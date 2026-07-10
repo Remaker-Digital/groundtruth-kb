@@ -97,6 +97,25 @@ def _init_verified_repo(tmp_path: Path) -> Path:
     return repo
 
 
+def _init_gapped_verified_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "config", "core.autocrlf", "false")
+    _write_project_marker(repo)
+    _write(repo / "bridge" / "sample-001.md", "NEW\n\n# Proposal\n")
+    _write(repo / "bridge" / "sample-002.md", "GO\n\n# GO\n")
+    _write(repo / "scripts" / "feature.py", "VALUE = 1\n")
+    _git(repo, "add", "--", "groundtruth.toml", "bridge/sample-001.md", "bridge/sample-002.md", "scripts/feature.py")
+    _git(repo, "commit", "-m", "chore: seed gapped bridge thread")
+    _write(repo / "bridge" / "sample-007.md", _implementation_report_body())
+    _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
+    return repo
+
+
 def _verified_body(*, version: int = 4, responds_to: str = "bridge/sample-003.md") -> str:
     return f"""VERIFIED
 author_identity: loyal-opposition/test
@@ -150,6 +169,131 @@ test_lo_verified_commit_atomicity.py` | yes | PASS |
 
 - `pytest platform_tests/scripts/test_lo_verified_commit_atomicity.py -q`
 """
+
+
+def test_verified_finalization_tolerates_never_existing_predecessor_gap(
+    verify_helper,
+    tmp_path: Path,
+) -> None:
+    repo = _init_gapped_verified_repo(tmp_path)
+
+    result = verify_helper.finalize_verified_commit(
+        "sample",
+        _verified_body(version=8, responds_to="bridge/sample-007.md"),
+        include_paths=["bridge/sample-007.md", "scripts/feature.py"],
+        commit_message="fix(gtkb): finalize gapped bridge thread",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    committed = set(_git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.splitlines())
+    assert committed == {"bridge/sample-007.md", "bridge/sample-008.md", "scripts/feature.py"}
+    assert result.verdict_path == "bridge/sample-008.md"
+    for version in range(3, 7):
+        assert not (repo / "bridge" / f"sample-{version:03d}.md").exists()
+
+
+def test_verified_finalization_rejects_missing_predecessor_that_exists_in_git_history(
+    verify_helper,
+    tmp_path: Path,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    _git(repo, "add", "--", "bridge/sample-003.md")
+    _git(repo, "commit", "-m", "chore: track predecessor fixture")
+    _git(repo, "rm", "--", "bridge/sample-003.md")
+    _git(repo, "commit", "-m", "chore: delete predecessor fixture")
+    _write(repo / "bridge" / "sample-005.md", _implementation_report_body())
+
+    with pytest.raises(
+        verify_helper.VerifiedFinalizationError, match="sample-003\\.md is missing but exists in git history"
+    ):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(version=6, responds_to="bridge/sample-005.md"),
+            include_paths=["bridge/sample-005.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): finalize deleted predecessor fixture",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-006.md").exists()
+
+
+def test_verified_finalization_rejects_missing_predecessor_when_history_check_fails(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_gapped_verified_repo(tmp_path)
+    real_run_git = verify_helper._run_git
+
+    def fail_history_inspection(
+        args: list[str],
+        *,
+        cwd: Path,
+        check: bool = False,
+        env: dict[str, str] | None = None,
+    ):
+        if args[:3] == ["log", "--format=%H", "--max-count=1"]:
+            return subprocess.CompletedProcess(["git", *args], 128, "", "fatal: simulated history failure")
+        return real_run_git(args, cwd=cwd, check=check, env=env)
+
+    monkeypatch.setattr(verify_helper, "_run_git", fail_history_inspection)
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="git history could not be inspected"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(version=8, responds_to="bridge/sample-007.md"),
+            include_paths=["bridge/sample-007.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): finalize gapped bridge thread",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-008.md").exists()
+
+
+def test_verified_finalization_rejects_present_untracked_predecessor(
+    verify_helper,
+    tmp_path: Path,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    _write(repo / "bridge" / "sample-004.md", _implementation_report_body())
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="sample-003\\.md is not git-tracked"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(version=5, responds_to="bridge/sample-004.md"),
+            include_paths=["bridge/sample-004.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): finalize untracked predecessor fixture",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-005.md").exists()
+
+
+def test_verified_finalization_rejects_dirty_tracked_predecessor(
+    verify_helper,
+    tmp_path: Path,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    _git(repo, "add", "--", "bridge/sample-003.md")
+    _git(repo, "commit", "-m", "chore: track predecessor fixture")
+    _write(repo / "bridge" / "sample-003.md", _implementation_report_body(title="# Dirty report"))
+    _write(repo / "bridge" / "sample-004.md", _implementation_report_body())
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="sample-003\\.md has uncommitted changes"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(version=5, responds_to="bridge/sample-004.md"),
+            include_paths=["bridge/sample-004.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): finalize dirty predecessor fixture",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-005.md").exists()
 
 
 def test_verified_finalization_commits_report_work_and_verdict_together(verify_helper, tmp_path: Path) -> None:

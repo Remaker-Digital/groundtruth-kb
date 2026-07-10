@@ -430,7 +430,14 @@ def _assert_predecessor_chain_committed(
         rel_path = f"bridge/{slug}-{version:03d}.md"
         abs_path = project_root / rel_path
         if not abs_path.is_file():
-            problems.append(f"{rel_path} is missing")
+            history = _run_git(["log", "--format=%H", "--max-count=1", "--", rel_path], cwd=project_root, check=False)
+            if history.returncode != 0:
+                problems.append(
+                    f"{rel_path} is missing and git history could not be inspected: "
+                    f"{(history.stderr or history.stdout).strip()}"
+                )
+            elif history.stdout.strip():
+                problems.append(f"{rel_path} is missing but exists in git history")
             continue
         if rel_path in transaction_set:
             continue
