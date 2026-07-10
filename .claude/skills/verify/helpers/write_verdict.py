@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,6 +99,14 @@ class VerifiedFinalizationResult:
             "verdict_path": self.verdict_path,
             "committed_paths": list(self.committed_paths),
         }
+
+
+@dataclass(frozen=True)
+class HunkPatch:
+    """A reviewed patch file plus the repo paths it touches."""
+
+    path: Path
+    touched_paths: tuple[str, ...]
 
 
 def append_skills_applied_disclosure(body: str, skills: list[str] | None) -> str:
@@ -438,10 +447,21 @@ def _assert_predecessor_chain_committed(
         )
 
 
-def _run_git(args: list[str], *, cwd: Path, check: bool = False) -> subprocess.CompletedProcess[str]:
+def _run_git(
+    args: list[str],
+    *,
+    cwd: Path,
+    check: bool = False,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    run_env = None
+    if env:
+        run_env = os.environ.copy()
+        run_env.update(env)
     result = subprocess.run(
         ["git", *args],
         cwd=cwd,
+        env=run_env,
         text=True,
         capture_output=True,
         encoding="utf-8",
@@ -493,6 +513,7 @@ def _run_git_with_lock_retry(
     attempts: int | None = None,
     base_delay: float | None = None,
     check: bool = True,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     attempts = attempts if attempts is not None else _env_int("GTKB_VERIFIED_COMMIT_LOCK_RETRIES", 5)
     base_delay = base_delay if base_delay is not None else _env_float("GTKB_VERIFIED_COMMIT_LOCK_BASE_DELAY", 0.5)
@@ -500,7 +521,7 @@ def _run_git_with_lock_retry(
     base_delay = max(0.0, base_delay)
     last: subprocess.CompletedProcess[str] | None = None
     for attempt in range(attempts):
-        result = _run_git(args, cwd=cwd, check=False)
+        result = _run_git(args, cwd=cwd, check=False, env=env)
         if result.returncode == 0:
             return result
         last = result
@@ -518,13 +539,120 @@ def _run_git_with_lock_retry(
     return last
 
 
-def _git_lines(args: list[str], *, cwd: Path) -> tuple[str, ...]:
-    result = _run_git(args, cwd=cwd, check=True)
+def _git_lines(args: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> tuple[str, ...]:
+    result = _run_git(args, cwd=cwd, check=True, env=env)
     return tuple(line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip())
 
 
-def _staged_paths(project_root: Path) -> tuple[str, ...]:
-    return _git_lines(["diff", "--name-only", "--cached", "--"], cwd=project_root)
+def _staged_paths(project_root: Path, *, env: dict[str, str] | None = None) -> tuple[str, ...]:
+    return _git_lines(["diff", "--name-only", "--cached", "--"], cwd=project_root, env=env)
+
+
+def _git_absolute_dir(project_root: Path) -> Path:
+    return Path(_git_lines(["rev-parse", "--absolute-git-dir"], cwd=project_root)[0])
+
+
+def _create_temporary_index(project_root: Path) -> tuple[dict[str, str], Path]:
+    git_dir = _git_absolute_dir(project_root)
+    handle, index_name = tempfile.mkstemp(prefix="gtkb-verified-index-", dir=git_dir)
+    os.close(handle)
+    index_path = Path(index_name)
+    index_path.unlink(missing_ok=True)
+    return {"GIT_INDEX_FILE": str(index_path)}, index_path
+
+
+def _patch_paths_from_text(patch_text: str, project_root: Path) -> tuple[str, ...]:
+    raw_paths: list[str] = []
+    for line in patch_text.splitlines():
+        if not (line.startswith("--- ") or line.startswith("+++ ")):
+            continue
+        path_text = line[4:].split("\t", 1)[0].strip()
+        if path_text == "/dev/null":
+            continue
+        if path_text.startswith(("a/", "b/")):
+            path_text = path_text[2:]
+        raw_paths.append(path_text)
+    return _unique_paths(project_root, raw_paths)
+
+
+def _resolve_hunk_patches(
+    project_root: Path,
+    *,
+    hunk_patch_paths: list[str],
+    include_paths: tuple[str, ...],
+) -> tuple[HunkPatch, ...]:
+    include_set = set(include_paths)
+    patches: list[HunkPatch] = []
+    for patch_arg in hunk_patch_paths:
+        patch_path = Path(patch_arg)
+        if not patch_path.is_absolute():
+            patch_path = project_root / patch_path
+        patch_path = patch_path.resolve()
+        try:
+            patch_path.relative_to(project_root.resolve())
+        except ValueError as exc:
+            raise VerifiedFinalizationError(f"Hunk patch path escapes project root: {patch_arg}") from exc
+        try:
+            patch_text = patch_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise VerifiedFinalizationError(f"Hunk patch is unreadable: {patch_arg}") from exc
+        touched = _patch_paths_from_text(patch_text, project_root)
+        if not touched:
+            raise VerifiedFinalizationError(f"Hunk patch does not identify any repository path: {patch_arg}")
+        outside = sorted(set(touched) - include_set)
+        if outside:
+            raise VerifiedFinalizationError(
+                "Hunk patch touches path(s) outside the VERIFIED include set: " + ", ".join(outside)
+            )
+        patches.append(HunkPatch(path=patch_path, touched_paths=touched))
+    return tuple(patches)
+
+
+def _allowed_staged_paths(
+    project_root: Path,
+    *,
+    expected_paths: tuple[str, ...],
+    staged_paths: set[str],
+) -> set[str]:
+    allowed: set[str] = set()
+    for path in expected_paths:
+        path_obj = project_root / path
+        if path_obj.is_dir():
+            prefix = path.rstrip("/") + "/"
+            children = {staged for staged in staged_paths if staged.startswith(prefix)}
+            allowed.update(children or {path})
+        else:
+            allowed.add(path)
+    return allowed
+
+
+def _realign_real_index_after_temp_commit(project_root: Path, committed_paths: set[str]) -> None:
+    if committed_paths:
+        _run_git_with_lock_retry(["reset", "-q", "HEAD", "--", *sorted(committed_paths)], cwd=project_root)
+
+
+def _apply_hunk_patch_to_index(project_root: Path, patch: HunkPatch, *, env: dict[str, str]) -> None:
+    check = _run_git(["apply", "--cached", "--check", str(patch.path)], cwd=project_root, check=False, env=env)
+    if check.returncode == 0:
+        _run_git_with_lock_retry(["apply", "--cached", str(patch.path)], cwd=project_root, env=env)
+        return
+
+    whitespace_check = _run_git(
+        ["apply", "--cached", "--check", "--ignore-space-change", str(patch.path)],
+        cwd=project_root,
+        check=False,
+        env=env,
+    )
+    if whitespace_check.returncode == 0:
+        _run_git_with_lock_retry(
+            ["apply", "--cached", "--ignore-space-change", str(patch.path)],
+            cwd=project_root,
+            env=env,
+        )
+        return
+
+    failure = (check.stderr or check.stdout or whitespace_check.stderr or whitespace_check.stdout).strip()
+    raise VerifiedFinalizationError(f"hunk patch failed to apply to the disposable index: {patch.path}: {failure}")
 
 
 def _cleanup_failed_verdict(project_root: Path, verdict_rel_path: str, staged_paths: tuple[str, ...]) -> None:
@@ -629,6 +757,7 @@ def finalize_verified_commit(
     body: str,
     *,
     include_paths: list[str],
+    hunk_patch_paths: list[str] | None = None,
     commit_message: str,
     project_root: Path | None = None,
     pre_populate: bool = False,
@@ -638,14 +767,15 @@ def finalize_verified_commit(
 ) -> VerifiedFinalizationResult:
     """Write a VERIFIED verdict and create the final local commit as one transaction.
 
-    The helper writes the next versioned bridge verdict, stages the verified
-    path set plus that verdict, and commits ONLY that path set via an explicit
-    pathspec. Unrelated paths already staged in the shared index by other
-    sessions are tolerated and left untouched (never folded into this commit).
-    If any step after the verdict write fails, the verdict file is removed and
-    the staged paths added by this helper are unstaged.
+    The helper writes the next versioned bridge verdict, builds a disposable
+    index from HEAD, stages the verified path set plus that verdict in the
+    disposable index, and commits that reviewed index with no pathspec.
+    Unrelated paths already staged in the shared real index by other sessions
+    are tolerated and never folded into this commit. If any step after the
+    verdict write fails, the verdict file is removed.
     """
     root = _project_root_from_arg(project_root)
+    hunk_patch_paths = hunk_patch_paths or []
     if not include_paths:
         raise VerifiedFinalizationError(
             "VERIFIED finalization requires at least one verified implementation/report path."
@@ -665,13 +795,12 @@ def finalize_verified_commit(
     if len(expected_paths) != len(include_paths) + 1:
         raise VerifiedFinalizationError("VERIFIED finalization include paths must not duplicate the verdict path.")
     _assert_predecessor_chain_committed(slug, root, next_version, expected_paths)
-
-    # Pre-existing staged paths from other sessions in the shared index are
-    # tolerated: the final commit below uses an explicit pathspec, so only the
-    # verified path set is committed regardless of unrelated staged work. We
-    # capture them to scope the post-`git add` staged-set assertion to this
-    # helper's own paths; unrelated staged entries are left untouched.
-    staged_before = set(_staged_paths(root))
+    hunk_patches = _resolve_hunk_patches(
+        root,
+        hunk_patch_paths=hunk_patch_paths,
+        include_paths=tuple(_unique_paths(root, include_paths)),
+    )
+    hunk_patch_touched_paths = {path for patch in hunk_patches for path in patch.touched_paths}
 
     body_to_write = seed_prior_deliberations(
         slug,
@@ -692,62 +821,50 @@ def finalize_verified_commit(
     _assert_verdict_review_independence(slug, body_to_write, root)
     _assert_verdict_author_session_context_is_real(body_to_write)
 
-    # Determine which expected paths are actually dirty/modified/untracked
-    # so we only expect those to be staged after `git add`.
-    dirty_expected_paths = [verdict_rel_path]
-    for path in expected_paths:
-        if path == verdict_rel_path:
-            continue
-        res = _run_git(["status", "--porcelain", "--ignored", "--", path], cwd=root)
-        if res.stdout.strip():
-            dirty_expected_paths.append(path)
-
     from scripts.gtkb_bridge_writer import write_bridge_file
 
     write_bridge_file(slug, next_version, body_to_write, root)
+    temp_env: dict[str, str] | None = None
+    temp_index: Path | None = None
     try:
-        _run_git_with_lock_retry(["add", "-f", "--", *expected_paths], cwd=root)
-        staged_after = set(_staged_paths(root))
+        temp_env, temp_index = _create_temporary_index(root)
+        _run_git(["read-tree", "HEAD"], cwd=root, check=True, env=temp_env)
 
-        # Support directory targets by expanding them into their staged children.
-        expanded_dirty_expected = set()
-        for path in dirty_expected_paths:
-            path_obj = root / path
-            if path_obj.is_dir():
-                prefix = path.rstrip("/") + "/"
-                children = {p for p in staged_after if p.startswith(prefix)}
-                if children:
-                    expanded_dirty_expected.update(children)
-                else:
-                    expanded_dirty_expected.add(path)
-            else:
-                expanded_dirty_expected.add(path)
+        full_stage_paths = [path for path in expected_paths if path not in hunk_patch_touched_paths]
+        if full_stage_paths:
+            _run_git_with_lock_retry(["add", "-f", "--", *full_stage_paths], cwd=root, env=temp_env)
 
-        missing = expanded_dirty_expected - staged_after
-        # Anything staged beyond the helper's own expected paths must be a
-        # pre-existing unrelated entry (tolerated); the helper must never have
-        # introduced new staging of its own beyond `expanded_dirty_expected`.
-        unexpected_new = (staged_after - expanded_dirty_expected) - staged_before
-        if missing or unexpected_new:
+        for patch in hunk_patches:
+            _apply_hunk_patch_to_index(root, patch, env=temp_env)
+
+        temp_staged = set(_staged_paths(root, env=temp_env))
+        allowed_staged = _allowed_staged_paths(root, expected_paths=expected_paths, staged_paths=temp_staged)
+        missing = {verdict_rel_path} - temp_staged
+        unexpected = temp_staged - allowed_staged
+        if missing or unexpected:
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
-                f"missing={sorted(missing)}; unexpected_new={sorted(unexpected_new)}; "
-                f"expected_dirty={list(dirty_expected_paths)}; "
-                f"expanded_dirty={sorted(expanded_dirty_expected)}; "
-                f"pre_existing_staged={sorted(staged_before)}"
+                f"missing={sorted(missing)}; unexpected_new={sorted(unexpected)}; "
+                f"expected_paths={list(expected_paths)}; temp_staged={sorted(temp_staged)}"
             )
-        # Commit ONLY the verified path set via explicit pathspec so unrelated
-        # pre-existing staged files are never folded into this VERIFIED commit.
-        commit = _run_git_with_lock_retry(
-            ["commit", "-m", commit_message, "--", *expected_paths], cwd=root, check=False
-        )
+        commit = _run_git_with_lock_retry(["commit", "-m", commit_message], cwd=root, check=False, env=temp_env)
         if commit.returncode != 0:
             raise VerifiedFinalizationError(
                 f"git commit failed with exit {commit.returncode}: {(commit.stderr or commit.stdout).strip()}"
             )
+        committed = set(_git_lines(["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"], cwd=root))
+        if committed != temp_staged:
+            raise VerifiedFinalizationError(
+                "VERIFIED finalization committed-path mismatch. "
+                f"committed={sorted(committed)}; expected={sorted(temp_staged)}"
+            )
+        _realign_real_index_after_temp_commit(root, committed)
     except Exception:
-        _cleanup_failed_verdict(root, verdict_rel_path, expected_paths)
+        _cleanup_failed_verdict(root, verdict_rel_path, ())
         raise
+    finally:
+        if temp_index is not None:
+            temp_index.unlink(missing_ok=True)
 
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
     _auto_retire_completed_projects_after_verified(root)
@@ -794,6 +911,15 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="Verified implementation/report path to include in the final commit. Repeat as needed.",
     )
+    parser.add_argument(
+        "--hunk-patch",
+        action="append",
+        default=[],
+        help=(
+            "Unified patch containing reviewed hunks to apply to the disposable index. "
+            "All patch paths must be in the --include set. Repeat as needed."
+        ),
+    )
     parser.add_argument("--commit-message", help="Commit message for --finalize-verified.")
     parser.add_argument("--project-root", type=Path, help="Project root for --finalize-verified.")
     parser.add_argument(
@@ -818,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
             args.slug,
             body,
             include_paths=args.include,
+            hunk_patch_paths=args.hunk_patch,
             commit_message=args.commit_message or "",
             project_root=args.project_root,
             pre_populate=not args.no_prepopulate,
