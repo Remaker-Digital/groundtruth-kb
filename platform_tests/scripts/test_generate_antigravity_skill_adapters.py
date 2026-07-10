@@ -2,8 +2,9 @@
 
 Covers the Antigravity-specific behaviour that distinguishes this generator
 from the Codex generator: full-skill-set adapter selection, BOM-aware
-frontmatter placement, check mode, the manifest, and the insert-or-rewrite
-[capabilities.antigravity] registry update.
+frontmatter placement, check mode, the manifest, and (WI-5095) the adapter-only
+[capabilities.antigravity] source_sha256 refresh (never insert, never clobber
+an intentional status='unsupported' override).
 """
 
 from __future__ import annotations
@@ -102,6 +103,7 @@ adapter_source = ".claude/skills/build/SKILL.md"
 source_sha256 = "codexhash2"
 ''',
         encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -190,11 +192,128 @@ def test_manifest_lists_all_adapters(tmp_path: Path) -> None:
     )
 
 
-def test_update_registry_inserts_antigravity_block(tmp_path: Path) -> None:
+def _write_registry_with_unsupported_antigravity(project_root: Path) -> None:
+    """Single-capability registry whose antigravity block is an intentional
+    status='unsupported' parity override carrying a stale source_sha256."""
+    registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(
+        """registry_id = "test-registry"
+purpose = "test"
+
+[[capabilities]]
+id = "skill.review"
+kind = "skill"
+canonical_name = "review"
+canonical_source = ".claude/skills/review/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/review/SKILL.md"
+status = "native"
+
+[capabilities.antigravity]
+surface = ".agent/skills/review/SKILL.md"
+status = "unsupported"
+adapter_source = ".claude/skills/review/SKILL.md"
+source_sha256 = "stalehash"
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _write_registry_with_stale_both_harness_blocks(project_root: Path) -> None:
+    """Two-capability registry where every capability already has BOTH a codex
+    and an antigravity status='adapter' block, each with a stale source_sha256."""
+    registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(
+        """registry_id = "test-registry"
+purpose = "test"
+
+[[capabilities]]
+id = "skill.review"
+kind = "skill"
+canonical_name = "review"
+canonical_source = ".claude/skills/review/SKILL.md"
+required_for_roles = ["loyal-opposition", "prime-builder"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/review/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/review/SKILL.md"
+source_sha256 = "stalehash"
+
+[capabilities.antigravity]
+surface = ".agent/skills/review/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/review/SKILL.md"
+source_sha256 = "stalehash"
+
+[[capabilities]]
+id = "skill.build"
+kind = "skill"
+canonical_name = "build"
+canonical_source = ".claude/skills/build/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/build/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/build/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/build/SKILL.md"
+source_sha256 = "stalehash"
+
+[capabilities.antigravity]
+surface = ".agent/skills/build/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/build/SKILL.md"
+source_sha256 = "stalehash"
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def test_update_registry_does_not_insert_missing_antigravity_block(tmp_path: Path) -> None:
+    """WI-5095: the refresh NEVER inserts a [capabilities.antigravity] block for
+    a capability that has none. The prior insert-or-rewrite behaviour clobbered
+    intentional 'unsupported' parity by materializing blocks for un-projected
+    skills."""
     module = _load_module()
     _write_skill(tmp_path, "review")
     _write_skill(tmp_path, "build")
-    _write_registry(tmp_path)
+    _write_registry(tmp_path)  # fixture has no antigravity blocks
+
+    adapters = module.build_adapters(tmp_path)
+    changed = module.update_registry(tmp_path, adapters)
+
+    registry_text = (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").read_text(
+        encoding="utf-8"
+    )
+    assert changed is False
+    assert "[capabilities.antigravity]" not in registry_text
+
+
+def test_update_registry_refreshes_existing_stale_block(tmp_path: Path) -> None:
+    """WI-5095: an existing status='adapter' antigravity block's stale
+    source_sha256 is refreshed; the sibling capability that lacks a block gets
+    no block inserted."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_skill(tmp_path, "build")
+    _write_registry(tmp_path, existing_antigravity_block=True)  # only review has one
 
     adapters = module.build_adapters(tmp_path)
     changed = module.update_registry(tmp_path, adapters)
@@ -203,43 +322,42 @@ def test_update_registry_inserts_antigravity_block(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert changed is True
-    assert registry_text.count("[capabilities.antigravity]") == 2
-    assert 'surface = ".agent/skills/review/SKILL.md"' in registry_text
-    assert 'surface = ".agent/skills/build/SKILL.md"' in registry_text
+    assert registry_text.count("[capabilities.antigravity]") == 1  # build NOT inserted
+    assert "stalehash" not in registry_text
     parsed = tomllib.loads(registry_text)
     review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")
     build = next(c for c in parsed["capabilities"] if c["id"] == "skill.build")
-    assert review["antigravity"]["status"] == "adapter"
-    assert review["antigravity"]["adapter_source"] == ".claude/skills/review/SKILL.md"
-    assert build["antigravity"]["status"] == "adapter"
-    assert build["antigravity"]["adapter_source"] == ".claude/skills/build/SKILL.md"
+    review_adapter = next(a for a in adapters if a.source_relative_path == ".claude/skills/review/SKILL.md")
+    assert review["antigravity"]["source_sha256"] == review_adapter.source_sha256
+    assert "antigravity" not in build
 
 
-def test_update_registry_rewrites_existing_block(tmp_path: Path) -> None:
+def test_update_registry_preserves_unsupported_antigravity_block(tmp_path: Path) -> None:
+    """WI-5095: a status='unsupported' antigravity parity override is preserved
+    (never flipped to 'adapter', source_sha256 never touched)."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry_with_unsupported_antigravity(tmp_path)
+
+    adapters = module.build_adapters(tmp_path)
+    changed = module.update_registry(tmp_path, adapters)
+
+    parsed = tomllib.loads(
+        (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").read_text(encoding="utf-8")
+    )
+    review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")
+    assert changed is False
+    assert review["antigravity"]["status"] == "unsupported"
+    assert review["antigravity"]["source_sha256"] == "stalehash"
+
+
+def test_update_registry_is_idempotent(tmp_path: Path) -> None:
+    """WI-5095: refreshing an existing stale block is a one-shot change; a second
+    refresh over the now-truthful registry is a no-op."""
     module = _load_module()
     _write_skill(tmp_path, "review")
     _write_skill(tmp_path, "build")
     _write_registry(tmp_path, existing_antigravity_block=True)
-
-    adapters = module.build_adapters(tmp_path)
-    changed = module.update_registry(tmp_path, adapters)
-
-    registry_text = (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").read_text(
-        encoding="utf-8"
-    )
-    assert changed is True
-    assert registry_text.count("[capabilities.antigravity]") == 2
-    assert "stalehash" not in registry_text
-    parsed = tomllib.loads(registry_text)
-    review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")
-    assert review["antigravity"]["source_sha256"] != "stalehash"
-
-
-def test_update_registry_is_idempotent(tmp_path: Path) -> None:
-    module = _load_module()
-    _write_skill(tmp_path, "review")
-    _write_skill(tmp_path, "build")
-    _write_registry(tmp_path)
 
     adapters = module.build_adapters(tmp_path)
     assert module.update_registry(tmp_path, adapters) is True
@@ -256,11 +374,14 @@ def test_update_registry_is_idempotent(tmp_path: Path) -> None:
 def test_codex_and_antigravity_registry_updates_converge(
     tmp_path: Path, first_generator: str, second_generator: str
 ) -> None:
+    """WI-5095: the codex and antigravity refreshes maintain their own harness
+    tables independently and converge to a stable registry (each refreshing only
+    its own status='adapter' source_sha256, neither inserting nor clobbering)."""
     codex_module = _load_codex_module()
     antigravity_module = _load_module()
     _write_skill(tmp_path, "review")
     _write_skill(tmp_path, "build")
-    _write_registry(tmp_path)
+    _write_registry_with_stale_both_harness_blocks(tmp_path)
 
     generators = {
         "codex": (codex_module, codex_module.build_adapters(tmp_path)),
@@ -275,6 +396,7 @@ def test_codex_and_antigravity_registry_updates_converge(
 
     registry_path = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
     converged_text = registry_path.read_text(encoding="utf-8")
+    assert "stalehash" not in converged_text
     parsed = tomllib.loads(converged_text)
     for capability in parsed["capabilities"]:
         assert capability["codex"]["status"] == "adapter"

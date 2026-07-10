@@ -4,6 +4,7 @@ import importlib.util
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -76,6 +77,7 @@ status = "adapter"
 adapter_source = ".claude/skills/review/SKILL.md"
 """.lstrip(),
         encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -392,10 +394,82 @@ def test_existing_current_adapters_pass_check_mode(tmp_path: Path) -> None:
     assert adapters == [".codex/skills/review/SKILL.md"]
 
 
-def test_update_registry_points_codex_at_generated_adapter(tmp_path: Path) -> None:
+def _write_registry_variant(
+    project_root: Path,
+    *,
+    codex_status: str | None = "adapter",
+    codex_source_sha256: str | None = "stalehash",
+) -> None:
+    """Write a single-capability registry for the WI-5095 refresh tests.
+
+    ``codex_status=None`` omits the ``[capabilities.codex]`` sub-table entirely;
+    otherwise the sub-table is written with the given status and (when
+    ``codex_source_sha256`` is not None) a ``source_sha256`` line.
+    """
+    registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    codex_block = ""
+    if codex_status is not None:
+        sha_line = f'\nsource_sha256 = "{codex_source_sha256}"' if codex_source_sha256 is not None else ""
+        codex_block = (
+            "\n\n[capabilities.codex]\n"
+            'surface = ".codex/skills/review/SKILL.md"\n'
+            f'status = "{codex_status}"\n'
+            'adapter_source = ".claude/skills/review/SKILL.md"'
+            f"{sha_line}"
+        )
+    registry_path.write_text(
+        f'''registry_id = "test-registry"
+purpose = "test"
+
+[[capabilities]]
+id = "skill.review"
+kind = "skill"
+canonical_name = "review"
+canonical_source = ".claude/skills/review/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[capabilities.claude]
+surface = ".claude/skills/review/SKILL.md"
+status = "native"{codex_block}
+''',
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _read_registry(project_root: Path) -> dict:
+    text = (project_root / "config" / "agent-control" / "harness-capability-registry.toml").read_text(encoding="utf-8")
+    return tomllib.loads(text)
+
+
+def test_registry_refresh_rewrites_stale_codex_source_sha256(tmp_path: Path) -> None:
+    """WI-5095: update_registry refreshes ONLY the source_sha256 line of an
+    existing status='adapter' codex block, leaving the other fields intact."""
     module = _load_module()
     _write_skill(tmp_path, "review")
-    _write_registry(tmp_path)
+    _write_registry_variant(tmp_path, codex_status="adapter", codex_source_sha256="stalehash")
+
+    adapters = module.build_adapters(tmp_path)
+    changed = module.update_registry(tmp_path, adapters)
+
+    parsed = _read_registry(tmp_path)
+    review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")
+    assert changed is True
+    assert review["codex"]["status"] == "adapter"
+    assert review["codex"]["surface"] == ".codex/skills/review/SKILL.md"
+    assert review["codex"]["adapter_source"] == ".claude/skills/review/SKILL.md"
+    assert review["codex"]["source_sha256"] == adapters[0].source_sha256
+    assert review["codex"]["source_sha256"] != "stalehash"
+
+
+def test_registry_refresh_does_not_insert_missing_codex_block(tmp_path: Path) -> None:
+    """WI-5095: the refresh NEVER inserts a [capabilities.codex] block for a
+    capability that has none (the -001 approach's over-projection defect)."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry_variant(tmp_path, codex_status=None)
 
     adapters = module.build_adapters(tmp_path)
     changed = module.update_registry(tmp_path, adapters)
@@ -403,11 +477,52 @@ def test_update_registry_points_codex_at_generated_adapter(tmp_path: Path) -> No
     registry_text = (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").read_text(
         encoding="utf-8"
     )
-    assert changed is True
-    assert 'surface = ".codex/skills/review/SKILL.md"' in registry_text
-    assert 'status = "adapter"' in registry_text
-    assert 'adapter_source = ".claude/skills/review/SKILL.md"' in registry_text
-    assert "source_sha256 =" in registry_text
+    assert changed is False
+    assert "[capabilities.codex]" not in registry_text
+
+
+def test_registry_refresh_preserves_unsupported_codex_block(tmp_path: Path) -> None:
+    """WI-5095: an intentional status='unsupported' parity override is NEVER
+    flipped to 'adapter' and its source_sha256 is NEVER touched."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry_variant(tmp_path, codex_status="unsupported", codex_source_sha256="stalehash")
+
+    adapters = module.build_adapters(tmp_path)
+    changed = module.update_registry(tmp_path, adapters)
+
+    parsed = _read_registry(tmp_path)
+    review = next(c for c in parsed["capabilities"] if c["id"] == "skill.review")
+    assert changed is False
+    assert review["codex"]["status"] == "unsupported"
+    assert review["codex"]["source_sha256"] == "stalehash"
+
+
+def test_registry_refresh_is_idempotent(tmp_path: Path) -> None:
+    """WI-5095: a second refresh over an already-truthful registry is a no-op."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry_variant(tmp_path, codex_status="adapter", codex_source_sha256="stalehash")
+
+    adapters = module.build_adapters(tmp_path)
+    assert module.update_registry(tmp_path, adapters) is True
+    assert module.update_registry(tmp_path, adapters) is False
+
+
+def test_update_registry_flag_is_deprecated_noop(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """WI-5095: --update-registry is a deprecated no-op; the refresh is folded
+    into the default generate() flow, so the flag does not double-run it."""
+    module = _load_module()
+    _write_skill(tmp_path, "review")
+    _write_registry_variant(tmp_path, codex_status="adapter", codex_source_sha256="stalehash")
+
+    rc = module.main(["--project-root", str(tmp_path), "--update-registry"])
+    err = capsys.readouterr().err
+    assert rc == 0
+    assert "deprecated" in err
+    # The default flow still refreshed the stale source_sha256.
+    review = next(c for c in _read_registry(tmp_path)["capabilities"] if c["id"] == "skill.review")
+    assert review["codex"]["source_sha256"] == module.build_adapters(tmp_path)[0].source_sha256
 
 
 # ---------------------------------------------------------------------------

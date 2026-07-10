@@ -156,87 +156,20 @@ def _manifest_content(adapters: list[SkillAdapter]) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
-def _antigravity_subsection_lines(adapter: SkillAdapter) -> list[str]:
-    return [
-        REGISTRY_HARNESS_TABLE,
-        f'surface = "{adapter.adapter_relative_path}"',
-        'status = "adapter"',
-        f'adapter_source = "{adapter.source_relative_path}"',
-        f'source_sha256 = "{adapter.source_sha256}"',
-    ]
-
-
-def _emit_antigravity_block(output: list[str], adapter: SkillAdapter) -> None:
-    """Append a [capabilities.antigravity] block to ``output``, preceded by
-    exactly one blank line to match the registry's blank-line-before-subtable
-    style. Any trailing blank lines already in ``output`` are collapsed first."""
-
-    while output and output[-1].strip() == "":
-        output.pop()
-    output.append("")
-    output.extend(_antigravity_subsection_lines(adapter))
-
-
-def _apply_antigravity_registry(text: str, adapters: list[SkillAdapter]) -> str:
-    """Insert or rewrite a [capabilities.antigravity] block per LO-scoped capability.
-
-    The block is placed last in its [[capabilities]] entry (after the
-    [capabilities.codex] block). On a re-run an existing block is replaced.
-    Capabilities not in the LO-scoped adapter set are left untouched.
-    """
-
-    adapters_by_source = {adapter.source_relative_path: adapter for adapter in adapters}
-    lines = text.splitlines()
-    output: list[str] = []
-    current_source: str | None = None
-    pending_adapter: SkillAdapter | None = None
-    skipping_old_block = False
-
-    for line in lines:
-        stripped = line.strip()
-
-        if skipping_old_block:
-            if stripped.startswith("["):
-                skipping_old_block = False
-            else:
-                continue
-
-        if stripped.startswith("[[capabilities]]"):
-            if pending_adapter is not None:
-                _emit_antigravity_block(output, pending_adapter)
-                pending_adapter = None
-            current_source = None
-            output.append(line)
-            continue
-
-        if stripped.startswith("canonical_source"):
-            current_source = stripped.split("=", 1)[1].strip().strip('"')
-            pending_adapter = adapters_by_source.get(current_source)
-            output.append(line)
-            continue
-
-        if stripped == REGISTRY_HARNESS_TABLE:
-            adapter = adapters_by_source.get(current_source or "")
-            if adapter is not None:
-                _emit_antigravity_block(output, adapter)
-                pending_adapter = None
-                skipping_old_block = True
-                continue
-            output.append(line)
-            continue
-
-        output.append(line)
-
-    if pending_adapter is not None:
-        _emit_antigravity_block(output, pending_adapter)
-
-    return "\n".join(output).rstrip() + "\n"
-
-
 def update_registry(project_root: Path, adapters: list[SkillAdapter], *, check: bool = False) -> bool:
+    """Adapter-only ``source_sha256`` refresh for the [capabilities.antigravity]
+    sub-tables, delegating to the shared harness-agnostic refresh.
+
+    WI-5095: this replaces the prior insert-or-rewrite behaviour, which both
+    inserted [capabilities.antigravity] blocks for skills that had none and
+    whole-block-rewrote existing ones, clobbering intentional
+    ``status = "unsupported"`` parity overrides. The refresh now only replaces
+    the ``source_sha256`` line of blocks that already declare
+    ``status = "adapter"``; it never inserts a block and never flips a status.
+    """
     registry_path = project_root / REGISTRY_RELATIVE_PATH
     current = registry_path.read_bytes().decode("utf-8")
-    updated = _apply_antigravity_registry(current, adapters)
+    updated = codex_gen._refresh_registry_source_sha256(current, adapters, REGISTRY_HARNESS_TABLE)
     if current == updated:
         return False
     if not check:
@@ -283,6 +216,11 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
     manifest_path = project_root / ANTIGRAVITY_SKILLS_RELATIVE_PATH / MANIFEST_NAME
     if _write_if_changed(manifest_path, _manifest_content(adapters), check=check):
         changed.append(_relative_path(project_root, manifest_path))
+    # WI-5095: the adapter-only registry source_sha256 refresh is part of the
+    # default flow. In --check it reports a stale adapter-block source_sha256 as
+    # drift without writing.
+    if update_registry(project_root, adapters, check=check):
+        changed.append(REGISTRY_RELATIVE_PATH.as_posix())
     changed.extend(_remove_orphan_adapters(project_root, adapters, check=check))
     return changed, [adapter.adapter_relative_path for adapter in adapters]
 
@@ -294,15 +232,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--update-registry",
         action="store_true",
-        help="Insert or update [capabilities.antigravity] capability-registry blocks.",
+        help="Deprecated no-op; registry source_sha256 refresh is now part of the default flow.",
     )
     args = parser.parse_args(argv)
 
     changed, adapter_paths = generate(args.project_root, check=args.check)
     if args.update_registry:
-        adapters = build_adapters(args.project_root.resolve())
-        if update_registry(args.project_root.resolve(), adapters, check=args.check):
-            changed.append(REGISTRY_RELATIVE_PATH.as_posix())
+        print(
+            "Antigravity skill adapters: --update-registry is deprecated and a no-op; "
+            "the registry source_sha256 refresh is now part of the default flow.",
+            file=sys.stderr,
+        )
 
     if changed:
         action = "would update" if args.check else "updated"
