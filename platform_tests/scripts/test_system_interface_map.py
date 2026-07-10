@@ -48,8 +48,23 @@ def test_backlog_row_points_to_unified_work_items_authority() -> None:
     assert backlog["authoritative_source"] == "MemBase table: current_work_items"
     assert "current_work_items" in combined
     assert "work_items" in combined
-    assert "bridge/INDEX.md" in combined
+    assert "versioned bridge file chain" in combined
     assert "dashboard/startup rows are summaries" in combined
+
+
+def test_memory_working_records_are_non_authoritative() -> None:
+    module = _load_module()
+    system_map = module.load_map()
+    expected_rows = {
+        "memory-md": ("memory/MEMORY.md", "non_authoritative_operational_notepad"),
+        "release-readiness": ("memory/release-readiness.md", "non_authoritative_release_working_record"),
+    }
+
+    for system_id, (expected_source, expected_state) in expected_rows.items():
+        row = next(row for row in module.system_rows(system_map) if row["id"] == system_id)
+        assert row["authoritative_source"] == expected_source
+        assert row["generated_or_authoritative"] == expected_state
+        assert "non-authoritative" in row["read_method"]
 
 
 def test_common_owner_terms_resolve_to_expected_systems() -> None:
@@ -93,7 +108,7 @@ def test_human_companion_declares_map_is_not_authority() -> None:
 
     assert "config/agent-control/system-interface-map.toml" in text
     assert "not a replacement authority" in text
-    assert "bridge/INDEX.md is bridge queue state, not the backlog" in text
+    assert "Retired bridge-index artifacts" in text
 
 
 def test_human_companion_path_declared_in_map_exists_in_root() -> None:

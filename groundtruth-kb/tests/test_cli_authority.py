@@ -47,6 +47,20 @@ def test_authority_resolve_bridge_index_json_includes_authority_fields() -> None
     assert isinstance(system["related_specs"], list)
 
 
+def test_authority_resolves_memory_working_records_as_non_authoritative() -> None:
+    expected = {
+        "memory note": "non_authoritative_operational_notepad",
+        "release readiness": "non_authoritative_release_working_record",
+    }
+
+    for term, expected_state in expected.items():
+        result = resolve_subject(term, project_root=PROJECT_ROOT)
+        assert result["status"] == "resolved", result
+        system = result["system"]
+        assert system["generated_or_authoritative"] == expected_state
+        assert "non-authoritative" in system["read_method"]
+
+
 def test_authority_resolves_required_owner_facing_terms() -> None:
     expected = {
         "bridge": "file-bridge",
