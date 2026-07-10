@@ -111,7 +111,10 @@ DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "sessio
 STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
 STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
 STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
-STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 2.0
+# Local startup-report rendering can exceed two seconds while remaining well
+# within the interactive hook budget. Keep this bounded and overrideable for
+# fail-visible timeout coverage.
+STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS = 5.0
 # WI-5083: SessionStart 'source' values that mark a mid-session continuation
 # (resume/compact). A startup-input gate armed under one of these is never a
 # legitimate fresh-start relay window. Duplicated (not imported) in

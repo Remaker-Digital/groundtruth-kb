@@ -1682,14 +1682,16 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     stale_time_str = "2026-01-01T00:00:00Z"
     diagnostics = tmp_path / ".codex" / "gtkb-hooks"
     diagnostics.mkdir(parents=True, exist_ok=True)
-    cache_file = diagnostics / "last-user-visible-startup.md"
-    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file = diagnostics / "last-user-visible-startup-pb.md"
+    meta_file = diagnostics / "last-user-visible-startup-pb.meta.json"
     cache_file.write_text(body_text, encoding="utf-8", newline="\n")
 
     encoded = body_text.encode("utf-8")
     meta = {
         "harness_name": "codex",
         "harness_id": "A",
+        "role_mode": "pb",
+        "role_profile": "prime-builder",
         "generated_at": stale_time_str,
         "byte_length": len(encoded),
         "sha256": hashlib.sha256(encoded).hexdigest(),
@@ -1701,7 +1703,7 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
 
     response = module.handle_hook_payload(
-        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        {"hook_event_name": "UserPromptSubmit", "prompt": "::init gtkb pb"},
         tmp_path,
     )
 
@@ -1709,6 +1711,15 @@ def test_startup_gate_self_heals_freshness_stale_cache(tmp_path, monkeypatch) ->
     new_meta = json.loads(meta_file.read_text(encoding="utf-8"))
     assert new_meta["generated_at"] != stale_time_str
     assert "STARTUP RELAY FAILURE" not in response["hookSpecificOutput"]["additionalContext"]
+
+
+def test_startup_gate_default_refresh_budget_allows_local_render(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.delenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", raising=False)
+
+    assert module.STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS == 5.0
+    assert module._startup_relay_refresh_timeout_seconds() == 5.0
 
 
 def test_startup_gate_self_heals_rederivable_content_drift(tmp_path, monkeypatch) -> None:

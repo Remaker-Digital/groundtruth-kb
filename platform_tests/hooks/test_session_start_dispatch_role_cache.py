@@ -156,8 +156,10 @@ def test_metadata_role_mode_fields_match_cache(
 
     assert pb_meta["role_mode"] == "pb"
     assert pb_meta["role_profile"] == "prime-builder"
+    assert isinstance(pb_meta["generated_at"], str) and pb_meta["generated_at"].endswith("Z")
     assert lo_meta["role_mode"] == "lo"
     assert lo_meta["role_profile"] == "loyal-opposition"
+    assert isinstance(lo_meta["generated_at"], str) and lo_meta["generated_at"].endswith("Z")
     assert pb_meta["role_authority"]["interactive_resolved_role"] == "prime-builder"
     assert pb_meta["role_authority"]["authority_mode"] == "cache_only_pending_init_keyword"
     assert "non-overriding" in pb_meta["role_authority"]["durable_registry_authority"]
