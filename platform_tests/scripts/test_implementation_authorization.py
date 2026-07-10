@@ -102,6 +102,30 @@ def _write_verdict(project_root: Path, slug: str, version: int, verdict: str = "
     return path
 
 
+def _write_implementation_report(project_root: Path, slug: str, version: int, paths: list[str]) -> Path:
+    """Write a minimal post-GO implementation report with concrete changed paths."""
+    path = project_root / "bridge" / f"{slug}-{version:03d}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    changed_paths = "\n".join(f"- `{item}`" for item in paths)
+    path.write_text(
+        "\n".join(
+            [
+                "NEW",
+                "",
+                "bridge_kind: implementation_report",
+                f"Document: {slug}",
+                "",
+                "## Files Changed",
+                "",
+                changed_paths,
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def _setup_simple_go_bridge(project_root: Path, slug: str = "fixture-bridge") -> tuple[str, Path, Path]:
     """Build a project root with a single GO'd bridge: NEW at -001, GO at -002."""
     proposal = _write_proposal(project_root, slug, version=1, target_paths=["scripts/dummy.py", ".gtkb-state/**"])
@@ -273,6 +297,90 @@ def test_create_packet_allows_same_session_overlapping_named_packet(auth_module,
     packet_b = auth_module.create_authorization_packet(tmp_path, "bridge-b", session_id="session-A")
 
     assert packet_b["bridge_id"] == "bridge-b"
+
+
+def test_create_packet_allows_when_peer_claim_registry_read_fails(auth_module, tmp_path, monkeypatch):
+    """WI-5105: a peer-registry lookup failure is not evidence of a collision."""
+    _write_proposal(tmp_path, "bridge-a", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "bridge-a", version=2, verdict="GO")
+    _write_proposal(tmp_path, "bridge-b", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
+    packet_a = auth_module.create_authorization_packet(tmp_path, "bridge-a")
+    auth_module.write_named_packet(tmp_path, packet_a, "bridge-a")
+    _write_prime_marker(tmp_path, "session-a")
+    assert auth_module.bridge_work_intent_registry.acquire("bridge-a", "session-a", project_root=tmp_path)
+
+    def registry_unavailable(*_args, **_kwargs):
+        raise auth_module.bridge_work_intent_registry.WorkIntentRegistryError("fixture registry unavailable")
+
+    monkeypatch.setattr(auth_module.bridge_work_intent_registry, "current_holder", registry_unavailable)
+
+    packet_b = auth_module.create_authorization_packet(tmp_path, "bridge-b", session_id="session-b")
+
+    assert packet_b["bridge_id"] == "bridge-b"
+
+
+def _seed_peer_report_collision(auth_module, tmp_path) -> None:
+    _write_proposal(tmp_path, "peer-thread", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "peer-thread", version=2, verdict="GO")
+    peer_packet = auth_module.create_authorization_packet(tmp_path, "peer-thread")
+    auth_module.write_named_packet(tmp_path, peer_packet, "peer-thread")
+    _write_implementation_report(tmp_path, "peer-thread", version=3, paths=["scripts/shared.py"])
+
+
+def test_create_packet_blocks_dirty_path_claimed_by_nonterminal_peer_report(auth_module, tmp_path, monkeypatch):
+    """WI-5105: a released claim cannot reopen a dirty peer's reported path."""
+    _seed_peer_report_collision(auth_module, tmp_path)
+    _write_proposal(tmp_path, "current-thread", version=1, target_paths=["scripts/shared.py"])
+    _write_verdict(tmp_path, "current-thread", version=2, verdict="GO")
+    monkeypatch.setattr(auth_module, "_dirty_worktree_paths", lambda _root: ["scripts/shared.py"])
+
+    with pytest.raises(auth_module.AuthorizationError) as exc_info:
+        auth_module.create_authorization_packet(tmp_path, "current-thread", session_id="session-current")
+
+    message = str(exc_info.value)
+    assert "Peer implementation report conflict" in message
+    assert "peer-thread" in message
+    assert "scripts/shared.py" in message
+
+
+def test_peer_report_dirty_path_guard_allows_terminal_clean_same_thread_and_nonoverlap(
+    auth_module, tmp_path, monkeypatch
+):
+    """WI-5105 allow-side coverage prevents false-positive serialization."""
+    _seed_peer_report_collision(auth_module, tmp_path)
+    guard = auth_module.peer_report_dirty_path_collision_reason
+
+    monkeypatch.setattr(auth_module, "_dirty_worktree_paths", lambda _root: ["scripts/shared.py"])
+    assert guard(tmp_path, targets=["scripts/shared.py"], bridge_id="peer-thread") is None
+    assert guard(tmp_path, targets=["scripts/other.py"], bridge_id="current-thread") is None
+
+    monkeypatch.setattr(auth_module, "_dirty_worktree_paths", lambda _root: [])
+    assert guard(tmp_path, targets=["scripts/shared.py"], bridge_id="current-thread") is None
+
+    monkeypatch.setattr(auth_module, "_dirty_worktree_paths", lambda _root: ["scripts/shared.py"])
+    _write_verdict(tmp_path, "peer-thread", version=4, verdict="VERIFIED")
+    assert guard(tmp_path, targets=["scripts/shared.py"], bridge_id="current-thread") is None
+
+
+def test_peer_report_dirty_path_guard_fails_soft_for_unreadable_peer_chain(auth_module, tmp_path, monkeypatch):
+    """WI-5105: a bridge-read failure cannot manufacture a commingle block."""
+    _seed_peer_report_collision(auth_module, tmp_path)
+    monkeypatch.setattr(auth_module, "_dirty_worktree_paths", lambda _root: ["scripts/shared.py"])
+
+    def unreadable_chain(*_args, **_kwargs):
+        raise auth_module.AuthorizationError("fixture unreadable bridge")
+
+    monkeypatch.setattr(auth_module, "bridge_entry", unreadable_chain)
+
+    assert (
+        auth_module.peer_report_dirty_path_collision_reason(
+            tmp_path,
+            targets=["scripts/shared.py"],
+            bridge_id="current-thread",
+        )
+        is None
+    )
 
 
 # ---------------------------------------------------------------------------

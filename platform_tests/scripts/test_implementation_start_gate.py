@@ -77,6 +77,25 @@ def _go_verdict_body(bridge_id: str = "sample-implementation") -> str:
     )
 
 
+def _write_implementation_report(root: Path, bridge_id: str, paths: list[str]) -> None:
+    (root / "bridge" / f"{bridge_id}-003.md").write_text(
+        "\n".join(
+            [
+                "NEW",
+                "",
+                "bridge_kind: implementation_report",
+                f"Document: {bridge_id}",
+                "",
+                "## Files Changed",
+                "",
+                *(f"- `{path}`" for path in paths),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_thread(
     root: Path,
     *,
@@ -85,7 +104,7 @@ def _write_thread(
     proposal: str | None = None,
 ) -> None:
     bridge = root / "bridge"
-    bridge.mkdir()
+    bridge.mkdir(exist_ok=True)
     proposal_name = f"{bridge_id}-001.md"
     go_name = f"{bridge_id}-002.md"
     proposal_body = proposal or _proposal(bridge_id=bridge_id)
@@ -233,6 +252,28 @@ def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> 
     _claim_bridge(tmp_path)
 
     assert gate.gate_decision(_apply_patch_payload(tmp_path)) == {}
+
+
+def test_gate_blocks_dirty_path_claimed_by_nonterminal_peer_report(tmp_path: Path, monkeypatch) -> None:
+    """WI-5105: protected mutation rechecks a released peer report before edit."""
+    peer = "peer-thread"
+    current = "current-thread"
+    _write_thread(tmp_path, bridge_id=peer)
+    peer_packet = auth.create_authorization_packet(tmp_path, peer)
+    auth.write_named_packet(tmp_path, peer_packet, peer)
+    _write_thread(tmp_path, bridge_id=current)
+    current_packet = auth.create_authorization_packet(tmp_path, current)
+    auth.write_packet(tmp_path, current_packet)
+    _claim_bridge(tmp_path, current, "session-1")
+    _write_implementation_report(tmp_path, peer, ["scripts/sample.py"])
+    monkeypatch.setattr(auth, "_dirty_worktree_paths", lambda _root: ["scripts/sample.py"])
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, session_id="session-1"))
+
+    assert result["decision"] == "block"
+    assert "Peer implementation report conflict" in result["reason"]
+    assert "peer-thread" in result["reason"]
+    assert "scripts/sample.py" in result["reason"]
 
 
 def test_dispatcher_rules_toml_direct_apply_patch_blocked_even_with_go(tmp_path: Path) -> None:

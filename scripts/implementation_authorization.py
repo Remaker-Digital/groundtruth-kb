@@ -1295,6 +1295,178 @@ def packet_hash(packet: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def _dirty_worktree_paths(project_root: Path) -> list[str]:
+    """Return concrete dirty paths from git, or no evidence when git is unavailable.
+
+    This is intentionally fail-soft. The commingle guard only blocks on positive,
+    attributable evidence and must not turn an unavailable git status check into a
+    spurious implementation denial.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            cwd=project_root,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return []
+    if result.returncode != 0:
+        return []
+
+    paths: set[str] = set()
+    records = result.stdout.split(b"\0")
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if len(record) < 4:
+            continue
+        status = record[:2]
+        raw_path = record[3:]
+        try:
+            path_text = raw_path.decode("utf-8", errors="surrogateescape")
+            paths.add(normalize_relative_path(project_root, path_text))
+        except (AuthorizationError, UnicodeError):
+            continue
+        # Porcelain v1 emits a second NUL-delimited source path for a rename or
+        # copy. It is not a currently dirty destination that another thread can
+        # mutate, so skip it deterministically.
+        if b"R" in status or b"C" in status:
+            index += 1
+    return sorted(paths)
+
+
+def _reported_paths_from_implementation_report(project_root: Path, markdown: str) -> list[str]:
+    """Extract concrete paths from an implementation report's Files Changed section.
+
+    Implementation reports deliberately carry their own changed-path claim. Do
+    not infer ownership from the original proposal: the whole point of this guard
+    is to identify the exact dirty artifact the peer reported after implementation.
+    """
+    if proposal_bridge_kind(markdown) != "implementation_report":
+        return []
+
+    paths: set[str] = set()
+    for _level, heading, body in _iter_section_spans(markdown):
+        normalized_heading = heading.lower().replace("–", "-").replace("—", "-").strip()
+        if normalized_heading not in {"files changed", "implemented paths"}:
+            continue
+        for raw_line in body.splitlines():
+            line = raw_line.strip()
+            if not line.startswith(("- ", "* ")):
+                continue
+            candidate = line[2:].strip()
+            ticked = re.match(r"`([^`]+)`", candidate)
+            if ticked:
+                candidate = ticked.group(1).strip()
+            else:
+                candidate = candidate.split(maxsplit=1)[0].strip("`.,;:")
+            if not candidate:
+                continue
+            try:
+                paths.add(normalize_relative_path(project_root, candidate))
+            except AuthorizationError:
+                continue
+    return sorted(paths)
+
+
+def _historical_peer_packet(project_root: Path, bridge_id: str) -> dict[str, Any] | None:
+    """Read a peer's historical named packet without rejecting its post-GO report.
+
+    ``load_named_packet`` correctly rejects a packet once a post-implementation
+    NEW/REVISED report becomes the thread's latest state. This guard needs that
+    packet precisely in that state, so it verifies the packet identity and hash
+    without applying current-status/expiry checks intended for resumed mutation.
+    """
+    try:
+        raw = packet_path_for_bridge(project_root, bridge_id).read_text(encoding="utf-8")
+        packet = json.loads(raw)
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(packet, dict) or packet.get("bridge_id") != bridge_id:
+        return None
+    if not isinstance(packet.get("target_path_globs"), list):
+        return None
+    if packet.get("packet_hash") != packet_hash(packet):
+        return None
+    return packet
+
+
+def _peer_implementation_report_paths(project_root: Path, bridge_id: str) -> list[str]:
+    """Return a non-terminal peer's newest post-GO implementation-report paths."""
+    try:
+        entry = bridge_entry(project_root, bridge_id)
+    except AuthorizationError:
+        return []
+    if entry.latest_status in {"VERIFIED", "WITHDRAWN"}:
+        return []
+
+    go_index = next((index for index, (status, _) in enumerate(entry.versions) if status == "GO"), None)
+    if go_index is None:
+        return []
+    for status, rel_path in entry.versions[:go_index]:
+        if status not in {"NEW", "REVISED"}:
+            continue
+        try:
+            report = (project_root / rel_path).read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError):
+            continue
+        paths = _reported_paths_from_implementation_report(project_root, report)
+        if paths:
+            return paths
+    return []
+
+
+def peer_report_dirty_path_collision_reason(
+    project_root: Path,
+    *,
+    targets: list[str],
+    bridge_id: str,
+) -> str | None:
+    """Return a per-thread commingle block only for attributable dirty peer paths.
+
+    WI-5105 closes the post-report window left after WI-4471 releases a peer's
+    active claim. A block requires all three facts: a non-terminal peer report
+    names the concrete path, the peer's named packet authorizes it, and git says
+    that same path is dirty. Every lookup failure is fail-soft.
+    """
+    if bridge_id in BOOTSTRAP_BRIDGE_IDS:
+        return None
+    dirty_paths = _dirty_worktree_paths(project_root)
+    if not dirty_paths:
+        return None
+    by_bridge_dir = project_root / BY_BRIDGE_DIRECTORY_RELATIVE_PATH
+    if not by_bridge_dir.is_dir():
+        return None
+
+    for packet_path in sorted(by_bridge_dir.glob("*.json")):
+        peer_bridge_id = packet_path.stem
+        if peer_bridge_id in {bridge_id, *BOOTSTRAP_BRIDGE_IDS}:
+            continue
+        peer_packet = _historical_peer_packet(project_root, peer_bridge_id)
+        if peer_packet is None:
+            continue
+        peer_targets = [str(path) for path in peer_packet["target_path_globs"] if isinstance(path, str)]
+        report_paths = set(_peer_implementation_report_paths(project_root, peer_bridge_id))
+        if not report_paths:
+            continue
+        for dirty_path in dirty_paths:
+            if dirty_path not in report_paths:
+                continue
+            if not path_authorized_by_target_paths(targets, dirty_path):
+                continue
+            if not path_authorized_by_target_paths(peer_targets, dirty_path):
+                continue
+            return (
+                f"Peer implementation report conflict: bridge {peer_bridge_id!r} has a non-terminal "
+                f"implementation report that claims dirty path {dirty_path!r}. Wait for that thread "
+                "to reach a terminal state before mutating the shared path. "
+                "(PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001)"
+            )
+    return None
+
+
 def _go_self_review_error(proposal_content: str, go_path: Path, bridge_id: str | None = None) -> None:
     """Refuse a self-review GO at impl-start (WI-4829 defense-in-depth backstop).
 
@@ -1432,6 +1604,15 @@ def create_authorization_packet(
         )
         if collision_reason:
             errors.append(collision_reason)
+
+    if target_paths:
+        peer_report_reason = peer_report_dirty_path_collision_reason(
+            project_root,
+            targets=target_paths,
+            bridge_id=bridge_id,
+        )
+        if peer_report_reason:
+            errors.append(peer_report_reason)
 
     if errors:
         raise AuthorizationError("; ".join(errors))

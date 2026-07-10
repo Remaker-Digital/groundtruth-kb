@@ -22,6 +22,7 @@ try:
         finalization_target_paths_for_verified,
         normalize_relative_path,
         path_authorized_by_target_paths,
+        peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
         validate_targets,
         work_intent_claim_block_reason,
@@ -34,6 +35,7 @@ except ImportError:  # pragma: no cover - direct script execution path
         finalization_target_paths_for_verified,
         normalize_relative_path,
         path_authorized_by_target_paths,
+        peer_report_dirty_path_collision_reason,
         resolve_work_intent_session_id,
         validate_targets,
         work_intent_claim_block_reason,
@@ -1320,6 +1322,13 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if collision_reason:
             raise AuthorizationError(collision_reason)
+        peer_report_reason = peer_report_dirty_path_collision_reason(
+            root,
+            targets=protected,
+            bridge_id=bridge_id,
+        )
+        if peer_report_reason:
+            raise AuthorizationError(peer_report_reason)
         # WI-4527: the edit is authorized. As a fail-soft side-effect on the
         # already-allowed path, auto-extend an active GO-implementation claim
         # whose deadline is near so a long build does not lose its claim
