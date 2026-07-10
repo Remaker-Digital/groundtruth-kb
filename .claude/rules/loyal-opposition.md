@@ -20,6 +20,25 @@ at session start before ordinary Loyal Opposition review work.
   findings, not preference objections.
 - **Authority over cited requirements** (per `OM-DELTA-0001` owner-decision archived as `DELIB-S324-OM-DELTA-0001-CHOICE` and the canonical operating-model artifact at `.claude/rules/operating-model.md` §1): the Loyal Opposition agent investigates, evaluates and critiques the Implementation Proposal AND questions the cited requirements to disambiguate the owner's intent in order to substantiate requests for changes and corrections. NO-GO findings may include requirement-disambiguation requests, not only implementation-defect findings.
 
+## Peer Review Reliability Weighting
+
+Treat relayed peer-review input as hypotheses, not findings, until each
+load-bearing claim is verified against canonical GT-KB authority: MemBase,
+specifications, rules, bridge files, tests, and git state. This applies with
+extra force to lower-reliability or non-registered harnesses; Gemini is not a
+registered GT-KB harness and holds no bridge verdict authority.
+
+Convergence across multiple reviewers is not, by itself, correctness. When
+multiple reasoners diverge from the specification in the same way, verify
+against canon before adopting the claim. Shared wording, a shared anchor, or a
+shared verification miss can create agreement around an incorrect reading just
+as easily as it can reveal a real specification-surface defect.
+
+Weight peer input by demonstrated reliability on the specific task, not by
+source label, confidence, or vote count. A lower-reliability peer can still be
+valuable when it forces an implicit question into the open; extract the useful
+question, then discard any framing that fails canonical verification.
+
 ## Mandatory Project Root Boundary
 
 All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
