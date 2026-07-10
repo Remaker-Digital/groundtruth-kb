@@ -1,20 +1,11 @@
-"""Tests for the harness-aware `changed_by` resolver.
-
-Authority: bridge/gtkb-kb-attribution-harness-aware-003.md (Codex GO at -004).
-
-Covers the three-source priority order (kwarg / env / single Prime),
-fail-closed semantics for mutating callers, and the separate read-only
-variant. Also asserts the 4 archive helpers no longer contain the literal
-`prime-builder/claude-code` (Codex F1+F2 fix verification).
-"""
+"""Specification-derived tests for document-authoritative backlog attribution."""
 
 from __future__ import annotations
 
+import inspect
 import json
-import os
 import sys
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -24,343 +15,129 @@ ARCHIVE_HELPERS = sorted(SCRIPTS_DIR.glob("_archive_delib_s32*.py"))
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts._kb_attribution import (  # noqa: E402
-    ENV_VAR_HARNESS_NAME,
-    resolve_changed_by,
-    resolve_changed_by_or_none,
-)
+from groundtruth_kb.session.envelope import worker_session_envelope_path  # noqa: E402
 
-_VENDOR_ENV_VARS = (
-    "CLAUDECODE",
-    "CLAUDE_CODE_SESSION_ID",
-    "CLAUDE_PROJECT_DIR",
-    "CODEX_HOME",
-    "CODEX_THREAD_ID",
-)
+import scripts._kb_attribution as kb  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def mock_harness_state(tmp_path, monkeypatch):
-    registry_file = tmp_path / "harness-registry.json"
-    identities_file = tmp_path / "harness-identities.json"
-
-    registry_file.write_text(
+def _write_worker_document(
+    root: Path,
+    *,
+    harness_name: str,
+    session_id: str,
+    role: str,
+    harness_id: str = "A",
+) -> None:
+    path = worker_session_envelope_path(root, harness_name, session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
-                "source_of_truth": "MemBase harnesses table",
-                "harnesses": [
-                    {
-                        "id": "A",
-                        "harness_name": "codex",
-                        "harness_type": "codex",
-                        "role": ["loyal-opposition"],
-                        "status": "active",
-                    },
-                    {
-                        "id": "B",
-                        "harness_name": "claude",
-                        "harness_type": "claude",
-                        "role": ["prime-builder"],
-                        "status": "active",
-                    },
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    identities_file.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "source_of_truth": "GT-KB harness installation identities",
-                "harnesses": {
-                    "claude": {"id": "B"},
-                    "codex": {"id": "A"},
-                    "antigravity": {"id": "C"},
-                    "ollama": {"id": "D"},
+                "status": "open",
+                "session_id": session_id,
+                "harness_id": harness_id,
+                "harness_name": harness_name,
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": session_id,
+                    "harness_id": harness_id,
+                    "harness_name": harness_name,
+                    "role": role,
+                    "role_resolution_source": "dispatcher_composition",
+                    "dispatch_run_id": session_id,
+                    "issued_at": "2026-07-10T18:00:00Z",
                 },
             }
         ),
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry_file))
-    monkeypatch.setenv("GTKB_HARNESS_IDENTITIES_PATH", str(identities_file))
-    for env_var in _VENDOR_ENV_VARS:
+
+@pytest.fixture
+def worker_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, str]:
+    session_id = "session-5171"
+    monkeypatch.setattr(kb, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(kb, "_current_session_id", lambda: session_id)
+    monkeypatch.delenv(kb.ENV_VAR_HARNESS_NAME, raising=False)
+    for env_var in ("CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CODEX_HOME", "CODEX_THREAD_ID"):
         monkeypatch.delenv(env_var, raising=False)
-    # Baseline tests assert durable registry behavior; marker tests cover overrides.
-    monkeypatch.setattr(
-        "scripts._kb_attribution._session_role_override",
-        lambda _harness_name: None,
-    )
-    monkeypatch.setattr(
-        "scripts._kb_attribution._open_session_envelope_harness_name",
-        lambda: None,
-    )
+    return tmp_path, session_id
 
 
-def test_explicit_kwarg_resolves_codex() -> None:
-    """Priority 1: explicit kwarg `harness_name` takes precedence."""
-    result = resolve_changed_by(harness_name="codex")
-    assert result == "loyal-opposition/codex"
-
-
-def test_explicit_kwarg_resolves_claude() -> None:
-    """Priority 1: explicit kwarg works for either harness."""
-    result = resolve_changed_by(harness_name="claude")
-    assert result == "prime-builder/claude"
-
-
-def test_env_var_resolves_when_no_kwarg() -> None:
-    """Priority 2: GTKB_HARNESS_NAME env var is consulted when kwarg is None."""
-    with mock.patch.dict("os.environ", {ENV_VAR_HARNESS_NAME: "codex"}):
-        assert resolve_changed_by() == "loyal-opposition/codex"
-
-
-def test_kwarg_precedes_env_var() -> None:
-    """Priority 1 beats priority 2: explicit kwarg overrides env var."""
-    with mock.patch.dict("os.environ", {ENV_VAR_HARNESS_NAME: "codex"}):
-        assert resolve_changed_by(harness_name="claude") == "prime-builder/claude"
-
-
-def test_kwarg_and_env_precede_runtime_env_detection(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Higher-confidence sources beat conflicting vendor-runtime signals."""
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert resolve_changed_by(harness_name="codex") == "loyal-opposition/codex"
-
-    monkeypatch.setenv(ENV_VAR_HARNESS_NAME, "codex")
-    assert resolve_changed_by() == "loyal-opposition/codex"
-
-
-def test_runtime_env_detects_codex_over_prime_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Codex runtime signals identify Codex before the durable Prime fallback."""
-    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
-    monkeypatch.setenv("CODEX_HOME", "C:/Users/example/.codex")
-    assert resolve_changed_by() == "loyal-opposition/codex"
-
-
-def test_runtime_env_detects_claude(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Claude runtime signals identify Claude without relying on the fallback."""
-    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
-    monkeypatch.setenv("CLAUDECODE", "1")
-    assert resolve_changed_by() == "prime-builder/claude"
-
-
-def test_runtime_env_unknown_harness_still_fails_closed(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    ("harness_name", "role"),
+    [("codex", "prime-builder"), ("claude", "loyal-opposition")],
+)
+def test_role_dcl_a10_document_provenance_semantics_are_harness_independent(
+    worker_session: tuple[Path, str], harness_name: str, role: str
 ) -> None:
-    """Vendor detection is only a candidate source; identities still validate."""
-    monkeypatch.setattr("scripts._kb_attribution._harness_id_for_name", lambda _name: None)
-    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
-    monkeypatch.setenv("CODEX_THREAD_ID", "thread-123")
-    with pytest.raises(RuntimeError, match="has no entry"):
-        resolve_changed_by()
+    root, session_id = worker_session
+    _write_worker_document(root, harness_name=harness_name, session_id=session_id, role=role)
+
+    assert kb.resolve_changed_by(harness_name=harness_name) == f"{role}/{harness_name}"
 
 
-def test_single_prime_fallback_resolves_to_claude() -> None:
-    """Priority 3: with kwarg=None and no env var, the sole Prime Builder is used.
+def test_role_dcl_a2_canonical_writer_delegates_only_to_document_provenance(worker_session: tuple[Path, str]) -> None:
+    """The writer consumes document provenance and has no dispatcher-role path."""
+    root, session_id = worker_session
+    _write_worker_document(root, harness_name="codex", session_id=session_id, role="prime-builder")
 
-    Current role state: claude = prime-builder, codex = loyal-opposition.
-    Sole Prime Builder is claude.
-    """
-    # Ensure env var is unset for this test, preserving others like registry paths
-    with mock.patch.dict("os.environ", {}):
-        os.environ.pop(ENV_VAR_HARNESS_NAME, None)
-        assert resolve_changed_by() == "prime-builder/claude"
-
-
-def test_unresolvable_harness_raises() -> None:
-    """Priority 1 with unknown harness_name raises (no fallback)."""
-    with pytest.raises(RuntimeError, match="no entry in"):
-        resolve_changed_by(harness_name="nonexistent-harness-xyz")
+    resolver_source = inspect.getsource(kb.resolve_changed_by)
+    assert "resolve_worker_role_provenance" in resolver_source
+    assert "read_roles" not in resolver_source
+    assert "harness-registry" not in resolver_source
+    assert "dispatcher" not in resolver_source
+    assert kb.resolve_changed_by(harness_name="codex") == "prime-builder/codex"
 
 
-def test_or_none_returns_none_for_unresolvable() -> None:
-    """Read-only variant returns None where the mutating variant raises."""
-    assert resolve_changed_by_or_none(harness_name="nonexistent-harness-xyz") is None
+def test_harness_environment_selects_a_document_but_never_supplies_a_role(
+    worker_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, session_id = worker_session
+    _write_worker_document(root, harness_name="claude", session_id=session_id, role="loyal-opposition", harness_id="B")
+    monkeypatch.setenv(kb.ENV_VAR_HARNESS_NAME, "claude")
+
+    assert kb.resolve_changed_by() == "loyal-opposition/claude"
 
 
-def test_or_none_returns_value_when_resolvable() -> None:
-    """Read-only variant returns the same string when resolvable."""
-    assert resolve_changed_by_or_none(harness_name="claude") == "prime-builder/claude"
+def test_vendor_signal_without_a_worker_document_fails_closed(
+    worker_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CODEX_THREAD_ID", "untrusted-selector-only")
+
+    with pytest.raises(RuntimeError, match="provenance is missing"):
+        kb.resolve_changed_by()
+    assert kb.resolve_changed_by_or_none() is None
 
 
-def test_no_prime_builder_unknown_fallback() -> None:
-    """Resolver never returns 'prime-builder/unknown' (Codex F2 fix).
+def test_stale_explicit_document_fails_closed(worker_session: tuple[Path, str]) -> None:
+    root, _ = worker_session
+    _write_worker_document(root, harness_name="codex", session_id="older-session", role="prime-builder")
 
-    Mutating callers must fail closed; there is no documented-default
-    fallback that masks unresolved attribution.
-    """
-    # Probe many code paths and confirm no 'unknown' string ever returned
-    for name in ("claude", "codex"):
-        result = resolve_changed_by(harness_name=name)
-        assert "unknown" not in result.lower()
-    for name in ("nonexistent", None):
-        try:
-            result = resolve_changed_by(harness_name=name)
-            assert "unknown" not in result.lower()
-        except RuntimeError:
-            pass  # Expected fail-closed
+    with pytest.raises(RuntimeError, match="session id does not match"):
+        kb.resolve_changed_by(harness_name="codex")
 
 
-# Archive-helper greppable-absence tests (GO Implementation Condition 2)
-
-
-@pytest.mark.parametrize("helper_path", ARCHIVE_HELPERS, ids=lambda p: p.name)
-def test_archive_helpers_no_longer_hardcode_claude_code(helper_path: Path) -> None:
-    """Each archive helper must not contain literal `prime-builder/claude-code`.
-
-    Codex GO Implementation Condition 2: greppable absence required.
-    """
-    text = helper_path.read_text(encoding="utf-8")
-    assert "prime-builder/claude-code" not in text, (
-        f"{helper_path.name} still contains the hardcoded "
-        f"'prime-builder/claude-code' literal; should call resolve_changed_by()"
-    )
-
-
-@pytest.mark.parametrize("helper_path", ARCHIVE_HELPERS, ids=lambda p: p.name)
-def test_archive_helpers_call_resolve_changed_by(helper_path: Path) -> None:
-    """Each archive helper must call resolve_changed_by() for `changed_by` arg."""
-    text = helper_path.read_text(encoding="utf-8")
-    assert "resolve_changed_by" in text
-    assert "changed_by=resolve_changed_by(" in text
-
-
-@pytest.mark.parametrize("helper_path", ARCHIVE_HELPERS, ids=lambda p: p.name)
-def test_archive_helpers_do_not_use_or_none_variant(helper_path: Path) -> None:
-    """Mutating helpers MUST NOT call resolve_changed_by_or_none() (GO Condition 1)."""
-    text = helper_path.read_text(encoding="utf-8")
-    assert "resolve_changed_by_or_none" not in text, (
-        f"{helper_path.name} mutating helper must not use the read-only-test "
-        f"variant; use resolve_changed_by() which fails closed"
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# Slice 2: active Prime Builder attribution (ADR-ROLE-STATUS-ORTHOGONALITY-001
-# Consequences §1; DCL-SINGLE-ACTIVE-PER-ROLE-DISPATCH-001).
-# bridge/gtkb-role-status-orthogonality-dispatch-slice-2-resolver (GO at -002).
-#
-# Priority-3 attribution resolves to the single ACTIVE Prime Builder. The
-# active-status filter is applied upstream by load_role_assignments (it returns
-# only status=="active" harnesses), so an inactive same-role harness is filtered
-# out. These tests redirect the registry projection read via the
-# GTKB_HARNESS_REGISTRY_PATH env override so they never read live state.
-# ──────────────────────────────────────────────────────────────────────────
-
-
-def _write_attribution_registry(path: Path, harnesses: list[dict]) -> None:
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "source_of_truth": "MemBase harnesses table (groundtruth.db)",
-                "harnesses": harnesses,
-            }
-        ),
+def test_role_dcl_a8_a9_shared_marker_and_registry_cannot_supply_behavior_role(
+    worker_session: tuple[Path, str],
+) -> None:
+    root, session_id = worker_session
+    _write_worker_document(root, harness_name="codex", session_id=session_id, role="loyal-opposition")
+    state = root / "harness-state"
+    (state / "harness-registry.json").write_text(
+        json.dumps({"harnesses": [{"harness_name": "codex", "role": ["prime-builder"]}]}),
         encoding="utf-8",
     )
+    marker = root / ".claude" / "session" / "active-session-role.json"
+    marker.parent.mkdir(parents=True)
+    marker.write_text(json.dumps({"role": "prime-builder", "session_id": session_id}), encoding="utf-8")
+
+    assert kb.resolve_changed_by(harness_name="codex") == "loyal-opposition/codex"
 
 
-def test_active_prime_builder_attribution_filters_inactive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Priority-3 attribution resolves to the single ACTIVE Prime Builder.
-
-    claude (B) is active prime-builder; antigravity (C) is INACTIVE prime-builder.
-    load_role_assignments filters C out, so the priority-3 fallback resolves to
-    the single active PB (claude) and does NOT raise on 'two prime builders'.
-    Pins ADR-ROLE-STATUS-ORTHOGONALITY-001 Consequences §1.
-    """
-    registry = tmp_path / "harness-registry.json"
-    _write_attribution_registry(
-        registry,
-        [
-            {
-                "id": "B",
-                "harness_name": "claude",
-                "harness_type": "claude",
-                "status": "active",
-                "role": ["prime-builder"],
-            },
-            {
-                "id": "C",
-                "harness_name": "antigravity",
-                "harness_type": "antigravity",
-                "status": "inactive",
-                "role": ["prime-builder"],
-            },
-            {
-                "id": "A",
-                "harness_name": "codex",
-                "harness_type": "codex",
-                "status": "active",
-                "role": ["loyal-opposition"],
-            },
-        ],
-    )
-    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry))
-    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
-    assert resolve_changed_by() == "prime-builder/claude"
-
-
-def test_multiple_active_prime_builders_selects_single_dispatchable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Fallback attribution selects the only dispatchable active Prime Builder."""
-    registry = tmp_path / "harness-registry.json"
-    _write_attribution_registry(
-        registry,
-        [
-            {
-                "id": "A",
-                "harness_name": "codex",
-                "harness_type": "codex",
-                "status": "active",
-                "role": ["prime-builder"],
-                "can_receive_dispatch": True,
-            },
-            {
-                "id": "B",
-                "harness_name": "claude",
-                "harness_type": "claude",
-                "status": "active",
-                "role": ["prime-builder"],
-                "can_receive_dispatch": False,
-            },
-        ],
-    )
-    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry))
-    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
-    assert resolve_changed_by() == "prime-builder/codex"
-
-
-def test_two_dispatchable_prime_builders_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Two dispatchable ACTIVE Prime Builders are ambiguous and fail closed."""
-    registry = tmp_path / "harness-registry.json"
-    _write_attribution_registry(
-        registry,
-        [
-            {
-                "id": "B",
-                "harness_name": "claude",
-                "harness_type": "claude",
-                "status": "active",
-                "role": ["prime-builder"],
-                "can_receive_dispatch": True,
-            },
-            {
-                "id": "C",
-                "harness_name": "antigravity",
-                "harness_type": "antigravity",
-                "status": "active",
-                "role": ["prime-builder"],
-                "can_receive_dispatch": True,
-            },
-        ],
-    )
-    monkeypatch.setenv("GTKB_HARNESS_REGISTRY_PATH", str(registry))
-    monkeypatch.delenv(ENV_VAR_HARNESS_NAME, raising=False)
-    with pytest.raises(RuntimeError):
-        resolve_changed_by()
+@pytest.mark.parametrize("helper_path", ARCHIVE_HELPERS, ids=lambda path: path.name)
+def test_archive_helpers_use_the_fail_closed_attribution_helper(helper_path: Path) -> None:
+    text = helper_path.read_text(encoding="utf-8")
+    assert "prime-builder/claude-code" not in text
+    assert "changed_by=resolve_changed_by(" in text
+    assert "resolve_changed_by_or_none" not in text

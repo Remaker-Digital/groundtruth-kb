@@ -87,7 +87,7 @@ class AddWorkItemRequest:
     dry_run: bool
 
 
-def _resolve_changed_by() -> str:
+def _resolve_changed_by(project_root: Path) -> str:
     """Resolve ``changed_by`` via the MUTATING fail-closed resolver.
 
     Raises ``RuntimeError`` (surfaced unchanged) when no harness can be
@@ -96,7 +96,7 @@ def _resolve_changed_by() -> str:
     """
     from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return cast(str, resolve_changed_by())
+    return cast(str, resolve_changed_by(project_root=project_root))
 
 
 def _coerce_test_ids(raw: Any) -> list[str]:
@@ -180,13 +180,13 @@ def add_work_item_with_test(config: GTConfig, request: AddWorkItemRequest) -> di
     Returns a dict with ``work_item_id``, ``test_id``, ``phase_id``, and
     ``dry_run``.
     """
-    from groundtruth_kb.cli_backlog_add import BacklogAddError, BacklogAddRequest, add_backlog_item
+    from groundtruth_kb.cli_backlog_add import BacklogAddError, BacklogAddRequest, _add_backlog_item
 
     test_spec_id = _validate_request(request)
 
     # Attribution resolved BEFORE any write path (fail-closed). A RuntimeError
     # propagates to the caller, which exits non-zero with no DB mutation.
-    changed_by = _resolve_changed_by()
+    changed_by = _resolve_changed_by(Path(config.project_root))
 
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
 
@@ -224,7 +224,7 @@ def add_work_item_with_test(config: GTConfig, request: AddWorkItemRequest) -> di
 
     if request.dry_run:
         try:
-            wi_result = add_backlog_item(config, wi_request)
+            wi_result = _add_backlog_item(config, wi_request, changed_by=changed_by)
         except (BacklogAddError, RuntimeError) as exc:
             raise AddWorkItemError(str(exc)) from exc
         return {
@@ -237,7 +237,7 @@ def add_work_item_with_test(config: GTConfig, request: AddWorkItemRequest) -> di
 
     # --- Non-dry-run: create work item, then test, then assign to phase. ---
     try:
-        wi_result = add_backlog_item(config, wi_request)
+        wi_result = _add_backlog_item(config, wi_request, changed_by=changed_by)
     except (BacklogAddError, RuntimeError) as exc:
         raise AddWorkItemError(str(exc)) from exc
     work_item_id = wi_result["id"]

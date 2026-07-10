@@ -14,9 +14,12 @@ from groundtruth_kb.session.envelope import (
     close_current_topic,
     close_topic,
     current_envelope_path,
+    ensure_worker_session,
     load_current,
     open_session,
     open_topic,
+    resolve_worker_role_provenance,
+    worker_session_envelope_path,
 )
 from groundtruth_kb.session.topic_router import (
     handle_topic_command,
@@ -24,6 +27,8 @@ from groundtruth_kb.session.topic_router import (
     render_topic_context,
 )
 from groundtruth_kb.session.wrap import is_canonical_wrap_trigger, run_wrap
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _seed_harness(root: Path) -> None:
@@ -49,7 +54,7 @@ def _seed_harness(root: Path) -> None:
     )
 
 
-def test_open_session_writes_current_per_harness_envelope(tmp_path: Path) -> None:
+def test_role_dcl_a6_explicit_role_is_preserved_against_registry_fallback(tmp_path: Path) -> None:
     _seed_harness(tmp_path)
 
     envelope = open_session(
@@ -65,6 +70,7 @@ def test_open_session_writes_current_per_harness_envelope(tmp_path: Path) -> Non
     saved = json.loads(current.read_text(encoding="utf-8"))
     assert saved["session_id"] == envelope["session_id"]
     assert saved["harness_id"] == "A"
+    assert saved["role_asserted"] == "prime-builder"
     assert saved["role_resolved"] == "prime-builder"
     assert saved["role_resolution"]["interactive_resolved_role"] == "prime-builder"
     assert saved["role_resolution"]["interactive_role_source"] == "transcript_init_keyword"
@@ -74,16 +80,28 @@ def test_open_session_writes_current_per_harness_envelope(tmp_path: Path) -> Non
     assert saved["active_work_item_id"] == "WI-4301"
 
 
-def test_open_session_without_role_uses_durable_registry_fallback(tmp_path: Path) -> None:
+def test_role_dcl_a7_subject_only_startup_uses_source_classified_fallback(tmp_path: Path) -> None:
     _seed_harness(tmp_path)
 
-    open_session(tmp_path, harness_name="codex")
+    open_session(tmp_path, harness_name="codex", init_keyword="::init gtkb", subject="gtkb")
 
     saved = json.loads(current_envelope_path(tmp_path, "codex").read_text(encoding="utf-8"))
+    assert saved["subject_asserted"] == "gtkb"
     assert saved["role_resolved"] == "loyal-opposition"
     assert saved["role_resolution"]["interactive_role_source"] is None
     assert saved["role_resolution"]["durable_registry_role"] == "loyal-opposition"
     assert saved["role_resolution"]["authority_mode"] == "durable_registry_fallback"
+
+
+def test_role_dcl_a4_worker_bootstrap_precedes_marker_and_lifecycle_loading() -> None:
+    """The explicit worker document is established before later startup work."""
+    source = (REPO_ROOT / "scripts" / "session_self_initialization.py").read_text(encoding="utf-8")
+
+    worker_bootstrap = source.index("            ensure_worker_session(")
+    marker_persistence = source.index("    # Persist interactive role overrides")
+    lifecycle_loading = source.index("    lifecycle_guard_path = (")
+
+    assert worker_bootstrap < marker_persistence < lifecycle_loading
 
 
 def test_topic_open_close_is_strict_and_single_active(tmp_path: Path) -> None:
@@ -248,6 +266,29 @@ def test_render_topic_context_injects_activity_profile_for_open(tmp_path: Path) 
     assert "## Ops Activity Status And AUQ Options" not in context
 
 
+def test_render_topic_context_loads_only_open_activity_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """TEST-11253: the opened activity shard is composed without unrelated shards."""
+    _seed_harness(tmp_path)
+    open_session(tmp_path, harness_name="codex")
+    command = parse_topic_command("::open build")
+    assert command is not None
+
+    monkeypatch.setattr(topic_router, "_render_open_operator_context", lambda _result: "")
+    monkeypatch.setattr(topic_router, "_render_activity_terminology", lambda _root, _profile: "")
+
+    result = handle_topic_command(tmp_path, command, harness_name="codex")
+    context = render_topic_context(result)
+
+    assert "- name: build" in context
+    assert "- skills: bridge, bridge-propose, verify, kb-work-item, kb-spec" in context
+    assert "- scenario: activity:build" in context
+    assert "grill-me-for-clarification" not in context
+    assert "decision-capture" not in context
+    assert "gtkb-hygiene-investigation" not in context
+    assert "activity:deliberation" not in context
+    assert "activity:ops" not in context
+
+
 def test_render_topic_context_does_not_inject_profile_for_close(tmp_path: Path) -> None:
     _seed_harness(tmp_path)
     open_session(tmp_path, harness_name="codex")
@@ -363,3 +404,67 @@ def test_render_topic_context_injects_activity_terminology_definitions(tmp_path:
     assert "**implementation proposal**: Pre-implementation bridge artifact requesting LO review." in context
     assert "**work item**: A tracked unit of implementation work in MemBase." in context
     assert "**deliberation**" not in context
+
+
+def test_ensure_worker_session_writes_the_document_role_authority(tmp_path: Path) -> None:
+    _seed_harness(tmp_path)
+
+    envelope = ensure_worker_session(
+        tmp_path,
+        harness_name="codex",
+        session_id="session-5171",
+        role="prime-builder",
+        role_source="dispatcher_composition",
+        dispatch_run_id="run-5171",
+    )
+    provenance = resolve_worker_role_provenance(
+        tmp_path,
+        current_session_id="session-5171",
+        harness_name="codex",
+    )
+
+    assert envelope["worker_role_provenance"]["role"] == "prime-builder"
+    assert provenance["harness_name"] == "codex"
+    assert provenance["dispatch_run_id"] == "run-5171"
+
+
+def test_worker_sessions_keep_distinct_document_role_authority(tmp_path: Path) -> None:
+    """A later worker cannot replace an earlier session's authority document."""
+    _seed_harness(tmp_path)
+
+    ensure_worker_session(
+        tmp_path,
+        harness_name="codex",
+        session_id="session-one",
+        role="prime-builder",
+        role_source="dispatcher_composition",
+        dispatch_run_id="run-one",
+    )
+    ensure_worker_session(
+        tmp_path,
+        harness_name="codex",
+        session_id="session-two",
+        role="loyal-opposition",
+        role_source="dispatcher_composition",
+        dispatch_run_id="run-two",
+    )
+
+    assert worker_session_envelope_path(tmp_path, "codex", "session-one").is_file()
+    assert worker_session_envelope_path(tmp_path, "codex", "session-two").is_file()
+    assert (
+        resolve_worker_role_provenance(
+            tmp_path,
+            current_session_id="session-one",
+            harness_name="codex",
+        )["role"]
+        == "prime-builder"
+    )
+    assert (
+        resolve_worker_role_provenance(
+            tmp_path,
+            current_session_id="session-two",
+            harness_name="codex",
+        )["role"]
+        == "loyal-opposition"
+    )
+    assert load_current(tmp_path, "codex")["session_id"] == "session-two"

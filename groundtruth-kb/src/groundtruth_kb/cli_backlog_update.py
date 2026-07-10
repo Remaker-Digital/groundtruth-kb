@@ -54,11 +54,11 @@ class BacklogUpdateRequest:
     source_spec_id: str | None = None
 
 
-def _resolve_changed_by() -> str:
+def _resolve_changed_by(project_root: Path) -> str:
     """Resolve ``changed_by`` via the MUTATING fail-closed resolver."""
     from scripts._kb_attribution import resolve_changed_by  # type: ignore[import-untyped]
 
-    return cast(str, resolve_changed_by())
+    return cast(str, resolve_changed_by(project_root=project_root))
 
 
 def _validate_json_string_array(value: str | None, option_name: str) -> None:
@@ -147,7 +147,7 @@ def update_backlog_item(config: GTConfig, request: BacklogUpdateRequest) -> dict
     _validate_json_string_array(request.related_bridge_threads, "--related-bridge-threads")
 
     # Attribution is resolved BEFORE opening any write path
-    changed_by = _resolve_changed_by()
+    changed_by = _resolve_changed_by(Path(config.project_root))
 
     db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
     current = db.get_work_item(request.work_item_id)

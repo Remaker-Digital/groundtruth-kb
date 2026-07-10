@@ -1,8 +1,9 @@
 """Deterministic session-envelope state writer.
 
-The session envelope is the per-harness outer container for a GT-KB session.
-It is intentionally local-file based so prompt-time hooks and CLIs can inspect
-and update it without depending on MemBase availability.
+The session envelope is local-file based so prompt-time hooks and CLIs can
+inspect and update it without depending on MemBase availability. Each worker
+session has its own authoritative document; the per-harness current envelope is
+only a compatibility projection for lifecycle consumers.
 
 Activity-specific terminology and skill advisories are not part of the base
 envelope; they load when ``::open <activity>`` is accepted (SPEC-INTAKE-46594e).
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,8 +22,11 @@ from typing import Any
 from groundtruth_kb.harness_projection import HarnessStateError, read_identity, read_roles
 
 ENVELOPE_SCHEMA_VERSION = 1
+WORKER_ROLE_PROVENANCE_SCHEMA_VERSION = 1
 TOPIC_TYPES = ("ops", "deliberation", "build", "test", "spec", "project")
 GIT_STATUS_SHORT_LINE_LIMIT = 80
+WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
+_SAFE_SESSION_DOCUMENT_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 ROUTE_TARGETS = {
     "ops": "operations-status-decision-service",
@@ -82,6 +87,23 @@ def current_envelope_path(project_root: Path, harness_name: str) -> Path:
     return harness_state_dir(project_root, harness_name) / "session-envelope.json"
 
 
+def worker_session_envelope_dir(project_root: Path, harness_name: str) -> Path:
+    """Return the directory containing authoritative per-session documents."""
+    return harness_state_dir(project_root, harness_name) / "session-envelopes"
+
+
+def _worker_session_document_filename(session_id: str) -> str:
+    session_token = str(session_id).strip()
+    if not session_token or session_token in {".", ".."} or _SAFE_SESSION_DOCUMENT_ID.fullmatch(session_token) is None:
+        raise EnvelopeError("Worker session id is not safe for a session-envelope document path.")
+    return f"{session_token}.json"
+
+
+def worker_session_envelope_path(project_root: Path, harness_name: str, session_id: str) -> Path:
+    """Return the authoritative document path for one worker session."""
+    return worker_session_envelope_dir(project_root, harness_name) / _worker_session_document_filename(session_id)
+
+
 def archive_dir(project_root: Path, harness_name: str) -> Path:
     return harness_state_dir(project_root, harness_name) / "session-envelope-archive"
 
@@ -95,6 +117,11 @@ def _read_json(path: Path, default: Any) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return default
+
+
+def _write_envelope_document(path: Path, envelope: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def resolve_harness_identity(
@@ -181,6 +208,7 @@ def _base_envelope(
     project_id: str | None = None,
     work_item_ids: list[str] | None = None,
     active_work_item_id: str | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     opened_at = utc_now_iso()
     durable_role = _resolve_role(project_root, harness_id)
@@ -190,7 +218,7 @@ def _base_envelope(
     authority_mode = "interactive_transcript" if role else "durable_registry_fallback"
     return {
         "envelope_schema_version": ENVELOPE_SCHEMA_VERSION,
-        "session_id": _session_id(harness_id, opened_at),
+        "session_id": session_id or _session_id(harness_id, opened_at),
         "harness_id": harness_id,
         "harness_name": harness_name,
         "model_id": os.environ.get("GTKB_MODEL_ID") or os.environ.get("CODEX_MODEL") or "unknown",
@@ -225,18 +253,182 @@ def _base_envelope(
     }
 
 
+def _require_nonempty_string(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise EnvelopeError(f"Worker role provenance field {field!r} must be a non-empty string.")
+    return value.strip()
+
+
+def _worker_role_provenance(
+    envelope: dict[str, Any],
+    *,
+    role: str,
+    role_source: str,
+    dispatch_run_id: str | None,
+) -> dict[str, Any]:
+    if role not in WORKER_ROLES:
+        raise EnvelopeError(f"Worker role provenance role must be one of {sorted(WORKER_ROLES)}.")
+    return {
+        "schema_version": WORKER_ROLE_PROVENANCE_SCHEMA_VERSION,
+        "session_id": envelope["session_id"],
+        "harness_id": envelope["harness_id"],
+        "harness_name": envelope["harness_name"],
+        "role": role,
+        "role_resolution_source": _require_nonempty_string(role_source, "role_resolution_source"),
+        "dispatch_run_id": dispatch_run_id,
+        "issued_at": utc_now_iso(),
+    }
+
+
+def _validate_worker_role_provenance(
+    envelope: dict[str, Any],
+    *,
+    current_session_id: str,
+    expected_harness_name: str | None = None,
+) -> dict[str, str | int | None]:
+    """Validate the explicit worker-role authority carried by one open envelope."""
+    if envelope.get("status") != "open":
+        raise EnvelopeError("Worker role provenance requires an open session envelope.")
+    provenance = envelope.get("worker_role_provenance")
+    if not isinstance(provenance, dict):
+        raise EnvelopeError("Worker role provenance is missing from the session envelope.")
+    if provenance.get("schema_version") != WORKER_ROLE_PROVENANCE_SCHEMA_VERSION:
+        raise EnvelopeError("Worker role provenance schema version is missing or unsupported.")
+
+    session_id = _require_nonempty_string(envelope.get("session_id"), "session_id")
+    harness_id = _require_nonempty_string(envelope.get("harness_id"), "harness_id")
+    harness_name = _require_nonempty_string(envelope.get("harness_name"), "harness_name")
+    if session_id != current_session_id:
+        raise EnvelopeError("Worker role provenance session id does not match the current session.")
+    if expected_harness_name is not None and harness_name != expected_harness_name:
+        raise EnvelopeError("Worker role provenance harness name does not match the expected worker.")
+
+    result: dict[str, str | int | None] = {"schema_version": WORKER_ROLE_PROVENANCE_SCHEMA_VERSION}
+    for field, expected in (("session_id", session_id), ("harness_id", harness_id), ("harness_name", harness_name)):
+        actual = _require_nonempty_string(provenance.get(field), field)
+        if actual != expected:
+            raise EnvelopeError(f"Worker role provenance {field} conflicts with its session envelope.")
+        result[field] = actual
+
+    role = _require_nonempty_string(provenance.get("role"), "role")
+    if role not in WORKER_ROLES:
+        raise EnvelopeError(f"Worker role provenance role must be one of {sorted(WORKER_ROLES)}.")
+    result["role"] = role
+    result["role_resolution_source"] = _require_nonempty_string(
+        provenance.get("role_resolution_source"), "role_resolution_source"
+    )
+    result["issued_at"] = _require_nonempty_string(provenance.get("issued_at"), "issued_at")
+    dispatch_run_id = provenance.get("dispatch_run_id")
+    if dispatch_run_id is not None:
+        result["dispatch_run_id"] = _require_nonempty_string(dispatch_run_id, "dispatch_run_id")
+    else:
+        result["dispatch_run_id"] = None
+    return result
+
+
+def _load_worker_document(path: Path) -> dict[str, Any]:
+    envelope = _read_json(path, None)
+    if not isinstance(envelope, dict):
+        raise EnvelopeError(f"Worker session envelope is malformed: {path}")
+    return envelope
+
+
+def resolve_worker_role_provenance(
+    project_root: Path,
+    *,
+    current_session_id: str,
+    harness_name: str | None = None,
+) -> dict[str, str | int | None]:
+    """Return the validated, document-authoritative actor for one worker session.
+
+    The optional harness name selects a document only. It never contributes role
+    authority; roles come exclusively from ``worker_role_provenance``.
+    """
+    current_session_id = _require_nonempty_string(current_session_id, "current_session_id")
+    if harness_name is not None:
+        expected_harness_name = _require_nonempty_string(harness_name, "harness_name")
+        path = worker_session_envelope_path(project_root, expected_harness_name, current_session_id)
+        if not path.is_file():
+            # Existing installations may still have exactly one session document
+            # in the legacy projection path. It is acceptable only when its own
+            # session id validates; it can never authorize another session.
+            path = current_envelope_path(project_root, expected_harness_name)
+        if not path.is_file():
+            if any(worker_session_envelope_dir(project_root, expected_harness_name).glob("*.json")):
+                raise EnvelopeError("Worker role provenance session id does not match the current session.")
+            raise EnvelopeError("Worker role provenance is missing for the current session.")
+        envelope = _load_worker_document(path)
+        return _validate_worker_role_provenance(
+            envelope,
+            current_session_id=current_session_id,
+            expected_harness_name=expected_harness_name,
+        )
+
+    state_root = project_root / "harness-state"
+    document_name = _worker_session_document_filename(current_session_id)
+    matched: list[tuple[dict[str, Any], str]] = []
+    session_document_harnesses: set[str] = set()
+    for path in sorted(state_root.glob(f"*/session-envelopes/{document_name}")):
+        if not path.is_file():
+            continue
+        harness = path.parent.parent.name
+        session_document_harnesses.add(harness)
+        matched.append((_load_worker_document(path), harness))
+
+    # Retain a narrow read-only migration path for a legacy document, but never
+    # let a shared per-harness projection compete with an exact session document.
+    for path in sorted(state_root.glob("*/session-envelope.json")):
+        harness = path.parent.name
+        if harness in session_document_harnesses or not path.is_file():
+            continue
+        envelope = _read_json(path, None)
+        if not isinstance(envelope, dict):
+            continue
+        provenance = envelope.get("worker_role_provenance")
+        if isinstance(provenance, dict) and provenance.get("session_id") == current_session_id:
+            matched.append((envelope, harness))
+
+    if not matched:
+        raise EnvelopeError("Worker role provenance is missing for the current session.")
+    if len(matched) != 1:
+        raise EnvelopeError("Worker role provenance is ambiguous across session envelopes.")
+    envelope, expected_harness_name = matched[0]
+    return _validate_worker_role_provenance(
+        envelope,
+        current_session_id=current_session_id,
+        expected_harness_name=expected_harness_name,
+    )
+
+
 def write_current(project_root: Path, harness_name: str, envelope: dict[str, Any]) -> Path:
+    session_id = _require_nonempty_string(envelope.get("session_id"), "session_id")
+    authoritative_path = worker_session_envelope_path(project_root, harness_name, session_id)
+    _write_envelope_document(authoritative_path, envelope)
     path = current_envelope_path(project_root, harness_name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    _write_projection(project_root, harness_name, envelope, authoritative=True)
+    _write_envelope_document(path, envelope)
+    _write_projection(
+        project_root,
+        harness_name,
+        envelope,
+        authoritative=True,
+        authoritative_path=authoritative_path,
+    )
     return path
 
 
-def _write_projection(project_root: Path, harness_name: str, envelope: dict[str, Any], *, authoritative: bool) -> None:
+def _write_projection(
+    project_root: Path,
+    harness_name: str,
+    envelope: dict[str, Any],
+    *,
+    authoritative: bool,
+    authoritative_path: Path | None = None,
+) -> None:
     projection = dict(envelope)
     projection["projection_authoritative"] = authoritative
-    projection["authoritative_path"] = current_envelope_path(project_root, harness_name).as_posix()
+    projection["authoritative_path"] = (
+        authoritative_path or current_envelope_path(project_root, harness_name)
+    ).as_posix()
     path = projection_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(projection, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -244,6 +436,17 @@ def _write_projection(project_root: Path, harness_name: str, envelope: dict[str,
 
 def load_current(project_root: Path, harness_name: str) -> dict[str, Any] | None:
     path = current_envelope_path(project_root, harness_name)
+    if not path.is_file():
+        return None
+    data = _read_json(path, None)
+    if not isinstance(data, dict):
+        raise EnvelopeError(f"Session envelope is not a JSON object: {path}")
+    return data
+
+
+def load_worker_session(project_root: Path, harness_name: str, session_id: str) -> dict[str, Any] | None:
+    """Load one authoritative session document without consulting the projection."""
+    path = worker_session_envelope_path(project_root, harness_name, session_id)
     if not path.is_file():
         return None
     data = _read_json(path, None)
@@ -263,20 +466,15 @@ def open_session(
     project_id: str | None = None,
     work_item_ids: list[str] | None = None,
     active_work_item_id: str | None = None,
+    session_id: str | None = None,
+    worker_role_source: str | None = None,
+    dispatch_run_id: str | None = None,
 ) -> dict[str, Any]:
     resolved_name, resolved_id = resolve_harness_identity(
         project_root,
         harness_name=harness_name,
         harness_id=harness_id,
     )
-    prior = load_current(project_root, resolved_name)
-    if prior and prior.get("status") == "open":
-        close_session(
-            project_root,
-            harness_name=resolved_name,
-            harness_id=resolved_id,
-            wrap_outcome="recovered_by_session_open",
-        )
     envelope = _base_envelope(
         project_root,
         harness_name=resolved_name,
@@ -287,9 +485,69 @@ def open_session(
         project_id=project_id,
         work_item_ids=work_item_ids,
         active_work_item_id=active_work_item_id,
+        session_id=session_id,
     )
+    if worker_role_source is not None:
+        if role is None:
+            raise EnvelopeError("Worker role provenance requires an explicit resolved role.")
+        envelope["worker_role_provenance"] = _worker_role_provenance(
+            envelope,
+            role=role,
+            role_source=worker_role_source,
+            dispatch_run_id=dispatch_run_id,
+        )
     write_current(project_root, resolved_name, envelope)
     return envelope
+
+
+def ensure_worker_session(
+    project_root: Path,
+    *,
+    harness_name: str,
+    session_id: str,
+    role: str,
+    role_source: str,
+    harness_id: str | None = None,
+    init_keyword: str | None = None,
+    dispatch_run_id: str | None = None,
+) -> dict[str, Any]:
+    """Create or refresh one session-keyed document used for worker authority."""
+    resolved_name, resolved_id = resolve_harness_identity(
+        project_root,
+        harness_name=harness_name,
+        harness_id=harness_id,
+    )
+    current = load_worker_session(project_root, resolved_name, session_id)
+    if current is None or current.get("status") != "open" or current.get("session_id") != session_id:
+        return open_session(
+            project_root,
+            harness_name=resolved_name,
+            harness_id=resolved_id,
+            init_keyword=init_keyword,
+            role=role,
+            session_id=session_id,
+            worker_role_source=role_source,
+            dispatch_run_id=dispatch_run_id,
+        )
+
+    current["role_asserted"] = role
+    current["role_resolved"] = role
+    current["role"] = role
+    current["role_resolution"] = {
+        "interactive_resolved_role": role,
+        "interactive_role_source": role_source,
+        "durable_registry_role": current.get("role_resolution", {}).get("durable_registry_role"),
+        "durable_registry_authority": "dispatcher routing and audit only; worker behavior comes from this document",
+        "authority_mode": "worker_session_document",
+    }
+    current["worker_role_provenance"] = _worker_role_provenance(
+        current,
+        role=role,
+        role_source=role_source,
+        dispatch_run_id=dispatch_run_id,
+    )
+    write_current(project_root, resolved_name, current)
+    return current
 
 
 def ensure_current(
@@ -476,8 +734,16 @@ def close_session(
     out_dir.mkdir(parents=True, exist_ok=True)
     archive_path = out_dir / f"{archive_timestamp(closed_at)}-session-envelope.json"
     archive_path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    worker_path = worker_session_envelope_path(project_root, resolved_name, str(envelope["session_id"]))
+    _write_envelope_document(worker_path, envelope)
     current_path = current_envelope_path(project_root, resolved_name)
     if current_path.exists():
         current_path.unlink()
-    _write_projection(project_root, resolved_name, envelope, authoritative=False)
+    _write_projection(
+        project_root,
+        resolved_name,
+        envelope,
+        authoritative=False,
+        authoritative_path=worker_path,
+    )
     return envelope, archive_path

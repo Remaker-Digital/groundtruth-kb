@@ -7571,6 +7571,42 @@ def main(argv: list[str] | None = None) -> int:
         )
         role_profile_explicit = False
 
+    # WI-5171: establish explicit worker-role evidence before marker, activity,
+    # dashboard, or lifecycle work. The durable registry selected dispatch routing;
+    # it is not re-read here as behavior authority.
+    if startup_emit_requested:
+        try:
+            from groundtruth_kb.session.envelope import ensure_worker_session
+
+            from scripts.gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+        except ImportError:  # pragma: no cover - direct script execution path
+            from groundtruth_kb.session.envelope import ensure_worker_session
+            from gtkb_session_id import BRIDGE_WORK_INTENT_ORDER, resolve_session_id
+
+        worker_session_id = resolve_session_id(order=BRIDGE_WORK_INTENT_ORDER)
+        if worker_session_id:
+            runtime_harness_name = (
+                args.harness_name
+                or os.environ.get("GTKB_HARNESS_NAME")
+                or ("claude" if (os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_SESSION_ID")) else "codex")
+            )
+            dispatch_run_id = os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID") or None
+            role_source = (
+                "dispatcher_composition"
+                if dispatch_run_id
+                else ("transcript_init_keyword" if role_profile_explicit else "session_resolver_fallback")
+            )
+            ensure_worker_session(
+                project_root,
+                harness_name=runtime_harness_name,
+                harness_id=args.harness_id,
+                session_id=worker_session_id,
+                role=role_profile,
+                role_source=role_source,
+                init_keyword=(os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD") or None),
+                dispatch_run_id=dispatch_run_id,
+            )
+
     # Persist interactive role overrides (marker files) per WI-4673
     if override_role and args.harness_name:
         try:

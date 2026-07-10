@@ -6,6 +6,7 @@ Authority: bridge/gtkb-backlog-update-cli-slice-1-003.md (REVISED-1), Codex GO a
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,52 @@ from click.testing import CliRunner
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
+
+_TEST_SESSION_ID = "backlog-update-cli-test"
+
+
+def _write_worker_document(project_dir: Path) -> None:
+    path = project_dir / "harness-state" / "claude" / "session-envelopes" / f"{_TEST_SESSION_ID}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "status": "open",
+                "session_id": _TEST_SESSION_ID,
+                "harness_id": "B",
+                "harness_name": "claude",
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": _TEST_SESSION_ID,
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "role": "prime-builder",
+                    "role_resolution_source": "transcript_init_keyword",
+                    "dispatch_run_id": None,
+                    "issued_at": "2026-07-10T18:00:00Z",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.fixture(autouse=True)
+def document_actor(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide only session-document evidence to mutating command tests."""
+    _write_worker_document(project_dir)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    for name in (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_SESSION_ID",
+        "GTKB_INHERITED_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "ANTIGRAVITY_SESSION_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GTKB_SESSION_ID", _TEST_SESSION_ID)
 
 
 def _seed_db(project_dir: Path) -> None:
@@ -373,7 +420,7 @@ def test_backlog_update_fail_closed_attribution(
     from groundtruth_kb import cli_backlog_update
 
     # Mock attribution resolver to raise RuntimeError
-    def _mock_resolve_changed_by() -> str:
+    def _mock_resolve_changed_by(_project_root: Path) -> str:
         raise RuntimeError("No harness resolved")
 
     monkeypatch.setattr(cli_backlog_update, "_resolve_changed_by", _mock_resolve_changed_by)

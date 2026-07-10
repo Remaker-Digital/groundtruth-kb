@@ -37,6 +37,15 @@ from groundtruth_kb.cli import main  # noqa: E402
 _FORBIDDEN_CHANGED_BY = ("gt-backlog-add", "unknown", "prime-builder/unknown")
 
 
+@pytest.fixture(autouse=True)
+def document_actor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep command tests focused; resolver behavior is covered separately."""
+    monkeypatch.setattr(
+        "groundtruth_kb.cli_backlog_add._resolve_changed_by",
+        lambda _project_root: "prime-builder/claude",
+    )
+
+
 def _project(tmp_path: Path) -> tuple[Path, Path]:
     """Create a temp project with a groundtruth.toml; return (root, config)."""
     root = tmp_path / "project"
@@ -396,14 +405,14 @@ def test_add_attributes_changed_by_via_resolver(tmp_path: Path) -> None:
     db_path = root / "groundtruth.db"
     with (
         mock.patch.dict("os.environ", {"GTKB_HARNESS_NAME": "claude"}),
-        mock.patch("scripts._kb_attribution._role_for_harness_id", return_value="prime-builder"),
+        mock.patch("groundtruth_kb.cli_backlog_add._resolve_changed_by", return_value="loyal-opposition/claude"),
     ):
         result = CliRunner().invoke(main, _add_args(config, "--json"))
     assert result.exit_code == 0, result.output
     new_id = json.loads(result.output)["id"]
     row = _wi_row(db_path, new_id)
     assert row is not None
-    assert row["changed_by"] == "prime-builder/claude"
+    assert row["changed_by"] == "loyal-opposition/claude"
 
 
 # ---------------------------------------------------------------------------
@@ -416,13 +425,9 @@ def test_add_fails_closed_without_harness_resolution(tmp_path: Path) -> None:
     db_path = root / "groundtruth.db"
     count_before = _wi_count(db_path)
 
-    # Clear GTKB_HARNESS_NAME and force the resolver's three-source resolution
-    # to find no harness (no kwarg, no env, no sole Prime). Patching the
-    # internal name resolver to return None makes resolve_changed_by() raise
-    # RuntimeError authentically.
-    with (
-        mock.patch.dict("os.environ", {}, clear=True),
-        mock.patch("scripts._kb_attribution._resolve_harness_name", return_value=None),
+    with mock.patch(
+        "groundtruth_kb.cli_backlog_add._resolve_changed_by",
+        side_effect=RuntimeError("worker role provenance is missing"),
     ):
         result = CliRunner().invoke(main, _add_args(config))
     assert result.exit_code != 0
@@ -440,9 +445,9 @@ def test_add_does_not_emit_fallback_changed_by(tmp_path: Path) -> None:
 
     # Run the fail-closed scenario from T12, then assert no row exists with a
     # forbidden fallback ``changed_by`` literal.
-    with (
-        mock.patch.dict("os.environ", {}, clear=True),
-        mock.patch("scripts._kb_attribution._resolve_harness_name", return_value=None),
+    with mock.patch(
+        "groundtruth_kb.cli_backlog_add._resolve_changed_by",
+        side_effect=RuntimeError("worker role provenance is missing"),
     ):
         result = CliRunner().invoke(main, _add_args(config))
     assert result.exit_code != 0

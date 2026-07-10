@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 from unittest import mock
 
+import pytest
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +31,15 @@ from groundtruth_kb.cli import main  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
 _PHASE_ID = "PLAN-001-P1"
+
+
+@pytest.fixture(autouse=True)
+def document_actor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep compound-writer tests focused; provenance validation has dedicated tests."""
+    monkeypatch.setattr(
+        "groundtruth_kb.cli_backlog_add_work_item._resolve_changed_by",
+        lambda _project_root: "prime-builder/claude",
+    )
 
 
 def _project(tmp_path: Path) -> tuple[Path, Path]:
@@ -222,10 +232,22 @@ def test_fail_closed_attribution(tmp_path: Path) -> None:
     db_path = root / "groundtruth.db"
     _seed(db_path)
     before = _counts(db_path)
-    with (
-        mock.patch.dict("os.environ", {}, clear=True),
-        mock.patch("scripts._kb_attribution._resolve_harness_name", return_value=None),
+    with mock.patch(
+        "groundtruth_kb.cli_backlog_add_work_item._resolve_changed_by",
+        side_effect=RuntimeError("worker role provenance is missing"),
     ):
         result = CliRunner().invoke(main, _argv(config, "--test-plan-phase", _PHASE_ID))
     assert result.exit_code != 0
     assert _counts(db_path) == before  # no work item / test created
+
+
+def test_compound_writer_resolves_one_document_actor_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root, config = _project(tmp_path)
+    _seed(root / "groundtruth.db")
+    resolver = mock.Mock(return_value="loyal-opposition/claude")
+    monkeypatch.setattr("groundtruth_kb.cli_backlog_add_work_item._resolve_changed_by", resolver)
+
+    result = CliRunner().invoke(main, _argv(config, "--test-plan-phase", _PHASE_ID, "--json"))
+
+    assert result.exit_code == 0, result.output
+    assert resolver.call_count == 1
