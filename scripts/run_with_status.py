@@ -2,10 +2,13 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """Lightweight process execution wrapper that writes exit code to a status file."""
 
+import base64
+import json
 import os
 import signal
 import subprocess
 import sys
+from typing import Any
 
 try:
     from windows_subprocess import (
@@ -30,6 +33,7 @@ except ImportError:  # pragma: no cover - package import path used by tests
 DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS = 600  # 10-minute generous Phase 0 baseline (LO GO -002)
 TIMEOUT_EXIT_CODE = 124  # coreutils `timeout` convention; distinguishes a lifetime-timeout kill
 TERMINATE_GRACE_SECONDS = 10
+CONFIG_ENV_VAR = "GTKB_RUN_WITH_STATUS_CONFIG_B64"
 
 
 def _prefer_windows_gui_python(command: str) -> str:
@@ -99,6 +103,72 @@ def _parse_lifetime(value: str) -> int:
     return parsed
 
 
+def _usage() -> str:
+    return (
+        "Usage: python run_with_status.py [--config-env] "
+        "[--stdin <file>] [--stdout <file>] [--stderr <file>] "
+        "<status_file_path> <cmd> [args...]"
+    )
+
+
+def _config_error(message: str) -> None:
+    print(f"run_with_status.py: invalid {CONFIG_ENV_VAR}: {message}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def _require_string(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        _config_error(f"{field} must be a non-empty string")
+    return value
+
+
+def _optional_string(value: Any, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        _config_error(f"{field} must be null or a non-empty string")
+    return value
+
+
+def _load_env_config() -> tuple[str | None, str | None, str | None, int, str, list[str]]:
+    """Load wrapper configuration from a bounded environment payload.
+
+    Dispatcher-launched workers use this path so volatile sidecar paths and
+    child harness argv are not exposed on the live status-wrapper command line.
+    The positional CLI mode below remains supported for older callers.
+    """
+    encoded = os.environ.get(CONFIG_ENV_VAR)
+    if not encoded:
+        _config_error("environment variable is not set")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+        data = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        _config_error(f"payload is not valid base64 JSON ({type(exc).__name__})")
+    if not isinstance(data, dict):
+        _config_error("payload must be a JSON object")
+
+    stdin_path = _optional_string(data.get("stdin_path"), "stdin_path")
+    stdout_path = _optional_string(data.get("stdout_path"), "stdout_path")
+    stderr_path = _optional_string(data.get("stderr_path"), "stderr_path")
+    status_file_path = _require_string(data.get("status_file_path"), "status_file_path")
+
+    raw_lifetime = data.get("lifetime_seconds")
+    if raw_lifetime is None:
+        raw_lifetime = DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS
+    lifetime_seconds = _parse_lifetime(str(raw_lifetime))
+
+    raw_cmd_args = data.get("cmd_args")
+    if not isinstance(raw_cmd_args, list) or not raw_cmd_args:
+        _config_error("cmd_args must be a non-empty list")
+    cmd_args = []
+    for index, value in enumerate(raw_cmd_args):
+        if not isinstance(value, str) or not value:
+            _config_error(f"cmd_args[{index}] must be a non-empty string")
+        cmd_args.append(value)
+    return stdin_path, stdout_path, stderr_path, lifetime_seconds, status_file_path, cmd_args
+
+
 def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
 
@@ -110,28 +180,28 @@ def main(argv: list[str] | None = None) -> None:
     # The dispatcher passes --lifetime; absent it, the module default applies.
     lifetime_seconds: int = DEFAULT_WORKER_LIFETIME_TIMEOUT_SECONDS
 
-    # Parse optional stdin/stdout/stderr/lifetime arguments
-    while len(args) >= 2 and args[0] in ("--stdin", "--stdout", "--stderr", "--lifetime"):
-        flag = args.pop(0)
-        val = args.pop(0)
-        if flag == "--stdin":
-            stdin_path = val
-        elif flag == "--stdout":
-            stdout_path = val
-        elif flag == "--stderr":
-            stderr_path = val
-        else:  # --lifetime
-            lifetime_seconds = _parse_lifetime(val)
+    if args == ["--config-env"] or (not args and os.environ.get(CONFIG_ENV_VAR)):
+        stdin_path, stdout_path, stderr_path, lifetime_seconds, status_file_path, cmd_args = _load_env_config()
+    else:
+        # Parse optional stdin/stdout/stderr/lifetime arguments
+        while len(args) >= 2 and args[0] in ("--stdin", "--stdout", "--stderr", "--lifetime"):
+            flag = args.pop(0)
+            val = args.pop(0)
+            if flag == "--stdin":
+                stdin_path = val
+            elif flag == "--stdout":
+                stdout_path = val
+            elif flag == "--stderr":
+                stderr_path = val
+            else:  # --lifetime
+                lifetime_seconds = _parse_lifetime(val)
 
-    if len(args) < 2:
-        print(
-            "Usage: python run_with_status.py [--stdin <file>] [--stdout <file>] [--stderr <file>] <status_file_path> <cmd> [args...]",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        if len(args) < 2:
+            print(_usage(), file=sys.stderr)
+            sys.exit(1)
 
-    status_file_path = args[0]
-    cmd_args = args[1:]
+        status_file_path = args[0]
+        cmd_args = args[1:]
 
     exit_code = 127
     stdin_fh = None
@@ -183,6 +253,9 @@ def main(argv: list[str] | None = None) -> None:
             # os.killpg on a lifetime timeout. No-op on Windows (taskkill /T walks
             # the tree); not passed on Windows where the kwarg is unsupported.
             popen_kwargs["start_new_session"] = True
+        child_env = dict(os.environ)
+        child_env.pop(CONFIG_ENV_VAR, None)
+        popen_kwargs["env"] = child_env
 
         p = subprocess.Popen(cmd_args, **popen_kwargs)
 

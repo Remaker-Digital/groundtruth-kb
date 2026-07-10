@@ -10,6 +10,8 @@ console window, and must omit Windows-only launch kwargs off Windows.
 
 from __future__ import annotations
 
+import base64
+import json
 import os
 import subprocess
 import sys
@@ -23,6 +25,10 @@ from scripts import run_with_status
 EXPECTED_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 EXPECTED_CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
 EXPECTED_DETACHED_PROCESS = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+
+
+def _encoded_config(payload: dict[str, object]) -> str:
+    return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
 
 
 class _RecordingProcess:
@@ -96,6 +102,54 @@ def test_status_file_records_exit_code(monkeypatch: pytest.MonkeyPatch, tmp_path
     status_file = captured["status_file"]
     assert isinstance(status_file, Path)
     assert status_file.read_text(encoding="utf-8").strip() == "0"
+
+
+def test_config_env_mode_supplies_wrapper_inputs_without_positional_args(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_popen(cmd_args, **kwargs):  # noqa: ANN001, ANN003 - test stub
+        captured["cmd_args"] = cmd_args
+        captured["kwargs"] = kwargs
+        return _RecordingProcess()
+
+    status_file = tmp_path / "status.txt"
+    stdout_file = tmp_path / "worker.stdout.log"
+    stderr_file = tmp_path / "worker.stderr.log"
+    monkeypatch.setenv(
+        run_with_status.CONFIG_ENV_VAR,
+        _encoded_config(
+            {
+                "stdin_path": None,
+                "stdout_path": str(stdout_file),
+                "stderr_path": str(stderr_file),
+                "lifetime_seconds": 17,
+                "status_file_path": str(status_file),
+                "cmd_args": [sys.executable, "--version"],
+            }
+        ),
+    )
+    monkeypatch.setattr(run_with_status.os, "name", "posix")
+    monkeypatch.setattr(run_with_status.subprocess, "Popen", fake_popen)
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_with_status.main(["--config-env"])
+
+    assert exc_info.value.code == 0
+    assert captured["cmd_args"] == [sys.executable, "--version"]
+    kwargs = captured["kwargs"]
+    assert kwargs["env"].get(run_with_status.CONFIG_ENV_VAR) is None
+    assert status_file.read_text(encoding="utf-8").strip() == "0"
+
+
+def test_config_env_mode_requires_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(run_with_status.CONFIG_ENV_VAR, raising=False)
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_with_status.main(["--config-env"])
+
+    assert exc_info.value.code == 2
 
 
 def test_windows_python_command_uses_sibling_pythonw_when_available(
@@ -257,7 +311,7 @@ def test_dispatch_lo_gets_review_lifetime() -> None:
     implementation lifetime to Prime Builder dispatches."""
     from scripts import dispatcher_runtime as trigger
 
-    assert trigger.worker_lifetime_seconds("loyal-opposition") == 1800
+    assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
     assert trigger.worker_lifetime_seconds("loyal-opposition") == trigger.LO_REVIEW_WORKER_LIFETIME_SECONDS
     assert trigger.worker_lifetime_seconds("prime-builder") == trigger.PB_IMPL_WORKER_LIFETIME_SECONDS
     assert trigger.worker_lifetime_seconds(None) is None
