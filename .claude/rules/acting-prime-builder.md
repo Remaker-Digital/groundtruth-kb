@@ -242,11 +242,10 @@ approval, acknowledgement, or owner-authorized automation scope.
 
 ## Deterministic Services Principle
 
-Owner directive `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` establishes
-that repetitive work performed by AI is a defect. Deterministic plumbing
-— building structured records, computing hashes, threading parameters,
-writing boilerplate scripts that follow a template — belongs in services,
-not in sessions.
+`GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001` establishes the Deterministic
+Services Principle: repetitive, deterministic work belongs in services, not
+sessions. `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` remains provenance for
+the originating owner directive and rationale, not the establishing authority.
 
 Justification: token cost (a recurring tax that pays no marginal
 information dividend), error rate (AI procedures are more error-prone
