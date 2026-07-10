@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -131,6 +132,72 @@ def _write_runtime(root: Path) -> None:
     (runs_dir / f"{live_id}.create_time_epoch").write_text(f"{create_time:.6f}", encoding="utf-8")
 
 
+def _write_workflow_membase(root: Path) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as connection:
+        connection.executescript(
+            """
+            CREATE TABLE current_work_items (id TEXT, title TEXT, source_spec_id TEXT);
+            CREATE TABLE current_specifications (id TEXT, status TEXT);
+            CREATE TABLE current_project_authorizations (
+                id TEXT,
+                project_id TEXT,
+                status TEXT,
+                included_work_item_ids TEXT,
+                excluded_work_item_ids TEXT
+            );
+            CREATE TABLE current_project_work_item_memberships (
+                project_id TEXT,
+                work_item_id TEXT,
+                status TEXT
+            );
+            """
+        )
+        connection.executemany(
+            "INSERT INTO current_work_items VALUES (?, ?, ?)",
+            [
+                ("WI-7001", "Ready workflow item", "SPEC-7001"),
+                ("WI-7002", "Missing specification", None),
+                ("WI-7003", "Missing authorization", "SPEC-7001"),
+            ],
+        )
+        connection.execute("INSERT INTO current_specifications VALUES (?, ?)", ("SPEC-7001", "specified"))
+        connection.execute(
+            "INSERT INTO current_project_authorizations VALUES (?, ?, ?, ?, ?)",
+            ("PAUTH-TEST-7001", "PROJECT-TEST-7000", "active", json.dumps(["WI-7001"]), json.dumps([])),
+        )
+        connection.executemany(
+            "INSERT INTO current_project_work_item_memberships VALUES (?, ?, ?)",
+            [("PROJECT-TEST-7000", work_item_id, "active") for work_item_id in ("WI-7001", "WI-7002", "WI-7003")],
+        )
+
+
+def _write_workflow_bridge(
+    root: Path,
+    slug: str,
+    status: str,
+    *,
+    work_item_id: str | None = None,
+    authorization_id: str | None = None,
+    project_id: str | None = "PROJECT-TEST-7000",
+) -> Path:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    metadata = [
+        status,
+        f"bridge_kind: {'lo_verdict' if status in {'GO', 'NO-GO'} else 'prime_proposal'}",
+        f"Document: {slug}",
+    ]
+    if work_item_id:
+        metadata.append(f"Work Item: {work_item_id}")
+    if authorization_id:
+        metadata.append(f"Project Authorization: {authorization_id}")
+    if project_id:
+        metadata.append(f"Project: {project_id}")
+    path = bridge_dir / f"{slug}-001.md"
+    path.write_text("\n".join(metadata) + "\n", encoding="utf-8")
+    return path
+
+
 def test_bridge_dispatch_report_json_exposes_required_sections_and_cause_taxonomy(tmp_path: Path) -> None:
     root, config = _project(tmp_path)
     _write_runtime(root)
@@ -189,9 +256,9 @@ def test_bridge_dispatch_report_human_output_is_compact(tmp_path: Path) -> None:
     result = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report"])
 
     assert result.exit_code == 0, result.output
-    assert "Bridge dispatch report:" in result.output
-    assert "Selected candidates:" in result.output
-    assert "Recent runs:" in result.output
+    assert "Bridge dispatch workflow:" in result.output
+    assert "Prime Builder:" in result.output
+    assert "Loyal Opposition:" in result.output
 
 
 def test_dispatch_health_status_and_report_json_expose_dimension_rollup(
@@ -361,3 +428,80 @@ def test_wi5000_dispatch_health_passes_for_impl_auth_quarantine_visibility(tmp_p
     )
     assert classification["severity"] == "PASS"
     assert classification["stale_failure_reason"] == "current all_impl_auth_quarantined non-launch"
+
+
+def test_wi5174_compact_workflow_report_uses_canonical_queue_and_membase_prerequisites(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    _write_workflow_membase(root)
+    _write_workflow_bridge(root, "go-ready", "GO", work_item_id="WI-7001", authorization_id="PAUTH-TEST-7001")
+    _write_workflow_bridge(root, "go-missing-spec", "GO", work_item_id="WI-7002", authorization_id="PAUTH-TEST-7001")
+    _write_workflow_bridge(root, "go-missing-pauth", "GO", work_item_id="WI-7003", authorization_id="PAUTH-TEST-7003")
+    _write_workflow_bridge(root, "revise-me", "NO-GO")
+    _write_workflow_bridge(root, "review-new", "NEW")
+    _write_workflow_bridge(root, "review-revised", "REVISED")
+    _write_workflow_bridge(root, "owner-advisory", "ADVISORY")
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["schema_version"] == "gtkb.dispatch_workflow.v1"
+    assert set(payload["queues"]["prime_builder"]) == {"actionable_now", "candidate_next", "blocked"}
+    assert set(payload["queues"]["loyal_opposition"]) == {"actionable_now", "candidate_next", "blocked"}
+    assert payload["in_flight"][0]["recipient"] == "prime-builder:A"
+
+    prime_now = {row["id"] for row in payload["queues"]["prime_builder"]["actionable_now"]}
+    assert {"go-ready", "revise-me"} <= prime_now
+    prime_blocks = {row["id"]: row["reason_code"] for row in payload["queues"]["prime_builder"]["blocked"]}
+    assert prime_blocks["go-missing-spec"] == "missing_source_spec"
+    assert prime_blocks["go-missing-pauth"] == "missing_matching_pauth"
+    assert payload["queues"]["prime_builder"]["candidate_next"][0]["reason_code"] == "advisory_requires_owner_intake"
+
+    loyal_now = {row["id"] for row in payload["queues"]["loyal_opposition"]["actionable_now"]}
+    assert {"review-new", "review-revised"} <= loyal_now
+
+
+def test_wi5174_default_and_explicit_compact_human_report_are_workflow_views(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+
+    default = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report"])
+    explicit = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--compact"])
+
+    assert default.exit_code == 0, default.output
+    assert explicit.exit_code == 0, explicit.output
+    for output in (default.output, explicit.output):
+        assert "Bridge dispatch workflow:" in output
+        assert "Prime Builder:" in output
+        assert "Loyal Opposition:" in output
+
+
+def test_wi5174_compact_workflow_is_bounded_and_read_only(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    for number in range(21):
+        _write_workflow_bridge(root, f"review-{number:02d}", "NEW")
+
+    tracked = [
+        root / "config" / "dispatcher" / "rules.toml",
+        root / "harness-state" / "harness-registry.json",
+        root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json",
+        root / "bridge" / "review-00-001.md",
+    ]
+    before = {path: path.read_bytes() for path in tracked}
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    loyal_now = payload["queues"]["loyal_opposition"]["actionable_now"]
+    assert len(loyal_now) == 20
+    assert payload["bounds"]["per_section_limit"] == 20
+    assert payload["bounds"]["truncated"]["queues"]["loyal_opposition"]["actionable_now"] is True
+    assert {path: path.read_bytes() for path in tracked} == before

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import subprocess
 from collections import Counter, deque
 from datetime import UTC, datetime
@@ -22,6 +23,18 @@ RUNS_RELATIVE_PATH = STATE_DIR_RELATIVE_PATH / "dispatch-runs"
 RUN_TIMESTAMP_RE = re.compile(r"^(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)")
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
+WORKFLOW_SCHEMA_VERSION = "gtkb.dispatch_workflow.v1"
+WORKFLOW_RECORD_LIMIT = 20
+_WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*`?(?P<work_item_id>WI-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE)
+_PROJECT_AUTHORIZATION_METADATA_RE = re.compile(
+    r"^Project Authorization:\s*`?(?P<authorization_id>PAUTH-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE
+)
+_PROJECT_METADATA_RE = re.compile(r"^Project:\s*`?(?P<project_id>[A-Za-z0-9_-]+)", re.IGNORECASE | re.MULTILINE)
+_BRIDGE_VERSION_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3,})\.md$")
+_DISPATCH_RECIPIENT_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z-(?P<role>prime-builder|loyal-opposition)-"
+    r"(?P<harness_id>[^-]+)-"
+)
 
 
 def build_bridge_dispatch_report(
@@ -145,6 +158,332 @@ def format_bridge_dispatch_report(report: dict[str, Any]) -> str:
         for finding in report["reliability"]["findings"]:
             lines.append(f"- {finding}")
     return "\n".join(lines)
+
+
+def build_compact_dispatch_workflow(
+    project_root: Path,
+    *,
+    report: dict[str, Any] | None = None,
+    max_records: int = WORKFLOW_RECORD_LIMIT,
+) -> dict[str, Any]:
+    """Build the bounded, read-only workflow projection for dispatch reporting."""
+    from groundtruth_kb.bridge.status_driver import collect_bridge_status
+
+    root = project_root.resolve()
+    limit = min(max(1, max_records), WORKFLOW_RECORD_LIMIT)
+    full_report = report or build_bridge_dispatch_report(root)
+    queue = collect_bridge_status(root, top_n=None).queue
+
+    prime_queues, prime_truncation = _workflow_prime_queues(root, queue.prime_actionable, limit)
+    loyal_queues, loyal_truncation = _workflow_loyal_queues(queue.loyal_opposition_actionable, limit)
+    in_flight, in_flight_truncated = _bounded_workflow_records(_workflow_in_flight(full_report), limit)
+    findings, findings_truncated = _bounded_workflow_records(
+        [{"finding": finding} for finding in full_report["reliability"]["findings"]],
+        limit,
+    )
+    selected_targets, targets_truncated = _workflow_selected_targets(full_report, limit)
+
+    return {
+        "schema_version": WORKFLOW_SCHEMA_VERSION,
+        "status": {
+            "health_status": full_report["summary"]["health_status"],
+            "findings": findings,
+            "bridge_status_counts": dict(queue.status_counts),
+            "selected_targets": selected_targets,
+        },
+        "in_flight": in_flight,
+        "queues": {
+            "prime_builder": prime_queues,
+            "loyal_opposition": loyal_queues,
+        },
+        "bounds": {
+            "per_section_limit": limit,
+            "truncated": {
+                "status_findings": findings_truncated,
+                "status_selected_targets": targets_truncated,
+                "in_flight": in_flight_truncated,
+                "queues": {
+                    "prime_builder": prime_truncation,
+                    "loyal_opposition": loyal_truncation,
+                },
+            },
+        },
+    }
+
+
+def format_compact_dispatch_workflow(workflow: dict[str, Any]) -> str:
+    """Render the default bounded human workflow view."""
+    status = workflow["status"]
+    lines = [
+        f"Bridge dispatch workflow: {status['health_status']}",
+        f"In-flight dispatches: {len(workflow['in_flight'])}",
+        "",
+    ]
+    for label, key in (("Prime Builder", "prime_builder"), ("Loyal Opposition", "loyal_opposition")):
+        lines.append(f"{label}:")
+        queues = workflow["queues"][key]
+        for category, title in (
+            ("actionable_now", "Actionable now"),
+            ("candidate_next", "Candidate next"),
+            ("blocked", "Blocked"),
+        ):
+            rows = queues[category]
+            if not rows:
+                lines.append(f"- {title}: (none)")
+                continue
+            rendered = ", ".join(_format_workflow_record(row) for row in rows)
+            lines.append(f"- {title}: {rendered}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
+def _workflow_prime_queues(
+    root: Path, items: Any, limit: int
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
+    categories: dict[str, list[dict[str, Any]]] = {
+        "actionable_now": [],
+        "candidate_next": [],
+        "blocked": [],
+    }
+    for item in items:
+        record = _workflow_record(item)
+        if item.top_status == "NO-GO":
+            categories["actionable_now"].append(record)
+            continue
+        if item.top_status == "ADVISORY":
+            record["reason_code"] = "advisory_requires_owner_intake"
+            categories["candidate_next"].append(record)
+            continue
+        if item.top_status != "GO":
+            continue
+
+        reason_code, context = _workflow_go_context(root, item.top_file)
+        if context:
+            record.update(context)
+        if reason_code is None:
+            categories["actionable_now"].append(record)
+        else:
+            record["reason_code"] = reason_code
+            categories["blocked"].append(record)
+    return _bound_workflow_categories(categories, limit)
+
+
+def _workflow_loyal_queues(items: Any, limit: int) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
+    categories: dict[str, list[dict[str, Any]]] = {
+        "actionable_now": [],
+        "candidate_next": [],
+        "blocked": [],
+    }
+    for item in items:
+        record = _workflow_record(item)
+        if item.top_status in {"NEW", "REVISED"}:
+            categories["actionable_now"].append(record)
+        else:
+            record["reason_code"] = "owner_hold"
+            categories["candidate_next"].append(record)
+    return _bound_workflow_categories(categories, limit)
+
+
+def _workflow_record(item: Any) -> dict[str, Any]:
+    return {
+        "id": item.document_name,
+        "document_name": item.document_name,
+        "title": item.document_name,
+        "source_authority": item.top_file,
+        "lifecycle_status": item.top_status,
+        "dispatchable": item.dispatchable,
+    }
+
+
+def _workflow_go_context(root: Path, top_file: str) -> tuple[str | None, dict[str, Any]]:
+    metadata = _read_workflow_bridge_metadata(root, top_file)
+    work_item_id = metadata.get("work_item_id")
+    authorization_id = metadata.get("authorization_id")
+    project_id = metadata.get("project_id")
+    if not work_item_id or not project_id:
+        return "bridge_metadata_unresolvable", {}
+
+    context: dict[str, Any] = {"work_item_id": work_item_id, "project_id": project_id}
+    if authorization_id:
+        context["project_authorization_id"] = authorization_id
+    db_path = root / "groundtruth.db"
+    if not db_path.is_file():
+        return "bridge_metadata_unresolvable", context
+
+    try:
+        with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            work_item = connection.execute(
+                "SELECT id, title, source_spec_id FROM current_work_items WHERE id = ? LIMIT 1",
+                (work_item_id,),
+            ).fetchone()
+            if work_item is None:
+                return "bridge_metadata_unresolvable", context
+            title = str(work_item["title"] or "").strip()
+            if title:
+                context["title"] = title
+            membership = connection.execute(
+                """
+                SELECT status
+                FROM current_project_work_item_memberships
+                WHERE project_id = ? AND work_item_id = ?
+                LIMIT 1
+                """,
+                (project_id, work_item_id),
+            ).fetchone()
+            if membership is None or str(membership["status"] or "").lower() != "active":
+                return "bridge_metadata_unresolvable", context
+            source_spec_id = str(work_item["source_spec_id"] or "").strip()
+            if not source_spec_id:
+                return "missing_source_spec", context
+            context["source_spec_id"] = source_spec_id
+            specification = connection.execute(
+                "SELECT status FROM current_specifications WHERE id = ? LIMIT 1",
+                (source_spec_id,),
+            ).fetchone()
+            if specification is None or str(specification["status"] or "").lower() not in {
+                "specified",
+                "implemented",
+                "verified",
+            }:
+                return "missing_source_spec", context
+            if not authorization_id:
+                return "missing_matching_pauth", context
+            authorization = connection.execute(
+                """
+                SELECT id, project_id, status, included_work_item_ids, excluded_work_item_ids
+                FROM current_project_authorizations
+                WHERE id = ? AND status = 'active'
+                LIMIT 1
+                """,
+                (authorization_id,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return "bridge_metadata_unresolvable", context
+
+    if (
+        authorization is None
+        or str(authorization["project_id"] or "") != project_id
+        or not _authorization_covers_work_item(authorization, work_item_id)
+    ):
+        return "missing_matching_pauth", context
+    return None, context
+
+
+def _read_workflow_bridge_metadata(root: Path, top_file: str) -> dict[str, str | None]:
+    top_path = root / top_file
+    candidates = [top_path]
+    match = _BRIDGE_VERSION_RE.match(top_path.name)
+    if match and top_path.parent.is_dir():
+        versions: list[tuple[int, Path]] = []
+        for path in top_path.parent.glob(f"{match.group('slug')}-*.md"):
+            version_match = _BRIDGE_VERSION_RE.match(path.name)
+            if version_match and version_match.group("slug") == match.group("slug"):
+                versions.append((int(version_match.group("version")), path))
+        candidates = [path for _version, path in sorted(versions, reverse=True)]
+
+    metadata: dict[str, str | None] = {"work_item_id": None, "authorization_id": None, "project_id": None}
+    for path in candidates:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if metadata["work_item_id"] is None:
+            work_item = _WORK_ITEM_METADATA_RE.search(text)
+            if work_item:
+                metadata["work_item_id"] = work_item.group("work_item_id").upper()
+        if metadata["authorization_id"] is None:
+            authorization = _PROJECT_AUTHORIZATION_METADATA_RE.search(text)
+            if authorization:
+                metadata["authorization_id"] = authorization.group("authorization_id")
+        if metadata["project_id"] is None:
+            project = _PROJECT_METADATA_RE.search(text)
+            if project:
+                metadata["project_id"] = project.group("project_id")
+        if all(metadata.values()):
+            break
+    return metadata
+
+
+def _authorization_covers_work_item(authorization: sqlite3.Row, work_item_id: str) -> bool:
+    included = _workflow_json_list(authorization["included_work_item_ids"])
+    excluded = _workflow_json_list(authorization["excluded_work_item_ids"])
+    return work_item_id not in excluded and (not included or work_item_id in included)
+
+
+def _workflow_json_list(value: Any) -> set[str]:
+    if value is None:
+        return set()
+    try:
+        decoded = json.loads(str(value))
+    except json.JSONDecodeError:
+        decoded = str(value).split(",")
+    if not isinstance(decoded, list):
+        return set()
+    return {str(item).strip() for item in decoded if str(item).strip()}
+
+
+def _workflow_in_flight(report: dict[str, Any]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for run in report["history"]["recent_runs"]:
+        state = str(run.get("state") or "")
+        if state not in {"live", "stale", "unknown"}:
+            continue
+        dispatch_id = str(run.get("dispatch_id") or "")
+        recipient_match = _DISPATCH_RECIPIENT_RE.match(dispatch_id)
+        recipient = None
+        if recipient_match:
+            recipient = f"{recipient_match.group('role')}:{recipient_match.group('harness_id')}"
+        records.append(
+            {
+                "dispatch_id": dispatch_id,
+                "recipient": recipient,
+                "lifecycle_state": state,
+                "started_at": run.get("started_at"),
+                "age_seconds": run.get("age_seconds"),
+                "bridge_document": None,
+                "work_item_id": None,
+            }
+        )
+    return records
+
+
+def _workflow_selected_targets(report: dict[str, Any], limit: int) -> tuple[dict[str, list[dict[str, Any]]], bool]:
+    selected: dict[str, list[dict[str, Any]]] = {}
+    truncated = False
+    for role in DISPATCH_ROLES:
+        rows = report["topology"]["selected_by_role"].get(role, [])
+        summaries = [
+            {
+                "id": row.get("id"),
+                "harness_name": row.get("harness_name"),
+                "dispatch_availability": row.get("dispatch_availability"),
+            }
+            for row in rows
+        ]
+        selected[role], role_truncated = _bounded_workflow_records(summaries, limit)
+        truncated = truncated or role_truncated
+    return selected, truncated
+
+
+def _bound_workflow_categories(
+    categories: dict[str, list[dict[str, Any]]], limit: int
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
+    bounded: dict[str, list[dict[str, Any]]] = {}
+    truncated: dict[str, bool] = {}
+    for category, records in categories.items():
+        bounded[category], truncated[category] = _bounded_workflow_records(records, limit)
+    return bounded, truncated
+
+
+def _bounded_workflow_records(records: list[dict[str, Any]], limit: int) -> tuple[list[dict[str, Any]], bool]:
+    return records[:limit], len(records) > limit
+
+
+def _format_workflow_record(record: dict[str, Any]) -> str:
+    label = str(record.get("title") or record.get("document_name") or record.get("id") or "unknown")
+    reason = record.get("reason_code")
+    return f"{label} [{reason}]" if reason else label
 
 
 def _read_json(path: Path) -> tuple[dict[str, Any], list[str]]:

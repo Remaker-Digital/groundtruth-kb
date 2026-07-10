@@ -602,15 +602,21 @@ def _emit_bridge_dispatch_health(ctx: click.Context, *, json_output: bool) -> No
     ctx.exit(0 if payload["health_status"] != "FAIL" else 1)
 
 
-def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool) -> None:
-    from groundtruth_kb.bridge_dispatch_report import build_bridge_dispatch_report, format_bridge_dispatch_report
+def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool, compact: bool) -> None:
+    from groundtruth_kb.bridge_dispatch_report import (
+        build_bridge_dispatch_report,
+        build_compact_dispatch_workflow,
+        format_compact_dispatch_workflow,
+    )
 
     config = _resolve_config(ctx)
     report = build_bridge_dispatch_report(config.project_root)
     if json_output:
-        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        payload = build_compact_dispatch_workflow(config.project_root, report=report) if compact else report
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
         return
-    click.echo(format_bridge_dispatch_report(report))
+    workflow = build_compact_dispatch_workflow(config.project_root, report=report)
+    click.echo(format_compact_dispatch_workflow(workflow))
 
 
 def _import_benchmark_cli() -> Any:
@@ -1255,10 +1261,11 @@ def bridge_dispatch_health_cmd(ctx: click.Context, json_output: bool) -> None:
 
 @bridge_dispatch_group.command("report")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--compact", is_flag=True, help="Emit the bounded compact workflow view explicitly.")
 @click.pass_context
-def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool) -> None:
+def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool, compact: bool) -> None:
     """Show a comprehensive read-only bridge dispatch operations report."""
-    _emit_bridge_dispatch_report(ctx, json_output=json_output)
+    _emit_bridge_dispatch_report(ctx, json_output=json_output, compact=compact)
 
 
 @bridge_dispatch_group.group("complex")
