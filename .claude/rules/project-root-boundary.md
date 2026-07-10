@@ -81,7 +81,9 @@ GT-KB rehearsal-class operations may emit runtime output to a path outside `E:\G
 3. The output is regenerable evidence (preview artifacts, classification manifests, dry-run DBs), not canonical project state.
 4. The output is documented in the bridge proposal that authorizes the operation, and the bridge passes Codex review with the path explicit.
 
-Source: `DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` and the manifest §3.3 owner decision recorded at S311 (commit `12538b97` context). Rationale: rehearsal output must avoid cloud-sync corruption (Google Drive currently syncs `E:`); the in-root `.driveignore` mechanism per commit `12538b97` adds a per-path enumeration burden that does not scale with rehearsal cardinality.
+Authority: `DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001`.
+
+Provenance: `DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` and the manifest §3.3 owner decision recorded at S311 (commit `12538b97` context). Rationale: rehearsal output must avoid cloud-sync corruption (Google Drive currently syncs `E:`); the in-root `.driveignore` mechanism per commit `12538b97` adds a per-path enumeration burden that does not scale with rehearsal cardinality.
 
 Outputs covered by this exception remain outside the scope of GT-KB canonical state, audit history, release evidence, regression tests (except as preview-evidence inputs), and dependency closure.
 
@@ -110,7 +112,9 @@ following hold:
    `_DB_SNAPSHOT_OUTPUT_ALLOWLIST` in `doctor.py` and reports FAIL if the output
    would land in an unrecognized location.
 
-Source: `DELIB-FAB03-ROOT-BOUNDARY-EXCEPTION-20260611` (owner AUQ). Rationale:
+Authority: `DCL-PROJECT-ROOT-BOUNDARY-DB-SNAPSHOT-OUTPUT-EXCEPTION-001`.
+
+Provenance: `DELIB-FAB03-ROOT-BOUNDARY-EXCEPTION-20260611` (owner AUQ). Rationale:
 `groundtruth.db` resides on a cloud-synced drive (`E:\`); writing VACUUM'd copies
 to the same sync root risks corruption from concurrent sync operations. The
 `%LOCALAPPDATA%` default is a non-synced, user-local directory that avoids this
@@ -153,4 +157,6 @@ artifacts MUST remain within E:\GT-KB, and no GT-KB project artifact may be
 created, read as a live dependency, updated, verified, or required from outside
 that root.
 
-Source: DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION (owner S366 AUQ).
+Authority: `DCL-PROJECT-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXEC-EXCEPTION-001`.
+
+Provenance: `DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION` (owner S366 AUQ).

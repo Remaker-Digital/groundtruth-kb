@@ -56,6 +56,17 @@ and from MEMORY.md (which holds *what was recently done*).
 `gt deliberations search <query>` (CLI); ChromaDB vector index at
 `.groundtruth-chroma/`.
 
+### Canonical carrier
+
+**Definition:** A governed artifact that establishes an operative rule or
+exception. Deliberations and memory may retain rationale or provenance, but
+they cannot be the sole authority for an operating rule.
+
+**Root-boundary example:** `DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001`,
+`DCL-PROJECT-ROOT-BOUNDARY-DB-SNAPSHOT-OUTPUT-EXCEPTION-001`, and
+`DCL-PROJECT-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXEC-EXCEPTION-001` are the
+canonical carriers for their respective exceptions.
+
 ### MEMORY.md
 
 **Definition:** The operational notepad tier of ADR-0001. A repo-tracked
