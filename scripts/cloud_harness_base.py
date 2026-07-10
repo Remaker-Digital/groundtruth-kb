@@ -17,8 +17,8 @@ Adopters supply only the varying axes via an :class:`AdopterProfile`:
   the Ollama re-base in slice 4) and raises :class:`NotImplementedError` if selected.
 * ``model`` routing — the adopter's ``.api-harness/routing.toml`` provider key.
 * ``hook_tier`` — ``guard-adapter-floor`` (the enforced mechanism) or ``native-full-hooks``
-  (slice-3 validated seam/flag; the floor is still enforced for this tier, and the concrete
-  full-hook lifecycle is wired against a live Anthropic adopter in slice 4).
+  (the Claude-style hook lifecycle from ``.claude/settings.json``; the floor is still
+  enforced for this tier).
 
 The dialect abstraction (slice 3) makes ``run_tool_loop`` dialect-agnostic: each dialect
 strategy owns request-build, tool-schema shaping, and response-parse, while the loop's
@@ -129,13 +129,27 @@ AUTH_STYLE_AUTHORIZATION_BEARER = "authorization-bearer"
 AUTH_STYLE_X_API_KEY = "x-api-key"
 SUPPORTED_AUTH_STYLES = frozenset({AUTH_STYLE_AUTHORIZATION_BEARER, AUTH_STYLE_X_API_KEY})
 
-# --- Hook tiers (slice 3: native-full-hooks is a validated seam/flag; the fail-closed
-# guard-adapter floor stays the enforced mechanism for all tiers until slice 4 wires
-# the concrete full-hook lifecycle against a live Anthropic adopter — DELIB-20260708-
-# CLOUD-HARNESS-TEMPLATE-SLICE3-NATIVE-HOOK-SCOPE) ---
+# --- Hook tiers (native-full-hooks runs the Claude-style lifecycle while keeping
+# the fail-closed guard-adapter floor enforced for mutating tools).
 HOOK_TIER_GUARD_ADAPTER_FLOOR = "guard-adapter-floor"
 HOOK_TIER_NATIVE_FULL = "native-full-hooks"
 SUPPORTED_HOOK_TIERS = frozenset({HOOK_TIER_GUARD_ADAPTER_FLOOR, HOOK_TIER_NATIVE_FULL})
+NATIVE_HOOK_SETTINGS_PATH = Path(".claude/settings.json")
+NATIVE_HOOK_SESSION_START = "SessionStart"
+NATIVE_HOOK_USER_PROMPT_SUBMIT = "UserPromptSubmit"
+NATIVE_HOOK_PRE_TOOL_USE = "PreToolUse"
+NATIVE_HOOK_POST_TOOL_USE = "PostToolUse"
+NATIVE_HOOK_STOP = "Stop"
+NATIVE_HOOK_EVENTS = frozenset(
+    {
+        NATIVE_HOOK_SESSION_START,
+        NATIVE_HOOK_USER_PROMPT_SUBMIT,
+        NATIVE_HOOK_PRE_TOOL_USE,
+        NATIVE_HOOK_POST_TOOL_USE,
+        NATIVE_HOOK_STOP,
+    }
+)
+DEFAULT_NATIVE_HOOK_TIMEOUT_SECONDS = 10.0
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
@@ -267,6 +281,7 @@ class AdopterProfile:
 
 
 GuardRunner = Callable[[Path, dict[str, Any], Mapping[str, str], float], GuardExecutionResult]
+NativeHookRunner = Callable[[str, dict[str, Any], Mapping[str, str], float], GuardExecutionResult]
 ChatFunc = Callable[[str, str, dict[str, Any], float], dict[str, Any]]
 CommandRunner = Callable[[str, Path, Mapping[str, str], float], subprocess.CompletedProcess[str]]
 RelativePathFunc = Callable[[Path, Path], str]
@@ -1078,6 +1093,42 @@ def _default_guard_runner(
     return GuardExecutionResult(completed.returncode, completed.stdout, completed.stderr)
 
 
+def _expand_native_hook_command(command: str, env: Mapping[str, str]) -> str:
+    expanded = command
+    for key in ("CLAUDE_PROJECT_DIR", "GTKB_PROJECT_ROOT"):
+        if key in env:
+            expanded = expanded.replace(f"${{{key}}}", env[key])
+            expanded = expanded.replace(f"${key}", env[key])
+            expanded = expanded.replace(f"%{key}%", env[key])
+    return expanded
+
+
+def _default_native_hook_runner(
+    command: str,
+    payload: dict[str, Any],
+    env: Mapping[str, str],
+    timeout: float,
+) -> GuardExecutionResult:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
+    expanded_command = _expand_native_hook_command(command, env)
+    try:
+        completed = subprocess.run(
+            expanded_command,
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            cwd=str(payload.get("cwd") or Path.cwd()),
+            env=dict(env),
+            timeout=timeout,
+            check=False,
+            shell=True,
+            creationflags=creationflags,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return GuardExecutionResult(-1, exc.stdout or "", exc.stderr or "", timed_out=True)
+    return GuardExecutionResult(completed.returncode, completed.stdout, completed.stderr)
+
+
 def _decision_reason(data: dict[str, Any]) -> str | None:
     decision = str(data.get("decision") or "").lower()
     if decision in {"block", "deny", "ask", "checkpoint"}:
@@ -1092,6 +1143,207 @@ def _decision_reason(data: dict[str, Any]) -> str | None:
                 or f"guard permission decision: {permission}"
             )
     return None
+
+
+def _native_hook_block_reason(data: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(data, dict):
+        return None
+    decision = str(data.get("decision") or "").lower()
+    if decision == "block":
+        return str(data.get("reason") or data.get("permissionDecisionReason") or "native hook blocked tool use")
+    reason = _decision_reason(dict(data))
+    return reason
+
+
+def _load_native_hook_settings(project_root: Path) -> Mapping[str, Any]:
+    settings_path = project_root / NATIVE_HOOK_SETTINGS_PATH
+    if not settings_path.is_file():
+        return {}
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise CloudHarnessError(f"native hook settings malformed JSON: {NATIVE_HOOK_SETTINGS_PATH.as_posix()}") from exc
+    if not isinstance(data, dict):
+        raise CloudHarnessError(f"native hook settings must be a JSON object: {NATIVE_HOOK_SETTINGS_PATH.as_posix()}")
+    hooks = data.get("hooks") or {}
+    if not isinstance(hooks, dict):
+        raise CloudHarnessError(
+            f"native hook settings hooks must be a JSON object: {NATIVE_HOOK_SETTINGS_PATH.as_posix()}"
+        )
+    return hooks
+
+
+def _native_hook_matcher_matches(matcher: Any, tool_name: str | None) -> bool:
+    if matcher in (None, ""):
+        return True
+    if tool_name is None:
+        return False
+    if not isinstance(matcher, str):
+        raise CloudHarnessError("native hook matcher must be a string")
+    for token in (part.strip() for part in matcher.split("|")):
+        if token and (token == tool_name or fnmatch.fnmatchcase(tool_name, token)):
+            return True
+    return False
+
+
+def _native_hook_command_timeout(raw_timeout: Any) -> float:
+    if raw_timeout in (None, ""):
+        return DEFAULT_NATIVE_HOOK_TIMEOUT_SECONDS
+    if isinstance(raw_timeout, bool):
+        raise CloudHarnessError("native hook timeout must be a positive number")
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError) as exc:
+        raise CloudHarnessError("native hook timeout must be a positive number") from exc
+    if timeout <= 0:
+        raise CloudHarnessError("native hook timeout must be a positive number")
+    return timeout
+
+
+def _iter_native_hook_commands(
+    hooks: Mapping[str, Any],
+    event_name: str,
+    tool_name: str | None,
+) -> Iterable[tuple[str, float]]:
+    registrations = hooks.get(event_name) or []
+    if not isinstance(registrations, list):
+        raise CloudHarnessError(f"native hook event {event_name} must be a list")
+    for registration in registrations:
+        if not isinstance(registration, dict):
+            raise CloudHarnessError(f"native hook event {event_name} registration must be a JSON object")
+        if not _native_hook_matcher_matches(registration.get("matcher"), tool_name):
+            continue
+        raw_hooks = registration.get("hooks") or []
+        if not isinstance(raw_hooks, list):
+            raise CloudHarnessError(f"native hook event {event_name} hooks must be a list")
+        for hook in raw_hooks:
+            if not isinstance(hook, dict):
+                raise CloudHarnessError(f"native hook event {event_name} hook must be a JSON object")
+            hook_type = str(hook.get("type") or "command")
+            if hook_type != "command":
+                raise CloudHarnessError(f"unsupported native hook type for {event_name}: {hook_type}")
+            command = hook.get("command")
+            if not isinstance(command, str) or not command.strip():
+                raise CloudHarnessError(f"native hook event {event_name} command must be nonblank")
+            yield command, _native_hook_command_timeout(hook.get("timeout"))
+
+
+def _native_hook_env(
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+) -> dict[str, str]:
+    env = set_author_metadata_env(
+        os.environ,
+        model_metadata.model_id,
+        model_metadata.model_version,
+        profile,
+        model_metadata.endpoint,
+        model_metadata.model_configuration,
+    )
+    env["CLAUDE_PROJECT_DIR"] = str(project_root)
+    env["GTKB_PROJECT_ROOT"] = str(project_root)
+    return env
+
+
+def _native_hook_payload(
+    event_name: str,
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    *,
+    prompt: str | None = None,
+    tool_name: str | None = None,
+    tool_input: Mapping[str, Any] | None = None,
+    tool_response: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "hook_event_name": event_name,
+        "cwd": str(project_root),
+        "project_root": str(project_root),
+        "session_id": resolve_harness_session_id(os.environ),
+        "transcript_path": "",
+        "profile": {
+            "display_name": profile.display_name,
+            "author_identity": profile.author_identity,
+            "author_harness_id": profile.author_harness_id,
+            "hook_tier": profile.hook_tier,
+            "dialect": profile.dialect,
+        },
+        "model_metadata": {
+            "model_id": model_metadata.model_id,
+            "model_version": model_metadata.model_version,
+            "endpoint": model_metadata.endpoint,
+            "route_key": model_metadata.route_key,
+            "model_configuration": model_metadata.model_configuration,
+            "requested_model_id": model_metadata.requested_model_id,
+        },
+    }
+    if prompt is not None:
+        payload["prompt"] = prompt
+    if tool_name is not None:
+        payload["tool_name"] = tool_name
+    if tool_input is not None:
+        payload["tool_input"] = dict(tool_input)
+    if tool_response is not None:
+        payload["tool_response"] = tool_response[:MAX_TOOL_OUTPUT_CHARS]
+    return payload
+
+
+def invoke_native_hooks(
+    event_name: str,
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    *,
+    prompt: str | None = None,
+    tool_name: str | None = None,
+    tool_input: Mapping[str, Any] | None = None,
+    tool_response: str | None = None,
+    native_hook_runner: NativeHookRunner | None = None,
+) -> dict[str, Any] | None:
+    if profile.hook_tier != HOOK_TIER_NATIVE_FULL:
+        return None
+    if event_name not in NATIVE_HOOK_EVENTS:
+        raise CloudHarnessError(f"unsupported native hook event: {event_name}")
+
+    hooks = _load_native_hook_settings(project_root)
+    env = _native_hook_env(model_metadata, project_root, profile)
+    payload = _native_hook_payload(
+        event_name,
+        model_metadata,
+        project_root,
+        profile,
+        prompt=prompt,
+        tool_name=tool_name,
+        tool_input=tool_input,
+        tool_response=tool_response,
+    )
+    runner = native_hook_runner or _default_native_hook_runner
+    last_output: dict[str, Any] | None = None
+    for command, hook_timeout in _iter_native_hook_commands(hooks, event_name, tool_name):
+        result = runner(command, payload, env, hook_timeout)
+        command_label = command[:120]
+        if result.timed_out:
+            raise CloudHarnessError(f"native hook timed out: {event_name}: {command_label}")
+        if result.returncode != 0:
+            raise CloudHarnessError(f"native hook exited nonzero: {event_name}: {command_label} ({result.returncode})")
+        stdout = (result.stdout or "").strip()
+        if not stdout:
+            raise CloudHarnessError(f"native hook emitted empty output: {event_name}: {command_label}")
+        try:
+            data = json.loads(stdout)
+        except json.JSONDecodeError as exc:
+            raise CloudHarnessError(f"native hook emitted malformed JSON: {event_name}: {command_label}") from exc
+        if not isinstance(data, dict):
+            raise CloudHarnessError(f"native hook output must be a JSON object: {event_name}: {command_label}")
+        reason = _native_hook_block_reason(data)
+        if reason:
+            if event_name == NATIVE_HOOK_PRE_TOOL_USE:
+                return {"decision": "block", "reason": reason}
+            raise CloudHarnessError(f"native hook blocked {event_name}: {command_label}: {reason}")
+        last_output = data
+    return last_output or {}
 
 
 def _guard_tool_input(tool_name: str, arguments: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
@@ -1526,6 +1778,7 @@ def run_tool_loop(
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
+    native_hook_runner: NativeHookRunner | None = None,
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
@@ -1541,11 +1794,6 @@ def run_tool_loop(
         raise CloudHarnessError("max_turns must be at least 1")
     if session_timeout <= 0:
         raise CloudHarnessError("session_timeout must be positive")
-    messages: list[dict[str, Any]] = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
-
     strategy = resolve_dialect_strategy(profile)
     schemas = strategy.build_tool_schemas(model_route.allowed_tools)
     chat = chat_func or strategy.chat
@@ -1557,76 +1805,134 @@ def run_tool_loop(
         requested_model_id=model_route.model_id,
     )
     session_deadline = time.monotonic() + session_timeout
+    native_hooks_started = False
+    if profile.hook_tier == HOOK_TIER_NATIVE_FULL:
+        invoke_native_hooks(
+            NATIVE_HOOK_SESSION_START,
+            metadata,
+            project_root,
+            profile,
+            native_hook_runner=native_hook_runner,
+        )
+        native_hooks_started = True
+
+    messages: list[dict[str, Any]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    if profile.hook_tier == HOOK_TIER_NATIVE_FULL:
+        invoke_native_hooks(
+            NATIVE_HOOK_USER_PROMPT_SUBMIT,
+            metadata,
+            project_root,
+            profile,
+            prompt=prompt,
+            native_hook_runner=native_hook_runner,
+        )
+    messages.append({"role": "user", "content": prompt})
+
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0
 
-    for _turn in range(max_turns):
-        payload = strategy.build_payload(messages, model_route, schemas)
+    try:
+        for _turn in range(max_turns):
+            payload = strategy.build_payload(messages, model_route, schemas)
 
-        operation_timeout = min(
-            timeout,
-            _remaining_timeout(session_deadline, "session timeout exceeded before provider chat turn"),
-        )
-        response = chat(endpoint, api_key, payload, operation_timeout)
+            operation_timeout = min(
+                timeout,
+                _remaining_timeout(session_deadline, "session timeout exceeded before provider chat turn"),
+            )
+            response = chat(endpoint, api_key, payload, operation_timeout)
 
-        if "error" in response:
-            error_details = response["error"]
-            error_message = error_details.get("message") if isinstance(error_details, dict) else str(error_details)
-            raise CloudHarnessError(f"provider API returned error: {error_message}")
+            if "error" in response:
+                error_details = response["error"]
+                error_message = error_details.get("message") if isinstance(error_details, dict) else str(error_details)
+                raise CloudHarnessError(f"provider API returned error: {error_message}")
 
-        metadata = metadata_from_response(metadata, response, profile)
-        message = strategy.parse_message(response)
-        tool_calls = message.get("tool_calls") or []
+            metadata = metadata_from_response(metadata, response, profile)
+            message = strategy.parse_message(response)
+            tool_calls = message.get("tool_calls") or []
 
-        if not tool_calls:
-            return _final_text_from_message(message)
+            if not tool_calls:
+                return _final_text_from_message(message)
 
-        if not isinstance(tool_calls, list):
-            raise CloudHarnessError("tool_calls must be a list")
+            if not isinstance(tool_calls, list):
+                raise CloudHarnessError("tool_calls must be a list")
 
-        tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
-        if tool_signature == previous_tool_signature:
-            repeated_tool_signature_turns += 1
-        else:
-            previous_tool_signature = tool_signature
-            repeated_tool_signature_turns = 1
-        if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
-            raise CloudHarnessError("repeated no-progress tool loop before final assistant text")
+            tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
+            if tool_signature == previous_tool_signature:
+                repeated_tool_signature_turns += 1
+            else:
+                previous_tool_signature = tool_signature
+                repeated_tool_signature_turns = 1
+            if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
+                raise CloudHarnessError("repeated no-progress tool loop before final assistant text")
 
-        assistant_message: dict[str, Any] = {
-            "role": "assistant",
-            "content": message.get("content") or "",
-            "tool_calls": tool_calls,
-        }
-        messages.append(assistant_message)
+            assistant_message: dict[str, Any] = {
+                "role": "assistant",
+                "content": message.get("content") or "",
+                "tool_calls": tool_calls,
+            }
+            messages.append(assistant_message)
 
-        for index, call in enumerate(tool_calls):
-            tool_name, arguments, call_id = _tool_call_parts(call, index)
-            if tool_name == "Bash":
-                arguments = dict(arguments)
-                requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
-                arguments["timeout_seconds"] = min(
-                    requested_timeout,
-                    _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
-                )
-            try:
-                result = dispatch_tool_call(
-                    tool_name,
-                    arguments,
+            for index, call in enumerate(tool_calls):
+                tool_name, arguments, call_id = _tool_call_parts(call, index)
+                if tool_name == "Bash":
+                    arguments = dict(arguments)
+                    requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+                    arguments["timeout_seconds"] = min(
+                        requested_timeout,
+                        _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
+                    )
+                block = invoke_native_hooks(
+                    NATIVE_HOOK_PRE_TOOL_USE,
                     metadata,
                     project_root,
                     profile,
-                    guard_runner=guard_runner,
-                    command_runner=command_runner,
+                    tool_name=tool_name,
+                    tool_input=arguments,
+                    native_hook_runner=native_hook_runner,
                 )
-            except CloudHarnessError as tool_err:
-                result = f"ERROR: {tool_err}"
-            messages.append(
-                {
-                    "role": "tool",
-                    "name": tool_name,
-                    "tool_call_id": call_id,
-                    "content": result[:MAX_TOOL_OUTPUT_CHARS],
-                }
+                block_reason = _native_hook_block_reason(block)
+                if block_reason:
+                    result = f"ERROR: native hook blocked {tool_name}: {block_reason}"
+                else:
+                    try:
+                        result = dispatch_tool_call(
+                            tool_name,
+                            arguments,
+                            metadata,
+                            project_root,
+                            profile,
+                            guard_runner=guard_runner,
+                            command_runner=command_runner,
+                        )
+                    except CloudHarnessError as tool_err:
+                        result = f"ERROR: {tool_err}"
+                invoke_native_hooks(
+                    NATIVE_HOOK_POST_TOOL_USE,
+                    metadata,
+                    project_root,
+                    profile,
+                    tool_name=tool_name,
+                    tool_input=arguments,
+                    tool_response=result,
+                    native_hook_runner=native_hook_runner,
+                )
+                messages.append(
+                    {
+                        "role": "tool",
+                        "name": tool_name,
+                        "tool_call_id": call_id,
+                        "content": result[:MAX_TOOL_OUTPUT_CHARS],
+                    }
+                )
+        raise CloudHarnessError("max-turn exhaustion before final assistant text")
+    finally:
+        if native_hooks_started:
+            invoke_native_hooks(
+                NATIVE_HOOK_STOP,
+                metadata,
+                project_root,
+                profile,
+                native_hook_runner=native_hook_runner,
             )
-    raise CloudHarnessError("max-turn exhaustion before final assistant text")

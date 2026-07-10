@@ -17,6 +17,7 @@ require:
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
@@ -82,6 +83,12 @@ def _root(tmp_path: Path) -> Path:
     (root / ".api-harness").mkdir()
     (root / CFG_PATH).write_text(ROUTING_TOML.strip() + "\n", encoding="utf-8")
     return root
+
+
+def _write_native_hook_settings(root: Path, hooks: dict) -> None:
+    settings_dir = root / ".claude"
+    settings_dir.mkdir(exist_ok=True)
+    (settings_dir / "settings.json").write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
 
 
 class _Resp:
@@ -395,6 +402,192 @@ def test_native_full_hooks_tier_still_enforces_guard_floor(tmp_path: Path) -> No
             guard_runner=deny,
             guard_paths=[Path("fake_guard.py")],
         )
+
+
+def test_native_full_hooks_lifecycle_runs_in_order(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / "note.txt").write_text("file body", encoding="utf-8")
+    _write_native_hook_settings(
+        root,
+        {
+            base.NATIVE_HOOK_SESSION_START: [{"hooks": [{"type": "command", "command": "record session"}]}],
+            base.NATIVE_HOOK_USER_PROMPT_SUBMIT: [{"hooks": [{"type": "command", "command": "record prompt"}]}],
+            base.NATIVE_HOOK_PRE_TOOL_USE: [
+                {"matcher": "Read", "hooks": [{"type": "command", "command": "record pre"}]}
+            ],
+            base.NATIVE_HOOK_POST_TOOL_USE: [
+                {"matcher": "Read", "hooks": [{"type": "command", "command": "record post"}]}
+            ],
+            base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "record stop"}]}],
+        },
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    turns: list[dict] = []
+    hook_events: list[tuple[str, dict, dict]] = []
+
+    def hook_runner(command: str, payload: dict, env: dict, timeout: float) -> base.GuardExecutionResult:
+        hook_events.append((command, dict(payload), dict(env)))
+        return base.GuardExecutionResult(returncode=0, stdout="{}")
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "function": {"name": "Read", "arguments": {"path": "note.txt"}},
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    result = base.run_tool_loop(
+        "read the note",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        3,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == "done"
+    assert [event[1]["hook_event_name"] for event in hook_events] == [
+        base.NATIVE_HOOK_SESSION_START,
+        base.NATIVE_HOOK_USER_PROMPT_SUBMIT,
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        base.NATIVE_HOOK_POST_TOOL_USE,
+        base.NATIVE_HOOK_STOP,
+    ]
+    pre_payload = hook_events[2][1]
+    post_payload = hook_events[3][1]
+    assert pre_payload["tool_name"] == "Read"
+    assert pre_payload["tool_input"] == {"path": "note.txt"}
+    assert post_payload["tool_response"] == "file body"
+    assert hook_events[0][2]["CLAUDE_PROJECT_DIR"] == str(root)
+
+
+def test_native_full_hooks_pretool_block_feeds_reason_to_model(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {
+            base.NATIVE_HOOK_SESSION_START: [{"hooks": [{"type": "command", "command": "record session"}]}],
+            base.NATIVE_HOOK_USER_PROMPT_SUBMIT: [{"hooks": [{"type": "command", "command": "record prompt"}]}],
+            base.NATIVE_HOOK_PRE_TOOL_USE: [
+                {"matcher": "Read", "hooks": [{"type": "command", "command": "record pre"}]}
+            ],
+            base.NATIVE_HOOK_POST_TOOL_USE: [
+                {"matcher": "Read", "hooks": [{"type": "command", "command": "record post"}]}
+            ],
+            base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "record stop"}]}],
+        },
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    turns: list[dict] = []
+    hook_payloads: list[dict] = []
+
+    def hook_runner(command: str, payload: dict, env: dict, timeout: float) -> base.GuardExecutionResult:
+        hook_payloads.append(dict(payload))
+        if payload["hook_event_name"] == base.NATIVE_HOOK_PRE_TOOL_USE:
+            return base.GuardExecutionResult(0, '{"decision": "block", "reason": "native denied"}')
+        return base.GuardExecutionResult(0, "{}")
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "function": {"name": "Read", "arguments": {"path": "missing.txt"}},
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        assert any("native denied" in message.get("content", "") for message in payload["messages"])
+        return {"choices": [{"message": {"content": "blocked noted"}}]}
+
+    result = base.run_tool_loop(
+        "read the missing note",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        3,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == "blocked noted"
+    assert hook_payloads[3]["tool_response"] == "ERROR: native hook blocked Read: native denied"
+
+
+def test_native_full_hooks_run_tool_loop_still_enforces_guard_floor(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / ".claude" / "hooks").mkdir(parents=True)
+    (root / ".claude" / "hooks" / "credential-scan.py").write_text("print('{}')\n", encoding="utf-8")
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Write",))
+    turns: list[dict] = []
+
+    def deny_guard(path: Path, payload: dict, env: dict, timeout: float) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(0, '{"decision": "block", "reason": "guard denied"}')
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "function": {
+                                        "name": "Write",
+                                        "arguments": {"path": "out.txt", "content": "content"},
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        assert any("guard denied Write" in message.get("content", "") for message in payload["messages"])
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    result = base.run_tool_loop(
+        "write the file",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        3,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        guard_runner=deny_guard,
+    )
+
+    assert result == "done"
+    assert not (root / "out.txt").exists()
 
 
 # --- Slice 3: anthropic-messages dialect ---
