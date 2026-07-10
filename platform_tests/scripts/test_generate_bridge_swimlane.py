@@ -8,7 +8,6 @@ Slice 2.1 of GTKB-DASHBOARD-002 — see
 
 from __future__ import annotations
 
-import hashlib
 import os
 import subprocess
 import sys
@@ -28,15 +27,7 @@ from scripts.gtkb_dashboard import generate_bridge_swimlane as gbs  # noqa: E402
 # ----------------------------- helpers -----------------------------
 
 
-def _seed_index(project_root: Path, body: str) -> Path:
-    bridge = project_root / "bridge"
-    bridge.mkdir(parents=True, exist_ok=True)
-    index = bridge / "INDEX.md"
-    index.write_text(body, encoding="utf-8")
-    return index
-
-
-def _seed_bridge_file(project_root: Path, name: str, content: str = "stub") -> Path:
+def _seed_bridge_file(project_root: Path, name: str, content: str = "NEW\n") -> Path:
     path = project_root / "bridge" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -95,7 +86,6 @@ def _commit_all(project_root: Path, *, message: str, when: str | None = None) ->
 
 
 def test_generate_swimlane_empty_index(tmp_path: Path) -> None:
-    _seed_index(tmp_path, "")
     snapshot = gbs.generate_swimlane(tmp_path)
     assert snapshot["threads"] == []
     assert snapshot["summary"]["thread_count"] == 0
@@ -104,9 +94,7 @@ def test_generate_swimlane_empty_index(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_single_thread(tmp_path: Path) -> None:
-    body = "Document: foo-bar\nNEW: bridge/foo-bar-001.md\n"
-    _seed_index(tmp_path, body)
-    _seed_bridge_file(tmp_path, "foo-bar-001.md")
+    _seed_bridge_file(tmp_path, "foo-bar-001.md", "NEW\n")
     snapshot = gbs.generate_swimlane(tmp_path)
     assert len(snapshot["threads"]) == 1
     thread = snapshot["threads"][0]
@@ -121,13 +109,15 @@ def test_generate_swimlane_single_thread(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_multi_version(tmp_path: Path) -> None:
-    body_lines = ["Document: alpha"]
-    statuses = ["VERIFIED", "NEW", "GO", "REVISED", "NO-GO"]
-    for idx, status in enumerate(statuses, start=1):
-        version = len(statuses) - idx + 1
-        body_lines.append(f"{status}: bridge/alpha-{version:03d}.md")
-        _seed_bridge_file(tmp_path, f"alpha-{version:03d}.md")
-    _seed_index(tmp_path, "\n".join(body_lines) + "\n")
+    version_statuses = {
+        1: "NO-GO",
+        2: "REVISED",
+        3: "GO",
+        4: "NEW",
+        5: "VERIFIED",
+    }
+    for version, status in version_statuses.items():
+        _seed_bridge_file(tmp_path, f"alpha-{version:03d}.md", f"{status}\n")
     snapshot = gbs.generate_swimlane(tmp_path)
     thread = snapshot["threads"][0]
     assert thread["latest_status"] == "VERIFIED"
@@ -137,31 +127,14 @@ def test_generate_swimlane_multi_version(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_terminality(tmp_path: Path) -> None:
-    body = (
-        "\n".join(
-            [
-                "Document: aa",
-                "VERIFIED: bridge/aa-001.md",
-                "",
-                "Document: bb",
-                "NO-GO: bridge/bb-001.md",
-                "",
-                "Document: cc",
-                "GO: bridge/cc-001.md",
-                "",
-                "Document: dd",
-                "NEW: bridge/dd-001.md",
-                "",
-                "Document: ee",
-                "REVISED: bridge/ee-001.md",
-                "",
-            ]
-        )
-        + "\n"
-    )
-    _seed_index(tmp_path, body)
-    for name in ("aa-001.md", "bb-001.md", "cc-001.md", "dd-001.md", "ee-001.md"):
-        _seed_bridge_file(tmp_path, name)
+    for name, status in (
+        ("aa-001.md", "VERIFIED"),
+        ("bb-001.md", "NO-GO"),
+        ("cc-001.md", "GO"),
+        ("dd-001.md", "NEW"),
+        ("ee-001.md", "REVISED"),
+    ):
+        _seed_bridge_file(tmp_path, name, f"{status}\n")
     snapshot = gbs.generate_swimlane(tmp_path)
     by_doc = {t["document"]: t for t in snapshot["threads"]}
     assert by_doc["aa"]["is_terminal"] is True and by_doc["aa"]["awaiting_prime"] is False
@@ -173,13 +146,8 @@ def test_generate_swimlane_terminality(tmp_path: Path) -> None:
 
 def test_generate_swimlane_summary_counts(tmp_path: Path) -> None:
     statuses = ["VERIFIED", "VERIFIED", "VERIFIED", "VERIFIED", "NO-GO", "GO", "NEW", "NEW", "REVISED", "REVISED"]
-    body_lines: list[str] = []
     for idx, status in enumerate(statuses, start=1):
-        body_lines.append(f"Document: thread-{idx:02d}")
-        body_lines.append(f"{status}: bridge/thread-{idx:02d}-001.md")
-        body_lines.append("")
-        _seed_bridge_file(tmp_path, f"thread-{idx:02d}-001.md")
-    _seed_index(tmp_path, "\n".join(body_lines) + "\n")
+        _seed_bridge_file(tmp_path, f"thread-{idx:02d}-001.md", f"{status}\n")
     snapshot = gbs.generate_swimlane(tmp_path)
     summary = snapshot["summary"]
     assert summary["thread_count"] == 10
@@ -189,17 +157,18 @@ def test_generate_swimlane_summary_counts(tmp_path: Path) -> None:
     assert summary["awaiting_lo_count"] == 4  # 2 NEW + 2 REVISED
 
 
-def test_generate_swimlane_age_from_git(tmp_path: Path) -> None:
+def test_generate_swimlane_age_from_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GTKB_BRIDGE_SWIMLANE_USE_GIT_TIMESTAMPS", "1")
     _init_repo(tmp_path)
-    body = "Document: zz\nNEW: bridge/zz-001.md\n"
-    _seed_index(tmp_path, body)
-    _seed_bridge_file(tmp_path, "zz-001.md", "v1")
+    _seed_bridge_file(tmp_path, "zz-001.md", "NEW\n")
     # Commit with controlled timestamp 10 minutes ago.
     when = "2026-04-24T15:00:00+0000"
     _commit_all(tmp_path, message="seed", when=when)
     snapshot = gbs.generate_swimlane(tmp_path)
     thread = snapshot["threads"][0]
-    assert thread["last_updated_at"] is not None
+    parsed_updated = gbs._parse_iso(thread["last_updated_at"])
+    assert parsed_updated is not None
+    assert parsed_updated.isoformat() == "2026-04-24T15:00:00+00:00"
     # Age computed from now → at least many minutes since 2026-04-24.
     # We just assert it's an integer ≥ 0 and last_updated_at parses.
     assert thread["age_in_state_minutes"] is not None
@@ -210,9 +179,7 @@ def test_generate_swimlane_age_from_git(tmp_path: Path) -> None:
 
 
 def test_generate_swimlane_age_fallback_to_mtime(tmp_path: Path) -> None:
-    body = "Document: yy\nNEW: bridge/yy-001.md\n"
-    _seed_index(tmp_path, body)
-    bridge_file = _seed_bridge_file(tmp_path, "yy-001.md")
+    bridge_file = _seed_bridge_file(tmp_path, "yy-001.md", "NEW\n")
     # No git repo initialized → git log returns nothing → fall back to mtime.
     # Force mtime to a known recent value.
     past = time.time() - 600  # 10 minutes ago
@@ -224,19 +191,26 @@ def test_generate_swimlane_age_fallback_to_mtime(tmp_path: Path) -> None:
     assert age is not None and age >= 8
 
 
-def test_generate_swimlane_index_sha(tmp_path: Path) -> None:
-    body = "Document: hh\nNEW: bridge/hh-001.md\n"
-    _seed_index(tmp_path, body)
-    _seed_bridge_file(tmp_path, "hh-001.md")
+def test_generate_swimlane_state_sha(tmp_path: Path) -> None:
+    _seed_bridge_file(tmp_path, "hh-001.md", "NEW\n")
     snapshot = gbs.generate_swimlane(tmp_path)
-    expected = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    assert snapshot["source_index_sha"] == expected
+    expected = gbs._state_sha256(
+        [
+            {
+                "document": "hh",
+                "latest_status": "NEW",
+                "latest_file": "hh-001.md",
+                "latest_version": 1,
+                "version_count": 1,
+            }
+        ]
+    )
+    assert snapshot["source_state_sha"] == expected
+    assert "source_index_sha" not in snapshot
 
 
 def test_write_swimlane_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    body = "Document: ii\nNEW: bridge/ii-001.md\n"
-    _seed_index(tmp_path, body)
-    _seed_bridge_file(tmp_path, "ii-001.md")
+    _seed_bridge_file(tmp_path, "ii-001.md", "NEW\n")
     out = tmp_path / "out" / "bridge-swimlane.json"
     # First, write it once successfully.
     gbs.write_swimlane(tmp_path, out)
@@ -254,22 +228,17 @@ def test_write_swimlane_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_generate_swimlane_handles_malformed_index(tmp_path: Path) -> None:
-    body = (
-        "Document: good\n"
-        "NEW: bridge/good-001.md\n"
-        "garbage line that is not a valid status\n"
-        "NEW: NOT-A-VALID-PATH\n"
-        "Document: also-good\n"
-        "NEW: bridge/also-good-001.md\n"
-    )
-    _seed_index(tmp_path, body)
-    _seed_bridge_file(tmp_path, "good-001.md")
-    _seed_bridge_file(tmp_path, "also-good-001.md")
+    _seed_bridge_file(tmp_path, "good-001.md", "NEW\n")
+    _seed_bridge_file(tmp_path, "malformed-001.md", "garbage line that is not a valid status\n")
+    _seed_bridge_file(tmp_path, "also-good-001.md", "NEW\n")
     snapshot = gbs.generate_swimlane(tmp_path)
     docs = sorted(t["document"] for t in snapshot["threads"])
     assert docs == ["also-good", "good"]
-    # Sanity: even a totally-binary index doesn't crash.
-    binary_index = tmp_path / "bridge" / "INDEX.md"
-    binary_index.write_bytes(b"\x00\x01\x02not utf at all\xff")
-    snapshot2 = gbs.generate_swimlane(tmp_path)
+
+    # Sanity: even a totally-binary numbered bridge file doesn't crash.
+    binary_root = tmp_path / "binary-case"
+    binary_file = binary_root / "bridge" / "binary-001.md"
+    binary_file.parent.mkdir(parents=True, exist_ok=True)
+    binary_file.write_bytes(b"\x00\x01\x02not utf at all\xff")
+    snapshot2 = gbs.generate_swimlane(binary_root)
     assert snapshot2["threads"] == []
