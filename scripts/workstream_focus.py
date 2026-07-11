@@ -111,6 +111,7 @@ DEFAULT_DASHBOARD_PREFERENCES_PATH = GTKB_HARNESS_STATE_ROOT / "codex" / "sessio
 STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS = 30 * 60
 STARTUP_RELAY_CACHE_MAX_AGE_SECONDS = STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS
 STARTUP_RELAY_CACHE_FUTURE_SKEW_SECONDS = 5 * 60
+_STARTUP_INPUT_CONTENT_STATE_FIELDS = frozenset({"startup_prompt_preview"})
 # Local startup-report rendering can exceed two seconds while remaining well
 # within the interactive hook budget. Keep this bounded and overrideable for
 # fail-visible timeout coverage.
@@ -421,7 +422,18 @@ def _read_lifecycle_guard(project_root: Path | None = None) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _drop_startup_input_content(state: dict[str, Any]) -> bool:
+    """Remove legacy owner-content fields from lifecycle state in place."""
+    removed = False
+    for key in _STARTUP_INPUT_CONTENT_STATE_FIELDS:
+        if key in state:
+            state.pop(key, None)
+            removed = True
+    return removed
+
+
 def _write_lifecycle_guard(state: dict[str, Any], project_root: Path | None = None) -> None:
+    _drop_startup_input_content(state)
     path = lifecycle_guard_path(project_root)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1905,10 +1917,12 @@ def _consume_discard_first_prompt_gate(
     session_id: str | None = None,
 ) -> dict[str, Any] | None:
     state = _read_lifecycle_guard(project_root)
+    content_scrubbed = _drop_startup_input_content(state)
     if state.get("discard_next_user_prompt") is not True:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return None
 
-    trimmed_prompt = " ".join(prompt.strip().split())
     init_match = _match_startup_init_keyword(prompt)
     if state.get("first_wrapup_suppressed") is True and state.get("startup_response_pending") is not True:
         state.update(
@@ -1917,7 +1931,6 @@ def _consume_discard_first_prompt_gate(
                 "stale_startup_gate_cleared": True,
                 "stale_startup_gate_cleared_at": _now_iso(),
                 "stale_startup_gate_reason": "startup_stop_already_suppressed",
-                "startup_prompt_preview": trimmed_prompt[:160],
             }
         )
         _write_lifecycle_guard(state, project_root)
@@ -1931,7 +1944,6 @@ def _consume_discard_first_prompt_gate(
                 "startup_response_pending": False,
                 "startup_gate_no_match_passed_through": True,
                 "startup_gate_no_match_at": _now_iso(),
-                "startup_prompt_preview": trimmed_prompt[:160],
             }
         )
         _write_lifecycle_guard(state, project_root)
@@ -1943,7 +1955,6 @@ def _consume_discard_first_prompt_gate(
             "discard_next_user_prompt": False,
             "startup_prompt_discarded": True,
             "startup_prompt_discarded_at": _now_iso(),
-            "startup_prompt_preview": trimmed_prompt[:160],
             "startup_response_pending": True,
             "startup_init_app_scope": init_match.app_scope,
             "startup_init_mode": init_match.mode,
@@ -2000,22 +2011,63 @@ def _consume_discard_first_prompt_gate(
     return _startup_gate_response(project_root, role_mode=role_mode, init_mode=init_match.mode)
 
 
-def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> None:
-    state = _read_lifecycle_guard(project_root)
+def _clear_startup_response_pending(
+    state: dict[str, Any],
+    project_root: Path | None = None,
+    *,
+    clear_reason: str,
+) -> bool:
+    """Clear a pending gate without retaining any owner-input content."""
+    changed = _drop_startup_input_content(state)
     if state.get("startup_response_pending") is not True:
-        return
+        if changed:
+            _write_lifecycle_guard(state, project_root)
+        return False
     state.update(
         {
             "startup_response_pending": False,
             "startup_input_gate_cleared_at": _now_iso(),
+            "startup_input_gate_clear_reason": clear_reason,
         }
     )
     _write_lifecycle_guard(state, project_root)
+    return True
+
+
+def _clear_startup_response_pending_for_followup(project_root: Path | None = None) -> bool:
+    return _clear_startup_response_pending(
+        _read_lifecycle_guard(project_root),
+        project_root,
+        clear_reason="owner_followup",
+    )
+
+
+def acknowledge_startup_owner_input(session_id: str | None, project_root: Path | None = None) -> bool:
+    """Acknowledge a completed owner-input tool round trip for its own session.
+
+    The caller supplies only the session identifier. A missing or mismatched
+    identifier cannot clear a pending gate, and no prompt or answer content is
+    accepted or written to lifecycle state.
+    """
+    normalized_session_id = str(session_id or "").strip()
+    state = _read_lifecycle_guard(project_root)
+    if not normalized_session_id or state.get("startup_guard_id") != normalized_session_id:
+        if _drop_startup_input_content(state):
+            _write_lifecycle_guard(state, project_root)
+        return False
+    return _clear_startup_response_pending(
+        state,
+        project_root,
+        clear_reason="ask_user_question_completed",
+    )
 
 
 def _startup_response_pending(project_root: Path | None = None) -> bool:
     state = _read_lifecycle_guard(project_root)
+    content_scrubbed = _drop_startup_input_content(state)
     if state.get("startup_response_pending") is not True:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return False
     # WI-5083 belt-and-suspenders: a gate armed under a mid-session continuation
     # source (resume/compact) is never a genuine fresh-start await. If such an
@@ -2035,9 +2087,13 @@ def _startup_response_pending(project_root: Path | None = None) -> bool:
         return False
     started_at = _parse_iso8601(state.get("startup_prompt_discarded_at") or state.get("armed_at"))
     if started_at is None:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return True
     age_seconds = (datetime.now(UTC) - started_at).total_seconds()
     if age_seconds <= STARTUP_RESPONSE_PENDING_EXPIRY_SECONDS:
+        if content_scrubbed:
+            _write_lifecycle_guard(state, project_root)
         return True
     state.update(
         {

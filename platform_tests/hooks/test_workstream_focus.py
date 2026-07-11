@@ -328,7 +328,7 @@ def test_hook_payload_accepts_claude_prompt_field_for_startup_gate(tmp_path, mon
     assert guard_state["discard_next_user_prompt"] is False
     assert guard_state["startup_prompt_discarded"] is True
     assert guard_state["startup_response_pending"] is True
-    assert guard_state["startup_prompt_preview"] == "::init gtkb pb"
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_startup_gate_no_match_passes_prompt_through(tmp_path, monkeypatch) -> None:
@@ -407,7 +407,7 @@ Read bridge/INDEX.md directly before acting.
     assert guard_state["startup_prompt_discarded"] is False
     assert guard_state["startup_response_pending"] is False
     assert guard_state["startup_gate_no_match_passed_through"] is True
-    assert guard_state["startup_prompt_preview"].startswith("::init gtkb pb Dispatcher daemon bridge dispatch")
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_startup_gate_init_keyword_sets_app_scope(tmp_path, monkeypatch) -> None:
@@ -732,7 +732,7 @@ def test_user_promptsubmit_clears_stale_startup_gate_after_startup_stop(tmp_path
     assert guard_state["discard_next_user_prompt"] is False
     assert guard_state["stale_startup_gate_cleared"] is True
     assert guard_state["stale_startup_gate_reason"] == "startup_stop_already_suppressed"
-    assert guard_state["startup_prompt_preview"] == "work subject application"
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_prompt_hook_accepts_bom_prefixed_stdin_from_windows_pipeline(tmp_path) -> None:
@@ -927,7 +927,7 @@ def test_prompt_hook_discards_first_fresh_session_message_when_startup_gate_is_a
     assert guard_state["discard_next_user_prompt"] is False
     assert guard_state["startup_prompt_discarded"] is True
     assert guard_state["startup_response_pending"] is True
-    assert guard_state["startup_prompt_preview"] == "Please resume."
+    assert "startup_prompt_preview" not in guard_state
 
 
 @pytest.mark.skip(reason="workstream-focus.py intentionally retired S304/S305; see REVISED-5 BN-3")
@@ -1149,6 +1149,7 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
             {
                 "discard_next_user_prompt": False,
                 "startup_prompt_discarded": True,
+                "startup_prompt_preview": "owner-private-input",
                 "startup_response_pending": True,
             }
         )
@@ -1167,6 +1168,47 @@ def test_startup_response_pending_blocks_tool_use_until_next_owner_prompt(tmp_pa
     assert "init-keyword contract" in response["reason"]
     assert "DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001" in response["reason"]
     assert "first owner message of this fresh session was discarded" not in response["reason"]
+    assert "startup_prompt_preview" not in json.loads(guard_path.read_text(encoding="utf-8"))
+
+
+def test_auq_acknowledgement_clears_only_matching_pending_session(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    guard_path = tmp_path / "guard.json"
+    monkeypatch.setenv("GTKB_WORKSTREAM_FOCUS_STATE", str(tmp_path / "focus.json"))
+    monkeypatch.setenv("GTKB_LIFECYCLE_GUARD_PATH", str(guard_path))
+    guard_path.write_text(
+        json.dumps(
+            {
+                "discard_next_user_prompt": False,
+                "startup_guard_id": "session-a",
+                "startup_prompt_discarded": True,
+                "startup_prompt_discarded_at": module._now_iso(),
+                "startup_prompt_preview": "owner-private-input",
+                "startup_response_pending": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert module.acknowledge_startup_owner_input("session-b", REPO_ROOT) is False
+    mismatched_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert mismatched_state["startup_response_pending"] is True
+    assert "startup_prompt_preview" not in mismatched_state
+
+    assert module.acknowledge_startup_owner_input("session-a", REPO_ROOT) is True
+    assert module.acknowledge_startup_owner_input("session-a", REPO_ROOT) is False
+    guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_input_gate_clear_reason"] == "ask_user_question_completed"
+    assert "startup_prompt_preview" not in guard_state
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Write", "tool_input": {"file_path": ".claude/rules/new-rule.md"}},
+            REPO_ROOT,
+        )
+        == {}
+    )
 
 
 def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, monkeypatch) -> None:
@@ -1180,6 +1222,7 @@ def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, 
                 "discard_next_user_prompt": False,
                 "startup_prompt_discarded": True,
                 "startup_prompt_discarded_at": "2026-01-01T00:00:00Z",
+                "startup_prompt_preview": "owner-private-input",
                 "startup_response_pending": True,
             }
         )
@@ -1196,6 +1239,7 @@ def test_stale_startup_response_pending_does_not_block_later_tool_use(tmp_path, 
     guard_state = json.loads(guard_path.read_text(encoding="utf-8"))
     assert guard_state["startup_response_pending"] is False
     assert guard_state["stale_startup_response_pending_cleared"] is True
+    assert "startup_prompt_preview" not in guard_state
 
 
 def test_bash_guard_blocks_mutating_gtkb_and_governance_commands(tmp_path, monkeypatch) -> None:

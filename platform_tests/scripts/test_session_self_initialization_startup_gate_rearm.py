@@ -118,3 +118,19 @@ def test_absent_source_arms_gate_default_armed_source(tmp_path):
 
     assert armed is True
     assert json.loads(guard_path.read_text(encoding="utf-8"))["armed_source"] == "startup"
+
+
+def test_lifecycle_guard_writer_removes_legacy_prompt_preview(tmp_path):
+    m = _load_module()
+    guard_path = tmp_path / "guard.json"
+    state = {
+        "startup_guard_id": "session-a",
+        "startup_prompt_preview": "owner-private-input",
+        "startup_response_pending": True,
+    }
+
+    m._write_lifecycle_guard(guard_path, state)
+
+    persisted = json.loads(guard_path.read_text(encoding="utf-8"))
+    assert "startup_prompt_preview" not in state
+    assert "startup_prompt_preview" not in persisted

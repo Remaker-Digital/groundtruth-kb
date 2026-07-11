@@ -7280,6 +7280,8 @@ def _read_lifecycle_guard(path: Path) -> dict[str, Any]:
 
 
 def _write_lifecycle_guard(path: Path, state: dict[str, Any]) -> None:
+    # WI-5118: lifecycle state may record transition metadata, never owner input.
+    state.pop("startup_prompt_preview", None)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
