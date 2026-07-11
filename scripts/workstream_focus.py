@@ -1864,7 +1864,8 @@ def _startup_gate_response(
     *,
     role_mode: str | None = None,
     init_mode: str | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], bool]:
+    """Build the relay response and report whether its disclosure source validated."""
     pointer = _startup_relay_pointer(project_root, role_mode=role_mode)
     if pointer is None and role_mode is not None:
         pointer = _startup_relay_pointer(project_root, role_mode=None)
@@ -1872,13 +1873,16 @@ def _startup_gate_response(
         diagnostic = _startup_relay_failure_context(
             "the cache file or its metadata sidecar is missing, empty, or malformed"
         )
-        return {
-            "systemMessage": diagnostic,
-            "hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": diagnostic,
+        return (
+            {
+                "systemMessage": diagnostic,
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": diagnostic,
+                },
             },
-        }
+            False,
+        )
     message = _startup_gate_message(role_mode or pointer.get("role_mode"), init_mode=init_mode)
     if not pointer["consistent"]:
         diagnostic = _startup_relay_failure_context(
@@ -1886,13 +1890,16 @@ def _startup_gate_response(
             "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
             "it may be stale, wrong-role, or displaced by a non-disclosure payload"
         )
-        return {
-            "systemMessage": diagnostic,
-            "hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": diagnostic,
+        return (
+            {
+                "systemMessage": diagnostic,
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": diagnostic,
+                },
             },
-        }
+            False,
+        )
     pointer_block = (
         "\n\n## Startup Disclosure Relay Source\n\n"
         f"- cache file: {pointer['cache_path']}\n"
@@ -1901,13 +1908,16 @@ def _startup_gate_response(
         "Read that cache file once (a single read-only filesystem read), then "
         "relay its full content verbatim as the owner-visible startup disclosure."
     )
-    return {
-        "systemMessage": message,
-        "hookSpecificOutput": {
-            "hookEventName": "UserPromptSubmit",
-            "additionalContext": f"{message}{pointer_block}",
+    return (
+        {
+            "systemMessage": message,
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": f"{message}{pointer_block}",
+            },
         },
-    }
+        True,
+    )
 
 
 def _consume_discard_first_prompt_gate(
@@ -2008,7 +2018,10 @@ def _consume_discard_first_prompt_gate(
     if role_mode:
         state["startup_init_role_mode"] = role_mode
     _write_lifecycle_guard(state, project_root)
-    return _startup_gate_response(project_root, role_mode=role_mode, init_mode=init_match.mode)
+    response, relay_validated = _startup_gate_response(project_root, role_mode=role_mode, init_mode=init_match.mode)
+    if role_mode == "lo" and relay_validated:
+        _clear_startup_response_pending(state, project_root, clear_reason="lo_startup_relay")
+    return response
 
 
 def _clear_startup_response_pending(

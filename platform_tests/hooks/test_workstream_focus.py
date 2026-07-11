@@ -600,6 +600,23 @@ def test_lo_default_startup_gate_continues_to_harness_action(tmp_path, monkeypat
     assert "status-bearing versioned files under `bridge/`" in context
     assert "process actionable latest `NEW` / `REVISED` bridge entries oldest-to-newest by default" in context
     assert "stop and wait for the next owner message" not in context
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_input_gate_clear_reason"] == "lo_startup_relay"
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+            tmp_path,
+        )
+        == {}
+    )
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Write", "tool_input": {"file_path": "bridge/gtkb-wi5186-example-002.md"}},
+            tmp_path,
+        )
+        == {}
+    )
 
 
 def test_lo_advisory_startup_gate_asks_before_auto_process(tmp_path, monkeypatch) -> None:
@@ -625,6 +642,16 @@ def test_lo_advisory_startup_gate_asks_before_auto_process(tmp_path, monkeypatch
     assert "ask Mike whether to switch to auto-process" in context
     assert "Do not write verdict files or auto-process bridge entries in advisory mode" in context
     assert "stop and wait for the next owner message" not in context
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is False
+    assert guard_state["startup_input_gate_clear_reason"] == "lo_startup_relay"
+    assert (
+        module.guard_tool_use(
+            {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+            tmp_path,
+        )
+        == {}
+    )
 
 
 def test_prime_builder_startup_gate_still_waits_after_disclosure(tmp_path, monkeypatch) -> None:
@@ -649,6 +676,15 @@ def test_prime_builder_startup_gate_still_waits_after_disclosure(tmp_path, monke
     assert "stop and wait for the next owner message" in context
     assert "must not choose, map, or begin session work" in context
     assert "process actionable latest `NEW` / `REVISED`" not in context
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is True
+    for payload in (
+        {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+        {"tool_name": "Write", "tool_input": {"file_path": "bridge/gtkb-wi5186-example-002.md"}},
+    ):
+        blocked = module.guard_tool_use(payload, tmp_path)
+        assert blocked["decision"] == "block"
+        assert "GTKB-STARTUP-INPUT-GATE" in blocked["reason"]
 
 
 def test_startup_gate_does_not_consult_shared_dashboard_report(tmp_path, monkeypatch) -> None:
@@ -679,23 +715,34 @@ def test_startup_gate_fails_visibly_on_inconsistent_cache(tmp_path, monkeypatch)
     """T5 -- DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001: a bad cache fails visibly, not silently."""
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
+    _seed_registry(tmp_path, {"A": ("codex", ["loyal-opposition"], "active")})
     monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "A")
     monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     _write_startup_gate_guard(tmp_path)
     _write_relay_cache(
         tmp_path / ".codex" / "gtkb-hooks",
         "# Fresh Session Startup\n\nbody",
         sha="0" * 64,
+        role_mode="lo",
     )
 
     response = module.handle_hook_payload(
-        {"hook_event_name": "UserPromptSubmit", "prompt": "init gtkb"},
+        {"hook_event_name": "UserPromptSubmit", "prompt": "::init gtkb lo", "session_id": "session-lo"},
         tmp_path,
     )
     context = response["hookSpecificOutput"]["additionalContext"]
 
     assert "STARTUP RELAY FAILURE" in context
     assert "do not treat startup as satisfied" in context.lower()
+    guard_state = json.loads((tmp_path / "guard.json").read_text(encoding="utf-8"))
+    assert guard_state["startup_response_pending"] is True
+    blocked = module.guard_tool_use(
+        {"tool_name": "Bash", "tool_input": {"command": "gt bridge state-report --markdown"}},
+        tmp_path,
+    )
+    assert blocked["decision"] == "block"
+    assert "GTKB-STARTUP-INPUT-GATE" in blocked["reason"]
 
 
 def test_user_promptsubmit_clears_stale_startup_gate_after_startup_stop(tmp_path, monkeypatch) -> None:
