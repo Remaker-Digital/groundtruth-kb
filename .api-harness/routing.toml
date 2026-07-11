@@ -43,6 +43,19 @@ tool_calling_supported = true
 allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 omit_payload_model = true
 
+[models.alibaba-deepseek-v4-pro]
+model_id = "deepseek-v4-pro"
+provider = "alibaba-cloud-studio"
+tool_calling_supported = true
+allowed_tools = [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash",
+]
+
 [models.deepseek-v4-flash]
 model_id = "deepseek/deepseek-v4-flash"
 provider = "openrouter"
@@ -58,6 +71,16 @@ max_turns = 200
 bridge-review = "kimi-k2-7-code-cloud"
 verification = "kimi-k2-7-code-cloud"
 implementation = "kimi-k2-7-code-cloud"
+
+[routing.alibaba-cloud-studio]
+default_model = "alibaba-deepseek-v4-pro"
+timeout_seconds = 240
+max_turns = 200
+
+[routing.alibaba-cloud-studio.skills]
+bridge-review = "alibaba-deepseek-v4-pro"
+verification = "alibaba-deepseek-v4-pro"
+implementation = "alibaba-deepseek-v4-pro"
 
 [routing.openrouter]
 default_model = "openrouter-cloud-default"

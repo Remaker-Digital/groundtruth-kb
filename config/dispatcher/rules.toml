@@ -69,6 +69,11 @@ description = "OpenRouter"
 max_items = 1
 tags = ["low-cost", "prime-builder"]
 
+[harnesses.H]
+description = "Alibaba Cloud Studio H"
+max_items = 1
+tags = ["loyal-opposition", "alibaba-cloud-studio"]
+
 [[rules]]
 id = "bridge-prime-builder-default"
 required_roles = ["prime-builder"]

@@ -1679,6 +1679,185 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
     )
 
 
+def _check_alibaba_cloud_studio_harness(target: Path) -> ToolCheck:
+    """Verify the Alibaba Cloud Studio H onboarding contract without reading secrets."""
+    import tomllib  # noqa: PLC0415 - py3.11+; defer import
+
+    from groundtruth_kb.harness_projection import (  # noqa: PLC0415
+        HarnessStateError,
+        read_capabilities,
+        read_identity,
+        read_roles,
+    )
+
+    check_name = "Alibaba Cloud Studio H harness consistency"
+    canonical_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+    findings: list[str] = []
+
+    # Layer 1: the durable installation identity is separate from the registry projection.
+    try:
+        identities = read_identity(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L1: identities store error: {exc}")
+    else:
+        harnesses = identities.get("harnesses") if isinstance(identities, dict) else None
+        entry = harnesses.get("alibaba-cloud-studio") if isinstance(harnesses, dict) else None
+        if not isinstance(entry, dict):
+            findings.append("L1: identities store missing 'alibaba-cloud-studio' entry")
+        elif entry.get("id") != "H":
+            findings.append(f"L1: alibaba-cloud-studio.id={entry.get('id')!r}; expected 'H'")
+
+    registry_entry: dict[str, Any] | None = None
+    goose_entry: dict[str, Any] | None = None
+    # Layer 2: H's live-smoke ordering is governed report evidence; the registry
+    # records only its current (pre- or post-proof) dispatch state.
+    try:
+        registry = read_roles(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L2: registry store error: {exc}")
+    else:
+        records = registry.get("harnesses") if isinstance(registry, dict) else None
+        if isinstance(records, list):
+            for entry in records:
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("id") == "H":
+                    registry_entry = entry
+                elif entry.get("id") == "G":
+                    goose_entry = entry
+        if registry_entry is None:
+            findings.append("L2: registry has no entry for id=H")
+        else:
+            expected = {
+                "harness_name": "alibaba-cloud-studio",
+                "harness_type": "claude",
+                "status": "active",
+            }
+            for key, value in expected.items():
+                if registry_entry.get(key) != value:
+                    findings.append(f"L2: registry {key}={registry_entry.get(key)!r}; expected {value!r}")
+            if registry_entry.get("role") != ["loyal-opposition"]:
+                findings.append(f"L2: registry role={registry_entry.get('role')!r}; expected ['loyal-opposition']")
+            if not isinstance(registry_entry.get("can_receive_dispatch"), bool):
+                findings.append("L2: H can_receive_dispatch must be a boolean")
+            surfaces = registry_entry.get("invocation_surfaces")
+            headless = surfaces.get("headless") if isinstance(surfaces, dict) else None
+            argv = headless.get("argv") if isinstance(headless, dict) else None
+            if not isinstance(argv, list):
+                findings.append("L2: H headless invocation argv is missing")
+            else:
+                required_argv = {
+                    "scripts/alibaba_cloud_studio_harness.py",
+                    "--prompt",
+                    "{{PROMPT}}",
+                    "--skill",
+                    "bridge-review",
+                    "--model",
+                    "alibaba-deepseek-v4-pro",
+                }
+                missing_argv = sorted(required_argv.difference(str(item) for item in argv))
+                if missing_argv:
+                    findings.append(f"L2: H headless argv missing {missing_argv}")
+        if goose_entry is None:
+            findings.append("L2: registry has no retained Goose G retirement record")
+        else:
+            if goose_entry.get("status") not in {"suspended", "retired"}:
+                findings.append(f"L2: Goose status={goose_entry.get('status')!r}; expected suspended or retired")
+            if goose_entry.get("can_receive_dispatch") is not False:
+                findings.append("L2: Goose G remains dispatchable")
+
+    # Layer 3: capability floor, provider envelope, and env-name-only metadata.
+    try:
+        capabilities = read_capabilities(project_root=target)
+    except HarnessStateError as exc:
+        findings.append(f"L3: capability registry error: {exc}")
+    else:
+        h_caps = (
+            capabilities.get("harnesses", {}).get("alibaba-cloud-studio") if isinstance(capabilities, dict) else None
+        )
+        if not isinstance(h_caps, dict):
+            findings.append("L3: capability registry missing [harnesses.alibaba-cloud-studio]")
+        else:
+            expected_caps: dict[str, Any] = {
+                "bridge_compliance_gate_respect": True,
+                "root_boundary_respect": True,
+                "author_metadata_env_var_setting": True,
+                "destructive_gate_delegation": True,
+                "advertised_tool_subset": canonical_tools,
+                "tool_guard_adapter_fail_closed": True,
+                "dialect": "anthropic-messages",
+                "hook_tier": "native-full-hooks",
+                "auth_style": "authorization-bearer",
+                "auth_env_key": "ALIBABA_API_KEY",
+                "endpoint_env_key": "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT",
+                "provider_routing_key": "alibaba-cloud-studio",
+                "activity_envelope_projection_mode": "compact-provider",
+                "compact_result_envelope_mode": "compact-provider",
+                "compact_session_envelope_mode": "compact-provider",
+                "full_transcript_archive_required": False,
+            }
+            for key, value in expected_caps.items():
+                if h_caps.get(key) != value:
+                    findings.append(f"L3: capability {key}={h_caps.get(key)!r}; expected {value!r}")
+
+    # Layer 4: routing and wrapper source only name the approved env keys.
+    routing_path = target / ".api-harness" / "routing.toml"
+    try:
+        routing = tomllib.loads(routing_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        findings.append(f"L4: routing TOML unreadable: {exc}")
+    else:
+        model = routing.get("models", {}).get("alibaba-deepseek-v4-pro") if isinstance(routing, dict) else None
+        route = routing.get("routing", {}).get("alibaba-cloud-studio") if isinstance(routing, dict) else None
+        if not isinstance(model, dict):
+            findings.append("L4: routing has no models.alibaba-deepseek-v4-pro row")
+        else:
+            if model.get("provider") != "alibaba-cloud-studio":
+                findings.append(f"L4: Alibaba model provider={model.get('provider')!r}")
+            if model.get("tool_calling_supported") is not True:
+                findings.append("L4: Alibaba model does not advertise tool calling")
+            if model.get("allowed_tools") != canonical_tools:
+                findings.append("L4: Alibaba model does not expose the canonical tool set")
+        if not isinstance(route, dict):
+            findings.append("L4: routing has no routing.alibaba-cloud-studio row")
+        elif route.get("default_model") != "alibaba-deepseek-v4-pro":
+            findings.append(f"L4: Alibaba default_model={route.get('default_model')!r}")
+
+    wrapper_path = target / "scripts" / "alibaba_cloud_studio_harness.py"
+    try:
+        wrapper_source = wrapper_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        findings.append(f"L4: Alibaba wrapper unreadable: {exc}")
+    else:
+        for env_name in ("ALIBABA_API_KEY", "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT"):
+            if env_name not in wrapper_source:
+                findings.append(f"L4: wrapper does not reference {env_name}")
+            if re.search(rf"{env_name}\\s*=\\s*['\"](?!['\"])", wrapper_source):
+                findings.append(f"L4: wrapper embeds a value for {env_name}")
+
+    if not findings:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="pass",
+            message=(
+                "Alibaba H onboarding clean (identity, registry, capability floor, routing, "
+                "env-name-only wrapper, Goose retirement)"
+            ),
+        )
+
+    head = findings[0]
+    extra = f" (+{len(findings) - 1} more)" if len(findings) > 1 else ""
+    return ToolCheck(
+        name=check_name,
+        required=False,
+        found=True,
+        status="warning",
+        message=f"{len(findings)} findings; first: {head}{extra}",
+    )
+
+
 def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
     """WI-4778: surface Cursor headless dispatch readiness without activating it."""
 
@@ -7041,6 +7220,7 @@ def run_doctor(
         # bridge/gtkb-ollama-integration-phase-1-verification-006.md (GO at -006).
         # Severity WARN per Phase-1 GOV-HARNESS-ONBOARDING-CONTRACT-001 rollout convention.
         checks.append(_check_ollama_harness(target))
+        checks.append(_check_alibaba_cloud_studio_harness(target))
         # WI-4778: Cursor headless dispatch readiness stays diagnostic until
         # the external Cursor Agent CLI is present and activation is deliberate.
         checks.append(_check_cursor_dispatch_readiness(target))

@@ -1896,6 +1896,40 @@ full_transcript_archive_required = false
 activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
 result_envelope_limitations = "OpenRouter is a provider harness; it is assessed by compact dispatch/result envelopes and not by full interactive transcript archives."
 
+[harnesses.alibaba-cloud-studio]
+# Direct Anthropic-compatible provider adopter for the H identity.
+bridge_compliance_gate_respect = true
+root_boundary_respect = true
+author_metadata_env_var_setting = true
+destructive_gate_delegation = true
+advertised_tool_subset = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
+tool_guard_adapter_fail_closed = true
+routing_schema_version = 1
+routing_multiple_model_rows_supported = true
+routing_skill_overrides_supported = true
+routing_advertised_model_inventory_check = false
+provider_readiness_contract = "env-local-credential-live-dispatch"
+provider_readiness_credential_source = "ALIBABA_API_KEY via process env or .env.local"
+provider_readiness_default_test_mode = "mocked-credential-and-provider-responses"
+provider_readiness_failure_classes = ["missing_credential", "invalid_credential", "provider_backpressure", "provider_outage"]
+skill_adapter_generation_supported = true
+skill_adapter_generator = "scripts/generate_api_skill_adapters.py"
+skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
+skill_adapter_drift_check_supported = true
+phase_1_only = true
+dialect = "anthropic-messages"
+hook_tier = "native-full-hooks"
+auth_style = "authorization-bearer"
+endpoint_env_key = "ALIBABA_ANTHROPIC_COMPATIBLE_ENDPOINT"
+auth_env_key = "ALIBABA_API_KEY"
+provider_routing_key = "alibaba-cloud-studio"
+activity_envelope_projection_mode = "compact-provider"
+compact_result_envelope_mode = "compact-provider"
+compact_session_envelope_mode = "compact-provider"
+full_transcript_archive_required = false
+activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
+result_envelope_limitations = "Alibaba Cloud Studio H is a provider harness with native full hooks; parity is assessed through compact dispatch/result envelopes rather than raw transcript archives."
+
 # ── Slice 6 owner-approved typed parity waivers (DELIB-20266285) ──
 [[parity_waivers]]
 capability_id = "hook.bridge-compliance-gate-apply-patch-adapter"
