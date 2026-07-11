@@ -6898,6 +6898,152 @@ class KnowledgeDB:
         )
         return [_row_to_dict(r) for r in rows]
 
+    def insert_dispatch_default_metric_event(
+        self,
+        id: str,
+        event: dict[str, Any],
+        changed_by: str,
+        change_reason: str,
+        *,
+        status: str = "active",
+    ) -> dict[str, Any] | None:
+        """Append one privacy-bounded canonical default-metrics event.
+
+        The projection module supplies an allowlisted event. Repeating the
+        same event id is intentionally idempotent so a dispatch completion
+        retry cannot create a second observation.
+        """
+        event_id = _require_text("dispatch default metric event id", id)
+        existing = self.get_dispatch_default_metric_event(event_id)
+        if existing is not None:
+            return existing
+        self.insert_dispatch_event(
+            event_id=event_id,
+            rule_id=_require_text("event_schema_id", event["event_schema_id"]),
+            target_kind="dispatch_default_metric",
+            target_value=event_id,
+            trigger_at=event["event_at"],
+            gate_result=event.get("queue_outcome") or "observed",
+            spawn_outcome=event.get("selection_outcome") or "observed",
+            spawn_exit_status=event.get("exit_status"),
+            activity_gate=event.get("role") or "unknown",
+            dry_run=True,
+            payload=event,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+        return self.get_dispatch_default_metric_event(event_id)
+
+    def get_dispatch_default_metric_event(self, event_id: str) -> dict[str, Any] | None:
+        row = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM dispatch_events WHERE id = ? AND rule_id = ? ORDER BY version DESC LIMIT 1",
+                (_require_text("dispatch default metric event id", event_id), "gtkb.dispatch_default_metric_event.v1"),
+            )
+            .fetchone()
+        )
+        if row is None or not row["payload"]:
+            return None
+        try:
+            event = json.loads(row["payload"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(event, dict):
+            return None
+        event["version"] = row["version"]
+        event["changed_at"] = row["changed_at"]
+        event["tool_counts_parsed"] = event.get("tool_counts")
+        return event
+
+    def list_dispatch_default_metric_events(
+        self,
+        *,
+        bridge_document_id: str | None = None,
+        event_at_start: str | None = None,
+        event_at_end: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        query = "SELECT * FROM dispatch_events WHERE rule_id = ?"
+        params: list[Any] = ["gtkb.dispatch_default_metric_event.v1"]
+        if bridge_document_id:
+            query += " AND json_extract(payload, '$.bridge_document_id') = ?"
+            params.append(bridge_document_id)
+        if event_at_start:
+            query += " AND trigger_at >= ?"
+            params.append(event_at_start)
+        if event_at_end:
+            query += " AND trigger_at <= ?"
+            params.append(event_at_end)
+        query += " ORDER BY trigger_at, id LIMIT ?"
+        params.append(limit)
+        rows = self._get_conn().execute(query, params).fetchall()
+        events: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                event = json.loads(row["payload"])
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(event, dict):
+                event["version"] = row["version"]
+                event["tool_counts_parsed"] = event.get("tool_counts")
+                events.append(event)
+        return events
+
+    def insert_dispatch_default_metrics_snapshot(
+        self,
+        id: str,
+        snapshot: dict[str, Any],
+        changed_by: str,
+        change_reason: str,
+        *,
+        status: str = "active",
+    ) -> dict[str, Any] | None:
+        """Append one canonical bounded default-metrics snapshot idempotently."""
+        snapshot_id = _require_text("dispatch default metrics snapshot id", id)
+        existing = self.get_dispatch_default_metrics_snapshot(snapshot_id)
+        if existing is not None:
+            return existing
+        self.insert_document(
+            id=snapshot_id,
+            title="Canonical default dispatch metrics snapshot",
+            category="dispatch_default_metrics_snapshot",
+            status=_require_text("status", status),
+            changed_by=_require_text("changed_by", changed_by),
+            change_reason=_require_text("change_reason", change_reason),
+            content=json.dumps(snapshot, sort_keys=True, separators=(",", ":")),
+            tags=["WI-5180", snapshot["snapshot_schema_id"]],
+        )
+        return self.get_dispatch_default_metrics_snapshot(snapshot_id)
+
+    def get_dispatch_default_metrics_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        row = self.get_document(_require_text("dispatch default metrics snapshot id", snapshot_id))
+        if row is None or row.get("category") != "dispatch_default_metrics_snapshot":
+            return None
+        try:
+            snapshot = json.loads(row.get("content") or "")
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(snapshot, dict):
+            return None
+        snapshot["version"] = row.get("version")
+        snapshot["freshness_parsed"] = snapshot.get("freshness")
+        snapshot["provenance_parsed"] = snapshot.get("provenance")
+        return snapshot
+
+    def list_dispatch_default_metrics_snapshots(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        rows = self.list_documents(category="dispatch_default_metrics_snapshot")
+        snapshots: list[dict[str, Any]] = []
+        for row in rows[:limit]:
+            snapshot = self.get_dispatch_default_metrics_snapshot(row["id"])
+            if snapshot is not None:
+                snapshots.append(snapshot)
+        return snapshots
+
     def insert_flow_event(
         self,
         id: str,
@@ -9336,6 +9482,24 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "blocked_lanes",
         "freshness",
         "runtime_suppression",
+        "tool_counts",
+        "coverage",
+        "unavailable_reasons",
+        "source_refs",
+        "source_event_ids",
+        "counts_by_harness",
+        "counts_by_model_profile",
+        "counts_by_role",
+        "counts_by_bridge_outcome",
+        "counts_by_failure_class",
+        "elapsed_distribution",
+        "turns_distribution",
+        "tools_distribution",
+        "usage_coverage",
+        "cost_coverage",
+        "quality_coverage",
+        "adaptation_coverage",
+        "provenance",
     ):
         if key in d and d[key] and isinstance(d[key], str):
             try:
