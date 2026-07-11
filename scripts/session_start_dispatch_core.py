@@ -37,6 +37,7 @@ import sys
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
+from uuid import UUID
 
 PROJECT_ROOT = Path(r"E:\GT-KB")
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -316,6 +317,40 @@ def _read_first_prompt_line() -> str | None:
     return raw or None
 
 
+def _read_session_start_payload() -> dict[str, object]:
+    """Read the SessionStart payload once, returning an empty mapping on failure."""
+    try:
+        stream = sys.stdin
+        if stream is None or stream.isatty():
+            return {}
+        raw = stream.read()
+    except (OSError, ValueError):
+        return {}
+    if not raw or not raw.strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _session_start_source(payload: dict[str, object]) -> str | None:
+    source = payload.get("source")
+    return source.strip() if isinstance(source, str) and source.strip() else None
+
+
+def _session_start_context_id(payload: dict[str, object]) -> str | None:
+    """Return a canonical SessionStart UUID suitable for a content-free guard."""
+    raw_session_id = payload.get("session_id")
+    if not isinstance(raw_session_id, str) or not raw_session_id.strip():
+        return None
+    try:
+        return str(UUID(raw_session_id.strip()))
+    except (AttributeError, ValueError):
+        return None
+
+
 def _read_session_start_source() -> str | None:
     """Return the SessionStart hook input ``source`` field, or None.
 
@@ -331,24 +366,7 @@ def _read_session_start_source() -> str | None:
     pre-WI-5083 behavior. Only the NORMAL_STARTUP / SPOOF_FALLBACK path reads
     this; the auto-dispatch path returns earlier and never calls it.
     """
-    try:
-        stream = sys.stdin
-        if stream is None or stream.isatty():
-            return None
-        raw = stream.read()
-    except (OSError, ValueError):
-        return None
-    if not raw or not raw.strip():
-        return None
-    try:
-        payload = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        return None
-    if isinstance(payload, dict):
-        source = payload.get("source")
-        if isinstance(source, str) and source.strip():
-            return source.strip()
-    return None
+    return _session_start_source(_read_session_start_payload())
 
 
 def _role_modes_from_field(raw_role: object) -> frozenset[str]:
@@ -767,16 +785,27 @@ def main() -> int:
         "--harness-id",
         _persistent_harness_id(),
     ]
+    # WI-5083 / WI-5118: read the SessionStart payload once. The source keeps a
+    # continuation from re-arming the gate; a validated UUID lets a completed
+    # AUQ clear only that same session's pending gate without storing owner text.
+    session_start_payload = _read_session_start_payload()
     # WI-5083: thread the SessionStart 'source' so the startup service can skip
     # re-arming the startup-input gate on a mid-session continuation. Read only
     # on this normal-startup path (the auto-dispatch path returned above) and
     # passed as a CLI arg. Absent source => arg omitted => treated as fresh.
-    session_start_source = _read_session_start_source()
+    session_start_source = _session_start_source(session_start_payload)
     if session_start_source:
         command += ["--session-start-source", session_start_source]
     try:
         env = dict(os.environ)
         env["GTKB_STARTUP_REQUESTED_AT"] = request_started_at
+        # A missing or malformed context must not inherit a prior session's
+        # guard id. The startup service then retains its ordinary fresh-start
+        # fallback instead of allowing cross-session acknowledgement.
+        env.pop("GTKB_STARTUP_GUARD_ID", None)
+        session_start_context_id = _session_start_context_id(session_start_payload)
+        if session_start_context_id:
+            env["GTKB_STARTUP_GUARD_ID"] = session_start_context_id
         process = subprocess.run(
             command,
             cwd=str(PROJECT_ROOT),

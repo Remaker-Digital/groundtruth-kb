@@ -21,6 +21,7 @@ import io
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -123,3 +124,79 @@ def test_read_session_start_source_none_on_bad_json(monkeypatch) -> None:
     bad.isatty = lambda: False  # type: ignore[method-assign]
     monkeypatch.setattr(module.sys, "stdin", bad)
     assert module._read_session_start_source() is None
+
+
+def test_session_start_context_id_accepts_only_canonical_uuid() -> None:
+    module = _load_module()
+    session_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
+
+    assert module._session_start_context_id({"session_id": session_id.upper()}) == session_id
+    assert module._session_start_context_id({"session_id": "not-a-session"}) is None
+    assert module._session_start_context_id({"session_id": 42}) is None
+    assert module._session_start_context_id({}) is None
+
+
+def _run_normal_startup(module, monkeypatch, tmp_path, payload: dict[str, object]) -> dict[str, object]:
+    from groundtruth_kb.mode_switch import pending
+
+    captured: dict[str, object] = {}
+    stream = io.StringIO(json.dumps(payload))
+    stream.isatty = lambda: False  # type: ignore[method-assign]
+    monkeypatch.setattr(module.sys, "stdin", stream)
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path / "out")
+    monkeypatch.setattr(module, "HARNESS_NAME", "claude")
+    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "B")
+    monkeypatch.setattr(module, "_invalidate_session_role_marker", lambda: None)
+    monkeypatch.setattr(module, "_sweep_stale_per_session_role_markers", lambda **_kwargs: None)
+    monkeypatch.setattr(pending, "apply_pending", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        module,
+        "_bridge_dispatch_keyword_check",
+        lambda: (module.StartupDecision.NORMAL_STARTUP, "normal"),
+    )
+    monkeypatch.setattr(module, "_valid_session_start_payload", lambda *_args: True)
+    monkeypatch.setattr(module, "_write_startup_relay_cache", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "_write_role_scoped_startup_relay_caches", lambda *_args, **_kwargs: None)
+
+    def _fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "SessionStart",
+                        "additionalContext": "startup",
+                    }
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    assert module.main() == 0
+    return captured
+
+
+def test_main_passes_valid_session_context_as_startup_guard_id(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    session_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
+
+    captured = _run_normal_startup(module, monkeypatch, tmp_path, {"source": "startup", "session_id": session_id})
+
+    assert captured["env"]["GTKB_STARTUP_GUARD_ID"] == session_id
+    assert captured["command"][-2:] == ["--session-start-source", "startup"]
+
+
+@pytest.mark.parametrize("session_id", [None, "not-a-session", 42])
+def test_main_drops_inherited_guard_id_without_valid_session_context(monkeypatch, tmp_path, session_id) -> None:
+    module = _load_module()
+    monkeypatch.setenv("GTKB_STARTUP_GUARD_ID", "inherited-other-session")
+    payload: dict[str, object] = {"source": "startup"}
+    if session_id is not None:
+        payload["session_id"] = session_id
+
+    captured = _run_normal_startup(module, monkeypatch, tmp_path, payload)
+
+    assert "GTKB_STARTUP_GUARD_ID" not in captured["env"]
