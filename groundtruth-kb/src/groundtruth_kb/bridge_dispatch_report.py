@@ -25,6 +25,8 @@ PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
 WORKFLOW_SCHEMA_VERSION = "gtkb.dispatch_workflow.v1"
 WORKFLOW_RECORD_LIMIT = 20
+METRICS_SNAPSHOT_CATEGORY = "dispatch_default_metrics_snapshot"
+_METRIC_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/@()+-]{0,119}$")
 _WORK_ITEM_METADATA_RE = re.compile(r"^Work Item:\s*`?(?P<work_item_id>WI-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE)
 _PROJECT_AUTHORIZATION_METADATA_RE = re.compile(
     r"^Project Authorization:\s*`?(?P<authorization_id>PAUTH-[A-Za-z0-9-]+)", re.IGNORECASE | re.MULTILINE
@@ -182,6 +184,7 @@ def build_compact_dispatch_workflow(
         limit,
     )
     selected_targets, targets_truncated = _workflow_selected_targets(full_report, limit)
+    recent_work_metrics = _recent_work_metrics(root, limit)
 
     return {
         "schema_version": WORKFLOW_SCHEMA_VERSION,
@@ -196,6 +199,7 @@ def build_compact_dispatch_workflow(
             "prime_builder": prime_queues,
             "loyal_opposition": loyal_queues,
         },
+        "recent_work_metrics": recent_work_metrics,
         "bounds": {
             "per_section_limit": limit,
             "truncated": {
@@ -234,7 +238,189 @@ def format_compact_dispatch_workflow(workflow: dict[str, Any]) -> str:
             rendered = ", ".join(_format_workflow_record(row) for row in rows)
             lines.append(f"- {title}: {rendered}")
         lines.append("")
+    metrics = workflow["recent_work_metrics"]
+    lines.append("Recent-work metrics:")
+    if metrics["availability"] in {"unavailable", "stale"}:
+        lines.append(f"- {metrics['availability']}: {metrics['reason']}")
+    else:
+        lines.extend(
+            [
+                f"- Snapshot: {metrics['snapshot_id']}",
+                f"- Availability: {metrics['availability']}",
+                f"- Records: {metrics['record_count']}",
+                f"- Coverage: {json.dumps(metrics['coverage'], sort_keys=True, separators=(',', ':'))}",
+            ]
+        )
     return "\n".join(lines).rstrip()
+
+
+def _unavailable_recent_work_metrics(reason: str) -> dict[str, Any]:
+    return {
+        "availability": "unavailable",
+        "reason": reason,
+        "snapshot_id": None,
+        "schema_id": None,
+        "schema_version": None,
+        "source_window": {"start": None, "end": None},
+        "generated_at": None,
+        "freshness": {"status": "unavailable"},
+        "record_count": None,
+        "coverage": None,
+        "distributions": None,
+        "breakouts": None,
+        "cost_coverage": {
+            "provider_reported": None,
+            "benchmark_estimated": None,
+        },
+        "bounds": {"per_distribution_limit": WORKFLOW_RECORD_LIMIT},
+    }
+
+
+def _recent_work_metrics(root: Path, limit: int) -> dict[str, Any]:
+    db_path = root / "groundtruth.db"
+    if not db_path.is_file():
+        return _unavailable_recent_work_metrics("canonical_snapshot_store_unavailable")
+    try:
+        with sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT id, content, changed_at, version
+                FROM current_documents
+                WHERE category = ? AND status = 'active'
+                ORDER BY changed_at DESC, version DESC, id DESC
+                LIMIT 1
+                """,
+                (METRICS_SNAPSHOT_CATEGORY,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return _unavailable_recent_work_metrics("canonical_snapshot_store_unavailable")
+    if row is None:
+        return _unavailable_recent_work_metrics("canonical_snapshot_unavailable")
+    try:
+        from groundtruth_kb.dispatch_default_metrics import SNAPSHOT_SCHEMA_ID, validate_metrics_snapshot
+
+        raw = json.loads(str(row["content"] or ""))
+        snapshot = validate_metrics_snapshot(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _unavailable_recent_work_metrics("canonical_snapshot_invalid")
+
+    freshness = snapshot.get("freshness") if isinstance(snapshot.get("freshness"), dict) else {}
+    freshness_status = str(freshness.get("status") or "unavailable")
+    if freshness_status not in {"fresh", "partial", "stale", "unavailable"}:
+        freshness_status = "unavailable"
+    record_count = snapshot.get("source_record_count")
+    usage_coverage = snapshot.get("usage_coverage") if isinstance(snapshot.get("usage_coverage"), dict) else {}
+    cost_coverage = snapshot.get("cost_coverage") if isinstance(snapshot.get("cost_coverage"), dict) else {}
+    coverage = {
+        "turns": _metric_coverage(usage_coverage.get("turns")),
+        "tool_calls": _metric_coverage(usage_coverage.get("tools")),
+        "token_cache": _metric_coverage(usage_coverage.get("usage")),
+        "benchmark_quality": _metric_coverage(snapshot.get("quality_coverage")),
+        "adaptation": _metric_coverage(snapshot.get("adaptation_coverage")),
+    }
+    availability = _metrics_availability(freshness_status, record_count, coverage)
+    reason = None
+    if availability == "stale":
+        reason = "canonical_snapshot_stale"
+    elif availability == "unavailable":
+        reason = "canonical_snapshot_empty"
+    elif availability == "partial":
+        reason = "canonical_snapshot_partial"
+
+    return {
+        "availability": availability,
+        "reason": reason,
+        "snapshot_id": _safe_metric_label(snapshot.get("id")),
+        "schema_id": SNAPSHOT_SCHEMA_ID,
+        "schema_version": 1,
+        "source_window": {
+            "start": _safe_metric_timestamp(snapshot.get("source_window_start")),
+            "end": _safe_metric_timestamp(snapshot.get("source_window_end")),
+        },
+        "generated_at": _safe_metric_timestamp(snapshot.get("generated_at")),
+        "freshness": {"status": freshness_status},
+        "record_count": record_count,
+        "coverage": coverage,
+        "distributions": {
+            "outcomes": _bounded_metric_counts(snapshot.get("counts_by_bridge_outcome"), limit),
+            "failure_classes": _bounded_metric_counts(snapshot.get("counts_by_failure_class"), limit),
+            "elapsed_time": _bounded_metric_counts(snapshot.get("elapsed_distribution"), limit),
+            "turns": _bounded_metric_counts(snapshot.get("turns_distribution"), limit),
+            "tool_calls": _bounded_metric_counts(snapshot.get("tools_distribution"), limit),
+        },
+        "breakouts": {
+            "harness": _bounded_metric_counts(snapshot.get("counts_by_harness"), limit),
+            "model_profile": _bounded_metric_counts(snapshot.get("counts_by_model_profile"), limit),
+            "role": _bounded_metric_counts(snapshot.get("counts_by_role"), limit),
+        },
+        "cost_coverage": {
+            "provider_reported": _metric_coverage(cost_coverage.get("provider_reported")),
+            "benchmark_estimated": _metric_coverage(cost_coverage.get("benchmark_estimated")),
+        },
+        "bounds": {"per_distribution_limit": limit},
+    }
+
+
+def _bounded_metric_counts(value: Any, limit: int) -> dict[str, int | float] | None:
+    if not isinstance(value, dict):
+        return None
+    allowed: dict[str, int | float] = {}
+    for key, item in sorted(value.items(), key=lambda row: str(row[0])):
+        if len(allowed) >= limit:
+            break
+        safe_key = _safe_metric_label(key)
+        if safe_key is None or isinstance(item, bool) or not isinstance(item, (int, float)) or item < 0:
+            continue
+        allowed[safe_key] = item
+    return allowed
+
+
+def _metric_coverage(value: Any) -> dict[str, int | float] | None:
+    if not isinstance(value, dict):
+        return None
+    result: dict[str, int | float] = {}
+    for key in ("observed_count", "missing_count", "record_count", "coverage_ratio"):
+        item = value.get(key)
+        if isinstance(item, (int, float)) and not isinstance(item, bool) and item >= 0:
+            result[key] = item
+    return result or None
+
+
+def _safe_metric_label(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized if _METRIC_LABEL_RE.fullmatch(normalized) else None
+
+
+def _safe_metric_timestamp(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _metrics_availability(
+    freshness_status: str,
+    record_count: Any,
+    coverage: dict[str, dict[str, Any] | None],
+) -> str:
+    if freshness_status == "stale":
+        return "stale"
+    if freshness_status == "unavailable" or not isinstance(record_count, int) or record_count <= 0:
+        return "unavailable"
+    if freshness_status == "partial":
+        return "partial"
+    for details in coverage.values():
+        if isinstance(details, dict) and int(details.get("missing_count") or 0) > 0:
+            return "partial"
+    return "observed"
 
 
 def _workflow_prime_queues(

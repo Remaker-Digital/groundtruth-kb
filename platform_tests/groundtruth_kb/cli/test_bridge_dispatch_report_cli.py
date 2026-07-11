@@ -171,6 +171,75 @@ def _write_workflow_membase(root: Path) -> None:
         )
 
 
+def _metrics_snapshot(*, freshness: str = "fresh", partial: bool = False) -> dict[str, object]:
+    missing = 1 if partial else 0
+    observed = 1 if partial else 2
+    coverage = {
+        "observed_count": observed,
+        "missing_count": missing,
+        "record_count": 2,
+        "coverage_ratio": observed / 2,
+    }
+    return {
+        "id": "dispatch-metrics-test",
+        "snapshot_schema_id": "gtkb.dispatch_default_metrics_snapshot.v1",
+        "generated_at": "2026-07-11T06:00:00Z",
+        "source_window_start": "2026-07-11T05:00:00Z",
+        "source_window_end": "2026-07-11T06:00:00Z",
+        "source_event_ids": ["event-1", "event-2"],
+        "source_record_count": 2,
+        "max_records": 50,
+        "counts_by_harness": {f"harness-{index:02d}": 1 for index in range(25)},
+        "counts_by_model_profile": {"model-safe": 2},
+        "counts_by_role": {"prime-builder": 2},
+        "counts_by_bridge_outcome": {"VERIFIED": 2},
+        "counts_by_failure_class": {"none": 2},
+        "elapsed_distribution": {"under_1s": 1, "1_to_5s": 1},
+        "turns_distribution": {"under_10": 2},
+        "tools_distribution": {"1_to_10": 2},
+        "usage_coverage": {"turns": coverage, "tools": coverage, "usage": coverage},
+        "cost_coverage": {
+            "provider_reported": coverage,
+            "benchmark_estimated": {**coverage, "observed_count": 1, "missing_count": 1},
+        },
+        "quality_coverage": coverage,
+        "adaptation_coverage": coverage,
+        "freshness": {"status": freshness, "generated_at": "2026-07-11T06:00:00Z"},
+        "prompt": "forbidden prompt content",
+        "tool_arguments": {"secret": "forbidden credential"},
+        "provider_body": {"generated_text": "forbidden provider content"},
+    }
+
+
+def _write_metrics_snapshot(root: Path, snapshot: dict[str, object]) -> None:
+    with sqlite3.connect(root / "groundtruth.db") as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS current_documents (
+                id TEXT,
+                title TEXT,
+                category TEXT,
+                status TEXT,
+                content TEXT,
+                version INTEGER,
+                changed_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO current_documents VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                snapshot["id"],
+                "Canonical default dispatch metrics snapshot",
+                "dispatch_default_metrics_snapshot",
+                "active",
+                json.dumps(snapshot),
+                1,
+                "2026-07-11T06:00:00Z",
+            ),
+        )
+
+
 def _write_workflow_bridge(
     root: Path,
     slug: str,
@@ -505,3 +574,93 @@ def test_wi5174_compact_workflow_is_bounded_and_read_only(tmp_path: Path) -> Non
     assert payload["bounds"]["per_section_limit"] == 20
     assert payload["bounds"]["truncated"]["queues"]["loyal_opposition"]["actionable_now"] is True
     assert {path: path.read_bytes() for path in tracked} == before
+
+
+def test_wi5181_compact_and_human_views_use_same_bounded_canonical_snapshot(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    _write_metrics_snapshot(root, _metrics_snapshot())
+    tracked = [
+        root / "groundtruth.db",
+        root / "config" / "dispatcher" / "rules.toml",
+        root / "harness-state" / "harness-registry.json",
+        root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json",
+    ]
+    before = {path: path.read_bytes() for path in tracked}
+
+    full = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report", "--json"])
+    compact = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+    human = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report"])
+
+    assert full.exit_code == 0, full.output
+    assert compact.exit_code == 0, compact.output
+    assert human.exit_code == 0, human.output
+    assert "recent_work_metrics" not in json.loads(full.output)
+    metrics = json.loads(compact.output)["recent_work_metrics"]
+    assert metrics["snapshot_id"] == "dispatch-metrics-test"
+    assert metrics["availability"] == "observed"
+    assert metrics["record_count"] == 2
+    assert len(metrics["breakouts"]["harness"]) == 20
+    assert set(metrics["cost_coverage"]) == {"benchmark_estimated", "provider_reported"}
+    assert "Recent-work metrics:" in human.output
+    assert "Snapshot: dispatch-metrics-test" in human.output
+    assert "Availability: observed" in human.output
+    serialized = json.dumps(metrics)
+    assert "forbidden" not in serialized
+    assert "prompt" not in serialized
+    assert "tool_arguments" not in serialized
+    assert "provider_body" not in serialized
+    assert {path: path.read_bytes() for path in tracked} == before
+
+
+def test_wi5181_unavailable_snapshot_preserves_workflow_queues(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_runtime(root)
+    _write_workflow_bridge(root, "review-new", "NEW")
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["recent_work_metrics"]["availability"] == "unavailable"
+    assert payload["recent_work_metrics"]["reason"] == "canonical_snapshot_store_unavailable"
+    assert payload["queues"]["loyal_opposition"]["actionable_now"][0]["id"] == "review-new"
+
+
+def test_wi5181_partial_snapshot_is_explicit(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_metrics_snapshot(root, _metrics_snapshot(partial=True))
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    metrics = json.loads(result.output)["recent_work_metrics"]
+    assert metrics["availability"] == "partial"
+    assert metrics["reason"] == "canonical_snapshot_partial"
+    assert metrics["coverage"]["token_cache"]["missing_count"] == 1
+
+
+def test_wi5181_stale_snapshot_is_not_silently_substituted(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_metrics_snapshot(root, _metrics_snapshot(freshness="stale"))
+
+    compact = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "report", "--compact", "--json"],
+    )
+    human = CliRunner().invoke(main, ["--config", str(config), "bridge", "dispatch", "report"])
+
+    assert compact.exit_code == 0, compact.output
+    metrics = json.loads(compact.output)["recent_work_metrics"]
+    assert metrics["availability"] == "stale"
+    assert metrics["reason"] == "canonical_snapshot_stale"
+    assert "stale: canonical_snapshot_stale" in human.output
