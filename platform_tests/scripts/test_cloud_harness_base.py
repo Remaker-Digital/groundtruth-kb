@@ -518,6 +518,69 @@ def test_native_full_hooks_lifecycle_runs_in_order(tmp_path: Path) -> None:
     assert hook_events[0][2]["CLAUDE_PROJECT_DIR"] == str(root)
 
 
+def test_native_full_hooks_empty_pretool_output_allows_later_hooks_and_tool(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / "note.txt").write_text("file body", encoding="utf-8")
+    _write_native_hook_settings(
+        root,
+        {
+            base.NATIVE_HOOK_PRE_TOOL_USE: [
+                {
+                    "matcher": "Read",
+                    "hooks": [
+                        {"type": "command", "command": "empty pre"},
+                        {"type": "command", "command": "later pre"},
+                    ],
+                }
+            ]
+        },
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    hook_commands: list[str] = []
+    turns: list[dict] = []
+
+    def hook_runner(command: str, payload: dict, env: dict, timeout: float) -> base.GuardExecutionResult:
+        hook_commands.append(command)
+        stdout = "" if command == "empty pre" else "{}"
+        return base.GuardExecutionResult(returncode=0, stdout=stdout)
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "function": {"name": "Read", "arguments": {"path": "note.txt"}},
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        assert any(message.get("content") == "file body" for message in payload["messages"])
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    result = base.run_tool_loop(
+        "read the note",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        3,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == "done"
+    assert hook_commands == ["empty pre", "later pre"]
+
+
 def test_native_full_hooks_pretool_block_feeds_reason_to_model(tmp_path: Path) -> None:
     root = _root(tmp_path)
     _write_native_hook_settings(

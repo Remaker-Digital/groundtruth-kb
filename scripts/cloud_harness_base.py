@@ -1330,7 +1330,7 @@ def invoke_native_hooks(
             raise CloudHarnessError(f"native hook exited nonzero: {event_name}: {command_label} ({result.returncode})")
         stdout = (result.stdout or "").strip()
         if not stdout:
-            raise CloudHarnessError(f"native hook emitted empty output: {event_name}: {command_label}")
+            continue
         try:
             data = json.loads(stdout)
         except json.JSONDecodeError as exc:

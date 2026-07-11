@@ -152,6 +152,48 @@ def test_alibaba_native_hook_adapter_keeps_empty_pretool_output_fail_closed(
     assert result.stdout == ""
 
 
+def test_shared_native_hook_layer_accepts_real_alibaba_empty_pretool_adapter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    settings_dir = root / ".claude"
+    settings_dir.mkdir()
+    (settings_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    base.NATIVE_HOOK_PRE_TOOL_USE: [
+                        {"matcher": "Read", "hooks": [{"type": "command", "command": "empty pre"}]}
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def empty_native_hook(*_args, **_kwargs):
+        return base.GuardExecutionResult(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(base, "_default_native_hook_runner", empty_native_hook)
+
+    result = base.invoke_native_hooks(
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        base.ModelMetadata(
+            model_id="alibaba-deepseek-v4-pro",
+            model_version="alibaba-deepseek-v4-pro",
+            endpoint="https://example.test/v1",
+            route_key="alib-route",
+        ),
+        root,
+        ach._ALIBABA_PROFILE,
+        tool_name="Read",
+        tool_input={"path": "note.txt"},
+        native_hook_runner=ach.run_alibaba_native_hook,
+    )
+
+    assert result == {}
+
+
 def test_alibaba_native_hook_adapter_wraps_non_json_lifecycle_context(monkeypatch: pytest.MonkeyPatch) -> None:
     def text_native_hook(*_args, **_kwargs):
         return base.GuardExecutionResult(returncode=0, stdout="informational lifecycle context", stderr="")
