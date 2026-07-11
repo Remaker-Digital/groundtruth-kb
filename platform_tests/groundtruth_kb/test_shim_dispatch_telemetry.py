@@ -292,3 +292,38 @@ def test_harness_telemetry_cli_exposes_read_only_distribution(tmp_path: Path) ->
     payload = json.loads(result.output)
     assert payload["schema_id"] == telemetry.QUERY_SCHEMA_ID
     assert payload["distribution"] == [{"count": 1, "value": "openrouter"}]
+
+
+def test_read_dispatch_telemetry_records_is_filtered_newest_first_and_bounded(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+
+    for index in range(55):
+        dispatch_id = f"dispatch-{index:02d}"
+        observer = _observer(root, dispatch_id)
+        observer.finish(stop_reason="final_response")
+        path = telemetry.telemetry_path(root, dispatch_id)
+        path.touch()
+
+    other = telemetry.create_dispatch_telemetry_observer(
+        root,
+        harness_id="A",
+        harness_name="codex",
+        provider="openai",
+        model_id="gpt-test",
+        model_version="test",
+        turn_budget=1,
+        environ={telemetry.DISPATCH_ID_ENV_VAR: "dispatch-other"},
+    )
+    other.finish(stop_reason="role_document_invalid")
+
+    records = telemetry.read_dispatch_telemetry_records(
+        root,
+        harness_id="F",
+        harness_name="openrouter",
+        limit=100,
+    )
+
+    assert len(records) == 50
+    assert all(record["worker"]["harness_id"] == "F" for record in records)
+    assert records[0]["correlation"]["dispatch_id"] == "dispatch-54"

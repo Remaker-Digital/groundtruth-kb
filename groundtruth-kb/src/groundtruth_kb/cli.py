@@ -9241,6 +9241,30 @@ def harness_telemetry_cmd(
         click.echo(f"- {row['value']}: {row['count']}")
 
 
+@harness_group.command("diagnostic")
+@click.option("--harness-id", required=True, help="Durable harness id to inspect (for example A or B).")
+@click.option("--json", "json_output", is_flag=True, help="Emit the canonical machine-readable diagnostic schema.")
+@click.pass_context
+def harness_diagnostic_cmd(ctx: click.Context, harness_id: str, json_output: bool) -> None:
+    """Show a bounded, local, read-only harness diagnostic projection."""
+
+    from groundtruth_kb.harness_diagnostic import diagnose_harness
+
+    config = _resolve_config(ctx)
+    try:
+        payload = diagnose_harness(Path(config.project_root), harness_id)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    harness = payload.get("harness") or {}
+    click.echo(f"Harness diagnostic: {harness.get('harness_name') or harness_id}")
+    click.echo(f"Status: {payload.get('status')}")
+    click.echo(f"Role: {(payload.get('role') or {}).get('role')}")
+    click.echo(f"Recent runs: {len(payload.get('recent_runs') or [])}")
+
+
 def _harness_emit(record: object) -> None:
     """Echo a harness record (or list of records) as indented, key-sorted JSON."""
     import json as _json

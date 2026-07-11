@@ -768,3 +768,38 @@ def query_dispatch_telemetry(
         "distribution": [{"value": value, "count": count} for value, count in sorted(distribution.items())],
         "bounds": {"record_limit": bounded_limit, "records_examined": examined, "records_available": len(paths)},
     }
+
+
+def read_dispatch_telemetry_records(
+    project_root: Path,
+    *,
+    harness_id: str | None = None,
+    harness_name: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Read bounded canonical telemetry records for diagnostic projection.
+
+    Records remain internal input to the diagnostic allowlist; callers must not
+    serialize unrecognized fields from a telemetry file.
+    """
+    bounded_limit = min(max(int(limit), 1), 50)
+    path_rows: list[tuple[float, Path]] = []
+    for path in _runs_directory(project_root).glob("*.telemetry.json"):
+        try:
+            path_rows.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    result: list[dict[str, Any]] = []
+    for _mtime, path in sorted(path_rows, key=lambda row: (row[0], row[1].name), reverse=True):
+        record = _read_json_object(path)
+        if record is None or record.get("schema_id") != SCHEMA_ID:
+            continue
+        worker = _mapping(record.get("worker"))
+        if harness_id is not None and worker.get("harness_id") != harness_id:
+            continue
+        if harness_name is not None and worker.get("harness_name") != harness_name:
+            continue
+        result.append(record)
+        if len(result) >= bounded_limit:
+            break
+    return result

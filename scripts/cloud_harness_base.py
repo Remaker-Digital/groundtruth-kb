@@ -1744,6 +1744,17 @@ def _tool_call_parts(call: Any, index: int) -> tuple[str, dict[str, Any], str]:
     return name, raw_arguments, call_id
 
 
+def run_diagnostic(project_root: Path, *, harness_id: str) -> dict[str, Any]:
+    """Return the shared local diagnostic contract for a cloud harness.
+
+    Cloud adapters inherit this read-only surface; diagnostic mode never opens
+    a provider connection and derives role provenance from the worker document.
+    """
+    from groundtruth_kb.harness_diagnostic import diagnose_harness
+
+    return diagnose_harness(project_root, harness_id)
+
+
 def _message_from_response(response: Mapping[str, Any]) -> dict[str, Any]:
     choices = response.get("choices")
     if not isinstance(choices, list) or not choices:

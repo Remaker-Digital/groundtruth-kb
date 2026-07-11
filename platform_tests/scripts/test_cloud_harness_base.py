@@ -788,3 +788,21 @@ def test_run_tool_loop_anthropic_round_trip(tmp_path: Path) -> None:
         if isinstance(message.get("content"), list)
         for block in message["content"]
     )
+
+
+def test_cloud_template_inherits_local_diagnostic_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from groundtruth_kb import harness_diagnostic
+
+    root = _root(tmp_path)
+    captured: dict[str, object] = {}
+
+    def fake_diagnostic(project_root: Path, harness_id: str) -> dict[str, object]:
+        captured.update({"project_root": project_root, "harness_id": harness_id})
+        return {"schema_id": harness_diagnostic.SCHEMA_ID, "provider_health": {"mode": "local"}}
+
+    monkeypatch.setattr(harness_diagnostic, "diagnose_harness", fake_diagnostic)
+
+    result = base.run_diagnostic(root, harness_id="H")
+
+    assert result["schema_id"] == "gtkb.harness_diagnostic.v1"
+    assert captured == {"project_root": root, "harness_id": "H"}

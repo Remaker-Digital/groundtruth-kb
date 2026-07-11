@@ -500,6 +500,25 @@ def test_harness_set_role_emits_role_holder_sets(tmp_path: Path) -> None:
     assert payload["new_role_set"] == ["prime-builder"]
 
 
+def test_harness_diagnostic_json_is_local_and_structured(tmp_path: Path) -> None:
+    _, config = _project(tmp_path)
+    _register_active(config, "A", "codex-cli", role=["prime-builder"])
+
+    result = _invoke(config, "diagnostic", "--harness-id", "A", "--json")
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["schema_id"] == "gtkb.harness_diagnostic.v1"
+    assert payload["harness"]["harness_id"] == "A"
+    assert payload["provider_health"] == {
+        "coverage": "not_requested",
+        "freshness": "local",
+        "mode": "local",
+        "status": "unavailable",
+        "unavailable_reason": "provider_request_forbidden",
+    }
+
+
 # --- T-HC-8: the gt mode set-role command is unaffected ---------------------
 
 
