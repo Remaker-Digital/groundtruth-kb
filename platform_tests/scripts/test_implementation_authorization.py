@@ -44,6 +44,11 @@ def auth_module():
     return module
 
 
+@pytest.fixture(autouse=True)
+def _select_fixture_worker_documents(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
+
+
 def _ignore_retired_index_fixture(project_root: Path, blocks: list[str]) -> Path:
     """Keep obsolete chain fixture arguments without writing retired index state."""
     del blocks
@@ -276,7 +281,7 @@ def test_create_packet_blocks_different_session_overlapping_named_packet(auth_mo
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
     packet_a = auth_module.create_authorization_packet(tmp_path, "bridge-a")
     auth_module.write_named_packet(tmp_path, packet_a, "bridge-a")
-    _write_prime_marker(tmp_path, "session-A")
+    _write_prime_worker_session(tmp_path, "session-A")
     assert auth_module.bridge_work_intent_registry.acquire("bridge-a", "session-A", project_root=tmp_path)
 
     with pytest.raises(auth_module.AuthorizationError, match="Concurrent path reservation conflict"):
@@ -291,7 +296,7 @@ def test_create_packet_allows_same_session_overlapping_named_packet(auth_module,
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
     packet_a = auth_module.create_authorization_packet(tmp_path, "bridge-a")
     auth_module.write_named_packet(tmp_path, packet_a, "bridge-a")
-    _write_prime_marker(tmp_path, "session-A")
+    _write_prime_worker_session(tmp_path, "session-A")
     assert auth_module.bridge_work_intent_registry.acquire("bridge-a", "session-A", project_root=tmp_path)
 
     packet_b = auth_module.create_authorization_packet(tmp_path, "bridge-b", session_id="session-A")
@@ -307,7 +312,7 @@ def test_create_packet_allows_when_peer_claim_registry_read_fails(auth_module, t
     _write_verdict(tmp_path, "bridge-b", version=2, verdict="GO")
     packet_a = auth_module.create_authorization_packet(tmp_path, "bridge-a")
     auth_module.write_named_packet(tmp_path, packet_a, "bridge-a")
-    _write_prime_marker(tmp_path, "session-a")
+    _write_prime_worker_session(tmp_path, "session-a")
     assert auth_module.bridge_work_intent_registry.acquire("bridge-a", "session-a", project_root=tmp_path)
 
     def registry_unavailable(*_args, **_kwargs):
@@ -543,17 +548,30 @@ def _begin_packet(auth_module, tmp_path: Path, slug: str) -> dict[str, Any]:
     return packet
 
 
-def _write_prime_marker(tmp_path: Path, session_id: str) -> None:
-    marker_dir = tmp_path / ".claude" / "session"
-    marker_dir.mkdir(parents=True, exist_ok=True)
-    (marker_dir / f"role-{session_id}.json").write_text(
-        json.dumps({"role": "prime-builder", "session_id": session_id}),
-        encoding="utf-8",
-    )
+def _write_prime_worker_session(tmp_path: Path, session_id: str) -> None:
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": "T",
+        "harness_name": "fixture",
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": "T",
+            "harness_name": "fixture",
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-07-11T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = tmp_path / "harness-state" / "fixture" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
 
 
 def _claim_bridge(auth_module, tmp_path: Path, slug: str, session_id: str = "session-1") -> None:
-    _write_prime_marker(tmp_path, session_id)
+    _write_prime_worker_session(tmp_path, session_id)
     assert auth_module.bridge_work_intent_registry.acquire(slug, session_id, project_root=tmp_path)
 
 

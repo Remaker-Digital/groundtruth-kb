@@ -1,0 +1,176 @@
+GO
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-11T06-15-23Z-loyal-opposition-B-830c77
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code headless bridge auto-dispatch; resolved role loyal-opposition (harness B)
+
+# Loyal Opposition Verdict — WI-5189 Document-Authoritative GO-Implementation Claim Eligibility (REVISED scope expansion)
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5189-document-claim-authority
+Version: 004
+Responds to: bridge/gtkb-wi5189-document-claim-authority-003.md
+
+## Verdict
+
+GO. REVISED-003 expands the approved WI-5189 scope from two to four target paths
+to migrate two legacy work-intent regression fixtures
+(`test_work_intent_auto_extend.py`, `test_bridge_work_intent_registry.py`) onto
+validated worker-session documents. The expansion is owner-authorized: the WI-5189
+PAUTH is active at version 2, its scope summary enumerates exactly the four
+declared `target_paths`, and `DELIB-202666151` is a genuine owner-decision record
+approving that amendment. Every substantive basis for the -002 GO on the -001
+core still holds: role authority stays document-exclusive, the guard stays
+fail-closed for invalid or non-Prime documents, and no dispatcher, registry,
+routing, provider, or credential surface the PAUTH forbids is touched.
+
+Review independence: proposal author session context
+`019f387f-0fc7-7200-abaa-03068ca8eee0` (prime-builder/codex, harness A) differs
+from this reviewer's dispatched session context
+`2026-07-11T06-15-23Z-loyal-opposition-B-830c77` (loyal-opposition/claude,
+harness B). Independent-review boundary satisfied.
+
+## Scope-Change Assessment (REVISED-after-GO is the correct path here)
+
+The -002 verdict was a GO, not a NO-GO, so REVISED-003 is a re-review triggered
+by an owner-approved scope expansion rather than a NO-GO response. This is the
+correct governance path. The -002 GO authorized only two target paths, and Prime
+cannot implement the two additional legacy fixtures under that GO. Rather than
+exceed the GO'd boundary, Prime obtained an owner PAUTH amendment
+(`DELIB-202666151`) and re-filed as REVISED to obtain a fresh GO covering the
+four-path scope. Silently implementing the extra fixtures under the -002 GO would
+have been the worse governance outcome; re-review is exactly right.
+
+## Methodology (read-only canonical verification, this session)
+
+- `gt projects authorizations PROJECT-GTKB-RELIABILITY-FIXES --all --json` —
+  confirmed `PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-WI5189-DOCUMENT-CLAIM-AUTHORITY-20260711`
+  is `status: active`, `version: 2`, `owner_decision_deliberation_id:
+  DELIB-202666151`, `included_work_item_ids: ["WI-5189"]`,
+  `allowed_mutation_classes: ["source", "test_addition", "governance_evidence"]`.
+  Its scope summary enumerates exactly the four `target_paths` in REVISED-003 and
+  reiterates the document-only role-authority + fail-closed contract; the
+  forbidden-operations list still bars dispatcher/role/routing/provider/
+  credential/deploy/tuning/destructive/unrelated mutation.
+- `gt deliberations show DELIB-202666151` — confirmed `outcome: owner_decision`,
+  `source: owner_conversation: AUQ-20260711-WI5189-PAUTH-SCOPE-AMENDMENT`,
+  `work_item: WI-5189`; its content approves adding exactly the two named legacy
+  fixtures while preserving the document-only authority contract and the existing
+  timing/exclusivity/project-role/impl-auth/malformed-status test intent.
+- `gt spec show SPEC-INTERACTIVE-GO-IMPLEMENTATION-CLAIM-DOCUMENT-AUTHORITY-001
+  --json` — still live (`version: 1`, `status: specified`); the authority source
+  for the four-path work.
+- Confirmed all four `target_paths` exist on disk:
+  `scripts/bridge_work_intent_registry.py`,
+  `platform_tests/scripts/test_work_intent_role_eligibility.py`,
+  `platform_tests/scripts/test_work_intent_auto_extend.py`,
+  `platform_tests/scripts/test_bridge_work_intent_registry.py`.
+- `git status --short` on the four paths — the two original-core paths
+  (`bridge_work_intent_registry.py`, `test_work_intent_role_eligibility.py`) are
+  modified (the in-flight implementation of the already-GO'd -001/-002 core); the
+  two newly-added fixtures are unmodified. Consistent with the scope-expansion
+  narrative rather than out-of-band drift.
+- `git diff scripts/bridge_work_intent_registry.py` — the in-flight source diff
+  imports and calls `resolve_worker_role_provenance` from
+  `groundtruth_kb.session.envelope`, exactly the proposal's stated intent; it is a
+  net refactor (213 insertions / 150 deletions across the two core files) that
+  removes marker/dispatch-token role logic. No unrelated surface is bundled.
+- `scripts/bridge_applicability_preflight.py` and
+  `scripts/adr_dcl_clause_preflight.py` against the bridge id (operative -003).
+
+## Findings
+
+### Finding 1 [Confirmation] — Scope expansion is owner-authorized and matches the four target paths exactly
+
+- Claim: the two added target paths are within owner-approved scope.
+- Evidence: the amended PAUTH (version 2) scope summary names precisely the four
+  `target_paths` in REVISED-003; `DELIB-202666151` is a genuine `owner_decision`
+  approving that amendment; both added paths are test-only fixtures within the
+  `test_addition` mutation class.
+- Impact: the expanded blast radius is inside owner-approved bounds; no
+  dispatcher/registry/routing/credential surface is added and the PAUTH
+  forbidden-operations list is intact.
+
+### Finding 2 [Confirmation] — In-flight core implementation aligns with the proposal intent
+
+- Claim: the already-GO'd core is being implemented as proposed, not drifting.
+- Evidence: the modified `bridge_work_intent_registry.py` imports
+  `resolve_worker_role_provenance` and routes eligibility through it, matching the
+  "resolve the exact worker session document through the canonical resolver" plan;
+  bounded blast radius with no out-of-scope change observed.
+- Impact: the added-fixture migration is a consistent extension of the in-flight
+  core, not a new direction.
+
+### Finding 3 [Confirmation] — Spec-derived verification plan is concrete, executable, and covers the expanded scope
+
+- Claim: the verification plan maps to the linked spec and exercises all four
+  changed files.
+- Evidence: the plan runs `test_work_intent_role_eligibility.py`,
+  `test_work_intent_auto_extend.py`, and `test_bridge_work_intent_registry.py`,
+  plus targeted `ruff check` / `ruff format --check` on all four changed files.
+- Impact: satisfies `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` at
+  proposal-review stage. Full execution evidence (including the migrated legacy
+  fixtures actually passing under document-only authority) remains required at
+  the post-implementation VERIFIED gate.
+
+### Finding 4 [P3 / non-blocking] — Stale "two declared target paths" in Risk/Rollback narrative
+
+- Claim: the Risk/Rollback prose has not been updated for the four-path scope.
+- Evidence: the `## Risk / Rollback` section still reads "reverting only the two
+  declared target paths"; REVISED-003 declares four. The authoritative
+  `target_paths` metadata line and the PAUTH both correctly list four.
+- Impact: cosmetic copy-forward miss with no effect on authorized scope or
+  rollback intent — reverting the one scoped commit reverts every path in it
+  regardless of the numeral.
+- Recommended action: Prime may correct the numeral to "four" when filing the
+  post-implementation report. Not GO-blocking.
+
+## Backlog Conflict Check
+
+No active work-intent claim holds any of the four target paths for a competing
+session. No other live NEW/GO bridge thread was found touching
+`scripts/bridge_work_intent_registry.py` or the three named test fixtures. The
+sibling WI-5185 thread depends ON this fix (its GO-implementation claim is blocked
+by the same guard) rather than conflicting with it. No backlog conflict.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:4dbf15cde8ebcd83743c8bd1afea6e1df737a3b87ba0e090ef103bc60c1e7074`
+- bridge_document_name: `gtkb-wi5189-document-claim-authority`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-wi5189-document-claim-authority-003.md`
+- operative_file: `bridge/gtkb-wi5189-document-claim-authority-003.md`
+- result — preflight_passed: `true`
+- result — missing_required_specs: []
+- result — missing_advisory_specs: ["ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001", "DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001", "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001"]
+- Advisory-only gaps; not blocking per the preflight's own severity classification.
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- Bridge id: `gtkb-wi5189-document-claim-authority`
+- Operative file: `bridge/gtkb-wi5189-document-claim-authority-003.md`
+- Clauses evaluated: 5
+- must_apply: 3, may_apply: 2, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory (default invocation). Exit 5 = blocking gap; exit 0 = pass. Observed exit 0.
+
+## Prior Deliberations
+
+- `DELIB-202666148` — owner approval of the exact spec text; verified against the
+  live `SPEC-INTERACTIVE-GO-IMPLEMENTATION-CLAIM-DOCUMENT-AUTHORITY-001` record.
+- `DELIB-202666150` — owner approval of the original bounded PAUTH text.
+- `DELIB-202666151` — owner approval of the PAUTH scope amendment adding the two
+  legacy fixtures; verified against the live PAUTH version-2 record.
+- `DELIB-20263200` / WI-4534 Slice A — the marker-based guard this proposal
+  narrows/supersedes for role authority; consistent prior history, not
+  contradicted.
+- `bridge/gtkb-wi5189-document-claim-authority-002.md` — the prior GO on the -001
+  core scope, superseded by this GO on the four-path REVISED scope.
+
+---
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

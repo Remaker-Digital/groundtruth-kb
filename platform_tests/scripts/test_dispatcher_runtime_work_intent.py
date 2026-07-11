@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,15 +19,15 @@ if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 
 from bridge_work_intent_registry import acquire, current_holder  # noqa: E402
-from gtkb_session_id import per_session_role_marker_path  # noqa: E402
 from test_dispatcher_runtime import (  # noqa: E402
     _CODEX_INVOCATION_SURFACES,
-    _load_trigger,
     _make_synthetic_project,
     _rec,
     _write_bridge_file,
-    _write_index,
     _write_registry,
+)
+from test_dispatcher_runtime import (  # noqa: E402
+    _load_trigger as _load_base_trigger,
 )
 
 _BRIDGE_KIND_BODY = (
@@ -64,10 +65,53 @@ def _fake_popen(*_args, **_kwargs) -> _FakeProcess:
     return _FakeProcess()
 
 
-def _write_prime_session_marker(root: Path, session_id: str) -> None:
-    marker = per_session_role_marker_path(root, session_id)
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(json.dumps({"role": "prime-builder", "session_id": session_id}), encoding="utf-8")
+@pytest.fixture(autouse=True)
+def _select_fixture_worker_documents(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
+    work_intents = sys.modules["bridge_work_intent_registry"]
+    real_acquire = work_intents.acquire
+
+    def _acquire_with_worker_document(
+        slug: str,
+        session_id: str,
+        ttl_seconds: int = 30,
+        *,
+        project_root: Path | None = None,
+    ) -> bool:
+        if project_root is not None:
+            _write_prime_worker_session(project_root, session_id)
+        return real_acquire(slug, session_id, ttl_seconds=ttl_seconds, project_root=project_root)
+
+    monkeypatch.setattr(work_intents, "acquire", _acquire_with_worker_document)
+
+
+def _write_prime_worker_session(root: Path, session_id: str) -> None:
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": "T",
+        "harness_name": "fixture",
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": "T",
+            "harness_name": "fixture",
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-07-11T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / "fixture" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def _load_trigger():
+    trigger = _load_base_trigger()
+    # Keep launcher Popen fakes local to this dispatcher module instance.
+    trigger.subprocess = SimpleNamespace(**vars(trigger.subprocess))
+    return trigger
 
 
 def _index_with_go_documents(
@@ -93,8 +137,8 @@ def _index_with_go_documents(
 
 
 def _prime_selected(trigger, root: Path, max_items: int = 2) -> list[object]:
-    index_text = (root / "bridge" / "INDEX.md").read_text(encoding="utf-8")
-    prime_items, _ = trigger._compute_actionable(index_text, root)
+    bridge_state = trigger._read_bridge_state_live(root)
+    prime_items, _ = trigger._compute_actionable(bridge_state, root)
     filtered = [item for item in prime_items if getattr(item, "dispatchable", True)]
     return trigger._selected_oldest_first(filtered, max_items)
 
@@ -119,8 +163,8 @@ def test_prime_dispatch_filters_held_work_intent_and_signs_unheld_batch(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_go_documents(root, "held-thread", "free-thread"))
-    _write_prime_session_marker(root, "foreground-session")
+    _index_with_go_documents(root, "held-thread", "free-thread")
+    _write_prime_worker_session(root, "foreground-session")
     assert acquire("held-thread", "foreground-session", ttl_seconds=120, project_root=root)
 
     trigger = _load_trigger()
@@ -164,17 +208,14 @@ def test_prime_dispatch_suppresses_same_batch_target_path_overlap(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     shared_target = "scripts/shared.py"
-    _write_index(
+    _index_with_go_documents(
         root,
-        _index_with_go_documents(
-            root,
-            "first-thread",
-            "second-thread",
-            target_paths_by_slug={
-                "first-thread": [shared_target],
-                "second-thread": [shared_target],
-            },
-        ),
+        "first-thread",
+        "second-thread",
+        target_paths_by_slug={
+            "first-thread": [shared_target],
+            "second-thread": [shared_target],
+        },
     )
     trigger = _load_trigger()
     monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
@@ -208,17 +249,14 @@ def test_prime_dispatch_keeps_disjoint_go_items_fanning_out_to_cap(
     """WI-4996: target serialization preserves normal fan-out for disjoint paths."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(
+    _index_with_go_documents(
         root,
-        _index_with_go_documents(
-            root,
-            "first-thread",
-            "second-thread",
-            target_paths_by_slug={
-                "first-thread": ["scripts/first.py"],
-                "second-thread": ["platform_tests/scripts/test_second.py"],
-            },
-        ),
+        "first-thread",
+        "second-thread",
+        target_paths_by_slug={
+            "first-thread": ["scripts/first.py"],
+            "second-thread": ["platform_tests/scripts/test_second.py"],
+        },
     )
     trigger = _load_trigger()
     monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
@@ -246,26 +284,20 @@ def test_prime_dispatch_suppresses_later_tick_inflight_target_path_overlap(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     shared_target = "scripts/shared.py"
-    _write_index(
+    _index_with_go_documents(
         root,
-        _index_with_go_documents(
-            root,
-            "inflight-thread",
-            target_paths_by_slug={"inflight-thread": [shared_target]},
-        ),
+        "inflight-thread",
+        target_paths_by_slug={"inflight-thread": [shared_target]},
     )
     trigger = _load_trigger()
     packet = trigger.create_authorization_packet(root, "inflight-thread")
     trigger.write_named_packet(root, packet, "inflight-thread")
-    _write_prime_session_marker(root, "foreground-session")
+    _write_prime_worker_session(root, "foreground-session")
     assert acquire("inflight-thread", "foreground-session", ttl_seconds=120, project_root=root)
-    _write_index(
+    _index_with_go_documents(
         root,
-        _index_with_go_documents(
-            root,
-            "later-thread",
-            target_paths_by_slug={"later-thread": [shared_target]},
-        ),
+        "later-thread",
+        target_paths_by_slug={"later-thread": [shared_target]},
     )
     popen_calls: list[object] = []
 
@@ -299,7 +331,7 @@ def test_prime_acquire_failure_releases_batch_and_preserves_signature(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_go_documents(root, "first-thread", "second-thread"))
+    _index_with_go_documents(root, "first-thread", "second-thread")
     state_dir.mkdir(parents=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps(
@@ -357,7 +389,7 @@ def test_prime_spawn_failure_releases_claims_and_preserves_signature(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _write_index(root, _index_with_go_documents(root, "spawn-fail-thread"))
+    _index_with_go_documents(root, "spawn-fail-thread")
     state_dir.mkdir(parents=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps(
@@ -400,7 +432,6 @@ def test_loyal_opposition_dispatch_ignores_work_intent_holders(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_bridge_file(root, "review-thread-001.md", _BRIDGE_KIND_BODY)
-    _write_index(root, "# bridge index\n\nDocument: review-thread\nNEW: bridge/review-thread-001.md\n")
     assert acquire("review-thread", "foreground-session", ttl_seconds=120, project_root=root)
 
     trigger = _load_trigger()
@@ -421,7 +452,7 @@ def test_dispatcher_mediated_codex_exec_composition_remains_launchable(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_registry(root, [_rec("A", "codex", ["prime-builder"], "active", _CODEX_INVOCATION_SURFACES)])
-    _write_index(root, _index_with_go_documents(root, "codex-dispatch-thread"))
+    _index_with_go_documents(root, "codex-dispatch-thread")
     trigger = _load_trigger()
     popen_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
@@ -438,11 +469,20 @@ def test_dispatcher_mediated_codex_exec_composition_remains_launchable(
     assert result["recipient"] == "prime-builder:A"
     assert popen_calls
     wrapped_command = None
-    for args, _kwargs in popen_calls:
-        command = args[0]
-        if any(str(part).replace("\\", "/").rsplit("/", 1)[-1].lower().startswith("codex") for part in command):
-            wrapped_command = command
-            break
+    for _args, kwargs in popen_calls:
+        env = kwargs.get("env") or {}
+        if trigger.RUN_WITH_STATUS_CONFIG_ENV_VAR in env:
+            import base64
+            import json
+
+            raw = base64.b64decode(env[trigger.RUN_WITH_STATUS_CONFIG_ENV_VAR])
+            config = json.loads(raw.decode("utf-8"))
+            cmd_args = config.get("cmd_args")
+            if cmd_args and any(
+                str(part).replace("\\", "/").rsplit("/", 1)[-1].lower().startswith("codex") for part in cmd_args
+            ):
+                wrapped_command = cmd_args
+                break
     assert wrapped_command is not None
     codex_index = next(
         index

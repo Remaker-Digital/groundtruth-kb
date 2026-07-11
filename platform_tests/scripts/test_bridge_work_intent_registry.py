@@ -1,15 +1,10 @@
-"""WI-4540 per-session guard-reader tests for the go_implementation claim.
+"""Document-authoritative guard-reader tests for the go_implementation claim.
 
 bridge/gtkb-wi4540-per-session-role-marker-context-envelope-003.md (GO at -004).
 
-These tests exercise the WI-4540 change to the WI-4534 role-eligibility guard
-(``scripts.bridge_work_intent_registry._interactive_marker_role`` via
-``acquire``): an owner-declared interactive Prime session is recognized through
-the PER-SESSION marker (``.claude/session/role-<sanitized_session_id>.json``)
-keyed under — and validated against — the querying session id. This is the
-GO's required demonstration that "the WI-4534 guard's interactive branch now
-finds a valid per-session marker written from the same interactive context,
-under the canonical id."
+WI-5189 supersedes marker and dispatch-token role inference for claim
+eligibility. Positive GO-claim fixtures therefore use validated worker-session
+documents; legacy marker fixtures remain as negative non-authority coverage.
 
 Every oracle is the production ``acquire()`` outcome (raise vs. acquired) plus
 the persisted claim record. WI-4868 removed the legacy shared-marker fallback;
@@ -121,23 +116,47 @@ def _write_legacy_marker(root: Path, role: str, session_id: str = "marker-sessio
     )
 
 
+def _write_worker_session(root: Path, role: str, session_id: str) -> Path:
+    harness_name = "fixture"
+    harness_id = "T"
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": harness_id,
+        "harness_name": harness_name,
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": harness_id,
+            "harness_name": harness_name,
+            "role": role,
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-06-14T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.delenv("GTKB_HARNESS_REGISTRY_PATH", raising=False)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
     registry = _registry()
     base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(registry, "now_utc", lambda: base)
     return registry
 
 
-def test_go_impl_allowed_for_uuid_session_with_per_session_prime_marker(tmp_path: Path, env) -> None:
-    """F3/b realized via the per-session marker: an owner-declared interactive
-    Prime session (raw-UUID id) is accepted when a per-session Prime marker
-    keyed+validated under that id exists."""
+def test_go_impl_allowed_for_uuid_session_with_prime_worker_document(tmp_path: Path, env) -> None:
+    """A raw-UUID Prime session is accepted through its validated document."""
     _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
     _write_index(tmp_path, {"go-thread": "GO"})
     session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
-    _write_per_session_marker(tmp_path, "prime-builder", session_id)
+    _write_worker_session(tmp_path, "prime-builder", session_id)
 
     assert env.acquire("go-thread", session_id, project_root=tmp_path) is True
     holder = env.current_holder("go-thread", project_root=tmp_path)
@@ -234,11 +253,10 @@ def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, e
     conn.commit()
     conn.close()
 
-    assert env.acquire(
-        "thread-a",
-        "2026-06-22T00-00-00Z-prime-builder-B-abc123",
-        project_root=tmp_path,
-    )
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire("thread-a", session_id, project_root=tmp_path)
     holder = env.current_holder("thread-a", project_root=tmp_path)
     assert holder is not None
     assert holder["acting_role"] == "prime-builder"
@@ -255,6 +273,7 @@ def test_same_role_project_holder_detects_conflicting_same_role_claim(tmp_path: 
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
 
     assert env.acquire("thread-a", holder_session, project_root=tmp_path)
 
@@ -271,6 +290,8 @@ def test_same_role_project_guard_does_not_alter_acquire_verdict(tmp_path: Path, 
     _write_project_thread(tmp_path, "thread-b", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
     other_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
+    _write_worker_session(tmp_path, "prime-builder", other_session)
 
     assert env.acquire("thread-a", holder_session, project_root=tmp_path)
     assert env.same_role_project_holder("prime-builder", "PROJECT-X", other_session, project_root=tmp_path)
@@ -283,6 +304,7 @@ def test_same_role_project_holder_ignores_expired_or_lapsed_claim(
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
 
     assert env.acquire("thread-a", holder_session, project_root=tmp_path)
     monkeypatch.setattr(
@@ -309,6 +331,8 @@ def test_go_impl_peer_claim_stays_locked_until_lapsed_then_reacquires(
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
     first_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
     second_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    _write_worker_session(tmp_path, "prime-builder", first_session)
+    _write_worker_session(tmp_path, "prime-builder", second_session)
     base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(env, "now_utc", lambda: base)
 
@@ -343,6 +367,7 @@ def test_impl_authorization_refuses_borrowed_work_intent_claim(
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
     holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
     caller_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    _write_worker_session(tmp_path, "prime-builder", holder_session)
     base = datetime(2026, 6, 14, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(implementation_authorization.bridge_work_intent_registry, "now_utc", lambda: base)
 
@@ -373,11 +398,10 @@ def test_same_role_project_holder_returns_none_on_null_project_or_role(tmp_path:
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_project_thread(tmp_path, "thread-a", "GO", project_id="PROJECT-X")
 
-    assert env.acquire(
-        "thread-a",
-        "2026-06-22T00-00-00Z-prime-builder-B-abc123",
-        project_root=tmp_path,
-    )
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire("thread-a", session_id, project_root=tmp_path)
 
     assert env.same_role_project_holder(None, "PROJECT-X", "other-session", project_root=tmp_path) is None
     assert env.same_role_project_holder("prime-builder", None, "other-session", project_root=tmp_path) is None
@@ -455,7 +479,7 @@ def test_acquire_tolerates_legacy_status_shadowed_thread(tmp_path: Path, env) ->
     _write_registry(tmp_path, {"B": "prime-builder"})
     _write_index(tmp_path, {"shadowed-thread": "GO"})
     session_id = "26c2349e-1cd0-4024-acef-f934b35fea4e"
-    _write_per_session_marker(tmp_path, "prime-builder", session_id)
+    _write_worker_session(tmp_path, "prime-builder", session_id)
 
     _write_bridge_file(tmp_path, "shadowed-thread", 1, "NEW\n\n# Body\n")
     _write_bridge_file(tmp_path, "shadowed-thread", 2, "PAUSED\n\n# Legacy\n")

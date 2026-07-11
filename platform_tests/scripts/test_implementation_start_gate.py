@@ -17,13 +17,13 @@ if str(ROOT) not in sys.path:
 
 from scripts import implementation_authorization as auth  # noqa: E402
 from scripts import implementation_start_gate as gate  # noqa: E402
-from scripts.gtkb_session_id import per_session_role_marker_path  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def _clear_ambient_work_intent_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in auth.gtkb_session_id.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "fixture")
 
 
 def _proposal(
@@ -212,25 +212,31 @@ def _seed_owner_sufficiency_deliberation(root: Path) -> str:
     return deliberation_id
 
 
-def _write_prime_marker(root: Path, session_id: str) -> None:
-    marker_path = per_session_role_marker_path(root, session_id)
-    marker_path.parent.mkdir(parents=True, exist_ok=True)
-    marker_path.write_text(
-        json.dumps(
-            {
-                "role": "prime-builder",
-                "session_id": session_id,
-                "session_id_source": "test-fixture",
-                "source": "test-fixture",
-            }
-        ),
-        encoding="utf-8",
-    )
+def _write_prime_worker_session(root: Path, session_id: str) -> None:
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": "T",
+        "harness_name": "fixture",
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": "T",
+            "harness_name": "fixture",
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-07-11T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / "fixture" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
 
 
 def _claim_bridge(root: Path, bridge_id: str = "sample-implementation", session_id: str | None = None) -> None:
     holder = session_id or "session-1"
-    _write_prime_marker(root, holder)
+    _write_prime_worker_session(root, holder)
     assert auth.bridge_work_intent_registry.acquire(bridge_id, holder, project_root=root)
 
 

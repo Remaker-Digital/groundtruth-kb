@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import sqlite3
@@ -33,23 +32,6 @@ GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = GO_IMPLEMENTATION_
 
 CLAIM_KIND_DRAFT: Final[str] = "draft"
 CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
-
-# WI-4534 Slice A: role-eligibility guard on go_implementation claim acquisition.
-# Cross-harness-trigger dispatch ids encode role + harness id as
-# ``<compact-ISO8601>-<role>-<harness_id>-<6hex>`` (see
-# ``dispatcher_runtime._new_dispatch_id``). The anchored regex captures
-# the harness-id segment only; the role token is used solely to locate that
-# segment and is NEVER treated as authorization (authority is the durable
-# registry). Non-matching ids (interactive / raw-UUID) yield ``None``.
-DISPATCH_SESSION_ID_RE: Final[re.Pattern[str]] = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z"
-    r"-(?:prime-builder|loyal-opposition|acting-prime-builder)"
-    r"-([A-Za-z0-9]+)-[0-9a-fA-F]{6}$"
-)
-# Durable roles eligible to hold a go_implementation claim. ``acting-prime-builder``
-# is READ-accepted as a Prime-eligible compatibility role per the Acting-Prime
-# Compatibility Contract.
-PRIME_ELIGIBLE_ROLES: Final[frozenset[str]] = frozenset({"prime-builder", "acting-prime-builder"})
 
 
 class WorkIntentRegistryError(RuntimeError):
@@ -375,21 +357,60 @@ def _normalize_claim_role(role: str | None) -> str | None:
     return normalized or None
 
 
+def _worker_harness_selector() -> str | None:
+    """Return a harness name only as a worker-document selector.
+
+    The selector narrows the canonical envelope lookup; it never supplies a
+    role. A headless dispatch must not inherit the parent harness selector, so
+    it falls back to the resolver's ambiguity check unless the dispatcher
+    explicitly supplies ``GTKB_HARNESS_NAME``.
+    """
+    configured = os.environ.get("GTKB_HARNESS_NAME", "").strip()
+    if configured:
+        return configured
+    if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
+        return None
+    if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
+        return "claude"
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
+        return "codex"
+    return None
+
+
+def _resolve_worker_role(session_id: str, *, project_root: Path | None) -> tuple[str | None, str]:
+    """Resolve the worker role from the exact validated session document.
+
+    Dispatch metadata and interactive marker files remain useful to their own
+    routing/lifecycle surfaces, but they are not claim-role authority. The
+    canonical envelope resolver validates the document's identity, open state,
+    provenance, and role before this registry can use it.
+    """
+    try:
+        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
+    except ImportError as exc:  # pragma: no cover - installation failure is fail-closed
+        return None, f"worker session document resolver unavailable: {exc}"
+
+    try:
+        provenance = resolve_worker_role_provenance(
+            _root(project_root),
+            current_session_id=session_id,
+            harness_name=_worker_harness_selector(),
+        )
+    except EnvelopeError as exc:
+        return None, f"worker session document rejected: {exc}"
+    except (OSError, ValueError) as exc:  # pragma: no cover - defensive fail-closed path
+        return None, f"worker session document could not be read: {exc}"
+
+    role = provenance.get("role")
+    if not isinstance(role, str) or role not in {"prime-builder", "loyal-opposition"}:
+        return None, f"worker session document contains unsupported role {role!r}"
+    return role, f"worker session document role {role!r}"
+
+
 def _resolve_acting_role(session_id: str, *, project_root: Path | None) -> str | None:
-    """Resolve the canonical role label to persist with a work-intent claim."""
-    harness_id = _dispatch_harness_id(session_id)
-    if harness_id is not None:
-        try:
-            reader = _harness_projection_reader()
-            document = reader.load_harness_projection(_root(project_root))
-            role_set = reader.role_set_for_id(document, harness_id)
-        except Exception:
-            return None
-        for role in ("prime-builder", "acting-prime-builder", "loyal-opposition"):
-            if role in role_set:
-                return _normalize_claim_role(role)
-        return _normalize_claim_role(sorted(role_set)[0]) if role_set else None
-    return _normalize_claim_role(_interactive_marker_role(project_root, session_id))
+    """Resolve the document-authoritative role to persist with a claim."""
+    role, _detail = _resolve_worker_role(session_id, project_root=project_root)
+    return _normalize_claim_role(role)
 
 
 def _claim_values(
@@ -438,89 +459,16 @@ def _claim_values(
     }
 
 
-def _dispatch_harness_id(session_id: str) -> str | None:
-    """Return the harness id encoded in a dispatch-format session id, else ``None``.
-
-    Parses the dispatcher-daemon dispatch id
-    ``<compact-ISO8601>-<role>-<harness_id>-<6hex>``. The role token is matched
-    only to anchor the harness-id capture; it is never used for authorization.
-    A raw-UUID / interactive (non-dispatch) id returns ``None``.
-    """
-    match = DISPATCH_SESSION_ID_RE.match(session_id or "")
-    return match.group(1) if match else None
-
-
-def _harness_projection_reader():  # pragma: no cover - import shim
-    """Lazy-import the stdlib-only harness projection reader (no DB, hook-safe)."""
-    try:
-        from scripts import harness_projection_reader as reader
-    except ImportError:  # direct-script / scripts-dir-on-path execution
-        import harness_projection_reader as reader  # type: ignore[no-redef]
-    return reader
-
-
-def _interactive_marker_role(project_root: Path | None, session_id: str | None = None) -> str | None:
-    """Return the session-stated role from the owner-declared marker, or ``None``.
-
-    WI-4540 keyed the marker per session; WI-4868 removes the legacy shared
-    ``.claude/session/active-session-role.json`` fallback from work-intent claim
-    attribution. Only a per-session marker whose stored ``session_id`` matches
-    the querying id is positive evidence. A missing, unreadable, mismatched, or
-    malformed marker yields ``None`` so peer sessions cannot clobber claim role
-    metadata through the shared slot.
-    """
-    if not session_id:
-        return None
-    try:
-        from scripts.gtkb_session_id import per_session_role_marker_path
-    except ImportError:  # pragma: no cover - direct script execution path
-        from gtkb_session_id import per_session_role_marker_path  # type: ignore[no-redef]
-
-    per_session_path = per_session_role_marker_path(_root(project_root), session_id)
-    try:
-        per_session_body = json.loads(per_session_path.read_text(encoding="utf-8", errors="replace"))
-    except (FileNotFoundError, OSError, ValueError):
-        return None
-    if not isinstance(per_session_body, dict):
-        return None
-    marker_session_id = per_session_body.get("session_id")
-    role = per_session_body.get("role")
-    if isinstance(marker_session_id, str) and marker_session_id == session_id and isinstance(role, str):
-        return role
-    return None
-
-
 def _resolve_go_implementation_eligibility(session_id: str, *, project_root: Path | None) -> tuple[bool, str]:
-    """Resolve whether ``session_id`` may hold a go_implementation claim.
-
-    Returns ``(eligible, detail)`` where ``detail`` is a human-readable
-    description of the resolved authority for the rejection message.
-
-    - **Dispatch id:** authority is the durable registry role-set for the parsed
-      harness id (intersected with ``PRIME_ELIGIBLE_ROLES``). An unknown harness
-      id (empty role set) is NOT eligible — no token fallback (F2). A
-      token/registry mismatch resolves from the registry (token ignored) (F2/d).
-    - **Non-dispatch (un-resolvable) id:** require positive Prime evidence — the
-      owner-declared interactive-Prime marker. Absent/unreadable/non-Prime →
-      not eligible (no fail-open) (F3).
-    """
-    harness_id = _dispatch_harness_id(session_id)
-    if harness_id is not None:
-        reader = _harness_projection_reader()
-        document = reader.load_harness_projection(_root(project_root))
-        role_set = reader.role_set_for_id(document, harness_id)
-        eligible = bool(role_set & PRIME_ELIGIBLE_ROLES)
-        roles_desc = ", ".join(sorted(role_set)) if role_set else "<harness id absent from registry>"
-        return eligible, f"dispatch harness {harness_id!r} dispatcher role-set {{{roles_desc}}}"
-    marker_role = _interactive_marker_role(project_root, session_id)
-    eligible = marker_role == "prime-builder"
-    return eligible, f"interactive session marker role {marker_role!r}"
+    """Resolve whether ``session_id`` may hold a go_implementation claim."""
+    role, detail = _resolve_worker_role(session_id, project_root=project_root)
+    return role == "prime-builder", detail
 
 
 def _go_implementation_eligible(session_id: str, *, project_root: Path | None = None) -> bool:
     """Return True iff ``session_id`` may hold a go_implementation claim.
 
-    Registry-authoritative role-eligibility guard (WI-4534 Slice A); see
+    Document-authoritative role-eligibility guard (WI-5189); see
     ``_resolve_go_implementation_eligibility`` for the resolution contract.
     """
     return _resolve_go_implementation_eligibility(session_id, project_root=project_root)[0]
@@ -559,11 +507,10 @@ def acquire(
             now = now_utc()
             values = _claim_values(slug, session_id, ttl_seconds=ttl_seconds, project_root=project_root, now=now)
             if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
-                # WI-4534 Slice A: registry-authoritative role-eligibility guard.
-                # Only a registry-prime-builder (or compat acting-prime-builder)
-                # harness — or an owner-declared interactive Prime session — may
-                # hold a go_implementation claim. Draft (non-GO) claims are
-                # unaffected because this branch only fires for GO-latest threads.
+                # WI-5189: only the validated worker-session document may
+                # authorize a GO-implementation claim. Draft claims remain
+                # unaffected because this branch only fires for GO-latest
+                # threads.
                 eligible, detail = _resolve_go_implementation_eligibility(session_id, project_root=project_root)
                 if not eligible:
                     raise WorkIntentRegistryError(
