@@ -203,6 +203,7 @@ def run_tool_loop(
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
+    telemetry: Any | None = None,
 ) -> str:
     return base.run_tool_loop(
         prompt,
@@ -218,6 +219,7 @@ def run_tool_loop(
         command_runner=command_runner,
         timeout=timeout,
         session_timeout=session_timeout,
+        telemetry=telemetry,
     )
 
 

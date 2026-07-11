@@ -7315,3 +7315,49 @@ def test_wi4658_batch_quarantine_then_transient_releases_acquired_skips_quaranti
     # Quarantined slug is preserved in the result for caller-side persistence.
     assert len(result["quarantined_slugs"]) == 1
     assert result["quarantined_slugs"][0]["slug"] == "malformed"
+
+
+def test_exit_reconciliation_writes_partial_shim_telemetry_without_worker_output(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "telemetry-thread-001.md").write_text("NEW\nWork Item: WI-5173\n", encoding="utf-8")
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "dispatch-exit-reconciliation"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("124", encoding="utf-8")
+    stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stdout_path.write_text("", encoding="utf-8")
+    stderr_path.write_text("", encoding="utf-8")
+    recipients = {
+        "prime-builder:A": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "launched": True,
+                "launched_at": "2026-07-10T10:00:00Z",
+                "stdout_path": str(stdout_path),
+                "stderr_path": str(stderr_path),
+                "signature": "signature",
+                "needed_role_label": "prime-builder",
+                "primary_bridge_id": "telemetry-thread",
+            }
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients, state_dir, root)
+
+    telemetry_path = runs_dir / f"{dispatch_id}.telemetry.json"
+    payload = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    assert payload["outcome"] == {
+        "stop_reason": "external_timeout",
+        "exit_status": "failed",
+        "exit_code": 124,
+        "bridge_status": None,
+    }
+    assert payload["usage"]["coverage"] == "unavailable"
+    assert payload["usage"]["input_tokens"] is None
+    assert recipients["prime-builder:A"]["last_launch"]["telemetry_reconciliation"] == "reconciled"

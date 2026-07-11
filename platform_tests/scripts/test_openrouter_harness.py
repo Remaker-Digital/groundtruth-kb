@@ -371,6 +371,45 @@ def test_tool_loop_uses_response_model_metadata_for_bridge_write(tmp_path: Path)
     assert f"requested_model={FIXTURE_MODEL_ID}" in guard_env["GTKB_AUTHOR_MODEL_CONFIGURATION"]
 
 
+def test_openrouter_wrapper_forwards_telemetry_observer(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+
+    class Recorder:
+        def __init__(self) -> None:
+            self.turns: list[tuple[int, list[str]]] = []
+            self.stop_reasons: list[str] = []
+
+        def record_turn(self, index: int, tool_names: list[str], **_kwargs) -> None:
+            self.turns.append((index, tool_names))
+
+        def set_model(self, _model_id: str, _model_version: str) -> None:
+            return None
+
+        def finish(self, *, stop_reason: str) -> None:
+            self.stop_reasons.append(stop_reason)
+
+    recorder = Recorder()
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        return {"choices": [{"message": {"content": "done"}}], "usage": {"total_tokens": 0}}
+
+    assert (
+        orh.run_tool_loop(
+            "hello",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            1,
+            root,
+            chat_func=chat,
+            telemetry=recorder,
+        )
+        == "done"
+    )
+    assert recorder.turns == [(1, [])]
+    assert recorder.stop_reasons == ["final_response"]
+
+
 def test_response_model_metadata_falls_back_to_routing_metadata_when_missing():
     original = metadata()
 
@@ -802,6 +841,36 @@ def test_wi5060_openrouter_direct_timeout_exhaustion_fails_closed(monkeypatch: p
     with pytest.raises(orh.OpenRouterHarnessError, match="request failed"):
         orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
 
+    assert len(calls) == orh.CHAT_MAX_ATTEMPTS
+
+
+def test_wi5064_openrouter_ssl_bad_record_mac_retry_then_success(monkeypatch: pytest.MonkeyPatch):
+    calls: list[str] = []
+    body = orh.json.dumps({"choices": [{"message": {"content": "ok"}}]})
+    ssl_error = orh.ssl.SSLError("[SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac")
+    _patch_openrouter_urlopen(monkeypatch, [ssl_error, body], calls)
+
+    result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
+
+    assert result["choices"][0]["message"]["content"] == "ok"
+    assert len(calls) == 2
+
+
+def test_wi5064_openrouter_ssl_bad_record_mac_exhaustion_is_credential_safe(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    calls: list[str] = []
+    ssl_error = orh.ssl.SSLError("[SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac")
+    behaviors = [ssl_error] * (orh.CHAT_MAX_ATTEMPTS + 1)
+    _patch_openrouter_urlopen(monkeypatch, behaviors, calls)
+
+    with pytest.raises(orh.OpenRouterHarnessError) as exc_info:
+        orh.call_openrouter_chat("https://openrouter.test", "secret-openrouter-key", {"model": "m"})
+
+    message = str(exc_info.value)
+    assert "OpenRouter provider transport failure" in message
+    assert "SSLV3_ALERT_BAD_RECORD_MAC" in message
+    assert "secret-openrouter-key" not in message
     assert len(calls) == orh.CHAT_MAX_ATTEMPTS
 
 

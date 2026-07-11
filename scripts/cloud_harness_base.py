@@ -1782,6 +1782,7 @@ def run_tool_loop(
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
+    telemetry: Any | None = None,
 ) -> str:
     """Framework-free tool-call loop shared across cloud harnesses (dialect-agnostic).
 
@@ -1804,6 +1805,21 @@ def run_tool_loop(
         model_route.key,
         requested_model_id=model_route.model_id,
     )
+    if telemetry is None:
+        try:
+            from groundtruth_kb.shim_dispatch_telemetry import create_dispatch_telemetry_observer
+
+            telemetry = create_dispatch_telemetry_observer(
+                project_root,
+                harness_id=profile.author_harness_id,
+                harness_name=profile.display_name.lower().replace(" ", "-"),
+                provider=profile.provider_routing_key,
+                model_id=model_route.model_id,
+                model_version=model_route.model_version,
+                turn_budget=max_turns,
+            )
+        except (ImportError, OSError, ValueError):
+            telemetry = None
     session_deadline = time.monotonic() + session_timeout
     native_hooks_started = False
     if profile.hook_tier == HOOK_TIER_NATIVE_FULL:
@@ -1833,6 +1849,7 @@ def run_tool_loop(
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0
 
+    stop_reason = "process_error"
     try:
         for _turn in range(max_turns):
             payload = strategy.build_payload(messages, model_route, schemas)
@@ -1844,15 +1861,31 @@ def run_tool_loop(
             response = chat(endpoint, api_key, payload, operation_timeout)
 
             if "error" in response:
+                stop_reason = "provider_error"
                 error_details = response["error"]
                 error_message = error_details.get("message") if isinstance(error_details, dict) else str(error_details)
                 raise CloudHarnessError(f"provider API returned error: {error_message}")
 
             metadata = metadata_from_response(metadata, response, profile)
+            if telemetry is not None:
+                with contextlib.suppress(Exception):
+                    telemetry.set_model(metadata.model_id, metadata.model_version)
             message = strategy.parse_message(response)
             tool_calls = message.get("tool_calls") or []
 
+            tool_names = []
+            if isinstance(tool_calls, list):
+                for call in tool_calls:
+                    function = call.get("function") if isinstance(call, dict) else None
+                    tool_name = function.get("name") if isinstance(function, dict) else None
+                    if isinstance(tool_name, str) and tool_name in CANONICAL_TOOLS:
+                        tool_names.append(tool_name)
+            if telemetry is not None:
+                with contextlib.suppress(Exception):
+                    telemetry.record_turn(_turn + 1, tool_names, provider_response=response)
+
             if not tool_calls:
+                stop_reason = "final_response"
                 return _final_text_from_message(message)
 
             if not isinstance(tool_calls, list):
@@ -1926,8 +1959,25 @@ def run_tool_loop(
                         "content": result[:MAX_TOOL_OUTPUT_CHARS],
                     }
                 )
+        stop_reason = "max_turn_exhaustion"
         raise CloudHarnessError("max-turn exhaustion before final assistant text")
+    except CloudHarnessError as exc:
+        message = str(exc).lower()
+        if "max-turn" in message:
+            stop_reason = "max_turn_exhaustion"
+        elif "repeated no-progress" in message:
+            stop_reason = "no_progress_loop"
+        elif "session timeout" in message:
+            stop_reason = "session_timeout"
+        elif any(marker in message for marker in ("provider", "request", "http", "api returned", "rate limit")):
+            stop_reason = "provider_error"
+        elif "guard" in message or "native hook" in message:
+            stop_reason = "guard_error"
+        raise
     finally:
+        if telemetry is not None:
+            with contextlib.suppress(Exception):
+                telemetry.finish(stop_reason=stop_reason)
         if native_hooks_started:
             invoke_native_hooks(
                 NATIVE_HOOK_STOP,

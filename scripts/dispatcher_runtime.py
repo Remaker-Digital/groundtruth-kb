@@ -4975,6 +4975,11 @@ def _spawn_harness(
 
     selected = _selected_oldest_first(items, max_items)
     sig = _signature(selected)
+    primary_bridge_id = selected[0].document_name if selected else ""
+    # This is correlation context only. The dispatched worker still resolves
+    # its role exclusively from its own validated session document.
+    if primary_bridge_id:
+        env["GTKB_DISPATCH_PRIMARY_BRIDGE_ID"] = primary_bridge_id
     status_file_path = runs_dir / f"{dispatch_id}.exit_code"
     wrapped_command = [
         _run_with_status_wrapper_executable(),
@@ -5011,7 +5016,7 @@ def _spawn_harness(
         "status_file_path": str(status_file_path),
         "selected_documents": [it.document_name for it in selected],
         "selected_top_files": [getattr(it, "top_file", "") for it in selected],
-        "primary_bridge_id": selected[0].document_name if selected else "",
+        "primary_bridge_id": primary_bridge_id,
         "worker_lifetime_seconds": _worker_lifetime,
         "worker_lifetime_source": lifetime_profile.get("source"),
         "worker_lifetime_profile": lifetime_profile.get("profile"),
@@ -5421,7 +5426,8 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                 last_launch.get("document_lease_handles")
             )
 
-        if (exit_code == 0 or post_verdict_exit_reconciled) and failure_reason is None:
+        dispatch_succeeded = (exit_code == 0 or post_verdict_exit_reconciled) and failure_reason is None
+        if dispatch_succeeded:
             # Success: keep signature state aligned for every recipient role.
             if launch_signature:
                 recipient_state["last_dispatched_signature"] = launch_signature
@@ -5524,6 +5530,44 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                     session_id=str(wi_session),
                 )
                 last_launch["work_intent_released_on_failure"] = True
+
+        # Reconciliation is observational. A missing/corrupt worker envelope
+        # becomes a partial record with only dispatcher-observed facts; a
+        # telemetry write failure must never change retry or verdict handling.
+        try:
+            from groundtruth_kb.shim_dispatch_telemetry import reconcile_dispatch_telemetry
+
+            bridge_status = last_launch.get("verdict_status")
+            if exit_code == 124 or failure_reason == "worker_timeout":
+                telemetry_stop_reason = "external_timeout"
+            elif exit_code == 4294967295:
+                telemetry_stop_reason = "external_termination"
+            elif dispatch_succeeded and bridge_status:
+                telemetry_stop_reason = "verdict_emitted"
+            elif dispatch_succeeded:
+                telemetry_stop_reason = "final_response"
+            else:
+                telemetry_stop_reason = "process_error"
+            elapsed_ms = elapsed_seconds * 1000 if elapsed_seconds is not None else None
+            telemetry_result = reconcile_dispatch_telemetry(
+                project_root,
+                str(dispatch_id),
+                launched_at=last_launch.get("launched_at"),
+                completed_at=last_launch.get("completed_at") or last_launch.get("exit_processed_at"),
+                elapsed_ms=elapsed_ms,
+                exit_code=exit_code,
+                exit_status=(
+                    "succeeded"
+                    if dispatch_succeeded
+                    else ("external_termination" if exit_code == 4294967295 else "failed")
+                ),
+                stop_reason=telemetry_stop_reason,
+                bridge_status=bridge_status if isinstance(bridge_status, str) else None,
+                bridge_document_id=_primary_bridge_id_for_launch(last_launch),
+            )
+            last_launch["telemetry_reconciliation"] = "reconciled" if telemetry_result.written else "write_failed"
+        except Exception:
+            last_launch["telemetry_reconciliation"] = "reconciliation_failed"
 
 
 def _prior_dispatched_signature(prior: dict[str, Any]) -> Any:

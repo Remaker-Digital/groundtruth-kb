@@ -9161,6 +9161,86 @@ def harness_capabilities_cmd(ctx: click.Context) -> None:
     click.echo(json.dumps(data, indent=2, sort_keys=True))
 
 
+@harness_group.command("telemetry")
+@click.option(
+    "--group-by",
+    type=click.Choice(
+        [
+            "harness",
+            "provider_model",
+            "role",
+            "stop_reason",
+            "bridge_version_count",
+            "target_path_count",
+            "linked_spec_count",
+            "verification_command_count",
+        ]
+    ),
+    default="harness",
+    show_default=True,
+    help="Dimension for the successful reconciled-review distribution.",
+)
+@click.option("--harness", help="Filter by harness name.")
+@click.option("--provider-model", help="Filter by provider/model as provider/model.")
+@click.option(
+    "--role", type=click.Choice(["prime-builder", "loyal-opposition"]), help="Filter by document-derived role."
+)
+@click.option("--stop-reason", help="Filter by normalized stop reason.")
+@click.option(
+    "--complexity",
+    type=click.Choice(["bridge_version_count", "target_path_count", "linked_spec_count", "verification_command_count"]),
+    help="Require a known raw thread-complexity count.",
+)
+@click.option(
+    "--complexity-value",
+    type=click.IntRange(0, None),
+    help="Filter the selected raw thread-complexity count to one value.",
+)
+@click.option("--limit", type=click.IntRange(1, 200), default=50, show_default=True, help="Maximum records to inspect.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def harness_telemetry_cmd(
+    ctx: click.Context,
+    group_by: str,
+    harness: str | None,
+    provider_model: str | None,
+    role: str | None,
+    stop_reason: str | None,
+    complexity: str | None,
+    complexity_value: int | None,
+    limit: int,
+    json_output: bool,
+) -> None:
+    """Summarize bounded telemetry from successful reconciled reviews only."""
+
+    from groundtruth_kb.shim_dispatch_telemetry import query_dispatch_telemetry
+
+    config = _resolve_config(ctx)
+    try:
+        payload = query_dispatch_telemetry(
+            Path(config.project_root),
+            group_by=group_by,
+            harness=harness,
+            provider_model=provider_model,
+            role=role,
+            stop_reason=stop_reason,
+            complexity=complexity,
+            complexity_value=complexity_value,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(
+        f"Shim dispatch telemetry: {payload['successful_reconciled_review_count']} successful reconciled review(s)"
+    )
+    click.echo(f"Grouped by: {payload['group_by']}")
+    for row in payload["distribution"]:
+        click.echo(f"- {row['value']}: {row['count']}")
+
+
 def _harness_emit(record: object) -> None:
     """Echo a harness record (or list of records) as indented, key-sorted JSON."""
     import json as _json

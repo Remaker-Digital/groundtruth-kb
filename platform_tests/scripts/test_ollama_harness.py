@@ -313,6 +313,33 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == oh.CANONICAL_TOOLS
 
 
+def test_tool_loop_emits_allowlisted_turn_metadata_to_telemetry(tmp_path: Path):
+    root = make_root(tmp_path)
+
+    class Recorder:
+        def __init__(self) -> None:
+            self.turns: list[tuple[int, list[str]]] = []
+            self.stop_reasons: list[str] = []
+
+        def record_turn(self, index: int, tool_names: list[str], **_kwargs) -> None:
+            self.turns.append((index, tool_names))
+
+        def finish(self, *, stop_reason: str) -> None:
+            self.stop_reasons.append(stop_reason)
+
+    recorder = Recorder()
+
+    def chat(_url: str, _payload: dict, _timeout: float) -> dict:
+        return {"message": {"content": "done"}, "prompt_eval_count": 0, "eval_count": 0}
+
+    assert (
+        oh.run_tool_loop("hello", route(root), "http://ollama.test", 1, root, chat_func=chat, telemetry=recorder)
+        == "done"
+    )
+    assert recorder.turns == [(1, [])]
+    assert recorder.stop_reasons == ["final_response"]
+
+
 def test_bridge_review_system_prompt_uses_selected_route_metadata(tmp_path: Path):
     root = make_root(tmp_path)
     calls: list[dict] = []

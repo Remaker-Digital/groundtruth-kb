@@ -999,6 +999,7 @@ def run_tool_loop(
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
+    telemetry: Any | None = None,
 ) -> str:
     if max_turns < 1:
         raise OllamaHarnessError("max_turns must be at least 1")
@@ -1011,66 +1012,116 @@ def run_tool_loop(
     schemas = build_tool_schemas(model_route.allowed_tools)
     chat = chat_func or call_ollama_chat
     metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
+    if telemetry is None:
+        try:
+            from groundtruth_kb.shim_dispatch_telemetry import create_dispatch_telemetry_observer
+
+            telemetry = create_dispatch_telemetry_observer(
+                project_root,
+                harness_id=AUTHOR_HARNESS_ID,
+                harness_name="ollama",
+                provider="ollama",
+                model_id=model_route.model_id,
+                model_version=model_route.model_version,
+                turn_budget=max_turns,
+            )
+        except (ImportError, OSError, ValueError):
+            telemetry = None
     session_deadline = time.monotonic() + session_timeout
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0
 
-    for _turn in range(max_turns):
-        payload = {"model": model_route.model_id, "messages": messages, "tools": schemas, "stream": False}
-        operation_timeout = min(
-            timeout,
-            _remaining_timeout(session_deadline, "session timeout exceeded before Ollama chat turn"),
-        )
-        response = chat(endpoint, payload, operation_timeout)
-        message = _message_from_response(response)
-        tool_calls = message.get("tool_calls") or response.get("tool_calls") or []
-        if not tool_calls:
-            return _final_text_from_message(message)
-        if not isinstance(tool_calls, list):
-            raise OllamaHarnessError("tool_calls must be a list")
-
-        tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
-        if tool_signature == previous_tool_signature:
-            repeated_tool_signature_turns += 1
-        else:
-            previous_tool_signature = tool_signature
-            repeated_tool_signature_turns = 1
-        if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
-            raise OllamaHarnessError("repeated no-progress tool loop before final assistant text")
-
-        messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": tool_calls})
-        for index, call in enumerate(tool_calls):
-            tool_name, arguments, call_id = _tool_call_parts(call, index)
-            if tool_name == "Bash":
-                arguments = dict(arguments)
-                requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
-                arguments["timeout_seconds"] = min(
-                    requested_timeout,
-                    _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
-                )
-            try:
-                result = dispatch_tool_call(
-                    tool_name,
-                    arguments,
-                    metadata,
-                    project_root,
-                    guard_runner=guard_runner,
-                    command_runner=command_runner,
-                )
-            except OllamaHarnessError as tool_err:
-                # Guard denial or other tool error: return error as tool result
-                # instead of crashing the loop. Model sees the denial and can
-                # try a different path.
-                result = f"ERROR: {tool_err}"
-            messages.append(
-                {
-                    "role": "tool",
-                    "name": tool_name,
-                    "tool_call_id": call_id,
-                    "content": result[:MAX_TOOL_OUTPUT_CHARS],
-                }
+    stop_reason = "process_error"
+    try:
+        for _turn in range(max_turns):
+            payload = {"model": model_route.model_id, "messages": messages, "tools": schemas, "stream": False}
+            operation_timeout = min(
+                timeout,
+                _remaining_timeout(session_deadline, "session timeout exceeded before Ollama chat turn"),
             )
-    raise OllamaHarnessError("max-turn exhaustion before final assistant text")
+            response = chat(endpoint, payload, operation_timeout)
+            message = _message_from_response(response)
+            tool_calls = message.get("tool_calls") or response.get("tool_calls") or []
+            tool_names = []
+            if isinstance(tool_calls, list):
+                for call in tool_calls:
+                    function = call.get("function") if isinstance(call, dict) else None
+                    tool_name = (
+                        function.get("name")
+                        if isinstance(function, dict)
+                        else (call.get("name") if isinstance(call, dict) else None)
+                    )
+                    if isinstance(tool_name, str) and tool_name in CANONICAL_TOOLS:
+                        tool_names.append(tool_name)
+            if telemetry is not None:
+                with contextlib.suppress(Exception):
+                    telemetry.record_turn(_turn + 1, tool_names, provider_response=response)
+            if not tool_calls:
+                stop_reason = "final_response"
+                return _final_text_from_message(message)
+            if not isinstance(tool_calls, list):
+                raise OllamaHarnessError("tool_calls must be a list")
+
+            tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
+            if tool_signature == previous_tool_signature:
+                repeated_tool_signature_turns += 1
+            else:
+                previous_tool_signature = tool_signature
+                repeated_tool_signature_turns = 1
+            if repeated_tool_signature_turns > MAX_REPEATED_TOOL_SIGNATURE_TURNS:
+                raise OllamaHarnessError("repeated no-progress tool loop before final assistant text")
+
+            messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": tool_calls})
+            for index, call in enumerate(tool_calls):
+                tool_name, arguments, call_id = _tool_call_parts(call, index)
+                if tool_name == "Bash":
+                    arguments = dict(arguments)
+                    requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
+                    arguments["timeout_seconds"] = min(
+                        requested_timeout,
+                        _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
+                    )
+                try:
+                    result = dispatch_tool_call(
+                        tool_name,
+                        arguments,
+                        metadata,
+                        project_root,
+                        guard_runner=guard_runner,
+                        command_runner=command_runner,
+                    )
+                except OllamaHarnessError as tool_err:
+                    # Guard denial or other tool error: return error as tool result
+                    # instead of crashing the loop. Model sees the denial and can
+                    # try a different path.
+                    result = f"ERROR: {tool_err}"
+                messages.append(
+                    {
+                        "role": "tool",
+                        "name": tool_name,
+                        "tool_call_id": call_id,
+                        "content": result[:MAX_TOOL_OUTPUT_CHARS],
+                    }
+                )
+        stop_reason = "max_turn_exhaustion"
+        raise OllamaHarnessError("max-turn exhaustion before final assistant text")
+    except OllamaHarnessError as exc:
+        message = str(exc).lower()
+        if "max-turn" in message:
+            stop_reason = "max_turn_exhaustion"
+        elif "repeated no-progress" in message:
+            stop_reason = "no_progress_loop"
+        elif "session timeout" in message:
+            stop_reason = "session_timeout"
+        elif any(marker in message for marker in ("provider", "request", "http", "api returned", "rate limit")):
+            stop_reason = "provider_error"
+        elif "guard" in message:
+            stop_reason = "guard_error"
+        raise
+    finally:
+        if telemetry is not None:
+            with contextlib.suppress(Exception):
+                telemetry.finish(stop_reason=stop_reason)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

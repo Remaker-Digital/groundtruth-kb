@@ -348,6 +348,47 @@ def test_run_tool_loop_returns_final_text(tmp_path: Path) -> None:
     assert result == "done"
 
 
+def test_run_tool_loop_reports_allowlisted_turn_metadata_to_telemetry(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+
+    class Recorder:
+        def __init__(self) -> None:
+            self.turns: list[tuple[int, list[str], dict]] = []
+            self.stop_reasons: list[str] = []
+
+        def record_turn(self, index: int, tool_names: list[str], *, provider_response: dict) -> None:
+            self.turns.append((index, tool_names, provider_response))
+
+        def set_model(self, _model_id: str, _model_version: str) -> None:
+            return None
+
+        def finish(self, *, stop_reason: str) -> None:
+            self.stop_reasons.append(stop_reason)
+
+    recorder = Recorder()
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        return {"choices": [{"message": {"content": "done"}}], "usage": {"total_tokens": 1}}
+
+    assert (
+        base.run_tool_loop(
+            "hello",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            1,
+            root,
+            _profile(),
+            chat_func=chat,
+            telemetry=recorder,
+        )
+        == "done"
+    )
+    assert recorder.turns == [(1, [], {"choices": [{"message": {"content": "done"}}], "usage": {"total_tokens": 1}})]
+    assert recorder.stop_reasons == ["final_response"]
+
+
 def test_run_tool_loop_rejects_blank_final_text(tmp_path: Path) -> None:
     root = _root(tmp_path)
     route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
