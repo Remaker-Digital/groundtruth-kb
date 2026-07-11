@@ -4011,11 +4011,12 @@ def _command_without_prompt_payload(command: list[str], prompt: str) -> list[str
 #   1. harness-registry.json: needed_role_label -> harness_id  (canonical role authority)
 #   2. harness-identities.json (inverted): harness_id -> harness_command_handle
 #      (identity authority)
-#   3. Drift check: role_record["harness_type"] (denormalized) MUST match
+#   3. Drift check: role_record["harness_name"] (denormalized) MUST match
 #      identity-derived handle.
 #
-# The role record's ``harness_type`` field is OPTIONAL drift-detection
-# metadata, NOT command-handle authority.
+# The role record's ``harness_name`` field is OPTIONAL drift-detection
+# metadata, NOT command-handle authority. ``harness_type`` remains the
+# runtime-kind input for readiness evaluation.
 # ---------------------------------------------------------------------------
 
 
@@ -4651,10 +4652,10 @@ def _resolve_dispatch_targets(
             )
         identity_handle = id_to_handle[harness_id]
 
-        role_record_handle = role_record.get("harness_type")
-        if role_record_handle is not None and role_record_handle != identity_handle:
+        role_record_name = role_record.get("harness_name")
+        if role_record_name is not None and role_record_name != identity_handle:
             raise ValueError(
-                f"drift detected: harness-registry projection harness_type={role_record_handle!r} "
+                f"drift detected: harness-registry projection harness_name={role_record_name!r} "
                 f"disagrees with harness-identities resolution to {identity_handle!r} "
                 f"for harness ID {harness_id!r}"
             )

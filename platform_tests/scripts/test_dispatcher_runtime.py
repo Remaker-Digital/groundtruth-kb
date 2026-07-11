@@ -407,6 +407,29 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
     return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n"
 
 
+def _write_prime_worker_session_document(root: Path, session_id: str) -> None:
+    """Provide document-authoritative role evidence for GO-claim fixtures."""
+    document = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": "B",
+        "harness_name": "claude",
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": "B",
+            "harness_name": "claude",
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-06-22T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    path = root / "harness-state" / "claude" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
 def _index_with_one_new(root: Path, doc: str = "example-thread") -> str:
     """Build an INDEX with one NEW entry and create the referenced file."""
     _write_bridge_file(root, f"{doc}-001.md", "bridge_kind: implementation_proposal\n")
@@ -849,14 +872,18 @@ def test_gtkb_subject_allows_cross_harness_dispatch_negative_control(
     assert _suppression_records(state_dir) == []
 
 
-def test_filter_prime_selected_stands_down_on_same_role_project_holder(tmp_path: Path) -> None:
+def test_filter_prime_selected_stands_down_on_same_role_project_holder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     trigger = _load_trigger()
     registry = sys.modules["bridge_work_intent_registry"]
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     project_id = "PROJECT-GUARD"
-    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
-    dispatch_session = "2026-06-22T00-01-00Z-prime-builder-B-def456"
+    holder_session = "2026-06-22T000000Z-prime-builder-B-abc123"
+    dispatch_session = "2026-06-22T000100Z-prime-builder-B-def456"
+    _write_prime_worker_session_document(root, holder_session)
 
     for doc in ("held-thread", "selected-thread"):
         _write_bridge_file(
@@ -911,9 +938,11 @@ def test_run_dispatch_cycle_filters_held_prime_items_before_spawn(
 ) -> None:
     trigger = _load_trigger()
     registry = sys.modules["bridge_work_intent_registry"]
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    holder_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    holder_session = "2026-06-22T000000Z-prime-builder-B-abc123"
+    _write_prime_worker_session_document(root, holder_session)
 
     _write_authorized_go_thread(root, "held-thread")
     _write_authorized_go_thread(root, "open-thread")
@@ -5418,6 +5447,7 @@ def _rec(
     dispatch_quality=None,
     dispatch_cost=None,
     dispatch_availability=None,
+    harness_type=None,
 ) -> dict:
     """Build one registry record. status=_NO_STATUS omits the status key
     (assertion 5: absent status). Pass status=None / "" / "bogus" for the other
@@ -5425,7 +5455,7 @@ def _rec(
     record: dict = {
         "id": harness_id,
         "harness_name": harness_name,
-        "harness_type": harness_name,
+        "harness_type": harness_name if harness_type is None else harness_type,
         "role": role,
         "invocation_surfaces": surfaces or {"headless": {"argv": [harness_name, "-p", "{{PROMPT}}"]}},
     }
@@ -6935,6 +6965,53 @@ def test_resolve_exactly_one_active_dispatches(tmp_path: Path) -> None:
     assert pb.invocation_surfaces == _CLAUDE_INVOCATION_SURFACES
     lo = trigger._resolve_dispatch_target("loyal-opposition", tmp_path, tmp_path / "state")
     assert lo is not None and lo.harness_id == "A" and lo.canonical_mode == "lo"
+
+
+def test_resolve_uses_harness_name_for_identity_drift_and_keeps_runtime_kind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-5185: identity drift compares the name, not the runtime kind."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [
+            _rec(
+                "B",
+                "alibaba-cloud-studio",
+                ["prime-builder"],
+                "active",
+                _CLAUDE_INVOCATION_SURFACES,
+                harness_type="claude",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        trigger, "_evaluate_harness_dispatch_readiness", lambda kind, _root: {"ready": kind == "claude"}
+    )
+
+    target = trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state")
+
+    assert target is not None
+    assert target.harness_id == "B"
+    assert target.command_handle == "alibaba-cloud-studio"
+    assert trigger._resolve_dispatch_target("prime-builder", tmp_path, tmp_path / "state") is not None
+
+
+def test_resolve_rejects_harness_name_identity_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WI-5185: a mismatched projected name fails closed."""
+    trigger = _load_trigger()
+    _write_registry(
+        tmp_path,
+        [_rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES, harness_type="claude")],
+    )
+    monkeypatch.setattr(
+        trigger,
+        "_read_harness_identities",
+        lambda _root: {"harnesses": {"alibaba-cloud-studio": {"id": "B"}}},
+    )
+
+    with pytest.raises(ValueError, match="harness_name"):
+        trigger._resolve_dispatch_targets("prime-builder", tmp_path, tmp_path / "state")
 
 
 def test_resolve_filters_by_active_status(tmp_path: Path) -> None:
