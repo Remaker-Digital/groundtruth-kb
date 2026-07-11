@@ -1268,6 +1268,46 @@ def bridge_dispatch_report_cmd(ctx: click.Context, json_output: bool, compact: b
     _emit_bridge_dispatch_report(ctx, json_output=json_output, compact=compact)
 
 
+@bridge_dispatch_group.group("tuning")
+def bridge_dispatch_tuning_group() -> None:
+    """Read-only dispatch tuning evaluation."""
+
+
+@bridge_dispatch_tuning_group.command("evaluate")
+@click.option(
+    "--input",
+    "input_path",
+    required=True,
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    help="In-root JSON evidence packet.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_tuning_evaluate_cmd(ctx: click.Context, input_path: Path, json_output: bool) -> None:
+    """Evaluate one offline or shadow tuning hypothesis without activation."""
+    from groundtruth_kb.dispatch_tuning_advisory import evaluate_dispatch_tuning
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    resolved_input = input_path.resolve()
+    try:
+        resolved_input.relative_to(root)
+    except ValueError as exc:
+        raise click.ClickException("tuning evidence input must be inside the project root") from exc
+    try:
+        raw = json.loads(resolved_input.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(f"unable to read tuning evidence input: {exc}") from exc
+    payload = evaluate_dispatch_tuning(raw if isinstance(raw, dict) else {})
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    click.echo(f"Dispatch tuning advisory: {payload['outcome']}")
+    click.echo(f"Advisory ID: {payload['advisory_id']}")
+    click.echo("Advisory only: yes")
+    click.echo(f"Rationale: {payload['rationale']}")
+
+
 @bridge_dispatch_group.group("complex")
 def bridge_dispatch_complex_group() -> None:
     """Aggregate dispatcher daemon, supervisor, and watchdog controls."""
