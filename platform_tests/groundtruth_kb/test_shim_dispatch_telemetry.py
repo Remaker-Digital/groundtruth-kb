@@ -139,6 +139,80 @@ def test_envelope_is_atomic_document_authoritative_and_privacy_bounded(tmp_path:
     assert list(path.parent.glob(f"{dispatch_id}.telemetry.json")) == [path]
 
 
+def test_governed_verdict_tool_is_counted_without_serializing_payload(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-governed-verdict-tool"
+    observer = _observer(root, dispatch_id)
+
+    observer.record_turn(
+        1,
+        [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Bash",
+            "PublishBridgeVerdict",
+            "PublishBridgeVerdict",
+            "UnknownTool",
+        ],
+        provider_response={
+            "tool_arguments": {
+                "path": "/sensitive/review.md",
+                "content": "PRIVATE_VERDICT_BODY",
+            },
+            "messages": "PROMPT_TEXT_SENTINEL",
+            "provider_body": "PROVIDER_BODY_SENTINEL",
+            "environment_value": "ENV_VALUE_SENTINEL",
+        },
+    )
+    observer.finish(stop_reason="verdict_emitted")
+
+    path = telemetry.telemetry_path(root, dispatch_id)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["schema_id"] == telemetry.SCHEMA_ID
+    assert payload["turns"] == [
+        {
+            "index": 1,
+            "tool_names": [
+                "Read",
+                "Write",
+                "Edit",
+                "Grep",
+                "Glob",
+                "Bash",
+                "PublishBridgeVerdict",
+                "PublishBridgeVerdict",
+            ],
+        }
+    ]
+    assert payload["tool_calls"] == {
+        "total": 8,
+        "by_name": {
+            "Bash": 1,
+            "Edit": 1,
+            "Glob": 1,
+            "Grep": 1,
+            "PublishBridgeVerdict": 2,
+            "Read": 1,
+            "Write": 1,
+        },
+    }
+    serialized = path.read_text(encoding="utf-8")
+    for prohibited in (
+        "UnknownTool",
+        "/sensitive/review.md",
+        "PRIVATE_VERDICT_BODY",
+        "PROMPT_TEXT_SENTINEL",
+        "PROVIDER_BODY_SENTINEL",
+        "ENV_VALUE_SENTINEL",
+    ):
+        assert prohibited not in serialized
+
+
 def test_missing_role_document_is_never_filled_from_dispatch_intent(tmp_path: Path) -> None:
     root = tmp_path / "project"
     root.mkdir()

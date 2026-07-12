@@ -28,7 +28,7 @@ SESSION_ID_ENV_VAR = "GTKB_INHERITED_SESSION_ID"
 PRIMARY_BRIDGE_ID_ENV_VAR = "GTKB_DISPATCH_PRIMARY_BRIDGE_ID"
 MAX_TELEMETRY_RECORD_BYTES = 1_000_000
 
-CANONICAL_TOOL_NAMES = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
+CANONICAL_TOOL_NAMES = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash", "PublishBridgeVerdict"})
 STOP_REASONS = frozenset(
     {
         "verdict_emitted",
