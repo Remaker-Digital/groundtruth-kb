@@ -441,8 +441,12 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
     schemas = {
         "Read": _schema(
             "Read",
-            "Read a UTF-8 text file under the GT-KB project root.",
-            {"path": {"type": "string"}, "max_chars": {"type": "integer", "minimum": 1}},
+            "Read a UTF-8 text file under the GT-KB project root with character-offset pagination.",
+            {
+                "path": {"type": "string"},
+                "offset": {"type": "integer", "minimum": 0},
+                "max_chars": {"type": "integer", "minimum": 1},
+            },
             ["path"],
         ),
         "Write": _schema(
@@ -764,11 +768,50 @@ def _positive_int_argument(arguments: Mapping[str, Any], name: str, default: int
     return parsed
 
 
+def _nonnegative_int_argument(arguments: Mapping[str, Any], name: str, default: int) -> int:
+    if name not in arguments:
+        return default
+
+    value = arguments[name]
+    parsed: int | None = None
+    if isinstance(value, bool):
+        parsed = None
+    elif isinstance(value, int):
+        parsed = value
+    elif isinstance(value, float):
+        parsed = int(value) if value.is_integer() else None
+    elif isinstance(value, str):
+        text = value.strip()
+        if re.fullmatch(r"\d+(?:\.0+)?", text):
+            parsed = int(text.split(".", 1)[0])
+
+    if parsed is None or parsed < 0:
+        raise OllamaHarnessError(f"{name} must be a nonnegative integer")
+    return parsed
+
+
+def _bounded_read_result(content: str, offset: int, max_chars: int) -> str:
+    end = min(len(content), offset + max_chars, offset + MAX_TOOL_OUTPUT_CHARS)
+    if end >= len(content):
+        return content[offset:end]
+
+    while True:
+        marker = (
+            f"\n\n[Read truncated: returned characters [{offset}, {end}) of {len(content)}. "
+            f"Continue with offset={end}.]"
+        )
+        bounded_end = min(end, offset + max(0, MAX_TOOL_OUTPUT_CHARS - len(marker)))
+        if bounded_end == end:
+            return content[offset:end] + marker
+        end = bounded_end
+
+
 def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
+    offset = _nonnegative_int_argument(arguments, "offset", 0)
     max_chars = _positive_int_argument(arguments, "max_chars", MAX_TOOL_OUTPUT_CHARS)
     try:
-        return path.read_text(encoding="utf-8")[:max_chars]
+        return _bounded_read_result(path.read_text(encoding="utf-8"), offset, max_chars)
     except FileNotFoundError:
         return f"Read failed: file not found: {_relative_path(project_root, path)}"
     except OSError as exc:

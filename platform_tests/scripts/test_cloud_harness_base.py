@@ -18,6 +18,7 @@ require:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -28,6 +29,10 @@ import pytest
 from scripts import cloud_harness_base as base
 
 CFG_PATH = Path(".api-harness") / "routing.toml"
+READ_TRUNCATION_MARKER_RE = re.compile(
+    r"\n\n\[Read truncated: returned characters \[(\d+), (\d+)\) of (\d+)\. "
+    r"Continue with offset=(\d+)\.\]$"
+)
 
 ROUTING_TOML = """
 schema_version = 1
@@ -192,6 +197,84 @@ def test_routing_config_carries_runtime_limits_and_cli_overrides(tmp_path: Path)
         cli_session_timeout=22,
         cli_max_turns=33,
     ) == (11, 22, 33)
+
+
+# --- Truthful bounded Read pagination (WI-5214 / TEST-11368) ---
+
+
+def test_read_schema_and_short_file_output_remain_compatible(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    content = "short file\n"
+    (root / "short.txt").write_text(content, encoding="utf-8")
+
+    read_schema = base.build_tool_schemas(["Read"])[0]["function"]["parameters"]
+    assert read_schema["properties"]["offset"] == {"type": "integer", "minimum": 0}
+    assert base._dispatch_read({"path": "short.txt"}, root) == content
+    assert base._dispatch_read({"path": "short.txt", "offset": len(content)}, root) == ""
+
+    for invalid_offset in (-1, -1.0, "-1", 1.5, True):
+        with pytest.raises(base.CloudHarnessError, match="offset must be a nonnegative integer"):
+            base._dispatch_read({"path": "short.txt", "offset": invalid_offset}, root)
+
+
+def test_read_pagination_is_bounded_marked_and_lossless_for_unicode(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    content = "segment-\u03b1-\U0001f642\n" * 1200
+    (root / "long.txt").write_text(content, encoding="utf-8")
+
+    offset = 0
+    chunks: list[str] = []
+    marker_count = 0
+    while offset < len(content):
+        result = base._dispatch_read({"path": "long.txt", "offset": offset}, root)
+        assert len(result) <= base.MAX_TOOL_OUTPUT_CHARS
+        marker = READ_TRUNCATION_MARKER_RE.search(result)
+        if marker is None:
+            chunks.append(result)
+            break
+
+        marker_count += 1
+        chunk = result[: marker.start()]
+        start, end, total, next_offset = (int(value) for value in marker.groups())
+        assert start == offset
+        assert end == offset + len(chunk)
+        assert total == len(content)
+        assert next_offset == end
+        assert chunk
+        chunks.append(chunk)
+        offset = next_offset
+
+    assert marker_count >= 2
+    assert "".join(chunks) == content
+
+
+def test_read_marker_survives_small_and_oversized_page_requests(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    content = "x" * 12_115
+    (root / "h-report.txt").write_text(content, encoding="utf-8")
+
+    small = base._dispatch_read({"path": "h-report.txt", "max_chars": 1}, root)
+    small_marker = READ_TRUNCATION_MARKER_RE.search(small)
+    assert small_marker is not None
+    assert small_marker.start() == 1
+    assert tuple(int(value) for value in small_marker.groups()) == (0, 1, len(content), 1)
+
+    oversized = base._dispatch_read({"path": "h-report.txt", "max_chars": 1_000_000}, root)
+    oversized_marker = READ_TRUNCATION_MARKER_RE.search(oversized)
+    assert oversized_marker is not None
+    assert len(oversized) <= base.MAX_TOOL_OUTPUT_CHARS
+    assert int(oversized_marker.group(2)) == oversized_marker.start()
+    assert int(oversized_marker.group(3)) == len(content)
+
+    large_offset = 1_000_000
+    large_content = "x" * (large_offset + 12_115)
+    large_offset_result = base._bounded_read_result(large_content, large_offset, 1_000_000)
+    large_offset_marker = READ_TRUNCATION_MARKER_RE.search(large_offset_result)
+    assert large_offset_marker is not None
+    assert len(large_offset_result) <= base.MAX_TOOL_OUTPUT_CHARS
+    assert int(large_offset_marker.group(1)) == large_offset
+    assert int(large_offset_marker.group(2)) == large_offset + large_offset_marker.start()
+    assert int(large_offset_marker.group(4)) == int(large_offset_marker.group(2))
 
 
 # --- Author-metadata injection (base owns it, adopter supplies identity) ---
@@ -404,6 +487,50 @@ def test_run_tool_loop_returns_final_text(tmp_path: Path) -> None:
 
     result = base.run_tool_loop("hello", route, "https://test.cloud/api/v1", "key", 1, root, _profile(), chat_func=chat)
     assert result == "done"
+
+
+def test_run_tool_loop_keeps_read_continuation_marker_model_visible(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / "long.txt").write_text("x" * 12_115, encoding="utf-8")
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    turns: list[dict] = []
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "read_1",
+                                    "function": {"name": "Read", "arguments": {"path": "long.txt"}},
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        tool_result = payload["messages"][-1]
+        assert tool_result["role"] == "tool"
+        assert len(tool_result["content"]) <= base.MAX_TOOL_OUTPUT_CHARS
+        assert READ_TRUNCATION_MARKER_RE.search(tool_result["content"]) is not None
+        return {"choices": [{"message": {"content": "marker observed"}}]}
+
+    result = base.run_tool_loop(
+        "read the report",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        2,
+        root,
+        _profile(),
+        chat_func=chat,
+    )
+
+    assert result == "marker observed"
 
 
 def test_run_tool_loop_reports_allowlisted_turn_metadata_to_telemetry(tmp_path: Path) -> None:

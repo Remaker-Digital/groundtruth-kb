@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,10 @@ from scripts import ollama_harness as oh
 
 FIXTURE_MODEL_ID = "fixture-model:fixture-version"
 FIXTURE_MODEL_VERSION = oh.infer_model_version(FIXTURE_MODEL_ID)
+READ_TRUNCATION_MARKER_RE = re.compile(
+    r"\n\n\[Read truncated: returned characters \[(\d+), (\d+)\) of (\d+)\. "
+    r"Continue with offset=(\d+)\.\]$"
+)
 
 
 def make_root(tmp_path: Path) -> Path:
@@ -220,6 +225,81 @@ def test_runtime_timeouts_use_distinct_routing_session_timeout(tmp_path: Path):
     assert session_timeout == 28800
 
 
+def test_read_schema_and_short_file_output_remain_compatible(tmp_path: Path):
+    root = make_root(tmp_path)
+    content = "short file\n"
+    (root / "short.txt").write_text(content, encoding="utf-8")
+
+    read_schema = oh.build_tool_schemas(["Read"])[0]["function"]["parameters"]
+    assert read_schema["properties"]["offset"] == {"type": "integer", "minimum": 0}
+    assert oh._dispatch_read({"path": "short.txt"}, root) == content
+    assert oh._dispatch_read({"path": "short.txt", "offset": len(content)}, root) == ""
+
+    for invalid_offset in (-1, -1.0, "-1", 1.5, True):
+        with pytest.raises(oh.OllamaHarnessError, match="offset must be a nonnegative integer"):
+            oh._dispatch_read({"path": "short.txt", "offset": invalid_offset}, root)
+
+
+def test_read_pagination_is_bounded_marked_and_lossless_for_unicode(tmp_path: Path):
+    root = make_root(tmp_path)
+    content = "segment-\u03b1-\U0001f642\n" * 1200
+    (root / "long.txt").write_text(content, encoding="utf-8")
+
+    offset = 0
+    chunks: list[str] = []
+    marker_count = 0
+    while offset < len(content):
+        result = oh._dispatch_read({"path": "long.txt", "offset": offset}, root)
+        assert len(result) <= oh.MAX_TOOL_OUTPUT_CHARS
+        marker = READ_TRUNCATION_MARKER_RE.search(result)
+        if marker is None:
+            chunks.append(result)
+            break
+
+        marker_count += 1
+        chunk = result[: marker.start()]
+        start, end, total, next_offset = (int(value) for value in marker.groups())
+        assert start == offset
+        assert end == offset + len(chunk)
+        assert total == len(content)
+        assert next_offset == end
+        assert chunk
+        chunks.append(chunk)
+        offset = next_offset
+
+    assert marker_count >= 2
+    assert "".join(chunks) == content
+
+
+def test_read_marker_survives_small_and_oversized_page_requests(tmp_path: Path):
+    root = make_root(tmp_path)
+    content = "x" * 12_115
+    (root / "h-report.txt").write_text(content, encoding="utf-8")
+
+    small = oh._dispatch_read({"path": "h-report.txt", "max_chars": 1}, root)
+    small_marker = READ_TRUNCATION_MARKER_RE.search(small)
+    assert small_marker is not None
+    assert small_marker.start() == 1
+    assert tuple(int(value) for value in small_marker.groups()) == (0, 1, len(content), 1)
+
+    oversized = oh._dispatch_read({"path": "h-report.txt", "max_chars": 1_000_000}, root)
+    oversized_marker = READ_TRUNCATION_MARKER_RE.search(oversized)
+    assert oversized_marker is not None
+    assert len(oversized) <= oh.MAX_TOOL_OUTPUT_CHARS
+    assert int(oversized_marker.group(2)) == oversized_marker.start()
+    assert int(oversized_marker.group(3)) == len(content)
+
+    large_offset = 1_000_000
+    large_content = "x" * (large_offset + 12_115)
+    large_offset_result = oh._bounded_read_result(large_content, large_offset, 1_000_000)
+    large_offset_marker = READ_TRUNCATION_MARKER_RE.search(large_offset_result)
+    assert large_offset_marker is not None
+    assert len(large_offset_result) <= oh.MAX_TOOL_OUTPUT_CHARS
+    assert int(large_offset_marker.group(1)) == large_offset
+    assert int(large_offset_marker.group(2)) == large_offset + large_offset_marker.start()
+    assert int(large_offset_marker.group(4)) == int(large_offset_marker.group(2))
+
+
 def test_runtime_timeouts_preserve_default_session_when_timeout_override_is_explicit(tmp_path: Path):
     root = make_root(tmp_path)
     set_ollama_timeout(root, 42.5)
@@ -349,6 +429,31 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     assert calls[0][1]["model"] == FIXTURE_MODEL_ID
     assert calls[0][1]["stream"] is False
     assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == oh.CANONICAL_TOOLS
+
+
+def test_tool_loop_keeps_read_continuation_marker_model_visible(tmp_path: Path):
+    root = make_root(tmp_path)
+    (root / "long.txt").write_text("x" * 12_115, encoding="utf-8")
+    calls: list[tuple[str, dict]] = []
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        calls.append((url, payload))
+        if len(calls) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [{"id": "read_1", "function": {"name": "Read", "arguments": {"path": "long.txt"}}}],
+                }
+            }
+        tool_result = payload["messages"][-1]
+        assert tool_result["role"] == "tool"
+        assert len(tool_result["content"]) <= oh.MAX_TOOL_OUTPUT_CHARS
+        assert READ_TRUNCATION_MARKER_RE.search(tool_result["content"]) is not None
+        return {"message": {"content": "marker observed"}}
+
+    result = oh.run_tool_loop("read the report", route(root), "http://ollama.test", 2, root, chat_func=chat)
+
+    assert result == "marker observed"
 
 
 def test_tool_loop_emits_allowlisted_turn_metadata_to_telemetry(tmp_path: Path):
