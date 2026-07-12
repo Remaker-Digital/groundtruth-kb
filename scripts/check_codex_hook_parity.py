@@ -191,12 +191,20 @@ def _codex_hooks_enabled(codex_config: dict[str, Any]) -> bool:
 
 def _commands_for_event(hooks_document: dict[str, Any], event_name: str) -> list[str]:
     commands: list[str] = []
+    for hook in _hooks_for_event(hooks_document, event_name):
+        command = hook.get("command")
+        if isinstance(command, str):
+            commands.append(command)
+    return commands
+
+
+def _hooks_for_event(hooks_document: dict[str, Any], event_name: str) -> list[dict[str, Any]]:
+    hooks: list[dict[str, Any]] = []
     for group in hooks_document.get("hooks", {}).get(event_name, []):
         for hook in group.get("hooks", []):
-            command = hook.get("command")
-            if isinstance(command, str):
-                commands.append(command)
-    return commands
+            if isinstance(hook, dict):
+                hooks.append(hook)
+    return hooks
 
 
 def _all_hook_commands(hooks_document: dict[str, Any]) -> list[str]:
@@ -1104,6 +1112,22 @@ def check_project(project_root: Path = PROJECT_ROOT) -> list[str]:
         errors.append("Claude Stop hook must resolve durable ID from harness-state/harness-identities.json")
     if any("--role-profile" in command for command in claude_stop_commands):
         errors.append("Claude Stop hook must discover the role profile instead of forcing one")
+    claude_wrapup_stop_hooks = [
+        hook
+        for hook in _hooks_for_event(claude_settings, "Stop")
+        if isinstance(hook.get("command"), str)
+        and _contains_hook_path(hook["command"], SESSION_SELF_INITIALIZATION_SCRIPT)
+        and "--emit-wrapup" in hook["command"]
+    ]
+    if not claude_wrapup_stop_hooks:
+        errors.append("Claude proactive wrap-up Stop hook registration is missing")
+    elif any(
+        isinstance(hook.get("timeout"), bool)
+        or not isinstance(hook.get("timeout"), (int, float))
+        or float(hook["timeout"]) != 60.0
+        for hook in claude_wrapup_stop_hooks
+    ):
+        errors.append("Claude proactive wrap-up Stop hook timeout must be exactly 60 seconds")
 
     if codex_hooks.get("hooks") == {}:
         errors.extend(_resolution_table_parity_errors(project_root))

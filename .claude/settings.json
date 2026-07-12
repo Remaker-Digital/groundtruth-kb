@@ -206,7 +206,7 @@
           {
             "type": "command",
             "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/session_self_initialization.py\" --emit-wrapup --fast-hook --harness-name claude",
-            "timeout": 15
+            "timeout": 60
           },
           {
             "type": "command",

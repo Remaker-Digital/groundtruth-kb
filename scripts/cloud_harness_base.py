@@ -100,6 +100,11 @@ MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
 MAX_FILE_SCAN_ENTRIES = 5000
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
+MAX_NATIVE_STOP_BLOCKS = 8
+NATIVE_STOP_CONTINUATION_PROMPT = (
+    "A native Stop hook blocked completion for this reason:\n{reason}\n"
+    "Continue working and return a new final response when the issue is resolved."
+)
 SKIPPED_SCAN_DIR_NAMES = frozenset(
     {
         ".git",
@@ -1431,16 +1436,20 @@ def invoke_native_hooks(
     )
     runner = native_hook_runner or _default_native_hook_runner
     last_output: dict[str, Any] | None = None
+    stop_event = event_name == NATIVE_HOOK_STOP
     post_tool_event = event_name == NATIVE_HOOK_POST_TOOL_USE
     for command, hook_timeout in _iter_native_hook_commands(hooks, event_name, tool_name):
         result = runner(command, payload, env, hook_timeout)
         command_label = command[:120]
         if result.timed_out:
-            if post_tool_event:
+            if stop_event or post_tool_event:
                 continue
             raise CloudHarnessError(f"native hook timed out: {event_name}: {command_label}")
+        if stop_event and result.returncode == 2:
+            reason = (result.stderr or result.stdout or "native Stop hook requested continuation").strip()
+            return {"decision": "block", "reason": reason}
         if result.returncode != 0:
-            if post_tool_event:
+            if stop_event or post_tool_event:
                 continue
             raise CloudHarnessError(f"native hook exited nonzero: {event_name}: {command_label} ({result.returncode})")
         stdout = (result.stdout or "").strip()
@@ -1449,20 +1458,40 @@ def invoke_native_hooks(
         try:
             data = json.loads(stdout)
         except json.JSONDecodeError as exc:
-            if post_tool_event:
+            if stop_event or post_tool_event:
                 continue
             raise CloudHarnessError(f"native hook emitted malformed JSON: {event_name}: {command_label}") from exc
         if not isinstance(data, dict):
-            if post_tool_event:
+            if stop_event or post_tool_event:
                 continue
             raise CloudHarnessError(f"native hook output must be a JSON object: {event_name}: {command_label}")
         reason = _native_hook_block_reason(data)
         if reason:
-            if event_name == NATIVE_HOOK_PRE_TOOL_USE:
+            if event_name in {NATIVE_HOOK_PRE_TOOL_USE, NATIVE_HOOK_STOP}:
                 return {"decision": "block", "reason": reason}
             raise CloudHarnessError(f"native hook blocked {event_name}: {command_label}: {reason}")
         last_output = data
     return last_output or {}
+
+
+def _invoke_native_stop_hooks_nonmasking(
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    native_hook_runner: NativeHookRunner | None,
+) -> str | None:
+    """Run fail-soft Stop lifecycle hooks and return only an explicit block reason."""
+    try:
+        result = invoke_native_hooks(
+            NATIVE_HOOK_STOP,
+            model_metadata,
+            project_root,
+            profile,
+            native_hook_runner=native_hook_runner,
+        )
+    except Exception:
+        return None
+    return _native_hook_block_reason(result)
 
 
 def _guard_tool_input(tool_name: str, arguments: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
@@ -2093,6 +2122,8 @@ def run_tool_loop(
 
     previous_tool_signature: str | None = None
     repeated_tool_signature_turns = 0
+    native_stop_blocks = 0
+    native_stop_completed = False
 
     stop_reason = "process_error"
     try:
@@ -2132,6 +2163,30 @@ def run_tool_loop(
             if not tool_calls:
                 content = message.get("content")
                 if isinstance(content, str) and content.strip():
+                    block_reason = None
+                    if native_hooks_started:
+                        block_reason = _invoke_native_stop_hooks_nonmasking(
+                            metadata,
+                            project_root,
+                            profile,
+                            native_hook_runner,
+                        )
+                    if block_reason:
+                        native_stop_blocks += 1
+                        if native_stop_blocks >= MAX_NATIVE_STOP_BLOCKS:
+                            native_stop_completed = True
+                            raise CloudHarnessError(
+                                f"native Stop hook blocked completion {MAX_NATIVE_STOP_BLOCKS} consecutive times"
+                            )
+                        messages.append({"role": "assistant", "content": content})
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": NATIVE_STOP_CONTINUATION_PROMPT.format(reason=block_reason),
+                            }
+                        )
+                        continue
+                    native_stop_completed = native_hooks_started
                     stop_reason = "final_response"
                     return content
                 messages.append({"role": "user", "content": BLANK_FINAL_RECOVERY_PROMPT})
@@ -2228,11 +2283,12 @@ def run_tool_loop(
         if telemetry is not None:
             with contextlib.suppress(Exception):
                 telemetry.finish(stop_reason=stop_reason)
-        if native_hooks_started:
-            invoke_native_hooks(
-                NATIVE_HOOK_STOP,
-                metadata,
-                project_root,
-                profile,
-                native_hook_runner=native_hook_runner,
-            )
+        if native_hooks_started and not native_stop_completed:
+            with contextlib.suppress(Exception):
+                invoke_native_hooks(
+                    NATIVE_HOOK_STOP,
+                    metadata,
+                    project_root,
+                    profile,
+                    native_hook_runner=native_hook_runner,
+                )

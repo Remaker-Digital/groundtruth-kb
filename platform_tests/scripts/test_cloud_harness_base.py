@@ -265,6 +265,38 @@ def test_guard_empty_output_fails_closed(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("guard_result", "error_match"),
+    [
+        (base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True), "guard timed out"),
+        (base.GuardExecutionResult(returncode=1, stdout="", stderr="failed"), "guard exited nonzero"),
+        (base.GuardExecutionResult(returncode=0, stdout="not json", stderr=""), "guard emitted malformed JSON"),
+    ],
+    ids=("timeout", "nonzero", "malformed"),
+)
+def test_guard_adapter_runtime_failures_remain_fail_closed(
+    tmp_path: Path,
+    guard_result: base.GuardExecutionResult,
+    error_match: str,
+) -> None:
+    root = _root(tmp_path)
+    (root / "fake_guard.py").write_text("print('{}')\n", encoding="utf-8")
+
+    def guard_runner(_path: Path, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return guard_result
+
+    with pytest.raises(base.CloudHarnessError, match=error_match):
+        base.invoke_guard_adapter(
+            "Write",
+            {"path": "out.txt", "content": "content"},
+            _meta(),
+            root,
+            _profile(),
+            guard_runner=guard_runner,
+            guard_paths=[Path("fake_guard.py")],
+        )
+
+
 def test_read_only_tool_skips_guard(tmp_path: Path) -> None:
     root = _root(tmp_path)
     (root / "note.txt").write_text("hello", encoding="utf-8")
@@ -656,6 +688,218 @@ def test_native_posttool_fail_soft_does_not_change_pretool_timeout_enforcement(t
         return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
 
     with pytest.raises(base.CloudHarnessError, match="native hook timed out: PreToolUse"):
+        base.invoke_native_hooks(
+            base.NATIVE_HOOK_PRE_TOOL_USE,
+            _meta(),
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            tool_name="Read",
+            tool_input={"path": "note.txt"},
+            native_hook_runner=hook_runner,
+        )
+
+
+@pytest.mark.parametrize(
+    "stop_result",
+    [
+        base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True),
+        base.GuardExecutionResult(returncode=1, stdout="", stderr="informational failure"),
+        base.GuardExecutionResult(returncode=0, stdout="informational non-json output", stderr=""),
+    ],
+    ids=("timeout", "nonblocking-nonzero", "malformed-informational-output"),
+)
+def test_native_stop_lifecycle_failures_preserve_candidate_result(
+    tmp_path: Path,
+    stop_result: base.GuardExecutionResult,
+) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "stop hook"}]}]},
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return stop_result
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        return {"choices": [{"message": {"content": "candidate result"}}]}
+
+    assert (
+        base.run_tool_loop(
+            "finish",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            1,
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            chat_func=chat,
+            native_hook_runner=hook_runner,
+        )
+        == "candidate result"
+    )
+
+
+@pytest.mark.parametrize(
+    "stop_result",
+    [
+        base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True),
+        base.GuardExecutionResult(returncode=3, stdout="", stderr="informational failure"),
+        base.GuardExecutionResult(returncode=0, stdout="informational non-json output", stderr=""),
+    ],
+    ids=("timeout", "nonblocking-nonzero", "malformed-informational-output"),
+)
+def test_native_stop_lifecycle_failures_preserve_original_exception(
+    tmp_path: Path,
+    stop_result: base.GuardExecutionResult,
+) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "stop hook"}]}]},
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return stop_result
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        raise RuntimeError("original provider exception")
+
+    with pytest.raises(RuntimeError, match="original provider exception"):
+        base.run_tool_loop(
+            "finish",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            1,
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            chat_func=chat,
+            native_hook_runner=hook_runner,
+        )
+
+
+@pytest.mark.parametrize(
+    ("first_stop_result", "expected_reason"),
+    [
+        (base.GuardExecutionResult(returncode=2, stdout="", stderr="exit-two reason"), "exit-two reason"),
+        (
+            base.GuardExecutionResult(
+                returncode=0,
+                stdout='{"decision": "block", "reason": "json-block reason"}',
+                stderr="",
+            ),
+            "json-block reason",
+        ),
+    ],
+    ids=("exit-two", "json-block"),
+)
+def test_native_stop_explicit_block_continues_model_loop_with_reason(
+    tmp_path: Path,
+    first_stop_result: base.GuardExecutionResult,
+    expected_reason: str,
+) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "stop hook"}]}]},
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    stop_calls = 0
+    turns: list[dict] = []
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        nonlocal stop_calls
+        stop_calls += 1
+        if stop_calls == 1:
+            return first_stop_result
+        return base.GuardExecutionResult(returncode=0, stdout="{}", stderr="")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 2:
+            assert any(expected_reason in message.get("content", "") for message in payload["messages"])
+        return {"choices": [{"message": {"content": f"candidate {len(turns)}"}}]}
+
+    result = base.run_tool_loop(
+        "finish",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        3,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == "candidate 2"
+    assert stop_calls == 2
+
+
+def test_native_stop_repeated_blocks_fail_closed_at_eight_block_limit(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "stop hook"}]}]},
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    stop_calls = 0
+    chat_calls = 0
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        nonlocal stop_calls
+        stop_calls += 1
+        return base.GuardExecutionResult(returncode=2, stdout="", stderr="still blocked")
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        nonlocal chat_calls
+        chat_calls += 1
+        return {"choices": [{"message": {"content": "candidate"}}]}
+
+    with pytest.raises(base.CloudHarnessError, match="blocked completion 8 consecutive times"):
+        base.run_tool_loop(
+            "finish",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            base.MAX_NATIVE_STOP_BLOCKS + 1,
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            chat_func=chat,
+            native_hook_runner=hook_runner,
+        )
+
+    assert chat_calls == base.MAX_NATIVE_STOP_BLOCKS
+    assert stop_calls == base.MAX_NATIVE_STOP_BLOCKS
+
+
+@pytest.mark.parametrize(
+    ("hook_result", "error_match"),
+    [
+        (base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True), "native hook timed out"),
+        (base.GuardExecutionResult(returncode=1, stdout="", stderr="failed"), "native hook exited nonzero"),
+        (base.GuardExecutionResult(returncode=0, stdout="not json", stderr=""), "native hook emitted malformed JSON"),
+    ],
+    ids=("timeout", "nonzero", "malformed"),
+)
+def test_native_pretool_lifecycle_errors_remain_fail_closed(
+    tmp_path: Path,
+    hook_result: base.GuardExecutionResult,
+    error_match: str,
+) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_PRE_TOOL_USE: [{"matcher": "Read", "hooks": [{"type": "command", "command": "pre hook"}]}]},
+    )
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return hook_result
+
+    with pytest.raises(base.CloudHarnessError, match=error_match):
         base.invoke_native_hooks(
             base.NATIVE_HOOK_PRE_TOOL_USE,
             _meta(),

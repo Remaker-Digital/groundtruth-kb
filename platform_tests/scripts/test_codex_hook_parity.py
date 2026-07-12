@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_codex_hook_parity.py"
 CODEX_SESSION_START_DISPATCHER = REPO_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
 CODEX_HOOKS_PATH = REPO_ROOT / ".codex" / "hooks.json"
+CLAUDE_SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
 SESSION_START_DISPATCH_CORE = REPO_ROOT / "scripts" / "session_start_dispatch_core.py"
 
 
@@ -106,6 +107,18 @@ def test_codex_userpromptsubmit_wrapup_hook_has_headroom_timeout() -> None:
     )
 
     assert wrapup_hook["timeout"] >= 60
+
+
+def test_claude_proactive_wrapup_stop_hook_has_sixty_second_allowance() -> None:
+    claude_settings = json.loads(CLAUDE_SETTINGS_PATH.read_text(encoding="utf-8"))
+    wrapup_hook = _hook_with_command_fragment(
+        claude_settings,
+        "Stop",
+        "session_self_initialization.py",
+    )
+
+    assert "--emit-wrapup" in wrapup_hook["command"]
+    assert wrapup_hook["timeout"] == 60
 
 
 def test_codex_hook_parity_requires_session_lifecycle_hook_intent() -> None:

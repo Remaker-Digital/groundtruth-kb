@@ -238,6 +238,47 @@ def test_alibaba_native_hook_adapter_wraps_non_json_lifecycle_context(monkeypatc
     assert json.loads(result.stdout) == {"hookSpecificOutput": {"additionalContext": "informational lifecycle context"}}
 
 
+def test_alibaba_native_full_loop_preserves_candidate_when_stop_times_out(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = make_root(tmp_path)
+    settings_dir = root / ".claude"
+    settings_dir.mkdir()
+    (settings_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    base.NATIVE_HOOK_STOP: [{"hooks": [{"type": "command", "command": "slow wrapup", "timeout": 60}]}]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    route = ach.resolve_model(ach.load_routing_config(root), None)
+
+    def timed_out_stop(*_args, **_kwargs):
+        return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        return {"model": route.model_id, "content": [{"type": "text", "text": "H candidate"}]}
+
+    monkeypatch.setattr(base, "_default_native_hook_runner", timed_out_stop)
+
+    assert (
+        ach.run_tool_loop(
+            "review",
+            route,
+            "https://example.test/v1",
+            "fixture-token",
+            1,
+            root,
+            chat_func=chat,
+        )
+        == "H candidate"
+    )
+
+
 def test_alibaba_native_full_loop_continues_when_posttool_maintenance_times_out(tmp_path: Path) -> None:
     root = make_root(tmp_path)
     (root / "note.txt").write_text("governed evidence", encoding="utf-8")
