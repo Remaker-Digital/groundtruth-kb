@@ -3660,6 +3660,33 @@ def build_startup_model(
     }
 
 
+def build_fast_wrapup_model(project_root: Path) -> dict[str, Any]:
+    """Collect only the fields consumed by ``render_wrapup_notice``."""
+
+    generated_at = _now_iso()
+    database = _database_metrics(project_root)
+    backlog, top_actions = _backlog_metrics(project_root)
+    blockers = _release_blockers(project_root)
+    contention = _bridge_metrics(project_root)
+    drift = _git_drift(project_root)
+    membase = database.get("membase", {})
+
+    return {
+        "generated_at": generated_at,
+        "metrics": {
+            "backlog": {"active_item_count": backlog.get("active_item_count")},
+            "membase": {
+                "open_work_items": membase.get("open_work_items"),
+                "raw_open_work_items": membase.get("raw_open_work_items"),
+            },
+            "regression": {"release_blocker_count": len(blockers)},
+            "contention": {"actionable_count": contention.get("actionable_count")},
+            "drift": {"changed_path_count": drift.get("changed_path_count")},
+        },
+        "top_priority_actions": [{"id": item.get("id"), "title": item.get("title")} for item in top_actions],
+    }
+
+
 def _collect_work_subject(project_root: Path) -> dict[str, Any]:
     """Collect the active work-subject for the dashboard.
 
@@ -6549,6 +6576,42 @@ def _write_dashboard_pdf(dashboard_path: Path, pdf_path: Path) -> dict[str, Any]
     return {"available": True, "path": str(pdf_path), "error": None}
 
 
+def write_fast_wrapup_report(
+    project_root: Path,
+    dashboard_dir: Path,
+) -> dict[str, Any]:
+    """Write the fast-hook wrap-up without refreshing startup/dashboard artifacts."""
+
+    model = build_fast_wrapup_model(project_root)
+    dashboard_dir.mkdir(parents=True, exist_ok=True)
+
+    dashboard_path = project_root / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
+    data_path = dashboard_dir / "dashboard-data.json"
+    pdf_path = dashboard_dir / PDF_EXPORT_FILENAME
+    report_path = dashboard_dir / "session-startup-report.md"
+    wrapup_path = dashboard_dir / "session-wrapup-report.md"
+    dashboard_link = _markdown_url_link(GRAFANA_DASHBOARD_URL)
+    wrapup_text = render_wrapup_notice(model, dashboard_link)
+    _atomic_write_text(wrapup_path, wrapup_text)
+
+    return {
+        "project_root": project_root,
+        "model": model,
+        "dashboard_path": dashboard_path,
+        "dashboard_url": GRAFANA_DASHBOARD_URL,
+        "pdf_path": pdf_path,
+        "pdf_export": {
+            "available": False,
+            "path": str(pdf_path),
+            "error": "Skipped by minimal fast wrap-up path.",
+        },
+        "data_path": data_path,
+        "report_path": report_path,
+        "wrapup_path": wrapup_path,
+        "wrapup_text": wrapup_text,
+    }
+
+
 def write_dashboard_and_report(
     project_root: Path,
     dashboard_dir: Path,
@@ -7694,21 +7757,27 @@ def main(argv: list[str] | None = None) -> int:
         if args.history_path is not None
         else project_root / "memory" / "gtkb-dashboard-history.json"
     )
-    result = write_dashboard_and_report(
-        project_root=project_root,
-        dashboard_dir=dashboard_dir,
-        history_path=history_path,
-        generate_pdf=not args.fast_hook,
-        seed_historical_backfill=not args.fast_hook,
-        startup_bridge_maintenance=bridge_maintenance,
-        startup_pruning=startup_pruning,
-        role_profile=role_profile,
-        harness_name=args.harness_name,
-        harness_id=args.harness_id,
-        role_record_path=role_record_path,
-        role_profile_explicit=role_profile_explicit,
-        fast_hook=args.fast_hook,
-    )
+    if args.emit_wrapup and args.fast_hook:
+        result = write_fast_wrapup_report(
+            project_root=project_root,
+            dashboard_dir=dashboard_dir,
+        )
+    else:
+        result = write_dashboard_and_report(
+            project_root=project_root,
+            dashboard_dir=dashboard_dir,
+            history_path=history_path,
+            generate_pdf=not args.fast_hook,
+            seed_historical_backfill=not args.fast_hook,
+            startup_bridge_maintenance=bridge_maintenance,
+            startup_pruning=startup_pruning,
+            role_profile=role_profile,
+            harness_name=args.harness_name,
+            harness_id=args.harness_id,
+            role_record_path=role_record_path,
+            role_profile_explicit=role_profile_explicit,
+            fast_hook=args.fast_hook,
+        )
     if startup_emit_requested:
         _maybe_open_dashboard_on_session_start(result["dashboard_url"])
     if args.json:

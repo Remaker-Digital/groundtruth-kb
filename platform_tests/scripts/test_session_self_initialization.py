@@ -2233,6 +2233,161 @@ def test_emit_wrapup_uses_session_start_hook_context_json(tmp_path, capsys, monk
     assert "Suggested Next User Actions" in context
 
 
+def test_fast_wrapup_notice_is_byte_identical_to_equivalent_full_model(tmp_path, monkeypatch) -> None:
+    module = _load_module()
+    generated_at = "2026-07-12T02:00:00Z"
+    backlog = {
+        "active_item_count": 3,
+        "visible_non_terminal_item_count": 8,
+        "source": "MemBase work_items",
+    }
+    top_actions = [
+        {"id": "WI-5206", "title": "Fast wrap-up", "priority": "P1"},
+        {"id": "WI-5207", "title": "Batch completion", "priority": "P2"},
+    ]
+    membase = {
+        "open_work_items": 4,
+        "raw_open_work_items": 9,
+        "test_records": 12,
+    }
+    blockers = ["Release blocker one", "Release blocker two"]
+    contention = {"actionable_count": 2, "raw_actionable_count": 7}
+    drift = {"changed_path_count": 5, "raw_changed_path_count": 11}
+
+    monkeypatch.setattr(module, "_now_iso", lambda: generated_at)
+    monkeypatch.setattr(module, "_database_metrics", lambda project_root: {"membase": membase})
+    monkeypatch.setattr(module, "_backlog_metrics", lambda project_root: (backlog, top_actions))
+    monkeypatch.setattr(module, "_release_blockers", lambda project_root: blockers)
+    monkeypatch.setattr(module, "_bridge_metrics", lambda project_root: contention)
+    monkeypatch.setattr(module, "_git_drift", lambda project_root: drift)
+
+    minimal_model = module.build_fast_wrapup_model(tmp_path)
+    full_model = {
+        "generated_at": generated_at,
+        "metrics": {
+            "backlog": backlog,
+            "membase": membase,
+            "regression": {"release_blocker_count": len(blockers), "blockers": blockers},
+            "contention": contention,
+            "drift": drift,
+            "unconsumed_full_model_group": {"value": "ignored"},
+        },
+        "top_priority_actions": top_actions,
+        "unconsumed_full_model_field": "ignored",
+    }
+
+    assert minimal_model == {
+        "generated_at": generated_at,
+        "metrics": {
+            "backlog": {"active_item_count": 3},
+            "membase": {"open_work_items": 4, "raw_open_work_items": 9},
+            "regression": {"release_blocker_count": 2},
+            "contention": {"actionable_count": 2},
+            "drift": {"changed_path_count": 5},
+        },
+        "top_priority_actions": [
+            {"id": "WI-5206", "title": "Fast wrap-up"},
+            {"id": "WI-5207", "title": "Batch completion"},
+        ],
+    }
+    dashboard_link = module._markdown_url_link(module.GRAFANA_DASHBOARD_URL)
+    assert (
+        module.render_wrapup_notice(minimal_model, dashboard_link).encode()
+        == module.render_wrapup_notice(full_model, dashboard_link).encode()
+    )
+
+
+def test_emit_wrapup_fast_hook_uses_minimal_writer_only(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    dashboard_dir = tmp_path / "dashboard"
+    history_path = tmp_path / "history.json"
+    model = {
+        "generated_at": "2026-07-12T02:00:00Z",
+        "metrics": {
+            "backlog": {"active_item_count": 1},
+            "membase": {"open_work_items": 2, "raw_open_work_items": 2},
+            "regression": {"release_blocker_count": 0},
+            "contention": {"actionable_count": 1},
+            "drift": {"changed_path_count": 0},
+        },
+        "top_priority_actions": [{"id": "WI-5206", "title": "Fast wrap-up"}],
+    }
+
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
+    monkeypatch.setattr(module, "build_fast_wrapup_model", lambda project_root: model)
+
+    def fail_full_writer(*args, **kwargs):
+        raise AssertionError("fast wrap-up must not call the full startup/dashboard writer")
+
+    monkeypatch.setattr(module, "write_dashboard_and_report", fail_full_writer)
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(dashboard_dir),
+            "--history-path",
+            str(history_path),
+            "--emit-wrapup",
+            "--fast-hook",
+            "--force-wrapup",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    wrapup_path = dashboard_dir / "session-wrapup-report.md"
+    assert payload["additionalContext"] == wrapup_path.read_text(encoding="utf-8")
+    assert not (dashboard_dir / "dashboard-data.json").exists()
+    assert not (dashboard_dir / "session-startup-report.md").exists()
+    assert not history_path.exists()
+    assert not (dashboard_dir / module.PDF_EXPORT_FILENAME).exists()
+
+
+def test_emit_wrapup_without_fast_hook_uses_full_writer(tmp_path, capsys, monkeypatch) -> None:
+    module = _load_module()
+    calls: list[str] = []
+    result = _startup_service_result(module, {}, "startup report")
+    result["wrapup_text"] = "full wrap-up report"
+
+    monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
+    monkeypatch.setattr(
+        module,
+        "write_fast_wrapup_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("ordinary non-fast wrap-up must not call the minimal writer")
+        ),
+    )
+
+    def fake_full_writer(*args, **kwargs):
+        calls.append("full")
+        return result
+
+    monkeypatch.setattr(module, "write_dashboard_and_report", fake_full_writer)
+
+    exit_code = module.main(
+        [
+            "--project-root",
+            str(REPO_ROOT),
+            "--dashboard-dir",
+            str(tmp_path / "dashboard"),
+            "--history-path",
+            str(tmp_path / "history.json"),
+            "--emit-wrapup",
+            "--force-wrapup",
+            "--lifecycle-guard-path",
+            str(tmp_path / "guard.json"),
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls == ["full"]
+    assert json.loads(capsys.readouterr().out) == {"additionalContext": "full wrap-up report"}
+
+
 def test_emit_wrapup_suppresses_first_stop_after_startup_focus_gate(tmp_path, capsys, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setattr(module, "discover_role_profile", lambda project_root, **kwargs: "prime-builder")
