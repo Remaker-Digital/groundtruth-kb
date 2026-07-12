@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import importlib
 import json
 import os
+import re
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -26,6 +30,10 @@ PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 1.0
 DEFAULT_LEASE_TTL_SECONDS = 300
 COMPUTED_QUALITY_RELATIVE = Path(".gtkb-state") / "ops" / "dispatch-quality.json"
 KILL_SWITCH_ENV_VAR = "GTKB_NO_CROSS_HARNESS_TRIGGER"
+TARGETED_REOFFER_AUDIT_RELATIVE_PATH = Path(".gtkb-state") / "bridge-dispatch-reset-transactions" / "audit.jsonl"
+
+_RECIPIENT_PATTERN = re.compile(r"^(?:prime-builder|loyal-opposition):[A-Za-z0-9][A-Za-z0-9_-]*$")
+_DOCUMENT_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 TerminateFn = Callable[[int], None]
 NowFn = Callable[[], float]
@@ -75,6 +83,43 @@ class ResetResult:
             "stale_dispatch_runs_pruned": self.stale_dispatch_runs_pruned,
             "details": list(self.details),
         }
+
+
+@dataclass
+class TargetedReofferResult:
+    """Result of rearming one exact dispatcher recipient/document pair."""
+
+    status: str
+    recipient: str
+    document: str
+    dry_run: bool
+    mutated: bool = False
+    changed_fields: list[str] = field(default_factory=list)
+    state_path: Path | None = None
+    before_hash: str | None = None
+    after_hash: str | None = None
+    audit_path: Path | None = None
+    message: str = ""
+
+    def to_json_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "status": self.status,
+            "recipient": self.recipient,
+            "document": self.document,
+            "dry_run": self.dry_run,
+            "mutated": self.mutated,
+            "changed_fields": list(self.changed_fields),
+            "message": self.message,
+        }
+        if self.state_path is not None:
+            payload["state_path"] = str(self.state_path)
+        if self.before_hash is not None:
+            payload["before_hash"] = self.before_hash
+        if self.after_hash is not None:
+            payload["after_hash"] = self.after_hash
+        if self.audit_path is not None:
+            payload["audit_path"] = str(self.audit_path)
+        return payload
 
 
 @dataclass
@@ -182,6 +227,224 @@ def _write_json_atomic(path: Path, payload: dict[str, Any], *, dry_run: bool) ->
         except OSError:
             pass
     return True
+
+
+def _hash_json(payload: dict[str, Any]) -> str:
+    rendered = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(rendered).hexdigest()
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def _load_bridge_lease_registry(project_root: Path) -> Any:
+    """Load the canonical scripts-side document lease primitive."""
+    candidates = (
+        project_root.resolve() / "scripts",
+        Path(__file__).resolve().parents[3] / "scripts",
+    )
+    for scripts_dir in candidates:
+        if not (scripts_dir / "bridge_lease_registry.py").is_file():
+            continue
+        scripts_dir_text = str(scripts_dir)
+        if scripts_dir_text not in sys.path:
+            sys.path.insert(0, scripts_dir_text)
+        return importlib.import_module("bridge_lease_registry")
+    raise RuntimeError("canonical bridge lease registry is unavailable")
+
+
+def _targeted_reoffer_invalid(recipient: str, document: str, message: str, *, dry_run: bool) -> TargetedReofferResult:
+    return TargetedReofferResult(
+        status="invalid",
+        recipient=recipient,
+        document=document,
+        dry_run=dry_run,
+        message=message,
+    )
+
+
+def _targeted_reoffer_from_state(
+    state: dict[str, Any],
+    *,
+    recipient: str,
+    document: str,
+) -> tuple[list[str], str, str]:
+    before_hash = _hash_json(state)
+    recipients = state.get("recipients")
+    if not isinstance(recipients, dict):
+        return [], before_hash, before_hash
+    recipient_state = recipients.get(recipient)
+    if not isinstance(recipient_state, dict):
+        return [], before_hash, before_hash
+
+    changed_fields: list[str] = []
+    removed_signature: Any = None
+    signature_found = False
+    per_document = recipient_state.get("last_dispatched_signatures_by_document")
+    if isinstance(per_document, dict) and document in per_document:
+        retained = dict(per_document)
+        removed_signature = retained.pop(document)
+        signature_found = True
+        recipient_state["last_dispatched_signatures_by_document"] = retained
+        changed_fields.append(f"recipients.{recipient}.last_dispatched_signatures_by_document.{document}")
+
+    thread_reoffers = state.get("thread_reoffers")
+    if isinstance(thread_reoffers, dict) and document in thread_reoffers:
+        retained_reoffers = dict(thread_reoffers)
+        retained_reoffers.pop(document)
+        state["thread_reoffers"] = retained_reoffers
+        changed_fields.append(f"thread_reoffers.{document}")
+
+    if signature_found and removed_signature is not None:
+        for field_name in ("last_dispatched_signature", "signature", "last_suppressed_signature"):
+            if recipient_state.get(field_name) == removed_signature:
+                recipient_state[field_name] = None
+                changed_fields.append(f"recipients.{recipient}.{field_name}")
+
+    after_hash = _hash_json(state)
+    return changed_fields, before_hash, after_hash
+
+
+def targeted_reoffer(
+    state_dirs: DispatchStateDirs,
+    recipient: str,
+    document: str,
+    *,
+    dry_run: bool = False,
+) -> TargetedReofferResult:
+    """Rearm one exact recipient/document without disturbing other runtime state."""
+    recipient = str(recipient or "").strip()
+    document = str(document or "").strip()
+    if not _RECIPIENT_PATTERN.fullmatch(recipient):
+        return _targeted_reoffer_invalid(
+            recipient,
+            document,
+            "recipient must be an exact prime-builder:<id> or loyal-opposition:<id> key",
+            dry_run=dry_run,
+        )
+    if not _DOCUMENT_PATTERN.fullmatch(document):
+        return _targeted_reoffer_invalid(
+            recipient,
+            document,
+            "document must be a kebab-case bridge document slug",
+            dry_run=dry_run,
+        )
+
+    state_dir = state_dirs.dispatch_dirs[0]
+    state_path = state_dir / DISPATCH_STATE_FILENAME
+    lease_registry = _load_bridge_lease_registry(state_dirs.project_root)
+    if dry_run:
+        if lease_registry.is_lease_held(document, state_dir=state_dir):
+            return TargetedReofferResult(
+                status="lease_held",
+                recipient=recipient,
+                document=document,
+                dry_run=True,
+                state_path=state_path,
+                message="the exact document has a live dispatcher lease",
+            )
+        state = _read_json(state_path)
+        if state is None:
+            return TargetedReofferResult(
+                status="not_found",
+                recipient=recipient,
+                document=document,
+                dry_run=True,
+                state_path=state_path,
+                message="canonical dispatcher state was not found",
+            )
+        changed_fields, before_hash, after_hash = _targeted_reoffer_from_state(
+            state,
+            recipient=recipient,
+            document=document,
+        )
+        return TargetedReofferResult(
+            status="changed" if changed_fields else "not_found",
+            recipient=recipient,
+            document=document,
+            dry_run=True,
+            changed_fields=changed_fields,
+            state_path=state_path,
+            before_hash=before_hash,
+            after_hash=after_hash,
+            message="targeted reoffer dry run; no files written",
+        )
+
+    handle = lease_registry.acquire_lease(
+        document,
+        action=f"targeted-reoffer:{recipient}",
+        state_dir=state_dir,
+    )
+    if handle is None:
+        return TargetedReofferResult(
+            status="lease_held",
+            recipient=recipient,
+            document=document,
+            dry_run=False,
+            state_path=state_path,
+            message="the exact document has a live dispatcher lease",
+        )
+    try:
+        state = _read_json(state_path)
+        if state is None:
+            return TargetedReofferResult(
+                status="not_found",
+                recipient=recipient,
+                document=document,
+                dry_run=False,
+                state_path=state_path,
+                message="canonical dispatcher state was not found",
+            )
+        changed_fields, before_hash, after_hash = _targeted_reoffer_from_state(
+            state,
+            recipient=recipient,
+            document=document,
+        )
+        if not changed_fields:
+            return TargetedReofferResult(
+                status="not_found",
+                recipient=recipient,
+                document=document,
+                dry_run=False,
+                state_path=state_path,
+                before_hash=before_hash,
+                after_hash=after_hash,
+                message="no matching dispatch signature or thread-reoffer state was found",
+            )
+        _write_json_atomic(state_path, state, dry_run=False)
+        audit_path = state_dirs.project_root / TARGETED_REOFFER_AUDIT_RELATIVE_PATH
+        _append_jsonl(
+            audit_path,
+            {
+                "ts": _now_iso(),
+                "transaction": "targeted-reoffer",
+                "status": "applied",
+                "recipient": recipient,
+                "document": document,
+                "state_path": str(state_path),
+                "before_hash": before_hash,
+                "after_hash": after_hash,
+                "changed_fields": changed_fields,
+            },
+        )
+        return TargetedReofferResult(
+            status="changed",
+            recipient=recipient,
+            document=document,
+            dry_run=False,
+            mutated=True,
+            changed_fields=changed_fields,
+            state_path=state_path,
+            before_hash=before_hash,
+            after_hash=after_hash,
+            audit_path=audit_path,
+            message="targeted reoffer applied",
+        )
+    finally:
+        lease_registry.release_lease(handle)
 
 
 def _clear_recipient_entry(entry: dict[str, Any]) -> bool:

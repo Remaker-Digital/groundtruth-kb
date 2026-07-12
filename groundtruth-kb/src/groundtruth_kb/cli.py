@@ -2181,6 +2181,8 @@ def _resolve_dispatch_state_dirs(ctx: click.Context, state_dir: str | None):
 @click.option("--soft", is_flag=True, default=False, help="Clear transient dispatcher runtime state.")
 @click.option("--hard", is_flag=True, default=False, help="Owner-gated factory reset (soft + quality wipe).")
 @click.option("--confirm", is_flag=True, default=False, help="Required for --hard reset.")
+@click.option("--recipient", default=None, help="Exact dispatcher recipient key for targeted reoffer.")
+@click.option("--document", default=None, help="Exact bridge document slug for targeted reoffer.")
 @click.option("--dry-run", is_flag=True, default=False, help="Report without mutating state.")
 @click.option("--state-dir", type=click.Path(path_type=Path), default=None, help="Primary dispatcher state directory.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -2190,15 +2192,59 @@ def bridge_dispatch_reset_cmd(
     soft: bool,
     hard: bool,
     confirm: bool,
+    recipient: str | None,
+    document: str | None,
     dry_run: bool,
     state_dir: Path | None,
     json_output: bool,
 ) -> None:
     """Reset bridge dispatcher transient state (WI-4793)."""
-    from groundtruth_kb.bridge_dispatch_reset import hard_reset, soft_reset
+    from groundtruth_kb.bridge_dispatch_reset import hard_reset, soft_reset, targeted_reoffer
+
+    def _invalid(message: str) -> None:
+        if json_output:
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "invalid",
+                        "recipient": recipient,
+                        "document": document,
+                        "dry_run": dry_run,
+                        "mutated": False,
+                        "changed_fields": [],
+                        "message": message,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            raise click.exceptions.Exit(2)
+        raise click.ClickException(message)
+
+    targeted = recipient is not None or document is not None
+    if targeted:
+        if recipient is None or document is None:
+            _invalid("Targeted reoffer requires both --recipient and --document.")
+        if soft or hard or confirm:
+            _invalid("Targeted reoffer cannot be combined with --soft, --hard, or --confirm.")
+        state_dirs = _resolve_dispatch_state_dirs(ctx, str(state_dir) if state_dir else None)
+        result = targeted_reoffer(state_dirs, recipient, document, dry_run=dry_run)
+        payload = result.to_json_dict()
+        if json_output:
+            click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            suffix = " (dry-run)" if dry_run else ""
+            click.echo(f"Bridge dispatch targeted reoffer {payload['status']}{suffix}.")
+            click.echo(f"- recipient: {recipient}")
+            click.echo(f"- document: {document}")
+            if payload.get("audit_path"):
+                click.echo(f"- audit_path: {payload['audit_path']}")
+        if result.status == "invalid":
+            raise click.exceptions.Exit(2)
+        return
 
     if (soft and hard) or (not soft and not hard):
-        raise click.ClickException("Specify exactly one of --soft or --hard.")
+        _invalid("Specify exactly one of --soft or --hard.")
     if hard and not confirm:
         raise click.ClickException(
             "Refusing --hard reset without --confirm. Use --soft for transient-only clear, or pass --confirm."

@@ -17,11 +17,13 @@ from groundtruth_kb.bridge_dispatch_reset import (
     KILL_SWITCH_ENV_VAR,
     PROVENANCE_LEDGER_FILENAME,
     QUIESCE_STATE_FILENAME,
+    TARGETED_REOFFER_AUDIT_RELATIVE_PATH,
     DispatchStateDirs,
     dispatch_is_draining,
     drain,
     hard_reset,
     soft_reset,
+    targeted_reoffer,
 )
 from groundtruth_kb.cli import main
 
@@ -86,6 +88,42 @@ def _write_lease(lease_dir: Path, name: str, *, pid: int, heartbeat: str, ttl: i
     return path
 
 
+def _seed_targeted_reoffer_state(project_dir: Path) -> DispatchStateDirs:
+    state_dirs = _seed_state_dirs(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    state = {
+        "schema_version": 1,
+        "thread_reoffers": {
+            "target-document": {"count": 4, "last_reoffer_at": "2026-07-12T00:00:00Z"},
+            "other-document": {"count": 2, "last_reoffer_at": "2026-07-11T00:00:00Z"},
+        },
+        "recipients": {
+            "loyal-opposition:B": {
+                "last_dispatched_signatures_by_document": {
+                    "target-document": "target-signature",
+                    "other-document": "other-signature",
+                },
+                "last_dispatched_signature": "batch-signature",
+                "signature": "batch-signature",
+                "last_suppressed_signature": "suppressed-signature",
+                "launch_ledger": {"active": {"dispatch-1": {"pid": 44}}, "completed": []},
+                "last_launch": {"dispatch_id": "dispatch-1", "launched": True},
+                "last_attempt": {"dispatch_id": "attempt-2", "reason": "document_lease_held"},
+                "failure_count": 3,
+                "last_failure_reason": "provider_failure",
+                "retry_not_before": "2026-07-12T02:00:00Z",
+                "circuit_breaker_tripped": True,
+            },
+            "loyal-opposition:D": {
+                "last_dispatched_signatures_by_document": {"target-document": "d-signature"},
+                "last_launch": {"dispatch_id": "dispatch-d"},
+            },
+        },
+    }
+    (state_dir / DISPATCH_STATE_FILENAME).write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return state_dirs
+
+
 def test_soft_reset_clears_transient_preserves_audit(project_dir: Path) -> None:
     state_dirs = _seed_state_dirs(project_dir)
     state_dir = state_dirs.dispatch_dirs[0]
@@ -132,6 +170,114 @@ def test_hard_reset_without_confirm_is_refused(runner: CliRunner, project_dir: P
     assert result.exit_code != 0
     assert "--confirm" in result.output
     assert (state_dir / DISPATCH_STATE_FILENAME).read_text(encoding="utf-8") == before
+
+
+def test_targeted_reoffer_dry_run_is_byte_immutable(project_dir: Path) -> None:
+    state_dirs = _seed_targeted_reoffer_state(project_dir)
+    state_path = state_dirs.dispatch_dirs[0] / DISPATCH_STATE_FILENAME
+    before = state_path.read_bytes()
+
+    result = targeted_reoffer(state_dirs, "loyal-opposition:B", "target-document", dry_run=True)
+
+    assert result.status == "changed"
+    assert result.mutated is False
+    assert result.before_hash != result.after_hash
+    assert state_path.read_bytes() == before
+    assert not (project_dir / TARGETED_REOFFER_AUDIT_RELATIVE_PATH).exists()
+
+
+def test_targeted_reoffer_apply_preserves_every_unrelated_field(project_dir: Path) -> None:
+    state_dirs = _seed_targeted_reoffer_state(project_dir)
+    state_path = state_dirs.dispatch_dirs[0] / DISPATCH_STATE_FILENAME
+    before = _read_dispatch_state(state_path)
+    target_before = dict(before["recipients"]["loyal-opposition:B"])
+    target_before.pop("last_dispatched_signatures_by_document")
+
+    result = targeted_reoffer(state_dirs, "loyal-opposition:B", "target-document")
+
+    assert result.status == "changed"
+    assert result.mutated is True
+    assert result.audit_path == project_dir / TARGETED_REOFFER_AUDIT_RELATIVE_PATH
+    after = _read_dispatch_state(state_path)
+    assert after["recipients"]["loyal-opposition:B"]["last_dispatched_signatures_by_document"] == {
+        "other-document": "other-signature"
+    }
+    assert after["thread_reoffers"] == {"other-document": before["thread_reoffers"]["other-document"]}
+    target_after = dict(after["recipients"]["loyal-opposition:B"])
+    target_after.pop("last_dispatched_signatures_by_document")
+    assert target_after == target_before
+    assert after["recipients"]["loyal-opposition:D"] == before["recipients"]["loyal-opposition:D"]
+    assert not (state_dirs.dispatch_dirs[0] / "leases" / "target-document.lock").exists()
+    audit = json.loads(result.audit_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert audit["transaction"] == "targeted-reoffer"
+    assert audit["recipient"] == "loyal-opposition:B"
+    assert audit["document"] == "target-document"
+
+
+def test_targeted_reoffer_clears_only_matching_aggregate_signatures(project_dir: Path) -> None:
+    state_dirs = _seed_targeted_reoffer_state(project_dir)
+    state_path = state_dirs.dispatch_dirs[0] / DISPATCH_STATE_FILENAME
+    state = _read_dispatch_state(state_path)
+    recipient = state["recipients"]["loyal-opposition:B"]
+    recipient["last_dispatched_signature"] = "target-signature"
+    recipient["signature"] = "target-signature"
+    recipient["last_suppressed_signature"] = "target-signature"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    result = targeted_reoffer(state_dirs, "loyal-opposition:B", "target-document")
+
+    assert result.status == "changed"
+    after = _read_dispatch_state(state_path)["recipients"]["loyal-opposition:B"]
+    assert after["last_dispatched_signature"] is None
+    assert after["signature"] is None
+    assert after["last_suppressed_signature"] is None
+    assert after["last_dispatched_signatures_by_document"] == {"other-document": "other-signature"}
+
+
+def test_targeted_reoffer_refuses_exact_live_lease_without_mutation(project_dir: Path) -> None:
+    state_dirs = _seed_targeted_reoffer_state(project_dir)
+    state_dir = state_dirs.dispatch_dirs[0]
+    state_path = state_dir / DISPATCH_STATE_FILENAME
+    before = state_path.read_bytes()
+    _write_lease(
+        state_dir / "leases",
+        "target-document",
+        pid=os.getpid(),
+        heartbeat=datetime.now(UTC).isoformat(),
+    )
+
+    result = targeted_reoffer(state_dirs, "loyal-opposition:B", "target-document")
+
+    assert result.status == "lease_held"
+    assert result.mutated is False
+    assert state_path.read_bytes() == before
+    assert not (project_dir / TARGETED_REOFFER_AUDIT_RELATIVE_PATH).exists()
+
+
+@pytest.mark.parametrize(
+    ("recipient", "document", "status"),
+    [
+        ("loyal-opposition", "target-document", "invalid"),
+        ("loyal-opposition:B", "Target Document", "invalid"),
+        ("loyal-opposition:H", "target-document", "not_found"),
+        ("loyal-opposition:B", "missing-document", "not_found"),
+    ],
+)
+def test_targeted_reoffer_invalid_and_not_found_outcomes(
+    project_dir: Path,
+    recipient: str,
+    document: str,
+    status: str,
+) -> None:
+    state_dirs = _seed_targeted_reoffer_state(project_dir)
+    state_path = state_dirs.dispatch_dirs[0] / DISPATCH_STATE_FILENAME
+    before = state_path.read_bytes()
+
+    result = targeted_reoffer(state_dirs, recipient, document)
+
+    assert result.status == status
+    assert result.mutated is False
+    assert state_path.read_bytes() == before
 
 
 # WI4793_DRAIN_KILL_SWITCH_TEST

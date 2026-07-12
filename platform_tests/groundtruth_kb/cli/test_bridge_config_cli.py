@@ -127,6 +127,177 @@ def test_bridge_dispatch_drain_dry_run_reports_live_dispatch_run_worker(
     assert payload["terminated_pids"] == []
 
 
+def test_bridge_dispatch_targeted_reoffer_json_apply_is_scoped_and_audited(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_dispatch_state(
+        root,
+        {
+            "thread_reoffers": {"target-document": {"count": 3}, "other-document": {"count": 1}},
+            "recipients": {
+                "loyal-opposition:D": {
+                    "last_dispatched_signatures_by_document": {
+                        "target-document": "target-signature",
+                        "other-document": "other-signature",
+                    },
+                    "last_dispatched_signature": "target-signature",
+                    "signature": "target-signature",
+                    "last_launch": {"dispatch_id": "dispatch-1"},
+                    "last_attempt": {"reason": "document_lease_held"},
+                    "launch_ledger": {"active": {}, "completed": ["dispatch-0"]},
+                    "failure_count": 2,
+                    "circuit_breaker_tripped": True,
+                }
+            },
+        },
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "bridge",
+            "dispatch",
+            "reset",
+            "--recipient",
+            "loyal-opposition:D",
+            "--document",
+            "target-document",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "changed"
+    assert payload["mutated"] is True
+    assert Path(payload["audit_path"]).is_file()
+    state = json.loads((root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json").read_text(encoding="utf-8"))
+    recipient = state["recipients"]["loyal-opposition:D"]
+    assert recipient["last_dispatched_signatures_by_document"] == {"other-document": "other-signature"}
+    assert recipient["last_dispatched_signature"] is None
+    assert recipient["signature"] is None
+    assert recipient["last_launch"] == {"dispatch_id": "dispatch-1"}
+    assert recipient["last_attempt"] == {"reason": "document_lease_held"}
+    assert recipient["launch_ledger"] == {"active": {}, "completed": ["dispatch-0"]}
+    assert recipient["failure_count"] == 2
+    assert recipient["circuit_breaker_tripped"] is True
+    assert state["thread_reoffers"] == {"other-document": {"count": 1}}
+
+
+def test_bridge_dispatch_targeted_reoffer_dry_run_is_nonmutating(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_dispatch_state(
+        root,
+        {
+            "thread_reoffers": {"target-document": {"count": 3}},
+            "recipients": {
+                "loyal-opposition:D": {
+                    "last_dispatched_signatures_by_document": {"target-document": "target-signature"}
+                }
+            },
+        },
+    )
+    state_path = root / ".gtkb-state" / "bridge-poller" / "dispatch-state.json"
+    before = state_path.read_bytes()
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "bridge",
+            "dispatch",
+            "reset",
+            "--recipient",
+            "loyal-opposition:D",
+            "--document",
+            "target-document",
+            "--dry-run",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["status"] == "changed"
+    assert state_path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "extra_args",
+    [
+        ["--recipient", "loyal-opposition:D"],
+        ["--document", "target-document"],
+        ["--recipient", "loyal-opposition:D", "--document", "target-document", "--soft"],
+        ["--recipient", "loyal-opposition:D", "--document", "target-document", "--hard", "--confirm"],
+    ],
+)
+def test_bridge_dispatch_targeted_reoffer_invalid_argument_combinations_are_json(
+    tmp_path: Path,
+    extra_args: list[str],
+) -> None:
+    _root, config = _project(tmp_path)
+
+    result = CliRunner().invoke(
+        main,
+        ["--config", str(config), "bridge", "dispatch", "reset", *extra_args, "--json"],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["status"] == "invalid"
+    assert payload["mutated"] is False
+
+
+def test_bridge_dispatch_targeted_reoffer_reports_live_lease(tmp_path: Path) -> None:
+    root, config = _project(tmp_path)
+    _write_dispatch_state(
+        root,
+        {
+            "recipients": {
+                "loyal-opposition:D": {
+                    "last_dispatched_signatures_by_document": {"target-document": "target-signature"}
+                }
+            }
+        },
+    )
+    lease_path = root / ".gtkb-state" / "bridge-poller" / "leases" / "target-document.lock"
+    lease_path.parent.mkdir(parents=True)
+    lease_path.write_text(
+        json.dumps(
+            {
+                "doc_slug": "target-document",
+                "lease_token": "held",
+                "pid": 123,
+                "heartbeat_at": "2999-01-01T00:00:00+00:00",
+                "ttl_seconds": 300,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "bridge",
+            "dispatch",
+            "reset",
+            "--recipient",
+            "loyal-opposition:D",
+            "--document",
+            "target-document",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "lease_held"
+    assert payload["mutated"] is False
+
+
 def test_bridge_dispatch_daemon_stop_reaps_workers_before_daemon_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
