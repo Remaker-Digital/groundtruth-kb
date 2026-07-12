@@ -870,6 +870,70 @@ def test_daemon_reconciles_nonzero_exit_and_falls_back_to_next_lo(
     assert fallback_state["last_launch"]["dispatch_id"] == "fallback-lo-run"
 
 
+def test_wi5207_daemon_delegates_per_document_exit_reconciliation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import datetime as dt
+
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    runs_dir = state_dir / runtime.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    dispatch_id = "wi5207-daemon-partial"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    _write_bridge(root, "daemon-completed", "NEW", 1)
+    _write_bridge(root, "daemon-completed", "GO", 2)
+    _write_bridge(root, "daemon-missing", "NO-ACTION", 2)
+    launched_at = (dt.datetime.now(dt.UTC) - dt.timedelta(seconds=5)).isoformat()
+    runtime._write_dispatch_state(
+        state_dir,
+        {
+            "schema_version": 1,
+            "updated_at": launched_at,
+            "recipients": {
+                "loyal-opposition:B": {
+                    "last_result": "launched",
+                    "pending_count": 2,
+                    "selected_count": 2,
+                    "failure_count": 0,
+                    "last_launch": {
+                        "dispatch_id": dispatch_id,
+                        "recipient": "loyal-opposition:B",
+                        "launched": True,
+                        "launched_at": launched_at,
+                        "signature": "daemon-batch-signature",
+                        "needed_role_label": "loyal-opposition",
+                        "selected_documents": ["daemon-completed", "daemon-missing"],
+                        "selected_top_files": [
+                            "bridge/daemon-completed-001.md",
+                            "bridge/daemon-missing-002.md",
+                        ],
+                        "selected_document_signatures": {
+                            "daemon-completed": "completed-signature",
+                            "daemon-missing": "missing-signature",
+                        },
+                        "primary_bridge_id": "daemon-completed",
+                    },
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(runtime, "_resolve_dispatch_targets", lambda *_args, **_kwargs: [])
+
+    daemon.compute_shadow_decisions(root, max_items=2)
+
+    state = runtime._load_dispatch_state(state_dir, root)["recipients"]["loyal-opposition:B"]
+    assert state["last_result"] == runtime.SELECTED_DOCUMENTS_INCOMPLETE
+    assert state["last_launch"]["completed_documents"] == ["daemon-completed"]
+    assert state["last_launch"]["incomplete_documents"] == ["daemon-missing"]
+    assert state["last_dispatched_signatures_by_document"] == {
+        "daemon-completed": "completed-signature",
+    }
+
+
 # --- WI-4852: watchdog dormancy detection and fail-soft restart ---------------
 
 

@@ -6270,6 +6270,275 @@ def test_find_dispatch_verdict_requires_canonical_version_advancement(tmp_path: 
     assert latency == pytest.approx(2.0)
 
 
+def _wi5207_batch_launch(
+    *,
+    dispatch_id: str,
+    launched_at: str,
+    documents: list[str],
+    top_versions: list[int],
+) -> dict:
+    return {
+        "dispatch_id": dispatch_id,
+        "recipient": "loyal-opposition:B",
+        "launched": True,
+        "pid": 12345,
+        "launched_at": launched_at,
+        "signature": "batch-signature",
+        "needed_role_label": "loyal-opposition",
+        "selected_documents": documents,
+        "selected_top_files": [f"bridge/{slug}-{version:03d}.md" for slug, version in zip(documents, top_versions)],
+        "selected_document_signatures": {slug: f"signature-{slug}" for slug in documents},
+        "primary_bridge_id": documents[0],
+        "document_lease_handles": [{"doc_slug": slug} for slug in documents],
+    }
+
+
+def test_wi5207_partial_batch_preserves_completed_signature_and_reoffers_only_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    _write_registry(
+        root,
+        [
+            _rec("B", "claude", ["loyal-opposition"], "active", _CLAUDE_INVOCATION_SURFACES),
+            _rec("A", "codex", ["prime-builder"], "active", _CODEX_INVOCATION_SURFACES),
+        ],
+    )
+    bridge_dir = root / "bridge"
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "wi5207-partial"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    _write_bridge_file(root, "completed-thread-001.md", "NEW\n")
+    (bridge_dir / "completed-thread-002.md").write_text("GO\n", encoding="utf-8")
+    _write_bridge_file(root, "missing-thread-001.md", "REVISED\n")
+    released: list[list[str]] = []
+
+    def _release(records):
+        slugs = [record["doc_slug"] for record in records]
+        released.append(slugs)
+        return slugs
+
+    monkeypatch.setattr(trigger, "_release_document_lease_records", _release)
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        documents=["completed-thread", "missing-thread"],
+        top_versions=[1, 1],
+    )
+    recipients_state = {
+        "loyal-opposition:B": {
+            "last_launch": launch,
+            "last_dispatched_signature": "batch-signature",
+            "signature": "batch-signature",
+            "last_dispatched_signatures_by_document": {
+                "older-thread": "older-signature",
+                "missing-thread": "stale-missing-signature",
+            },
+            "failure_count": 2,
+            "circuit_breaker_tripped": True,
+            "failure_class": "provider_failure",
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:B"]
+    assert state["last_result"] == trigger.SELECTED_DOCUMENTS_INCOMPLETE
+    assert state["last_launch"]["completed_documents"] == ["completed-thread"]
+    assert state["last_launch"]["incomplete_documents"] == ["missing-thread"]
+    assert state["last_launch"]["exit_failure_reason"] == trigger.SELECTED_DOCUMENTS_INCOMPLETE
+    assert state["last_dispatched_signature"] is None
+    assert state["signature"] is None
+    assert state["last_dispatched_signatures_by_document"] == {
+        "older-thread": "older-signature",
+        "completed-thread": "signature-completed-thread",
+    }
+    assert state["failure_count"] == 0
+    assert state["circuit_breaker_tripped"] is False
+    assert "failure_class" not in state
+    assert state["pending_count"] == 1
+    assert released == [["completed-thread", "missing-thread"]]
+    assert _failure_records(state_dir) == []
+
+    trigger._write_dispatch_state(
+        state_dir,
+        {
+            "schema_version": 1,
+            "updated_at": trigger._now_iso(),
+            "recipients": recipients_state,
+        },
+    )
+    captured_lo_batches: list[list[str]] = []
+
+    def _capture_reoffer(**kwargs):
+        if kwargs["target"].needed_role_label == "loyal-opposition":
+            captured_lo_batches.append([item.document_name for item in kwargs["items"]])
+        return {"launched": False, "reason": "dry_run", "dispatch_id": kwargs.get("dispatch_id")}
+
+    monkeypatch.setattr(trigger, "_is_dispatch_ready", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(trigger, "_spawn_harness", _capture_reoffer)
+
+    reoffer_result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True, max_items=2)
+
+    assert captured_lo_batches == [["missing-thread"]], reoffer_result["results"]
+
+
+def test_wi5207_full_batch_retains_every_document_signature(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "wi5207-full"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    for slug, verdict in (("first-thread", "GO"), ("second-thread", "NO-GO")):
+        (bridge_dir / f"{slug}-001.md").write_text("NEW\n", encoding="utf-8")
+        (bridge_dir / f"{slug}-002.md").write_text(f"{verdict}\n", encoding="utf-8")
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        documents=["first-thread", "second-thread"],
+        top_versions=[1, 1],
+    )
+    launch.pop("document_lease_handles")
+    recipients_state = {"loyal-opposition:B": {"last_launch": launch, "failure_count": 0}}
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:B"]
+    assert state["last_dispatched_signature"] == "batch-signature"
+    assert state["last_dispatched_signatures_by_document"] == {
+        "first-thread": "signature-first-thread",
+        "second-thread": "signature-second-thread",
+    }
+    assert state["last_launch"]["completed_documents"] == ["first-thread", "second-thread"]
+    assert state["last_launch"]["incomplete_documents"] == []
+    assert "exit_failure_reason" not in state["last_launch"]
+
+
+def test_wi5207_mixed_new_no_action_batch_requires_each_corrected_verdict(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "wi5207-mixed"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    (bridge_dir / "new-thread-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "new-thread-002.md").write_text("GO\n", encoding="utf-8")
+    (bridge_dir / "no-action-thread-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "no-action-thread-002.md").write_text("NO-ACTION\n", encoding="utf-8")
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        documents=["new-thread", "no-action-thread"],
+        top_versions=[1, 2],
+    )
+    launch.pop("document_lease_handles")
+    recipients_state = {"loyal-opposition:B": {"last_launch": launch, "failure_count": 0}}
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:B"]
+    assert state["last_result"] == trigger.SELECTED_DOCUMENTS_INCOMPLETE
+    assert state["last_launch"]["incomplete_documents"] == ["no-action-thread"]
+    assert state["last_dispatched_signatures_by_document"] == {
+        "new-thread": "signature-new-thread",
+    }
+
+
+def test_wi5207_single_document_no_verdict_keeps_legacy_failure(tmp_path: Path) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "wi5207-single"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    (bridge_dir / "single-thread-001.md").write_text("NEW\n", encoding="utf-8")
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        documents=["single-thread"],
+        top_versions=[1],
+    )
+    launch.pop("document_lease_handles")
+    recipients_state = {"loyal-opposition:B": {"last_launch": launch, "failure_count": 0}}
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:B"]
+    assert state["last_result"] == "no_verdict_produced"
+    assert state["failure_count"] == 1
+    assert state["last_launch"]["incomplete_documents"] == ["single-thread"]
+
+
+def test_wi5207_late_verdict_is_snapshotted_before_recipient_state_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "wi5207-late"
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    for slug in ("early-thread", "late-thread"):
+        (bridge_dir / f"{slug}-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge_dir / "early-thread-002.md").write_text("GO\n", encoding="utf-8")
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        documents=["early-thread", "late-thread"],
+        top_versions=[1, 1],
+    )
+    launch.pop("document_lease_handles")
+    recipients_state = {"loyal-opposition:B": {"last_launch": launch, "failure_count": 0, "last_result": "launched"}}
+    original_find = trigger._find_dispatch_verdict
+    calls: list[str] = []
+
+    def _find_with_late_verdict(**kwargs):
+        calls.append(kwargs["bridge_id"])
+        assert recipients_state["loyal-opposition:B"]["last_result"] == "launched"
+        if kwargs["bridge_id"] == "early-thread":
+            (bridge_dir / "late-thread-002.md").write_text("VERIFIED\n", encoding="utf-8")
+            monkeypatch.setattr(trigger, "_git_commit_containing_path", lambda *_args: "committed-sha")
+        return original_find(**kwargs)
+
+    monkeypatch.setattr(trigger, "_find_dispatch_verdict", _find_with_late_verdict)
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:B"]
+    assert calls == ["early-thread", "late-thread"]
+    assert state["last_launch"]["incomplete_documents"] == []
+    assert state["last_dispatched_signature"] == "batch-signature"
+
+
 def test_lo_nonzero_exit_with_post_launch_verdict_reconciles_success(tmp_path: Path) -> None:
     """WI-4933: an LO worker that files a verdict then exits nonzero is recovered."""
     from datetime import datetime, timedelta

@@ -1315,6 +1315,32 @@ def test_wi4995_document_lease_held_does_not_hide_current_exit_failure() -> None
     assert classification["stale_failure_evidence"] is False
 
 
+def test_wi5207_selected_documents_incomplete_is_distinct_nonprovider_warning() -> None:
+    row: dict = {
+        "pending_count": 1,
+        "selected_count": 0,
+        "last_result": "selected_documents_incomplete",
+        "failure_count": 0,
+        "circuit_breaker_tripped": False,
+        "last_launch": {
+            "recipient": "loyal-opposition:B",
+            "exit_failure_reason": "selected_documents_incomplete",
+            "completed_documents": ["completed-thread"],
+            "incomplete_documents": ["missing-thread"],
+        },
+    }
+
+    classification = bridge_dispatch_config._runtime_classification_for_recipient("loyal-opposition:B", row)
+    findings = "\n".join(classification["findings"])
+
+    assert classification["severity"] == "WARN"
+    assert "selected_documents_incomplete" in findings
+    assert "missing_documents=['missing-thread']" in findings
+    assert "dispatch runtime failure" not in findings
+    assert "provider_failure" not in findings
+    assert classification["failure_class"] is None
+
+
 def test_wi4992_all_impl_auth_quarantine_ignores_stale_failure_class() -> None:
     """all_impl_auth_quarantined is deterministic non-work, not a subprocess failure."""
     row: dict = {

@@ -100,6 +100,7 @@ DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS = frozenset(
 BENIGN_NONLAUNCH_LAUNCH_REASONS = BENIGN_NONLAUNCH_LAUNCH_REASONS | DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS
 DOCUMENT_LEASE_HELD_NONLAUNCH_REASON = "document_lease_held"
 IMPL_AUTH_QUARANTINED_NONLAUNCH_REASON = "all_impl_auth_quarantined"
+SELECTED_DOCUMENTS_INCOMPLETE_RESULT = "selected_documents_incomplete"
 HEALTH_STATUS_RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
 RECENT_RUN_FAILURE_MARKERS = (
     ("provider_rate_limited", "provider_rate_limited"),
@@ -1372,6 +1373,17 @@ def _runtime_classification_for_recipient(
             "dispatch runtime warning: "
             f"{recipient_key} backpressure last_result={last_result} "
             f"with pending_count={pending_count}, live_inflight={live_inflight_dispatch_count}"
+        )
+    if (
+        last_result == SELECTED_DOCUMENTS_INCOMPLETE_RESULT
+        or launch_exit_failure == SELECTED_DOCUMENTS_INCOMPLETE_RESULT
+    ) and has_pending_work:
+        missing_documents = last_launch.get("incomplete_documents")
+        findings.append(
+            "dispatch runtime warning: "
+            f"{recipient_key} selected_documents_incomplete "
+            f"missing_documents={missing_documents if isinstance(missing_documents, list) else []} "
+            f"with pending_count={pending_count}"
         )
     if last_result == "launch_failed" and launch_reason in DISPATCH_BUDGET_BENIGN_LAUNCH_REASONS and has_pending_work:
         cap_value = last_launch.get("per_session_usd")

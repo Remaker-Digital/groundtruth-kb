@@ -414,6 +414,7 @@ FATAL_WORKER_OUTPUT_MARKERS = (
 )
 POST_VERDICT_RECONCILABLE_FAILURE_CLASSES = frozenset({"max_turn_exhaustion", "worker_timeout"})
 VERIFIED_FINALIZATION_MISSING_COMMIT = "verified_finalization_missing_commit"
+SELECTED_DOCUMENTS_INCOMPLETE = "selected_documents_incomplete"
 FAST_TRIP_FAILURE_CLASSES = frozenset(
     {
         "auth_failure",
@@ -5066,6 +5067,7 @@ def _spawn_harness(
         "status_file_path": str(status_file_path),
         "selected_documents": [it.document_name for it in selected],
         "selected_top_files": [getattr(it, "top_file", "") for it in selected],
+        "selected_document_signatures": {it.document_name: _signature([it]) for it in selected},
         "primary_bridge_id": primary_bridge_id,
         "worker_lifetime_seconds": _worker_lifetime,
         "worker_lifetime_source": lifetime_profile.get("source"),
@@ -5269,6 +5271,87 @@ def _primary_bridge_id_for_launch(launch: dict[str, Any]) -> str:
     return ""
 
 
+def _selected_bridge_ids_for_launch(launch: dict[str, Any]) -> list[str]:
+    selected: list[str] = []
+    raw_selected = launch.get("selected_documents")
+    if isinstance(raw_selected, list):
+        for item in raw_selected:
+            if isinstance(item, str) and item.strip() and item.strip() not in selected:
+                selected.append(item.strip())
+    if not selected:
+        primary = _primary_bridge_id_for_launch(launch)
+        if primary:
+            selected.append(primary)
+    return selected
+
+
+def _selected_top_versions_for_launch(launch: dict[str, Any]) -> dict[str, int]:
+    selected = _selected_bridge_ids_for_launch(launch)
+    raw_top_files = launch.get("selected_top_files")
+    if not isinstance(raw_top_files, list):
+        return {}
+    versions: dict[str, int] = {}
+    for bridge_id, raw_path in zip(selected, raw_top_files, strict=False):
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        parsed = parse_versioned_bridge_filename(Path(raw_path).name)
+        if parsed is None:
+            continue
+        slug, version = parsed
+        accepted_slugs = {bridge_id, f"gtkb-{bridge_id}"}
+        if slug in accepted_slugs:
+            versions[bridge_id] = version
+    return versions
+
+
+def _selected_document_signatures_for_launch(launch: dict[str, Any]) -> dict[str, str]:
+    selected = _selected_bridge_ids_for_launch(launch)
+    raw_signatures = launch.get("selected_document_signatures")
+    signatures = (
+        {str(key): str(value) for key, value in raw_signatures.items() if isinstance(key, str) and value}
+        if isinstance(raw_signatures, dict)
+        else {}
+    )
+    if len(selected) == 1 and selected[0] not in signatures and launch.get("signature"):
+        signatures[selected[0]] = str(launch["signature"])
+    return signatures
+
+
+def _selected_document_verdicts(
+    launch: dict[str, Any],
+    *,
+    dispatch_ts: float,
+    project_root: Path,
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Snapshot completion evidence for every selected document before state mutation."""
+
+    versions = _selected_top_versions_for_launch(launch)
+    outcomes: dict[str, dict[str, Any]] = {}
+    incomplete: list[str] = []
+    for bridge_id in _selected_bridge_ids_for_launch(launch):
+        verdict_path, verdict_latency = _find_dispatch_verdict(
+            dispatch_ts=dispatch_ts,
+            bridge_id=bridge_id,
+            project_root=project_root,
+            after_version=versions.get(bridge_id),
+        )
+        if verdict_path is None:
+            incomplete.append(bridge_id)
+            outcomes[bridge_id] = {"completed": False}
+            continue
+        verdict_status = _status_from_bridge_file(project_root / verdict_path)
+        completed = verdict_status in _DISPATCH_VERDICT_STATUSES
+        outcomes[bridge_id] = {
+            "completed": completed,
+            "verdict_path": verdict_path,
+            "verdict_status": verdict_status,
+            "verdict_latency_seconds": verdict_latency,
+        }
+        if not completed:
+            incomplete.append(bridge_id)
+    return outcomes, incomplete
+
+
 def _document_lease_ttl_seconds(role_label: str | None, lifetime_seconds: int | None = None) -> int:
     lifetime = lifetime_seconds if lifetime_seconds is not None else worker_lifetime_seconds(role_label) or 0
     return max(lifetime + 300, 600)
@@ -5418,35 +5501,67 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
         failure_error_type: str | None = None
         failure_extra: dict[str, Any] = {}
         post_verdict_exit_reconciled = False
+        selected_documents_incomplete = False
+        selected_document_outcomes: dict[str, dict[str, Any]] = {}
+        completed_documents: list[str] = []
+        incomplete_documents: list[str] = []
         if last_launch.get("needed_role_label") == "loyal-opposition":
             dispatch_ts = _launch_ts(last_launch)
-            bridge_id = _primary_bridge_id_for_launch(last_launch)
-            after_version = _selected_top_version_for_launch(last_launch, bridge_id)
-            verdict_path, verdict_latency = (
-                _find_dispatch_verdict(
+            selected_bridge_ids = _selected_bridge_ids_for_launch(last_launch)
+            if dispatch_ts is not None:
+                selected_document_outcomes, incomplete_documents = _selected_document_verdicts(
+                    last_launch,
                     dispatch_ts=dispatch_ts,
-                    bridge_id=bridge_id,
                     project_root=project_root,
-                    after_version=after_version,
                 )
-                if dispatch_ts is not None
-                else (None, None)
-            )
-            if verdict_path:
-                verdict_status = _status_from_bridge_file(project_root / verdict_path)
-                last_launch["verdict_path"] = verdict_path
-                if verdict_status:
-                    last_launch["verdict_status"] = verdict_status
-                last_launch["verdict_latency_seconds"] = verdict_latency
-                if verdict_status == "VERIFIED":
+                completed_documents = [
+                    bridge_id
+                    for bridge_id in selected_bridge_ids
+                    if selected_document_outcomes.get(bridge_id, {}).get("completed") is True
+                ]
+            else:
+                incomplete_documents = list(selected_bridge_ids)
+                selected_document_outcomes = {bridge_id: {"completed": False} for bridge_id in selected_bridge_ids}
+
+            last_launch["selected_document_outcomes"] = selected_document_outcomes
+            last_launch["completed_documents"] = completed_documents
+            last_launch["incomplete_documents"] = incomplete_documents
+
+            primary_bridge_id = _primary_bridge_id_for_launch(last_launch)
+            primary_outcome = selected_document_outcomes.get(primary_bridge_id, {})
+            if primary_outcome.get("completed"):
+                last_launch["verdict_path"] = primary_outcome["verdict_path"]
+                last_launch["verdict_status"] = primary_outcome["verdict_status"]
+                last_launch["verdict_latency_seconds"] = primary_outcome["verdict_latency_seconds"]
+
+            verified_commit_shas: dict[str, str] = {}
+            for bridge_id in completed_documents:
+                outcome = selected_document_outcomes[bridge_id]
+                if outcome.get("verdict_status") == "VERIFIED":
+                    verdict_path = str(outcome["verdict_path"])
                     commit_sha = _git_commit_containing_path(project_root, verdict_path)
                     if commit_sha:
-                        last_launch["verified_commit_sha"] = commit_sha
+                        verified_commit_shas[bridge_id] = commit_sha
                     else:
                         failure_reason = VERIFIED_FINALIZATION_MISSING_COMMIT
                         failure_error_type = VERIFIED_FINALIZATION_MISSING_COMMIT
                         failure_extra["verdict_path"] = verdict_path
-                if failure_reason is None and exit_code != 0:
+                        failure_extra["bridge_id"] = bridge_id
+                        break
+            if verified_commit_shas:
+                last_launch["verified_commit_shas_by_document"] = verified_commit_shas
+                if primary_bridge_id in verified_commit_shas:
+                    last_launch["verified_commit_sha"] = verified_commit_shas[primary_bridge_id]
+
+            if failure_reason is None and incomplete_documents:
+                if len(selected_bridge_ids) > 1 and exit_code == 0:
+                    selected_documents_incomplete = True
+                elif exit_code == 0:
+                    failure_reason = "no_verdict_produced"
+                    failure_error_type = "missing_bridge_verdict"
+                    failure_extra["bridge_id"] = primary_bridge_id
+            elif failure_reason is None and exit_code != 0:
+                if completed_documents:
                     matched_label = str(matched_markers[0]["label"]) if matched_markers else ""
                     if matched_label and matched_label not in POST_VERDICT_RECONCILABLE_FAILURE_CLASSES:
                         failure_reason = matched_label
@@ -5459,16 +5574,22 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                         last_launch["exit_reconciled_after_verdict"] = True
                         last_launch["post_verdict_exit_code"] = exit_code
                         post_verdict_exit_reconciled = True
-            elif exit_code == 0:
-                failure_reason = "no_verdict_produced"
-                failure_error_type = "missing_bridge_verdict"
-                failure_extra["bridge_id"] = bridge_id
-        if failure_reason is None and matched_markers and not post_verdict_exit_reconciled:
+        if (
+            failure_reason is None
+            and matched_markers
+            and not post_verdict_exit_reconciled
+            and not selected_documents_incomplete
+        ):
             failure_reason = matched_markers[0]["label"]
             failure_error_type = "fatal_worker_output_marker"
             failure_extra.update(inspected_paths)
             failure_extra["matched_markers"] = matched_markers
-        if failure_reason is None and exit_code == 124 and not post_verdict_exit_reconciled:
+        if (
+            failure_reason is None
+            and exit_code == 124
+            and not post_verdict_exit_reconciled
+            and not selected_documents_incomplete
+        ):
             failure_reason = "worker_timeout"
             failure_error_type = "worker_timeout"
 
@@ -5477,13 +5598,50 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
                 last_launch.get("document_lease_handles")
             )
 
-        dispatch_succeeded = (exit_code == 0 or post_verdict_exit_reconciled) and failure_reason is None
-        if dispatch_succeeded:
+        dispatch_succeeded = (
+            (exit_code == 0 or post_verdict_exit_reconciled)
+            and failure_reason is None
+            and not selected_documents_incomplete
+        )
+        document_signatures = _selected_document_signatures_for_launch(last_launch)
+        prior_document_signatures = recipient_state.get("last_dispatched_signatures_by_document")
+        if not isinstance(prior_document_signatures, dict):
+            prior_document_signatures = {}
+        retained_document_signatures = dict(prior_document_signatures)
+        if selected_documents_incomplete:
+            for bridge_id in completed_documents:
+                if bridge_id in document_signatures:
+                    retained_document_signatures[bridge_id] = document_signatures[bridge_id]
+            for bridge_id in incomplete_documents:
+                retained_document_signatures.pop(bridge_id, None)
+            recipient_state["last_dispatched_signatures_by_document"] = retained_document_signatures
+            recipient_state["last_dispatched_signature"] = None
+            recipient_state["signature"] = None
+            recipient_state["last_suppressed_signature"] = None
+            recipient_state["pending_count"] = len(incomplete_documents)
+            recipient_state["selected_count"] = 0
+            recipient_state["failure_count"] = 0
+            recipient_state["circuit_breaker_tripped"] = False
+            recipient_state.pop("circuit_breaker_tripped_at", None)
+            recipient_state.pop("circuit_breaker_half_open", None)
+            recipient_state.pop("last_failure_reason", None)
+            recipient_state.pop("failure_class", None)
+            recipient_state.pop("non_retryable_failure", None)
+            recipient_state.pop("previous_launch_failed_logged_at", None)
+            recipient_state.pop("previous_launch_failed", None)
+            recipient_state["last_result"] = SELECTED_DOCUMENTS_INCOMPLETE
+            last_launch["exit_failure_reason"] = SELECTED_DOCUMENTS_INCOMPLETE
+        elif dispatch_succeeded:
             # Success: keep signature state aligned for every recipient role.
             if launch_signature:
                 recipient_state["last_dispatched_signature"] = launch_signature
                 recipient_state["signature"] = launch_signature
                 recipient_state["last_suppressed_signature"] = None
+            for bridge_id in completed_documents:
+                if bridge_id in document_signatures:
+                    retained_document_signatures[bridge_id] = document_signatures[bridge_id]
+            if retained_document_signatures:
+                recipient_state["last_dispatched_signatures_by_document"] = retained_document_signatures
 
             # Reset failure count and circuit breaker
             recipient_state["failure_count"] = 0
@@ -5501,6 +5659,12 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             recipient_state.pop("previous_launch_failed", None)
         else:
             # Failure!
+            for bridge_id in _selected_bridge_ids_for_launch(last_launch):
+                retained_document_signatures.pop(bridge_id, None)
+            if retained_document_signatures:
+                recipient_state["last_dispatched_signatures_by_document"] = retained_document_signatures
+            else:
+                recipient_state.pop("last_dispatched_signatures_by_document", None)
             if launch_signature:
                 # A failed launch is not a completed dispatch for dedupe
                 # purposes. Keep the failed batch signature on last_launch for
@@ -6222,6 +6386,11 @@ def run_dispatch_cycle(
                 else prior_legacy_signature
             )
             prior_suppressed = prior.get("last_suppressed_signature") if isinstance(prior, dict) else None
+            prior_document_signatures = (
+                prior.get("last_dispatched_signatures_by_document") if isinstance(prior, dict) else None
+            )
+            if not isinstance(prior_document_signatures, dict):
+                prior_document_signatures = {}
 
             # Carry forward prior values; update conditionally per branch below.
             recipient_state: dict[str, Any] = {
@@ -6231,6 +6400,7 @@ def run_dispatch_cycle(
                 "raw_pending_count": len(items),
                 "updated_at": _now_iso(),
                 "last_dispatched_signature": prior_dispatched,
+                "last_dispatched_signatures_by_document": dict(prior_document_signatures),
                 "last_suppressed_signature": prior_suppressed,
                 # Legacy field updated only on real dispatch; carry forward here.
                 "signature": prior_legacy_signature,
