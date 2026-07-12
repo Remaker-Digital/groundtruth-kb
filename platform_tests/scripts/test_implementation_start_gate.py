@@ -831,6 +831,20 @@ def test_bridge_status_file_write_blocks_without_governed_helper(tmp_path: Path)
     assert "governed bridge" in result["reason"]
 
 
+@pytest.mark.parametrize("path_key", ["path", "file_path"])
+def test_raw_write_bridge_status_path_aliases_remain_direct_mutation_denials(tmp_path: Path, path_key: str) -> None:
+    payload = {
+        "cwd": str(tmp_path),
+        "tool_name": "Write",
+        "tool_input": {path_key: "bridge/provider-verdict-002.md", "content": "GO\n"},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "bridge_status_file_direct_mutation"
+
+
 def test_non_status_bridge_note_write_remains_open_without_authorization(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),

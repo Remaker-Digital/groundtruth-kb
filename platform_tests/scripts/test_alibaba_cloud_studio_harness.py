@@ -69,6 +69,7 @@ def test_routing_loads_alibaba_default_and_ignores_same_model_from_other_provide
     assert config.default_model == "alib-route"
     assert set(config.models) == {"alib-route"}
     assert selected.model_id == "alibaba-deepseek-v4-pro"
+    assert "PublishBridgeVerdict" not in selected.allowed_tools
     assert ach.resolve_model(config, None, skill="bridge-review") == selected
 
 
@@ -106,17 +107,41 @@ def test_run_tool_loop_delegates_profile_and_native_hook_runner(
     def fake_run_tool_loop(*args, **kwargs):
         captured["profile"] = args[6]
         captured["native_hook_runner"] = kwargs["native_hook_runner"]
+        captured["skill"] = kwargs["skill"]
         return "done"
 
     monkeypatch.setattr(base, "run_tool_loop", fake_run_tool_loop)
 
     assert (
         ach.run_tool_loop(
-            "hello", route, "https://example.test/v1", "fixture-token", 1, root, native_hook_runner=hook_runner
+            "hello",
+            route,
+            "https://example.test/v1",
+            "fixture-token",
+            1,
+            root,
+            skill="bridge-review",
+            native_hook_runner=hook_runner,
         )
         == "done"
     )
-    assert captured == {"profile": ach._ALIBABA_PROFILE, "native_hook_runner": hook_runner}
+    assert captured == {
+        "profile": ach._ALIBABA_PROFILE,
+        "native_hook_runner": hook_runner,
+        "skill": "bridge-review",
+    }
+
+
+def test_bridge_review_prompt_requires_governed_verdict_tool(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    route = ach.resolve_model(ach.load_routing_config(root), None)
+
+    prompt = ach.build_system_prompt("bridge-review", route)
+
+    assert prompt is not None
+    assert "PublishBridgeVerdict" in prompt
+    assert "never use Write, Edit, or Bash for a numbered bridge artifact" in prompt
+    assert ach.build_system_prompt("implementation", route) is None
 
 
 def test_alibaba_native_hook_adapter_accepts_empty_non_tool_lifecycle_output(

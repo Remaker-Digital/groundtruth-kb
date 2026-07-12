@@ -63,6 +63,7 @@ _ALIBABA_PROFILE = base.AdopterProfile(
     dialect=base.DIALECT_ANTHROPIC_MESSAGES,
     hook_tier=base.HOOK_TIER_NATIVE_FULL,
     auth_style=base.AUTH_STYLE_AUTHORIZATION_BEARER,
+    publish_bridge_verdict_tool=True,
 )
 
 
@@ -163,6 +164,7 @@ def run_tool_loop(
     max_turns: int,
     project_root: Path,
     *,
+    skill: str | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
@@ -179,6 +181,7 @@ def run_tool_loop(
         max_turns,
         project_root,
         _ALIBABA_PROFILE,
+        skill=skill,
         system_prompt=system_prompt,
         chat_func=chat_func or call_alibaba_cloud_studio_chat,
         guard_runner=guard_runner,
@@ -199,7 +202,10 @@ def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | Non
         "You are Alibaba Cloud Studio harness H operating as Loyal Opposition for GT-KB. "
         "Use the versioned bridge-file chain as authoritative and acquire the required "
         "bridge work-intent claim before any bridge verdict write. "
-        "Do not use Bash to mutate bridge artifacts; preserve guard decisions exactly. "
+        "Publish every GO, NO-GO, or VERIFIED only with PublishBridgeVerdict; never use Write, Edit, "
+        "or Bash for a numbered bridge artifact. The verdict tool computes path/version and VERIFIED "
+        "requires include_paths plus commit_message (and hunk_patch_paths when reviewed shared-file "
+        "hunks must be isolated). Preserve every guard decision exactly. "
         f"Bridge author metadata: identity={AUTHOR_IDENTITY}; harness_id={AUTHOR_HARNESS_ID}; "
         f"session_id={session_id}; model={model_route.model_id}; allowed_tools={tools}."
     )
@@ -277,6 +283,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             api_key,
             max_turns,
             project_root,
+            skill=args.skill,
             system_prompt=build_system_prompt(args.skill, model_route),
             timeout=operation_timeout,
             session_timeout=session_timeout,

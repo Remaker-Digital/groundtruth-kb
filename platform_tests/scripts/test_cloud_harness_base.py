@@ -18,6 +18,8 @@ require:
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -64,6 +66,7 @@ def _profile(**overrides) -> base.AdopterProfile:
         routing_config_path=CFG_PATH,
         dialect=base.DIALECT_OPENAI_CHAT,
         hook_tier=base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
+        publish_bridge_verdict_tool=True,
         extra_headers={},
     )
     kwargs.update(overrides)
@@ -1015,3 +1018,175 @@ def test_cloud_template_inherits_local_diagnostic_contract(tmp_path: Path, monke
 
     assert result["schema_id"] == "gtkb.harness_diagnostic.v1"
     assert captured == {"project_root": root, "harness_id": "H"}
+
+
+def test_publish_bridge_verdict_schema_has_no_path_or_version_authority() -> None:
+    schemas = base.build_tool_schemas([base.PUBLISH_BRIDGE_VERDICT_TOOL])
+
+    schema = schemas[0]["function"]
+    properties = schema["parameters"]["properties"]
+    assert schema["name"] == "PublishBridgeVerdict"
+    assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
+    assert "path" not in properties
+    assert "file_path" not in properties
+    assert "version" not in properties
+    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "VERIFIED"]
+
+
+def test_provider_verdict_publisher_bootstraps_project_root_under_safe_path() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    code = f"""
+import sys
+from pathlib import Path
+
+project_root = Path({str(project_root)!r})
+sys.path.insert(0, str(project_root / "scripts"))
+import cloud_harness_base as base
+sys.path = [entry for entry in sys.path if Path(entry or ".").resolve() != project_root.resolve()]
+publisher = base._load_provider_verdict_publisher(project_root)
+assert publisher.__module__ == "scripts.gtkb_bridge_writer"
+assert str(project_root.resolve()) in sys.path
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-c", code],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_dispatch_worker_role_document_uses_canonical_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from groundtruth_kb.session import envelope
+
+    root = _root(tmp_path)
+    captured: dict[str, object] = {}
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-envelope")
+    monkeypatch.setattr(
+        envelope,
+        "ensure_worker_session",
+        lambda project_root, **kwargs: captured.update(project_root=project_root, **kwargs),
+    )
+
+    base.ensure_dispatch_worker_role_document(root, _profile())
+
+    assert captured == {
+        "project_root": root,
+        "harness_name": "testcloud",
+        "harness_id": "H",
+        "session_id": "dispatch-H-envelope",
+        "role": "loyal-opposition",
+        "role_source": "dispatcher_composition",
+        "init_keyword": "::init gtkb lo",
+        "dispatch_run_id": "dispatch-H-envelope",
+    }
+
+
+def test_dispatch_worker_role_document_rejects_unknown_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb maybe")
+
+    with pytest.raises(base.CloudHarnessError, match="unsupported dispatcher init keyword"):
+        base.ensure_dispatch_worker_role_document(_root(tmp_path), _profile())
+
+
+def test_publish_bridge_verdict_is_filtered_outside_lo_skills() -> None:
+    allowed = ("Read", base.PUBLISH_BRIDGE_VERDICT_TOOL)
+
+    assert base.allowed_tools_for_skill(allowed, "bridge-review", publish_bridge_verdict_tool=True) == allowed
+    assert base.allowed_tools_for_skill(allowed, "verification", publish_bridge_verdict_tool=True) == allowed
+    assert base.allowed_tools_for_skill(allowed, "implementation") == ("Read",)
+    assert base.allowed_tools_for_skill(allowed, None) == ("Read",)
+
+
+def test_dispatch_publish_bridge_verdict_uses_trusted_runtime_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import gtkb_bridge_writer as writer
+
+    root = _root(tmp_path)
+    captured: dict[str, object] = {}
+
+    class _Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md", "claim_released": True}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        captured.update(
+            slug=slug,
+            verdict=verdict,
+            content=content,
+            project_root=project_root,
+            **kwargs,
+        )
+        return _Published()
+
+    monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-1")
+
+    result = base.dispatch_tool_call(
+        base.PUBLISH_BRIDGE_VERDICT_TOOL,
+        {
+            "slug": "example",
+            "verdict": "GO",
+            "content": "GO\n\nResponds to: bridge/example-001.md\n",
+        },
+        _meta(),
+        root,
+        _profile(),
+        skill="bridge-review",
+    )
+
+    assert json.loads(result)["verdict_path"] == "bridge/example-002.md"
+    assert captured["session_id"] == "dispatch-H-1"
+    assert captured["harness_name"] == "testcloud"
+    metadata = captured["author_metadata"]
+    assert isinstance(metadata, dict)
+    assert metadata["author_harness_id"] == "H"
+    assert metadata["author_model"] == "testvendor/tc-model"
+
+
+def test_dispatch_publish_bridge_verdict_denies_non_lo_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _root(tmp_path)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-1")
+
+    with pytest.raises(base.CloudHarnessError, match="bridge-review/verification"):
+        base.dispatch_tool_call(
+            base.PUBLISH_BRIDGE_VERDICT_TOOL,
+            {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            _meta(),
+            root,
+            _profile(),
+            skill="implementation",
+        )
+
+
+def test_dispatch_publish_bridge_verdict_denies_profile_without_capability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-F-1")
+
+    with pytest.raises(base.CloudHarnessError, match="not enabled for this provider profile"):
+        base.dispatch_tool_call(
+            base.PUBLISH_BRIDGE_VERDICT_TOOL,
+            {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            _meta(),
+            root,
+            _profile(publish_bridge_verdict_tool=False, author_harness_id="F"),
+            skill="bridge-review",
+        )

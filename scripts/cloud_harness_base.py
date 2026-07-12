@@ -115,8 +115,13 @@ SKIPPED_SCAN_DIR_NAMES = frozenset(
     }
 )
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
-CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
+PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
+CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash", PUBLISH_BRIDGE_VERDICT_TOOL})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
+DISPATCH_KEYWORD_ROLES = {
+    "::init gtkb lo": "loyal-opposition",
+    "::init gtkb pb": "prime-builder",
+}
 
 # --- Dialect seam (slice 2: openai-chat; slice 3: + anthropic-messages; slice 4: + ollama-native) ---
 DIALECT_OPENAI_CHAT = "openai-chat"
@@ -265,6 +270,7 @@ class AdopterProfile:
     auth_style: str = AUTH_STYLE_AUTHORIZATION_BEARER
     anthropic_version: str = DEFAULT_ANTHROPIC_VERSION
     max_tokens: int = DEFAULT_ANTHROPIC_MAX_TOKENS
+    publish_bridge_verdict_tool: bool = False
 
     def __post_init__(self) -> None:
         if self.dialect not in SUPPORTED_DIALECTS:
@@ -645,12 +651,42 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
+        PUBLISH_BRIDGE_VERDICT_TOOL: _schema(
+            PUBLISH_BRIDGE_VERDICT_TOOL,
+            (
+                "Publish a governed Loyal Opposition GO, NO-GO, or VERIFIED verdict. "
+                "The runtime computes the next bridge path/version. VERIFIED also requires "
+                "include_paths and commit_message; hunk_patch_paths is optional."
+            ),
+            {
+                "slug": {"type": "string"},
+                "verdict": {"type": "string", "enum": ["GO", "NO-GO", "VERIFIED"]},
+                "content": {"type": "string"},
+                "include_paths": {"type": "array", "items": {"type": "string"}},
+                "hunk_patch_paths": {"type": "array", "items": {"type": "string"}},
+                "commit_message": {"type": "string"},
+            },
+            ["slug", "verdict", "content"],
+        ),
     }
     allowed = tuple(allowed_tools)
     unknown = sorted(set(allowed) - CANONICAL_TOOLS)
     if unknown:
         raise CloudHarnessError(f"unknown allowed tools: {unknown}")
     return [schemas[name] for name in allowed]
+
+
+def allowed_tools_for_skill(
+    allowed_tools: Iterable[str],
+    skill: str | None,
+    *,
+    publish_bridge_verdict_tool: bool = False,
+) -> tuple[str, ...]:
+    allowed = tuple(allowed_tools)
+    without_verdict = tuple(name for name in allowed if name != PUBLISH_BRIDGE_VERDICT_TOOL)
+    if publish_bridge_verdict_tool and skill in LOYAL_OPPOSITION_BRIDGE_SKILLS:
+        return (*without_verdict, PUBLISH_BRIDGE_VERDICT_TOOL)
+    return without_verdict
 
 
 def _call_with_wall_clock_bound(
@@ -1557,6 +1593,55 @@ def _positive_int_argument(arguments: Mapping[str, Any], name: str, default: int
     return parsed
 
 
+def _string_list_argument(arguments: Mapping[str, Any], name: str) -> tuple[str, ...]:
+    value = arguments.get(name, [])
+    if value is None:
+        return ()
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+        raise CloudHarnessError(f"{name} must be an array of non-empty strings")
+    return tuple(item.strip() for item in value)
+
+
+def _load_provider_verdict_publisher(project_root: Path) -> Callable[..., Any]:
+    root_text = str(project_root.resolve())
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
+    try:
+        from scripts.gtkb_bridge_writer import publish_lo_verdict
+    except ModuleNotFoundError as exc:
+        raise CloudHarnessError(
+            f"governed bridge verdict publisher is unavailable from project root {root_text}: {exc}"
+        ) from exc
+    return publish_lo_verdict
+
+
+def ensure_dispatch_worker_role_document(project_root: Path, profile: AdopterProfile) -> None:
+    keyword = os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD", "").strip().lower()
+    if not keyword:
+        return
+    role = DISPATCH_KEYWORD_ROLES.get(keyword)
+    if role is None:
+        raise CloudHarnessError(f"unsupported dispatcher init keyword for worker role authority: {keyword!r}")
+    session_id = resolve_harness_session_id(os.environ)
+    if not session_id:
+        raise CloudHarnessError("dispatcher worker role authority requires a concrete dispatch session id")
+    try:
+        from groundtruth_kb.session.envelope import ensure_worker_session
+
+        ensure_worker_session(
+            project_root,
+            harness_name=profile.provider_routing_key,
+            harness_id=profile.author_harness_id,
+            session_id=session_id,
+            role=role,
+            role_source="dispatcher_composition",
+            init_keyword=keyword,
+            dispatch_run_id=session_id,
+        )
+    except (ImportError, OSError, ValueError) as exc:
+        raise CloudHarnessError(f"could not establish dispatcher worker role authority: {exc}") from exc
+
+
 def _dispatch_read(arguments: Mapping[str, Any], project_root: Path) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     max_chars = _positive_int_argument(arguments, "max_chars", MAX_TOOL_OUTPUT_CHARS)
@@ -1589,6 +1674,55 @@ def _dispatch_write(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return f"wrote {_relative_path(project_root, path)}"
+
+
+def _dispatch_publish_bridge_verdict(
+    arguments: Mapping[str, Any],
+    model_metadata: ModelMetadata,
+    project_root: Path,
+    profile: AdopterProfile,
+    *,
+    skill: str | None,
+) -> str:
+    if not profile.publish_bridge_verdict_tool:
+        raise CloudHarnessError("PublishBridgeVerdict is not enabled for this provider profile")
+    if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
+        raise CloudHarnessError("PublishBridgeVerdict is available only for bridge-review/verification skills")
+    session_id = resolve_harness_session_id(os.environ)
+    if not session_id:
+        raise CloudHarnessError("PublishBridgeVerdict requires a concrete dispatcher session id")
+    slug = _require_string(arguments, "slug")
+    verdict = _require_string(arguments, "verdict")
+    content = _require_string(arguments, "content")
+    include_paths = _string_list_argument(arguments, "include_paths")
+    hunk_patch_paths = _string_list_argument(arguments, "hunk_patch_paths")
+    commit_message = str(arguments.get("commit_message") or "")
+
+    try:
+        publish_lo_verdict = _load_provider_verdict_publisher(project_root)
+        published = publish_lo_verdict(
+            slug,
+            verdict,
+            content,
+            project_root,
+            session_id=session_id,
+            harness_name=profile.provider_routing_key,
+            author_metadata={
+                "author_identity": profile.author_identity,
+                "author_harness_id": profile.author_harness_id,
+                "author_session_context_id": session_id,
+                "author_model": model_metadata.model_id,
+                "author_model_version": model_metadata.model_version,
+                "author_model_configuration": model_metadata.model_configuration
+                or _default_config_label(profile, model_metadata.endpoint),
+            },
+            include_paths=include_paths,
+            hunk_patch_paths=hunk_patch_paths,
+            commit_message=commit_message,
+        )
+    except Exception as exc:
+        raise CloudHarnessError(f"governed bridge verdict publication failed: {exc}") from exc
+    return json.dumps(published.to_dict(), sort_keys=True)
 
 
 def _dispatch_edit(
@@ -1782,6 +1916,7 @@ def dispatch_tool_call(
     relative_path: RelativePathFunc = _relative_path,
     iter_text_files: IterFilesFunc = _iter_text_files,
     iter_bounded_paths: IterFilesFunc = _iter_bounded_paths,
+    skill: str | None = None,
 ) -> str:
     if tool_name not in CANONICAL_TOOLS:
         raise CloudHarnessError(f"unsupported tool: {tool_name}")
@@ -1799,6 +1934,14 @@ def dispatch_tool_call(
         )
     if tool_name == "Bash":
         return _dispatch_bash(arguments, model_metadata, project_root, profile, guard_runner, command_runner)
+    if tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
+        return _dispatch_publish_bridge_verdict(
+            arguments,
+            model_metadata,
+            project_root,
+            profile,
+            skill=skill,
+        )
     raise CloudHarnessError(f"unsupported tool: {tool_name}")
 
 
@@ -1869,6 +2012,7 @@ def run_tool_loop(
     project_root: Path,
     profile: AdopterProfile,
     *,
+    skill: str | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
@@ -1889,8 +2033,15 @@ def run_tool_loop(
         raise CloudHarnessError("max_turns must be at least 1")
     if session_timeout <= 0:
         raise CloudHarnessError("session_timeout must be positive")
+    ensure_dispatch_worker_role_document(project_root, profile)
     strategy = resolve_dialect_strategy(profile)
-    schemas = strategy.build_tool_schemas(model_route.allowed_tools)
+    schemas = strategy.build_tool_schemas(
+        allowed_tools_for_skill(
+            model_route.allowed_tools,
+            skill,
+            publish_bridge_verdict_tool=profile.publish_bridge_verdict_tool,
+        )
+    )
     chat = chat_func or strategy.chat
     metadata = ModelMetadata(
         model_route.model_id,
@@ -2036,6 +2187,7 @@ def run_tool_loop(
                             profile,
                             guard_runner=guard_runner,
                             command_runner=command_runner,
+                            skill=skill,
                         )
                     except CloudHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"

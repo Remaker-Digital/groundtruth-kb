@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts import gtkb_bridge_writer as provider_writer
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFY_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
 CODEX_VERIFY_HELPER_PATH = REPO_ROOT / ".codex" / "skills" / "verify" / "helpers" / "write_verdict.py"
@@ -73,6 +75,8 @@ author_session_context_id: 11111111-1111-4111-8111-111111111111
 author_model: test-model
 author_model_version: test-version
 author_model_configuration: test-config
+
+bridge_kind: implementation_report
 
 {title}
 """
@@ -169,6 +173,151 @@ test_lo_verified_commit_atomicity.py` | yes | PASS |
 
 - `pytest platform_tests/scripts/test_lo_verified_commit_atomicity.py -q`
 """
+
+
+def _provider_metadata() -> dict[str, str]:
+    return {
+        "author_identity": "loyal-opposition/test",
+        "author_harness_id": "T",
+        "author_session_context_id": "22222222-2222-4222-8222-222222222222",
+        "author_model": "test-model",
+        "author_model_version": "test-version",
+        "author_model_configuration": "test-config",
+    }
+
+
+def _mock_provider_authority(monkeypatch: pytest.MonkeyPatch, released: list[str]) -> None:
+    monkeypatch.setattr(
+        provider_writer,
+        "_resolve_lo_worker",
+        lambda *_args, **_kwargs: {"role": "loyal-opposition", "harness_id": "T"},
+    )
+    monkeypatch.setattr(
+        provider_writer,
+        "_claim_holder",
+        lambda *_args, **_kwargs: {"session_id": "22222222-2222-4222-8222-222222222222"},
+    )
+    monkeypatch.setattr(provider_writer, "_run_provider_verdict_guards", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        provider_writer,
+        "_release_claim",
+        lambda _root, slug, _session: released.append(slug),
+    )
+
+
+def test_provider_verified_publication_uses_atomic_finalizer_and_releases_claim(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    released: list[str] = []
+    _mock_provider_authority(monkeypatch, released)
+    _write(repo / "provider-feature.patch", _git(repo, "diff", "--", "scripts/feature.py").stdout)
+
+    def finalize(**kwargs):
+        return verify_helper.finalize_verified_commit(
+            kwargs["document_name"],
+            kwargs["content"],
+            include_paths=list(kwargs["include_paths"]),
+            hunk_patch_paths=list(kwargs["hunk_patch_paths"]),
+            commit_message=kwargs["commit_message"],
+            project_root=kwargs["project_root"],
+            pre_populate=False,
+        ).to_dict()
+
+    monkeypatch.setattr(provider_writer, "_finalize_verified_provider_verdict", finalize)
+
+    result = provider_writer.publish_lo_verdict(
+        "sample",
+        "VERIFIED",
+        _verified_body(),
+        repo,
+        session_id="22222222-2222-4222-8222-222222222222",
+        harness_name="test",
+        author_metadata=_provider_metadata(),
+        include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+        hunk_patch_paths=["provider-feature.patch"],
+        commit_message="fix(gtkb): provider verified finalization",
+    )
+
+    assert result.commit_sha == _git(repo, "rev-parse", "HEAD").stdout.strip()
+    assert released == ["sample"]
+    committed = set(_git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.splitlines())
+    assert committed == {"bridge/sample-003.md", "bridge/sample-004.md", "scripts/feature.py"}
+
+
+def test_provider_verified_commit_failure_rolls_back_verdict_and_retains_claim(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    released: list[str] = []
+    _mock_provider_authority(monkeypatch, released)
+    _write(repo / "provider-feature.patch", _git(repo, "diff", "--", "scripts/feature.py").stdout)
+    real_run_git = verify_helper._run_git
+
+    def fail_commit(args: list[str], *, cwd: Path, check: bool = False, env=None):
+        if args and args[0] == "commit":
+            return subprocess.CompletedProcess(["git", *args], 1, "", "simulated provider commit failure")
+        return real_run_git(args, cwd=cwd, check=check, env=env)
+
+    def finalize(**kwargs):
+        return verify_helper.finalize_verified_commit(
+            kwargs["document_name"],
+            kwargs["content"],
+            include_paths=list(kwargs["include_paths"]),
+            hunk_patch_paths=list(kwargs["hunk_patch_paths"]),
+            commit_message=kwargs["commit_message"],
+            project_root=kwargs["project_root"],
+            pre_populate=False,
+        ).to_dict()
+
+    monkeypatch.setattr(verify_helper, "_run_git", fail_commit)
+    monkeypatch.setattr(provider_writer, "_finalize_verified_provider_verdict", finalize)
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="git commit failed"):
+        provider_writer.publish_lo_verdict(
+            "sample",
+            "VERIFIED",
+            _verified_body(),
+            repo,
+            session_id="22222222-2222-4222-8222-222222222222",
+            harness_name="test",
+            author_metadata=_provider_metadata(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            hunk_patch_paths=["provider-feature.patch"],
+            commit_message="fix(gtkb): provider verified finalization",
+        )
+
+    assert not (repo / "bridge/sample-004.md").exists()
+    assert released == []
+
+
+def test_provider_verified_rejects_modified_tracked_include_without_hunk_patch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    released: list[str] = []
+    _mock_provider_authority(monkeypatch, released)
+
+    with pytest.raises(provider_writer.BridgePublicationError, match="require explicit reviewed hunk patches"):
+        provider_writer.publish_lo_verdict(
+            "sample",
+            "VERIFIED",
+            _verified_body(),
+            repo,
+            session_id="22222222-2222-4222-8222-222222222222",
+            harness_name="test",
+            author_metadata=_provider_metadata(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            commit_message="fix(gtkb): provider verified finalization",
+        )
+
+    assert not (repo / "bridge/sample-004.md").exists()
+    assert released == []
 
 
 def test_verified_finalization_tolerates_never_existing_predecessor_gap(
