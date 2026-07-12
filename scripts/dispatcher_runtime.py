@@ -303,6 +303,9 @@ DISPATCH_FAILURES_FILENAME = "dispatch-failures.jsonl"
 DISPATCH_SUPPRESSIONS_FILENAME = "dispatch-suppressions.jsonl"
 DISPATCH_BUDGET_LEDGER_FILENAME = "dispatch-budget-ledger.jsonl"
 DISPATCH_RUNS_SUBDIR = "dispatch-runs"
+LAUNCH_LEDGER_KEY = "launch_ledger"
+LAUNCH_LEDGER_SCHEMA_VERSION = 1
+MAX_COMPLETED_LAUNCH_LEDGER_ENTRIES = 16
 PID_CREATE_TIME_SUFFIX = ".create_time_epoch"
 PID_CREATE_TIME_META_KEY = "pid_create_time_epoch"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
@@ -602,10 +605,12 @@ LEGACY_TO_NEW_STATE_KEY = {
 
 
 def _role_state_carries_retry_evidence(value: dict[str, Any]) -> bool:
-    launch = value.get("last_launch")
-    if isinstance(launch, dict):
+    attempts = [value.get("last_attempt"), value.get("last_launch")]
+    for launch in attempts:
+        if not isinstance(launch, dict):
+            continue
         if _is_reconciled_post_verdict_exit(launch):
-            return False
+            continue
         if launch.get("stdout_path") or launch.get("stderr_path"):
             return True
         if launch.get("reason") in NON_LAUNCHED_FAILURE_REASONS:
@@ -622,6 +627,7 @@ def _merge_role_retry_evidence(existing: dict[str, Any], value: dict[str, Any]) 
     if "last_launch" in value:
         existing["last_launch"] = value["last_launch"]
     for key in (
+        "last_attempt",
         "previous_launch_failed",
         "previous_launch_failed_logged_at",
         "last_failure_reason",
@@ -630,6 +636,24 @@ def _merge_role_retry_evidence(existing: dict[str, Any], value: dict[str, Any]) 
     ):
         if key in value:
             existing[key] = value[key]
+    incoming_ledger = value.get(LAUNCH_LEDGER_KEY)
+    if isinstance(incoming_ledger, dict):
+        existing_ledger = existing.get(LAUNCH_LEDGER_KEY)
+        if not isinstance(existing_ledger, dict):
+            existing_ledger = {}
+        for dispatch_id, launch in incoming_ledger.items():
+            if isinstance(dispatch_id, str) and isinstance(launch, dict):
+                prior_launch = existing_ledger.get(dispatch_id)
+                if not isinstance(prior_launch, dict) or (
+                    bool(launch.get("exit_code_processed")),
+                    _launch_ledger_progress_key(launch),
+                ) > (
+                    bool(prior_launch.get("exit_code_processed")),
+                    _launch_ledger_progress_key(prior_launch),
+                ):
+                    existing_ledger[dispatch_id] = launch
+        existing[LAUNCH_LEDGER_KEY] = existing_ledger
+        existing["launch_ledger_schema_version"] = LAUNCH_LEDGER_SCHEMA_VERSION
 
 
 def _migrate_recipients_state_keys(recipients: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:
@@ -1007,6 +1031,7 @@ def _reset_recipient_state(
                     # Capture the prior launch before clearing so we can reap its
                     # straggler process below (WI-4805).
                     prior_last_launch = entry.get("last_launch")
+                    prior_launch_ledger = entry.get(LAUNCH_LEDGER_KEY)
                     # Existing circuit-breaker / failure resets (unchanged).
                     entry["failure_count"] = 0
                     entry["circuit_breaker_tripped"] = False
@@ -1017,6 +1042,11 @@ def _reset_recipient_state(
                     # state so re-dispatch arms on a fresh evaluation rather than
                     # stale signature equality or stale failure markers.
                     entry.pop("last_launch", None)
+                    entry.pop("last_attempt", None)
+                    entry.pop(LAUNCH_LEDGER_KEY, None)
+                    entry.pop("launch_ledger_schema_version", None)
+                    entry.pop("launch_ledger_active_count", None)
+                    entry.pop("launch_ledger_completed_count", None)
                     entry["signature"] = None
                     entry["last_dispatched_signature"] = None
                     entry["last_suppressed_signature"] = None
@@ -1026,6 +1056,15 @@ def _reset_recipient_state(
                     # recipient's recorded pid, gated on liveness + staleness.
                     if _reap_stale_dispatch_pid(prior_last_launch, now):
                         reap_count += 1
+                    if isinstance(prior_launch_ledger, dict):
+                        prior_dispatch_id = (
+                            prior_last_launch.get("dispatch_id") if isinstance(prior_last_launch, dict) else None
+                        )
+                        for launch in prior_launch_ledger.values():
+                            if not isinstance(launch, dict) or launch.get("dispatch_id") == prior_dispatch_id:
+                                continue
+                            if _reap_stale_dispatch_pid(launch, now):
+                                reap_count += 1
         if reset_count > 0:
             state["recipients"] = recipients_state
             state["thread_reoffers"] = {}
@@ -1575,7 +1614,11 @@ def _detect_previous_launch_failure(
     signature: str,
 ) -> dict[str, Any] | None:
     """Return failure evidence when prior worker logs show a fatal marker."""
-    launch = prior.get("last_launch")
+    launch = prior.get("last_attempt")
+    if not isinstance(launch, dict) or (
+        not launch.get("launched") and str(launch.get("reason") or "") not in NON_LAUNCHED_FAILURE_REASONS
+    ):
+        launch = prior.get("last_launch")
     if not isinstance(launch, dict):
         return None
     if _is_reconciled_post_verdict_exit(launch):
@@ -3183,6 +3226,9 @@ def _bridge_ids_from_recipient_state(recipient_state: dict[str, Any]) -> list[st
     last_launch = recipient_state.get("last_launch")
     if isinstance(last_launch, dict):
         _add_from_mapping(last_launch)
+    last_attempt = recipient_state.get("last_attempt")
+    if isinstance(last_attempt, dict):
+        _add_from_mapping(last_attempt)
     return ids
 
 
@@ -5436,12 +5482,122 @@ def _acquire_dispatch_document_leases(
     return acquired_items, acquired_records, held_items
 
 
-def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Path, project_root: Path) -> None:
+def _launch_ledger_sort_key(launch: dict[str, Any]) -> tuple[str, str]:
+    return (
+        str(launch.get("launched_at") or ""),
+        str(launch.get("dispatch_id") or ""),
+    )
+
+
+def _launch_ledger_progress_key(launch: dict[str, Any]) -> tuple[str, str]:
+    return (
+        str(launch.get("completed_at") or launch.get("exit_processed_at") or ""),
+        str(launch.get("dispatch_id") or ""),
+    )
+
+
+def _launch_reconciliation_sort_key(
+    item: tuple[str, dict[str, Any]], state_dir: Path
+) -> tuple[int, float, tuple[str, str]]:
+    dispatch_id, launch = item
+    if launch.get("exit_code_processed"):
+        return (0, 0.0, _launch_ledger_sort_key(launch))
+    status_file = state_dir / DISPATCH_RUNS_SUBDIR / f"{dispatch_id}.exit_code"
+    try:
+        observed_at = status_file.stat().st_mtime
+    except OSError:
+        observed_at = float("inf")
+    return (1, observed_at, _launch_ledger_sort_key(launch))
+
+
+def _refresh_launch_ledger_counts(recipient_state: dict[str, Any], ledger: dict[str, dict[str, Any]]) -> None:
+    active_count = sum(not launch.get("exit_code_processed") for launch in ledger.values())
+    recipient_state["launch_ledger_schema_version"] = LAUNCH_LEDGER_SCHEMA_VERSION
+    recipient_state["launch_ledger_active_count"] = active_count
+    recipient_state["launch_ledger_completed_count"] = len(ledger) - active_count
+
+
+def _prune_launch_ledger(recipient_state: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw_ledger = recipient_state.get(LAUNCH_LEDGER_KEY)
+    ledger = (
+        {
+            str(dispatch_id): launch
+            for dispatch_id, launch in raw_ledger.items()
+            if isinstance(dispatch_id, str) and dispatch_id and isinstance(launch, dict)
+        }
+        if isinstance(raw_ledger, dict)
+        else {}
+    )
+    completed = sorted(
+        ((dispatch_id, launch) for dispatch_id, launch in ledger.items() if launch.get("exit_code_processed")),
+        key=lambda item: _launch_ledger_sort_key(item[1]),
+        reverse=True,
+    )
+    for dispatch_id, _launch in completed[MAX_COMPLETED_LAUNCH_LEDGER_ENTRIES:]:
+        ledger.pop(dispatch_id, None)
+    recipient_state[LAUNCH_LEDGER_KEY] = ledger
+    _refresh_launch_ledger_counts(recipient_state, ledger)
+    return ledger
+
+
+def _recipient_launch_ledger(recipient_state: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return the bounded launch ledger, migrating a legacy live last_launch."""
+
+    ledger = _prune_launch_ledger(recipient_state)
+    legacy_launch = recipient_state.get("last_launch")
+    if isinstance(legacy_launch, dict) and legacy_launch.get("launched"):
+        dispatch_id = legacy_launch.get("dispatch_id")
+        if isinstance(dispatch_id, str) and dispatch_id and dispatch_id not in ledger:
+            ledger[dispatch_id] = legacy_launch
+    elif isinstance(legacy_launch, dict):
+        recipient_state.setdefault("last_attempt", legacy_launch)
+    recipient_state[LAUNCH_LEDGER_KEY] = ledger
+    _refresh_launch_ledger_counts(recipient_state, ledger)
+    return ledger
+
+
+def _register_recipient_launch(recipient_state: dict[str, Any], launch: dict[str, Any]) -> None:
+    """Register a successful spawn without relying on the compatibility projection."""
+
+    dispatch_id = launch.get("dispatch_id")
+    if not launch.get("launched") or not isinstance(dispatch_id, str) or not dispatch_id:
+        return
+    ledger = _recipient_launch_ledger(recipient_state)
+    ledger[dispatch_id] = launch
+    recipient_state[LAUNCH_LEDGER_KEY] = ledger
+    _prune_launch_ledger(recipient_state)
+
+
+def _record_recipient_attempt(recipient_state: dict[str, Any], attempt: dict[str, Any]) -> None:
+    """Record every attempt while keeping last_launch reserved for actual spawns."""
+
+    recipient_state["last_attempt"] = attempt
+    if attempt.get("launched"):
+        _register_recipient_launch(recipient_state, attempt)
+        recipient_state["last_launch"] = attempt
+    elif attempt.get("reason") == "dry_run":
+        ledger = recipient_state.get(LAUNCH_LEDGER_KEY)
+        has_active_launch = isinstance(ledger, dict) and any(
+            isinstance(launch, dict) and not launch.get("exit_code_processed") for launch in ledger.values()
+        )
+        if not has_active_launch:
+            recipient_state["last_launch"] = attempt
+
+
+def _process_pending_exit_codes_for_last_launch(
+    recipients_state: dict[str, Any],
+    state_dir: Path,
+    project_root: Path,
+    *,
+    launch_overrides: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """Check prior launch status files and update signature state."""
     for recipient, recipient_state in list(recipients_state.items()):
         if not isinstance(recipient_state, dict):
             continue
-        last_launch = recipient_state.get("last_launch")
+        last_launch = launch_overrides.get(recipient) if launch_overrides is not None else None
+        if last_launch is None:
+            last_launch = recipient_state.get("last_launch")
         if not isinstance(last_launch, dict) or not last_launch.get("launched"):
             continue
 
@@ -5783,6 +5939,41 @@ def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Pat
             last_launch["telemetry_reconciliation"] = "reconciled" if telemetry_result.written else "write_failed"
         except Exception:
             last_launch["telemetry_reconciliation"] = "reconciliation_failed"
+
+
+def _process_pending_exit_codes(recipients_state: dict[str, Any], state_dir: Path, project_root: Path) -> None:
+    """Reconcile every recorded launch independently, then restore last_launch projection."""
+
+    for recipient, recipient_state in list(recipients_state.items()):
+        if not isinstance(recipient_state, dict):
+            continue
+        original_last_launch = recipient_state.get("last_launch")
+        raw_ledger = recipient_state.get(LAUNCH_LEDGER_KEY)
+        has_ledger = isinstance(raw_ledger, dict) and bool(raw_ledger)
+        has_legacy_launch = isinstance(original_last_launch, dict) and bool(original_last_launch.get("launched"))
+        if not has_ledger and not has_legacy_launch:
+            continue
+
+        ledger = _recipient_launch_ledger(recipient_state)
+        for dispatch_id, launch in sorted(
+            ledger.items(), key=lambda item: _launch_reconciliation_sort_key(item, state_dir)
+        ):
+            _process_pending_exit_codes_for_last_launch(
+                {recipient: recipient_state},
+                state_dir,
+                project_root,
+                launch_overrides={recipient: launch},
+            )
+            ledger[dispatch_id] = launch
+
+        recipient_state[LAUNCH_LEDGER_KEY] = ledger
+        ledger = _prune_launch_ledger(recipient_state)
+        if ledger:
+            recipient_state["last_launch"] = max(ledger.values(), key=_launch_ledger_sort_key)
+        elif isinstance(original_last_launch, dict) and original_last_launch.get("launched"):
+            recipient_state["last_launch"] = original_last_launch
+        else:
+            recipient_state.pop("last_launch", None)
 
 
 def _prior_dispatched_signature(prior: dict[str, Any]) -> Any:
@@ -6391,6 +6582,9 @@ def run_dispatch_cycle(
             )
             if not isinstance(prior_document_signatures, dict):
                 prior_document_signatures = {}
+            prior_launch_ledger = prior.get(LAUNCH_LEDGER_KEY) if isinstance(prior, dict) else None
+            if not isinstance(prior_launch_ledger, dict):
+                prior_launch_ledger = {}
 
             # Carry forward prior values; update conditionally per branch below.
             recipient_state: dict[str, Any] = {
@@ -6401,6 +6595,8 @@ def run_dispatch_cycle(
                 "updated_at": _now_iso(),
                 "last_dispatched_signature": prior_dispatched,
                 "last_dispatched_signatures_by_document": dict(prior_document_signatures),
+                LAUNCH_LEDGER_KEY: dict(prior_launch_ledger),
+                "launch_ledger_schema_version": LAUNCH_LEDGER_SCHEMA_VERSION,
                 "last_suppressed_signature": prior_suppressed,
                 # Legacy field updated only on real dispatch; carry forward here.
                 "signature": prior_legacy_signature,
@@ -6412,6 +6608,8 @@ def run_dispatch_cycle(
                 recipient_state["circuit_breaker_half_open"] = prior.get("circuit_breaker_half_open")
             if isinstance(prior, dict) and isinstance(prior.get("last_launch"), dict):
                 recipient_state["last_launch"] = prior["last_launch"]
+            if isinstance(prior, dict) and isinstance(prior.get("last_attempt"), dict):
+                recipient_state["last_attempt"] = prior["last_attempt"]
             # WI-4662: carry forward the previous_launch_failed re-log cooldown stamp
             # so the throttle persists across reconcile cycles (recipient_state is a
             # fresh dict each cycle and does not otherwise inherit prior fields).
@@ -6800,7 +6998,7 @@ def run_dispatch_cycle(
                                     }
                                     _record_dispatch_failure(state_dir, unlaunchable_meta)
                                     recipient_state["last_result"] = "target_unlaunchable"
-                                    recipient_state["last_launch"] = unlaunchable_meta
+                                    _record_recipient_attempt(recipient_state, unlaunchable_meta)
                                     results[recipient] = unlaunchable_meta
                                     recipients_state[recipient] = recipient_state
                                     continue
@@ -6821,7 +7019,7 @@ def run_dispatch_cycle(
                                 recipient_state["quarantined_threads"] = quarantined_slugs
                                 if not acquire_result["ok"]:
                                     recipient_state["last_result"] = acquire_result["reason"]
-                                    recipient_state["last_launch"] = {
+                                    failed_attempt = {
                                         "dispatch_id": dispatch_id,
                                         "recipient": recipient,
                                         "launched": False,
@@ -6831,7 +7029,8 @@ def run_dispatch_cycle(
                                         "released_slugs": acquire_result.get("acquired_slugs", []),
                                         "quarantined_slugs": quarantined_slugs,
                                     }
-                                    results[recipient] = recipient_state["last_launch"]
+                                    _record_recipient_attempt(recipient_state, failed_attempt)
+                                    results[recipient] = failed_attempt
                                     recipients_state[recipient] = recipient_state
                                     continue
                                 acquired_work_intent_slugs = list(acquire_result["acquired_slugs"])
@@ -6877,7 +7076,7 @@ def run_dispatch_cycle(
                                     acquired_document_leases
                                 )
                             recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
-                            recipient_state["last_launch"] = launch
+                            _record_recipient_attempt(recipient_state, launch)
                             if launch.get("launched") and not dry_run and dispatched_selected:
                                 first_thread = dispatched_selected[0]
                                 recipient_state["thread_reoffer"] = _record_thread_reoffer(

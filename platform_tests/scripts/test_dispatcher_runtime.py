@@ -6539,6 +6539,163 @@ def test_wi5207_late_verdict_is_snapshotted_before_recipient_state_mutation(
     assert state["last_dispatched_signature"] == "batch-signature"
 
 
+def _wi5208_prime_launch(dispatch_id: str, launched_at: str, document: str) -> dict:
+    return {
+        "dispatch_id": dispatch_id,
+        "recipient": "prime-builder:A",
+        "launched": True,
+        "launched_at": launched_at,
+        "signature": f"signature-{document}",
+        "needed_role_label": "prime-builder",
+        "selected_documents": [document],
+        "document_lease_handles": [{"doc_slug": document}],
+    }
+
+
+def test_wi5208_concurrent_launches_reconcile_out_of_order_and_release_exactly_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    launches = {
+        "launch-a": _wi5208_prime_launch("launch-a", "2026-07-12T08:00:00+00:00", "thread-a"),
+        "launch-b": _wi5208_prime_launch("launch-b", "2026-07-12T08:01:00+00:00", "thread-b"),
+        "launch-c": _wi5208_prime_launch("launch-c", "2026-07-12T08:02:00+00:00", "thread-c"),
+    }
+    (runs_dir / "launch-b.exit_code").write_text("0", encoding="utf-8")
+    (runs_dir / "launch-c.exit_code").write_text("0", encoding="utf-8")
+    release_calls: list[list[str]] = []
+
+    def _release(records):
+        slugs = [record["doc_slug"] for record in records]
+        release_calls.append(slugs)
+        return slugs
+
+    monkeypatch.setattr(trigger, "_release_document_lease_records", _release)
+    nonlaunch_projection = {
+        "dispatch_id": "lease-held-attempt",
+        "recipient": "prime-builder:A",
+        "launched": False,
+        "reason": trigger.DOCUMENT_LEASE_HELD_RESULT,
+    }
+    recipients = {
+        "prime-builder:A": {
+            "last_launch": nonlaunch_projection,
+            trigger.LAUNCH_LEDGER_KEY: launches,
+            "failure_count": 0,
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients, state_dir, tmp_path)
+    trigger._process_pending_exit_codes(recipients, state_dir, tmp_path)
+
+    state = recipients["prime-builder:A"]
+    ledger = state[trigger.LAUNCH_LEDGER_KEY]
+    assert ledger["launch-a"].get("exit_code_processed") is not True
+    assert ledger["launch-b"]["exit_code_processed"] is True
+    assert ledger["launch-c"]["exit_code_processed"] is True
+    assert state["launch_ledger_active_count"] == 1
+    assert state["launch_ledger_completed_count"] == 2
+    assert state["last_attempt"] == nonlaunch_projection
+    assert state["last_launch"]["dispatch_id"] == "launch-c"
+    assert release_calls == [["thread-b"], ["thread-c"]]
+
+    (runs_dir / "launch-a.exit_code").write_text("0", encoding="utf-8")
+    trigger._process_pending_exit_codes(recipients, state_dir, tmp_path)
+    trigger._process_pending_exit_codes(recipients, state_dir, tmp_path)
+
+    assert state["launch_ledger_active_count"] == 0
+    assert state["launch_ledger_completed_count"] == 3
+    assert all(launch["exit_code_processed"] is True for launch in ledger.values())
+    assert state["last_launch"]["dispatch_id"] == "launch-c"
+    assert release_calls == [["thread-b"], ["thread-c"], ["thread-a"]]
+
+
+def test_wi5208_legacy_last_launch_migrates_without_dropping_inflight(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    launch = _wi5208_prime_launch("legacy-launch", "2026-07-12T08:00:00+00:00", "legacy-thread")
+    launch.pop("document_lease_handles")
+    recipients = {"prime-builder:A": {"last_launch": launch, "failure_count": 0}}
+
+    trigger._process_pending_exit_codes(recipients, state_dir, tmp_path)
+
+    state = recipients["prime-builder:A"]
+    assert state[trigger.LAUNCH_LEDGER_KEY]["legacy-launch"] == launch
+    assert state["launch_ledger_active_count"] == 1
+    assert state["last_launch"] == launch
+
+    (runs_dir / "legacy-launch.exit_code").write_text("0", encoding="utf-8")
+    trigger._process_pending_exit_codes(recipients, state_dir, tmp_path)
+
+    assert state[trigger.LAUNCH_LEDGER_KEY]["legacy-launch"]["exit_code_processed"] is True
+    assert state["launch_ledger_active_count"] == 0
+    assert state["launch_ledger_completed_count"] == 1
+
+
+def test_wi5208_completed_launch_history_is_bounded_but_active_launches_survive() -> None:
+    trigger = _load_trigger()
+    ledger = {
+        f"completed-{index:02d}": {
+            "dispatch_id": f"completed-{index:02d}",
+            "launched": True,
+            "launched_at": f"2026-07-12T08:{index:02d}:00+00:00",
+            "exit_code_processed": True,
+            "completed_at": f"2026-07-12T08:{index:02d}:30+00:00",
+        }
+        for index in range(trigger.MAX_COMPLETED_LAUNCH_LEDGER_ENTRIES + 3)
+    }
+    ledger["active-old"] = {
+        "dispatch_id": "active-old",
+        "launched": True,
+        "launched_at": "2026-07-12T07:00:00+00:00",
+    }
+    state = {trigger.LAUNCH_LEDGER_KEY: ledger}
+
+    pruned = trigger._prune_launch_ledger(state)
+
+    assert "active-old" in pruned
+    assert state["launch_ledger_active_count"] == 1
+    assert state["launch_ledger_completed_count"] == trigger.MAX_COMPLETED_LAUNCH_LEDGER_ENTRIES
+    assert len(pruned) == trigger.MAX_COMPLETED_LAUNCH_LEDGER_ENTRIES + 1
+
+
+def test_wi5208_role_alias_merge_keeps_more_advanced_launch_record() -> None:
+    trigger = _load_trigger()
+    existing = {
+        trigger.LAUNCH_LEDGER_KEY: {
+            "shared-launch": {
+                "dispatch_id": "shared-launch",
+                "launched": True,
+                "launched_at": "2026-07-12T08:00:00+00:00",
+            }
+        }
+    }
+    incoming = {
+        trigger.LAUNCH_LEDGER_KEY: {
+            "shared-launch": {
+                "dispatch_id": "shared-launch",
+                "launched": True,
+                "launched_at": "2026-07-12T08:00:00+00:00",
+                "exit_code": 0,
+                "exit_code_processed": True,
+                "completed_at": "2026-07-12T08:10:00+00:00",
+            }
+        }
+    }
+
+    trigger._merge_role_retry_evidence(existing, incoming)
+
+    merged = existing[trigger.LAUNCH_LEDGER_KEY]["shared-launch"]
+    assert merged["exit_code_processed"] is True
+    assert merged["completed_at"] == "2026-07-12T08:10:00+00:00"
+
+
 def test_lo_nonzero_exit_with_post_launch_verdict_reconciles_success(tmp_path: Path) -> None:
     """WI-4933: an LO worker that files a verdict then exits nonzero is recovered."""
     from datetime import datetime, timedelta

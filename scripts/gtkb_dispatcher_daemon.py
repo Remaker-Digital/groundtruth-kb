@@ -819,7 +819,7 @@ def _execute_live_spawns(
             recipient_state["last_result"] = reason
             recipient_state["pending_count"] = len(selected)
             recipient_state["selected_count"] = 0
-            recipient_state["last_launch"] = result
+            runtime._record_recipient_attempt(recipient_state, result)
             recipients_state[recipient] = recipient_state
             if target is not None and selected:
                 spawn_results.append(result)
@@ -892,13 +892,16 @@ def _execute_live_spawns(
                     recipient_state["selected_count"] = 0
                     if reason == "work_intent_already_held":
                         runtime._clear_stale_failure_fields(recipient_state)
-                    recipient_state["last_launch"] = {
-                        "dispatch_id": dispatch_id,
-                        "recipient": recipient,
-                        "launched": False,
-                        "reason": reason,
-                        "work_intent_session_id": work_intent_session_id,
-                    }
+                    runtime._record_recipient_attempt(
+                        recipient_state,
+                        {
+                            "dispatch_id": dispatch_id,
+                            "recipient": recipient,
+                            "launched": False,
+                            "reason": reason,
+                            "work_intent_session_id": work_intent_session_id,
+                        },
+                    )
                 record["spawned"] = False
                 record["spawn_reason"] = reason
                 result = {
@@ -928,13 +931,16 @@ def _execute_live_spawns(
                     recipient_state["pending_count"] = 0
                     recipient_state["selected_count"] = 0
                     runtime._clear_stale_failure_fields(recipient_state)
-                    recipient_state["last_launch"] = {
-                        "dispatch_id": dispatch_id,
-                        "recipient": recipient,
-                        "launched": False,
-                        "reason": "work_intent_already_held",
-                        "work_intent_session_id": work_intent_session_id,
-                    }
+                    runtime._record_recipient_attempt(
+                        recipient_state,
+                        {
+                            "dispatch_id": dispatch_id,
+                            "recipient": recipient,
+                            "launched": False,
+                            "reason": "work_intent_already_held",
+                            "work_intent_session_id": work_intent_session_id,
+                        },
+                    )
                 record["spawned"] = False
                 record["spawn_reason"] = "work_intent_already_held"
                 result = {
@@ -1043,7 +1049,7 @@ def _execute_live_spawns(
                         recipient_state["last_suppressed_signature"] = pre_lease_signature
                         recipient_state["pending_count"] = len(lease_held_items)
                         recipient_state["selected_count"] = len(lease_held_items)
-                        recipient_state["last_launch"] = result
+                        runtime._record_recipient_attempt(recipient_state, result)
                     record["spawned"] = False
                     record["spawn_reason"] = runtime.DOCUMENT_LEASE_HELD_RESULT
                     spawn_results.append(result)
@@ -1077,7 +1083,7 @@ def _execute_live_spawns(
                 }
                 if recipient_state is not None:
                     recipient_state["last_result"] = reason
-                    recipient_state["last_launch"] = result
+                    runtime._record_recipient_attempt(recipient_state, result)
                     recipient_state["pending_count"] = len(selected)
                     recipient_state["selected_count"] = 0
                 record["spawned"] = False
@@ -1126,7 +1132,7 @@ def _execute_live_spawns(
                 acquired_document_leases
             )
         if recipient_state is not None:
-            recipient_state["last_launch"] = result
+            runtime._record_recipient_attempt(recipient_state, result)
             if result.get("launched"):
                 recipient_state["last_dispatched_signature"] = signature
                 recipient_state["signature"] = signature

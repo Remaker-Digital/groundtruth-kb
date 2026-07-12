@@ -934,6 +934,97 @@ def test_wi5207_daemon_delegates_per_document_exit_reconciliation(
     }
 
 
+def test_wi5208_daemon_registers_concurrent_launches_before_nonlaunch_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    state_dir = daemon._bridge_poller_state_dir(root)
+    target = runtime.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="lo",
+        invocation_surfaces=_CLAUDE_INVOCATION,
+    )
+    selected_batches = [
+        [
+            types.SimpleNamespace(
+                document_name=f"ledger-thread-{index}", top_status="NEW", top_file=f"bridge/t-{index}.md"
+            )
+        ]
+        for index in range(3)
+    ]
+    decisions = [
+        {
+            "role": "loyal-opposition",
+            "recipient": target.dispatch_state_key,
+            "signature": runtime._signature(selected),
+            "_spawn_target": target,
+            "_spawn_selected": selected,
+        }
+        for selected in selected_batches
+    ]
+    launch_ids: list[str] = []
+
+    def _spawn(**kwargs):
+        dispatch_id = kwargs["dispatch_id"]
+        launch_ids.append(dispatch_id)
+        return {
+            "dispatch_id": dispatch_id,
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "launched_at": daemon._now_iso(),
+            "signature": runtime._signature(list(reversed(kwargs["items"]))),
+            "needed_role_label": "loyal-opposition",
+            "selected_documents": [item.document_name for item in kwargs["items"]],
+        }
+
+    monkeypatch.setattr(runtime, "_spawn_harness", _spawn)
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: (items, [], []),
+    )
+
+    results = daemon._execute_live_spawns(root, decisions, max_items=1, dry_run=False)
+
+    assert len(results) == 3
+    state = runtime._load_dispatch_state(state_dir, root)["recipients"][target.dispatch_state_key]
+    assert set(state[runtime.LAUNCH_LEDGER_KEY]) == set(launch_ids)
+    assert state["launch_ledger_active_count"] == 3
+    assert state["last_launch"]["dispatch_id"] == launch_ids[-1]
+
+    held_item = types.SimpleNamespace(
+        document_name="ledger-thread-held",
+        top_status="NEW",
+        top_file="bridge/held.md",
+    )
+    held_decision = {
+        "role": "loyal-opposition",
+        "recipient": target.dispatch_state_key,
+        "signature": runtime._signature([held_item]),
+        "_spawn_target": target,
+        "_spawn_selected": [held_item],
+    }
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: ([], [], items),
+    )
+
+    held_results = daemon._execute_live_spawns(root, [held_decision], max_items=1, dry_run=False)
+
+    assert held_results[0]["reason"] == runtime.DOCUMENT_LEASE_HELD_RESULT
+    state = runtime._load_dispatch_state(state_dir, root)["recipients"][target.dispatch_state_key]
+    assert set(state[runtime.LAUNCH_LEDGER_KEY]) == set(launch_ids)
+    assert state["launch_ledger_active_count"] == 3
+    assert state["last_launch"]["dispatch_id"] == launch_ids[-1]
+    assert state["last_attempt"]["reason"] == runtime.DOCUMENT_LEASE_HELD_RESULT
+
+
 # --- WI-4852: watchdog dormancy detection and fail-soft restart ---------------
 
 
