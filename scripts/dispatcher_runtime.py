@@ -3309,6 +3309,8 @@ def _terminal_bridge_reconciliation_reason(project_root: Path | None, recipient_
     statuses = {bridge_id: _latest_bridge_status_for_document(project_root, bridge_id) for bridge_id in bridge_ids}
     if not statuses or any(status is None for status in statuses.values()):
         return None
+    if any(status == "NO-ACTION" for status in statuses.values()):
+        return None
     if all(status in _TERMINAL_DISPATCH_BRIDGE_STATUSES for status in statuses.values() if status is not None):
         rendered = ", ".join(f"{bridge_id}={status}" for bridge_id, status in sorted(statuses.items()))
         return f"referenced bridge document terminal ({rendered})"
@@ -3803,7 +3805,8 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, p
         f"`{venv_gt} harness roles`. Do not run `python -m groundtruth_kb.harness_projection` "
         "as a role reader, and do not use ambient bare `python` or bare `gt` for package-importing commands. "
         "Process the bridge entries selected below according to your declared role: "
-        "Loyal Opposition reviews latest NEW or REVISED entries; "
+        "Loyal Opposition reviews latest NEW, REVISED, or NO-ACTION entries; "
+        "NO-ACTION requires a corrected governance-compliant verdict via review_no_action. "
         "Prime Builder acts on latest GO or NO-GO entries assigned to its harness. "
         "Latest VERIFIED entries are bridge closure for both roles and are not "
         "queue work; do not process them as actionable."

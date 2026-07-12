@@ -240,7 +240,7 @@ def test_advisory_link_alone_does_not_resolve_without_verified_implementation(tm
         db.close()
 
 
-@pytest.mark.parametrize("blocking_status", ["NEW", "REVISED", "NO-GO", "DEFERRED"])
+@pytest.mark.parametrize("blocking_status", ["NEW", "REVISED", "NO-ACTION", "NO-GO", "DEFERRED"])
 def test_implementation_like_non_verified_links_still_block_resolution(tmp_path: Path, blocking_status: str) -> None:
     module = _load_module()
     _write_index(tmp_path, {"impl-thread": "VERIFIED", "blocking-thread": blocking_status})

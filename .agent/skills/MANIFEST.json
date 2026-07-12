@@ -26,7 +26,7 @@
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
+      "source_sha256": "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
     },
     {
       "adapter_relative_path": ".agent/skills/bridge-config/SKILL.md",

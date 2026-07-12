@@ -9,6 +9,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from groundtruth_kb.bridge.disposition import LOYAL_OPPOSITION_ACTIONABLE_STATUSES
 from groundtruth_kb.bridge_dispatch_config import (
     ROLE_LOYAL_OPPOSITION,
     ROLE_PRIME_BUILDER,
@@ -17,7 +18,6 @@ from groundtruth_kb.bridge_dispatch_config import (
 )
 from groundtruth_kb.harness_projection import read_roles
 
-LO_ACTIONABLE_STATUSES = frozenset({"NEW", "REVISED"})
 BRIDGE_THREAD_HELPER = Path("scripts") / "bridge_thread_files.py"
 
 
@@ -51,7 +51,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     bridge_rows.extend((row["status"], str(row["count"])) for row in bridge["status_mix"])
     bridge_rows.append(
         (
-            "LO_ACTIONABLE_LATEST_NEW_REVISED",
+            "LO_ACTIONABLE_LATEST_NEW_REVISED_NO_ACTION",
             _actionable_summary(bridge["lo_actionable"]),
         )
     )
@@ -112,7 +112,7 @@ def _bridge_section(root: Path) -> dict[str, Any]:
             }
         )
 
-    lo_actionable = [row for row in threads if row["latest_status"] in LO_ACTIONABLE_STATUSES]
+    lo_actionable = [row for row in threads if row["latest_status"] in LOYAL_OPPOSITION_ACTIONABLE_STATUSES]
     return {
         "total_thread_count": len(threads),
         "status_mix": _status_mix(status_counts),
@@ -240,7 +240,17 @@ def _argv_config_assignments(argv: list[str]) -> dict[str, str]:
 
 
 def _status_mix(status_counts: Counter[str]) -> list[dict[str, Any]]:
-    preferred_order = ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN")
+    preferred_order = (
+        "NEW",
+        "REVISED",
+        "NO-ACTION",
+        "GO",
+        "NO-GO",
+        "VERIFIED",
+        "ADVISORY",
+        "DEFERRED",
+        "WITHDRAWN",
+    )
     rows = []
     seen: set[str] = set()
     for status in preferred_order:

@@ -66,8 +66,8 @@ def test_bridge_rules_describe_loyal_opposition_workflow(tmp_path: Path) -> None
     content = (tmp_path / "project" / ".claude" / "rules" / "file-bridge-protocol.md").read_text(
         encoding="utf-8",
     )
-    assert "NEW or REVISED" in content
-    assert "dispatcher/TAFE bridge state" in content
+    assert "NEW, REVISED, or NO-ACTION" in content
+    assert "dispatcher/TAFE" in content
 
 
 def test_bridge_index_absent_for_local_only(tmp_path: Path) -> None:

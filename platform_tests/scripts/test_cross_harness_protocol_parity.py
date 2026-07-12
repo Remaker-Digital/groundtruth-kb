@@ -96,13 +96,31 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
     protocol = _read_text(".claude/rules/file-bridge-protocol.md")
     disposition = _read_text("groundtruth-kb/src/groundtruth_kb/bridge/disposition.py")
     assert "GO, NO-GO, or ADVISORY" in protocol
-    assert "NEW or REVISED entries" in protocol
+    assert "NEW, REVISED, or NO-ACTION entries" in protocol
     assert 'STATUS_NO_ACTION: Final[str] = "NO-ACTION"' in disposition
     assert "LOYAL_OPPOSITION_ACTIONABLE_STATUSES" in disposition
     assert (
         "ADVISORY entries are Prime-actionable for interactive sessions and non-dispatchable for headless runs"
         in protocol
     )
+
+    for relative_path in (
+        "AGENTS.md",
+        "CLAUDE.md",
+        "config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md",
+        ".claude/rules/codex-standing-priorities.md",
+        ".claude/rules/codex-review-operating-contract.md",
+        ".claude/rules/codex-loyal-opposition-runbook.md",
+        ".claude/rules/prime-bridge-collaboration-protocol.md",
+        ".claude/skills/bridge/SKILL.md",
+        ".codex/skills/bridge/SKILL.md",
+        ".agent/skills/bridge/SKILL.md",
+        ".api-harness/skills/bridge/SKILL.md",
+        "scripts/dispatcher_runtime.py",
+        "scripts/ollama_harness.py",
+        "scripts/openrouter_harness.py",
+    ):
+        assert "NO-ACTION" in _read_text(relative_path), relative_path
 
 
 def test_protected_mutation_surfaces_expose_go_packet_and_claim_requirements() -> None:

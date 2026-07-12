@@ -406,7 +406,7 @@ unindexed work-in-progress files; `DEFERRED` is indexed workflow state.
 
 ## Loyal Opposition Workflow
 
-1. Periodically scan TAFE/dispatcher bridge state for NEW or REVISED entries;
+1. Periodically scan TAFE/dispatcher bridge state for NEW, REVISED, or NO-ACTION entries;
    skip ADVISORY, DEFERRED, WITHDRAWN, and VERIFIED as non-actionable for Loyal
    Opposition review work.
 2. Process entries starting from the oldest actionable item.

@@ -52,6 +52,16 @@ def test_backlog_row_points_to_unified_work_items_authority() -> None:
     assert "dashboard/startup rows are summaries" in combined
 
 
+def test_bridge_queue_permissions_include_no_action_review() -> None:
+    module = _load_module()
+    system_map = module.load_map()
+    file_bridge = next(row for row in module.system_rows(system_map) if row["id"] == "file-bridge")
+    bridge_queue = next(row for row in module.system_rows(system_map) if row["id"] == "bridge-queue")
+
+    assert "Loyal Opposition acts on latest NEW/REVISED/NO-ACTION" in file_bridge["role_permissions"]
+    assert "NO-ACTION" in bridge_queue["role_permissions"]
+
+
 def test_memory_working_records_are_non_authoritative() -> None:
     module = _load_module()
     system_map = module.load_map()

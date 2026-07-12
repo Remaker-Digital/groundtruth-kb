@@ -1,6 +1,6 @@
 ---
 name: gtkb-bridge
-description: Operate the bridge protocol — file proposals, route actionable bridge work, write GO/NO-GO/VERIFIED verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.
+description: Operate the bridge protocol — file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/NO-ACTION entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.
 ---
 
 # /gtkb-bridge
@@ -19,7 +19,7 @@ This skill body presents **identical content** to both Claude Code and Codex age
 
 ## Bridge protocol summary
 
-Six operations, six lifecycle states. Operations:
+Six operations, seven lifecycle states. Operations:
 
 | Operation | Who runs it | What it produces |
 |---|---|---|
@@ -38,6 +38,7 @@ Lifecycle states (per `.claude/rules/file-bridge-protocol.md`):
 | `REVISED` | Prime | Updated proposal after a NO-GO |
 | `GO` | Loyal Opposition | Proposal approved for implementation |
 | `NO-GO` | Loyal Opposition | Proposal requires changes before approval |
+| `NO-ACTION` | Prime | Rejects a non-compliant Loyal Opposition verdict and requires `review_no_action` |
 | `VERIFIED` | Loyal Opposition | Post-implementation verification passed |
 | (terminal) | — | A thread is "terminal" when its latest entry is VERIFIED with no further work pending |
 
@@ -95,7 +96,7 @@ review or audit explicitly needs archival detail.
 
 1. Read dispatcher/TAFE bridge state and the versioned bridge file chain.
 2. Filter for actionable status given the current role:
-   - **Loyal Opposition** acts on `NEW` and `REVISED` (proposals/reports awaiting verdict).
+   - **Loyal Opposition** acts on `NEW`, `REVISED`, and `NO-ACTION` (proposals/reports awaiting a governance-compliant verdict or a verdict correction).
    - **Prime Builder** acts only on `NO-GO` (revise) and `GO` (implement). `VERIFIED` is terminal closure for both roles, not queue work.
 3. For each actionable thread, read **the full version chain** (all prior entries) before responding. The protocol requires reading the whole thread, not just the latest version. The `Show-thread` helper below mechanizes that load.
 4. Optional: cross-check with `.gtkb-state/bridge-poller/dispatch-state.json` (or successor under `.gtkb-state/dispatcher-daemon/`) to deduplicate against already-dispatched signatures.
@@ -118,7 +119,7 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 
 ### Respond
 
-**Purpose**: file a GO/NO-GO/VERIFIED verdict on a NEW or REVISED entry.
+**Purpose**: file the required governance-compliant verdict on a NEW, REVISED, or NO-ACTION entry. `NO-ACTION` uses the generic `review_no_action` path; do not encode an exclusive corrected-verdict status set.
 
 **Action**:
 
@@ -202,7 +203,7 @@ full mode only when the version chain or citing-path archive is required.
    - `VERIFIED` (terminal — no further action)
    - `GO` (Prime: implement)
    - `NO-GO` (Prime: revise)
-   - `NEW` / `REVISED` (Loyal Opposition: review)
+   - `NEW` / `REVISED` / `NO-ACTION` (Loyal Opposition: review)
 
 Use this when you need to know "what is the state of thread X?" without touching anything.
 

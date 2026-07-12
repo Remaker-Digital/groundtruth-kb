@@ -1594,6 +1594,8 @@ def _terminal_bridge_reconciliation_reason(project_root: Path | None, row: dict[
     statuses = {bridge_id: _latest_bridge_status_for_document(project_root, bridge_id) for bridge_id in bridge_ids}
     if not statuses or any(status is None for status in statuses.values()):
         return None
+    if any(status == "NO-ACTION" for status in statuses.values()):
+        return None
     if all(status in TERMINAL_DISPATCH_BRIDGE_STATUSES for status in statuses.values() if status is not None):
         rendered = ", ".join(f"{bridge_id}={status}" for bridge_id, status in sorted(statuses.items()))
         return f"referenced bridge document terminal ({rendered})"

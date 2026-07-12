@@ -23,7 +23,9 @@ from groundtruth_kb.db import (  # noqa: E402
     WORK_ITEM_TERMINAL_RESOLUTION_STATUSES,
 )
 
-BRIDGE_FILE_STATUS_RE = re.compile(r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b")
+BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(NEW|REVISED|NO-ACTION|GO|NO-GO|VERIFIED|ADVISORY|DEFERRED|WITHDRAWN)\b"
+)
 BRIDGE_PATH_RE = re.compile(r"(?:^|\b)bridge/([A-Za-z0-9_.-]+?)-\d{3}\.md(?:\b|$)")
 VERSIONED_MD_RE = re.compile(r"^([A-Za-z0-9_.-]+?)-\d{3}\.md$")
 TOKEN_SPLIT_RE = re.compile(r"[,;\r\n]+")

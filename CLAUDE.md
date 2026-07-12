@@ -63,7 +63,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 - **All implementation proposals MUST be reviewed by Codex before any code is written.**
 - **All post-implementation reports MUST be reviewed by Codex before committing.**
 - **Propose:** Save proposal to `bridge/{name}-001.md` through the governed dispatcher-backed bridge path.
-- **Review:** an eligible Loyal Opposition target receives dispatcher-routed NEW/REVISED work, reviews, adds GO or NO-GO version.
+- **Review:** an eligible Loyal Opposition target receives dispatcher-routed NEW/REVISED/NO-ACTION work and writes the required governance-compliant verdict.
 - **Review independence:** same-session review is self-review and fails closed;
   same harness ID alone is not a blocker when author and reviewer session
   contexts are unrelated and the reviewer has a valid Loyal Opposition role or
@@ -71,7 +71,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 - **Execute:** After Codex GO, implement code, tests, and verify.
 - **Report:** Save post-implementation report as new version, publish it through the dispatcher-backed bridge path for verification.
 - **Verify:** an eligible Loyal Opposition target reviews report and adds VERIFIED or NO-GO version.
-- **Dispatch:** Bridge dispatch automation is the **dispatcher daemon** at `scripts/gtkb_dispatcher_daemon.py`. It dispatches latest `NEW` or `REVISED` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. Retired hook-trigger and poller paths are archived; do not re-enable them.
+- **Dispatch:** Bridge dispatch automation is the **dispatcher daemon** at `scripts/gtkb_dispatcher_daemon.py`. It dispatches latest `NEW`, `REVISED`, or `NO-ACTION` items to eligible Loyal Opposition targets and latest `GO` or `NO-GO` items to eligible Prime Builder targets. `NO-ACTION` uses the generic `review_no_action` path for a corrected governance-compliant verdict. `VERIFIED` is terminal and not dispatched. Candidate eligibility and ranking come from `config/dispatcher/rules.toml`; inspect with the `bridge-config` skill or `gt bridge dispatch status`. Retired hook-trigger and poller paths are archived; do not re-enable them.
 - **Retired bridge aggregate:** Do not recreate aggregate queue artifacts. Any helper that requires them is defective and must be repaired.
 
 ---

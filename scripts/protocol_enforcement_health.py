@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$")
+STATUS_RE = re.compile(r"^(NEW|REVISED|NO-ACTION|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)$")
 VERSIONED_BRIDGE_RE = re.compile(r"^(?P<slug>.+?)-(?P<version>\d{3,})\.md$")
 
 STATE_DIR = Path(".gtkb-state/protocol-enforcement")
@@ -20,7 +20,7 @@ IMPLEMENTATION_PACKET_DIR = Path(".gtkb-state/implementation-authorizations/by-b
 POST_ACTION_RECEIPTS_DIR = Path(".gtkb-state/post-action-receipts")
 
 PRIME_ACTIONABLE = frozenset({"GO", "NO-GO"})
-LOYAL_OPPOSITION_ACTIONABLE = frozenset({"NEW", "REVISED"})
+LOYAL_OPPOSITION_ACTIONABLE = frozenset({"NEW", "REVISED", "NO-ACTION"})
 
 PROTECTED_BLOCK_NEXT_ACTIONS = {
     "missing_bridge_go": "restore_bridge_go_or_revise_thread",
@@ -231,6 +231,15 @@ def _add_bridge_disposition_items(
                     severity="warning",
                     evidence=evidence,
                     next_action="prime_builder_revise_or_record_blocker",
+                )
+            )
+        elif latest_status == "NO-ACTION":
+            items.append(
+                _item(
+                    category="unresolved_no_action",
+                    severity="warning",
+                    evidence=evidence,
+                    next_action="review_no_action",
                 )
             )
         elif latest_status == "ADVISORY":

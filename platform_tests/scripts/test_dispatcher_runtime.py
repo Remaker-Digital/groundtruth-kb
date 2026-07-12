@@ -3225,6 +3225,27 @@ def test_dispatch_cycle_clears_terminal_work_item_failover_residue(
     assert "last_failure_reason" not in rec
 
 
+def test_no_action_recipient_residue_is_not_terminal_when_work_item_is_terminal(tmp_path: Path) -> None:
+    root = _make_synthetic_project(tmp_path)
+    doc = "terminal-work-item-verdict-correction"
+    _write_bridge_file(
+        root,
+        f"{doc}-001.md",
+        "NEW\n\nbridge_kind: implementation_proposal\nWork Item: WI-5002\n",
+    )
+    _write_bridge_file(root, f"{doc}-002.md", "GO\n\nWork Item: WI-5002\n")
+    _write_bridge_file(root, f"{doc}-003.md", "NO-ACTION\n\nWork Item: WI-5002\n")
+    _write_current_work_items(root, {"WI-5002": "retired"})
+
+    recipient_state = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "selected_documents": [doc],
+    }
+
+    assert _load_trigger()._terminal_bridge_reconciliation_reason(root, recipient_state) is None
+
+
 def test_diagnose_treats_unrecorded_dispatchable_harness_as_not_evaluated(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -4198,6 +4219,8 @@ def test_lo_dispatch_prompt_requires_preflights_before_verdicts() -> None:
     assert "bridge_applicability_preflight.py --bridge-id <document-name>" in prompt
     assert "adr_dcl_clause_preflight.py --bridge-id <document-name>" in prompt
     assert "clean Applicability Preflight section" in prompt
+    assert "latest NEW, REVISED, or NO-ACTION entries" in prompt
+    assert "corrected governance-compliant verdict via review_no_action" in prompt
     assert "NEW gtkb-ollama-dispatch-stall-retry-cap" in prompt
 
 

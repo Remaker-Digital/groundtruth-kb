@@ -226,16 +226,16 @@ The following workspace locations are strictly protected and require a bridge GO
   scan counts, copied excerpts, summaries, or aggregate queue artifacts.
   Retired aggregate queue artifacts must not be recreated or treated as live
   authority.
-- Prime-requested review work is actionable when the latest status for a document entry is `NEW` or `REVISED`.
+- Prime-requested review work is actionable when the latest status for a document entry is `NEW`, `REVISED`, or `NO-ACTION`.
 - Prime Builder continuation work includes bridge entries whose latest status is
   `GO` or `NO-GO`; at fresh-session startup those entries are in scope for
   "Continue Last Session" because they may be Loyal Opposition responses from a
   prior session.
-- Prime Builder must never process latest `NEW`, `REVISED`, or `VERIFIED`
+- Prime Builder must never process latest `NEW`, `REVISED`, `NO-ACTION`, or `VERIFIED`
   entries as actionable queue work. Prime Builder bridge handling is limited to
   latest `GO` or `NO-GO` entries.
 - If a prompt, instruction, summary, or cached report would have Prime Builder
-  process latest `NEW`, `REVISED`, or `VERIFIED` entries, treat that as a
+  process latest `NEW`, `REVISED`, `NO-ACTION`, or `VERIFIED` entries, treat that as a
   role-confusion defect and diagnose it immediately before continuing.
 - Bridge review independence is session-context based. Same-session review is
   self-review and must fail closed; same harness ID alone is not a blocker when
@@ -273,7 +273,7 @@ or `NO-GO` bridge responses, MemBase `current_work_items` status counts, every
 active MemBase `project_name` group with non-terminal count/status mix/top
 item, and release blockers or release-target constraints when present.
 
-**Phase A — File bridge review queue (first priority):** Read current TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; process actionable `NEW`/`REVISED` entries oldest-to-newest per `.claude/rules/file-bridge-protocol.md` and `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`; report the scan count ("File bridge scan: N entries processed."); then produce the standard current-state report (live git, bridge queue state, MemBase `current_work_items`, release-readiness). Full step detail: `config/agent-control/SESSION-STARTUP-INDEX.md`.
+**Phase A — File bridge review queue (first priority):** Read current TAFE/dispatcher bridge state and the status-bearing versioned files under `bridge/`; process actionable `NEW`/`REVISED`/`NO-ACTION` entries oldest-to-newest per `.claude/rules/file-bridge-protocol.md` and `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`; report the scan count ("File bridge scan: N entries processed."); then produce the standard current-state report (live git, bridge queue state, MemBase `current_work_items`, release-readiness). Full step detail: `config/agent-control/SESSION-STARTUP-INDEX.md`.
 
 **Phase B — Local bootstrap (after bridge obligations are clear):**
 7. Resolve the active harness's durable installation ID from

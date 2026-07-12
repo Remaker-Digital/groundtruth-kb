@@ -221,6 +221,9 @@ def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     assert "gt bridge dispatch config" in prompt
     assert "gt bridge dispatch status" in prompt
     assert "gt bridge dispatch\nhealth" in prompt
+    assert "latest NEW, REVISED,\nor NO-ACTION" in prompt
+    assert "governance-compliant verdict through review_no_action" in prompt
+    assert "Do not encode an\nexclusive corrected-verdict status set" in prompt
 
 
 def test_bridge_review_prompt_seeds_prior_deliberations_before_verdict_write(tmp_path: Path):

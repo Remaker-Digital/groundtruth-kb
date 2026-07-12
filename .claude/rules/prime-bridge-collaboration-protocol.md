@@ -53,7 +53,7 @@ implementation plan.
 
 ### Loyal Opposition to Prime Builder
 
-Loyal Opposition processes latest `NEW` and `REVISED` entries, then writes the
+Loyal Opposition processes latest `NEW`, `REVISED`, and `NO-ACTION` entries, then writes the
 next numbered bridge file with one of:
 
 - `GO`
@@ -84,17 +84,13 @@ Prime Builder processes latest `GO` and `NO-GO` entries.
 
 Routine collaboration must not depend on manual owner prompting.
 
-- The cross-harness event-driven trigger
-  (`scripts/cross_harness_bridge_trigger.py`) is registered as PostToolUse
-  and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
-- The trigger fires on tool-use and Stop events: when TAFE-backed bridge state
-  changes, or the agent ends a turn, the trigger inspects dispatcher/TAFE state
-  and dispatches the
+- The dispatcher daemon (`scripts/gtkb_dispatcher_daemon.py`) owns automated
+  bridge dispatch.
+- On each daemon tick, it inspects dispatcher/TAFE state and dispatches the
   appropriate counterpart harness when its actionable queue signature has
   changed.
-- Manual bridge-state scans remain available as a fallback when the trigger is
-  unhealthy. The owner triggers a Prime bridge scan with a brief prompt such as
-  `Bridge` or `Bridge scan`.
+- Manual owner assignment/scanning is the only fallback when the daemon is
+  unhealthy.
 
 ## Escalation Boundary
 
@@ -104,17 +100,16 @@ Escalate to the owner only when:
 - A destructive action is required.
 - There is a true owner-only product or risk decision.
 - The bridge protocol itself is ambiguous or contradictory.
-- The cross-harness event-driven trigger fails repeatedly and cannot be
+- The dispatcher daemon fails repeatedly and cannot be
   recovered from documented procedures.
 
 ## Configuration Capture
 
 Keep `BRIDGE-INVENTORY.md` current with:
 
-- hook registrations (`.claude/settings.json` and `.codex/hooks.json`)
 - dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
-- trigger script path (`scripts/cross_harness_bridge_trigger.py`)
-- manual bridge-scan fallback procedure
+- daemon script path (`scripts/gtkb_dispatcher_daemon.py`)
+- manual owner assignment/scanning fallback procedure
 - log and lock paths
 - CLI commands and working directories
 - exact prompt text or prompt file paths

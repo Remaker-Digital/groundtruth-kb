@@ -539,8 +539,8 @@ NON_TERMINAL_WORK_ITEM_STATUSES = {
     "specified",
     "unresolved",
 }
-ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "GO", "NO-GO"}
-REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED"}
+ACTIONABLE_BRIDGE_STATUSES = {"NEW", "REVISED", "NO-ACTION", "GO", "NO-GO"}
+REVIEW_QUEUE_BRIDGE_STATUSES = {"NEW", "REVISED", "NO-ACTION"}
 PRIME_RESPONSE_BRIDGE_STATUSES = {"GO", "NO-GO"}
 ADVISORY_BRIDGE_STATUSES = {"ADVISORY"}
 PRIORITY_SORT_ORDER = {
@@ -3878,7 +3878,7 @@ def _sentence_fragment(value: Any, default: str) -> str:
 
 
 def _protocol_review_queue_count(contention: dict[str, Any]) -> int:
-    """Count latest NEW/REVISED bridge entries without dashboard scope filtering."""
+    """Count latest NEW/REVISED/NO-ACTION entries without dashboard scope filtering."""
 
     if "raw_review_queue_count" in contention:
         return int(contention.get("raw_review_queue_count") or 0)
@@ -4495,7 +4495,7 @@ def _render_loyal_opposition_startup_task(model: dict[str, Any]) -> str:
             f"- Bridge operation instructions: {BRIDGE_OPERATION_INSTRUCTIONS_TEXT}.",
             "- First task: verify that the Prime Builder / Loyal Opposition file bridge is functioning.",
             _render_file_bridge_scan(model),
-            "- If the live bridge verification succeeds, report the live scan result and auto-process actionable NEW/REVISED bridge entries oldest-to-newest by default (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
+            "- If the live bridge verification succeeds, report the live scan result and auto-process actionable NEW/REVISED/NO-ACTION bridge entries oldest-to-newest by default (per ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001).",
             "- Advisory mode opt-in: when the session was opened with `init gtkb advisory`, report the scan and ask Mike whether to switch to auto-process; do not write verdict files in advisory mode.",
             "- If the bridge is not functioning, diagnose and repair the bridge before ordinary review work.",
             "- Bridge authority: Loyal Opposition has permanent owner permission to diagnose and repair bridge function/use and downstream bridge-dependent artifacts needed to sustain the bridge.",
@@ -4509,7 +4509,7 @@ def _render_fresh_session_input_semantics(model: dict[str, Any]) -> str:
     ]
     if _is_loyal_opposition_model(model):
         lines.append(
-            "- After presenting this startup disclosure in default mode, execute the harness-only Loyal Opposition startup action before ordinary task work: verify live bridge state, report the live scan, and process actionable `NEW` / `REVISED` entries oldest-to-newest by default."
+            "- After presenting this startup disclosure in default mode, execute the harness-only Loyal Opposition startup action before ordinary task work: verify live bridge state, report the live scan, and process actionable `NEW` / `REVISED` / `NO-ACTION` entries oldest-to-newest by default."
         )
         lines.append(
             "- In `init gtkb advisory` mode, report the live scan and ask Mike whether to switch to auto-process before writing verdict files or processing bridge entries."
@@ -4779,10 +4779,10 @@ def _render_file_bridge_scan(model: dict[str, Any]) -> str:
     if actionable_review_count:
         return (
             f"- Generated-time file bridge scan, non-authoritative after report generation: "
-            f"{actionable_review_count} latest NEW/REVISED entr"
+            f"{actionable_review_count} latest NEW/REVISED/NO-ACTION entr"
             f"{'y' if actionable_review_count == 1 else 'ies'} identified."
         )
-    return "- Generated-time file bridge scan, non-authoritative after report generation: 0 latest NEW/REVISED entries identified."
+    return "- Generated-time file bridge scan, non-authoritative after report generation: 0 latest NEW/REVISED/NO-ACTION entries identified."
 
 
 def _render_wrapup_trigger_commands() -> str:

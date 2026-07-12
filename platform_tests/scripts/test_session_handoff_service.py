@@ -403,6 +403,25 @@ def test_handoff_reads_versioned_bridge_files_when_index_is_absent(tmp_path: Pat
     assert "versioned bridge file chain" in body
 
 
+def test_handoff_surfaces_latest_no_action_for_loyal_opposition(tmp_path: Path) -> None:
+    root = _make_project_root(tmp_path, session_id="S-NO-ACTION")
+    archive_file = next((root / "harness-state" / "claude" / "session-envelope-archive").glob("*.json"))
+    envelope = json.loads(archive_file.read_text(encoding="utf-8"))
+    envelope["role_resolved"] = "loyal-opposition"
+    archive_file.write_text(json.dumps(envelope, indent=2, sort_keys=True), encoding="utf-8")
+
+    (root / "bridge" / "INDEX.md").unlink()
+    slug = "gtkb-verdict-correction"
+    (root / "bridge" / f"{slug}-001.md").write_text("NEW\n\n# Proposal\n", encoding="utf-8")
+    (root / "bridge" / f"{slug}-002.md").write_text("GO\n\n# Initial verdict\n", encoding="utf-8")
+    (root / "bridge" / f"{slug}-003.md").write_text("NO-ACTION\n\n# Correct the verdict\n", encoding="utf-8")
+    db = _make_db(tmp_path)
+
+    result = generate(session_id="S-NO-ACTION", project_root=root, db=db)
+
+    assert f"NO-ACTION: {slug} -> bridge/{slug}-003.md" in result["prompt_markdown"]
+
+
 # ---------------------------------------------------------------------------
 # Regression: live identities schema must not select non-present harness
 # (NO-GO -007 FINDING-P1-002 — bridge/gtkb-handoff-prompt-deterministic-service-impl-007.md)

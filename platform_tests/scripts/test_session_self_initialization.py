@@ -1085,7 +1085,7 @@ def test_startup_report_treats_first_owner_message_as_session_start_stimulus() -
     assert "routes the first owner message through the init-keyword matcher" in loyal_context
     assert "SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001" in loyal_context
     assert "execute the harness-only Loyal Opposition startup action before ordinary task work" in loyal_context
-    assert "process actionable `NEW` / `REVISED` entries oldest-to-newest by default" in loyal_context
+    assert "process actionable `NEW` / `REVISED` / `NO-ACTION` entries oldest-to-newest by default" in loyal_context
     assert "ask Mike whether to switch to auto-process before writing verdict files" in loyal_context
     assert "render the startup disclosure and wait for the next message" not in loyal_context
     assert "wait for the next owner message before tool use" not in loyal_context
@@ -1453,13 +1453,16 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
         "NEW\n\n# GT-KB Current Main Integration\n\nGroundTruth-KB bridge proposal.",
         encoding="utf-8",
     )
+    (bridge_dir / "gtkb-verdict-correction-001.md").write_text("NEW\n\n# Proposal", encoding="utf-8")
+    (bridge_dir / "gtkb-verdict-correction-002.md").write_text("GO\n\n# Verdict", encoding="utf-8")
+    (bridge_dir / "gtkb-verdict-correction-003.md").write_text("NO-ACTION\n\n# Correct the verdict", encoding="utf-8")
 
     contention = module._bridge_metrics(tmp_path)
 
-    assert contention["latest_status_counts"] == {"NEW": 1}
-    assert contention["actionable_count"] == 1
-    assert contention["raw_latest_status_counts"] == {"NEW": 1}
-    assert contention["raw_review_queue_count"] == 1
+    assert contention["latest_status_counts"] == {"NEW": 1, "NO-ACTION": 1}
+    assert contention["actionable_count"] == 2
+    assert contention["raw_latest_status_counts"] == {"NEW": 1, "NO-ACTION": 1}
+    assert contention["raw_review_queue_count"] == 2
     assert contention["raw_prime_response_queue_count"] == 0
     assert contention["source"] == "bridge/*.md"
     assert contention["source_read_mode"] == "versioned_bridge_file_chain"
@@ -1467,7 +1470,7 @@ def test_loyal_opposition_bridge_scan_uses_unscoped_protocol_queue(tmp_path) -> 
     assert contention["live_bridge_directory_available"] is True
     assert module._render_file_bridge_scan({"metrics": {"contention": contention}}) == (
         "- Generated-time file bridge scan, non-authoritative after report generation: "
-        "1 latest NEW/REVISED entry identified."
+        "2 latest NEW/REVISED/NO-ACTION entries identified."
     )
 
 

@@ -154,6 +154,18 @@ def test_scenario_skill_names_resolve() -> None:
     )
 
 
+def test_bridge_skill_projects_no_action_review_semantics() -> None:
+    for relative_path in (
+        ".claude/skills/bridge/SKILL.md",
+        ".codex/skills/bridge/SKILL.md",
+        ".agent/skills/bridge/SKILL.md",
+        ".api-harness/skills/bridge/SKILL.md",
+    ):
+        text = (_REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        assert "NO-ACTION" in text, relative_path
+        assert "review_no_action" in text or relative_path.startswith(".api-harness/"), relative_path
+
+
 def test_advisory_intake_skills_are_cataloged_after_implementation() -> None:
     """WI-5059: advisory skills cannot appear without registry and adapter coverage.
 

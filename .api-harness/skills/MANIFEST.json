@@ -29,9 +29,9 @@
       "adapter_relative_path": ".api-harness/skills/bridge/SKILL.md",
       "canonical_name": "gtkb-bridge",
       "capability_id": "skill.bridge",
-      "description": "Operate the bridge protocol \u2014 file proposals, route actionable bridge work, write GO/NO-GO/VERIFIED verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
+      "description": "Operate the bridge protocol \u2014 file proposals, route actionable bridge work, write governance-compliant verdicts, file post-implementation reports, navigate lifecycle states. Use when proposing implementation work that needs Loyal Opposition review, when responding to a NEW/REVISED/NO-ACTION entry as the reviewing harness, or when checking bridge thread state. The companion skills `gtkb-bridge-propose`, `gtkb-proposal-review`, and `gtkb-send-review` cover specific subactions; use this skill when working across the protocol or when an action's fit isn't obvious.",
       "source_relative_path": ".claude/skills/bridge/SKILL.md",
-      "source_sha256": "5481e11662d6da2d4cdac7bd49a7731924e20c7f75698f27d023884cd0c55cf7"
+      "source_sha256": "4e6b7494cc4e587d4759680b3aec07a646ddc6b21b3f9b0cc6ecae5d7699b7a5"
     },
     {
       "adapter_relative_path": ".api-harness/skills/bridge-config/SKILL.md",

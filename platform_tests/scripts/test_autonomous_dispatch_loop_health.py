@@ -56,7 +56,7 @@ def _complete_chain(bridge_dir: Path, slug: str, *, wi: str = "WI-9999", session
 
 
 def test_extract_status_basic_tokens():
-    for status in ("NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"):
+    for status in ("NEW", "REVISED", "NO-ACTION", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"):
         assert adlh._extract_status(f"{status}\n\nsome body") == status
 
 
@@ -104,6 +104,11 @@ def test_classify_version_go():
 def test_classify_version_no_go():
     v = adlh.BridgeVersion(path=Path("x-004.md"), number=4, status="NO-GO", raw_text="")
     assert adlh._classify_version(v, "NEW") == "no_go"
+
+
+def test_classify_version_no_action():
+    v = adlh.BridgeVersion(path=Path("x-005.md"), number=5, status="NO-ACTION", raw_text="")
+    assert adlh._classify_version(v, "VERIFIED") == "no_action"
 
 
 def test_classify_version_verified():
@@ -155,6 +160,19 @@ def test_validate_loop_complete_without_expected_wi(tmp_path):
     # wi_found is True when any WI is present and no expected_wi is given
     assert result.wi_found is True
     assert result.complete is True
+
+
+def test_validate_loop_is_incomplete_when_no_action_follows_verified(tmp_path):
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    _complete_chain(bridge_dir, "test-slug", wi="WI-5555")
+    _write_bridge(bridge_dir, "test-slug", 5, "NO-ACTION")
+
+    result = adlh.validate_loop(bridge_dir, "test-slug")
+
+    assert result.complete is False
+    assert result.lifecycle["versions"][-1]["phase"] == "no_action"
+    assert any("not terminal VERIFIED" in error for error in result.errors)
 
 
 # ---------------------------------------------------------------------------

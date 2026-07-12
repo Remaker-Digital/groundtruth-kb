@@ -121,7 +121,7 @@ approves a documented waiver for that exact specification and risk.
 
 ## Review Coordination
 - Prime-requested reviews are coordinated through the file bridge in `bridge/`.
-- TAFE-backed bridge state is the authoritative queue for `NEW` and `REVISED`
+- TAFE-backed bridge state is the authoritative queue for `NEW`, `REVISED`, and `NO-ACTION`
   review requests.
 - Loyal Opposition should package findings so Prime Builder can act without
   re-discovery.

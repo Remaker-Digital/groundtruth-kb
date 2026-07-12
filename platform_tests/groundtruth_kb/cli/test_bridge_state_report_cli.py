@@ -123,6 +123,9 @@ rules = []
     (bridge_dir / "alpha-002.md").write_text("GO\n\n# Alpha approved\n", encoding="utf-8")
     (bridge_dir / "alpha-child-003.md").write_text("REVISED\n\n# Prefix sibling\n", encoding="utf-8")
     (bridge_dir / "gamma-001.md").write_text("NEW\n\n# Gamma proposal\n", encoding="utf-8")
+    (bridge_dir / "verdict-correction-001.md").write_text(
+        "NO-ACTION\n\n# Correct the prior verdict\n", encoding="utf-8"
+    )
     (bridge_dir / "closed-001.md").write_text("VERIFIED\n\n# Closed thread\n", encoding="utf-8")
     (bridge_dir / "alpha-draft.md").write_text("NO-GO\n\n# Non-canonical draft\n", encoding="utf-8")
 
@@ -143,15 +146,20 @@ def test_bridge_state_report_json_uses_exact_threads_and_harness_model_config(tm
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["bridge"]["total_thread_count"] == 4
+    assert payload["bridge"]["total_thread_count"] == 5
     threads = {row["slug"]: row for row in payload["bridge"]["threads"]}
     assert threads["alpha"]["latest_status"] == "GO"
     assert threads["alpha"]["latest_path"] == "bridge/alpha-002.md"
     assert "alpha-draft" not in threads
-    assert [row["slug"] for row in payload["bridge"]["lo_actionable"]] == ["alpha-child", "gamma"]
+    assert [row["slug"] for row in payload["bridge"]["lo_actionable"]] == [
+        "alpha-child",
+        "gamma",
+        "verdict-correction",
+    ]
     assert {row["status"]: row["count"] for row in payload["bridge"]["status_mix"]} == {
         "GO": 1,
         "NEW": 1,
+        "NO-ACTION": 1,
         "REVISED": 1,
         "VERIFIED": 1,
     }
@@ -174,7 +182,7 @@ def test_bridge_state_report_markdown_is_three_owner_tables(tmp_path: Path) -> N
     assert "| Status | Count |" in result.output
     assert "| Aspect | Value |" in result.output
     assert "| ID | Harness | Model / Config | Role | Active | Dispatchable | Events |" in result.output
-    assert "| LO_ACTIONABLE_LATEST_NEW_REVISED | 2: alpha-child" in result.output
+    assert "| LO_ACTIONABLE_LATEST_NEW_REVISED_NO_ACTION | 3: alpha-child" in result.output
     assert sum(1 for line in result.output.splitlines() if line.startswith("| ---")) == 3
 
 

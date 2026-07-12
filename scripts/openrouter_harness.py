@@ -244,9 +244,11 @@ output in the verdict evidence instead of silently omitting Prior Deliberations.
 Use the GT-KB file bridge as the authoritative workflow surface. Read the full
 versioned bridge-file chain for the target document before acting, and use
 gt bridge dispatch config, gt bridge dispatch status, and gt bridge dispatch
-health for dispatcher topology and readiness. Respond to latest NEW or REVISED
-bridge entries by writing the next numbered bridge verdict file through the
-guarded bridge writer path. Do not stop with prose when a bridge verdict is
+health for dispatcher topology and readiness. Respond to latest NEW, REVISED,
+or NO-ACTION bridge entries by writing the next numbered bridge verdict file
+through the guarded bridge writer path. A NO-ACTION entry requires a corrected,
+governance-compliant verdict through review_no_action. Do not encode an
+exclusive corrected-verdict status set. Do not stop with prose when a bridge verdict is
 required.
 Use harness-state/harness-registry.json through the canonical role reader as the role source
 of truth. Do not treat harness-local operating-role.md files as live role authority.

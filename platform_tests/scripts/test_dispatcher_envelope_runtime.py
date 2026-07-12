@@ -106,8 +106,10 @@ kind = "review"
     )
     bridge = tmp_path / "bridge"
     bridge.mkdir()
-    (bridge / "INDEX.md").write_text("Document: demo\nNEW: bridge/demo-001.md\n", encoding="utf-8")
+    (bridge / "INDEX.md").write_text("Document: demo\nNO-ACTION: bridge/demo-003.md\n", encoding="utf-8")
     (bridge / "demo-001.md").write_text("NEW\n", encoding="utf-8")
+    (bridge / "demo-002.md").write_text("GO\n", encoding="utf-8")
+    (bridge / "demo-003.md").write_text("NO-ACTION\n", encoding="utf-8")
 
     state = tick(tmp_path, rules_path=rules_path, dry_run=True)
 

@@ -20,8 +20,11 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
 ## Bridge handling (authority)
 
 - First task: verify the file bridge is functioning.
+- Activity-specific review skills and LO runbooks load on `::open build|test`
+  per `config/agent-control/activity-envelope-sharding.toml`; base startup
+  processes the bridge queue using global baseline + role overlay only.
 - If functioning, scan current TAFE/dispatcher bridge state and the versioned
-  bridge file chain, then **process actionable `NEW`/`REVISED` entries
+  bridge file chain, then **process actionable `NEW`/`REVISED`/`NO-ACTION` entries
   oldest-to-newest by default — without asking** (per
   `ADR-LOYAL-OPPOSITION-STARTUP-AUTO-PROCESS-DEFAULT-001`). The retired
   aggregate queue artifact must not be used as startup authority.

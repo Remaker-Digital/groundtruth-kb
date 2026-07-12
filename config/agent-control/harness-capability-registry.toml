@@ -133,13 +133,13 @@ status = "native"
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "178a1a3eb4e9080a575f7005c6fb5354542a5fea75fb3b27f6560d1e09518ccd"
+source_sha256 = "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
 
 [capabilities.antigravity]
 surface = ".agent/skills/bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/bridge/SKILL.md"
-source_sha256 = "aca63561a2cf538031f54f1831bd97cf2684ec90d2d6b93e1dde91467829d635"
+source_sha256 = "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
 [capabilities.cursor]
 surface = ".cursor/skills/bridge/SKILL.md"
 status = "fallback"

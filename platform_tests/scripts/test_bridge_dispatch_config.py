@@ -1407,6 +1407,21 @@ def test_terminal_work_item_dispatch_residue_is_health_pass(tmp_path: Path) -> N
     )
 
 
+def test_no_action_dispatch_residue_is_not_terminal_when_work_item_is_terminal(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    _write_bridge_thread_status_helper(tmp_path)
+    doc = "retired-work-item-verdict-correction"
+    _write_bridge_thread(tmp_path, doc, "NO-ACTION", "WI-5002")
+    _write_current_work_items(tmp_path, {"WI-5002": "retired"})
+    recipient_state = {
+        "pending_count": 1,
+        "selected_count": 1,
+        "selected_documents": [doc],
+    }
+
+    assert bridge_dispatch_config._terminal_bridge_reconciliation_reason(tmp_path, recipient_state) is None
+
+
 def test_wi5000_all_impl_auth_quarantine_with_live_worker_warns(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
