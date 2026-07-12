@@ -34,6 +34,7 @@ CommandRunner = base.CommandRunner
 
 infer_model_version = base.infer_model_version
 resolve_model = base.resolve_model
+resolve_runtime_limits = base.resolve_runtime_limits
 resolve_project_root = base.resolve_project_root
 ensure_utf8_output_streams = base.ensure_utf8_output_streams
 
@@ -240,7 +241,8 @@ def _load_env_local() -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     ensure_utf8_output_streams()
-    args = build_arg_parser().parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_arg_parser().parse_args(raw_argv)
     project_root = resolve_project_root(Path.cwd())
 
     try:
@@ -261,16 +263,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         config = load_routing_config(project_root)
         model_route = resolve_model(config, args.model, skill=args.skill)
+        operation_timeout, session_timeout, max_turns = resolve_runtime_limits(
+            config,
+            raw_argv,
+            cli_timeout=args.timeout,
+            cli_session_timeout=args.session_timeout,
+            cli_max_turns=args.max_turns,
+        )
         text = run_tool_loop(
             args.prompt,
             model_route,
             endpoint,
             api_key,
-            args.max_turns,
+            max_turns,
             project_root,
             system_prompt=build_system_prompt(args.skill, model_route),
-            timeout=args.timeout,
-            session_timeout=args.session_timeout,
+            timeout=operation_timeout,
+            session_timeout=session_timeout,
         )
     except AlibabaCloudStudioHarnessError as exc:
         print(f"alibaba_cloud_studio_harness: {exc}", file=sys.stderr)

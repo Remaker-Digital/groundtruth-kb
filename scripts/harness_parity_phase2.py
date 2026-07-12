@@ -34,7 +34,8 @@ NO_WINDOW_EVIDENCE_PATHS_BY_HARNESS = {
     ),
     "cursor": ("scripts/cursor_harness.py",),
     "ollama": ("scripts/ollama_harness.py",),
-    "openrouter": ("scripts/openrouter_harness.py",),
+    "openrouter": ("scripts/openrouter_harness.py", "scripts/dispatcher_runtime.py"),
+    "alibaba-cloud-studio": ("scripts/alibaba_cloud_studio_harness.py", "scripts/dispatcher_runtime.py"),
 }
 NO_WINDOW_EVIDENCE_TOKENS = (
     "create_no_window",
@@ -433,6 +434,7 @@ def _hook_projection_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
         "antigravity": [".agent"],
         "ollama": ["scripts/ollama_harness.py"],
         "openrouter": ["scripts/openrouter_harness.py"],
+        "alibaba-cloud-studio": ["scripts/alibaba_cloud_studio_harness.py"],
     }.get(name, [])
     existing = [path for path in surfaces if _exists(root, path)]
     if existing:
@@ -449,6 +451,7 @@ def _bridge_write_path_status(root: Path, harness: dict[str, Any]) -> tuple[str,
         "antigravity": [".agent/skills/bridge"],
         "ollama": ["scripts/ollama_harness.py", ".api-harness/skills/bridge"],
         "openrouter": ["scripts/openrouter_harness.py", ".api-harness/skills/bridge"],
+        "alibaba-cloud-studio": ["scripts/alibaba_cloud_studio_harness.py", ".api-harness/skills/bridge"],
     }.get(name, [])
     existing = [path for path in surfaces if _exists(root, path)]
     if existing:
@@ -458,9 +461,10 @@ def _bridge_write_path_status(root: Path, harness: dict[str, Any]) -> tuple[str,
 
 def _readiness_probe_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
+    script_name = name.replace("-", "_")
     candidates = [
         f"scripts/verify_{name}_dispatch.py",
-        f"scripts/{name}_harness.py",
+        f"scripts/{script_name}_harness.py",
         f"scripts/check_{name}_harness.py",
     ]
     existing = [path for path in candidates if _exists(root, path)]
@@ -472,7 +476,7 @@ def _readiness_probe_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
 def _provider_settings_status(harness: dict[str, Any], cap_registry: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
     floor = _harness_config(cap_registry, name)
-    provider_backed = name in {"ollama", "openrouter", "cursor"}
+    provider_backed = name in {"ollama", "openrouter", "alibaba-cloud-studio", "cursor"}
     if not provider_backed:
         return "supported", ["harness-state/harness-registry.json"], "Harness is not provider-shim scoped."
     fields = ("routing_schema_version", "skill_adapter_manifest", "skill_adapter_generation_supported")
@@ -563,15 +567,19 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
                 "Headless argv is declared." if headless_argv else "No headless argv is declared.",
             )
         )
-        can_receive = bool(harness.get("can_receive_dispatch"))
-        receive_status = "supported" if can_receive else ("needs_adapter" if status == "active" else "blocked")
+        currently_eligible = bool(harness.get("can_receive_dispatch"))
+        receive_capable = bool(headless_argv and set(roles).intersection(required_roles))
+        receive_status = "supported" if receive_capable else ("needs_adapter" if status == "active" else "blocked")
         cells.append(
             _cell(
                 harness,
                 "dispatcher_receive",
                 receive_status,
                 [_rel(root, root / DISPATCHER_RULES_PATH), _rel(root, root / HARNESS_REGISTRY_PATH)],
-                f"can_receive_dispatch={can_receive}; dispatcher required roles={sorted(required_roles)}",
+                (
+                    f"receive_capable={receive_capable}; current_eligibility={currently_eligible}; "
+                    f"dispatcher required roles={sorted(required_roles)}"
+                ),
             )
         )
         can_fire = bool(harness.get("can_fire_events"))

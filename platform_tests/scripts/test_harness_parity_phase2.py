@@ -54,6 +54,25 @@ def _write_fixture(root: Path, *, with_waiver: bool = False, waiver_text: str | 
                         "can_fire_events": False,
                         "invocation_surfaces": {},
                     },
+                    {
+                        "id": "H",
+                        "harness_name": "alibaba-cloud-studio",
+                        "harness_type": "claude",
+                        "status": "active",
+                        "role": ["loyal-opposition"],
+                        "can_receive_dispatch": False,
+                        "can_fire_events": False,
+                        "invocation_surfaces": {
+                            "headless": {
+                                "argv": [
+                                    "python.exe",
+                                    "scripts/alibaba_cloud_studio_harness.py",
+                                    "--prompt",
+                                    "{{PROMPT}}",
+                                ]
+                            }
+                        },
+                    },
                 ],
             }
         ),
@@ -85,12 +104,24 @@ purpose = "test"
 routing_schema_version = 1
 skill_adapter_generation_supported = true
 skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
+
+[harnesses.alibaba-cloud-studio]
+routing_schema_version = 1
+skill_adapter_generation_supported = true
+skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
 """.lstrip(),
         encoding="utf-8",
     )
     (root / ".codex" / "skills" / "MANIFEST.json").write_text('{"adapters": []}', encoding="utf-8")
+    (root / ".api-harness" / "skills" / "bridge").mkdir(parents=True)
+    (root / ".api-harness" / "skills" / "MANIFEST.json").write_text('{"adapters": []}', encoding="utf-8")
     (root / ".codex" / "hooks.json").write_text("{}", encoding="utf-8")
     (root / "scripts" / "check_codex_harness.py").write_text("# fixture\n", encoding="utf-8")
+    (root / "scripts" / "alibaba_cloud_studio_harness.py").write_text("# governed adapter\n", encoding="utf-8")
+    (root / "scripts" / "dispatcher_runtime.py").write_text(
+        "import subprocess\ncreationflags = subprocess.CREATE_NO_WINDOW\n",
+        encoding="utf-8",
+    )
 
     waiver = waiver_text or ""
     if with_waiver and waiver_text is None:
@@ -129,6 +160,27 @@ def test_report_includes_candidate_work_items_for_unwaived_gaps(tmp_path: Path) 
     assert report["overall_status"] == "FAIL"
     assert any(item["harness"] == "openrouter" for item in report["candidate_work_items"])
     assert all("gt backlog add" in item["suggested_command"] for item in report["candidate_work_items"])
+
+
+def test_alibaba_h_runtime_surfaces_and_receive_capability_are_recognized(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(tmp_path)
+
+    report = module.evaluate(tmp_path)
+    cells = {cell["dimension"]: cell for cell in report["cells"] if cell["harness"] == "alibaba-cloud-studio"}
+
+    for dimension in (
+        "skill_projection",
+        "hook_projection",
+        "bridge_write_path",
+        "readiness_probe",
+        "provider_settings",
+        "no_window_launch",
+        "dispatcher_receive",
+    ):
+        assert cells[dimension]["status"] == "supported"
+    assert "current_eligibility=False" in cells["dispatcher_receive"]["details"]
+    assert "receive_capable=True" in cells["dispatcher_receive"]["details"]
 
 
 def test_active_typed_waiver_marks_matching_gap_waived(tmp_path: Path) -> None:
@@ -238,8 +290,10 @@ status = "active"
 
     no_window_cells = [cell for cell in report["cells"] if cell["dimension"] == "no_window_launch"]
     assert no_window_cells
-    assert all(cell["status"] == "waived" for cell in no_window_cells)
-    assert all(cell["waiver_id"] == "WAIVER-NO-WINDOW-WILDCARD" for cell in no_window_cells)
+    assert all(cell["status"] in {"supported", "waived"} for cell in no_window_cells)
+    waived = [cell for cell in no_window_cells if cell["status"] == "waived"]
+    assert waived
+    assert all(cell["waiver_id"] == "WAIVER-NO-WINDOW-WILDCARD" for cell in waived)
     assert report["summary"]["active_waiver_count"] == 1
 
 

@@ -35,6 +35,9 @@ allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing.openrouter]
 default_model = "fixture-full"
+timeout_seconds = 900
+session_timeout_seconds = 28800
+max_turns = 600
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -72,6 +75,8 @@ def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
     assert selected.model_version == FIXTURE_MODEL_VERSION
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
     assert selected.omit_payload_model is False
+    config = orh.load_routing_config(root)
+    assert (config.timeout_seconds, config.session_timeout_seconds, config.max_turns) == (900, 28800, 600)
 
 
 def test_load_routing_config_parses_openrouter_cloud_default_omit_model(tmp_path: Path):
@@ -170,11 +175,14 @@ def test_main_loads_env_local_key_before_live_dispatch(
         api_key: str,
         max_turns: int,
         project_root: Path,
-        **_kwargs,
+        **kwargs,
     ) -> str:
         assert prompt == "hello"
         assert api_key == "env-file-fixture-key"
         assert project_root == root.resolve()
+        assert max_turns == 600
+        assert kwargs["timeout"] == 900
+        assert kwargs["session_timeout"] == 28800
         return "done"
 
     monkeypatch.setattr(env_loader, "load_env_local", fake_load_env_local)
@@ -620,7 +628,7 @@ def test_tool_loop_rejects_blank_final_text(tmp_path: Path, content: str):
     def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
         return {"choices": [{"message": {"content": content}}]}
 
-    with pytest.raises(orh.OpenRouterHarnessError, match="nonblank text content"):
+    with pytest.raises(orh.OpenRouterHarnessError, match="max-turn exhaustion"):
         orh.run_tool_loop(
             "return blank",
             route(root),

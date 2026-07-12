@@ -64,8 +64,9 @@ allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing.ollama]
 default_model = "kimi-k2-7-code-cloud"
-timeout_seconds = 3600
-max_turns = 200
+timeout_seconds = 900
+session_timeout_seconds = 28800
+max_turns = 600
 
 [routing.ollama.skills]
 bridge-review = "kimi-k2-7-code-cloud"
@@ -74,8 +75,9 @@ implementation = "kimi-k2-7-code-cloud"
 
 [routing.alibaba-cloud-studio]
 default_model = "alibaba-deepseek-v4-pro"
-timeout_seconds = 240
-max_turns = 200
+timeout_seconds = 900
+session_timeout_seconds = 28800
+max_turns = 600
 
 [routing.alibaba-cloud-studio.skills]
 bridge-review = "alibaba-deepseek-v4-pro"
@@ -84,7 +86,9 @@ implementation = "alibaba-deepseek-v4-pro"
 
 [routing.openrouter]
 default_model = "openrouter-cloud-default"
-timeout_seconds = 240
+timeout_seconds = 900
+session_timeout_seconds = 28800
+max_turns = 600
 
 [routing.openrouter.skills]
 bridge-review = "openrouter-cloud-default"

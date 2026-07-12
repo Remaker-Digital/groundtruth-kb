@@ -44,6 +44,9 @@ allowed_tools = ["Read"]
 
 [routing.testcloud]
 default_model = "tc-default"
+timeout_seconds = 900
+session_timeout_seconds = 28800
+max_turns = 600
 
 [routing.testcloud.skills]
 bridge-review = "tc-default"
@@ -166,6 +169,26 @@ def test_resolve_model_default_and_skill(tmp_path: Path) -> None:
     config = base.load_routing_config(_root(tmp_path), provider_key="testcloud", config_path=CFG_PATH)
     assert base.resolve_model(config, None).key == "tc-default"
     assert base.resolve_model(config, None, skill="bridge-review").key == "tc-default"
+
+
+def test_routing_config_carries_runtime_limits_and_cli_overrides(tmp_path: Path) -> None:
+    config = base.load_routing_config(_root(tmp_path), provider_key="testcloud", config_path=CFG_PATH)
+
+    assert (config.timeout_seconds, config.session_timeout_seconds, config.max_turns) == (900, 28800, 600)
+    assert base.resolve_runtime_limits(
+        config,
+        [],
+        cli_timeout=1,
+        cli_session_timeout=2,
+        cli_max_turns=3,
+    ) == (900, 28800, 600)
+    assert base.resolve_runtime_limits(
+        config,
+        ["--timeout", "11", "--session-timeout=22", "--max-turns", "33"],
+        cli_timeout=11,
+        cli_session_timeout=22,
+        cli_max_turns=33,
+    ) == (11, 22, 33)
 
 
 # --- Author-metadata injection (base owns it, adopter supplies identity) ---
@@ -389,15 +412,51 @@ def test_run_tool_loop_reports_allowlisted_turn_metadata_to_telemetry(tmp_path: 
     assert recorder.stop_reasons == ["final_response"]
 
 
-def test_run_tool_loop_rejects_blank_final_text(tmp_path: Path) -> None:
+def test_run_tool_loop_recovers_blank_final_without_empty_assistant_message(tmp_path: Path) -> None:
     root = _root(tmp_path)
     route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    payloads: list[dict] = []
+    responses = iter(
+        [
+            {"choices": [{"message": {"content": "   "}}]},
+            {"choices": [{"message": {"content": ""}}]},
+            {"choices": [{"message": {"content": "done"}}]},
+        ]
+    )
 
     def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        payloads.append(payload)
+        return next(responses)
+
+    assert (
+        base.run_tool_loop("hello", route, "https://test.cloud/api/v1", "key", 3, root, _profile(), chat_func=chat)
+        == "done"
+    )
+    assert payloads[1]["messages"][-1] == {"role": "user", "content": base.BLANK_FINAL_RECOVERY_PROMPT}
+    assert payloads[2]["messages"][-2:] == [
+        {"role": "user", "content": base.BLANK_FINAL_RECOVERY_PROMPT},
+        {"role": "user", "content": base.BLANK_FINAL_RECOVERY_PROMPT},
+    ]
+    assert not any(
+        message.get("role") == "assistant" and not str(message.get("content") or "").strip()
+        for payload in payloads
+        for message in payload["messages"]
+    )
+
+
+def test_run_tool_loop_repeated_blank_finals_fail_closed_at_overall_turn_budget(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    calls = 0
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        nonlocal calls
+        calls += 1
         return {"choices": [{"message": {"content": "   "}}]}
 
-    with pytest.raises(base.CloudHarnessError, match="nonblank text content"):
-        base.run_tool_loop("hello", route, "https://test.cloud/api/v1", "key", 1, root, _profile(), chat_func=chat)
+    with pytest.raises(base.CloudHarnessError, match="max-turn exhaustion"):
+        base.run_tool_loop("hello", route, "https://test.cloud/api/v1", "key", 5, root, _profile(), chat_func=chat)
+    assert calls == 5
 
 
 # --- Slice 3: hook-tier + auth-style validation (native-hook seam is a flag; floor stays enforced) ---

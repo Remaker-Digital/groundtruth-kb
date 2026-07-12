@@ -107,6 +107,7 @@ class RoutingConfig:
     default_model: str
     skill_routes: dict[str, str]
     timeout_seconds: float | None = None
+    session_timeout_seconds: float | None = None
     max_turns: int | None = None
 
 
@@ -328,6 +329,10 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
         timeout_seconds=_as_optional_positive_float(
             routing.get("timeout_seconds"),
             field="routing.ollama.timeout_seconds",
+        ),
+        session_timeout_seconds=_as_optional_positive_float(
+            routing.get("session_timeout_seconds"),
+            field="routing.ollama.session_timeout_seconds",
         ),
         max_turns=_as_optional_positive_int(
             routing.get("max_turns"),
@@ -1158,14 +1163,16 @@ def resolve_runtime_timeouts(
     timeout_explicit = _flag_was_supplied(argv, "--timeout")
     session_timeout_explicit = _flag_was_supplied(argv, "--session-timeout")
 
-    if config.timeout_seconds is None or timeout_explicit:
-        operation_timeout = float(args.timeout)
-        session_timeout = float(args.session_timeout)
-    else:
-        operation_timeout = config.timeout_seconds
-        session_timeout = derive_session_timeout_from_route_timeout(config.timeout_seconds)
-
+    operation_timeout = (
+        float(args.timeout) if config.timeout_seconds is None or timeout_explicit else config.timeout_seconds
+    )
     if session_timeout_explicit:
+        session_timeout = float(args.session_timeout)
+    elif config.session_timeout_seconds is not None:
+        session_timeout = config.session_timeout_seconds
+    elif config.timeout_seconds is not None and not timeout_explicit:
+        session_timeout = derive_session_timeout_from_route_timeout(config.timeout_seconds)
+    else:
         session_timeout = float(args.session_timeout)
     return operation_timeout, session_timeout
 

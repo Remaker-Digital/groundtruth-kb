@@ -32,6 +32,9 @@ allowed_tools = ["Read"]
 
 [routing.alibaba-cloud-studio]
 default_model = "alib-route"
+timeout_seconds = 900
+session_timeout_seconds = 28800
+max_turns = 600
 
 [routing.alibaba-cloud-studio.skills]
 bridge-review = "alib-route"
@@ -263,11 +266,14 @@ def test_main_uses_env_only_endpoint_and_never_prints_key(
     monkeypatch.setattr(ach, "_load_env_local", lambda: None)
     monkeypatch.setattr(ach, "load_routing_config", lambda _root: config)
 
-    def fake_run_tool_loop(prompt, model_route, selected_endpoint, api_key, *_args, **_kwargs):
+    def fake_run_tool_loop(prompt, model_route, selected_endpoint, api_key, max_turns, *_args, **kwargs):
         assert prompt == "hello"
         assert model_route.key == "alib-route"
         assert selected_endpoint == endpoint
         assert api_key == key
+        assert max_turns == 600
+        assert kwargs["timeout"] == 900
+        assert kwargs["session_timeout"] == 28800
         return "done"
 
     monkeypatch.setattr(ach, "run_tool_loop", fake_run_tool_loop)
@@ -278,3 +284,39 @@ def test_main_uses_env_only_endpoint_and_never_prints_key(
     assert captured.out.strip() == "done"
     assert key not in captured.out + captured.err
     assert endpoint not in captured.out + captured.err
+
+
+def test_main_explicit_runtime_limits_override_routing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    key = "fixture-token"
+    endpoint = "https://example.test/v1"
+    monkeypatch.chdir(root)
+    monkeypatch.setenv(ach.API_KEY_ENV, key)
+    monkeypatch.setenv(ach.ENDPOINT_ENV, endpoint)
+    monkeypatch.setattr(ach, "_load_env_local", lambda: None)
+
+    def fake_run_tool_loop(_prompt, _route, _endpoint, _key, max_turns, _root, **kwargs):
+        assert max_turns == 12
+        assert kwargs["timeout"] == 34
+        assert kwargs["session_timeout"] == 56
+        return "done"
+
+    monkeypatch.setattr(ach, "run_tool_loop", fake_run_tool_loop)
+
+    assert (
+        ach.main(
+            [
+                "-p",
+                "hello",
+                "--model",
+                "alib-route",
+                "--max-turns",
+                "12",
+                "--timeout",
+                "34",
+                "--session-timeout",
+                "56",
+            ]
+        )
+        == 0
+    )

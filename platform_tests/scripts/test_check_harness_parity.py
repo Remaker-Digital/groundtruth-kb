@@ -80,6 +80,51 @@ def _write_registry(project_root: Path, body: str) -> None:
     )
 
 
+def test_alibaba_managed_skill_adoption_review_is_truthfully_unsupported(monkeypatch, tmp_path: Path) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "H",
+                "harness_name": "alibaba-cloud-studio",
+                "harness_type": "claude",
+                "status": "active",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            }
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "skill.managed-skill-adoption-review"
+kind = "skill"
+canonical_name = "managed-skill-adoption-review"
+canonical_source = ".claude/skills/managed-skill-adoption-review/SKILL.md"
+required_for_roles = ["loyal-opposition"]
+parity_class = "required"
+
+[capabilities.alibaba-cloud-studio]
+status = "unsupported"
+reason = "Alibaba Cloud Studio is a provider harness and does not execute repo-local managed skill adapters; structural managed-artifact review remains assigned to native/adapter-capable harnesses."
+""",
+    )
+    monkeypatch.setattr(module, "KNOWN_HARNESSES", module._load_known_harnesses_from_projection(tmp_path))
+
+    report = module.check_harness_parity(
+        tmp_path,
+        harness="alibaba-cloud-studio",
+        role="loyal-opposition",
+    )
+    target = [result for result in report.results if result.capability_id == "skill.managed-skill-adoption-review"]
+
+    assert len(target) == 1
+    assert target[0].state == "UNSUPPORTED"
+    assert "does not execute repo-local managed skill adapters" in target[0].note
+
+
 def test_codex_fallback_is_degraded_not_missing(tmp_path: Path) -> None:
     module = _load_module()
     _write_skill(tmp_path, "review")

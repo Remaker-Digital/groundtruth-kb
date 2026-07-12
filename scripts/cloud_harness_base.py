@@ -91,6 +91,10 @@ RETRYABLE_PROVIDER_TRANSPORT_MARKERS = frozenset(
 # accurately-classified URLError before the join synthesizes a DNS-stall timeout.
 PROVIDER_CALL_WALL_CLOCK_GRACE_SECONDS = 5.0
 DEFAULT_MAX_TURNS = 40
+BLANK_FINAL_RECOVERY_PROMPT = (
+    "Your previous assistant response contained no text and no tool call. Continue the task. "
+    "Use the available tools if work remains, or return a nonblank final response when complete."
+)
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
@@ -220,6 +224,9 @@ class RoutingConfig:
     models: dict[str, ModelRoute]
     default_model: str
     skill_routes: dict[str, str]
+    timeout_seconds: float | None = None
+    session_timeout_seconds: float | None = None
+    max_turns: int | None = None
 
 
 @dataclass(frozen=True)
@@ -375,6 +382,36 @@ def _as_bool(value: Any, *, field: str, default: bool = False) -> bool:
     return value
 
 
+def _as_optional_positive_float(value: Any, *, field: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise CloudHarnessError(f"{field} must be a positive number")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise CloudHarnessError(f"{field} must be a positive number") from exc
+    if parsed <= 0:
+        raise CloudHarnessError(f"{field} must be a positive number")
+    return parsed
+
+
+def _as_optional_positive_int(value: Any, *, field: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise CloudHarnessError(f"{field} must be a positive integer")
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        parsed = int(value.strip())
+    else:
+        raise CloudHarnessError(f"{field} must be a positive integer")
+    if parsed <= 0:
+        raise CloudHarnessError(f"{field} must be a positive integer")
+    return parsed
+
+
 def infer_model_version(model_id: str) -> str:
     """Return the tag or version portion from a model identifier."""
     if ":" in model_id:
@@ -453,6 +490,13 @@ def load_routing_config(project_root: Path, *, provider_key: str, config_path: P
         models=models,
         default_model=default_model,
         skill_routes=_parse_skill_routes(routing, models),
+        timeout_seconds=_as_optional_positive_float(
+            routing.get("timeout_seconds"), field=f"routing.{provider_key}.timeout_seconds"
+        ),
+        session_timeout_seconds=_as_optional_positive_float(
+            routing.get("session_timeout_seconds"), field=f"routing.{provider_key}.session_timeout_seconds"
+        ),
+        max_turns=_as_optional_positive_int(routing.get("max_turns"), field=f"routing.{provider_key}.max_turns"),
     )
 
 
@@ -464,6 +508,36 @@ def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str
         return config.models[route_key]
     except KeyError as exc:
         raise CloudHarnessError(f"unknown model route: {route_key}") from exc
+
+
+def _flag_was_supplied(argv: Sequence[str], flag: str) -> bool:
+    prefix = f"{flag}="
+    return any(item == flag or item.startswith(prefix) for item in argv)
+
+
+def resolve_runtime_limits(
+    config: RoutingConfig,
+    argv: Sequence[str],
+    *,
+    cli_timeout: float,
+    cli_session_timeout: float,
+    cli_max_turns: int,
+) -> tuple[float, float, int]:
+    """Resolve explicit CLI limits over provider routing limits over CLI defaults."""
+    operation_timeout = (
+        float(cli_timeout)
+        if _flag_was_supplied(argv, "--timeout") or config.timeout_seconds is None
+        else config.timeout_seconds
+    )
+    session_timeout = (
+        float(cli_session_timeout)
+        if _flag_was_supplied(argv, "--session-timeout") or config.session_timeout_seconds is None
+        else config.session_timeout_seconds
+    )
+    max_turns = (
+        int(cli_max_turns) if _flag_was_supplied(argv, "--max-turns") or config.max_turns is None else config.max_turns
+    )
+    return operation_timeout, session_timeout, max_turns
 
 
 def resolve_harness_session_id(environ: Mapping[str, str] | None = None) -> str:
@@ -1896,8 +1970,12 @@ def run_tool_loop(
                     telemetry.record_turn(_turn + 1, tool_names, provider_response=response)
 
             if not tool_calls:
-                stop_reason = "final_response"
-                return _final_text_from_message(message)
+                content = message.get("content")
+                if isinstance(content, str) and content.strip():
+                    stop_reason = "final_response"
+                    return content
+                messages.append({"role": "user", "content": BLANK_FINAL_RECOVERY_PROMPT})
+                continue
 
             if not isinstance(tool_calls, list):
                 raise CloudHarnessError("tool_calls must be a list")

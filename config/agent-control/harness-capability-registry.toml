@@ -2168,3 +2168,7 @@ reason = "Ollama is a provider harness and does not execute repo-local managed s
 [capabilities.openrouter]
 status = "unsupported"
 reason = "OpenRouter is a provider harness and does not execute repo-local managed skill adapters in this WI-4841 slice."
+
+[capabilities.alibaba-cloud-studio]
+status = "unsupported"
+reason = "Alibaba Cloud Studio is a provider harness and does not execute repo-local managed skill adapters; structural managed-artifact review remains assigned to native/adapter-capable harnesses."

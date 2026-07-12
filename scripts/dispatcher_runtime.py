@@ -131,6 +131,8 @@ API_HARNESS_SCRIPT_MODULES = {
     "scripts/ollama_harness.py": "scripts.ollama_harness",
     "scripts/openrouter_harness.py": "scripts.openrouter_harness",
 }
+DISPATCHED_PROVIDER_RUNTIME_FLAGS = frozenset({"--max-turns", "--timeout", "--session-timeout"})
+ROUTING_PROFILE_COMMAND_HANDLES = frozenset({"ollama", "openrouter", "alibaba-cloud-studio"})
 
 
 def _b64_json(data: dict[str, Any]) -> str:
@@ -161,6 +163,31 @@ def _opaque_api_harness_command(command: list[str], project_root: Path, env: dic
         return command
     env[API_HARNESS_RUNNER_CONFIG_ENV_VAR] = _b64_json({"module": module, "argv": command[1:]})
     return [command[0], "-c", API_HARNESS_RUNNER_CODE]
+
+
+def _without_dispatched_provider_runtime_overrides(command: list[str], command_handle: str) -> list[str]:
+    """Let governed routing profiles supply provider-worker runtime limits.
+
+    Registry argv can retain legacy explicit limits while routing profiles are
+    rolled out. Those values must not override the dispatcher-owned profile;
+    direct adapter invocations still retain normal explicit-CLI precedence.
+    """
+    if command_handle not in ROUTING_PROFILE_COMMAND_HANDLES:
+        return command
+
+    filtered: list[str] = []
+    skip_value = False
+    for argument in command:
+        if skip_value:
+            skip_value = False
+            continue
+        if argument in DISPATCHED_PROVIDER_RUNTIME_FLAGS:
+            skip_value = True
+            continue
+        if any(argument.startswith(f"{flag}=") for flag in DISPATCHED_PROVIDER_RUNTIME_FLAGS):
+            continue
+        filtered.append(argument)
+    return filtered
 
 
 def _application_subject_dispatch_suppression(project_root: Path) -> dict[str, Any] | None:
@@ -3515,26 +3542,28 @@ def _load_antigravity_rules(project_root: Path, mode: str) -> str:
 # DELIB-20260703-DISPATCH-OPUS-FLOOR-20RUN-REFINEMENT, every harness starts at
 # an Opus-class floor until 20 profile-specific runs and quality/elapsed-time
 # analysis justify a lower threshold with 95% confidence.
-OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS = 3600
+GENEROUS_WORKER_LIFETIME_SECONDS = 29400
+OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS = GENEROUS_WORKER_LIFETIME_SECONDS
 LO_REVIEW_WORKER_LIFETIME_SECONDS = OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
-PB_IMPL_WORKER_LIFETIME_SECONDS = 5400  # 90 min: PB implementation default
+PB_IMPL_WORKER_LIFETIME_SECONDS = GENEROUS_WORKER_LIFETIME_SECONDS
 LO_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_LO_SECONDS"
 PB_WORKER_LIFETIME_ENV_VAR = "GTKB_WORKER_LIFETIME_PB_SECONDS"
 HARNESS_WORKER_LIFETIME_ENV_PREFIX = "GTKB_WORKER_LIFETIME_HARNESS_"
 OLLAMA_ROUTING_CONFIG_REL = Path(".api-harness") / "routing.toml"
 OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS = 60
-OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS = 300
-OPENROUTER_WORKER_LIFETIME_SECONDS = 900
-# WI-4986/WI-5003: start with generous harness/model-aware caps, then tighten
-# from measured telemetry. Codex-A PB implementation keeps the existing 90 min
-# PB floor; B/C/D LO targets inherit the Opus-class review floor. OpenRouter-F
-# uses the bounded WI-5066 silent-stall cap proven by direct headless dispatch.
+OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS = 600
+OPENROUTER_WORKER_LIFETIME_SECONDS = GENEROUS_WORKER_LIFETIME_SECONDS
+# WI-4986/WI-5202: start with generous harness/model-aware caps, then tighten
+# only from measured profile telemetry. Active dispatch targets share the
+# owner-authorized 8h session plus 10m completion-margin floor; semantic
+# no-progress and per-operation transport bounds remain the early-stop controls.
 HARNESS_WORKER_LIFETIME_DEFAULT_SECONDS = {
     "A": PB_IMPL_WORKER_LIFETIME_SECONDS,
     "B": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
     "C": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
     "D": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
     "F": OPENROUTER_WORKER_LIFETIME_SECONDS,
+    "H": OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS,
 }
 _MODEL_HINT_FLAGS = ("--model", "-m")
 
@@ -3618,34 +3647,45 @@ def _positive_float(value: Any) -> float | None:
     return parsed if parsed > 0 else None
 
 
-def _ollama_routing_timeout_seconds(project_root: Path) -> float | None:
+def _ollama_routing_limits(project_root: Path) -> tuple[float | None, float | None]:
     path = project_root / OLLAMA_ROUTING_CONFIG_REL
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
-        return None
+        return None, None
     if not isinstance(raw, dict):
-        return None
+        return None, None
     routing = raw.get("routing")
     if not isinstance(routing, dict):
-        return None
+        return None, None
     ollama = routing.get("ollama")
     if not isinstance(ollama, dict):
-        return None
-    return _positive_float(ollama.get("timeout_seconds"))
+        return None, None
+    return (
+        _positive_float(ollama.get("timeout_seconds")),
+        _positive_float(ollama.get("session_timeout_seconds")),
+    )
 
 
 def _ollama_worker_lifetime_from_routing(project_root: Path) -> dict[str, Any] | None:
-    timeout_seconds = _ollama_routing_timeout_seconds(project_root)
-    if timeout_seconds is None:
+    timeout_seconds, configured_session_timeout = _ollama_routing_limits(project_root)
+    if timeout_seconds is None and configured_session_timeout is None:
         return None
+    session_timeout_seconds = configured_session_timeout
+    if session_timeout_seconds is None:
+        session_timeout_seconds = float(timeout_seconds) + OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS
     return {
-        "seconds": math.ceil(
-            timeout_seconds + OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS + OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS
+        "seconds": math.ceil(session_timeout_seconds + OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS),
+        "source": (
+            "routing.ollama.session_timeout_seconds"
+            if configured_session_timeout is not None
+            else "routing.ollama.timeout_seconds"
         ),
-        "source": "routing.ollama.timeout_seconds",
         "routing_timeout_seconds": timeout_seconds,
-        "session_timeout_grace_seconds": OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS,
+        "routing_session_timeout_seconds": configured_session_timeout,
+        "session_timeout_grace_seconds": (
+            0 if configured_session_timeout is not None else OLLAMA_SESSION_TIMEOUT_GRACE_SECONDS
+        ),
         "worker_lifetime_margin_seconds": OLLAMA_WORKER_LIFETIME_MARGIN_SECONDS,
     }
 
@@ -3690,6 +3730,7 @@ def worker_lifetime_profile(target: Any, project_root: Path | None = None) -> di
                 "role_fallback_seconds": role_fallback,
                 "model_hint": _dispatch_target_model_hint(target),
                 "routing_timeout_seconds": routed_profile["routing_timeout_seconds"],
+                "routing_session_timeout_seconds": routed_profile["routing_session_timeout_seconds"],
                 "session_timeout_grace_seconds": routed_profile["session_timeout_grace_seconds"],
                 "worker_lifetime_margin_seconds": routed_profile["worker_lifetime_margin_seconds"],
             }
@@ -4956,6 +4997,11 @@ def _spawn_harness(
         env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_TIMEOUT_SECONDS"] = str(
             lifetime_profile.get("routing_timeout_seconds")
         )
+    if lifetime_profile.get("routing_session_timeout_seconds") is not None:
+        env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_SESSION_TIMEOUT_SECONDS"] = str(
+            lifetime_profile.get("routing_session_timeout_seconds")
+        )
+    command = _without_dispatched_provider_runtime_overrides(command, target.command_handle)
     original_command = list(command)
     command = _opaque_api_harness_command(command, project_root, env)
     worker_command_mode = "opaque_python_module" if command != original_command else "direct"
@@ -5033,6 +5079,7 @@ def _spawn_harness(
         meta["worker_lifetime_model_hint"] = lifetime_profile.get("model_hint")
     for key in (
         "routing_timeout_seconds",
+        "routing_session_timeout_seconds",
         "session_timeout_grace_seconds",
         "worker_lifetime_margin_seconds",
     ):
