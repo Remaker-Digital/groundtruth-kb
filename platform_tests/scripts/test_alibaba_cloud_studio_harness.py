@@ -213,6 +213,65 @@ def test_alibaba_native_hook_adapter_wraps_non_json_lifecycle_context(monkeypatc
     assert json.loads(result.stdout) == {"hookSpecificOutput": {"additionalContext": "informational lifecycle context"}}
 
 
+def test_alibaba_native_full_loop_continues_when_posttool_maintenance_times_out(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    (root / "note.txt").write_text("governed evidence", encoding="utf-8")
+    settings_dir = root / ".claude"
+    settings_dir.mkdir()
+    (settings_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    base.NATIVE_HOOK_POST_TOOL_USE: [
+                        {
+                            "matcher": "Read",
+                            "hooks": [{"type": "command", "command": "slow maintenance", "timeout": 10}],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    route = ach.resolve_model(ach.load_routing_config(root), None)
+    chat_calls = 0
+
+    def hook_runner(
+        _command: str,
+        payload: dict,
+        _env: dict,
+        _timeout: float,
+    ) -> base.GuardExecutionResult:
+        assert payload["hook_event_name"] == base.NATIVE_HOOK_POST_TOOL_USE
+        assert payload["tool_response"] == "governed evidence"
+        return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        nonlocal chat_calls
+        chat_calls += 1
+        if chat_calls == 1:
+            return {
+                "model": route.model_id,
+                "content": [{"type": "tool_use", "id": "tool_1", "name": "Read", "input": {"path": "note.txt"}}],
+            }
+        return {"model": route.model_id, "content": [{"type": "text", "text": "H verdict ready"}]}
+
+    assert (
+        ach.run_tool_loop(
+            "review",
+            route,
+            "https://example.test/v1",
+            "fixture-token",
+            3,
+            root,
+            chat_func=chat,
+            native_hook_runner=hook_runner,
+        )
+        == "H verdict ready"
+    )
+    assert chat_calls == 2
+
+
 def test_bridge_review_enables_readonly_native_hook_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LOYAL_OPPOSITION_READONLY", raising=False)
     monkeypatch.delenv("GTKB_NO_AXIS_2_SURFACE", raising=False)

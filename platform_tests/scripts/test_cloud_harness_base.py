@@ -577,6 +577,93 @@ def test_native_full_hooks_lifecycle_runs_in_order(tmp_path: Path) -> None:
     assert hook_events[0][2]["CLAUDE_PROJECT_DIR"] == str(root)
 
 
+@pytest.mark.parametrize(
+    "post_result",
+    [
+        base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True),
+        base.GuardExecutionResult(returncode=1, stdout="", stderr="maintenance failed"),
+        base.GuardExecutionResult(returncode=0, stdout="informational non-json output", stderr=""),
+        base.GuardExecutionResult(returncode=0, stdout="[]", stderr=""),
+    ],
+    ids=("timeout", "nonzero", "malformed", "non-object"),
+)
+def test_native_posttool_lifecycle_failures_do_not_mask_completed_tool(
+    tmp_path: Path,
+    post_result: base.GuardExecutionResult,
+) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {
+            base.NATIVE_HOOK_POST_TOOL_USE: [
+                {"matcher": "Read", "hooks": [{"type": "command", "command": "maintenance hook"}]}
+            ]
+        },
+    )
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return post_result
+
+    assert (
+        base.invoke_native_hooks(
+            base.NATIVE_HOOK_POST_TOOL_USE,
+            _meta(),
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            tool_name="Read",
+            tool_input={"path": "note.txt"},
+            tool_response="completed result",
+            native_hook_runner=hook_runner,
+        )
+        == {}
+    )
+
+
+def test_native_posttool_explicit_block_remains_fail_closed(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_POST_TOOL_USE: [{"matcher": "Read", "hooks": [{"type": "command", "command": "post gate"}]}]},
+    )
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(returncode=0, stdout='{"decision": "block", "reason": "post denied"}')
+
+    with pytest.raises(base.CloudHarnessError, match="native hook blocked PostToolUse.*post denied"):
+        base.invoke_native_hooks(
+            base.NATIVE_HOOK_POST_TOOL_USE,
+            _meta(),
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            tool_name="Read",
+            tool_input={"path": "note.txt"},
+            tool_response="completed result",
+            native_hook_runner=hook_runner,
+        )
+
+
+def test_native_posttool_fail_soft_does_not_change_pretool_timeout_enforcement(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_PRE_TOOL_USE: [{"matcher": "Read", "hooks": [{"type": "command", "command": "pre gate"}]}]},
+    )
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+
+    with pytest.raises(base.CloudHarnessError, match="native hook timed out: PreToolUse"):
+        base.invoke_native_hooks(
+            base.NATIVE_HOOK_PRE_TOOL_USE,
+            _meta(),
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            tool_name="Read",
+            tool_input={"path": "note.txt"},
+            native_hook_runner=hook_runner,
+        )
+
+
 def test_native_full_hooks_empty_pretool_output_allows_later_hooks_and_tool(tmp_path: Path) -> None:
     root = _root(tmp_path)
     (root / "note.txt").write_text("file body", encoding="utf-8")

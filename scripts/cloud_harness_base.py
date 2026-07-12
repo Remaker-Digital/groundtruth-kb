@@ -1395,12 +1395,17 @@ def invoke_native_hooks(
     )
     runner = native_hook_runner or _default_native_hook_runner
     last_output: dict[str, Any] | None = None
+    post_tool_event = event_name == NATIVE_HOOK_POST_TOOL_USE
     for command, hook_timeout in _iter_native_hook_commands(hooks, event_name, tool_name):
         result = runner(command, payload, env, hook_timeout)
         command_label = command[:120]
         if result.timed_out:
+            if post_tool_event:
+                continue
             raise CloudHarnessError(f"native hook timed out: {event_name}: {command_label}")
         if result.returncode != 0:
+            if post_tool_event:
+                continue
             raise CloudHarnessError(f"native hook exited nonzero: {event_name}: {command_label} ({result.returncode})")
         stdout = (result.stdout or "").strip()
         if not stdout:
@@ -1408,8 +1413,12 @@ def invoke_native_hooks(
         try:
             data = json.loads(stdout)
         except json.JSONDecodeError as exc:
+            if post_tool_event:
+                continue
             raise CloudHarnessError(f"native hook emitted malformed JSON: {event_name}: {command_label}") from exc
         if not isinstance(data, dict):
+            if post_tool_event:
+                continue
             raise CloudHarnessError(f"native hook output must be a JSON object: {event_name}: {command_label}")
         reason = _native_hook_block_reason(data)
         if reason:
