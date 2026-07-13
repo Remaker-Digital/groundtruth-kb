@@ -56,6 +56,7 @@ def _make_project(root: Path) -> Path:
                         "harness_type": "codex",
                         "status": "active",
                         "event_driven_hooks": True,
+                        "can_receive_dispatch": True,
                         "role": ["loyal-opposition"],
                         "invocation_surfaces": _CODEX_INVOCATION,
                     },
@@ -65,6 +66,7 @@ def _make_project(root: Path) -> Path:
                         "harness_type": "claude",
                         "status": "active",
                         "event_driven_hooks": True,
+                        "can_receive_dispatch": True,
                         "role": ["prime-builder"],
                         "invocation_surfaces": _CLAUDE_INVOCATION,
                     },
@@ -89,6 +91,7 @@ def _make_codex_prime_project(root: Path) -> Path:
                         "harness_type": "codex",
                         "status": "active",
                         "event_driven_hooks": True,
+                        "can_receive_dispatch": True,
                         "role": ["prime-builder"],
                         "invocation_surfaces": _CODEX_INVOCATION,
                     },
@@ -98,6 +101,7 @@ def _make_codex_prime_project(root: Path) -> Path:
                         "harness_type": "claude",
                         "status": "active",
                         "event_driven_hooks": True,
+                        "can_receive_dispatch": True,
                         "role": ["loyal-opposition"],
                         "invocation_surfaces": _CLAUDE_INVOCATION,
                     },
@@ -117,6 +121,21 @@ def _write_bridge(root: Path, stem: str, status: str, version: int) -> None:
 def _write_go_thread(root: Path, stem: str) -> None:
     _write_bridge(root, stem, "NEW", 1)
     _write_bridge(root, stem, "GO", 2)
+
+
+def _write_prime_worker_session(root: Path, session_id: str, *, harness_id: str, harness_name: str) -> None:
+    from groundtruth_kb.session.envelope import ensure_worker_session
+
+    ensure_worker_session(
+        root,
+        harness_name=harness_name,
+        harness_id=harness_id,
+        session_id=session_id,
+        role="prime-builder",
+        role_source="dispatcher_composition",
+        init_keyword="::init gtkb pb",
+        dispatch_run_id=session_id,
+    )
 
 
 def _set_manual_substrate(root: Path) -> None:
@@ -418,7 +437,7 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
         json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
         encoding="utf-8",
     )
-    _write_bridge(root, "pb-go-thread", "GO", 2)
+    _write_go_thread(root, "pb-go-thread")
     runtime = daemon._load_dispatch_runtime()
     calls: list[dict] = []
 
@@ -432,9 +451,9 @@ def test_daemon_daemon_substrate_dispatches(tmp_path: Path, monkeypatch: pytest.
     assert result["mode"] == "live"
     status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
     assert status["mode"] == "live"
-    assert calls, "expected live tick to invoke _spawn_harness"
-    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
-    launch = state["recipients"]["prime-builder:B"]["last_launch"]
+    assert calls, f"expected live tick to invoke _spawn_harness: {result}"
+    assert len(result["spawn_results"]) == 1
+    launch = result["spawn_results"][0]
     assert launch["launched"] is True
     assert launch["recipient"] == "prime-builder:B"
 
@@ -620,7 +639,7 @@ def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
         json.dumps({"substrate": daemon.DAEMON_SUBSTRATE}),
         encoding="utf-8",
     )
-    _write_bridge(root, "pb-go-thread", "GO", 2)
+    _write_go_thread(root, "pb-go-thread")
     runtime = daemon._load_dispatch_runtime()
     calls: list[dict] = []
 
@@ -1416,6 +1435,7 @@ def test_daemon_live_spawns_filter_prime_work_intent_claims(
 
     for slug in ("held-thread", "open-thread"):
         _write_go_thread(root, slug)
+    _write_prime_worker_session(root, holder_session, harness_id="A", harness_name="codex")
     assert registry.acquire("held-thread", holder_session, project_root=root)
 
     selected = [
@@ -1508,11 +1528,7 @@ def test_wi4994_daemon_prime_fanout_held_document_does_not_block_later_unheld(
     for slug in ("held-pb-thread", "free-pb-thread"):
         _write_go_thread(root, slug)
     holder_session = "2026-07-03T12-00-00Z-prime-builder-A-held"
-    from gtkb_session_id import per_session_role_marker_path
-
-    marker_path = per_session_role_marker_path(root, holder_session)
-    marker_path.parent.mkdir(parents=True, exist_ok=True)
-    marker_path.write_text(json.dumps({"role": "prime-builder", "session_id": holder_session}), encoding="utf-8")
+    _write_prime_worker_session(root, holder_session, harness_id="A", harness_name="codex")
     assert registry.acquire("held-pb-thread", holder_session, project_root=root)
     launched_docs: list[str] = []
 
@@ -1817,6 +1833,7 @@ def test_wi4992_daemon_impl_auth_quarantine_does_not_block_implementable_documen
         return _FakeProcess()
 
     monkeypatch.setattr(runtime, "_is_dispatch_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(runtime, "_is_spawn_rate_limited", lambda _runs_dir: False)
     monkeypatch.setattr(runtime, "_issue_dispatch_authorization_for_selected", _fake_issue)
     monkeypatch.setattr(runtime.subprocess, "Popen", _fake_popen)
     monkeypatch.setattr(runtime, "_pid_create_time_epoch", lambda pid: 123.0)
@@ -1967,45 +1984,45 @@ def test_daemon_live_skips_headless_ineligible_prime_no_go(
 
 
 def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The daemon live-spawn command carries the per-role --lifetime override:
-    LO target -> Opus floor, PB target -> 5400s."""
+    """The daemon live-spawn command carries the 29,400-second generous
+    lifetime for both Loyal Opposition and Prime Builder targets."""
     daemon = _load_daemon()
     runtime = daemon._load_dispatch_runtime()
     monkeypatch.delenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
     monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
 
     lo_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "loyal-opposition", "lo"), tmp_path, monkeypatch)
-    assert runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS == 3600
+    assert runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS == runtime.GENEROUS_WORKER_LIFETIME_SECONDS == 29400
     lo_command, lo_env = lo_cmd
     assert _lifetime_value(runtime, lo_command, lo_env) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS)
 
     pb_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "prime-builder", "pb"), tmp_path, monkeypatch)
     pb_command, pb_env = pb_cmd
-    assert _lifetime_value(runtime, pb_command, pb_env) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "5400"
+    assert _lifetime_value(runtime, pb_command, pb_env) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "29400"
 
 
 def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    """GTKB_WORKER_LIFETIME_LO_SECONDS / _PB_SECONDS override the per-role
-    defaults; invalid/non-positive falls back; other roles get no cap (WI-4845)."""
+    """Valid above-floor role overrides are honored; invalid/non-positive
+    values retain the generous defaults and unrelated roles remain uncapped."""
     daemon = _load_daemon()
     runtime = daemon._load_dispatch_runtime()
 
     monkeypatch.delenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, raising=False)
     monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
-    assert runtime.worker_lifetime_seconds("loyal-opposition") == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
-    assert runtime.worker_lifetime_seconds("prime-builder") == 5400
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == runtime.GENEROUS_WORKER_LIFETIME_SECONDS
+    assert runtime.worker_lifetime_seconds("prime-builder") == runtime.GENEROUS_WORKER_LIFETIME_SECONDS
     assert runtime.worker_lifetime_seconds("some-other-role") is None
     assert runtime.worker_lifetime_seconds(None) is None
 
-    monkeypatch.setenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, "2400")
-    monkeypatch.setenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, "7200")
-    assert runtime.worker_lifetime_seconds("loyal-opposition") == 2400
-    assert runtime.worker_lifetime_seconds("prime-builder") == 7200
+    monkeypatch.setenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, "30000")
+    monkeypatch.setenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, "30600")
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == 30000
+    assert runtime.worker_lifetime_seconds("prime-builder") == 30600
 
     monkeypatch.setenv(runtime.LO_WORKER_LIFETIME_ENV_VAR, "0")
     monkeypatch.setenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, "not-an-int")
-    assert runtime.worker_lifetime_seconds("loyal-opposition") == runtime.OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
-    assert runtime.worker_lifetime_seconds("prime-builder") == 5400
+    assert runtime.worker_lifetime_seconds("loyal-opposition") == runtime.GENEROUS_WORKER_LIFETIME_SECONDS
+    assert runtime.worker_lifetime_seconds("prime-builder") == runtime.GENEROUS_WORKER_LIFETIME_SECONDS
 
 
 def test_run_tick_watchdog_restart_failsoft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

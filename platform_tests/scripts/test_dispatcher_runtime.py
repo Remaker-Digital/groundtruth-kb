@@ -3764,7 +3764,7 @@ def test_diagnostic_classifies_document_lease_held(tmp_path: Path) -> None:
     """WI-3265 IP-2: a held target lease drives the
     loyal-opposition recipient to the `document_lease_held` class.
     """
-    from bridge_lease_registry import acquire_lease
+    trigger = _load_trigger()
 
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
@@ -3772,10 +3772,9 @@ def test_diagnostic_classifies_document_lease_held(tmp_path: Path) -> None:
     _index_with_one_new(root)
 
     # Acquire a lease on example-thread (loyal-opposition recipient)
-    handle = acquire_lease("example-thread", action="test-harness", state_dir=state_dir)
+    handle = trigger.acquire_lease("example-thread", action="test-harness", state_dir=state_dir)
     assert handle is not None
 
-    trigger = _load_trigger()
     trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=True)
 
     lo = [r for r in _read_diagnostics(state_dir) if r["recipient"] == "loyal-opposition"]
@@ -3788,17 +3787,16 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
     """Slice 4 D3: a Stop reconciliation suppressed by active worker ownership
     remains retryable once the worker lease is gone.
     """
-    from bridge_lease_registry import acquire_lease, release_lease
+    trigger = _load_trigger()
 
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     _index_with_one_new(root)
 
-    handle = acquire_lease("example-thread", action="test-worker", state_dir=state_dir)
+    handle = trigger.acquire_lease("example-thread", action="test-worker", state_dir=state_dir)
     assert handle is not None
 
-    trigger = _load_trigger()
     held = trigger.run_dispatch_cycle(
         project_root=root,
         state_dir=state_dir,
@@ -3811,7 +3809,7 @@ def test_stop_reconciliation_retries_after_suppressed_lease_is_released(tmp_path
     assert suppressed_signature
     assert state["recipients"]["loyal-opposition"].get("last_dispatched_signature") is None
 
-    release_lease(handle)
+    trigger.release_lease(handle)
     retried = trigger.run_dispatch_cycle(
         project_root=root,
         state_dir=state_dir,
