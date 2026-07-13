@@ -238,6 +238,48 @@ def test_alibaba_native_hook_adapter_wraps_non_json_lifecycle_context(monkeypatc
     assert json.loads(result.stdout) == {"hookSpecificOutput": {"additionalContext": "informational lifecycle context"}}
 
 
+def test_alibaba_user_prompt_timeout_preserves_original_provider_prompt(
+    tmp_path: Path,
+) -> None:
+    root = make_root(tmp_path)
+    settings_dir = root / ".claude"
+    settings_dir.mkdir()
+    (settings_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    base.NATIVE_HOOK_USER_PROMPT_SUBMIT: [{"hooks": [{"type": "command", "command": "slow glossary"}]}]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    route = ach.resolve_model(ach.load_routing_config(root), None)
+    provider_payloads: list[dict] = []
+
+    def timed_out_hook(*_args, **_kwargs):
+        return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        provider_payloads.append(payload)
+        return {"content": [{"type": "text", "text": "review complete"}]}
+
+    assert (
+        ach.run_tool_loop(
+            "original H assignment",
+            route,
+            "https://example.test/v1",
+            "key",
+            2,
+            root,
+            chat_func=chat,
+            native_hook_runner=timed_out_hook,
+        )
+        == "review complete"
+    )
+    assert {"role": "user", "content": "original H assignment"} in provider_payloads[0]["messages"]
+
+
 def test_alibaba_native_full_loop_preserves_candidate_when_stop_times_out(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
