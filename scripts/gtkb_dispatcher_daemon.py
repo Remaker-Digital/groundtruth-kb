@@ -1058,6 +1058,33 @@ def _execute_live_spawns(
         if getattr(target, "needed_role_label", None) == "prime-builder" and not dry_run:
             assert dispatch_id is not None
             assert work_intent_session_id is not None
+            worker_session_result = runtime._ensure_prime_worker_session(
+                project_root=project_root,
+                state_dir=state_dir,
+                target=target,
+                recipient=recipient or target.dispatch_state_key,
+                dispatch_id=dispatch_id,
+                session_id=work_intent_session_id,
+            )
+            if not worker_session_result["ok"]:
+                reason = worker_session_result["reason"]
+                if recipient_state is not None:
+                    recipient_state["last_result"] = reason
+                    runtime._record_recipient_attempt(recipient_state, worker_session_result)
+                    recipient_state["pending_count"] = len(selected)
+                    recipient_state["selected_count"] = 0
+                record["spawned"] = False
+                record["spawn_reason"] = reason
+                _append_prime_fanout_result(
+                    tick_prime_fanout,
+                    recipient_state,
+                    recipient=recipient,
+                    selected=selected,
+                    result=worker_session_result,
+                    signature=signature,
+                )
+                spawn_results.append(worker_session_result)
+                continue
             acquire_result = runtime._acquire_prime_work_intent_batch(
                 selected,
                 project_root=project_root,

@@ -2273,3 +2273,16 @@ def test_daemon_reap_helper_reaps_orphan(tmp_path: Path) -> None:
         if sleeper.poll() is None:
             sleeper.terminate()
             sleeper.wait(timeout=5)
+
+
+def test_wi5221_daemon_establishes_authority_before_claim_and_spawn() -> None:
+    source = _DAEMON_PATH.read_text(encoding="utf-8")
+    start = source.index('if getattr(target, "needed_role_label", None) == "prime-builder" and not dry_run:')
+    authority = source.index("worker_session_result = runtime._ensure_prime_worker_session(", start)
+    claim = source.index("acquire_result = runtime._acquire_prime_work_intent_batch(", authority)
+    spawn = source.index("result = runtime._spawn_harness(", claim)
+
+    assert authority < claim < spawn
+    failure_branch = source[authority:claim]
+    assert 'if not worker_session_result["ok"]:' in failure_branch
+    assert "continue" in failure_branch

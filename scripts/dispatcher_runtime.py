@@ -53,6 +53,7 @@ import sys
 import time
 import tomllib
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -2140,6 +2141,66 @@ def _release_prime_work_intents(slugs: list[str], *, project_root: Path, session
             pass
 
 
+@contextlib.contextmanager
+def _dispatcher_work_intent_environment(dispatch_id: str) -> Iterator[None]:
+    """Remove parent-harness selectors while resolving a dispatcher claim."""
+    previous_harness_name = os.environ.pop("GTKB_HARNESS_NAME", None)
+    previous_poller_run_id = os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID")
+    os.environ["GTKB_BRIDGE_POLLER_RUN_ID"] = dispatch_id
+    try:
+        yield
+    finally:
+        if previous_harness_name is not None:
+            os.environ["GTKB_HARNESS_NAME"] = previous_harness_name
+        else:
+            os.environ.pop("GTKB_HARNESS_NAME", None)
+        if previous_poller_run_id is not None:
+            os.environ["GTKB_BRIDGE_POLLER_RUN_ID"] = previous_poller_run_id
+        else:
+            os.environ.pop("GTKB_BRIDGE_POLLER_RUN_ID", None)
+
+
+def _ensure_prime_worker_session(
+    *,
+    project_root: Path,
+    state_dir: Path,
+    target: Any,
+    recipient: str,
+    dispatch_id: str,
+    session_id: str,
+) -> dict[str, Any]:
+    """Establish dispatcher-composed Prime authority before claim acquisition."""
+    try:
+        from groundtruth_kb.session.envelope import ensure_worker_session
+
+        envelope = ensure_worker_session(
+            project_root,
+            harness_name=target.command_handle,
+            harness_id=target.harness_id,
+            session_id=session_id,
+            role="prime-builder",
+            role_source="dispatcher_composition",
+            init_keyword=f"::init gtkb {target.canonical_mode}",
+            dispatch_run_id=dispatch_id,
+        )
+    except (ImportError, OSError, ValueError, RuntimeError) as exc:
+        failure = {
+            "ts": _now_iso(),
+            "dispatch_id": dispatch_id,
+            "recipient": recipient,
+            "launched": False,
+            "reason": "worker_session_authority_failed",
+            "work_intent_session_id": session_id,
+            "harness_id": target.harness_id,
+            "harness_name": target.command_handle,
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+        }
+        _record_dispatch_failure(state_dir, failure)
+        return {"ok": False, **failure}
+    return {"ok": True, "envelope": envelope}
+
+
 def _acquire_prime_work_intent_batch(
     selected: list[Any],
     *,
@@ -2176,12 +2237,13 @@ def _acquire_prime_work_intent_batch(
     for item in selected:
         slug = item.document_name
         try:
-            acquired = acquire_work_intent(
-                slug,
-                session_id,
-                ttl_seconds=WORK_INTENT_TRIGGER_TTL_SECONDS,
-                project_root=project_root,
-            )
+            with _dispatcher_work_intent_environment(dispatch_id):
+                acquired = acquire_work_intent(
+                    slug,
+                    session_id,
+                    ttl_seconds=WORK_INTENT_TRIGGER_TTL_SECONDS,
+                    project_root=project_root,
+                )
         except MalformedBridgeStatusError as exc:
             quarantine_entry: dict[str, Any] = {
                 "slug": slug,
@@ -7007,6 +7069,20 @@ def run_dispatch_cycle(
                                     dispatch_id = _new_dispatch_id(target.dispatch_state_key)
                                 if work_intent_session_id is None:
                                     work_intent_session_id = _work_intent_session_id(dispatch_id)
+                                worker_session_result = _ensure_prime_worker_session(
+                                    project_root=project_root,
+                                    state_dir=state_dir,
+                                    target=target,
+                                    recipient=recipient,
+                                    dispatch_id=dispatch_id,
+                                    session_id=work_intent_session_id,
+                                )
+                                if not worker_session_result["ok"]:
+                                    recipient_state["last_result"] = worker_session_result["reason"]
+                                    _record_recipient_attempt(recipient_state, worker_session_result)
+                                    results[recipient] = worker_session_result
+                                    recipients_state[recipient] = recipient_state
+                                    continue
                                 acquire_result = _acquire_prime_work_intent_batch(
                                     dispatched_selected,
                                     project_root=project_root,

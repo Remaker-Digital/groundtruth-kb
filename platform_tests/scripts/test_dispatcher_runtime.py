@@ -7926,3 +7926,102 @@ def test_exit_reconciliation_writes_partial_shim_telemetry_without_worker_output
     assert payload["usage"]["coverage"] == "unavailable"
     assert payload["usage"]["input_tokens"] is None
     assert recipients["prime-builder:A"]["last_launch"]["telemetry_reconciliation"] == "reconciled"
+
+
+def test_wi5221_prime_worker_session_writes_exact_dispatch_authority(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    dispatch_id = "2026-07-13T03-00-00Z-prime-builder-B-wi5221"
+    target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+    )
+
+    result = trigger._ensure_prime_worker_session(
+        project_root=root,
+        state_dir=state_dir,
+        target=target,
+        recipient=target.dispatch_state_key,
+        dispatch_id=dispatch_id,
+        session_id=dispatch_id,
+    )
+
+    assert result["ok"] is True
+    envelope_path = root / "harness-state" / "claude" / "session-envelopes" / f"{dispatch_id}.json"
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    assert envelope["session_id"] == dispatch_id
+    assert envelope["harness_id"] == "B"
+    assert envelope["harness_name"] == "claude"
+    assert envelope["init_keyword"] == "::init gtkb pb"
+    assert envelope["role_resolved"] == "prime-builder"
+    assert envelope["worker_role_provenance"]["role"] == "prime-builder"
+    assert envelope["worker_role_provenance"]["role_resolution_source"] == "dispatcher_composition"
+    assert envelope["worker_role_provenance"]["dispatch_run_id"] == dispatch_id
+
+
+def test_wi5221_prime_worker_session_failure_is_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    dispatch_id = "2026-07-13T03-01-00Z-prime-builder-B-wi5221"
+    target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+    )
+    from groundtruth_kb.session import envelope as session_envelope
+
+    def fail_worker_session(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise OSError("fixture envelope write denial")
+
+    monkeypatch.setattr(session_envelope, "ensure_worker_session", fail_worker_session)
+
+    result = trigger._ensure_prime_worker_session(
+        project_root=root,
+        state_dir=state_dir,
+        target=target,
+        recipient=target.dispatch_state_key,
+        dispatch_id=dispatch_id,
+        session_id=dispatch_id,
+    )
+
+    assert result["ok"] is False
+    assert result["launched"] is False
+    assert result["reason"] == "worker_session_authority_failed"
+    assert result["error_type"] == "OSError"
+    assert result["work_intent_session_id"] == dispatch_id
+    failures = _failure_records(state_dir)
+    assert failures[-1]["reason"] == "worker_session_authority_failed"
+    assert failures[-1]["dispatch_id"] == dispatch_id
+
+
+def test_wi5221_runtime_establishes_authority_before_claim_and_spawn() -> None:
+    source = _SCRIPT_PATH.read_text(encoding="utf-8")
+    start = source.index('if target.needed_role_label == "prime-builder" and not dry_run:')
+    authority = source.index("worker_session_result = _ensure_prime_worker_session(", start)
+    claim = source.index("acquire_result = _acquire_prime_work_intent_batch(", authority)
+    spawn = source.index("launch = _spawn_harness(", claim)
+
+    assert authority < claim < spawn
+    failure_branch = source[authority:claim]
+    assert 'if not worker_session_result["ok"]:' in failure_branch
+    assert "continue" in failure_branch
+
+
+def test_wi5221_dispatcher_claim_context_ignores_and_restores_parent_selector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "parent-dispatch")
+
+    with trigger._dispatcher_work_intent_environment("child-dispatch"):
+        assert "GTKB_HARNESS_NAME" not in os.environ
+        assert os.environ["GTKB_BRIDGE_POLLER_RUN_ID"] == "child-dispatch"
+
+    assert os.environ["GTKB_HARNESS_NAME"] == "codex"
+    assert os.environ["GTKB_BRIDGE_POLLER_RUN_ID"] == "parent-dispatch"
