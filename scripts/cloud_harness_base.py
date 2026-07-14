@@ -95,11 +95,18 @@ BLANK_FINAL_RECOVERY_PROMPT = (
     "Your previous assistant response contained no text and no tool call. Continue the task. "
     "Use the available tools if work remains, or return a nonblank final response when complete."
 )
+BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT = (
+    "This bridge-review or verification route is not complete until PublishBridgeVerdict "
+    "successfully advances the selected numbered bridge document. Reason: {reason}. "
+    "Use only PublishBridgeVerdict next, with the complete GO, NO-GO, or VERIFIED body "
+    "and required metadata. Do not return prose as the final answer until publication succeeds."
+)
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
 MAX_FILE_SCAN_ENTRIES = 5000
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
+MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
 MAX_NATIVE_STOP_BLOCKS = 8
 NATIVE_STOP_CONTINUATION_PROMPT = (
     "A native Stop hook blocked completion for this reason:\n{reason}\n"
@@ -2077,6 +2084,18 @@ def _final_text_from_message(message: Mapping[str, Any]) -> str:
     return content
 
 
+def _publish_bridge_verdict_succeeded(result: str) -> bool:
+    try:
+        parsed = json.loads(result)
+    except json.JSONDecodeError:
+        return False
+    return (
+        isinstance(parsed, dict)
+        and isinstance(parsed.get("verdict_path"), str)
+        and bool(parsed["verdict_path"].strip())
+    )
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -2109,12 +2128,10 @@ def run_tool_loop(
         raise CloudHarnessError("session_timeout must be positive")
     ensure_dispatch_worker_role_document(project_root, profile)
     strategy = resolve_dialect_strategy(profile)
-    schemas = strategy.build_tool_schemas(
-        allowed_tools_for_skill(
-            model_route.allowed_tools,
-            skill,
-            publish_bridge_verdict_tool=profile.publish_bridge_verdict_tool,
-        )
+    allowed_tools = allowed_tools_for_skill(
+        model_route.allowed_tools,
+        skill,
+        publish_bridge_verdict_tool=profile.publish_bridge_verdict_tool,
     )
     chat = chat_func or strategy.chat
     metadata = ModelMetadata(
@@ -2169,10 +2186,20 @@ def run_tool_loop(
     repeated_tool_signature_turns = 0
     native_stop_blocks = 0
     native_stop_completed = False
+    bridge_verdict_required = skill in LOYAL_OPPOSITION_BRIDGE_SKILLS and profile.publish_bridge_verdict_tool
+    bridge_verdict_published = False
+    bridge_recovery_turns = 0
+    publisher_failures = 0
 
     stop_reason = "process_error"
     try:
         for _turn in range(max_turns):
+            active_tools = (
+                (PUBLISH_BRIDGE_VERDICT_TOOL,)
+                if bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published
+                else allowed_tools
+            )
+            schemas = strategy.build_tool_schemas(active_tools)
             payload = strategy.build_payload(messages, model_route, schemas)
 
             operation_timeout = min(
@@ -2208,6 +2235,22 @@ def run_tool_loop(
             if not tool_calls:
                 content = message.get("content")
                 if isinstance(content, str) and content.strip():
+                    if bridge_verdict_required and not bridge_verdict_published:
+                        bridge_recovery_turns += 1
+                        if bridge_recovery_turns > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                            raise CloudHarnessError(
+                                "bridge verdict publication did not advance before final assistant text"
+                            )
+                        messages.append({"role": "assistant", "content": content})
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
+                                    reason="assistant returned final prose before publishing a governed verdict"
+                                ),
+                            }
+                        )
+                        continue
                     block_reason = None
                     if native_hooks_started:
                         block_reason = _invoke_native_stop_hooks_nonmasking(
@@ -2234,11 +2277,32 @@ def run_tool_loop(
                     native_stop_completed = native_hooks_started
                     stop_reason = "final_response"
                     return content
+                if bridge_verdict_required and not bridge_verdict_published:
+                    bridge_recovery_turns += 1
+                    if bridge_recovery_turns > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                        raise CloudHarnessError("bridge verdict publication did not advance after blank response")
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
+                                reason="assistant returned a blank response without a tool call"
+                            ),
+                        }
+                    )
+                    continue
                 messages.append({"role": "user", "content": BLANK_FINAL_RECOVERY_PROMPT})
                 continue
 
             if not isinstance(tool_calls, list):
                 raise CloudHarnessError("tool_calls must be a list")
+            if bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published:
+                recovery_tool_names = []
+                for call in tool_calls:
+                    function = call.get("function") if isinstance(call, dict) else None
+                    name = function.get("name") if isinstance(function, dict) else None
+                    recovery_tool_names.append(name)
+                if any(name != PUBLISH_BRIDGE_VERDICT_TOOL for name in recovery_tool_names):
+                    raise CloudHarnessError("bridge verdict publisher recovery received non-publisher tool call")
 
             tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
             if tool_signature == previous_tool_signature:
@@ -2258,6 +2322,7 @@ def run_tool_loop(
 
             for index, call in enumerate(tool_calls):
                 tool_name, arguments, call_id = _tool_call_parts(call, index)
+                publisher_recovery_reason = None
                 if tool_name == "Bash":
                     arguments = dict(arguments)
                     requested_timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
@@ -2291,6 +2356,17 @@ def run_tool_loop(
                         )
                     except CloudHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"
+                if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
+                    if not _publish_bridge_verdict_succeeded(result):
+                        publisher_failures += 1
+                        if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                            raise CloudHarnessError("repeated bridge verdict publisher failures before completion")
+                        bridge_recovery_turns = max(bridge_recovery_turns, 1)
+                        publisher_recovery_reason = "PublishBridgeVerdict did not return a verdict_path"
+                    else:
+                        bridge_verdict_published = True
+                        bridge_recovery_turns = 0
+                        publisher_failures = 0
                 invoke_native_hooks(
                     NATIVE_HOOK_POST_TOOL_USE,
                     metadata,
@@ -2309,13 +2385,22 @@ def run_tool_loop(
                         "content": result[:MAX_TOOL_OUTPUT_CHARS],
                     }
                 )
+                if publisher_recovery_reason is not None:
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(
+                                reason=publisher_recovery_reason
+                            ),
+                        }
+                    )
         stop_reason = "max_turn_exhaustion"
         raise CloudHarnessError("max-turn exhaustion before final assistant text")
     except CloudHarnessError as exc:
         message = str(exc).lower()
         if "max-turn" in message:
             stop_reason = "max_turn_exhaustion"
-        elif "repeated no-progress" in message:
+        elif "repeated no-progress" in message or "bridge verdict" in message:
             stop_reason = "no_progress_loop"
         elif "session timeout" in message:
             stop_reason = "session_timeout"

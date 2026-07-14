@@ -36,7 +36,7 @@ allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 [routing.openrouter]
 default_model = "fixture-full"
 timeout_seconds = 900
-session_timeout_seconds = 28800
+session_timeout_seconds = 3600
 max_turns = 600
 """.strip()
         + "\n",
@@ -76,7 +76,7 @@ def test_load_routing_config_parses_openrouter_model(tmp_path: Path):
     assert selected.allowed_tools == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
     assert selected.omit_payload_model is False
     config = orh.load_routing_config(root)
-    assert (config.timeout_seconds, config.session_timeout_seconds, config.max_turns) == (900, 28800, 600)
+    assert (config.timeout_seconds, config.session_timeout_seconds, config.max_turns) == (900, 3600, 600)
 
 
 def test_load_routing_config_parses_openrouter_cloud_default_omit_model(tmp_path: Path):
@@ -181,15 +181,16 @@ def test_main_loads_env_local_key_before_live_dispatch(
         assert api_key == "env-file-fixture-key"
         assert project_root == root.resolve()
         assert max_turns == 600
+        assert kwargs["skill"] == "bridge-review"
         assert kwargs["timeout"] == 900
-        assert kwargs["session_timeout"] == 28800
+        assert kwargs["session_timeout"] == 3600
         return "done"
 
     monkeypatch.setattr(env_loader, "load_env_local", fake_load_env_local)
     monkeypatch.setattr(orh, "load_routing_config", lambda _project_root: config)
     monkeypatch.setattr(orh, "run_tool_loop", fake_run_tool_loop)
 
-    assert orh.main(["-p", "hello"]) == 0
+    assert orh.main(["-p", "hello", "--skill", "bridge-review"]) == 0
     assert capsys.readouterr().out.strip() == "done"
 
 
@@ -211,6 +212,37 @@ def test_openrouter_reconfigures_output_streams_for_unicode_verdicts():
     assert stderr.calls == [{"encoding": "utf-8", "errors": "backslashreplace"}]
 
 
+def test_openrouter_bridge_review_inherits_shared_completion_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    selected = route(root)
+    captured: dict[str, object] = {}
+
+    def fake_base_loop(_prompt, _route, _endpoint, _api_key, _max_turns, _root, profile, **kwargs):
+        captured["profile"] = profile
+        captured["skill"] = kwargs["skill"]
+        return "done"
+
+    monkeypatch.setattr(orh.base, "run_tool_loop", fake_base_loop)
+
+    assert (
+        orh.run_tool_loop(
+            "review",
+            selected,
+            "https://openrouter.test",
+            "key",
+            1,
+            root,
+            skill="bridge-review",
+        )
+        == "done"
+    )
+    assert captured["profile"] is orh._OPENROUTER_PROFILE
+    assert captured["profile"].publish_bridge_verdict_tool is True
+    assert captured["skill"] == "bridge-review"
+
+
 def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     root = make_root(tmp_path)
     prompt = orh.build_system_prompt("bridge-review", route(root))
@@ -226,20 +258,17 @@ def test_bridge_review_prompt_uses_no_index_bridge_instructions(tmp_path: Path):
     assert "Do not encode an\nexclusive corrected-verdict status set" in prompt
 
 
-def test_bridge_review_prompt_seeds_prior_deliberations_before_verdict_write(tmp_path: Path):
+def test_bridge_review_prompt_requires_governed_verdict_publication(tmp_path: Path):
     root = make_root(tmp_path)
     prompt = orh.build_system_prompt("bridge-review", route(root))
 
     assert prompt is not None
     claim_index = prompt.index("python scripts\\bridge_claim_cli.py claim <document-slug>")
-    helper_index = prompt.index("python .claude/skills/verify/helpers/write_verdict.py")
+    publisher_index = prompt.index("Publish numbered GO, NO-GO, and VERIFIED artifacts")
     bridge_workflow_index = prompt.index("Use the GT-KB file bridge")
-    assert claim_index < helper_index < bridge_workflow_index
-    assert (
-        "python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <draft-body-file>"
-    ) in prompt
-    assert "Review and prune the helper-seeded Prior Deliberations" in prompt
-    assert "silently omitting Prior Deliberations" in prompt
+    assert claim_index < publisher_index < bridge_workflow_index
+    assert "only through\nPublishBridgeVerdict" in prompt
+    assert "Never use raw Write, Edit, or Bash for a numbered bridge verdict" in prompt
 
 
 def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Path):
@@ -247,11 +276,214 @@ def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Pa
     prompt = orh.build_system_prompt("bridge-review", route(root))
 
     assert prompt is not None
-    assert "--finalize-verified" in prompt
-    assert "--no-prepopulate" in prompt
-    assert "local commit containing the verified path set" in prompt
+    assert "include_paths" in prompt
+    assert "commit_message" in prompt
+    assert "performs atomic VERIFIED\nfinalization" in prompt
     assert "fail closed" in prompt
-    assert "terminal VERIFIED file" in prompt
+    assert "terminal\nVERIFIED file without its commit" in prompt
+
+
+def test_publish_bridge_verdict_is_exposed_only_for_lo_skills(tmp_path: Path):
+    root = make_root(tmp_path)
+    selected = route(root)
+
+    assert orh._OPENROUTER_PROFILE.publish_bridge_verdict_tool is True
+    for skill in ("bridge-review", "verification"):
+        allowed = orh.base.allowed_tools_for_skill(
+            selected.allowed_tools,
+            skill,
+            publish_bridge_verdict_tool=orh._OPENROUTER_PROFILE.publish_bridge_verdict_tool,
+        )
+        assert allowed[-1] == orh.base.PUBLISH_BRIDGE_VERDICT_TOOL
+    for skill in ("implementation", None):
+        allowed = orh.base.allowed_tools_for_skill(
+            selected.allowed_tools,
+            skill,
+            publish_bridge_verdict_tool=orh._OPENROUTER_PROFILE.publish_bridge_verdict_tool,
+        )
+        assert orh.base.PUBLISH_BRIDGE_VERDICT_TOOL not in allowed
+
+    schema = orh.build_tool_schemas([orh.base.PUBLISH_BRIDGE_VERDICT_TOOL])[0]["function"]
+    properties = schema["parameters"]["properties"]
+    assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
+    assert not {"path", "file_path", "version"} & properties.keys()
+
+
+def test_run_tool_loop_threads_skill_to_shared_tool_exposure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(
+        orh.base,
+        "_load_provider_verdict_publisher",
+        lambda _root: lambda *_args, **_kwargs: Published(),
+    )
+    for key in orh.base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-F-exposure")
+
+    def chat(endpoint: str, api_key: str, payload: dict, timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "publish_1",
+                                    "function": {
+                                        "name": orh.base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                        "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    orh.run_tool_loop(
+        "review",
+        route(root),
+        "https://openrouter.test",
+        "key",
+        2,
+        root,
+        skill="bridge-review",
+        chat_func=chat,
+    )
+
+    names = {tool["function"]["name"] for tool in payloads[0]["tools"]}
+    assert orh.base.PUBLISH_BRIDGE_VERDICT_TOOL in names
+
+
+def test_run_tool_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(
+        orh.base,
+        "_load_provider_verdict_publisher",
+        lambda _root: lambda *_args, **_kwargs: Published(),
+    )
+    for key in orh.base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-F-completion")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {"choices": [{"message": {"content": "ready but unpublished"}}]}
+        if len(payloads) == 2:
+            assert [tool["function"]["name"] for tool in payload["tools"]] == [orh.base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "publish_f",
+                                    "function": {
+                                        "name": orh.base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                        "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "published"}}]}
+
+    assert (
+        orh.run_tool_loop(
+            "review",
+            route(root),
+            "https://openrouter.test",
+            "key",
+            3,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "published"
+    )
+
+
+def test_dispatch_publish_bridge_verdict_uses_openrouter_runtime_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import gtkb_bridge_writer as writer
+
+    root = make_root(tmp_path)
+    captured: dict[str, object] = {}
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        captured.update(slug=slug, verdict=verdict, content=content, project_root=project_root, **kwargs)
+        return Published()
+
+    monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
+    for key in orh.base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-F-parity")
+
+    result = orh.dispatch_tool_call(
+        orh.base.PUBLISH_BRIDGE_VERDICT_TOOL,
+        {"slug": "example", "verdict": "GO", "content": "GO\n"},
+        metadata(),
+        root,
+        skill="bridge-review",
+    )
+
+    assert orh.json.loads(result)["verdict_path"] == "bridge/example-002.md"
+    assert captured["session_id"] == "dispatch-F-parity"
+    assert captured["harness_name"] == "openrouter"
+    author_metadata = captured["author_metadata"]
+    assert isinstance(author_metadata, dict)
+    assert author_metadata["author_harness_id"] == "F"
+    assert author_metadata["author_model"] == FIXTURE_MODEL_ID
+
+
+def test_dispatch_publish_bridge_verdict_fails_closed_without_lo_skill_or_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    arguments = {"slug": "example", "verdict": "GO", "content": "GO\n"}
+    for key in orh.base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+
+    with pytest.raises(orh.OpenRouterHarnessError, match="bridge-review/verification"):
+        orh.dispatch_tool_call(
+            orh.base.PUBLISH_BRIDGE_VERDICT_TOOL,
+            arguments,
+            metadata(),
+            root,
+            skill="implementation",
+        )
+    with pytest.raises(orh.OpenRouterHarnessError, match="concrete dispatcher session id"):
+        orh.dispatch_tool_call(
+            orh.base.PUBLISH_BRIDGE_VERDICT_TOOL,
+            arguments,
+            metadata(),
+            root,
+            skill="bridge-review",
+        )
 
 
 def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):

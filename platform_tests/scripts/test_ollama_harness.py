@@ -144,11 +144,11 @@ def test_load_routing_config_rejects_non_positive_ollama_timeout(tmp_path: Path)
 
 def test_load_routing_config_parses_distinct_ollama_session_timeout(tmp_path: Path):
     root = make_root(tmp_path)
-    set_ollama_session_timeout(root, 28800)
+    set_ollama_session_timeout(root, 3600)
 
     config = oh.load_routing_config(root)
 
-    assert config.session_timeout_seconds == 28800
+    assert config.session_timeout_seconds == 3600
 
 
 def test_load_routing_config_parses_ollama_max_turns(tmp_path: Path):
@@ -211,7 +211,7 @@ def test_runtime_timeouts_preserve_explicit_cli_overrides(tmp_path: Path):
 def test_runtime_timeouts_use_distinct_routing_session_timeout(tmp_path: Path):
     root = make_root(tmp_path)
     set_ollama_timeout(root, 900)
-    set_ollama_session_timeout(root, 28800)
+    set_ollama_session_timeout(root, 3600)
     raw_argv = ["-p", "hello"]
     args = oh.build_arg_parser().parse_args(raw_argv)
 
@@ -222,7 +222,7 @@ def test_runtime_timeouts_use_distinct_routing_session_timeout(tmp_path: Path):
     )
 
     assert operation_timeout == 900
-    assert session_timeout == 28800
+    assert session_timeout == 3600
 
 
 def test_read_schema_and_short_file_output_remain_compatible(tmp_path: Path):
@@ -379,12 +379,58 @@ def test_cli_parser_accepts_required_flags():
     assert args.max_turns == 2
 
 
+def test_main_threads_skill_and_preserves_generous_runtime_limits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_root(tmp_path)
+    set_ollama_timeout(root, 900)
+    set_ollama_session_timeout(root, 3600)
+    set_ollama_max_turns(root, 600)
+    captured: dict[str, object] = {}
+
+    def fake_run_tool_loop(prompt, model_route, endpoint, max_turns, project_root, **kwargs):
+        captured.update(
+            prompt=prompt,
+            model_route=model_route,
+            endpoint=endpoint,
+            max_turns=max_turns,
+            project_root=project_root,
+            **kwargs,
+        )
+        return "done"
+
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(oh, "call_ollama_tags", lambda _endpoint, _timeout: [FIXTURE_MODEL_ID])
+    monkeypatch.setattr(oh, "run_tool_loop", fake_run_tool_loop)
+
+    assert oh.main(["-p", "review", "--skill", "bridge-review"]) == 0
+    assert capsys.readouterr().out.strip() == "done"
+    assert captured["skill"] == "bridge-review"
+    assert captured["max_turns"] == 600
+    assert captured["timeout"] == 900
+    assert captured["session_timeout"] == 3600
+
+
 def test_tool_schemas_expose_only_canonical_tools():
     schemas = oh.build_tool_schemas(["Read", "Write", "Edit", "Grep", "Glob", "Bash"])
     names = [schema["function"]["name"] for schema in schemas]
     assert names == ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
     with pytest.raises(oh.OllamaHarnessError):
         oh.build_tool_schemas(["Read", "Delete"])
+
+
+def test_publish_bridge_verdict_schema_and_skill_filtering():
+    schema = oh.build_tool_schemas([oh.PUBLISH_BRIDGE_VERDICT_TOOL])[0]["function"]
+    properties = schema["parameters"]["properties"]
+    assert set(schema["parameters"]["required"]) == {"slug", "verdict", "content"}
+    assert not {"path", "file_path", "version"} & properties.keys()
+    assert properties["verdict"]["enum"] == ["GO", "NO-GO", "VERIFIED"]
+
+    allowed = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
+    for skill in ("bridge-review", "verification"):
+        assert oh.allowed_tools_for_skill(allowed, skill)[-1] == oh.PUBLISH_BRIDGE_VERDICT_TOOL
+    for skill in ("implementation", None):
+        assert oh.PUBLISH_BRIDGE_VERDICT_TOOL not in oh.allowed_tools_for_skill(allowed, skill)
 
 
 def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -428,7 +474,9 @@ def test_tool_loop_posts_chat_payload_and_returns_final_text(tmp_path: Path):
     assert calls[0][0] == "http://ollama.test"
     assert calls[0][1]["model"] == FIXTURE_MODEL_ID
     assert calls[0][1]["stream"] is False
-    assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == oh.CANONICAL_TOOLS
+    assert {tool["function"]["name"] for tool in calls[0][1]["tools"]} == (
+        oh.CANONICAL_TOOLS - {oh.PUBLISH_BRIDGE_VERDICT_TOOL}
+    )
 
 
 def test_tool_loop_keeps_read_continuation_marker_model_visible(tmp_path: Path):
@@ -529,11 +577,296 @@ def test_bridge_review_prompt_requires_atomic_verified_finalization(tmp_path: Pa
     prompt = oh.build_system_prompt("bridge-review", route(root))
 
     assert prompt is not None
-    assert "--finalize-verified" in prompt
-    assert "--no-prepopulate" in prompt
-    assert "local commit containing the verified path set" in prompt
+    assert "only through\nPublishBridgeVerdict" in prompt
+    assert "Never use raw Write, Edit, or Bash for a numbered bridge verdict" in prompt
+    assert "include_paths" in prompt
+    assert "commit_message" in prompt
+    assert "performs atomic VERIFIED\nfinalization" in prompt
     assert "fail closed" in prompt
-    assert "terminal VERIFIED file" in prompt
+    assert "terminal\nVERIFIED file without its commit" in prompt
+
+
+def test_dispatch_worker_role_document_uses_canonical_keyword(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from groundtruth_kb.session import envelope
+
+    root = make_root(tmp_path)
+    captured: dict[str, object] = {}
+    monkeypatch.setenv("GTKB_BRIDGE_DISPATCH_KEYWORD", "::init gtkb lo")
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-envelope")
+    monkeypatch.setattr(
+        envelope,
+        "ensure_worker_session",
+        lambda project_root, **kwargs: captured.update(project_root=project_root, **kwargs),
+    )
+
+    oh.ensure_dispatch_worker_role_document(root)
+
+    assert captured == {
+        "project_root": root,
+        "harness_name": "ollama",
+        "harness_id": "D",
+        "session_id": "dispatch-D-envelope",
+        "role": "loyal-opposition",
+        "role_source": "dispatcher_composition",
+        "init_keyword": "::init gtkb lo",
+        "dispatch_run_id": "dispatch-D-envelope",
+    }
+
+
+def test_run_tool_loop_threads_lo_skill_to_tool_exposure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-exposure")
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                            }
+                        }
+                    ],
+                }
+            }
+        return {"message": {"content": "done"}}
+
+    oh.run_tool_loop(
+        "review",
+        route(root),
+        "http://ollama.test",
+        2,
+        root,
+        skill="bridge-review",
+        chat_func=chat,
+    )
+
+    names = {tool["function"]["name"] for tool in payloads[0]["tools"]}
+    assert oh.PUBLISH_BRIDGE_VERDICT_TOOL in names
+
+
+def test_bridge_review_requires_publish_bridge_verdict_before_final_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-completion")
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(json.loads(json.dumps(payload)))
+        if len(payloads) == 1:
+            return {"message": {"content": "GO body without tool publication"}}
+        if len(payloads) == 2:
+            assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "publish_1",
+                            "function": {
+                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                            },
+                        }
+                    ],
+                }
+            }
+        return {"message": {"content": "published"}}
+
+    assert (
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            "http://ollama.test",
+            3,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "published"
+    )
+    assert payloads[1]["messages"][-2]["content"] == "GO body without tool publication"
+    assert "PublishBridgeVerdict" in payloads[1]["messages"][-1]["content"]
+
+
+def test_bridge_review_recovers_publisher_result_without_verdict_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+    publish_calls = 0
+
+    class MissingPath:
+        def to_dict(self) -> dict[str, object]:
+            return {"status": "ok"}
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(*_args, **_kwargs):
+        nonlocal publish_calls
+        publish_calls += 1
+        return MissingPath() if publish_calls == 1 else Published()
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-missing-path")
+
+    def publish_tool_call(call_id: str) -> dict:
+        return {
+            "id": call_id,
+            "function": {
+                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            },
+        }
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(json.loads(json.dumps(payload)))
+        if len(payloads) in (1, 2):
+            return {"message": {"content": "", "tool_calls": [publish_tool_call(f"publish_{len(payloads)}")]}}
+        return {"message": {"content": "done"}}
+
+    assert (
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            "http://ollama.test",
+            3,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "done"
+    )
+    assert [tool["function"]["name"] for tool in payloads[1]["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+    assert "verdict_path" in payloads[1]["messages"][-1]["content"]
+    assert publish_calls == 2
+
+
+def test_dispatch_publish_bridge_verdict_uses_ollama_runtime_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts import gtkb_bridge_writer as writer
+
+    root = make_root(tmp_path)
+    captured: dict[str, object] = {}
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        captured.update(slug=slug, verdict=verdict, content=content, project_root=project_root, **kwargs)
+        return Published()
+
+    monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-parity")
+
+    result = oh.dispatch_tool_call(
+        oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+        {"slug": "example", "verdict": "GO", "content": "GO\n"},
+        metadata(),
+        root,
+        skill="verification",
+    )
+
+    assert json.loads(result)["verdict_path"] == "bridge/example-002.md"
+    assert captured["session_id"] == "dispatch-D-parity"
+    assert captured["harness_name"] == "ollama"
+    author_metadata = captured["author_metadata"]
+    assert isinstance(author_metadata, dict)
+    assert author_metadata["author_harness_id"] == "D"
+    assert author_metadata["author_model"] == FIXTURE_MODEL_ID
+    assert "skill verification" in author_metadata["author_model_configuration"]
+
+
+def test_dispatch_publish_bridge_verdict_fails_closed_for_invalid_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    arguments = {"slug": "example", "verdict": "GO", "content": "GO\n"}
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+
+    with pytest.raises(oh.OllamaHarnessError, match="bridge-review/verification"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            arguments,
+            metadata(),
+            root,
+            skill="implementation",
+        )
+    with pytest.raises(oh.OllamaHarnessError, match="concrete dispatcher session id"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            arguments,
+            metadata(),
+            root,
+            skill="bridge-review",
+        )
+
+
+def test_dispatch_publish_bridge_verdict_rejects_malformed_lists_and_publisher_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-parity")
+
+    with pytest.raises(oh.OllamaHarnessError, match="include_paths must be an array"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            {"slug": "example", "verdict": "VERIFIED", "content": "VERIFIED\n", "include_paths": "bad"},
+            metadata(),
+            root,
+            skill="verification",
+        )
+
+    def fail_publisher(_root: Path):
+        def fail(*_args, **_kwargs):
+            raise ValueError("publisher rejected")
+
+        return fail
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", fail_publisher)
+    with pytest.raises(oh.OllamaHarnessError, match="governed bridge verdict publication failed"):
+        oh.dispatch_tool_call(
+            oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+            {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            metadata(),
+            root,
+            skill="bridge-review",
+        )
 
 
 def test_tool_loop_reconciles_success_only_after_canonical_bridge_advancement(tmp_path: Path):
@@ -633,6 +966,126 @@ def test_tool_loop_stops_repeated_no_progress_calls(tmp_path: Path):
         oh.run_tool_loop("loop", route(root), oh.DEFAULT_ENDPOINT, 20, root, chat_func=chat)
 
     assert len(calls) == oh.MAX_REPEATED_TOOL_SIGNATURE_TURNS + 1
+
+
+def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+    published: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        published.append(
+            {
+                "slug": slug,
+                "verdict": verdict,
+                "content": content,
+                "project_root": project_root,
+                **kwargs,
+            }
+        )
+        return Published()
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-completion")
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {"message": {"content": "VERIFIED is ready"}}
+        if len(payloads) == 2:
+            assert (
+                oh.BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.split("{reason}")[0] in payload["messages"][-1]["content"]
+            )
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "publish_1",
+                            "function": {
+                                "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                "arguments": {
+                                    "slug": "example",
+                                    "verdict": "VERIFIED",
+                                    "content": "VERIFIED\n\nResponds to: bridge/example-001.md\n",
+                                    "include_paths": ["scripts/example.py"],
+                                    "commit_message": "fix: example",
+                                },
+                            },
+                        }
+                    ],
+                }
+            }
+        assert "bridge/example-002.md" in payload["messages"][-1]["content"]
+        return {"message": {"content": "published"}}
+
+    assert (
+        oh.run_tool_loop(
+            "verify",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            4,
+            root,
+            skill="verification",
+            chat_func=chat,
+        )
+        == "published"
+    )
+    assert len(published) == 1
+    assert published[0]["session_id"] == "dispatch-D-completion"
+
+
+def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    calls = 0
+
+    def fail_publish(*_args, **_kwargs):
+        raise RuntimeError("claim contention")
+
+    monkeypatch.setattr(oh, "_load_provider_verdict_publisher", lambda _root: fail_publish)
+    for key in oh.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-failure")
+
+    def chat(_url: str, _payload: dict, _timeout: float) -> dict:
+        nonlocal calls
+        calls += 1
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": f"publish_{calls}",
+                        "function": {
+                            "name": oh.PUBLISH_BRIDGE_VERDICT_TOOL,
+                            "arguments": {
+                                "slug": "example",
+                                "verdict": "GO",
+                                "content": f"GO\n\nAttempt {calls}\n",
+                            },
+                        },
+                    }
+                ],
+            }
+        }
+
+    with pytest.raises(oh.OllamaHarnessError, match="repeated bridge verdict publisher failures"):
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            10,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+    assert calls == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
 
 
 def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

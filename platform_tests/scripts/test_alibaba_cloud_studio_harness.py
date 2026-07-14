@@ -33,7 +33,7 @@ allowed_tools = ["Read"]
 [routing.alibaba-cloud-studio]
 default_model = "alib-route"
 timeout_seconds = 900
-session_timeout_seconds = 28800
+session_timeout_seconds = 3600
 max_turns = 600
 
 [routing.alibaba-cloud-studio.skills]
@@ -130,6 +130,7 @@ def test_run_tool_loop_delegates_profile_and_native_hook_runner(
         "native_hook_runner": hook_runner,
         "skill": "bridge-review",
     }
+    assert captured["profile"].publish_bridge_verdict_tool is True
 
 
 def test_bridge_review_prompt_requires_governed_verdict_tool(tmp_path: Path) -> None:
@@ -380,6 +381,58 @@ def test_alibaba_native_full_loop_continues_when_posttool_maintenance_times_out(
     assert chat_calls == 2
 
 
+def test_alibaba_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = make_root(tmp_path)
+    route = ach.resolve_model(ach.load_routing_config(root), None)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def native_hook_runner(*_args, **_kwargs) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(returncode=0, stdout="{}")
+
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-completion")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
+        if len(payloads) == 2:
+            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            return {
+                "model": route.model_id,
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "publish_h",
+                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                        "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                    }
+                ],
+            }
+        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
+
+    assert (
+        ach.run_tool_loop(
+            "review",
+            route,
+            "https://example.test/v1",
+            "key",
+            3,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+            native_hook_runner=native_hook_runner,
+        )
+        == "published"
+    )
+
+
 def test_bridge_review_enables_readonly_native_hook_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LOYAL_OPPOSITION_READONLY", raising=False)
     monkeypatch.delenv("GTKB_NO_AXIS_2_SURFACE", raising=False)
@@ -440,7 +493,7 @@ def test_main_uses_env_only_endpoint_and_never_prints_key(
         assert api_key == key
         assert max_turns == 600
         assert kwargs["timeout"] == 900
-        assert kwargs["session_timeout"] == 28800
+        assert kwargs["session_timeout"] == 3600
         return "done"
 
     monkeypatch.setattr(ach, "run_tool_loop", fake_run_tool_loop)
