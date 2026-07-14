@@ -46,6 +46,7 @@ STOP_REASONS = frozenset(
 )
 EXIT_STATUSES = frozenset({"completed", "failed", "succeeded", "external_termination", "partial"})
 SUCCESSFUL_REVIEW_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+_SUCCESS_STOP_REASONS = frozenset({"verdict_emitted", "final_response"})
 QUERY_GROUPS = frozenset(
     {
         "harness",
@@ -632,7 +633,16 @@ def reconcile_dispatch_telemetry(
 
     outcome = dict(_mapping(payload.get("outcome")))
     if stop_reason in STOP_REASONS:
-        outcome["stop_reason"] = stop_reason
+        existing_stop_reason = _nonempty_string(outcome.get("stop_reason"))
+        if (
+            payload.get("schema_id") == SCHEMA_ID
+            and stop_reason == "process_error"
+            and existing_stop_reason in STOP_REASONS
+            and existing_stop_reason not in _SUCCESS_STOP_REASONS
+        ):
+            outcome["stop_reason"] = existing_stop_reason
+        else:
+            outcome["stop_reason"] = stop_reason
     if exit_status in EXIT_STATUSES:
         outcome["exit_status"] = exit_status
     if isinstance(exit_code, int) and not isinstance(exit_code, bool):

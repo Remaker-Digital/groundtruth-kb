@@ -318,6 +318,36 @@ def test_reconciliation_creates_partial_and_query_is_bounded_to_successful_revie
     assert complexity_filtered["distribution"] == [{"value": "2", "count": 1}]
 
 
+def test_reconciliation_preserves_worker_failure_reason_when_dispatcher_falls_back_to_process_error(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-provider-loop"
+    observer = _observer(root, dispatch_id)
+    observer.finish(stop_reason="no_progress_loop")
+
+    result = telemetry.reconcile_dispatch_telemetry(
+        root,
+        dispatch_id,
+        launched_at="2026-07-14T10:00:00Z",
+        completed_at="2026-07-14T10:00:05Z",
+        elapsed_ms=5000,
+        exit_code=1,
+        exit_status="failed",
+        stop_reason="process_error",
+        bridge_document_id="telemetry-thread",
+    )
+
+    assert result.written is True
+    payload = json.loads(telemetry.telemetry_path(root, dispatch_id).read_text(encoding="utf-8"))
+    assert payload["outcome"]["stop_reason"] == "no_progress_loop"
+    assert payload["outcome"]["exit_code"] == 1
+    assert payload["outcome"]["exit_status"] == "failed"
+    assert payload["timing"]["elapsed_ms"] == 5000
+
+
 def test_telemetry_write_failure_is_bounded_and_nonfatal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "project"
     root.mkdir()
