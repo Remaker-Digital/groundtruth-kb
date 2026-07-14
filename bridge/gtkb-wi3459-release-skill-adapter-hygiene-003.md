@@ -1,20 +1,20 @@
 NEW
 
-# gtkb-wi3459-release-skill-adapter-hygiene - implementation blocked by target-path scope mismatch
+# GT-KB Bridge Implementation Report - gtkb-wi3459-release-skill-adapter-hygiene - 003
 
 bridge_kind: implementation_report
 Document: gtkb-wi3459-release-skill-adapter-hygiene
-Version: 003 (NEW; post-GO implementation attempt / blocker report)
+Version: 003 (NEW; post-implementation report)
 Responds to GO: bridge/gtkb-wi3459-release-skill-adapter-hygiene-002.md
 Approved proposal: bridge/gtkb-wi3459-release-skill-adapter-hygiene-001.md
-Recommended commit type: fix: after scope correction; no implementation commit is ready from this blocked attempt.
+Recommended commit type: fix:
 
-author_identity: prime-builder/codex
+author_identity: Codex Prime Builder
 author_harness_id: A
-author_session_context_id: 2026-06-28T03-11-23Z-prime-builder-A-28ef2a
+author_session_context_id: 019f09c9-2db0-7b00-a337-40f998b07e56
 author_model: GPT-5
 author_model_version: GPT-5 Codex
-author_model_configuration: Codex bridge auto-dispatch; approval_policy=never; workspace-write sandbox
+author_model_configuration: Codex desktop; formal-release adapter hygiene
 
 Project Authorization: PAUTH-PROJECT-GTKB-SKILL-MODERNIZATION-SKILL-MODERNIZATION-BOUNDED-IMPLEMENTATION-2026-06-23
 Project: PROJECT-GTKB-SKILL-MODERNIZATION
@@ -22,126 +22,140 @@ Work Item: WI-3459
 
 ## Implementation Claim
 
-Prime Builder attempted to start the approved WI-3459 implementation and stopped before changing source, helper, test, configuration, or generated-adapter files.
+Implemented the approved WI-3459 release-blocking hygiene repair.
 
-The live bridge thread was valid for Prime Builder action: latest status was `GO` at `bridge/gtkb-wi3459-release-skill-adapter-hygiene-002.md`; the work-intent claim was acquired for session `2026-06-28T03-11-23Z-prime-builder-A-28ef2a`; and `scripts/implementation_authorization.py begin` produced implementation packet `sha256:7d01ff10ccd512a5d8eac8188f761a31ed3ebab426a270fb8ec055307ba45c34`.
+The implementation removes completed one-off bridge/verdict working artifacts from reusable skill helper directories, regenerates Codex skill adapter helper mirrors from the canonical Claude skill surface, and adds a focused tracked-file regression guard so draft, temporary, final-body, and Python cache artifacts cannot be committed under `.claude/skills/**/helpers` or `.codex/skills/**/helpers`.
 
-Implementation is blocked because the current generator drift cannot be resolved inside the approved target paths. The approved proposal allows the listed helper scratch files, selected generated helper mirrors, and `platform_tests/scripts/test_no_tracked_skill_helper_scratch.py`. The current `scripts/generate_codex_skill_adapters.py --check --update-registry` result would update these outside-scope paths:
+The cleanup is intentionally reductive: no new warning/provenance prose was added to explain stale helper artifacts. The confusing artifacts were removed, and the generator/check/test surfaces now make recurrence visible.
 
-```text
-Codex skill adapters: would update 3 file(s)
-- .codex/skills/decision-capture/helpers/__pycache__/record_decision.cpython-314.pyc
-- .codex/skills/spec-intake/helpers/__pycache__/spec_intake.cpython-314.pyc
-- config/agent-control/harness-capability-registry.toml
-```
+Implementation-start evidence:
 
-Those paths are not in the implementation packet's `target_path_globs`. The packet does authorize paths such as `.codex/skills/verify/helpers/write_verdict.py`; it does not authorize the current registry rewrite or the two currently-present generated helper cache files above. Prime Builder therefore did not run the mutating generator, delete files, add the regression test, or make partial approved-path changes.
+- Work-intent claim acquired for `gtkb-wi3459-release-skill-adapter-hygiene` as `claim_kind: go_implementation`, `acting_role: prime-builder`, session `019f09c9-2db0-7b00-a337-40f998b07e56`.
+- Implementation authorization packet created from latest `GO`: `sha256:0a7572cb9abe7a1699f5c1149bab6d423a3f2dafeba1fdd4e7e2c04e47f85f63`.
+- Packet proposal file: `bridge/gtkb-wi3459-release-skill-adapter-hygiene-001.md`.
+- Packet GO file: `bridge/gtkb-wi3459-release-skill-adapter-hygiene-002.md`.
 
 ## Specification Links
 
-- `GOV-FILE-BRIDGE-AUTHORITY-001`
-- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
-- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
-- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
-- `GOV-STANDING-BACKLOG-001`
-- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
-- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
-- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
-- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
-- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
-- `ADR-CROSS-HARNESS-PARITY-001`
-- `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001` - protected skill adapter/test files require bridge GO and implementation-start authorization.
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` - this proposal cites governing specs and maps tests to the work.
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` - this proposal carries PAUTH, project, work item, and concrete target paths.
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - post-implementation verification must map specs to executed evidence.
+- `GOV-STANDING-BACKLOG-001` - `WI-3459` is the open backlog authority for clean-tree skill adapter regeneration and parity follow-on work.
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` - implementation is bounded by the active skill-modernization PAUTH.
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` - release-blocking hygiene findings are preserved through a work item, bridge proposal, report, and verdict.
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` - scratch/verdict bodies should not masquerade as durable helper sources; durable evidence belongs in bridge artifacts.
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` - the release-blocking adapter drift finding is promoted from scratch observation into a formal implementation slice.
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001` - the work remains inside GT-KB root and does not treat Agent Red or external wiki state as implementation authority.
+- `ADR-CROSS-HARNESS-PARITY-001` - skill-surface changes must preserve cross-harness parity or declare a waiver.
+- `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001` - harness-surface proposals require an explicit Cross-Harness Disposition section.
 
 ## Owner Decisions / Input
 
-No new owner decision was requested or captured in this non-interactive auto-dispatch.
+No new owner decision is required by this implementation report.
 
-The blocker is an implementation-scope mismatch in the approved bridge packet. Forward progress requires a revised bridge path that either authorizes the actual current generator cleanup targets, including any required registry mutation coverage, or changes the implementation approach so the generator check can pass without outside-target writes. This worker cannot ask the owner interactively and did not infer new approval.
+The active project authorization `PAUTH-PROJECT-GTKB-SKILL-MODERNIZATION-SKILL-MODERNIZATION-BOUNDED-IMPLEMENTATION-2026-06-23` cites owner decision `DELIB-20265586`, includes `WI-3459`, and is active. The owner also made formal release hygiene the top priority on 2026-06-27.
 
 ## Prior Deliberations
 
-- `DELIB-20265586` - owner authorized the bounded 2026-06-23 skill-modernization implementation set.
-- `WI-3459` - open work item for skill adapter regeneration and parity follow-on work.
+- `DELIB-20265586` - owner authorized the bounded 2026-06-23 skill-modernization implementation set, including `WI-3459`.
+- Owner hygiene note, 2026-06-27 - architectural north star is minimal drift; actively clear stray noncanonical artifacts and avoid adding information that only declares other information unreliable.
 - `bridge/gtkb-wi3459-release-skill-adapter-hygiene-001.md` - approved implementation proposal carried forward.
-- `bridge/gtkb-wi3459-release-skill-adapter-hygiene-002.md` - Loyal Opposition GO verdict authorizing implementation only for the proposal target paths.
+- `bridge/gtkb-wi3459-release-skill-adapter-hygiene-002.md` - Loyal Opposition GO verdict authorizing implementation.
 
 ## Specification-Derived Verification Plan
 
 | Spec / governing surface | Executed verification evidence |
 | --- | --- |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `groundtruth-kb/.venv/Scripts/gt.exe bridge show gtkb-wi3459-release-skill-adapter-hygiene --json` reported latest `GO`; work-intent claim row `24673` was acquired; implementation packet `sha256:7d01ff10ccd512a5d8eac8188f761a31ed3ebab426a270fb8ec055307ba45c34` was created. |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene` passed with `missing_required_specs: []` and `missing_advisory_specs: []`. |
-| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | The implementation packet validated PAUTH `PAUTH-PROJECT-GTKB-SKILL-MODERNIZATION-SKILL-MODERNIZATION-BOUNDED-IMPLEMENTATION-2026-06-23`, project `PROJECT-GTKB-SKILL-MODERNIZATION`, and work item `WI-3459`. |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Not satisfied. No implementation was performed, and the proposed adapter/test evidence cannot pass while the generator requires outside-scope paths. |
-| `GOV-STANDING-BACKLOG-001` / `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | `gt projects show`, `gt backlog show WI-3459 --json`, and `gt projects authorizations PROJECT-GTKB-SKILL-MODERNIZATION --json` confirmed WI-3459 remains open under the active skill-modernization project authorization. |
-| `ADR-CROSS-HARNESS-PARITY-001` / `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001` | Not satisfied. `scripts/generate_codex_skill_adapters.py --check --update-registry` still reports three pending updates outside the approved target-path set. |
-| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | All inspected paths are under `E:\GT-KB`; no Agent Red lifecycle-independent repository or external root was used. |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `bridge_claim_cli.py claim ...` succeeded for Prime session; `implementation_authorization.py begin ...` succeeded with packet `sha256:0a7572cb9abe7a1699f5c1149bab6d423a3f2dafeba1fdd4e7e2c04e47f85f63`; bridge thread latest was `GO`. |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene` exited 0 with `preflight_passed: true`, `missing_required_specs: []`, and `missing_advisory_specs: []`. |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | Implementation authorization packet resolved the proposal PAUTH, `PROJECT-GTKB-SKILL-MODERNIZATION`, `WI-3459`, and concrete `target_path_globs`. |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | This report maps every linked governing surface to executed command evidence; focused pytest, generator, lint, and format checks all passed. |
+| `GOV-STANDING-BACKLOG-001` | `WI-3459` is the carried-forward work item on the approved bridge proposal/report and is implemented through the versioned bridge chain. |
+| `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | Packet project authorization resolved active PAUTH `PAUTH-PROJECT-GTKB-SKILL-MODERNIZATION-SKILL-MODERNIZATION-BOUNDED-IMPLEMENTATION-2026-06-23`, owner decision `DELIB-20265586`, and `work_item_id: WI-3459`. |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | The release hygiene finding is preserved as bridge proposal `-001`, GO `-002`, this implementation report `-003`, and the new regression guard. |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | New guard `platform_tests/scripts/test_no_tracked_skill_helper_scratch.py` passed and proves reusable helper directories do not retain the removed scratch/report-body artifacts in the staged commit candidate. |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | The release-blocking observation was promoted into `WI-3459` bridge evidence and a regression test rather than remaining as scratch-session knowledge. |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | All implementation paths are under `E:\GT-KB\.tmp\formal-release-main-20260627`; no Agent Red or external wiki path is used as implementation authority. |
+| `ADR-CROSS-HARNESS-PARITY-001` | `scripts/generate_codex_skill_adapters.py --check --update-registry` passed with `Codex skill adapters: PASS (37 adapters current)`. |
+| `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001` | Codex generated helper mirrors are current from canonical Claude helper sources; the proposal's Cross-Harness Disposition is satisfied without waiver. |
 
 ## Commands Run
 
-- `groundtruth-kb/.venv/Scripts/gt.exe harness roles` - PASS; harness `A` is assigned `prime-builder`.
-- `groundtruth-kb/.venv/Scripts/gt.exe bridge status` - PASS; bridge dispatch health `PASS`; selected Prime Builder candidates include `A` and `E`.
-- `groundtruth-kb/.venv/Scripts/gt.exe bridge dispatch status` - PASS; same selected candidate set.
-- `groundtruth-kb/.venv/Scripts/gt.exe bridge dispatch report` - PASS; report `PASS`; effective per-cycle ceiling `{'prime-builder': 3, 'loyal-opposition': 2}`.
-- `groundtruth-kb/.venv/Scripts/python.exe .codex/skills/bridge/helpers/show_thread_bridge.py gtkb-wi3459-release-skill-adapter-hygiene --format json --preview-lines 30` - PASS; version chain `NEW -> GO`, no drift.
-- `groundtruth-kb/.venv/Scripts/gt.exe bridge show gtkb-wi3459-release-skill-adapter-hygiene --json` - PASS; latest status `GO` at version 2.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_claim_cli.py claim gtkb-wi3459-release-skill-adapter-hygiene --session-id 2026-06-28T03-11-23Z-prime-builder-A-28ef2a --ttl-seconds 7200` - PASS; rowid `24673`.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/implementation_authorization.py begin --bridge-id gtkb-wi3459-release-skill-adapter-hygiene --session-id 2026-06-28T03-11-23Z-prime-builder-A-28ef2a --expires-minutes 60` - PASS; packet hash `sha256:7d01ff10ccd512a5d8eac8188f761a31ed3ebab426a270fb8ec055307ba45c34`.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene` - PASS; no missing required or advisory specs.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene` - PASS; zero blocking gaps.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/proposal_target_paths_coverage_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene --strict` - FAIL; reported target-path coverage gaps including `.codex/skills/**`, `.codex/skills/MANIFEST.json`, `config/agent-control/harness-capability-registry.toml`, and `scripts/generate_codex_skill_adapters.py`.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py --check --update-registry` - FAIL as a read-only check; would update three files listed in the implementation claim.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/implementation_authorization.py validate --target .codex/skills/verify/helpers/write_verdict.py` - PASS; this approved target is authorized.
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/implementation_authorization.py validate --target config/agent-control/harness-capability-registry.toml` - FAILED before an authorization verdict because existing named-packet validation hit an unrelated non-UTF-8 historical bridge file. The current WI-3459 packet was inspected directly and does not list this target.
-- `git ls-files '*__pycache__*'` - PASS command; no tracked `__pycache__` paths are currently listed.
-- `Test-Path` checks confirmed `.codex/skills/decision-capture/helpers/__pycache__/record_decision.cpython-314.pyc` and `.codex/skills/spec-intake/helpers/__pycache__/spec_intake.cpython-314.pyc` currently exist as untracked/generated files.
+```powershell
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe scripts\bridge_claim_cli.py claim gtkb-wi3459-release-skill-adapter-hygiene --session-id 019f09c9-2db0-7b00-a337-40f998b07e56 --ttl-seconds 7200 --project-root E:\GT-KB\.tmp\formal-release-main-20260627
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe scripts\implementation_authorization.py --project-root E:\GT-KB\.tmp\formal-release-main-20260627 begin --bridge-id gtkb-wi3459-release-skill-adapter-hygiene --session-id 019f09c9-2db0-7b00-a337-40f998b07e56
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe scripts\generate_codex_skill_adapters.py --update-registry
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe scripts\generate_codex_skill_adapters.py --check --update-registry
+$env:GIT_CONFIG_COUNT='1'; $env:GIT_CONFIG_KEY_0='safe.directory'; $env:GIT_CONFIG_VALUE_0='E:/GT-KB/.tmp/formal-release-main-20260627'; E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_no_tracked_skill_helper_scratch.py platform_tests\scripts\test_no_tracked_pyc_artifacts.py -q --tb=short
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_generate_codex_skill_adapters.py -q --tb=short
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe -m ruff check platform_tests\scripts\test_no_tracked_skill_helper_scratch.py
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check platform_tests\scripts\test_no_tracked_skill_helper_scratch.py
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe scripts\bridge_applicability_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene
+E:\GT-KB\groundtruth-kb\.venv\Scripts\python.exe scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-wi3459-release-skill-adapter-hygiene
+```
 
 ## Observed Results
 
-The selected bridge entry is valid and Prime-actionable, but the implementation cannot be completed without crossing the approved target-path envelope. The decisive read-only generator check still fails:
-
-```text
-Codex skill adapters: would update 3 file(s)
-- .codex/skills/decision-capture/helpers/__pycache__/record_decision.cpython-314.pyc
-- .codex/skills/spec-intake/helpers/__pycache__/spec_intake.cpython-314.pyc
-- config/agent-control/harness-capability-registry.toml
-```
-
-The approved target list includes `.codex/skills/decision-capture/helpers/record_decision.py` and `.codex/skills/spec-intake/helpers/spec_intake.py`, but not their `__pycache__` children. It also omits `config/agent-control/harness-capability-registry.toml`. The proposal's current acceptance criteria therefore cannot be satisfied without either target-path expansion or a different current-state cleanup strategy.
+- Work-intent claim: exit 0; acquired `go_implementation` claim, `acting_role: prime-builder`, `rowid: 24660`.
+- Implementation authorization: exit 0; latest status `GO`; packet hash `sha256:0a7572cb9abe7a1699f5c1149bab6d423a3f2dafeba1fdd4e7e2c04e47f85f63`; PAUTH active for `WI-3459`.
+- Adapter generation: exit 0; updated 18 Codex helper/mirror/orphan paths.
+- Adapter check: exit 0; `Codex skill adapters: PASS (37 adapters current)`.
+- Helper scratch/cache tests: exit 0; `4 passed`. Pytest emitted a cache-warning only about `.pytest_cache`; no test failure.
+- Generator tests: exit 0; `27 passed`. Pytest emitted a cache-warning only about `.pytest_cache`; no test failure.
+- Ruff lint: exit 0; `All checks passed!`.
+- Ruff format: exit 0; `1 file already formatted`.
+- Applicability preflight: exit 0; `preflight_passed: true`, `missing_required_specs: []`, `missing_advisory_specs: []`. It warned that the approved deleted `__pycache__` target path is missing, which is expected after the cleanup.
+- ADR/DCL clause preflight: exit 0; `Evidence gaps in must_apply clauses: 0`, `Blocking gaps (gate-failing): 0`.
 
 ## Files Changed
 
-No approved source, helper, generated adapter, configuration, or test implementation files were changed by this attempt.
-
-This bridge audit file is the only intended project artifact from the blocked attempt.
-
-The broader repository already had unrelated dirty state before this dispatch; it was left untouched.
+- Deleted `.claude/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-body.md`.
+- Deleted `.claude/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-draft.md`.
+- Deleted `.claude/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-final.md`.
+- Deleted `.claude/skills/verify/helpers/gtkb-wi4761-restore-ci-testing-integration-health-014-body.md`.
+- Regenerated `.codex/skills/bridge-propose/helpers/write_bridge.py`.
+- Deleted `.codex/skills/bridge/helpers/draft-4676-verdict.md`.
+- Deleted `.codex/skills/bridge/helpers/draft-4678-verdict.md`.
+- Regenerated `.codex/skills/bridge/helpers/impl_report_bridge.py`.
+- Regenerated `.codex/skills/bridge/helpers/revise_bridge.py`.
+- Regenerated `.codex/skills/bridge/helpers/show_thread_bridge.py`.
+- Regenerated `.codex/skills/decision-capture/helpers/record_decision.py`.
+- Regenerated `.codex/skills/spec-intake/helpers/spec_intake.py`.
+- Deleted `.codex/skills/verify/helpers/_temp_verdict_gtkb-target-paths-coverage-preflight-006.md`.
+- Deleted `.codex/skills/verify/helpers/draft-gtkb-wi4678-finalization-git-write-retry-002.md`.
+- Deleted `.codex/skills/verify/helpers/draft-gtkb-wi4678-git-write-finalization-002.md`.
+- Deleted `.codex/skills/verify/helpers/draft-verdict-gtkb-reconcile-included-work-item-ids-semantics-011.md`.
+- Deleted `.codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-body.md`.
+- Deleted `.codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-draft.md`.
+- Deleted `.codex/skills/verify/helpers/gtkb-remove-orphaned-bridge-authority-direction-switch-004-final.md`.
+- Deleted `.codex/skills/verify/helpers/gtkb-wi4761-restore-ci-testing-integration-health-014-body.md`.
+- Regenerated `.codex/skills/verify/helpers/write_verdict.py`.
+- Added `bridge/gtkb-wi3459-release-skill-adapter-hygiene-001.md`.
+- Added `bridge/gtkb-wi3459-release-skill-adapter-hygiene-002.md`.
+- Added `platform_tests/scripts/test_no_tracked_skill_helper_scratch.py`.
 
 ## Recommended Commit Type
 
-- Recommended commit type: `fix:` after the scope mismatch is corrected and the actual WI-3459 implementation is completed.
-- No implementation commit is ready from this blocked attempt.
+- Recommended commit type: `fix:`
+- Diff-stat justification: This repairs a release-blocking adapter drift gate and removes stale helper scratch artifacts. The new test is a recurrence guard for the repaired defect rather than a new user-facing capability.
 
 ## Acceptance Criteria Status
 
-- [ ] `scripts/generate_codex_skill_adapters.py --check --update-registry` exits 0 - BLOCKED by outside-scope generator drift.
-- [ ] No tracked `.claude/skills/**/helpers` or `.codex/skills/**/helpers` file matches scratch/verdict-body patterns - NOT CHANGED.
-- [ ] No tracked `.pyc` or `__pycache__` artifact exists - the read-only tracked-file check currently found none, but the generator still sees untracked cache files that it would delete outside the approved target list.
-- [ ] Codex adapter helper mirrors remain current - NOT PROVEN; generator check fails.
-- [ ] New focused helper-scratch regression test passes - NOT CREATED because the implementation was stopped before partial edits.
+- `scripts/generate_codex_skill_adapters.py --check --update-registry` exits 0: satisfied.
+- No tracked `.claude/skills/**/helpers` or `.codex/skills/**/helpers` file matches the scratch/verdict-body patterns named in the proposal: satisfied by `test_no_tracked_skill_helper_scratch.py`.
+- No tracked `.pyc` or `__pycache__` artifact exists: satisfied by `test_no_tracked_pyc_artifacts.py`.
+- Codex adapter helper mirrors remain byte-for-byte current with mirrorable canonical helper files: satisfied by adapter check and `test_generate_codex_skill_adapters.py`.
+- The release worktree remains clean after the implementation commit except for subsequent intentional release work: pending final `VERIFIED` commit-finalization transaction.
 
 ## Risk And Rollback
 
-Risk is unchanged from before this attempt: the release-candidate adapter check remains failing, and the approved WI-3459 cleanup cannot complete from this bridge packet as written. No implementation rollback is needed because no approved target implementation files were modified. The bridge audit trail is append-only.
+Residual risk is low. The deleted files are completed bridge/verdict working artifacts, not stable helper APIs, and the generated Codex helper changes came from the existing adapter generator. Rollback is a single revert of the eventual finalization commit; that would restore the release-blocking adapter drift and helper scratch artifacts.
 
 ## Loyal Opposition Asks
 
-1. Treat this as a blocked implementation attempt, not a completed implementation request.
-2. Return `NO-GO` or the appropriate bridge disposition recording that the current GO target paths are insufficient for the observed generator cleanup.
-3. Recommend whether Prime Builder should file a revised scope that includes the actual generator drift targets and any required registry mutation authorization, or first clear the untracked cache files through another already-authorized hygiene path.
+1. Verify that the implementation stayed inside the WI-3459 `GO` target set.
+2. Verify that the adapter generator gate and scratch/cache regression tests prove the release-blocking drift is cleared.
+3. Return `VERIFIED` through the commit-finalization helper if satisfied; otherwise return `NO-GO` with concrete path-specific findings.
 
-File bridge scan contribution: 1 entry processed.
-
----
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
