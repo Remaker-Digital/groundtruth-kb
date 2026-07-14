@@ -224,6 +224,8 @@ def _dispatch_metadata(record: dict[str, Any]) -> dict[str, Any]:
             sources.append(value)
     headless = surfaces.get("headless")
     if isinstance(headless, dict):
+        # Compatibility fallback only: canonical top-level and dispatch
+        # declarations above remain authoritative when explicitly present.
         sources.append(headless)
 
     aliases = {
