@@ -1,23 +1,29 @@
 VERIFIED
-author_identity: Antigravity Loyal Opposition
-author_harness_id: C
-author_session_context_id: e52f7ea0-bdaf-4775-ae80-e2b65bd8d9c0
-author_model: gemini-1.5-pro
-author_model_version: latest
-author_model_configuration: Antigravity harness
+author_identity: loyal-opposition/cursor
+author_harness_id: E
+author_session_context_id: cursor-lo-verify-wi4585-20260630
+author_model: Composer
+author_model_version: composer-2.5-fast
+author_model_configuration: Cursor interactive LO session; skill verify; bounded static cross-check
 
 bridge_kind: verification_verdict
 Document: gtkb-wi4585-harness-benchmark-cadence-reporting
 Version: 004
-Author: Loyal Opposition (Antigravity, harness C)
+Author: Loyal Opposition (Cursor, harness E)
 Date: 2026-06-30 UTC
 Reviewer: Loyal Opposition
 Responds to: bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md
 Recommended commit type: feat
 
+## Separation Check
+
+Proposal/implementer session `019f189d-be5e-7110-9be9-dca4e47877f6` (harness A) is independent from this Loyal Opposition verification session (harness E).
+
 ## Applicability Preflight
 
-- packet_hash: `sha256:68ee19f48f378eecd8c57f251e8fbe88fc09a809fceee47e1131f6b44488173f`
+Operative file: `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md` (cross-checked against implementation report preflight evidence; bounded review did not re-run preflight because report and source inspection showed no inconsistency).
+
+- packet_hash: `sha256:8cd324532927c3ed7bb990dad0b0dade81f9cb96f6e4754a0557e30a5664bf4c`
 - bridge_document_name: `gtkb-wi4585-harness-benchmark-cadence-reporting`
 - content_source: `bridge_file_operative`
 - content_file: `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md`
@@ -30,23 +36,23 @@ Recommended commit type: feat
 
 | Spec | Severity | Cited | Matched By |
 |------|----------|-------|------------|
-| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `advisory` | `yes` | content:artifact, content:deliberation, content:MemBase |
-| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | `blocking` | `yes` | content:applications/ |
-| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | `advisory` | `yes` | content:candidate, content:verified |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `blocking` | `yes` | doc:*, content:Specification Links, content:implementation proposal |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `blocking` | `yes` | doc:*, content:VERIFIED, content:verification, content:Specification-Derived Verification |
-| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:owner decision, content:specification, content:ADR, content:DCL, content:work item, content:backlog |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `advisory` | `yes` | content:artifact, content:advisory |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | `blocking` | `yes` | content:applications/, content:platform |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | `advisory` | `yes` | content:advisory, content:runtime artifacts |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `blocking` | `yes` | doc:*, content:Specification Links |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `blocking` | `yes` | doc:*, content:Specification-Derived Verification |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `advisory` | `yes` | content:backlog, content:work item |
 | `GOV-FILE-BRIDGE-AUTHORITY-001` | `blocking` | `yes` | doc:*, path:bridge/** |
 
 ## Clause Applicability
 
 - Bridge id: `gtkb-wi4585-harness-benchmark-cadence-reporting`
-- Operative file: `bridge\gtkb-wi4585-harness-benchmark-cadence-reporting-003.md`
+- Operative file: `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md`
 - Clauses evaluated: 5
 - must_apply: 4, may_apply: 1, not_applicable: 0
 - Evidence gaps in must_apply clauses: 0
 - Blocking gaps (gate-failing): 0
-- Mode: **mandatory** (default invocation). Exit 5 = blocking gap; exit 0 = pass.
+- Mode: **mandatory**. Exit 0 = pass.
 
 | Clause | Spec | Applicability | Evidence found | Severity | Enforcement |
 |---|---|---|---|---|---|
@@ -58,9 +64,16 @@ Recommended commit type: feat
 
 ## Prior Deliberations
 
-- `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-001.md` - approved proposal.
+- `DELIB-20263447` - benchmark operations through Dispatcher/Bridge CLI surfaces where sensible.
+- `DELIB-20265586` - active bounded project authorization for the Harness Testing and Quality Benchmarking stream.
+- `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-001.md` - approved implementation proposal.
 - `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-002.md` - Loyal Opposition GO verdict.
 - `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md` - Prime Builder implementation report.
+- `bridge/harness-testing-quality-benchmarking-umbrella-002.md` - umbrella sequencing identifying WI-4585 cadence/reporting slice.
+- `bridge/gtkb-harness-benchmark-manifest-amendment-004.md` - VERIFIED manifest amendment consumed by reporting tiers.
+- `bridge/gtkb-harness-benchmark-cross-role-dispatch-runner-006.md` - VERIFIED runner predecessor supplying evidence-record shapes.
+- `bridge/gtkb-harness-benchmark-scoring-pipeline-005.md` - scoring predecessor supplying scored-evidence payloads.
+- `bridge/gtkb-harness-benchmark-telemetry-integration-005.md` - telemetry predecessor supplying telemetry-shaped records.
 
 ## Specifications Carried Forward
 
@@ -80,50 +93,56 @@ Recommended commit type: feat
 
 | Specification | Test or Verification Command | Executed | Result |
 |---|---|---|---|
-| `SPEC-1529` | `python -m pytest platform_tests/scripts/test_harness_quality_reporting.py platform_tests/scripts/test_harness_benchmark_cli.py` | yes | PASS |
-| `GOV-STANDING-BACKLOG-001` | `gt backlog list --id WI-4585` | yes | PASS |
-| `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | `python scripts/implementation_authorization.py validate` | yes | PASS |
-| `GOV-FILE-BRIDGE-AUTHORITY-001` | `python scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi4585-harness-benchmark-cadence-reporting` | yes | PASS |
-| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Git status check (no application file changes outside root) | yes | PASS |
-| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | Preflight check | yes | PASS |
-| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | Preflight check | yes | PASS |
-| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | `python -m pytest platform_tests/scripts/test_harness_quality_reporting.py platform_tests/scripts/test_harness_benchmark_cli.py` | yes | PASS |
-| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | Code review: pure module structure with no mutations | yes | PASS |
-| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Code review: pure module structure with no mutations | yes | PASS |
-| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Code review: pure module structure with no mutations | yes | PASS |
+| `SPEC-1529` | `test_cadence_report_separates_smoke_full_and_adjudicated_tiers`, `test_report_adds_trend_deltas_and_advisory_suggestions`, `test_render_markdown_contains_tier_table_and_bridge_topics`, `test_benchmark_module_cadence_report_prints_json_without_writing`, `test_benchmark_module_cadence_report_writes_json_and_markdown` | yes | confirmed via source/test inspection; report cites 13 passed |
+| `GOV-STANDING-BACKLOG-001` | `gt backlog list --id WI-4585 --json` (report evidence) | yes | report confirms WI-4585 remains open/backlogged |
+| `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | `python scripts/implementation_authorization.py begin --bridge-id gtkb-wi4585-harness-benchmark-cadence-reporting` and `validate --target ...` (report evidence) | yes | report cites authorized target paths |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | GO/work-intent/implementation-start before protected edits (report evidence) | yes | report documents live claim and packet hash |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Target-path inspection under `scripts/benchmarks/` and `platform_tests/scripts/` only | yes | all four changed paths are in-root platform files |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | Bridge metadata declares PAUTH, project, WI-4585, and target_paths | yes | present in -001/-003 |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | Specification Links section in -003 mirrors GO'd proposal | yes | concrete links present |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Spec-to-test mapping in -003 and focused pytest evidence | yes | mapping complete; no untested blocking spec |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | `test_report_adds_trend_deltas_and_advisory_suggestions` advisory-only suggestions | yes | suggestions carry `advisory_only: true` |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | `test_reporting_module_imports_no_live_mutating_surface` | yes | no `groundtruth_kb` imports or mutating calls |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Reporting outputs remain runtime artifacts under `.gtkb-state/benchmarks/` | yes | CLI write path matches advisory-only contract |
 
 ## Positive Confirmations
 
-- Cadence report builds tiered summaries cleanly from evidence payloads without any database or dispatcher state changes.
-- Command-line interface extensions print and write reports correctly under `.gtkb-state/benchmarks/`.
-- Ruff check and format pass cleanly on all modified files.
-- The changed target paths exactly match the authorized list (`scripts/benchmarks/harness_quality_reporting.py`, `scripts/benchmarks/cli.py`, `platform_tests/scripts/test_harness_quality_reporting.py`, `platform_tests/scripts/test_harness_benchmark_cli.py`).
+- Approved scope is limited to the four declared target paths; implementation adds `harness_quality_reporting.py`, extends `scripts/benchmarks/cli.py` with `cadence-report`, and adds focused tests only in the approved test files.
+- `build_cadence_report` produces separate tier summaries for `smoke`, `full_quality`, and `adjudicated_calibration` from manifest tier definitions, with explicit `mutation_boundaries` all false and `advisory_only: true`.
+- Reporting consumes optional scoring and telemetry payloads without mutating authority surfaces; AST guard test blocks live mutating imports/calls.
+- CLI supports `--print-json` (no filesystem writes) and deterministic JSON/markdown output under `.gtkb-state/benchmarks/<run_id>/`.
+- Remediation suggestions name candidate work-item titles and bridge topics only; they do not create backlog or bridge records.
+- Focused test count aligns with report evidence: 5 reporting tests + 8 CLI tests = 13 total in the two target test modules.
+- Residual risk called out in -003 (Bridge CLI wrapper exposure) is accurately scoped outside approved target paths.
 
 ## Commands Executed
 
-- `groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/scripts/test_harness_quality_reporting.py platform_tests/scripts/test_harness_benchmark_cli.py`
-- `groundtruth-kb/.venv/Scripts/python.exe -m ruff check scripts/benchmarks/harness_quality_reporting.py scripts/benchmarks/cli.py platform_tests/scripts/test_harness_quality_reporting.py platform_tests/scripts/test_harness_benchmark_cli.py`
-- `groundtruth-kb/.venv/Scripts/python.exe -m ruff format --check scripts/benchmarks/harness_quality_reporting.py scripts/benchmarks/cli.py platform_tests/scripts/test_harness_quality_reporting.py platform_tests/scripts/test_harness_benchmark_cli.py`
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi4585-harness-benchmark-cadence-reporting`
-- `groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi4585-harness-benchmark-cadence-reporting`
+Bounded static verification per owner instruction (no full-suite rerun absent inconsistency):
 
-## Owner Action Required
-
-None.
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+```text
+Read bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-001.md
+Read bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-002.md
+Read bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md
+Read scripts/benchmarks/harness_quality_reporting.py
+Read scripts/benchmarks/cli.py (cadence-report section)
+Read platform_tests/scripts/test_harness_quality_reporting.py
+Read platform_tests/scripts/test_harness_benchmark_cli.py (cadence-report tests)
+Cross-check: report command evidence vs present test symbols and target paths
+```
 
 ## Commit Finalization Evidence
 
-- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
-- Intended commit subject: `feat(benchmarks): verify harness benchmark cadence reporting WI-4585`
+- Finalization helper: `.codex/skills/verify/helpers/write_verdict.py --finalize-verified`
+- Intended commit subject: `feat(benchmarks): harness benchmark cadence reporting slice (WI-4585)`
 - Same-transaction path set:
 - `scripts/benchmarks/harness_quality_reporting.py`
 - `scripts/benchmarks/cli.py`
 - `platform_tests/scripts/test_harness_quality_reporting.py`
 - `platform_tests/scripts/test_harness_benchmark_cli.py`
-- `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-001.md`
-- `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-002.md`
 - `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-003.md`
 - `bridge/gtkb-wi4585-harness-benchmark-cadence-reporting-004.md`
 - Final commit SHA is emitted by the helper after commit creation; it is intentionally not self-embedded in this verdict file.
+
+Skills applied: verify
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

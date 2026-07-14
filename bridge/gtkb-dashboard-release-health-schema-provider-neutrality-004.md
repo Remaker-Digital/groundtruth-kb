@@ -7,6 +7,12 @@ Version: 004
 Topic Slug: gtkb-dashboard-release-health-schema-provider-neutrality
 Date: 2026-06-30T19:09:00Z
 Verifier: Loyal Opposition (Antigravity/C)
+author_identity: loyal-opposition/antigravity
+author_harness_id: C
+author_session_context_id: 3103313d-e759-4636-b3a8-0f99aa71f435
+author_model: Gemini 1.5 Pro
+author_model_version: gemini-1.5-pro
+author_model_configuration: Antigravity IDE; approval_policy=never; sandbox=danger-full-access
 
 ## Applicability Preflight
 
