@@ -63,7 +63,26 @@ def envelope_open_cmd(
     json_output: bool,
 ) -> None:
     """Open a current per-harness session-envelope file."""
-    from groundtruth_kb.session.envelope import open_session
+    from groundtruth_kb.session.envelope import open_session, parse_canonical_init_keyword
+
+    parsed_keyword = parse_canonical_init_keyword(init_keyword) if init_keyword is not None else None
+    if init_keyword is not None and parsed_keyword is None:
+        raise click.ClickException("--init-keyword must use the exact canonical session-init grammar.")
+
+    parsed_role = parsed_keyword["role"] if parsed_keyword is not None else None
+    parsed_subject = parsed_keyword["subject"] if parsed_keyword is not None else None
+    if role is not None:
+        if parsed_role is None:
+            raise click.ClickException("--role requires a canonical role-bearing --init-keyword.")
+        if role != parsed_role:
+            raise click.ClickException("--role conflicts with the role asserted by --init-keyword.")
+    elif parsed_role is not None:
+        role = parsed_role
+
+    if subject is not None and parsed_subject is not None and subject != parsed_subject:
+        raise click.ClickException("--subject conflicts with the subject asserted by --init-keyword.")
+    if subject is None and parsed_subject is not None:
+        subject = parsed_subject
 
     config = _resolve_config(ctx)
     envelope = open_session(
@@ -74,6 +93,7 @@ def envelope_open_cmd(
         subject=subject,
         role=role,
         active_work_item_id=active_work_item_id,
+        worker_role_source="transcript_init_keyword" if parsed_role is not None else None,
     )
     if json_output:
         click.echo(json.dumps(envelope, indent=2, sort_keys=True))

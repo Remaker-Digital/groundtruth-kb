@@ -32,6 +32,11 @@ TOPIC_TYPES = ("ops", "deliberation", "build", "test", "spec", "project")
 GIT_STATUS_SHORT_LINE_LIMIT = 80
 WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
 _SAFE_SESSION_DOCUMENT_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+_CANONICAL_INIT_KEYWORD = re.compile(r"::init (gtkb|application)(?: (pb|lo))?")
+_CANONICAL_ROLE_BY_TOKEN = {
+    "pb": "prime-builder",
+    "lo": "loyal-opposition",
+}
 
 ROUTE_TARGETS = {
     "ops": "operations-status-decision-service",
@@ -106,6 +111,20 @@ MANDATORY_WRAP_STEPS = (1, 4, 8, 11, 12)
 
 class EnvelopeError(RuntimeError):
     """Raised when the session envelope cannot be updated safely."""
+
+
+def parse_canonical_init_keyword(value: str | None) -> dict[str, str | None] | None:
+    """Parse the exact canonical session-init grammar without normalization."""
+    if not isinstance(value, str):
+        return None
+    match = _CANONICAL_INIT_KEYWORD.fullmatch(value)
+    if match is None:
+        return None
+    subject, role_token = match.groups()
+    return {
+        "subject": subject,
+        "role": _CANONICAL_ROLE_BY_TOKEN.get(role_token),
+    }
 
 
 def utc_now_iso() -> str:

@@ -18,6 +18,7 @@ from groundtruth_kb.session.envelope import (
     load_current,
     open_session,
     open_topic,
+    parse_canonical_init_keyword,
     resolve_worker_role_provenance,
     worker_session_envelope_path,
 )
@@ -52,6 +53,46 @@ def _seed_harness(root: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+@pytest.mark.parametrize(
+    ("keyword", "subject", "role"),
+    [
+        ("::init gtkb", "gtkb", None),
+        ("::init gtkb pb", "gtkb", "prime-builder"),
+        ("::init gtkb lo", "gtkb", "loyal-opposition"),
+        ("::init application", "application", None),
+        ("::init application pb", "application", "prime-builder"),
+        ("::init application lo", "application", "loyal-opposition"),
+    ],
+)
+def test_canonical_init_keyword_parser_accepts_exact_six_form_grammar(
+    keyword: str,
+    subject: str,
+    role: str | None,
+) -> None:
+    assert parse_canonical_init_keyword(keyword) == {"subject": subject, "role": role}
+
+
+@pytest.mark.parametrize(
+    "keyword",
+    [
+        None,
+        "",
+        " ::init gtkb pb",
+        "::init gtkb pb ",
+        "::init  gtkb pb",
+        "::init gtkb  pb",
+        "::init GTKB pb",
+        "::init gtkb prime-builder",
+        "::init project pb",
+        "::init gtkb pb extra",
+        "::init gtkb pb\n",
+        "::init gtkb pb\nnext",
+    ],
+)
+def test_canonical_init_keyword_parser_rejects_noncanonical_forms(keyword: str | None) -> None:
+    assert parse_canonical_init_keyword(keyword) is None
 
 
 def test_role_dcl_a6_explicit_role_is_preserved_against_registry_fallback(tmp_path: Path) -> None:
