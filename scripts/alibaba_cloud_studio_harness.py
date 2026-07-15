@@ -64,6 +64,7 @@ _ALIBABA_PROFILE = base.AdopterProfile(
     hook_tier=base.HOOK_TIER_NATIVE_FULL,
     auth_style=base.AUTH_STYLE_AUTHORIZATION_BEARER,
     publish_bridge_verdict_tool=True,
+    force_anthropic_publisher_tool_choice=False,
 )
 
 

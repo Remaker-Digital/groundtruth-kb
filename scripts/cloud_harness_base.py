@@ -292,6 +292,7 @@ class AdopterProfile:
     anthropic_version: str = DEFAULT_ANTHROPIC_VERSION
     max_tokens: int = DEFAULT_ANTHROPIC_MAX_TOKENS
     publish_bridge_verdict_tool: bool = False
+    force_anthropic_publisher_tool_choice: bool = True
 
     def __post_init__(self) -> None:
         if self.dialect not in SUPPORTED_DIALECTS:
@@ -304,6 +305,8 @@ class AdopterProfile:
             raise CloudHarnessError(
                 f"unknown auth_style {self.auth_style!r}; expected one of {sorted(SUPPORTED_AUTH_STYLES)}"
             )
+        if type(self.force_anthropic_publisher_tool_choice) is not bool:
+            raise CloudHarnessError("force_anthropic_publisher_tool_choice must be a bool")
         # Slice 2 direct-cloud invariant (SPEC-INTAKE-9ec893): an adopter must declare a
         # direct-cloud endpoint; the base has no local-service bridge path.
         if not self.default_endpoint or not str(self.default_endpoint).strip():
@@ -2284,6 +2287,7 @@ def run_tool_loop(
                 publisher_only_recovery
                 and profile.dialect == DIALECT_ANTHROPIC_MESSAGES
                 and active_tools == (PUBLISH_BRIDGE_VERDICT_TOOL,)
+                and profile.force_anthropic_publisher_tool_choice
             ):
                 payload["tool_choice"] = {"type": "any"}
 

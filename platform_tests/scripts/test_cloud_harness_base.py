@@ -1137,6 +1137,66 @@ def test_profile_rejects_unknown_auth_style() -> None:
         _profile(auth_style="oauth2")
 
 
+@pytest.mark.parametrize("value", [0, 1, "false", None])
+def test_profile_rejects_non_boolean_anthropic_publisher_tool_choice(value: object) -> None:
+    with pytest.raises(base.CloudHarnessError, match="force_anthropic_publisher_tool_choice must be a bool"):
+        _profile(force_anthropic_publisher_tool_choice=value)
+
+
+def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-anthropic-default")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            assert "tool_choice" not in payload
+            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
+        if len(payloads) == 2:
+            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            assert payload["tool_choice"] == {"type": "any"}
+            return {
+                "model": route.model_id,
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "publish_default",
+                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                        "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                    }
+                ],
+            }
+        assert "tool_choice" not in payload
+        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
+
+    assert (
+        base.run_tool_loop(
+            "review",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            3,
+            root,
+            _anthropic_profile(),
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "published"
+    )
+
+
 def test_profile_accepts_native_full_hooks_tier() -> None:
     profile = _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL)
     assert profile.hook_tier == base.HOOK_TIER_NATIVE_FULL

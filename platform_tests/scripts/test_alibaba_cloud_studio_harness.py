@@ -131,6 +131,7 @@ def test_run_tool_loop_delegates_profile_and_native_hook_runner(
         "skill": "bridge-review",
     }
     assert captured["profile"].publish_bridge_verdict_tool is True
+    assert captured["profile"].force_anthropic_publisher_tool_choice is False
 
 
 def test_bridge_review_prompt_requires_governed_verdict_tool(tmp_path: Path) -> None:
@@ -405,7 +406,7 @@ def test_alibaba_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypat
             return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
         if len(payloads) == 2:
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["tool_choice"] == {"type": "any"}
+            assert "tool_choice" not in payload
             return {
                 "model": route.model_id,
                 "content": [
@@ -482,7 +483,7 @@ def test_alibaba_loop_rejects_mixed_publisher_recovery_turn_atomically(
             assert "tool_choice" not in payload
             return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
         if len(payloads) == 2:
-            assert payload["tool_choice"] == {"type": "any"}
+            assert "tool_choice" not in payload
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
             return {
                 "model": route.model_id,
@@ -492,7 +493,7 @@ def test_alibaba_loop_rejects_mixed_publisher_recovery_turn_atomically(
                 ],
             }
         if len(payloads) == 3:
-            assert payload["tool_choice"] == {"type": "any"}
+            assert "tool_choice" not in payload
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
             assert "publisher-only recovery rejected non-publisher tool call(s): Read" in str(payload["messages"])
             return {"model": route.model_id, "content": [publisher_block("publish_valid")]}
