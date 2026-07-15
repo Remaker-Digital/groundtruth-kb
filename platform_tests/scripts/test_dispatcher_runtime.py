@@ -183,17 +183,10 @@ def _frozen_pending_signature(items: list[object]) -> str:
 
 
 def _frozen_selected_items_for_prompt(items: list[object], max_items: int) -> list[object]:
-    """Frozen byte-identical reference for the retired smart-poller's
-    ``_selected_items_for_prompt`` (Slice 4 D7).
-
-    Source: ``archive/smart-poller-2026-05-09/groundtruth-kb/scripts/bridge_poller_runner.py``
-    lines 262-266 (function ``_selected_items_for_prompt``). INDEX is
-    newest-first; bridge work should be processed oldest-first, so reverse
-    then cap.
-    """
+    """Frozen reference for selecting the capped actionable queue head."""
     if max_items <= 0:
         return []
-    return list(reversed(items))[:max_items]
+    return items[:max_items]
 
 
 def _load_trigger() -> ModuleType:
@@ -437,7 +430,7 @@ def _index_with_one_new(root: Path, doc: str = "example-thread") -> str:
 
 
 def _index_with_new_threads(root: Path, docs: list[str]) -> str:
-    """Build a newest-first INDEX with multiple NEW entries."""
+    """Build an INDEX with multiple NEW entries in queue order."""
     lines = ["# bridge index", ""]
     for doc in docs:
         _write_bridge_file(root, f"{doc}-001.md")
@@ -1868,6 +1861,20 @@ def test_default_max_items_matches_smart_poller_default_cap(tmp_path: Path) -> N
     assert trigger.DEFAULT_MAX_ITEMS == 2
 
 
+def test_selected_oldest_first_preserves_actionable_queue_order() -> None:
+    """WI-5233: actionable bridge items are already oldest-first."""
+    trigger = _load_trigger()
+    items = [
+        SimpleNamespace(document_name="oldest-thread", top_status="NEW", top_file="bridge/oldest-thread-001.md"),
+        SimpleNamespace(document_name="middle-thread", top_status="NEW", top_file="bridge/middle-thread-001.md"),
+        SimpleNamespace(document_name="newest-thread", top_status="NEW", top_file="bridge/newest-thread-001.md"),
+    ]
+
+    selected = trigger._selected_oldest_first(items, 2)
+
+    assert [item.document_name for item in selected] == ["oldest-thread", "middle-thread"]
+
+
 def test_ollama_lo_dispatch_caps_selected_batch_to_one(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1907,6 +1914,74 @@ def test_ollama_lo_dispatch_caps_selected_batch_to_one(
     command_head = summary["results"]["loyal-opposition"]["command_head"]
     assert command_head[0] == "ollama-harness"
     assert command_head[1].startswith("::init gtkb lo\n")
+
+
+def test_dispatch_config_max_items_overlay_caps_ranked_target_without_headless_cap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WI-5233: ranked config caps must survive target resolution."""
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    rules_dir = root / "config" / "dispatcher"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "rules.toml").write_text(
+        """
+schema_version = 1
+selection_order = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+
+[harnesses.D]
+max_items = 1
+
+[[rules]]
+id = "bridge-loyal-opposition-quality-first"
+required_roles = ["loyal-opposition"]
+statuses = ["NEW", "REVISED"]
+prefer = ["quality", "cost", "availability", "reviewer_precedence", "harness_id"]
+""".lstrip(),
+        encoding="utf-8",
+    )
+    _write_registry(
+        root,
+        [
+            _rec(
+                "D",
+                "ollama",
+                ["loyal-opposition"],
+                "active",
+                {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}},
+                can_receive_dispatch=True,
+                reviewer_precedence=10,
+                dispatch_quality=90,
+                dispatch_cost=30,
+                dispatch_availability=95,
+            ),
+            _rec("B", "claude", ["prime-builder"], "active", _CLAUDE_INVOCATION_SURFACES),
+        ],
+    )
+    _index_with_new_threads(root, ["oldest-thread", "middle-thread", "newest-thread"])
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger, "_evaluate_ollama_dispatch_readiness", lambda _root: {"ready": True})
+
+    from groundtruth_kb.bridge.detector import parse_index  # type: ignore
+    from groundtruth_kb.bridge.notify import compute_actionable_pending  # type: ignore
+
+    parse_result = parse_index(trigger._read_bridge_state_live(root), project_root=root)
+    _, lo_items = compute_actionable_pending(parse_result, project_root=root)
+    assert len(lo_items) == 3
+    expected_first = lo_items[0].document_name
+    expected_second = lo_items[1].document_name
+
+    summary = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, max_items=2, dry_run=True)
+
+    rec = summary["dispatch_state"]["recipients"]["loyal-opposition"]
+    assert rec["pending_count"] == 3
+    assert rec["selected_count"] == 1
+    command_head = summary["results"]["loyal-opposition"]["command_head"]
+    prompt = command_head[1]
+    assert "Selected entries, oldest-first, capped at 1:" in prompt
+    assert f"- NEW {expected_first} bridge/{expected_first}-001.md" in prompt
+    assert expected_second not in prompt
 
 
 def test_ranked_lo_targets_after_exhausted_batch_clear_stale_state(
@@ -4842,15 +4917,16 @@ def test_worker_lifetime_profile_prefers_harness_env_override(monkeypatch: pytes
         },
     )
 
-    monkeypatch.setenv("GTKB_WORKER_LIFETIME_HARNESS_B_SECONDS", "4200")
+    monkeypatch.setenv("GTKB_WORKER_LIFETIME_HARNESS_B_SECONDS", "4800")
 
     profile = trigger.worker_lifetime_profile(target)
 
-    assert profile["seconds"] == 4200
+    assert profile["seconds"] == 4800
     assert profile["source"] == "env:GTKB_WORKER_LIFETIME_HARNESS_B_SECONDS"
-    assert profile["role_fallback_seconds"] == 29400
+    assert profile["role_fallback_seconds"] == 4200
     assert profile["model_hint"] == "opus-4.8"
     assert trigger._document_lease_ttl_seconds("loyal-opposition", lifetime_seconds=4200) == 4500
+    assert trigger.RESET_STRAGGLER_AGE_SECONDS == 4500
 
 
 def test_ollama_worker_lifetime_profile_derives_from_distinct_routing_session_timeout(
@@ -4896,7 +4972,7 @@ session_timeout_seconds = 36000
 
     assert profile["seconds"] == 36600
     assert profile["source"] == "routing.ollama.session_timeout_seconds"
-    assert profile["role_fallback_seconds"] == 29400
+    assert profile["role_fallback_seconds"] == 4200
     assert profile["model_hint"] == "deepseek-v4-pro-cloud"
     assert profile["routing_timeout_seconds"] == 900
     assert profile["routing_session_timeout_seconds"] == 36000
@@ -4940,7 +5016,7 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
             "lo",
             ["claude", "--model", "opus-4.8", "--reasoning-effort", "max", "-p", "{{PROMPT}}"],
             "NEW",
-            29400,
+            4200,
             "harness_default:B",
         ),
         (
@@ -4958,7 +5034,7 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
                 "Gemini 3.5 Flash (High)",
             ],
             "NEW",
-            29400,
+            4200,
             "harness_default:C",
         ),
         (
@@ -4968,7 +5044,7 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
             "lo",
             ["ollama-harness", "{{PROMPT}}"],
             "NEW",
-            29400,
+            4200,
             "harness_default:D",
         ),
         (
@@ -4987,7 +5063,7 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
                 "bridge-review",
             ],
             "NEW",
-            29400,
+            4200,
             "harness_default:F",
         ),
         (
@@ -4997,7 +5073,7 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
             "pb",
             _CODEX_HEADLESS_ARGV,
             "GO",
-            29400,
+            4200,
             "harness_default:A",
         ),
         (
@@ -5012,7 +5088,7 @@ def test_worker_lifetime_profile_uses_opus_floor_for_unprofiled_lo() -> None:
                 "{{PROMPT}}",
             ],
             "NEW",
-            29400,
+            4200,
             "harness_default:H",
         ),
     ],
@@ -5235,7 +5311,7 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
     )
 
     assert meta["launched"] is True
-    assert meta["worker_lifetime_seconds"] == 29400
+    assert meta["worker_lifetime_seconds"] == 4200
     assert meta["worker_lifetime_source"] == "harness_default:C"
     wrapped = captured["args"][0]
     assert wrapped[2:] == ["--config-env"]
@@ -5507,6 +5583,7 @@ def _rec(
     dispatch_quality=None,
     dispatch_cost=None,
     dispatch_availability=None,
+    dispatch_max_items=None,
     harness_type=None,
 ) -> dict:
     """Build one registry record. status=_NO_STATUS omits the status key
@@ -5535,6 +5612,8 @@ def _rec(
         record["dispatch_cost"] = dispatch_cost
     if dispatch_availability is not None:
         record["dispatch_availability"] = dispatch_availability
+    if dispatch_max_items is not None:
+        record["dispatch_max_items"] = dispatch_max_items
     return record
 
 

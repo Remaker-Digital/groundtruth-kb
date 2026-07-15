@@ -243,9 +243,9 @@ from implementation_authorization import (  # noqa: E402
     AuthorizationError,
     create_authorization_packet,
     cross_claim_path_collision_reason,
+    finalize_implementation_start_packet,
     target_patterns_overlap,
-    write_named_packet,
-    write_packet,
+    write_started_packets,
 )
 
 CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH: tuple[str, ...] = (
@@ -2347,6 +2347,13 @@ def _issue_dispatch_authorization_for_selected(
                 packet = create_authorization_packet(project_root, bridge_id)
             else:
                 packet = create_authorization_packet(project_root, bridge_id, session_id=session_id)
+            if session_id is None:
+                raise AuthorizationError("Dispatch implementation start requires a worker session id")
+            packet = finalize_implementation_start_packet(
+                project_root,
+                packet,
+                session_id=session_id,
+            )
         except AuthorizationError as exc:
             overlap_suppression = "Concurrent path reservation conflict" in str(exc)
             reason = TARGET_PATH_OVERLAP_INFLIGHT_REASON if overlap_suppression else "impl_auth_quarantined"
@@ -2370,6 +2377,14 @@ def _issue_dispatch_authorization_for_selected(
         successful_bridge_ids.append(bridge_id)
         successful_packets.append(packet)
 
+    released_quarantined_slugs = [str(item["slug"]) for item in quarantined_slugs]
+    if released_quarantined_slugs and session_id:
+        _release_prime_work_intents(
+            released_quarantined_slugs,
+            project_root=project_root,
+            session_id=session_id,
+        )
+
     if not successful_bridge_ids:
         first = quarantined_slugs[0] if quarantined_slugs else {}
         return {
@@ -2379,11 +2394,10 @@ def _issue_dispatch_authorization_for_selected(
             "failed_slug": first.get("slug"),
             "error": first.get("error_message"),
             "quarantined_slugs": quarantined_slugs,
+            "released_quarantined_slugs": released_quarantined_slugs,
         }
 
-    for bridge_id, packet in zip(successful_bridge_ids, successful_packets, strict=True):
-        write_named_packet(project_root, packet, bridge_id)
-    write_packet(project_root, successful_packets[0])
+    write_started_packets(project_root, successful_packets)
     context: dict[str, Any] = {
         "dispatch_id": dispatch_id,
         "bridge_ids": list(successful_bridge_ids),
@@ -2400,6 +2414,7 @@ def _issue_dispatch_authorization_for_selected(
     result: dict[str, Any] = {"ok": True, "reason": None, "context": context}
     if quarantined_slugs:
         result["quarantined_slugs"] = quarantined_slugs
+        result["released_quarantined_slugs"] = released_quarantined_slugs
     return result
 
 
@@ -3562,10 +3577,10 @@ def _compute_actionable(
 
 
 def _selected_oldest_first(items: list[Any], max_items: int) -> list[Any]:
-    """Compatibility bridge state is newest-first; bridge work is processed oldest-first."""
+    """Return the queue head, preserving the already oldest-first actionable order."""
     if max_items <= 0:
         return []
-    return list(reversed(items))[:max_items]
+    return items[:max_items]
 
 
 def _dispatch_item_identity(item: Any) -> tuple[str, str, str]:
@@ -3594,14 +3609,33 @@ def _without_selected_dispatch_items(items: list[Any], selected: list[Any]) -> l
     return remaining
 
 
+def _positive_int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
 def _effective_max_items_for_target(target: DispatchTarget, max_items: int) -> int:
     if max_items <= 0:
         return 0
+    target_limit = _positive_int_or_none(getattr(target, "dispatch_max_items", None))
+    if target_limit is not None:
+        return min(max_items, target_limit)
     if isinstance(target.invocation_surfaces, dict):
+        dispatch = target.invocation_surfaces.get("dispatch")
+        if isinstance(dispatch, dict):
+            for key in ("dispatch_max_items", "max_items"):
+                limit = _positive_int_or_none(dispatch.get(key))
+                if limit is not None:
+                    return min(max_items, limit)
         headless = target.invocation_surfaces.get("headless")
         if isinstance(headless, dict):
-            limit = headless.get("max_items")
-            if isinstance(limit, int):
+            limit = _positive_int_or_none(headless.get("max_items"))
+            if limit is not None:
                 return min(max_items, limit)
     return max_items
 
@@ -3646,14 +3680,11 @@ def _load_antigravity_rules(project_root: Path, mode: str) -> str:
     return "\n".join(parts)
 
 
-# WI-4845 / WI-5003: per-role worker-lifetime caps (seconds) for dispatched
-# workers. A full multi-turn bridge review or Prime Builder implementation
-# routinely exceeds the 600s default that run_with_status.py applies, so
-# dispatched workers get a longer, env-tunable budget. Per
-# DELIB-20260703-DISPATCH-OPUS-FLOOR-20RUN-REFINEMENT, every harness starts at
-# an Opus-class floor until 20 profile-specific runs and quality/elapsed-time
-# analysis justify a lower threshold with 95% confidence.
-GENEROUS_WORKER_LIFETIME_SECONDS = 29400
+# WI-4845 / WI-5003 / WI-5222: per-role worker-lifetime caps (seconds) for
+# dispatched workers. Per DELIB-20260713-DISPATCH-60-MINUTE-GENEROUS-ALLOWANCE,
+# the generous envelope is a 3,600-second model window plus 600 seconds for
+# completion and reconciliation. The result remains env-tunable per role.
+GENEROUS_WORKER_LIFETIME_SECONDS = 4200
 OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS = GENEROUS_WORKER_LIFETIME_SECONDS
 LO_REVIEW_WORKER_LIFETIME_SECONDS = OPUS_CLASS_WORKER_LIFETIME_FLOOR_SECONDS
 PB_IMPL_WORKER_LIFETIME_SECONDS = GENEROUS_WORKER_LIFETIME_SECONDS
@@ -4127,25 +4158,50 @@ def _dispatch_target_uses_stdin_prompt(target: DispatchTarget) -> bool:
     return False
 
 
-def _command_without_prompt_payload(command: list[str], prompt: str) -> list[str]:
-    """Remove the dispatch prompt payload from argv after stdin handoff is selected."""
+def _command_without_prompt_payload(
+    command: list[str],
+    prompt: str,
+    *,
+    replacement: str | None = None,
+) -> list[str]:
+    """Remove or replace the dispatch prompt payload after stdin handoff."""
     cleaned: list[str] = []
     index = 0
     prompt_value_flags = {"-p", "--prompt"}
     while index < len(command):
         current = command[index]
         if current in prompt_value_flags and index + 1 < len(command) and command[index + 1] == prompt:
+            if replacement is not None:
+                cleaned.extend((current, replacement))
             index += 2
             continue
         if current == prompt:
+            if replacement is not None:
+                cleaned.append(replacement)
             index += 1
             continue
         if current.startswith("--prompt=") and current[len("--prompt=") :] == prompt:
+            if replacement is not None:
+                cleaned.append(f"--prompt={replacement}")
             index += 1
             continue
         cleaned.append(current)
         index += 1
     return cleaned if cleaned else command[:1]
+
+
+def _antigravity_sidecar_pointer(project_root: Path, sidecar_path: Path, canonical_mode: str) -> str:
+    """Build a short in-root prompt that directs Antigravity to its assignment."""
+    try:
+        relative_path = sidecar_path.resolve().relative_to(project_root.resolve())
+    except ValueError as exc:
+        raise ValueError("Antigravity prompt sidecar escapes project root") from exc
+    return "\n".join(
+        (
+            f"::init gtkb {canonical_mode}",
+            f"Read and execute the complete dispatcher assignment at `{relative_path.as_posix()}` before acting.",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -4192,6 +4248,7 @@ class DispatchTarget:
     command_handle: str  # "claude" / "codex" — from inverted harness-identities.json
     canonical_mode: str  # "pb" / "lo" — the canonical-init-keyword mode
     reviewer_precedence: int | None = None
+    dispatch_max_items: int | None = None
     invocation_surfaces: dict[str, Any] | None = (
         None  # WI-3344: headless argv template from the harness-registry projection; None when the projection carries no record for this harness
     )
@@ -4762,9 +4819,10 @@ def _resolve_dispatch_targets(
             records.append(record)
         ranked = select_dispatch_candidates(records, dispatch_config, context)
         ranked_ids = [str(record.get("id") or "") for record in ranked]
+        ranked_by_id = {str(record.get("id") or ""): record for record in ranked}
         by_id = {str(h_id): (h_id, h_info) for h_id, h_info in active_matching}
         if ranked_ids or dispatch_config.rules:
-            active_matching = [by_id[h_id] for h_id in ranked_ids if h_id in by_id]
+            active_matching = [(by_id[h_id][0], ranked_by_id[h_id]) for h_id in ranked_ids if h_id in by_id]
         else:
             active_matching = _rank_role_matching_targets_with_uniform_tiebreak(active_matching)
     except Exception:
@@ -4830,6 +4888,7 @@ def _resolve_dispatch_targets(
                 reviewer_precedence=_reviewer_precedence_for_record(role_record)
                 if needed_role_label == "loyal-opposition"
                 else None,
+                dispatch_max_items=_positive_int_or_none(role_record.get("dispatch_max_items")),
                 invocation_surfaces=invocation_surfaces,
             )
         )
@@ -4928,7 +4987,26 @@ def _spawn_harness(
 
     prompt_via_stdin = _dispatch_target_uses_stdin_prompt(target)
     if prompt_via_stdin:
-        command = _command_without_prompt_payload(command, prompt)
+        replacement_prompt: str | None = None
+        if target.command_handle == "antigravity" or target.harness_id == "C":
+            expected_sidecar = state_dir / DISPATCH_RUNS_SUBDIR / f"{dispatch_id}.stdin.log"
+            try:
+                replacement_prompt = _antigravity_sidecar_pointer(
+                    project_root,
+                    expected_sidecar,
+                    target.canonical_mode,
+                )
+            except ValueError as exc:
+                meta = {
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient_key,
+                    "launched": False,
+                    "reason": "prompt_sidecar_outside_project_root",
+                    "error_message": str(exc),
+                }
+                _record_dispatch_failure(state_dir, meta)
+                return meta
+        command = _command_without_prompt_payload(command, prompt, replacement=replacement_prompt)
 
     if dry_run:
         return {
@@ -5150,8 +5228,17 @@ def _spawn_harness(
         stdin_path = runs_dir / f"{dispatch_id}.stdin.log"
         try:
             stdin_path.write_text(prompt, encoding="utf-8")
-        except OSError:
-            pass
+        except OSError as exc:
+            meta = {
+                "dispatch_id": dispatch_id,
+                "recipient": recipient_key,
+                "launched": False,
+                "reason": "prompt_sidecar_write_failed",
+                "error_message": str(exc),
+                "stdin_path": str(stdin_path),
+            }
+            _record_dispatch_failure(state_dir, meta)
+            return meta
     env[RUN_WITH_STATUS_CONFIG_ENV_VAR] = _b64_json(
         {
             "stdin_path": str(stdin_path) if stdin_path is not None else None,
@@ -6317,6 +6404,11 @@ def run_dispatch_cycle(
         return {"skipped": True, "reason": "runtime_inflight_active"}
 
     try:
+        # Close the drain/inflight check-then-acquire race: a lifecycle drain
+        # created while this invocation acquired the lock owns precedence.
+        if dispatch_is_draining(project_root, state_dir):
+            return {"skipped": True, "reason": "dispatch_drain_active"}
+
         _cleanup_stale_tmp_files(state_dir)
         retention_result = _apply_runtime_evidence_retention(project_root, state_dir)
 
@@ -6795,9 +6887,9 @@ def run_dispatch_cycle(
                             recipient_state["target_path_overlap_suppressions"] = target_path_filter["suppressions"]
                         dispatched_selected = list(target_path_filter["selected"])
                         dispatched_signature = _signature(dispatched_selected)
-                        # _spawn_harness expects newest-first input and applies
-                        # _selected_oldest_first itself before building the prompt.
-                        spawn_items = list(reversed(dispatched_selected))
+                        # _spawn_harness applies the final cap itself; keep
+                        # the selected queue order intact for the prompt.
+                        spawn_items = list(dispatched_selected)
                         recipient_state["selected_count"] = len(dispatched_selected)
 
                     if target.needed_role_label == "prime-builder" and not dispatched_selected:
@@ -7017,7 +7109,7 @@ def run_dispatch_cycle(
                                 if not dry_run:
                                     dispatched_selected = lease_selected
                                     dispatched_signature = _signature(dispatched_selected)
-                                    spawn_items = list(reversed(dispatched_selected))
+                                    spawn_items = list(dispatched_selected)
                                     recipient_state["selected_count"] = len(dispatched_selected)
                                     recipient_state["pending_count"] = len(dispatched_selected)
                                     if not dispatched_selected:
