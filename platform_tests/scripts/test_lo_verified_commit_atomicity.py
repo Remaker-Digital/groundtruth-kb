@@ -624,6 +624,113 @@ def test_hunk_patch_finalization_preserves_unrelated_real_index_entry(
     assert "# foreign working tree" in _git(repo, "diff", "--", "scripts/feature.py").stdout
 
 
+def test_hunk_patch_finalization_preserves_same_path_foreign_staged_hunk(
+    verify_helper,
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "config", "core.autocrlf", "false")
+    _write_project_marker(repo)
+    _write(repo / "bridge" / "sample-001.md", "NEW\n\n# Proposal\n")
+    _write(repo / "bridge" / "sample-002.md", "GO\n\n# GO\n")
+    _write(
+        repo / "scripts" / "shared.py",
+        "SELECTED = 1\nKEEP_A = 1\nKEEP_B = 1\nKEEP_C = 1\nKEEP_D = 1\nKEEP_E = 1\nFOREIGN = 1\n",
+    )
+    _git(repo, "add", "--", "groundtruth.toml", "bridge/sample-001.md", "bridge/sample-002.md", "scripts/shared.py")
+    _git(repo, "commit", "-m", "chore: seed same-path fixture")
+    _write(repo / "bridge" / "sample-003.md", _implementation_report_body())
+
+    _write(
+        repo / "scripts" / "shared.py",
+        "SELECTED = 1\nKEEP_A = 1\nKEEP_B = 1\nKEEP_C = 1\nKEEP_D = 1\nKEEP_E = 1\nFOREIGN = 2\n",
+    )
+    _git(repo, "add", "--", "scripts/shared.py")
+    _write(
+        repo / "scripts" / "shared.py",
+        "SELECTED = 2\nKEEP_A = 1\nKEEP_B = 1\nKEEP_C = 1\nKEEP_D = 1\nKEEP_E = 1\nFOREIGN = 2\n",
+    )
+    _write(
+        repo / "selected.patch",
+        """diff --git a/scripts/shared.py b/scripts/shared.py
+--- a/scripts/shared.py
++++ b/scripts/shared.py
+@@ -1,2 +1,2 @@
+-SELECTED = 1
++SELECTED = 2
+ KEEP_A = 1
+""",
+    )
+    _write(repo / "scripts" / "unrelated.py", "VALUE = 99\n")
+    _git(repo, "add", "--", "scripts/unrelated.py")
+    unrelated_before = _git(repo, "diff", "--cached", "--binary", "HEAD", "--", "scripts/unrelated.py").stdout
+
+    verify_helper.finalize_verified_commit(
+        "sample",
+        _verified_body(),
+        include_paths=["bridge/sample-003.md", "scripts/shared.py"],
+        hunk_patch_paths=["selected.patch"],
+        commit_message="fix(gtkb): preserve same-path staged work",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    assert _git(repo, "show", "HEAD:scripts/shared.py").stdout == (
+        "SELECTED = 2\nKEEP_A = 1\nKEEP_B = 1\nKEEP_C = 1\nKEEP_D = 1\nKEEP_E = 1\nFOREIGN = 1\n"
+    )
+    staged_shared = _git(repo, "diff", "--cached", "--", "scripts/shared.py").stdout
+    assert "+FOREIGN = 2" in staged_shared
+    assert "+SELECTED = 2" not in staged_shared
+    assert _git(repo, "diff", "--", "scripts/shared.py").stdout == ""
+    assert _git(repo, "diff", "--cached", "--binary", "HEAD", "--", "scripts/unrelated.py").stdout == unrelated_before
+    assert set(_git(repo, "diff", "--name-only", "--cached", "--").stdout.splitlines()) == {
+        "scripts/shared.py",
+        "scripts/unrelated.py",
+    }
+
+
+def test_hunk_patch_finalization_rejects_conflicting_same_path_staged_hunk_before_commit(
+    verify_helper,
+    tmp_path: Path,
+) -> None:
+    repo = _init_verified_repo(tmp_path)
+    original_head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    _write(repo / "scripts" / "feature.py", "VALUE = 3\n")
+    _git(repo, "add", "--", "scripts/feature.py")
+    staged_before = _git(repo, "diff", "--cached", "--binary", "HEAD", "--", "scripts/feature.py").stdout
+    _write(repo / "scripts" / "feature.py", "VALUE = 2\n")
+    _write(
+        repo / "feature.patch",
+        """diff --git a/scripts/feature.py b/scripts/feature.py
+--- a/scripts/feature.py
++++ b/scripts/feature.py
+@@ -1 +1 @@
+-VALUE = 1
++VALUE = 2
+""",
+    )
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="could not be rebased"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            hunk_patch_paths=["feature.patch"],
+            commit_message="fix(gtkb): reject conflicting same-path stage",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert _git(repo, "rev-parse", "HEAD").stdout.strip() == original_head
+    assert not (repo / "bridge" / "sample-004.md").exists()
+    assert _git(repo, "diff", "--cached", "--binary", "HEAD", "--", "scripts/feature.py").stdout == staged_before
+
+
 def test_hunk_patch_outside_include_set_fails_without_verdict(verify_helper, tmp_path: Path) -> None:
     repo = _init_verified_repo(tmp_path)
     _write(

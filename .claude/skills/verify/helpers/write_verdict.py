@@ -109,6 +109,25 @@ class HunkPatch:
     touched_paths: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class IndexEntry:
+    """One stage entry from a Git index."""
+
+    mode: str
+    object_id: str
+    stage: int
+
+
+@dataclass(frozen=True)
+class RealIndexRealignmentPlan:
+    """Exact real-index state required after a disposable-index commit."""
+
+    committed_paths: tuple[str, ...]
+    entries_before: dict[str, tuple[IndexEntry, ...]]
+    expected_entries: dict[str, tuple[IndexEntry, ...]]
+    preserved_overlap: tuple[str, ...]
+
+
 def append_skills_applied_disclosure(body: str, skills: list[str] | None) -> str:
     """Append the canonical Skills applied line when *skills* is not None (report-only)."""
     if skills is None:
@@ -646,9 +665,174 @@ def _allowed_staged_paths(
     return allowed
 
 
-def _realign_real_index_after_temp_commit(project_root: Path, committed_paths: set[str]) -> None:
-    if committed_paths:
-        _run_git_with_lock_retry(["reset", "-q", "HEAD", "--", *sorted(committed_paths)], cwd=project_root)
+def _index_entries(
+    project_root: Path,
+    *,
+    paths: tuple[str, ...] = (),
+    env: dict[str, str] | None = None,
+) -> dict[str, tuple[IndexEntry, ...]]:
+    args = ["ls-files", "--stage", "-z"]
+    if paths:
+        args.extend(["--", *paths])
+    output = _run_git(args, cwd=project_root, check=True, env=env).stdout
+    entries: dict[str, list[IndexEntry]] = {}
+    for record in output.split("\0"):
+        if not record:
+            continue
+        try:
+            metadata, path = record.split("\t", 1)
+            mode, object_id, stage_text = metadata.split()
+            entry = IndexEntry(mode=mode, object_id=object_id, stage=int(stage_text))
+        except (ValueError, TypeError) as exc:
+            raise VerifiedFinalizationError(f"Could not parse git index entry: {record!r}") from exc
+        entries.setdefault(path.replace("\\", "/"), []).append(entry)
+    return {path: tuple(path_entries) for path, path_entries in entries.items()}
+
+
+def _set_real_index_entries(
+    project_root: Path,
+    paths: tuple[str, ...],
+    entries: dict[str, tuple[IndexEntry, ...]],
+) -> None:
+    for path in paths:
+        path_entries = entries.get(path, ())
+        if not path_entries:
+            _run_git_with_lock_retry(["update-index", "--force-remove", "--", path], cwd=project_root)
+            continue
+        if len(path_entries) != 1 or path_entries[0].stage != 0:
+            raise VerifiedFinalizationError(
+                f"VERIFIED real-index realignment requires one stage-0 entry for {path!r}; observed={path_entries!r}"
+            )
+        entry = path_entries[0]
+        _run_git_with_lock_retry(
+            ["update-index", "--add", "--cacheinfo", entry.mode, entry.object_id, path],
+            cwd=project_root,
+        )
+
+
+def _apply_preserved_overlap_patch(
+    project_root: Path,
+    patch_path: Path,
+    *,
+    env: dict[str, str],
+) -> None:
+    exact_check = _run_git(
+        ["apply", "--binary", "--cached", "--check", str(patch_path)],
+        cwd=project_root,
+        check=False,
+        env=env,
+    )
+    if exact_check.returncode == 0:
+        _run_git_with_lock_retry(
+            ["apply", "--binary", "--cached", str(patch_path)],
+            cwd=project_root,
+            env=env,
+        )
+        return
+
+    three_way = _run_git_with_lock_retry(
+        ["apply", "--binary", "--cached", "--3way", str(patch_path)],
+        cwd=project_root,
+        check=False,
+        env=env,
+    )
+    if three_way.returncode != 0:
+        failure = (three_way.stderr or three_way.stdout or exact_check.stderr or exact_check.stdout).strip()
+        raise VerifiedFinalizationError(
+            "A pre-existing staged hunk on a VERIFIED path could not be rebased onto the reviewed candidate; "
+            f"finalization stopped before commit: {failure}"
+        )
+
+
+def _prepare_real_index_realign(
+    project_root: Path,
+    committed_paths: set[str],
+    *,
+    candidate_env: dict[str, str],
+) -> RealIndexRealignmentPlan:
+    ordered_paths = tuple(sorted(committed_paths))
+    entries_before = _index_entries(project_root)
+    candidate_entries = _index_entries(project_root, paths=ordered_paths, env=candidate_env)
+    staged_before = set(_staged_paths(project_root))
+    overlap = sorted(committed_paths & staged_before)
+    preserved_overlap = tuple(
+        path for path in overlap if entries_before.get(path, ()) != candidate_entries.get(path, ())
+    )
+    expected_entries = {path: candidate_entries.get(path, ()) for path in ordered_paths}
+    if not preserved_overlap:
+        return RealIndexRealignmentPlan(
+            committed_paths=ordered_paths,
+            entries_before=entries_before,
+            expected_entries=expected_entries,
+            preserved_overlap=(),
+        )
+
+    patch_handle, patch_name = tempfile.mkstemp(
+        prefix="gtkb-verified-overlap-", suffix=".patch", dir=_git_absolute_dir(project_root)
+    )
+    os.close(patch_handle)
+    patch_path = Path(patch_name)
+    preserve_env: dict[str, str] | None = None
+    preserve_index: Path | None = None
+    try:
+        patch_result = _run_git(
+            ["diff", "--cached", "--binary", "--full-index", "HEAD", "--", *preserved_overlap],
+            cwd=project_root,
+            check=False,
+        )
+        if patch_result.returncode != 0 or not patch_result.stdout.strip():
+            failure = (patch_result.stderr or patch_result.stdout).strip()
+            raise VerifiedFinalizationError(
+                "Could not capture the pre-existing staged hunk for VERIFIED real-index preservation: "
+                + (failure or "empty staged patch")
+            )
+        patch_path.write_text(patch_result.stdout, encoding="utf-8", newline="\n")
+
+        candidate_tree = _git_lines(["write-tree"], cwd=project_root, env=candidate_env)[0]
+        preserve_env, preserve_index = _create_temporary_index(project_root)
+        _run_git(["read-tree", candidate_tree], cwd=project_root, check=True, env=preserve_env)
+        _apply_preserved_overlap_patch(project_root, patch_path, env=preserve_env)
+        unmerged = _git_lines(["ls-files", "--unmerged"], cwd=project_root, env=preserve_env)
+        if unmerged:
+            raise VerifiedFinalizationError(
+                "A pre-existing staged hunk produced unmerged entries in the VERIFIED preservation preflight."
+            )
+        merged_entries = _index_entries(project_root, paths=preserved_overlap, env=preserve_env)
+        for path in preserved_overlap:
+            expected_entries[path] = merged_entries.get(path, ())
+    finally:
+        patch_path.unlink(missing_ok=True)
+        if preserve_index is not None:
+            preserve_index.unlink(missing_ok=True)
+
+    return RealIndexRealignmentPlan(
+        committed_paths=ordered_paths,
+        entries_before=entries_before,
+        expected_entries=expected_entries,
+        preserved_overlap=preserved_overlap,
+    )
+
+
+def _realign_real_index_after_temp_commit(project_root: Path, plan: RealIndexRealignmentPlan) -> None:
+    try:
+        _set_real_index_entries(project_root, plan.committed_paths, plan.expected_entries)
+        entries_after = _index_entries(project_root)
+        non_committed_before = {
+            path: entries for path, entries in plan.entries_before.items() if path not in plan.committed_paths
+        }
+        non_committed_after = {
+            path: entries for path, entries in entries_after.items() if path not in plan.committed_paths
+        }
+        if non_committed_after != non_committed_before:
+            raise VerifiedFinalizationError("VERIFIED real-index realignment changed a non-committed index entry.")
+        actual_committed = {path: entries_after.get(path, ()) for path in plan.committed_paths}
+        if actual_committed != plan.expected_entries:
+            raise VerifiedFinalizationError(
+                "VERIFIED real-index realignment did not reproduce the preservation-preflight entries."
+            )
+    except Exception:
+        _set_real_index_entries(project_root, plan.committed_paths, plan.entries_before)
+        raise
 
 
 def _apply_hunk_patch_to_index(project_root: Path, patch: HunkPatch, *, env: dict[str, str]) -> None:
@@ -870,6 +1054,8 @@ def finalize_verified_commit(
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
                 f"missing={sorted(missing)}; unexpected_new={sorted(unexpected)}; "
+    old_head = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
+    created_commit: str | None = None
                 f"expected_paths={list(expected_paths)}; temp_staged={sorted(temp_staged)}"
             )
         commit = _run_git_with_lock_retry(["commit", "-m", commit_message], cwd=root, check=False, env=temp_env)
@@ -883,19 +1069,32 @@ def finalize_verified_commit(
                 "VERIFIED finalization committed-path mismatch. "
                 f"committed={sorted(committed)}; expected={sorted(temp_staged)}"
             )
-        _realign_real_index_after_temp_commit(root, committed)
-    except Exception:
+        _realign_real_index_after_temp_commit(root, realignment_plan)
+    except Exception as exc:
+        if created_commit is not None:
+            rollback = _run_git_with_lock_retry(
+                ["update-ref", "HEAD", old_head, created_commit],
+                cwd=root,
+                check=False,
+            )
+            if rollback.returncode != 0:
+                raise VerifiedFinalizationError(
+                    "VERIFIED finalization created a commit but could not atomically roll HEAD back after "
+                    f"realignment failure; verdict retained for diagnosis: {(rollback.stderr or rollback.stdout).strip()}"
+                ) from exc
         _cleanup_failed_verdict(root, verdict_rel_path, ())
         raise
     finally:
         if temp_index is not None:
             temp_index.unlink(missing_ok=True)
 
+        realignment_plan = _prepare_real_index_realign(root, temp_staged, candidate_env=temp_env)
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
     _auto_retire_completed_projects_after_verified(root)
     return VerifiedFinalizationResult(
         commit_sha=commit_sha,
         verdict_path=verdict_rel_path,
+        created_commit = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
         committed_paths=expected_paths,
     )
 
