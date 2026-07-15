@@ -71,7 +71,8 @@ _DOCUMENT_LINE_RE = re.compile(r"(?im)^\s*Document:\s*`?(?P<value>[A-Za-z0-9_.-]
 _VERSION_LINE_RE = re.compile(r"(?im)^\s*Version:\s*`?(?P<value>\d{3})\b")
 _BRIDGE_KIND_RE = re.compile(r"(?im)^\s*bridge_kind:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$")
 _SAFE_SLUG_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
-_PATCH_PATH_RE = re.compile(r"(?m)^\+\+\+ b/(?P<path>[^\r\n]+)$")
+_PATCH_PATH_RE = re.compile(r"(?m)^(?:---|\+\+\+) (?P<path>[^\r\n]+)$")
+_DIFF_GIT_PATH_RE = re.compile(r"(?m)^diff --git a/(?P<old>.*?) b/(?P<new>[^\r\n]*)$")
 
 
 class BridgeError(Exception):
@@ -405,6 +406,29 @@ def _modified_tracked_include_paths(project_root: Path, include_paths: Sequence[
     return {line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()}
 
 
+def _patch_path_token(path_text: str) -> str | None:
+    path_text = path_text.split("\t", 1)[0].strip()
+    if path_text == "/dev/null":
+        return None
+    if path_text.startswith(("a/", "b/")):
+        path_text = path_text[2:]
+    return path_text.replace("\\", "/")
+
+
+def _patch_paths_from_text(patch_text: str) -> set[str]:
+    paths: set[str] = set()
+    for match in _DIFF_GIT_PATH_RE.finditer(patch_text):
+        for group_name in ("old", "new"):
+            path_text = _patch_path_token(match.group(group_name))
+            if path_text is not None:
+                paths.add(path_text)
+    for match in _PATCH_PATH_RE.finditer(patch_text):
+        path_text = _patch_path_token(match.group("path"))
+        if path_text is not None:
+            paths.add(path_text)
+    return paths
+
+
 def _hunk_patch_covered_paths(project_root: Path, hunk_patch_paths: Sequence[str]) -> set[str]:
     covered: set[str] = set()
     root = project_root.resolve()
@@ -415,10 +439,10 @@ def _hunk_patch_covered_paths(project_root: Path, hunk_patch_paths: Sequence[str
         except ValueError as exc:
             raise BridgePublicationError(f"VERIFIED hunk patch escapes project root: {raw_path}") from exc
         try:
-            content = patch.read_text(encoding="utf-8", errors="replace")
+            content = patch.read_bytes().decode("utf-8", errors="replace")
         except OSError as exc:
             raise BridgePublicationError(f"VERIFIED hunk patch is unreadable: {raw_path}") from exc
-        covered.update(match.group("path").strip() for match in _PATCH_PATH_RE.finditer(content))
+        covered.update(_patch_paths_from_text(content))
     return covered
 
 

@@ -568,17 +568,30 @@ def _create_temporary_index(project_root: Path) -> tuple[dict[str, str], Path]:
     return {"GIT_INDEX_FILE": str(index_path)}, index_path
 
 
+def _patch_path_token(path_text: str) -> str | None:
+    path_text = path_text.split("\t", 1)[0].strip()
+    if path_text == "/dev/null":
+        return None
+    if path_text.startswith(("a/", "b/")):
+        path_text = path_text[2:]
+    return path_text
+
+
 def _patch_paths_from_text(patch_text: str, project_root: Path) -> tuple[str, ...]:
     raw_paths: list[str] = []
     for line in patch_text.splitlines():
+        diff_match = re.match(r"^diff --git a/(?P<old>.*?) b/(?P<new>.*)$", line)
+        if diff_match:
+            for group_name in ("old", "new"):
+                path_text = _patch_path_token(diff_match.group(group_name))
+                if path_text is not None:
+                    raw_paths.append(path_text)
+            continue
         if not (line.startswith("--- ") or line.startswith("+++ ")):
             continue
-        path_text = line[4:].split("\t", 1)[0].strip()
-        if path_text == "/dev/null":
-            continue
-        if path_text.startswith(("a/", "b/")):
-            path_text = path_text[2:]
-        raw_paths.append(path_text)
+        path_text = _patch_path_token(line[4:])
+        if path_text is not None:
+            raw_paths.append(path_text)
     return _unique_paths(project_root, raw_paths)
 
 
@@ -600,7 +613,7 @@ def _resolve_hunk_patches(
         except ValueError as exc:
             raise VerifiedFinalizationError(f"Hunk patch path escapes project root: {patch_arg}") from exc
         try:
-            patch_text = patch_path.read_text(encoding="utf-8")
+            patch_text = patch_path.read_bytes().decode("utf-8", errors="replace")
         except OSError as exc:
             raise VerifiedFinalizationError(f"Hunk patch is unreadable: {patch_arg}") from exc
         touched = _patch_paths_from_text(patch_text, project_root)
@@ -639,20 +652,25 @@ def _realign_real_index_after_temp_commit(project_root: Path, committed_paths: s
 
 
 def _apply_hunk_patch_to_index(project_root: Path, patch: HunkPatch, *, env: dict[str, str]) -> None:
-    check = _run_git(["apply", "--cached", "--check", str(patch.path)], cwd=project_root, check=False, env=env)
+    check = _run_git(
+        ["apply", "--binary", "--cached", "--check", str(patch.path)],
+        cwd=project_root,
+        check=False,
+        env=env,
+    )
     if check.returncode == 0:
-        _run_git_with_lock_retry(["apply", "--cached", str(patch.path)], cwd=project_root, env=env)
+        _run_git_with_lock_retry(["apply", "--binary", "--cached", str(patch.path)], cwd=project_root, env=env)
         return
 
     whitespace_check = _run_git(
-        ["apply", "--cached", "--check", "--ignore-space-change", str(patch.path)],
+        ["apply", "--binary", "--cached", "--check", "--ignore-space-change", str(patch.path)],
         cwd=project_root,
         check=False,
         env=env,
     )
     if whitespace_check.returncode == 0:
         _run_git_with_lock_retry(
-            ["apply", "--cached", "--ignore-space-change", str(patch.path)],
+            ["apply", "--binary", "--cached", "--ignore-space-change", str(patch.path)],
             cwd=project_root,
             env=env,
         )

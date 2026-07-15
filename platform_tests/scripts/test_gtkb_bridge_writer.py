@@ -32,6 +32,18 @@ AUTHOR_METADATA = {
 }
 
 
+def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        check=check,
+    )
+
+
 def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path) -> None:
     path = write_bridge_file("docthing", 1, "NEW\n\nhello\n", tmp_path, author_metadata=AUTHOR_METADATA)
 
@@ -369,3 +381,21 @@ def test_publish_lo_verdict_denies_stale_response_version_and_guard_failure(
             harness_name="alibaba-cloud-studio",
             author_metadata=PROVIDER_METADATA,
         )
+
+
+def test_provider_hunk_coverage_recognizes_binary_patch_diff_git_header(tmp_path: Path) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "groundtruth.db").write_bytes(b"\x00GTKB binary original\x00\n")
+    _git(tmp_path, "add", "--", "groundtruth.db")
+    _git(tmp_path, "commit", "-m", "chore: seed binary fixture")
+    (tmp_path / "groundtruth.db").write_bytes(b"\x00GTKB binary reviewed\x01\n")
+    patch_text = _git(tmp_path, "diff", "--binary", "--", "groundtruth.db").stdout
+    assert "GIT binary patch" in patch_text
+    assert "+++ b/groundtruth.db" not in patch_text
+    (tmp_path / "groundtruth-db.patch").write_text(patch_text, encoding="utf-8", newline="\n")
+
+    covered = writer._hunk_patch_covered_paths(tmp_path, ["groundtruth-db.patch"])
+
+    assert covered == {"groundtruth.db"}

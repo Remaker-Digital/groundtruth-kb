@@ -44,6 +44,15 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
     )
 
 
+def _git_bytes(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        capture_output=True,
+        check=check,
+    )
+
+
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8", newline="\n")
@@ -705,6 +714,53 @@ def test_hunk_patch_with_crlf_context_applies_to_disposable_index(verify_helper,
 
     assert _git(repo, "show", "HEAD:scripts/crlf.txt").stdout == "alpha\nbeta selected\n"
     assert "foreign" in (repo / "scripts" / "crlf.txt").read_text(encoding="utf-8")
+
+
+def test_binary_hunk_patch_finalization_commits_reviewed_binary_include_only(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "config", "core.autocrlf", "false")
+    _write_project_marker(repo)
+    _write(repo / "bridge" / "sample-001.md", "NEW\n\n# Proposal\n")
+    _write(repo / "bridge" / "sample-002.md", "GO\n\n# GO\n")
+    original = b"\x00GTKB binary original\x00\n"
+    reviewed = b"\x00GTKB binary reviewed\x01\n"
+    foreign = b"\x00GTKB binary foreign\x02\n"
+    _write_bytes(repo / "groundtruth.db", original)
+    _git(repo, "add", "--", "groundtruth.toml", "bridge/sample-001.md", "bridge/sample-002.md", "groundtruth.db")
+    _git(repo, "commit", "-m", "chore: seed binary fixture")
+    _write(repo / "bridge" / "sample-003.md", _implementation_report_body())
+    _write_bytes(repo / "groundtruth.db", reviewed)
+    patch_text = _git(repo, "diff", "--binary", "--", "groundtruth.db").stdout
+    assert "GIT binary patch" in patch_text
+    assert "+++ b/groundtruth.db" not in patch_text
+    _write(repo / "groundtruth-db.patch", patch_text)
+    _write_bytes(repo / "groundtruth.db", foreign)
+    monkeypatch.setattr(verify_helper, "_auto_retire_completed_projects_after_verified", lambda _root: ())
+
+    result = verify_helper.finalize_verified_commit(
+        "sample",
+        _verified_body(),
+        include_paths=["bridge/sample-003.md", "groundtruth.db"],
+        hunk_patch_paths=["groundtruth-db.patch"],
+        commit_message="fix(gtkb): finalize reviewed binary include",
+        project_root=repo,
+        pre_populate=False,
+    )
+
+    committed = set(_git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.splitlines())
+    assert committed == {"bridge/sample-003.md", "bridge/sample-004.md", "groundtruth.db"}
+    assert result.verdict_path == "bridge/sample-004.md"
+    assert _git_bytes(repo, "show", "HEAD:groundtruth.db").stdout == reviewed
+    assert (repo / "groundtruth.db").read_bytes() == foreign
 
 
 def test_verified_finalization_retries_transient_index_lock_on_add(
