@@ -658,6 +658,7 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
                 in payload["messages"][-1]["content"]
             )
             assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            assert "tool_choice" not in payload
             return {
                 "choices": [
                     {
@@ -738,6 +739,8 @@ def test_bridge_review_recovers_publisher_result_without_verdict_path(
 
     def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
         payloads.append(payload)
+        if len(payloads) == 2:
+            assert '"status": "ok"' in payload["messages"][-1]["content"]
         if len(payloads) in (1, 2):
             return {
                 "choices": [{"message": {"content": "", "tool_calls": [publish_tool_call(f"publish_{len(payloads)}")]}}]
@@ -771,7 +774,7 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(
     calls = 0
 
     def fail_publish(*_args, **_kwargs):
-        raise RuntimeError("claim contention")
+        raise RuntimeError("claim\n contention\t")
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fail_publish)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
@@ -804,7 +807,7 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(
             ]
         }
 
-    with pytest.raises(base.CloudHarnessError, match="repeated bridge verdict publisher failures"):
+    with pytest.raises(base.CloudHarnessError, match="bridge verdict publisher recovery exhausted") as exc_info:
         base.run_tool_loop(
             "review",
             route,
@@ -817,6 +820,155 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(
             chat_func=chat,
         )
     assert calls == base.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
+    assert f"{calls} attempts" in str(exc_info.value)
+    assert "claim contention" in str(exc_info.value)
+    assert "\n" not in str(exc_info.value)
+
+
+def test_bridge_verdict_recovery_reason_is_normalized_and_bounded() -> None:
+    reason = "claim\n contention\t" + ("x" * (base.MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS + 100))
+
+    bounded = base._bounded_bridge_verdict_recovery_reason(reason)
+
+    assert bounded.startswith("claim contention ")
+    assert "\n" not in bounded and "\t" not in bounded
+    assert len(bounded) == base.MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS
+
+
+def test_bridge_review_rejects_mixed_publisher_recovery_turn_atomically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    payloads: list[dict] = []
+    dispatched_tools: list[str] = []
+    publish_calls = 0
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(*_args, **_kwargs):
+        nonlocal publish_calls
+        publish_calls += 1
+        return Published()
+
+    original_dispatch = base.dispatch_tool_call
+
+    def recording_dispatch(tool_name, *args, **kwargs):
+        dispatched_tools.append(tool_name)
+        return original_dispatch(tool_name, *args, **kwargs)
+
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    monkeypatch.setattr(base, "dispatch_tool_call", recording_dispatch)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-mixed-recovery")
+
+    def publish_tool_call(call_id: str) -> dict:
+        return {
+            "id": call_id,
+            "function": {
+                "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+            },
+        }
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {"choices": [{"message": {"content": "ready but unpublished"}}]}
+        if len(payloads) == 2:
+            assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                publish_tool_call("publish_rejected"),
+                                {
+                                    "id": "read_rejected",
+                                    "function": {"name": "Read", "arguments": {"path": "groundtruth.toml"}},
+                                },
+                            ],
+                        }
+                    }
+                ]
+            }
+        if len(payloads) == 3:
+            assert "publisher-only recovery rejected non-publisher tool call(s): Read" in str(payload["messages"])
+            return {"choices": [{"message": {"content": "", "tool_calls": [publish_tool_call("publish_valid")]}}]}
+        return {"choices": [{"message": {"content": "published"}}]}
+
+    assert (
+        base.run_tool_loop(
+            "review",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            4,
+            root,
+            _profile(),
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "published"
+    )
+    assert dispatched_tools == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+    assert publish_calls == 1
+
+
+def test_bridge_review_bounds_repeated_malformed_publisher_recovery_turns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    calls = 0
+
+    def reject_dispatch(*_args, **_kwargs):
+        raise AssertionError("malformed publisher-only recovery turn must not dispatch any tool")
+
+    monkeypatch.setattr(base, "dispatch_tool_call", reject_dispatch)
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return {"choices": [{"message": {"content": "ready but unpublished"}}]}
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "id": f"read_rejected_{calls}",
+                                "function": {"name": "Read", "arguments": {"path": "groundtruth.toml"}},
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+
+    expected_attempts = base.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
+    with pytest.raises(
+        base.CloudHarnessError,
+        match=rf"publisher recovery exhausted after {expected_attempts} attempts.*non-publisher tool call\(s\): Read",
+    ):
+        base.run_tool_loop(
+            "review",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            10,
+            root,
+            _profile(),
+            skill="bridge-review",
+            chat_func=chat,
+        )
+    assert calls == expected_attempts + 1
 
 
 # --- Slice 3: hook-tier + auth-style validation (native-hook seam is a flag; floor stays enforced) ---

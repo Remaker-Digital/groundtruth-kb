@@ -107,6 +107,7 @@ MAX_GLOB_RESULTS = 100
 MAX_FILE_SCAN_ENTRIES = 5000
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
 MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
+MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS = 500
 MAX_NATIVE_STOP_BLOCKS = 8
 NATIVE_STOP_CONTINUATION_PROMPT = (
     "A native Stop hook blocked completion for this reason:\n{reason}\n"
@@ -2096,6 +2097,13 @@ def _publish_bridge_verdict_succeeded(result: str) -> bool:
     )
 
 
+def _bounded_bridge_verdict_recovery_reason(reason: str) -> str:
+    normalized = " ".join(str(reason).split())
+    if not normalized:
+        normalized = "no publisher diagnostic was returned"
+    return normalized[:MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS]
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -2189,18 +2197,20 @@ def run_tool_loop(
     bridge_verdict_required = skill in LOYAL_OPPOSITION_BRIDGE_SKILLS and profile.publish_bridge_verdict_tool
     bridge_verdict_published = False
     bridge_recovery_turns = 0
-    publisher_failures = 0
+    publisher_recovery_failures = 0
+    last_publisher_failure: str | None = None
 
     stop_reason = "process_error"
     try:
         for _turn in range(max_turns):
-            active_tools = (
-                (PUBLISH_BRIDGE_VERDICT_TOOL,)
-                if bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published
-                else allowed_tools
+            publisher_only_recovery = bool(
+                bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published
             )
+            active_tools = (PUBLISH_BRIDGE_VERDICT_TOOL,) if publisher_only_recovery else allowed_tools
             schemas = strategy.build_tool_schemas(active_tools)
             payload = strategy.build_payload(messages, model_route, schemas)
+            if publisher_only_recovery and profile.dialect == DIALECT_ANTHROPIC_MESSAGES:
+                payload["tool_choice"] = {"type": "tool", "name": PUBLISH_BRIDGE_VERDICT_TOOL}
 
             operation_timeout = min(
                 timeout,
@@ -2295,14 +2305,60 @@ def run_tool_loop(
 
             if not isinstance(tool_calls, list):
                 raise CloudHarnessError("tool_calls must be a list")
-            if bridge_verdict_required and bridge_recovery_turns and not bridge_verdict_published:
+            if publisher_only_recovery:
                 recovery_tool_names = []
                 for call in tool_calls:
                     function = call.get("function") if isinstance(call, dict) else None
                     name = function.get("name") if isinstance(function, dict) else None
                     recovery_tool_names.append(name)
-                if any(name != PUBLISH_BRIDGE_VERDICT_TOOL for name in recovery_tool_names):
-                    raise CloudHarnessError("bridge verdict publisher recovery received non-publisher tool call")
+                rejected_names = [
+                    str(name) if name else "<missing>"
+                    for name in recovery_tool_names
+                    if name != PUBLISH_BRIDGE_VERDICT_TOOL
+                ]
+                if rejected_names:
+                    publisher_recovery_failures += 1
+                    rejected_summary = _bounded_bridge_verdict_recovery_reason(", ".join(dict.fromkeys(rejected_names)))
+                    last_publisher_failure = _bounded_bridge_verdict_recovery_reason(
+                        f"publisher-only recovery rejected non-publisher tool call(s): {rejected_summary}"
+                    )
+                    if publisher_recovery_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                        raise CloudHarnessError(
+                            "bridge verdict publisher recovery exhausted after "
+                            f"{publisher_recovery_failures} attempts; last failure: {last_publisher_failure}"
+                        )
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "tool_calls": tool_calls,
+                        }
+                    )
+                    rejection_result = (
+                        "ERROR: entire publisher-only recovery turn rejected atomically because it included "
+                        f"non-publisher tool call(s): {rejected_summary}"
+                    )
+                    for index, call in enumerate(tool_calls):
+                        call_id = (
+                            str(call.get("id") or f"tool_call_{index}")
+                            if isinstance(call, dict)
+                            else f"tool_call_{index}"
+                        )
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "name": recovery_tool_names[index] or "<missing>",
+                                "tool_call_id": call_id,
+                                "content": rejection_result,
+                            }
+                        )
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(reason=last_publisher_failure),
+                        }
+                    )
+                    continue
 
             tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
             if tool_signature == previous_tool_signature:
@@ -2358,15 +2414,22 @@ def run_tool_loop(
                         result = f"ERROR: {tool_err}"
                 if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
                     if not _publish_bridge_verdict_succeeded(result):
-                        publisher_failures += 1
-                        if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                            raise CloudHarnessError("repeated bridge verdict publisher failures before completion")
+                        publisher_recovery_failures += 1
+                        last_publisher_failure = _bounded_bridge_verdict_recovery_reason(
+                            f"PublishBridgeVerdict did not return a verdict_path: {result}"
+                        )
+                        if publisher_recovery_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                            raise CloudHarnessError(
+                                "bridge verdict publisher recovery exhausted after "
+                                f"{publisher_recovery_failures} attempts; last failure: {last_publisher_failure}"
+                            )
                         bridge_recovery_turns = max(bridge_recovery_turns, 1)
-                        publisher_recovery_reason = "PublishBridgeVerdict did not return a verdict_path"
+                        publisher_recovery_reason = last_publisher_failure
                     else:
                         bridge_verdict_published = True
                         bridge_recovery_turns = 0
-                        publisher_failures = 0
+                        publisher_recovery_failures = 0
+                        last_publisher_failure = None
                 invoke_native_hooks(
                     NATIVE_HOOK_POST_TOOL_USE,
                     metadata,

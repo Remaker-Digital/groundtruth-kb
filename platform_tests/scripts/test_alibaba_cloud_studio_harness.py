@@ -401,9 +401,11 @@ def test_alibaba_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypat
     def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
         payloads.append(payload)
         if len(payloads) == 1:
+            assert "tool_choice" not in payload
             return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
         if len(payloads) == 2:
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            assert payload["tool_choice"] == {"type": "tool", "name": base.PUBLISH_BRIDGE_VERDICT_TOOL}
             return {
                 "model": route.model_id,
                 "content": [
@@ -431,6 +433,88 @@ def test_alibaba_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypat
         )
         == "published"
     )
+
+
+def test_alibaba_loop_rejects_mixed_publisher_recovery_turn_atomically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    route = ach.resolve_model(ach.load_routing_config(root), None)
+    payloads: list[dict] = []
+    dispatched_tools: list[str] = []
+    publish_calls = 0
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(*_args, **_kwargs):
+        nonlocal publish_calls
+        publish_calls += 1
+        return Published()
+
+    def native_hook_runner(*_args, **_kwargs) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(returncode=0, stdout="{}")
+
+    original_dispatch = base.dispatch_tool_call
+
+    def recording_dispatch(tool_name, *args, **kwargs):
+        dispatched_tools.append(tool_name)
+        return original_dispatch(tool_name, *args, **kwargs)
+
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    monkeypatch.setattr(base, "dispatch_tool_call", recording_dispatch)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-mixed-recovery")
+
+    def publisher_block(call_id: str) -> dict:
+        return {
+            "type": "tool_use",
+            "id": call_id,
+            "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+            "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+        }
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            assert "tool_choice" not in payload
+            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
+        if len(payloads) == 2:
+            assert payload["tool_choice"] == {"type": "tool", "name": base.PUBLISH_BRIDGE_VERDICT_TOOL}
+            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            return {
+                "model": route.model_id,
+                "content": [
+                    publisher_block("publish_rejected"),
+                    {"type": "tool_use", "id": "read_rejected", "name": "Read", "input": {"path": "note.txt"}},
+                ],
+            }
+        if len(payloads) == 3:
+            assert payload["tool_choice"] == {"type": "tool", "name": base.PUBLISH_BRIDGE_VERDICT_TOOL}
+            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            assert "publisher-only recovery rejected non-publisher tool call(s): Read" in str(payload["messages"])
+            return {"model": route.model_id, "content": [publisher_block("publish_valid")]}
+        assert "tool_choice" not in payload
+        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
+
+    assert (
+        ach.run_tool_loop(
+            "review",
+            route,
+            "https://example.test/v1",
+            "key",
+            4,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+            native_hook_runner=native_hook_runner,
+        )
+        == "published"
+    )
+    assert dispatched_tools == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+    assert publish_calls == 1
 
 
 def test_bridge_review_enables_readonly_native_hook_environment(monkeypatch: pytest.MonkeyPatch) -> None:
