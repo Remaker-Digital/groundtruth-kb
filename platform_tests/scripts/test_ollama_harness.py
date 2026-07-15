@@ -767,6 +767,7 @@ def test_bridge_review_recovers_publisher_result_without_verdict_path(
     )
     assert [tool["function"]["name"] for tool in payloads[1]["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
     assert "verdict_path" in payloads[1]["messages"][-1]["content"]
+    assert '"status": "ok"' in payloads[1]["messages"][-1]["content"]
     assert publish_calls == 2
 
 
@@ -1044,6 +1045,7 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
 def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = make_root(tmp_path)
     calls = 0
+    payloads: list[dict] = []
 
     def fail_publish(*_args, **_kwargs):
         raise RuntimeError("claim contention")
@@ -1053,9 +1055,10 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: 
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-D-failure")
 
-    def chat(_url: str, _payload: dict, _timeout: float) -> dict:
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
         nonlocal calls
         calls += 1
+        payloads.append(json.loads(json.dumps(payload)))
         return {
             "message": {
                 "content": "",
@@ -1075,7 +1078,7 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: 
             }
         }
 
-    with pytest.raises(oh.OllamaHarnessError, match="repeated bridge verdict publisher failures"):
+    with pytest.raises(oh.OllamaHarnessError) as exc_info:
         oh.run_tool_loop(
             "review",
             route(root),
@@ -1086,6 +1089,69 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(tmp_path: 
             chat_func=chat,
         )
     assert calls == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 1
+    assert f"exhausted after {calls} attempts" in str(exc_info.value)
+    assert "claim contention" in str(exc_info.value)
+    assert "claim contention" in payloads[1]["messages"][-1]["content"]
+    for payload in payloads[1:]:
+        assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+
+
+def test_bridge_review_bounds_nonpublisher_recovery_without_dispatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = make_root(tmp_path)
+    payloads: list[dict] = []
+    dispatched: list[str] = []
+    original_dispatch = oh.dispatch_tool_call
+
+    def recording_dispatch(tool_name: str, *args, **kwargs) -> str:
+        dispatched.append(tool_name)
+        return original_dispatch(tool_name, *args, **kwargs)
+
+    monkeypatch.setattr(oh, "dispatch_tool_call", recording_dispatch)
+
+    def chat(_url: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(json.loads(json.dumps(payload)))
+        if len(payloads) == 1:
+            return {"message": {"content": "GO is ready"}}
+        return {
+            "message": {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": f"invalid_{len(payloads)}",
+                        "function": {"name": "Read", "arguments": {"path": "bridge/example-001.md"}},
+                    }
+                ],
+            }
+        }
+
+    with pytest.raises(oh.OllamaHarnessError) as exc_info:
+        oh.run_tool_loop(
+            "review",
+            route(root),
+            oh.DEFAULT_ENDPOINT,
+            10,
+            root,
+            skill="bridge-review",
+            chat_func=chat,
+        )
+
+    assert dispatched == []
+    assert len(payloads) == oh.MAX_BRIDGE_VERDICT_RECOVERY_TURNS + 2
+    assert "exhausted after 4 attempts" in str(exc_info.value)
+    assert "non-publisher tool call(s): Read" in str(exc_info.value)
+    for payload in payloads[1:]:
+        assert [tool["function"]["name"] for tool in payload["tools"]] == [oh.PUBLISH_BRIDGE_VERDICT_TOOL]
+
+
+def test_publisher_failure_diagnostic_is_credential_safe_and_bounded():
+    raw_secret = "secret-value-that-must-never-escape"
+    diagnostic = oh._bounded_publisher_failure_diagnostic(
+        f"ERROR: claim contention; api_key={raw_secret}; " + ("x" * 1000)
+    )
+
+    assert raw_secret not in diagnostic
+    assert "[REDACTED:api_key]" in diagnostic
+    assert len(diagnostic) <= oh.MAX_PUBLISHER_DIAGNOSTIC_CHARS
 
 
 def test_tool_loop_enforces_session_timeout_between_turns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

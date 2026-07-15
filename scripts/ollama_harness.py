@@ -54,6 +54,7 @@ MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
 MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
+MAX_PUBLISHER_DIAGNOSTIC_CHARS = 500
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
 BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT = (
@@ -1186,6 +1187,32 @@ def _publish_bridge_verdict_succeeded(result: str) -> bool:
     )
 
 
+def _bounded_publisher_failure_diagnostic(result: str) -> str:
+    if result.startswith("ERROR:"):
+        diagnostic = result
+    else:
+        diagnostic = f"PublishBridgeVerdict returned no nonblank verdict_path: {result}"
+
+    try:
+        from groundtruth_kb.governance.credential_patterns import db_pattern_list
+    except (ImportError, OSError):
+        return "publisher failure details unavailable because credential redaction could not be loaded"
+
+    for label, pattern in db_pattern_list():
+        diagnostic = pattern.sub(f"[REDACTED:{label}]", diagnostic)
+    diagnostic = " ".join(diagnostic.split()) or "empty publisher failure result"
+    if len(diagnostic) > MAX_PUBLISHER_DIAGNOSTIC_CHARS:
+        diagnostic = diagnostic[: MAX_PUBLISHER_DIAGNOSTIC_CHARS - 3].rstrip() + "..."
+    return diagnostic
+
+
+def _publisher_recovery_exhausted(attempts: int, last_failure: str | None) -> OllamaHarnessError:
+    diagnostic = last_failure or "publisher failure reason unavailable"
+    return OllamaHarnessError(
+        f"bridge verdict publisher recovery exhausted after {attempts} attempts; last failure: {diagnostic}"
+    )
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -1236,6 +1263,7 @@ def run_tool_loop(
     bridge_verdict_published = False
     bridge_recovery_turns = 0
     publisher_failures = 0
+    last_publisher_failure: str | None = None
 
     stop_reason = "process_error"
     try:
@@ -1298,8 +1326,25 @@ def run_tool_loop(
                         continue
                     function = call.get("function")
                     recovery_tool_names.append(function.get("name") if isinstance(function, dict) else call.get("name"))
-                if any(name != PUBLISH_BRIDGE_VERDICT_TOOL for name in recovery_tool_names):
-                    raise OllamaHarnessError("bridge verdict publisher recovery received non-publisher tool call")
+                rejected_names = sorted(
+                    {str(name or "<missing>") for name in recovery_tool_names if name != PUBLISH_BRIDGE_VERDICT_TOOL}
+                )
+                if rejected_names:
+                    publisher_failures += 1
+                    last_publisher_failure = _bounded_publisher_failure_diagnostic(
+                        "publisher-only recovery rejected non-publisher tool call(s): " + ", ".join(rejected_names)
+                    )
+                    if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                        raise _publisher_recovery_exhausted(publisher_failures, last_publisher_failure)
+                    bridge_recovery_turns = max(bridge_recovery_turns, 1)
+                    messages.append({"role": "assistant", "content": message.get("content") or ""})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT.format(reason=last_publisher_failure),
+                        }
+                    )
+                    continue
 
             tool_signature = json.dumps(tool_calls, sort_keys=True, default=str)
             if tool_signature == previous_tool_signature:
@@ -1339,14 +1384,16 @@ def run_tool_loop(
                 if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
                     if not _publish_bridge_verdict_succeeded(result):
                         publisher_failures += 1
+                        last_publisher_failure = _bounded_publisher_failure_diagnostic(result)
                         if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                            raise OllamaHarnessError("repeated bridge verdict publisher failures before completion")
+                            raise _publisher_recovery_exhausted(publisher_failures, last_publisher_failure)
                         bridge_recovery_turns = max(bridge_recovery_turns, 1)
-                        publisher_recovery_reason = "PublishBridgeVerdict did not return a verdict_path"
+                        publisher_recovery_reason = last_publisher_failure
                     else:
                         bridge_verdict_published = True
                         bridge_recovery_turns = 0
                         publisher_failures = 0
+                        last_publisher_failure = None
                 messages.append(
                     {
                         "role": "tool",
