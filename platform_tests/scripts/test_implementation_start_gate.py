@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import json
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +14,7 @@ import pytest
 from groundtruth_kb.db import KnowledgeDB
 
 ROOT = Path(__file__).resolve().parents[2]
+TAXONOMY_PATH = ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -61,6 +64,13 @@ def _proposal(
             "| T-gate | GOV-FILE-BRIDGE-AUTHORITY-001 | pytest |",
             "",
         ]
+    )
+
+
+def _pauth_proposal(**kwargs: object) -> str:
+    return (
+        _proposal(**kwargs)
+        + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
     )
 
 
@@ -129,7 +139,17 @@ def _write_thread(
     (bridge / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _seed_project_authorization(root: Path, *, link_work_item: bool = True, status: str = "active") -> None:
+def _seed_project_authorization(
+    root: Path,
+    *,
+    link_work_item: bool = True,
+    status: str = "active",
+    forbidden_operations: list[str] | None = None,
+    allowed_mutation_classes: list[str] | None = None,
+) -> None:
+    taxonomy_target = root / "config" / "governance" / TAXONOMY_PATH.name
+    taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(TAXONOMY_PATH, taxonomy_target)
     db = KnowledgeDB(root / "groundtruth.db")
     try:
         db.insert_deliberation(
@@ -185,6 +205,8 @@ def _seed_project_authorization(root: Path, *, link_work_item: bool = True, stat
             id="PAUTH-AUTH",
             status=status,
             included_spec_ids=["SPEC-AUTH-SEED"],
+            allowed_mutation_classes=allowed_mutation_classes or ["configuration", "source", "test"],
+            forbidden_operations=forbidden_operations,
         )
     finally:
         db.close()
@@ -251,8 +273,27 @@ def _apply_patch_payload(
     }
 
 
-def test_go_authorization_packet_allows_in_scope_apply_patch(tmp_path: Path) -> None:
+def test_go_authorization_packet_without_pauth_blocks_in_scope_apply_patch(tmp_path: Path) -> None:
+    taxonomy_target = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
+    taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(TAXONOMY_PATH, taxonomy_target)
     _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert "Project Authorization is required" in result["reason"]
+
+
+def test_pauth_backed_go_authorization_allows_in_scope_apply_patch(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path)
@@ -264,10 +305,11 @@ def test_gate_blocks_dirty_path_claimed_by_nonterminal_peer_report(tmp_path: Pat
     """WI-5105: protected mutation rechecks a released peer report before edit."""
     peer = "peer-thread"
     current = "current-thread"
+    _seed_project_authorization(tmp_path)
     _write_thread(tmp_path, bridge_id=peer)
     peer_packet = auth.create_authorization_packet(tmp_path, peer)
     auth.write_named_packet(tmp_path, peer_packet, peer)
-    _write_thread(tmp_path, bridge_id=current)
+    _write_thread(tmp_path, bridge_id=current, proposal=_pauth_proposal(bridge_id=current))
     current_packet = auth.create_authorization_packet(tmp_path, current)
     auth.write_packet(tmp_path, current_packet)
     _claim_bridge(tmp_path, current, "session-1")
@@ -327,7 +369,8 @@ def test_dispatcher_config_cli_command_not_treated_as_direct_file_edit(tmp_path:
 
 
 def test_valid_packet_blocks_when_work_intent_claim_missing(tmp_path: Path) -> None:
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
 
@@ -338,7 +381,8 @@ def test_valid_packet_blocks_when_work_intent_claim_missing(tmp_path: Path) -> N
 
 
 def test_valid_packet_blocks_when_claim_held_by_other_session(tmp_path: Path) -> None:
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path, "sample-implementation", "other-session")
@@ -350,7 +394,8 @@ def test_valid_packet_blocks_when_claim_held_by_other_session(tmp_path: Path) ->
 
 
 def test_lapsed_claim_blocks_mutation(tmp_path: Path) -> None:
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path, "sample-implementation", "session-1")
@@ -391,14 +436,15 @@ def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
     (c) ambient session mutating ``scripts/b_only.py`` (bridge-b's exclusive
         scope) -> BLOCKED by packet authorization (bridge-a doesn't cover it).
     """
+    _seed_project_authorization(tmp_path)
     bridge = tmp_path / "bridge"
     bridge.mkdir()
     (bridge / "bridge-a-001.md").write_text(
-        _proposal(bridge_id="bridge-a", target_paths=["scripts/shared.py"]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-a", target_paths=["scripts/shared.py"]), encoding="utf-8"
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _proposal(bridge_id="bridge-b", target_paths=["scripts/shared.py", "scripts/b_only.py"]),
+        _pauth_proposal(bridge_id="bridge-b", target_paths=["scripts/shared.py", "scripts/b_only.py"]),
         encoding="utf-8",
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
@@ -434,7 +480,8 @@ def test_gate_allows_concurrent_authorized_implementers(tmp_path: Path) -> None:
 
 
 def test_gate_allows_when_holder_is_dispatch_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path, "sample-implementation", "dispatch-1")
@@ -444,7 +491,8 @@ def test_gate_allows_when_holder_is_dispatch_id(tmp_path: Path, monkeypatch: pyt
 
 
 def test_gate_blocks_on_work_intent_registry_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path, "sample-implementation", "session-1")
@@ -460,8 +508,9 @@ def test_gate_blocks_on_work_intent_registry_error(tmp_path: Path, monkeypatch: 
     assert "Could not verify bridge work-intent claim" in result["reason"]
 
 
-def test_bootstrap_bridge_id_exempt_from_claim_check(tmp_path: Path) -> None:
+def test_bootstrap_bridge_id_does_not_exempt_missing_pauth(tmp_path: Path) -> None:
     bridge_id = "gtkb-implementation-start-authorization-gate"
+    _seed_project_authorization(tmp_path)
     _write_thread(
         tmp_path,
         bridge_id=bridge_id,
@@ -470,7 +519,10 @@ def test_bootstrap_bridge_id_exempt_from_claim_check(tmp_path: Path) -> None:
     packet = auth.create_authorization_packet(tmp_path, bridge_id)
     auth.write_packet(tmp_path, packet)
 
-    assert gate.gate_decision(_apply_patch_payload(tmp_path, session_id="")) == {}
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, session_id=""))
+
+    assert result["decision"] == "block"
+    assert "Project Authorization is required" in result["reason"]
 
 
 def test_existing_packet_blocks_when_bridge_becomes_latest_deferred(tmp_path: Path) -> None:
@@ -584,7 +636,8 @@ def test_authorization_accepts_bold_target_paths_metadata(tmp_path: Path) -> Non
 
 def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) -> None:
     exact_target = "config/governance/hygiene-baseline-registry.toml"
-    _write_thread(tmp_path, proposal=_proposal(target_paths=[exact_target]))
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal(target_paths=[exact_target]))
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     _claim_bridge(tmp_path)
@@ -646,9 +699,10 @@ def test_requirement_gap_blocks_authorization(tmp_path: Path) -> None:
 
 def test_requirement_sufficiency_are_sufficient_allows_gate_authorization(tmp_path: Path) -> None:
     """WI-3410: natural sufficient-state wording authorizes protected edits."""
+    _seed_project_authorization(tmp_path)
     _write_thread(
         tmp_path,
-        proposal=_proposal(requirement_sufficiency="Existing requirements are sufficient for this scoped fix."),
+        proposal=_pauth_proposal(requirement_sufficiency="Existing requirements are sufficient for this scoped fix."),
     )
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
@@ -668,9 +722,10 @@ def test_requirement_sufficiency_are_sufficient_allows_gate_authorization(tmp_pa
 
 def test_owner_sufficiency_deliberation_packet_allows_gate_authorization(tmp_path: Path) -> None:
     """WI-4241: owner-decision fallback packets authorize protected edits."""
+    _seed_project_authorization(tmp_path)
     _write_thread(
         tmp_path,
-        proposal=_proposal(requirement_sufficiency="Complete coverage exists without the bounded phrase."),
+        proposal=_pauth_proposal(requirement_sufficiency="Complete coverage exists without the bounded phrase."),
     )
     delib_id = _seed_owner_sufficiency_deliberation(tmp_path)
     packet = auth.create_authorization_packet(
@@ -710,6 +765,162 @@ def test_project_authorization_metadata_is_carried_in_packet(tmp_path: Path) -> 
     assert packet["project_authorization"]["project_id"] == "PROJECT-AUTH"
     assert packet["project_authorization"]["work_item_id"] == "WI-AUTH-001"
     assert auth.load_packet(tmp_path)["project_authorization"]["id"] == "PAUTH-AUTH"
+
+
+def test_start_finalizer_binds_live_pauth_claim_and_worker_evidence(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    pre_start_hash = packet["packet_hash"]
+    _claim_bridge(tmp_path)
+
+    finalized = auth.finalize_implementation_start_packet(tmp_path, packet, session_id="session-1")
+    auth.write_started_packets(tmp_path, [finalized])
+
+    evidence = finalized["implementation_start"]
+    assert finalized["schema_version"] == 3
+    assert evidence["pre_start_packet_hash"] == pre_start_hash
+    assert evidence["session_id"] == "session-1"
+    assert evidence["work_intent_claim"]["claim_kind"] == "go_implementation"
+    assert evidence["worker_role_provenance"]["role"] == "prime-builder"
+    assert evidence["project_authorization_decision"]["normalized_operation"] == "implementation_start"
+    assert evidence["project_authorization_decision"]["allowed"] is True
+    assert auth.packet_hash(finalized) == finalized["packet_hash"]
+    assert auth.load_packet(tmp_path) == finalized
+    assert auth.load_named_packet(tmp_path, "sample-implementation") == finalized
+
+
+def test_start_finalizer_rejects_missing_pauth_for_protected_targets(tmp_path: Path) -> None:
+    taxonomy_target = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
+    taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(TAXONOMY_PATH, taxonomy_target)
+    _write_thread(tmp_path)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    _claim_bridge(tmp_path)
+
+    with pytest.raises(auth.AuthorizationError, match="Project Authorization is required"):
+        auth.finalize_implementation_start_packet(tmp_path, packet, session_id="session-1")
+
+
+def test_start_finalizer_denial_writes_no_packet(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, forbidden_operations=["implementation_start"])
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    _claim_bridge(tmp_path)
+
+    with pytest.raises(auth.AuthorizationError, match="denied implementation_start"):
+        auth.finalize_implementation_start_packet(tmp_path, packet, session_id="session-1")
+
+    assert not auth.packet_path(tmp_path).exists()
+    assert not auth.packet_path_for_bridge(tmp_path, "sample-implementation").exists()
+
+
+@pytest.mark.parametrize("forbidden_operation", ["implementation_start", "protected_mutation"])
+def test_gate_rechecks_live_project_authorization_before_protected_effect(
+    tmp_path: Path,
+    forbidden_operation: str,
+) -> None:
+    _seed_project_authorization(tmp_path, forbidden_operations=[forbidden_operation])
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert f"denied {forbidden_operation}" in result["reason"]
+    assert "forbidden_operation" in result["reason"]
+
+
+def test_work_intent_acquire_denial_creates_no_claim(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, forbidden_operations=["work_intent_acquire"])
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
+    _write_prime_worker_session(tmp_path, "session-1")
+
+    with pytest.raises(auth.bridge_work_intent_registry.WorkIntentRegistryError, match="work_intent_acquire"):
+        auth.bridge_work_intent_registry.acquire("sample-implementation", "session-1", project_root=tmp_path)
+
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM work_intent_claims WHERE thread_slug = ?",
+            ("sample-implementation",),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert count == 0
+
+
+def test_work_intent_extension_denial_leaves_claim_unchanged(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, forbidden_operations=["work_intent_extend"])
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
+    _claim_bridge(tmp_path)
+    before = auth.bridge_work_intent_registry.current_holder("sample-implementation", project_root=tmp_path)
+
+    with pytest.raises(auth.bridge_work_intent_registry.WorkIntentRegistryError, match="work_intent_extend"):
+        auth.bridge_work_intent_registry.extend("sample-implementation", "session-1", project_root=tmp_path)
+
+    after = auth.bridge_work_intent_registry.current_holder("sample-implementation", project_root=tmp_path)
+    assert after == before
+
+
+def test_work_intent_renew_denial_leaves_go_claim_unchanged(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, forbidden_operations=["work_intent_renew"])
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal)
+    _claim_bridge(tmp_path)
+    before = auth.bridge_work_intent_registry.current_holder("sample-implementation", project_root=tmp_path)
+
+    with pytest.raises(
+        auth.bridge_work_intent_registry.WorkIntentAuthorizationError,
+        match="work_intent_renew",
+    ):
+        auth.bridge_work_intent_registry.acquire("sample-implementation", "session-1", project_root=tmp_path)
+
+    after = auth.bridge_work_intent_registry.current_holder("sample-implementation", project_root=tmp_path)
+    assert after == before
+
+
+def test_work_intent_reclassify_denial_leaves_draft_claim_unchanged(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, forbidden_operations=["work_intent_reclassify"])
+    proposal = (
+        _proposal() + "\nProject Authorization: `PAUTH-AUTH`\nProject: `PROJECT-AUTH`\nWork Item: `WI-AUTH-001`\n"
+    )
+    _write_thread(tmp_path, proposal=proposal, latest_status="NEW")
+    _write_prime_worker_session(tmp_path, "session-1")
+    assert auth.bridge_work_intent_registry.acquire("sample-implementation", "session-1", project_root=tmp_path)
+    before = auth.bridge_work_intent_registry.current_holder("sample-implementation", project_root=tmp_path)
+    (tmp_path / "bridge" / "sample-implementation-002.md").write_text(
+        _go_verdict_body(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        auth.bridge_work_intent_registry.WorkIntentAuthorizationError,
+        match="work_intent_reclassify",
+    ):
+        auth.bridge_work_intent_registry.acquire("sample-implementation", "session-1", project_root=tmp_path)
+
+    after = auth.bridge_work_intent_registry.current_holder("sample-implementation", project_root=tmp_path)
+    assert after == before
 
 
 def _write_amendment_packet(tmp_path: Path, filename: str, content: str) -> str:
@@ -999,24 +1210,246 @@ def test_read_only_shell_command_is_allowed_without_authorization(tmp_path: Path
     assert gate.gate_decision(payload) == {}
 
 
-def test_git_commit_finalization_command_is_allowed_without_authorization(tmp_path: Path) -> None:
-    payload = {
-        "cwd": str(tmp_path),
-        "tool_name": "Bash",
-        "tool_input": {"command": 'git commit -m "feat(gtkb): finalize verified bridge work"'},
-    }
+@pytest.mark.parametrize(
+    "command",
+    [
+        "python -m pytest platform_tests/scripts/test_sample.py -q",
+        "git status --short",
+        'rg -n "hello" scripts/sample.py',
+    ],
+)
+def test_structurally_single_read_only_commands_remain_allowed(command: str, tmp_path: Path) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": command}}
+
+    assert gate._is_safe_command(command) is True
+    assert gate.gate_decision(payload) == {}
+
+
+@pytest.mark.parametrize(
+    ("command", "reason_code"),
+    [
+        ("python -m pytest -q; Set-Content -Path scripts/bypass.py -Value x", "authorization"),
+        ("git status; git add scripts/bypass.py", "direct_git_effect_requires_lifecycle"),
+    ],
+)
+def test_safe_prefix_does_not_exempt_appended_mutating_stage(command: str, reason_code: str, tmp_path: Path) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": command}}
+
+    assert gate._is_safe_command(command) is False
+    paths, mutating = gate.changed_paths(payload)
+    assert mutating is True
+    assert "scripts/bypass.py" in paths
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    if reason_code == "authorization":
+        assert "authorization packet" in result["reason"]
+    else:
+        assert result["reason_code"] == reason_code
+
+
+@pytest.mark.parametrize(
+    "subcommand",
+    ["create", "attach", "preserve", "promote", "close", "resume", "recover", "drain"],
+)
+def test_git_lifecycle_mutating_subcommands_are_mutation_signals(subcommand: str) -> None:
+    command = f"python -m groundtruth_kb.git_lifecycle --repo . {subcommand} --fixture-argument x"
+
+    assert gate._has_mutating_git_lifecycle_signal(command) is True
+    assert gate._is_mutating_command(command) is True
+
+
+def test_git_lifecycle_preserve_requires_implementation_authority(tmp_path: Path) -> None:
+    command = (
+        'python -m groundtruth_kb.git_lifecycle --repo . preserve --work-item-id WI-TEST --message "preserve test"'
+    )
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": command}}
+
+    assert gate.changed_paths(payload) == ([], True)
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    assert "authorization packet" in result["reason"]
+
+
+@pytest.mark.parametrize("hook_input", ["", "{}", "[]", "{malformed-json"])
+def test_hook_denies_empty_or_malformed_json_payload(
+    hook_input: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(sys, "stdin", io.StringIO(hook_input))
+    monkeypatch.setattr(gate, "_record_gate_denial", lambda *_args, **_kwargs: None)
+
+    assert gate.main() == 0
+    output = json.loads(capsys.readouterr().out)
+    hook_output = output["hookSpecificOutput"]
+    assert hook_output["permissionDecision"] == "deny"
+    assert "payload" in hook_output["permissionDecisionReason"].lower()
+
+
+@pytest.mark.parametrize(
+    ("command", "subcommand"),
+    [
+        ('git commit -m "feat(gtkb): finalize verified bridge work"', "commit"),
+        ('git commit -m "literal ; | && message punctuation"', "commit"),
+        ("git commit --amend --no-edit", "commit"),
+        ('git -C . commit -m "scoped change"', "commit"),
+        ('git -c user.name="GT-KB" commit -m "scoped change"', "commit"),
+        ("git push origin develop", "push"),
+        ("git.exe push --porcelain origin HEAD", "push"),
+        ("git --git-dir=.git push --force-with-lease origin HEAD", "push"),
+        ("git switch -c bypass", "switch"),
+        ("git branch bypass", "branch"),
+        ("git cherry-pick HEAD~1", "cherry-pick"),
+        ("git revert HEAD", "revert"),
+        ("git update-ref refs/heads/main HEAD", "update-ref"),
+        ("git clean -fd", "clean"),
+        ("git worktree add ../bypass", "worktree"),
+        ("git checkout -b bypass", "checkout"),
+        ("git config user.name bypass", "config"),
+        ("git fetch origin", "fetch"),
+    ],
+)
+def test_direct_git_effects_require_lifecycle_command(
+    tmp_path: Path,
+    command: str,
+    subcommand: str,
+) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": command}}
+
+    assert gate.changed_paths(payload) == ([], True)
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
+    assert f"git {subcommand}" in result["reason"]
+    assert "python -m groundtruth_kb.git_lifecycle" in result["reason"]
+
+
+@pytest.mark.parametrize(
+    ("command", "subcommand"),
+    [
+        ('cmd /c "git.exe commit -m nested"', "commit"),
+        ('cmd.exe /s /c "git.exe push origin HEAD"', "push"),
+        ('powershell.exe -NoProfile -Command "git.exe commit -m nested"', "commit"),
+        ('pwsh -c "& git.exe push origin HEAD"', "push"),
+        ('bash -c "git commit -m nested"', "commit"),
+        ("Write-Output inspected\ngit.exe commit -m nested", "commit"),
+    ],
+)
+def test_shell_wrapped_direct_git_effects_require_lifecycle(
+    tmp_path: Path,
+    command: str,
+    subcommand: str,
+) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Shell", "tool_input": {"command": command}}
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
+    assert f"git {subcommand}" in result["reason"]
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "powershell.exe -EncodedCommand ZgBvAG8A",
+        "pwsh -Command",
+        "cmd.exe /c",
+        "bash -c",
+    ],
+)
+def test_uninspectable_nested_shell_commands_fail_closed(tmp_path: Path, command: str) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Shell", "tool_input": {"command": command}}
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cmd /c git.exe status --short",
+        'powershell.exe -Command "git.exe diff --stat"',
+        'bash -c "git log -1"',
+    ],
+)
+def test_shell_wrapped_read_only_git_commands_remain_allowed(tmp_path: Path, command: str) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "Shell", "tool_input": {"command": command}}
 
     assert gate.gate_decision(payload) == {}
 
 
-def test_git_push_finalization_command_is_allowed_without_authorization(tmp_path: Path) -> None:
-    payload = {
-        "cwd": str(tmp_path),
-        "tool_name": "Bash",
-        "tool_input": {"command": "git push origin develop"},
-    }
+@pytest.mark.parametrize(
+    ("tool_name", "tool_input", "subcommand"),
+    [
+        ("Shell", {"command": ["git", "commit", "--amend", "--no-edit"]}, "commit"),
+        ("git", {"argv": ["push", "origin", "HEAD"]}, "push"),
+        ("git.exe", {"args": ["-C", ".", "commit", "-m", "shell-free"]}, "commit"),
+    ],
+)
+def test_shell_free_direct_git_effect_payloads_fail_closed(
+    tmp_path: Path,
+    tool_name: str,
+    tool_input: dict[str, object],
+    subcommand: str,
+) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": tool_name, "tool_input": tool_input}
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
+    assert f"git {subcommand}" in result["reason"]
+
+
+@pytest.mark.parametrize(
+    "tool_input",
+    [
+        {"argv": ["status", "--short"]},
+        {"args": ["-C", ".", "diff", "--stat"]},
+    ],
+)
+def test_shell_free_read_only_git_commands_remain_allowed(
+    tmp_path: Path,
+    tool_input: dict[str, object],
+) -> None:
+    payload = {"cwd": str(tmp_path), "tool_name": "git", "tool_input": tool_input}
 
     assert gate.gate_decision(payload) == {}
+
+
+def test_direct_git_effect_cannot_be_enabled_by_implementation_packet(tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
+    packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
+    auth.write_packet(tmp_path, packet)
+    _claim_bridge(tmp_path)
+    payload = {
+        "cwd": str(tmp_path),
+        "session_id": "session-1",
+        "tool_name": "Bash",
+        "tool_input": {"command": 'git commit -m "must use lifecycle"'},
+    }
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
+
+
+def test_canonical_git_lifecycle_command_reaches_authorization_boundary(tmp_path: Path) -> None:
+    command = 'python -m groundtruth_kb.git_lifecycle preserve --work-item-id WI-TEST --message "preserve test"'
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": command}}
+
+    assert gate._direct_git_effect_from_payload(payload) is None
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert result.get("reason_code") != "direct_git_effect_requires_lifecycle"
+    assert "authorization packet" in result["reason"]
 
 
 def test_chained_git_commit_with_protected_write_still_blocks(tmp_path: Path) -> None:
@@ -1029,12 +1462,13 @@ def test_chained_git_commit_with_protected_write_still_blocks(tmp_path: Path) ->
     result = gate.gate_decision(payload)
 
     assert result["decision"] == "block"
-    assert "authorization packet" in result["reason"]
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
 
 
 def test_gate_uses_unique_named_packet_when_current_json_absent(tmp_path: Path) -> None:
     """WI-4452: a unique valid named packet can authorize the protected target."""
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
 
     named_path = auth.write_named_packet(tmp_path, packet, "sample-implementation")
@@ -1249,14 +1683,15 @@ def test_gate_blocks_when_other_session_claim_packet_reserves_target(
     """WI-4471: gate blocks when another session's active claim+packet reserves the target."""
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
     shared_target = "scripts/shared.py"
+    _seed_project_authorization(tmp_path)
     bridge = tmp_path / "bridge"
     bridge.mkdir()
     (bridge / "bridge-a-001.md").write_text(
-        _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
@@ -1282,7 +1717,8 @@ def test_gate_blocks_when_other_session_claim_packet_reserves_target(
 
 def test_gate_allows_when_no_other_session_reserves_target(tmp_path: Path) -> None:
     """WI-4471: no cross-claim collision when no other active named packet overlaps the target."""
-    _write_thread(tmp_path)
+    _seed_project_authorization(tmp_path)
+    _write_thread(tmp_path, proposal=_pauth_proposal())
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     auth.write_named_packet(tmp_path, packet, "sample-implementation")
@@ -1297,14 +1733,15 @@ def test_collision_ignores_expired_claim_for_overlapping_packet(
     """WI-4471: expired/lapsed claim does not trigger a cross-claim collision."""
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
     shared_target = "scripts/shared.py"
+    _seed_project_authorization(tmp_path)
     bridge = tmp_path / "bridge"
     bridge.mkdir()
     (bridge / "bridge-a-001.md").write_text(
-        _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
@@ -1340,14 +1777,15 @@ def test_collision_ignores_same_session_overlapping_claim(tmp_path: Path, monkey
     """WI-4471: same-session overlapping claim is not a collision (legitimate multi-thread)."""
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
     shared_target = "scripts/shared.py"
+    _seed_project_authorization(tmp_path)
     bridge = tmp_path / "bridge"
     bridge.mkdir()
     (bridge / "bridge-a-001.md").write_text(
-        _proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-a", target_paths=[shared_target]), encoding="utf-8"
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-b", target_paths=[shared_target]), encoding="utf-8"
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
@@ -1374,14 +1812,15 @@ def test_gate_blocks_when_other_session_glob_packet_reserves_target(
     """WI-4996: a peer packet glob reserves matching concrete protected edits."""
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "session-A")
     concrete_target = "scripts/dispatcher_runtime.py"
+    _seed_project_authorization(tmp_path)
     bridge = tmp_path / "bridge"
     bridge.mkdir()
     (bridge / "bridge-a-001.md").write_text(
-        _proposal(bridge_id="bridge-a", target_paths=[concrete_target]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-a", target_paths=[concrete_target]), encoding="utf-8"
     )
     (bridge / "bridge-a-002.md").write_text(_go_verdict_body("bridge-a"), encoding="utf-8")
     (bridge / "bridge-b-001.md").write_text(
-        _proposal(bridge_id="bridge-b", target_paths=["scripts/*.py"]), encoding="utf-8"
+        _pauth_proposal(bridge_id="bridge-b", target_paths=["scripts/*.py"]), encoding="utf-8"
     )
     (bridge / "bridge-b-002.md").write_text(_go_verdict_body("bridge-b"), encoding="utf-8")
     (bridge / "INDEX.md").write_text(
@@ -1487,82 +1926,17 @@ def test_start_gate_enforces_canonical_edit_from_worktree(tmp_path: Path) -> Non
     assert "authorization packet" in result.get("reason", "")
 
 
-# WI-3357: implementation_start_gate finalization-exemption quote-aware
-# control-marker fix. Cases derive from the Specification-Derived Verification
+# WI-3357 regression corpus for quote-aware command parsing. Cases derive from
+# the Specification-Derived Verification
 # Plan in bridge/gtkb-impl-start-gate-finalization-quoting-fix-007.md, plus the
 # -008 review's non-blocking observations (multi-cat / CRLF / unquoted shapes).
 # In a command string, \n is a literal newline; HEREDOC commands span lines.
 
 
-_WI3357_SIMPLE_CASES = [
-    # (case_id, command, expected_is_simple)
-    ("01-chaining-markers-double-quoted", 'git commit -m "fix X; tidy | done && wrap"', True),
-    ("02-chaining-marker-single-quoted", "git commit -m 'fix X; tidy Y'", True),
-    ("03-heredoc-single-quoted-delim", "git commit -m \"$(cat <<'EOF'\nmsg body\nEOF\n)\"", True),
-    ("04-heredoc-double-quoted-delim", 'git commit -m "$(cat <<"EOF"\nmsg\nEOF\n)"', True),
-    ("05-cmdsub-protected-write", 'git commit -m "$(Set-Content -Path scripts/sample.py -Value z)"', False),
-    ("06-backtick-protected-write", 'git commit -m "`Set-Content -Path scripts/sample.py -Value z`"', False),
-    ("07-cmdsub-non-heredoc", 'git commit -m "$(cat msg.txt)"', False),
-    ("08-heredoc-unquoted-delim", 'git commit -m "$(cat <<EOF\nmsg\nEOF\n)"', False),
-    ("09-heredoc-non-cat-command", "git commit -m \"$(rm scripts/sample.py <<'EOF'\nx\nEOF\n)\"", False),
-    ("10-cmdsub-literal-single-quoted", "git commit -m '$(whoami)'", True),
-    ("11-chained-after-git-finalization", 'git commit -m "x"; rm -rf y', False),
-    (
-        "12-chained-protected-write-punctuated",
-        'git commit -m "fix; tidy"; Set-Content -Path scripts/sample.py -Value "z"',
-        False,
-    ),
-    (
-        "13-chained-after-complete-heredoc",
-        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\" && Set-Content -Path scripts/sample.py -Value z",
-        False,
-    ),
-    ("14-plain-push", "git push origin develop", True),
-    ("15-denied-push-flag", "git push --force origin main", False),
-    (
-        "16-early-delimiter-then-command",
-        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\nSet-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
-        False,
-    ),
-    (
-        "17-early-delimiter-then-separator",
-        "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n; Set-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
-        False,
-    ),
-    (
-        "18-opener-redirect-tail",
-        "git commit -m \"$(cat <<'EOF' > scripts/sample.py\nmsg\nEOF\n)\"",
-        False,
-    ),
-    (
-        "19-opener-separator-tail",
-        "git commit -m \"$(cat <<'EOF'; Set-Content -Path scripts/sample.py -Value z\nmsg\nEOF\n)\"",
-        False,
-    ),
-    (
-        "20-opener-pipeline-tail",
-        "git commit -m \"$(cat <<'EOF' | tee scripts/sample.py\nmsg\nEOF\n)\"",
-        False,
-    ),
-    ("21-multi-cat-heredoc", "git commit -m \"$(cat <<'A' <<'B'\nbody\nA\nB\n)\"", False),
-    ("22-crlf-heredoc", "git commit -m \"$(cat <<'EOF'\r\nmsg\r\nEOF\r\n)\"", False),
-    ("23-unquoted-heredoc-substitution", "git commit -m $(cat <<'EOF'\nmsg\nEOF\n)", True),
-]
-
-
-@pytest.mark.parametrize(("case_id", "command", "expected"), _WI3357_SIMPLE_CASES)
-def test_wi3357_simple_git_finalization_classification(case_id: str, command: str, expected: bool) -> None:
-    """WI-3357: _is_simple_git_finalization_command classifies each verification
-    case correctly. Literal punctuation and the documented HEREDOC commit
-    pattern are exempt; executable command substitution, chaining, and any
-    heredoc whose substitution would run a further command are not."""
-    assert gate._is_simple_git_finalization_command(command) is expected, case_id
-
-
 _WI3357_GATE_CASES = [
-    # (case_id, command, expected) -- expected is "exempt" ({}) or "block"
-    ("01-chaining-markers-exempt", 'git commit -m "fix X; tidy | done && wrap"', "exempt"),
-    ("03-heredoc-exempt", "git commit -m \"$(cat <<'EOF'\nmsg body\nEOF\n)\"", "exempt"),
+    # Direct commit/push effects always block, regardless of message syntax.
+    ("01-chaining-markers-block", 'git commit -m "fix X; tidy | done && wrap"', "block"),
+    ("03-heredoc-block", "git commit -m \"$(cat <<'EOF'\nmsg body\nEOF\n)\"", "block"),
     (
         "05-cmdsub-protected-write-blocks",
         'git commit -m "$(Set-Content -Path scripts/sample.py -Value z)"',
@@ -1590,7 +1964,7 @@ _WI3357_GATE_CASES = [
         "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\" && Set-Content -Path scripts/sample.py -Value z",
         "block",
     ),
-    ("14-plain-push-exempt", "git push origin develop", "exempt"),
+    ("14-plain-push-block", "git push origin develop", "block"),
     (
         "16-early-delimiter-blocks",
         "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\nSet-Content -Path scripts/sample.py -Value z\nEOF\n)\"",
@@ -1621,19 +1995,18 @@ _WI3357_GATE_CASES = [
 
 @pytest.mark.parametrize(("case_id", "command", "expected"), _WI3357_GATE_CASES)
 def test_wi3357_gate_decision_classification(tmp_path: Path, case_id: str, command: str, expected: str) -> None:
-    """WI-3357: gate_decision exempts a punctuated/HEREDOC git finalization
-    command (returns {}) and blocks a command whose substitution or chaining
-    would run a protected mutation, with no authorization packet seeded."""
+    """All historical direct-finalization forms now require the lifecycle CLI."""
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "Bash",
         "tool_input": {"command": command},
     }
     result = gate.gate_decision(payload)
-    if expected == "exempt":
-        assert result == {}, case_id
+    assert expected == "block", case_id
+    assert result.get("decision") == "block", case_id
+    if result.get("reason_code") is not None:
+        assert result["reason_code"] == "direct_git_effect_requires_lifecycle", case_id
     else:
-        assert result.get("decision") == "block", case_id
         assert "authorization packet" in result.get("reason", ""), case_id
 
 
@@ -1744,20 +2117,19 @@ def _git_add_payload(root: Path, command: str, session_id: str = "session-1") ->
     }
 
 
-def test_post_verified_finalization_git_add_approved_path_allowed(tmp_path: Path) -> None:
-    """DELIB-WI4837-AUTOMATIC-PARITY-20260707: `git add` of a terminal-VERIFIED
-    thread's own approved target path is cleared (no per-instance owner waiver),
-    identified by the session's work-intent claim."""
+def test_post_verified_finalization_git_add_approved_path_requires_lifecycle(tmp_path: Path) -> None:
+    """Terminal verification does not bypass the canonical Git lifecycle."""
     _write_verified_thread(tmp_path, bridge_id="verified-impl")
     _claim_bridge(tmp_path, "verified-impl", "session-1")
 
     result = gate.gate_decision(_git_add_payload(tmp_path, "git add scripts/sample.py"))
 
-    assert result == {}
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
 
 
-def test_post_verified_finalization_git_add_multiple_approved_paths_allowed(tmp_path: Path) -> None:
-    """Every staged target inside approved target_paths is cleared together."""
+def test_post_verified_finalization_git_add_multiple_approved_paths_requires_lifecycle(tmp_path: Path) -> None:
+    """Multiple approved targets still require the canonical Git lifecycle."""
     _write_verified_thread(tmp_path, bridge_id="verified-impl")
     _claim_bridge(tmp_path, "verified-impl", "session-1")
 
@@ -1765,7 +2137,8 @@ def test_post_verified_finalization_git_add_multiple_approved_paths_allowed(tmp_
         _git_add_payload(tmp_path, "git add scripts/sample.py platform_tests/scripts/test_sample.py")
     )
 
-    assert result == {}
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "direct_git_effect_requires_lifecycle"
 
 
 def test_post_verified_finalization_git_add_outside_target_paths_blocked(tmp_path: Path) -> None:

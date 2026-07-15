@@ -52,11 +52,14 @@ BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN = (
 
 ROOT_MEMBASE_EXACT = frozenset({"groundtruth.db"})
 RUNTIME_AUTHORITY_PREFIXES = (
+    "harness-state/",
     ".gtkb-state/implementation-authorizations/",
     ".gtkb-state/work-intent/",
     ".gtkb-state/bridge-poller/",
     ".gtkb-state/dispatcher-daemon/",
     ".gtkb-state/dispatch/",
+    ".gtkb-state/git-lifecycle/",
+    ".gtkb-state/modernization-release-candidate/",
 )
 
 

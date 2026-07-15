@@ -327,6 +327,26 @@ def test_bridge_review_main_builds_prompt_mode_command(
     assert capsys.readouterr().out == "GO\n"
 
 
+def test_main_can_force_read_only_plan_mode(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    calls = []
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda _skill: None)
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="{}\n", stderr="")
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness.main(["--prompt", "inspect only", "--mode", "plan", "--output-format", "json"]) == 0
+    command, _kwargs = calls[0]
+    assert command[-3:] == ["--mode", "plan", "inspect only"]
+    assert capsys.readouterr().out == "{}\n"
+
+
 def test_main_uses_no_window_creationflags_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _load_harness()
     calls = []

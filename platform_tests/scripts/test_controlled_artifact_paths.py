@@ -41,6 +41,21 @@ from scripts.controlled_artifact_paths import (
             "runtime_authority_state_direct_mutation",
             ".gtkb-state/dispatcher-daemon/",
         ),
+        (
+            "harness-state/codex/session-envelope.json",
+            "runtime_authority_state_direct_mutation",
+            "harness-state/",
+        ),
+        (
+            ".gtkb-state/git-lifecycle/operations/operation.json",
+            "runtime_authority_state_direct_mutation",
+            ".gtkb-state/git-lifecycle/",
+        ),
+        (
+            ".gtkb-state/modernization-release-candidate/evidence/receipt.json",
+            "runtime_authority_state_direct_mutation",
+            ".gtkb-state/modernization-release-candidate/",
+        ),
     ],
 )
 def test_direct_controlled_artifacts_are_block_classified(path: str, reason_code: str, classification: str) -> None:
@@ -82,6 +97,8 @@ def test_bridge_status_helpers_are_specific() -> None:
 def test_runtime_authority_state_helper_is_specific() -> None:
     assert is_runtime_authority_state_path("groundtruth.db") is True
     assert is_runtime_authority_state_path(".gtkb-state/implementation-authorizations/current.json") is True
+    assert is_runtime_authority_state_path("harness-state/harness-registry.json") is True
+    assert is_runtime_authority_state_path(".gtkb-state/modernization-release-candidate/status.json") is True
     assert is_runtime_authority_state_path(".gtkb-state/bridge-impl-reports/drafts/report.md") is False
 
 

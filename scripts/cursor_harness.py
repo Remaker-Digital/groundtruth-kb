@@ -215,7 +215,13 @@ def cursor_adaptation_metadata(project_root: Path = PROJECT_ROOT) -> dict[str, A
     }
 
 
-def _build_command(prompt: str, project_root: Path, *, output_format: str) -> list[str]:
+def _build_command(
+    prompt: str,
+    project_root: Path,
+    *,
+    output_format: str,
+    mode: str | None = None,
+) -> list[str]:
     command = _resolve_agent_command()
     command.extend(
         [
@@ -225,9 +231,11 @@ def _build_command(prompt: str, project_root: Path, *, output_format: str) -> li
             str(project_root),
             "--output-format",
             output_format,
-            prompt,
         ]
     )
+    if mode is not None:
+        command.extend(["--mode", mode])
+    command.append(prompt)
     return command
 
 
@@ -405,6 +413,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_TIMEOUT_SECONDS,
         help="Subprocess timeout in seconds.",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["plan", "ask"],
+        help="Optional read-only Cursor execution mode.",
+    )
     return parser
 
 
@@ -432,7 +445,7 @@ def main(argv: list[str] | None = None) -> int:
         pass
     try:
         prompt = _build_prompt(args.prompt, args.skill)
-        command = _build_command(prompt, project_root, output_format=args.output_format)
+        command = _build_command(prompt, project_root, output_format=args.output_format, mode=args.mode)
         env = _cursor_agent_env()
         should_record_cursor_agents = bool(dispatch_run_id)
         if should_record_cursor_agents:
