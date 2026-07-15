@@ -541,7 +541,9 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
     required_roles = _role_tags(dispatcher_rules)
 
     cells: list[Cell] = [*waiver_validation]
-    harnesses = [h for h in harness_doc.get("harnesses", []) if isinstance(h, dict)]
+    registry_harnesses = [h for h in harness_doc.get("harnesses", []) if isinstance(h, dict)]
+    harnesses = [h for h in registry_harnesses if h.get("status") == "active"]
+    excluded_harnesses = [h for h in registry_harnesses if h.get("status") != "active"]
     for harness in harnesses:
         name = str(harness.get("harness_name") or "")
         status = str(harness.get("status") or "")
@@ -569,7 +571,7 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
         )
         currently_eligible = bool(harness.get("can_receive_dispatch"))
         receive_capable = bool(headless_argv and set(roles).intersection(required_roles))
-        receive_status = "supported" if receive_capable else ("needs_adapter" if status == "active" else "blocked")
+        receive_status = "supported" if receive_capable else "needs_adapter"
         cells.append(
             _cell(
                 harness,
@@ -587,7 +589,7 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
             _cell(
                 harness,
                 "event_source",
-                "supported" if can_fire else ("needs_adapter" if status == "active" else "blocked"),
+                "supported" if can_fire else "needs_adapter",
                 [_rel(root, root / HARNESS_REGISTRY_PATH)],
                 f"can_fire_events={can_fire}",
             )
@@ -627,6 +629,9 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
         "counts": dict(sorted(counts.items())),
         "summary": {
             "harness_count": len(harnesses),
+            "registry_harness_count": len(registry_harnesses),
+            "evaluated_harness_count": len(harnesses),
+            "excluded_harness_count": len(excluded_harnesses),
             "cell_count": len(cells),
             "unwaived_gap_count": len(unwaived_gaps),
             "unwaived_release_blocking_gap_count": len(unwaived_release_gaps),
@@ -652,6 +657,16 @@ def evaluate(project_root: Path, *, waiver_path: Path = DEFAULT_WAIVER_PATH) -> 
                 "role": harness.get("role") or [],
             }
             for harness in harnesses
+        ],
+        "excluded_harnesses": [
+            {
+                "id": harness.get("id"),
+                "name": harness.get("harness_name"),
+                "type": harness.get("harness_type"),
+                "status": harness.get("status"),
+                "role": harness.get("role") or [],
+            }
+            for harness in excluded_harnesses
         ],
         "cells": [asdict(cell) for cell in sorted(cells, key=lambda c: (c.harness, c.dimension))],
         "candidate_work_items": [asdict(candidate) for candidate in build_candidate_work_items(cells)],
@@ -710,17 +725,47 @@ def format_markdown(report: dict[str, Any], *, include_supported: bool = False) 
         f"- Waiver registry bridge: {metadata['waiver_registry_bridge_id']}",
         f"- Counts: {', '.join(f'{key}: {value}' for key, value in report['counts'].items()) or 'none'}",
         (
+            "- Harness population: "
+            f"registry={report['summary']['registry_harness_count']}, "
+            f"evaluated={report['summary']['evaluated_harness_count']}, "
+            f"excluded={report['summary']['excluded_harness_count']}"
+        ),
+        (
             "- Waivers: "
             f"active={report['summary']['active_waiver_count']}, "
             f"retired={report['summary']['retired_waiver_count']}, "
             f"invalid={report['summary']['invalid_waiver_count']}"
         ),
         "",
-        "## Findings",
+        "## Excluded Harnesses",
         "",
-        "| Harness | Dimension | State | Release Blocking | Evidence | Disposition | Details |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| ID | Name | Lifecycle Status | Roles |",
+        "| --- | --- | --- | --- |",
     ]
+    excluded_harnesses = report.get("excluded_harnesses", [])
+    if excluded_harnesses:
+        for harness in excluded_harnesses:
+            lifecycle_status = harness.get("status")
+            status_display = "<missing>" if lifecycle_status is None else str(lifecycle_status)
+            roles = ", ".join(str(role) for role in harness.get("role", [])) or "none"
+            status_display = status_display.replace("|", "\\|")
+            roles = roles.replace("|", "\\|")
+            lines.append(
+                f"| {harness.get('id') or '<missing>'} | {harness.get('name') or '<missing>'} | "
+                f"{status_display} | {roles} |"
+            )
+    else:
+        lines.append("| none | none | none | none |")
+
+    lines.extend(
+        [
+            "",
+            "## Findings",
+            "",
+            "| Harness | Dimension | State | Release Blocking | Evidence | Disposition | Details |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
     rows = report["cells"] if include_supported else [cell for cell in report["cells"] if cell["status"] != "supported"]
     if rows:
         for cell in rows:

@@ -350,6 +350,80 @@ def test_strict_mode_fails_on_unwaived_release_blocking_gap(tmp_path: Path) -> N
     assert module.main(["--project-root", str(tmp_path), "--strict"]) == 1
 
 
+def test_non_active_registry_rows_are_excluded_but_remain_visible(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_fixture(tmp_path)
+    registry_path = tmp_path / "harness-state" / "harness-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["harnesses"].extend(
+        [
+            {
+                "id": "S",
+                "harness_name": "suspended-fixture",
+                "harness_type": "provider",
+                "status": "suspended",
+                "role": ["loyal-opposition"],
+            },
+            {
+                "id": "I",
+                "harness_name": "inactive-fixture",
+                "harness_type": "provider",
+                "status": "inactive",
+                "role": ["prime-builder"],
+            },
+            {
+                "id": "R",
+                "harness_name": "retired-fixture",
+                "harness_type": "provider",
+                "status": "retired",
+                "role": [],
+            },
+            {
+                "id": "M",
+                "harness_name": "missing-status-fixture",
+                "harness_type": "provider",
+                "role": ["loyal-opposition"],
+            },
+            {
+                "id": "U",
+                "harness_name": "unknown-status-fixture",
+                "harness_type": "provider",
+                "status": "unexpected",
+                "role": ["prime-builder"],
+            },
+        ]
+    )
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+
+    report = module.evaluate(tmp_path)
+
+    excluded_names = {harness["name"] for harness in report["excluded_harnesses"]}
+    assert excluded_names == {
+        "suspended-fixture",
+        "inactive-fixture",
+        "retired-fixture",
+        "missing-status-fixture",
+        "unknown-status-fixture",
+    }
+    assert report["summary"]["registry_harness_count"] == 8
+    assert report["summary"]["evaluated_harness_count"] == 3
+    assert report["summary"]["excluded_harness_count"] == 5
+    assert all(cell["harness"] not in excluded_names for cell in report["cells"])
+    assert all(item["harness"] not in excluded_names for item in report["candidate_work_items"])
+    assert report["overall_status"] == "FAIL"
+    assert any(item["harness"] == "openrouter" for item in report["candidate_work_items"])
+
+    by_name = {harness["name"]: harness for harness in report["excluded_harnesses"]}
+    assert by_name["missing-status-fixture"]["status"] is None
+    assert by_name["unknown-status-fixture"]["status"] == "unexpected"
+    markdown = module.format_markdown(report)
+    assert "## Excluded Harnesses" in markdown
+    assert "missing-status-fixture" in markdown
+    assert "<missing>" in markdown
+    assert "unknown-status-fixture" in markdown
+    assert "unexpected" in markdown
+
+
 def test_wi4926_provider_readiness_contract_is_documented_and_registered() -> None:
     docs = (REPO_ROOT / "docs" / "harness-parity-phase-2.md").read_text(encoding="utf-8")
     matrix = (REPO_ROOT / "docs" / "harness-parity-phase-2-matrix.md").read_text(encoding="utf-8")
