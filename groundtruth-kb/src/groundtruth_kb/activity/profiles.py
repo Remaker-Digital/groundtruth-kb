@@ -22,7 +22,8 @@ from pathlib import Path
 from typing import Any
 
 # Six canonical activities per DELIB-20265287 D4 / DELIB-20260621 DEC-4.
-CANONICAL_ACTIVITIES: frozenset[str] = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
+CANONICAL_ACTIVITY_ORDER: tuple[str, ...] = ("ops", "deliberation", "build", "test", "spec", "project")
+CANONICAL_ACTIVITIES: frozenset[str] = frozenset(CANONICAL_ACTIVITY_ORDER)
 
 # Valid headless_eligibility tokens.
 _VALID_ELIGIBILITY: frozenset[str] = frozenset({"headless_eligible", "interactive_only", "interactive_primary"})
@@ -189,7 +190,7 @@ def load_activity_profiles(
         )
 
     profiles: dict[str, ActivityProfile] = {}
-    for name in CANONICAL_ACTIVITIES:
+    for name in CANONICAL_ACTIVITY_ORDER:
         entry: dict[str, Any] = activities_raw[name]
 
         # A2: each profile must define all four payload classes and classify

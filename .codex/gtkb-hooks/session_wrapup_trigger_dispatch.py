@@ -15,11 +15,13 @@ HARNESS_NAME = "codex"
 
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
+from groundtruth_kb.context.resource_routing import render_resource_context  # noqa: E402
 from groundtruth_kb.session.envelope import (  # noqa: E402
     EnvelopeError,
     load_current,
     open_session,
     resolve_harness_identity,
+    route_prompt_resources,
 )
 from groundtruth_kb.session.topic_router import (  # noqa: E402
     handle_topic_command,
@@ -295,7 +297,21 @@ def main() -> int:
         return 0
 
     if not _is_wrapup_trigger(prompt):
-        _emit_no_context()
+        try:
+            _ensure_session_role_latched()
+            selection = route_prompt_resources(
+                PROJECT_ROOT,
+                prompt,
+                harness_name=HARNESS_NAME,
+                harness_id=_persistent_harness_id(),
+            )
+            context = render_resource_context(selection)
+        except Exception:  # noqa: BLE001 - ordinary prompt routing must fail soft.
+            context = ""
+        if context:
+            print(_dump_payload(_hook_payload(context)))
+        else:
+            _emit_no_context()
         return 0
 
     runtime_context = ""

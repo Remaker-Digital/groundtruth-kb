@@ -368,6 +368,12 @@ of truth (the canonical `work_items` table), surfaced through
 `gt backlog list`. The migration to a MemBase-only backlog is complete;
 no transitional markdown view persists.
 
+**Resource-selection rule:** A current owner instruction that names `backlog`
+selects this MemBase resource, even when the requested work is bridge-, TAFE-,
+or harness-related. Those words qualify the backlog items; they do not replace
+the backlog with the bridge queue. Current literal resource terms outrank
+activity defaults, startup order, prior context, notes, and conjecture.
+
 **Lifecycle endpoint:** Per S337 owner directive
 (`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), at the
 conclusion of the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration the former
@@ -376,7 +382,8 @@ transitional markdown backlog view under `memory/` was deleted (Slice
 state is "MemBase only" — the canonical `work_items` table is the sole
 backlog authority.
 
-**Not to be confused with:** ignore list or deprecated work (forbidden
+**Not to be confused with:** the bridge queue (current handoff/review state,
+read with `gt bridge state-report`); ignore list or deprecated work (forbidden
 uses per operating-model §2); backlog snapshot (point-in-time export);
 a separate `backlog_items` conceptual class distinct from work items.
 
@@ -481,10 +488,28 @@ TAFE/dispatcher cutover, aggregate queue artifacts are not canonical dispatcher
 or bridge-state authority. Implementation never proceeds without GO.
 
 **Not to be confused with:** "the Bridge" as a generic concept (use
-"file bridge" in canonical text); cross-system message bridges.
+"file bridge" in canonical text); the backlog; cross-system message bridges.
+Bare `bridge`, `bridge work`, `bridge-related`, `TAFE`, or `harness` topic
+language does not by itself select the bridge queue.
 
 **Source:** dispatcher/TAFE bridge-state surfaces; `.claude/rules/file-bridge-protocol.md`
 for legacy helper behavior; `AGENTS.md` (Codex-side rule).
+
+### bridge queue
+
+**Definition:** The current file-bridge handoff and review workload derived from
+TAFE/dispatcher state plus the status-bearing numbered files under `bridge/`.
+Read it with `gt bridge state-report`. Approved explicit resource terms are
+`bridge queue` and `review queue`.
+
+**Not to be confused with:** the backlog, whose known-work authority is MemBase
+`current_work_items` and whose read route is `gt backlog list`. Scanning the
+bridge at startup or using it as a protected-change gate does not select the
+bridge queue as the owner's work resource. If an owner explicitly requests both
+resources, preserve both rather than choosing a silent winner.
+
+**Source:** `GOV-FILE-BRIDGE-AUTHORITY-001`; `GOV-STANDING-BACKLOG-001`;
+`DELIB-20260715-WI5266-TERMINAL-VERIFICATION-AUTHORIZATION`.
 
 ---
 

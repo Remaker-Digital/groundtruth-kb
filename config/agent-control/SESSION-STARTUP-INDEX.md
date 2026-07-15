@@ -59,6 +59,14 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    (Prime Builder: confirm session focus; Loyal Opposition: process the
    actionable bridge queue by default per the LO overlay).
 
+The load order above is not resource-selection precedence. A literal resource
+term in the current owner instruction controls: `backlog` means MemBase
+`current_work_items` through `gt backlog list`; `bridge queue` or `review queue`
+means TAFE/dispatcher state plus the numbered bridge chain through
+`gt bridge state-report`. Bare bridge/TAFE/harness topic language selects
+neither. If both resources are named, preserve both. The startup bridge scan is
+a governance obligation and cannot replace an explicit backlog instruction.
+
 ## Session-context review independence (normative)
 
 Formal bridge review (GO / NO-GO / VERIFIED) must come from a **different model

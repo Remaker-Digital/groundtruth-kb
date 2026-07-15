@@ -51,7 +51,8 @@ _GT_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
 if _GT_SRC.is_dir() and str(_GT_SRC) not in sys.path:
     sys.path.insert(0, str(_GT_SRC))
 
-from groundtruth_kb.session.envelope import EnvelopeError  # noqa: E402
+from groundtruth_kb.context.resource_routing import render_resource_context  # noqa: E402
+from groundtruth_kb.session.envelope import EnvelopeError, route_prompt_resources  # noqa: E402
 from groundtruth_kb.session.topic_router import (  # noqa: E402
     handle_topic_command,
     parse_topic_command,
@@ -153,7 +154,20 @@ def main() -> int:
 
     command = parse_topic_command(prompt)
     if command is None:
-        _emit_no_context()
+        try:
+            selection = route_prompt_resources(
+                PROJECT_ROOT,
+                prompt,
+                harness_name=HARNESS_NAME,
+                harness_id=_persistent_harness_id(),
+            )
+            context = render_resource_context(selection)
+        except Exception:  # noqa: BLE001 - ordinary prompt routing must fail soft.
+            context = ""
+        if context:
+            print(_dump_payload(_hook_payload(context)))
+        else:
+            _emit_no_context()
         return 0
 
     try:

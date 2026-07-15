@@ -19,6 +19,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.context.resource_routing import (
+    canonical_resource_contract,
+    dispatch_resource_selection,
+    resolve_resource_selection,
+)
 from groundtruth_kb.harness_projection import HarnessStateError, read_identity, read_roles
 
 ENVELOPE_SCHEMA_VERSION = 1
@@ -63,9 +68,10 @@ PRELOAD_STATES = {
     },
     "build": {
         "sources": [
-            "pyproject.toml",
-            "package_state",
-            "scaffold_state",
+            "selected_resource evidence from the current owner prompt",
+            "backlog authority: MemBase current_work_items",
+            "bridge queue authority: TAFE/dispatcher state plus status-bearing bridge/ files",
+            "active PAUTH and implementation-start authorization",
             "Advisory Proposals are governed bridge artifacts",
             "ADVISORY bridge entries are non-dispatchable and not implementation approval",
             "ADVISORY access through bridge/TAFE/dispatcher status surfaces and status-bearing bridge/ files",
@@ -75,8 +81,8 @@ PRELOAD_STATES = {
             "non-canonical session evidence only",
         ],
         "commands": [
-            "python -m build",
-            "npm run build",
+            "gt backlog list",
+            "gt bridge state-report",
             "gt bridge show <advisory-slug>",
             "gt bridge dispatch report --json --compact",
         ],
@@ -275,6 +281,8 @@ def _base_envelope(
             "authority_mode": authority_mode,
         },
         "application_id": None,
+        "resource_contract": canonical_resource_contract(),
+        "resource_selection": resolve_resource_selection("", selection_source="session_initialization"),
         "opened_at": opened_at,
         "closed_at": None,
         "wrap_outcome": None,
@@ -527,6 +535,9 @@ def open_session(
             role_source=worker_role_source,
             dispatch_run_id=dispatch_run_id,
         )
+    dispatch_selection = dispatch_resource_selection(dispatch_run_id)
+    if dispatch_selection["selected_resources"]:
+        envelope["resource_selection"] = dispatch_selection
     write_current(project_root, resolved_name, envelope)
     return envelope
 
@@ -577,6 +588,10 @@ def ensure_worker_session(
         role_source=role_source,
         dispatch_run_id=dispatch_run_id,
     )
+    dispatch_selection = dispatch_resource_selection(dispatch_run_id)
+    if dispatch_selection["selected_resources"]:
+        current["resource_contract"] = canonical_resource_contract()
+        current["resource_selection"] = dispatch_selection
     write_current(project_root, resolved_name, current)
     return current
 
@@ -596,6 +611,42 @@ def ensure_current(
     if current and current.get("status") == "open":
         return current
     return open_session(project_root, harness_name=resolved_name, harness_id=resolved_id)
+
+
+def route_prompt_resources(
+    project_root: Path,
+    prompt: str,
+    *,
+    harness_name: str = "codex",
+    harness_id: str | None = None,
+) -> dict[str, Any]:
+    """Apply explicit current-prompt resource and work-item evidence to an envelope."""
+
+    resolved_name, _ = resolve_harness_identity(
+        project_root,
+        harness_name=harness_name,
+        harness_id=harness_id,
+    )
+    envelope = ensure_current(project_root, harness_name=resolved_name, harness_id=harness_id)
+    selection = resolve_resource_selection(prompt)
+    prompt_work_items = selection["work_item_ids"]
+    if not selection["explicit_resource_terms"] and not prompt_work_items:
+        return selection
+
+    envelope["resource_contract"] = canonical_resource_contract()
+    if selection["explicit_resource_terms"]:
+        envelope["resource_selection"] = selection
+
+    existing_work_items = [
+        value for value in envelope.get("work_item_ids", []) if isinstance(value, str) and value.strip()
+    ]
+    envelope["work_item_ids"] = list(dict.fromkeys([*existing_work_items, *prompt_work_items]))
+    if len(prompt_work_items) == 1:
+        envelope["active_work_item_id"] = prompt_work_items[0]
+    elif len(prompt_work_items) > 1:
+        envelope["active_work_item_id"] = None
+    write_current(project_root, resolved_name, envelope)
+    return selection
 
 
 def open_topic(

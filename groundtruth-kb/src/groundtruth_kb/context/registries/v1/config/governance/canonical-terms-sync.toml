@@ -1,0 +1,6 @@
+schema_version = 1
+authority = "DELIB-FAB15-REMEDIATION-20260610"
+glossary_path = ".claude/rules/canonical-terminology.md"
+database_path = "groundtruth.db"
+changed_by = "fab15-canonical-terms-sync"
+freshness_failure_operations = ["insert", "update", "retire"]

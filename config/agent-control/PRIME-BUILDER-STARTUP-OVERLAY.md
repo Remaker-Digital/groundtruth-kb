@@ -22,6 +22,13 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
 
 ## Bridge handling
 
+- The startup bridge scan is a governance obligation, not the selected work
+  resource. Honor the owner's literal resource noun first: `backlog` routes to
+  MemBase `current_work_items` via `gt backlog list`; only explicit `bridge
+  queue` or `review queue` routes to TAFE/dispatcher plus numbered bridge state
+  via `gt bridge state-report`. Bare bridge/TAFE/harness topic qualifiers select
+  neither resource. A bridge GO remains the gate for protected backlog work but
+  cannot substitute bridge-queue processing for the selected backlog.
 - Prime Builder acts only on latest `GO` or `NO-GO` entries for its harness.
 - Never process latest `NEW`, `REVISED`, or `VERIFIED` as actionable queue work
   (that is a role-confusion defect to diagnose).

@@ -1,0 +1,313 @@
+schema_version = 1
+
+[manifest]
+version = 1
+categories = [
+  "glossary",
+  "skills",
+  "cli",
+  "source_of_truth",
+  "project_and_backlog",
+  "operating_context",
+  "work_subject",
+]
+activities = ["ops", "deliberation", "build", "test", "spec", "project"]
+layers = ["session_baseline", "role_bootstrap", "activity_overlay"]
+soft_token_budget = 100000
+hard_token_budget = 200000
+
+[resource_contract]
+schema_version = 1
+precedence = "current_owner_literal > dispatch_provenance > activity_or_startup_default > prior_context_or_notes > conjecture"
+no_inference = true
+topic_qualifiers = ["bridge", "bridge work", "bridge-related", "TAFE", "harness", "harness-related"]
+
+[resource_contract.resources.backlog]
+canonical_term = "backlog"
+accepted_terms = ["backlog", "standing backlog", "active backlog", "current backlog", "work list", "known work"]
+authority = "MemBase current_work_items"
+read_route = "gt backlog list"
+non_alias = "bridge_queue"
+
+[resource_contract.resources.bridge_queue]
+canonical_term = "bridge queue"
+accepted_terms = ["bridge queue", "review queue"]
+authority = "TAFE/dispatcher bridge state plus status-bearing numbered files under bridge/"
+read_route = "gt bridge state-report"
+non_alias = "backlog"
+
+[[items]]
+id = "baseline.glossary"
+layer = "session_baseline"
+category = "glossary"
+source_id = "canonical-terms-sync"
+source_path = "config/governance/canonical-terms-sync.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt canonical-terms list"
+mutation_route = "gt canonical-terms"
+recovery_route = "gt canonical-terms list"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 600
+priority = 100
+essential = true
+
+[[items]]
+id = "baseline.skills"
+layer = "session_baseline"
+category = "skills"
+source_id = "activity-disposition-profiles"
+source_path = "config/agent-control/activity-disposition-profiles.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt skills"
+mutation_route = "managed skill lifecycle"
+recovery_route = "gt skills"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 500
+priority = 100
+essential = true
+
+[[items]]
+id = "baseline.cli"
+layer = "session_baseline"
+category = "cli"
+source_id = "command-surface"
+source_path = "config/agent-control/command-surface.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt --help"
+mutation_route = "command-surface registry lifecycle"
+recovery_route = "gt --help"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 500
+priority = 100
+essential = true
+
+[[items]]
+id = "baseline.source-of-truth"
+layer = "session_baseline"
+category = "source_of_truth"
+source_id = "sot-artifacts"
+source_path = "config/registry/sot-artifacts.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt authority"
+mutation_route = "registered mutation API"
+recovery_route = "gt authority"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 700
+priority = 100
+essential = true
+
+[[items]]
+id = "baseline.project-and-backlog"
+layer = "session_baseline"
+category = "project_and_backlog"
+source_id = "membase-project-and-backlog-state"
+source_path = "groundtruth.db"
+authority_class = "canonical_live_state"
+lifecycle = "current"
+churn_class = "project_status"
+embedding = "live_query_only"
+read_route = "gt projects list; gt backlog list"
+mutation_route = "gt projects"
+recovery_route = "gt projects list; gt backlog list"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 250
+priority = 100
+essential = true
+
+[[items]]
+id = "baseline.operating-context"
+layer = "session_baseline"
+category = "operating_context"
+source_id = "system-interface-map"
+source_path = "config/agent-control/system-interface-map.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt status"
+mutation_route = "registered service routes"
+recovery_route = "gt status"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 700
+priority = 100
+essential = true
+
+[[items]]
+id = "baseline.work-subject"
+layer = "session_baseline"
+category = "work_subject"
+source_id = "membase-work-item-state"
+source_path = "groundtruth.db"
+authority_class = "canonical_live_state"
+lifecycle = "current"
+churn_class = "work_item_status"
+embedding = "live_query_only"
+read_route = "gt backlog list"
+mutation_route = "gt backlog"
+recovery_route = "gt backlog list"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 250
+priority = 100
+essential = true
+
+[[items]]
+id = "activity.glossary"
+layer = "activity_overlay"
+category = "glossary"
+source_id = "activity-disposition-profiles"
+source_path = "config/agent-control/activity-disposition-profiles.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt canonical-terms list"
+mutation_route = "gt canonical-terms"
+recovery_route = "gt canonical-terms list"
+applicability = ["*"]
+projection = "profile.terminology"
+token_cost = 900
+priority = 90
+essential = true
+
+[[items]]
+id = "activity.skills"
+layer = "activity_overlay"
+category = "skills"
+source_id = "activity-disposition-profiles"
+source_path = "config/agent-control/activity-disposition-profiles.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt skills"
+mutation_route = "managed skill lifecycle"
+recovery_route = "gt skills"
+applicability = ["*"]
+projection = "profile.skills"
+token_cost = 900
+priority = 90
+essential = true
+
+[[items]]
+id = "activity.cli"
+layer = "activity_overlay"
+category = "cli"
+source_id = "command-surface"
+source_path = "config/agent-control/command-surface.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt --help"
+mutation_route = "command-surface registry lifecycle"
+recovery_route = "gt --help"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 450
+priority = 80
+essential = true
+
+[[items]]
+id = "activity.source-of-truth"
+layer = "activity_overlay"
+category = "source_of_truth"
+source_id = "sot-artifacts"
+source_path = "config/registry/sot-artifacts.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt authority"
+mutation_route = "registered mutation API"
+recovery_route = "gt authority"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 500
+priority = 80
+essential = true
+
+[[items]]
+id = "activity.project-and-backlog"
+layer = "activity_overlay"
+category = "project_and_backlog"
+source_id = "membase-project-and-backlog-state"
+source_path = "groundtruth.db"
+authority_class = "canonical_live_state"
+lifecycle = "current"
+churn_class = "project_status"
+embedding = "live_query_only"
+read_route = "gt projects show; gt backlog list"
+mutation_route = "gt projects"
+recovery_route = "gt projects show; gt backlog list"
+applicability = ["*"]
+projection = "profile.history_state"
+token_cost = 300
+priority = 90
+essential = true
+
+[[items]]
+id = "activity.operating-context"
+layer = "activity_overlay"
+category = "operating_context"
+source_id = "activity-disposition-profiles"
+source_path = "config/agent-control/activity-disposition-profiles.toml"
+authority_class = "governed_registry"
+lifecycle = "current"
+churn_class = "low"
+embedding = "embedded"
+ttl_seconds = 120
+read_route = "gt session"
+mutation_route = "gt session"
+recovery_route = "gt session"
+applicability = ["*"]
+projection = "profile.direction"
+token_cost = 1100
+priority = 100
+essential = true
+
+[[items]]
+id = "activity.work-subject"
+layer = "activity_overlay"
+category = "work_subject"
+source_id = "membase-work-item-state"
+source_path = "groundtruth.db"
+authority_class = "canonical_live_state"
+lifecycle = "current"
+churn_class = "work_item_status"
+embedding = "live_query_only"
+read_route = "gt backlog list"
+mutation_route = "gt backlog"
+recovery_route = "gt backlog list"
+applicability = ["*"]
+projection = "descriptor"
+token_cost = 300
+priority = 90
+essential = true
