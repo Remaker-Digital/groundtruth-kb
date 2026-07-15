@@ -1602,3 +1602,186 @@ Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Technical | Reviewed the post-implementation report `bridge/gtkb-wi5083-startup-input-gate-rearm-fix-004.md` and finalized the `VERIFIED` verdict. Bypassing startup arming on continuation is correct; tests show the gate remains inactive for resume/compact while fresh starts block correctly. All tests pass cleanly. | bridge/gtkb-wi5083-startup-input-gate-rearm-fix-005.md, commits 7fe58355 + b584d0d4 | Verdict finalized and committed with 8 implementation/test paths. | Resolved |
+
+---
+
+### 2026-07-09 - WI-5104 Stale Finalization-Evidence Tests Parity Align Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5104-finalization-test-wi4829-independence-fix-001.md`. The proposal is well-formed, correctly scopes fixing stale test fixtures to ensure independent author session context validation under WI-5104, and passes all mechanical preflights and clause-applicability gates. | bridge/gtkb-wi5104-finalization-test-wi4829-independence-fix-001.md, bridge/gtkb-wi5104-finalization-test-wi4829-independence-fix-002.md | Issued GO verdict at version -002.md to authorize implementation of the test fixture fix. | Resolved |
+
+---
+
+### 2026-07-09 - WI-5071 No-Window Source-Fixes and Reintroduction-Guard Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW pre-implementation proposal `gtkb-wi5071-no-window-source-fixes-reintroduction-guard-001.md`. The proposal is well-formed, correctly scopes fixing outstanding window spawns and wiring the spawn audit into the release gate and pytest suite under WI-5071, and passes all mechanical preflights and clause-applicability gates. | bridge/gtkb-wi5071-no-window-source-fixes-reintroduction-guard-001.md, bridge/gtkb-wi5071-no-window-source-fixes-reintroduction-guard-002.md | Issued GO verdict at version -002.md to authorize implementation of window-spawn fixes and the reintroduction guard. | Resolved |
+
+---
+
+### 2026-07-09 - WI-5120 / WI-5121 Canonical-Authority-Drift Carrier Proposals Review
+
+Loyal Opposition (Claude/lo role, interactive session 295c552f).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-09-21-42.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance | Reviewed both NEW carrier-formalization proposals (formalize Deterministic Services Principle / root-boundary exceptions; demote DELIBs to provenance per DELIB-202665929). Premises verified true against live state; all preflights + clause gates green. Independent conclusion: GO on both. Peer LO (antigravity/C) filed valid GO -002 first; stood down without a duplicate verdict. | bridge/gtkb-wi5120-...-002.md, bridge/gtkb-wi5121-...-002.md; INSIGHTS-2026-07-09-21-42.md | Preserved richer implementation conditions the shallow peer GO omitted (load-bearing: WI-5121 template-scope discipline for canonical-terminology.md; GOV-vs-DCL carrier fit; DELIB-S324/S325 ID drift). Verifier to enforce at VERIFIED. | Resolved (GO; conditions pending impl) |
+
+---
+
+### 2026-07-09 - WI-4841 Managed-Skill-Adoption-Review Verification + WI-5095 Finalization Deadlock
+
+Loyal Opposition (Claude/lo role, interactive session 295c552f).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-09-22-16.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | WI-4841 `-015` report is verification-complete: 12 tests pass, adapter parity `--check` PASS, ruff clean, SHA agreement (`b9c8a7e0`), both preflights green, independent author session. Would be VERIFIED but for the finalization deadlock below. Not a NO-GO — implementation is correct. | bridge/gtkb-wi4841-...-015.md; executed test/adapter/ruff/sha/preflight evidence | Deferred per owner AUQ (2026-07-09). | Open (verify-complete; finalization deferred) |
+| Technical | Finalization deadlock: `config/agent-control/harness-capability-registry.toml` has commingled uncommitted hunks (WI-4841 block @L2097 + WI-5095 decision-capture sha refresh @L413). `write_verdict.py` stages `--include` wholesale (no hunk-isolation); impl-start gate froze the registry to protect WI-5095's in-review `-005` report; LO cannot do raw protected git mutation. Symmetric — WI-5095 equally blocked; its merits not independently verified this session. | Known root cause WI-5105 (WI-4471 overlap guard); registry diff = 2 hunks | Owner chose defer both. Mechanical park (`DEFERRED`) is Prime-only; dispatcher health FAIL so treadmill risk low. Await WI-5105 fix or a coordinated Prime finalization of the entangled pair. | Open (WI-5105) |
+
+---
+
+### 2026-07-10 - WI-5041 Dispatcher Per-Thread Re-Offer Backoff Verification (headless dispatch) — RECORD-AND-STOP
+
+Loyal Opposition (Claude/lo role, headless bridge auto-dispatch `2026-07-10T01-00-58Z-loyal-opposition-B-915251`; independent of `-003` author codex/harness A session `019f4929`).
+
+Full report: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-10-01-00-wi5041-finalization-blocker.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | WI-5041 `-003` report is verification-complete: implementation faithful to approved `-001`; 5 new tests behavioral; full approved target suite **227 pass**; ruff check + format clean; slug-keyed backoff orthogonal to provider `failure_count`; latent state-drop bug fixed (`payload = dict(state)` at L6586). Would be VERIFIED but for the finalization blocker below. NOT a NO-GO — no implementation defect. | bridge/gtkb-wi5041-...-003.md; reproduced 227-pass + both-ruff evidence; full source/test diff review | — | Open (verify-complete; finalization blocked) |
+| Technical | Durable-keyed regression `codex_dispatch_not_ready` ×2 (LO/Codex target) **EXONERATED**: stash-isolation shows identical 2 failures at HEAD with WI-5041 source removed. Pre-existing `_is_dispatch_ready` readiness-fixture drift, not a WI-5041 regression (answers report LO Ask #2). | `git stash push -- scripts/dispatcher_runtime.py` → same 2 failures at HEAD line 4577 | Route the `_is_dispatch_ready` readiness-fixture drift (also breaks `test_shadow_decision_shrinks_remaining_items` at HEAD) to its own backlog defect thread. | Open (pre-existing; own thread) |
+| Technical | Finalization blocker: target `platform_tests/scripts/test_gtkb_dispatcher_daemon.py` symmetrically entangled with WI-5066 (`--config-env` command-line redaction, `-007` REVISED / un-GO'd). WI-5041 green suite DEPENDS on WI-5066's uncommitted daemon-test fix (stash file→HEAD ⇒ 2 red); wholesale `--include` would capture WI-5066 un-GO'd work. Same class as WI-4841/WI-5095 above. | WI-5066 `-005` config-env prose; stash-isolation of daemon test file (both pops restored tree clean) | Finalize WI-5066 first → then VERIFIED WI-5041 cleanly with this report's evidence; OR owner by-reference co-finalization waiver. Do NOT re-review (substance complete). Known root cause WI-5105 (WI-4471 overlap guard). | Open (WI-5105) |
+
+---
+
+### 2026-07-11 - Auto-process LO queue + double-LO-on-same-NEW race observation
+
+Loyal Opposition (Claude/lo role, interactive session `abd7e6dd`).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-11-08-35-lo-session-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Coordination | Double-LO-on-same-NEW dispatch race: two active LO harness-B sessions (`abd7e6dd`, peer `a9e5fa8e`) co-drained the same NEW entries. Peer committed valid GO on BOTH wi5187 and wi5189 before my thorough interactive review finished; I stood down (no duplicate verdicts; wi5189 pre-write race-guard fired). Independent conclusions matched peer — no lost dissent, but duplicated review labor. | bridge/gtkb-modernization-wi5187-...-002.md, bridge/gtkb-wi5189-...-002.md (peer author `a9e5fa8e`); `groundtruth_kb.bridge.notify` dispatch signature | Behavioral (Option 1): when a peer LO is co-draining, prefer fleet-proof work over racing the GO/NO-GO lane (already in LO session memory). Mechanical (Option 2): per-entry LO soft-lease on the review signature, mirroring Prime-side work-intent claim. | **Captured** per owner directive 2026-07-11 → **WI-5197** (P3, behavioral) + **WI-5196** (P2, mechanical), both under PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY. Consideration candidates (not impl-approved). |
+| Technical | This session's own verdicts closed clean: wi5186 VERIFIED+finalized (commit 637ec02a), wi5181 GO, wi5182 GO — all three now terminal VERIFIED. The two ceded to peer (wi5187, wi5189) subsequently moved GO→NO-GO downstream; both now Prime-actionable, outside LO scope. | `gt bridge show` at wrap: wi5181/wi5182/wi5186 VERIFIED; wi5187/wi5189 NO-GO | None (LO scope complete). wi5187 out-of-root worktree blocker (`C:\Users\micha\.codex\worktrees\claude-design-backlog`) remains real for its eventual bootstrap. | Resolved (LO side) |
+| Technical | WI-5185 (`gtkb-wi5185-dispatcher-identity-runtime-kind`) REVISED report VERIFIED + commit-finalized (commit 1e7e1217). Sequencing-only -004 NO-GO genuinely resolved: WI-5189 now committed (cd877ac4) + VERIFIED, `resolve_worker_role_provenance` in HEAD, only the 2 WI-5185 paths dirty → independently finalizable. Source = exact 13-line harness_type→harness_name drift fix (spec-faithful); tests 193 pass + 3 focused; both ruff gates clean. Clean scoped commit (2 code + -001..-006 chain, 8 files, no foreign hunks). | commit 1e7e1217; git diff --stat; full test/ruff re-run this session | None — terminal VERIFIED. Happy-path resolution of the commingled-sibling pattern (correct NO-GO → sibling landed → dependent finalized). | Resolved (VERIFIED) |
+
+---
+
+### 2026-07-12 - WI-5200/5202 broad GO (validated downstream) + WI-5199 stand-down + dropbox-SoT clarifications
+
+Loyal Opposition (Claude/lo role, interactive session `4c34d164`; model sonnet-5 → opus-4-8 mid-session).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-12-16-30-lo-session-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | **GO** on `gtkb-wi5200-5202-generous-harness-repair-002` (broad). Root cause independently reproduced in source (not trusted from narrative): `cloud_harness_base.py:1898-1900`+`:1773-1776` blank no-tool turn raises fatal regardless of budget; `routing.toml max_turns=200` never threaded into `dispatcher_runtime.py` → silent fallback to `DEFAULT_MAX_TURNS=40`. GO advisory FINDING-A flagged the `groundtruth.db`/registry commingling risk with the live WI-5199 chain. | bridge/gtkb-wi5200-5202-generous-harness-repair-002.md; source grep; H stderr log | None (LO scope complete). | Resolved (LO side) |
+| Process | GO advisory FINDING-A **validated downstream**: broad GO quarantined at the impl-start gate for exactly the predicted `groundtruth.db`/registry overlap → broad chain WITHDRAWN (`-006`); owner-authorized repair relocated to `-narrow`, VERIFIED at `-narrow-008`, committed `45d1c7f2`. Correct-advisory → correct-quarantine → clean relocation. | broad `-003`/`-004` NO-ACTION, `-005` NO-GO, `-006` WITHDRAWN; narrow `-008` VERIFIED; commit 45d1c7f2 | None. | Resolved |
+| Technical | **STAND DOWN** on WI-5199 (`gtkb-wi5199-fd-evidence-h-functional-proof` `-003` NEW) — harness-functional-proof reserved for harness H; authoring any B verdict corrupts the acceptance criterion. No 16th duplicate report written (15th `INSIGHTS-...-14-14` current). Loop root cause: report stays NEW (no H verdict) and re-fans; H's `PublishBridgeVerdict` (WI-5210) fails server-side `ModuleNotFoundError: No module named 'scripts'`; WI-5210 GO'd but UNCOMMITTED, no impl report. | git HEAD `12a8508c` unchanged; WI-5210 4 files dirty; WI-5210 thread `-002` GO | **Prime/owner**: (a) fix WI-5210 sys.path defect; (b) file WI-5210 report→verify→commit; (c) re-run H-proof flip holding B ineligible until H COMMITS (not in-flight — FINDING-A re-fan window); or (d) owner re-scope WI-5199 to H-unproven (F proven, D DEGRADED). | **Open (P1) — Prime/owner** |
+| Coordination | Dispatch fully dark for both roles at last read (~14:25Z): all `can_receive_dispatch=false`, `selected_by_role` empty for both roles, plus standing 2026-07-07 console-window `disable_guard` on daemon/watchdog supervisor tasks. Likely mid-transaction, not a fault. | `gt bridge dispatch health/status --json`; `harness-state/harness-registry.json` | Prime confirm ≥1 PB + ≥1 LO target restored before expecting auto-dispatch. | Open (verify) |
+| Reference | Owner governance Q&A: CODEX-INSIGHT-DROPBOX is **not** a canonical SoT (absent from `config/registry/sot-artifacts.toml`); git-tracked, scaffold-recreated (`scaffold.py:649-651`), consumers fail-soft (`advisory_backlog_router.py:288`, `harvest_session_deliberations.py:235`). Deleting it = no runtime impairment but discards on-disk LO audit trail + un-harvested DA feeder inputs; git-recoverable unless committed. | cited files this session | Informational — if pruning, harvest deliberations first then archive, don't hard-delete. | Informational |
+
+---
+
+### 2026-07-13 - Cross-harness parity goal language + fleet-state findings (advisory)
+
+Loyal Opposition (Claude/lo role, interactive session `71381938`; model opus-4-8).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-13-16-41-lo-parity-goal-language-and-fleet-state-findings.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Deliverable | Finalized cross-harness parity goal language. Owner-settled: honor 60-min D/F/H allowance (`DELIB-20260713`), reading **2b** (each in-scope harness proves BOTH PB and LO roles — ≈12 proofs), E/G excluded. Scope implication: dispatcher routes by default role, so non-default-role proofs need a governed `gt mode set-role` flip per harness. In-scope = A,B,C,D,F,H. | full text in wrap report | Owner decision: persist goal as deliberation and/or spec? | Open (owner) |
+| Governance | **Phantom harness G (goose)**: owner confirmed goose harness does not exist, yet MemBase record G persists (`harness_type: goose-desktop`, `status: suspended`, v8; registry ~lines 346-404). Phantom Artifact; skews fleet-health/parity denominators; leftover from GOOSE-HARNESS-ADOPTION redirected to Alibaba (H). | `harness-state/harness-registry.json` G block; owner statement | Governed retirement via `gt harness retire` (not hand-edit); verify no live rule/PAUTH refs G first. | Open (P2, owner-gated) |
+| Coordination | F "suspension" is on the **dispatch-eligibility** axis, not lifecycle. `gt harness show --harness F` = `status: active` but `can_receive_dispatch: false` (set 2026-07-12T21:40 by `gt-bridge-dispatch-config-cli`). All 8 harnesses `can_receive_dispatch=false` → dispatch health FAIL. Correct lever = `gt bridge dispatch config` (F→true), NOT `gt harness resume` (wrong axis, no-op). | `gt harness show --harness F` rowid 315 v41; `gt bridge dispatch status` | Owner's original ask ("update TAFE for F"), interrupted twice — NOT performed. Owner-authorize F eligibility restore. | Open (owner) |
+| Bridge | **STAND DOWN** on WI-5211-f (`gtkb-wi5211-f-governed-publication-functional-proof-001`, NEW governance_advisory) — verdict reserved for `author_harness_id: F`; a B verdict defeats the proof. Blocked on Finding above (F not dispatch-eligible). WI-5222 (60-min envelope, NEW) read but not reviewed. No bridge mutation this session. | bridge state-report; reserved-verdict pattern | Prime/owner: restore F eligibility → F produces its own proof. | Open (Prime/owner) |
+
+---
+
+### 2026-07-15 - WI-5138 Database Incident Recovery Evidence Report Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-15-00-11-loyal-opposition-C-dispatch-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW recovery evidence report `bridge/gtkb-wi5138-database-incident-recovery-evidence-001.md`. Verified that database integrity check is completely clean (`PRAGMA integrity_check` -> `ok`) and foreign key constraints are fully satisfied (`PRAGMA foreign_key_check` -> empty). Verified that candidate work items (`WI-5178` v1, v2, v3) are restored, and newer live-only items (`WI-5229` to `WI-5232`) and tests (`TEST-11383` to `TEST-11386`) are preserved. All preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5138-database-incident-recovery-evidence-001.md, bridge/gtkb-wi5138-database-incident-recovery-evidence-002.md | Issued GO verdict at version -002.md to authorize resuming the modernization trust-enforcement slice under the stated caveats. | Resolved |
+---
+
+### 2026-07-15 - WI-5233 Dispatch Selection and Cap Repair Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-15-00-13-loyal-opposition-C-dispatch-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation report `bridge/gtkb-wi5233-dispatch-selection-order-cap-repair-implementation-003.md`. Verified that the dispatcher selection preserves queue order (oldest-first) and respects ranked target max-item caps. Confirmed that focused tests for order and capping pass (`4 passed`). Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5233-dispatch selection report and tests | Issued VERIFIED verdict at version -004.md (commit `a7f2c7be`). | Resolved (VERIFIED) |
+
+---
+
+### 2026-07-15 - WI-5139 Fleet MemBase Carrier Restoration Report Revision Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-15-00-13-loyal-opposition-C-dispatch-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the REVISED implementation report `bridge/gtkb-wi5139-fleet-membase-carrier-restoration-005.md`. Verified the presence of the mandatory `## By-Reference Finalization Waiver` section citing `DELIB-20260714-FLEET-GOAL-RESUME-CARRIER-REPAIR` and already committed `4ebb46f6` delta. Verified dry-run is idempotent and clean (`total_inserted: 0`, `skipped_existing: 41`). Pytest passed (`5 passed`). Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5139-fleet-membase-carrier-restoration-005.md | Issued VERIFIED verdict at version -006.md by-reference, committing only the verdict file (commit `ced301b7`). | Resolved (VERIFIED) |
+
+---
+
+### 2026-07-15 - WI-5138 Trust-Enforcement Slice Report Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-15-02-22-56Z-loyal-opposition-C-9aad92.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation report `bridge/gtkb-modernization-trust-enforcement-slice-007.md`. Verified that the trust-enforcement slice satisfies all five bounded behaviors (wrapped direct Git gating, multiline boundary checks, mutating Git verbs, controlled runtime authority, and Cursor read-only plan mode). Verified target file final hashes and formatting checks are completely clean. Pytests successfully executed and passed (`204 passed` on start gate, `48 passed` on paths and cursor). Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-modernization-trust-enforcement-slice-007.md | Issued VERIFIED verdict at version -008.md, committing the verdict and all 6 target files plus untracked predecessor files (commit `7ae6f769`). | Resolved (VERIFIED) |
+
+---
+
+### 2026-07-15 - WI-5144 HP08 Semantic Adapter Drift Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+Full wrap: `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-15-20-07-19Z-loyal-opposition-C-dispatch-wrap.md`.
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the REVISED implementation proposal `bridge/gtkb-wi5144-hp08-semantic-adapter-drift-003.md`. Verified that all three previous findings from version 002 (omitted cross-harness parity ADR/DCLs, missing cross-harness disposition matrix, and clean-checkout test dependencies) have been resolved. Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5144-hp08-semantic-adapter-drift-003.md | Issued GO verdict at version -004.md (commit `e1ebfb0f`) to authorize implementation of semantic-drift rejection. | Resolved (GO) |
+
+---
+
+### 2026-07-15 - WI-5217 Antigravity Prompt Transport Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the REVISED implementation proposal `bridge/gtkb-wi5217-antigravity-prompt-transport-005.md`. Verified that this dispatch itself successfully executes the in-vivo proof. Antigravity successfully parsed the short pointer prompt, opened the in-root sidecar payload, run preflights and focused test validations. Tests, ruff check, and format checks pass. All preflights and clause gates green. | bridge/gtkb-wi5217-antigravity-prompt-transport-005.md | Issued GO verdict at version -006.md to authorize resubmission of the implementation report. | Resolved (GO) |
+
+---
+
+### 2026-07-15 - WI-5299 Unignored Deterministic Scratch Residue Classes Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-001.md`. Verified that it correctly limits changes to `.gitignore` and `platform_tests/scripts/test_gitignore_tree_stabilization_scratch.py` to handle the specified seven deterministic scratch classes. Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-001.md | Issued GO verdict at version -002.md to authorize implementing the narrow ignore patterns. | Resolved (GO) |
