@@ -405,7 +405,7 @@ def test_alibaba_loop_inherits_publisher_only_recovery(tmp_path: Path, monkeypat
             return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
         if len(payloads) == 2:
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert payload["tool_choice"] == {"type": "tool", "name": base.PUBLISH_BRIDGE_VERDICT_TOOL}
+            assert payload["tool_choice"] == {"type": "any"}
             return {
                 "model": route.model_id,
                 "content": [
@@ -482,7 +482,7 @@ def test_alibaba_loop_rejects_mixed_publisher_recovery_turn_atomically(
             assert "tool_choice" not in payload
             return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
         if len(payloads) == 2:
-            assert payload["tool_choice"] == {"type": "tool", "name": base.PUBLISH_BRIDGE_VERDICT_TOOL}
+            assert payload["tool_choice"] == {"type": "any"}
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
             return {
                 "model": route.model_id,
@@ -492,7 +492,7 @@ def test_alibaba_loop_rejects_mixed_publisher_recovery_turn_atomically(
                 ],
             }
         if len(payloads) == 3:
-            assert payload["tool_choice"] == {"type": "tool", "name": base.PUBLISH_BRIDGE_VERDICT_TOOL}
+            assert payload["tool_choice"] == {"type": "any"}
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
             assert "publisher-only recovery rejected non-publisher tool call(s): Read" in str(payload["messages"])
             return {"model": route.model_id, "content": [publisher_block("publish_valid")]}

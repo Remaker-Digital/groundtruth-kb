@@ -17,6 +17,8 @@ require:
 
 from __future__ import annotations
 
+import http.client
+import io
 import json
 import re
 import subprocess
@@ -417,6 +419,153 @@ def test_openai_chat_exhaustion_uses_provider_label(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(base.CloudHarnessError, match=r"TestCloud completions request failed .*HTTP 500"):
         base.openai_chat_completion("https://test.cloud/api/v1", "key", {"model": "m"}, label="TestCloud")
+
+
+def test_http_error_diagnostic_is_allowlisted_bounded_and_credential_redacted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    read_sizes: list[int] = []
+
+    class BoundedBody(io.BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            read_sizes.append(size)
+            return super().read(size)
+
+    body = json.dumps(
+        {
+            "code": "InvalidToolChoice",
+            "message": "named selector rejected; api_key=abcdefghijklmnop" + " x" * 400,
+            "request_id": " request-\n 123 ",
+            "authorization": "Bearer ignored-authorization-sentinel",
+            "prompt": "ignored-prompt-sentinel",
+            "details": {"secret": "ignored-nested-sentinel"},
+        }
+    ).encode("utf-8")
+
+    def fake_urlopen(request, timeout: float):
+        raise base.urllib.error.HTTPError(
+            "https://alibaba.test/v1/messages",
+            400,
+            "Bad Request",
+            {},
+            BoundedBody(body),
+        )
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(base.CloudHarnessError) as excinfo:
+        base.anthropic_messages_completion(
+            "https://alibaba.test/v1",
+            "key",
+            {"model": "m"},
+            label="TestCloud",
+        )
+
+    message = str(excinfo.value)
+    diagnostic = message.split("; provider_error: ", 1)[1]
+    assert 'code="InvalidToolChoice"' in diagnostic
+    assert 'request_id="request- 123"' in diagnostic
+    assert "[REDACTED:api_key]" in diagnostic
+    assert "abcdefghijklmnop" not in diagnostic
+    assert "ignored-authorization-sentinel" not in message
+    assert "ignored-prompt-sentinel" not in message
+    assert "ignored-nested-sentinel" not in message
+    assert len(diagnostic) <= base.MAX_HTTP_ERROR_DIAGNOSTIC_CHARS
+    assert read_sizes == [base.MAX_HTTP_ERROR_BODY_BYTES]
+
+
+def test_http_error_diagnostic_accepts_one_nested_error_object(monkeypatch: pytest.MonkeyPatch) -> None:
+    body = json.dumps(
+        {
+            "error": {
+                "code": "InvalidParameter",
+                "message": "tool_choice is invalid",
+                "request_id": "nested-request",
+                "details": "ignored-error-detail",
+            },
+            "request_payload": "ignored-request-payload",
+        }
+    ).encode("utf-8")
+
+    def fake_urlopen(request, timeout: float):
+        raise base.urllib.error.HTTPError("https://alibaba.test/v1/messages", 400, "Bad Request", {}, io.BytesIO(body))
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(base.CloudHarnessError) as excinfo:
+        base.anthropic_messages_completion(
+            "https://alibaba.test/v1",
+            "key",
+            {"model": "m"},
+            label="TestCloud",
+        )
+
+    message = str(excinfo.value)
+    assert 'code="InvalidParameter"' in message
+    assert 'message="tool_choice is invalid"' in message
+    assert 'request_id="nested-request"' in message
+    assert "ignored-error-detail" not in message
+    assert "ignored-request-payload" not in message
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"non-json ignored-prompt-sentinel",
+        json.dumps({"error": ["ignored-array-sentinel"], "details": "ignored-details-sentinel"}).encode("utf-8"),
+    ],
+)
+def test_http_error_diagnostic_falls_back_without_raw_body_leakage(
+    monkeypatch: pytest.MonkeyPatch,
+    body: bytes,
+) -> None:
+    def fake_urlopen(request, timeout: float):
+        raise base.urllib.error.HTTPError("https://alibaba.test/v1/messages", 400, "Bad Request", {}, io.BytesIO(body))
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(base.CloudHarnessError) as excinfo:
+        base.anthropic_messages_completion(
+            "https://alibaba.test/v1",
+            "key",
+            {"model": "m"},
+            label="TestCloud",
+        )
+
+    message = str(excinfo.value)
+    assert "provider_error" not in message
+    assert "ignored-" not in message
+
+
+def test_http_error_incomplete_body_preserves_generic_cloud_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class IncompleteBody(io.BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            assert size == base.MAX_HTTP_ERROR_BODY_BYTES
+            raise http.client.IncompleteRead(b"ignored-partial-body-sentinel", 10)
+
+    def fake_urlopen(request, timeout: float):
+        raise base.urllib.error.HTTPError(
+            "https://alibaba.test/v1/messages",
+            400,
+            "Bad Request",
+            {},
+            IncompleteBody(),
+        )
+
+    monkeypatch.setattr(base.urllib.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(base.CloudHarnessError) as excinfo:
+        base.anthropic_messages_completion(
+            "https://alibaba.test/v1",
+            "key",
+            {"model": "m"},
+            label="TestCloud",
+        )
+
+    message = str(excinfo.value)
+    assert "TestCloud messages request failed (HTTP 400) after 1 attempt(s)" in message
+    assert "provider_error" not in message
+    assert "ignored-partial-body-sentinel" not in message
 
 
 # --- WI-5066: DNS / wall-clock bound on the provider call ---

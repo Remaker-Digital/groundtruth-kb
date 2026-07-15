@@ -35,6 +35,7 @@ from __future__ import annotations
 import contextlib
 import fnmatch
 import functools
+import http.client
 import json
 import os
 import re
@@ -108,6 +109,13 @@ MAX_FILE_SCAN_ENTRIES = 5000
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
 MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
 MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS = 500
+MAX_HTTP_ERROR_BODY_BYTES = 8192
+MAX_HTTP_ERROR_DIAGNOSTIC_CHARS = 500
+HTTP_ERROR_FIELD_CHAR_LIMITS = {
+    "code": 120,
+    "message": 300,
+    "request_id": 160,
+}
 MAX_NATIVE_STOP_BLOCKS = 8
 NATIVE_STOP_CONTINUATION_PROMPT = (
     "A native Stop hook blocked completion for this reason:\n{reason}\n"
@@ -362,6 +370,67 @@ def _http_retry_delay_seconds(exc: urllib.error.HTTPError, attempt: int) -> floa
 
 def _provider_transport_error_summary(exc: BaseException) -> str:
     return f"{type(exc).__module__}.{type(exc).__name__}: {exc}"
+
+
+def _bounded_http_error_diagnostic(exc: urllib.error.HTTPError) -> str | None:
+    try:
+        raw_body = exc.read(MAX_HTTP_ERROR_BODY_BYTES)
+    except (AttributeError, http.client.HTTPException, OSError, TypeError, ValueError):
+        return None
+    if not isinstance(raw_body, bytes) or not raw_body:
+        return None
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    candidates = [payload]
+    nested_error = payload.get("error")
+    if isinstance(nested_error, dict):
+        candidates.append(nested_error)
+
+    values: dict[str, str] = {}
+    for field_name, limit in HTTP_ERROR_FIELD_CHAR_LIMITS.items():
+        value = next(
+            (
+                candidate[field_name]
+                for candidate in candidates
+                if field_name in candidate
+                and isinstance(candidate[field_name], (str, int, float))
+                and not isinstance(candidate[field_name], bool)
+            ),
+            None,
+        )
+        if value is None:
+            continue
+        normalized = " ".join(str(value).split())
+        if not normalized:
+            continue
+        values[field_name] = normalized[:limit]
+    if not values:
+        return None
+
+    try:
+        from groundtruth_kb.governance.credential_patterns import db_pattern_list
+
+        credential_patterns = db_pattern_list()
+    except (ImportError, OSError):
+        return None
+    for field_name, value in values.items():
+        for label, pattern in credential_patterns:
+            value = pattern.sub(f"[REDACTED:{label}]", value)
+        values[field_name] = value
+
+    diagnostic = "; ".join(
+        f"{field_name}={json.dumps(values[field_name], ensure_ascii=True)}"
+        for field_name in HTTP_ERROR_FIELD_CHAR_LIMITS
+        if field_name in values
+    )
+    if len(diagnostic) > MAX_HTTP_ERROR_DIAGNOSTIC_CHARS:
+        diagnostic = diagnostic[: MAX_HTTP_ERROR_DIAGNOSTIC_CHARS - 3].rstrip() + "..."
+    return diagnostic
 
 
 def _is_retryable_provider_transport_error(exc: BaseException) -> bool:
@@ -796,15 +865,17 @@ def _post_json_with_bounded_retry(
                     f"{label} {noun} request timed out before retry",
                 )
                 continue
+            provider_diagnostic = _bounded_http_error_diagnostic(exc)
+            diagnostic_suffix = f"; provider_error: {provider_diagnostic}" if provider_diagnostic else ""
             if exc.code == 429:
                 retry_after = _retry_after_delay_seconds(exc)
                 retry_after_suffix = f"; retry_after_seconds={retry_after:g}" if retry_after is not None else ""
                 raise CloudHarnessError(
                     f"{label} rate limited (HTTP 429 provider backpressure) "
-                    f"after {attempt} attempt(s){retry_after_suffix}: {exc}"
+                    f"after {attempt} attempt(s){retry_after_suffix}: {exc}{diagnostic_suffix}"
                 ) from exc
             raise CloudHarnessError(
-                f"{label} {noun} request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}"
+                f"{label} {noun} request failed (HTTP {exc.code}) after {attempt} attempt(s): {exc}{diagnostic_suffix}"
             ) from exc
         except (urllib.error.URLError, ConnectionError, TimeoutError, ssl.SSLError) as exc:
             last_error = exc
@@ -2209,8 +2280,12 @@ def run_tool_loop(
             active_tools = (PUBLISH_BRIDGE_VERDICT_TOOL,) if publisher_only_recovery else allowed_tools
             schemas = strategy.build_tool_schemas(active_tools)
             payload = strategy.build_payload(messages, model_route, schemas)
-            if publisher_only_recovery and profile.dialect == DIALECT_ANTHROPIC_MESSAGES:
-                payload["tool_choice"] = {"type": "tool", "name": PUBLISH_BRIDGE_VERDICT_TOOL}
+            if (
+                publisher_only_recovery
+                and profile.dialect == DIALECT_ANTHROPIC_MESSAGES
+                and active_tools == (PUBLISH_BRIDGE_VERDICT_TOOL,)
+            ):
+                payload["tool_choice"] = {"type": "any"}
 
             operation_timeout = min(
                 timeout,
