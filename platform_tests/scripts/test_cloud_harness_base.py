@@ -1446,26 +1446,49 @@ def test_native_user_prompt_explicit_block_remains_fail_closed(tmp_path: Path) -
         )
 
 
-def test_native_posttool_fail_soft_does_not_change_pretool_timeout_enforcement(tmp_path: Path) -> None:
+def test_native_pretool_timeout_returns_bounded_block_and_stops_hook_chain(tmp_path: Path) -> None:
     root = _root(tmp_path)
     _write_native_hook_settings(
         root,
-        {base.NATIVE_HOOK_PRE_TOOL_USE: [{"matcher": "Read", "hooks": [{"type": "command", "command": "pre gate"}]}]},
+        {
+            base.NATIVE_HOOK_PRE_TOOL_USE: [
+                {
+                    "matcher": "Read",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "python .claude/hooks/formal-artifact-approval-gate.py --token command-secret",
+                            "timeout": 5,
+                        },
+                        {"type": "command", "command": "later hook.py"},
+                    ],
+                }
+            ]
+        },
     )
+    commands: list[str] = []
 
-    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+    def hook_runner(command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        commands.append(command)
         return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
 
-    with pytest.raises(base.CloudHarnessError, match="native hook timed out: PreToolUse"):
-        base.invoke_native_hooks(
-            base.NATIVE_HOOK_PRE_TOOL_USE,
-            _meta(),
-            root,
-            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
-            tool_name="Read",
-            tool_input={"path": "note.txt"},
-            native_hook_runner=hook_runner,
-        )
+    result = base.invoke_native_hooks(
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        _meta(),
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        tool_name="Read",
+        tool_input={"path": "tool-input-secret.txt"},
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == {
+        "decision": "block",
+        "reason": ("timeout event=PreToolUse; tool=Read; hook=formal-artifact-approval-gate.py; timeout_seconds=5"),
+    }
+    assert commands == ["python .claude/hooks/formal-artifact-approval-gate.py --token command-secret"]
+    assert "tool-input-secret" not in result["reason"]
+    assert "command-secret" not in result["reason"]
 
 
 @pytest.mark.parametrize(
@@ -1648,13 +1671,12 @@ def test_native_stop_repeated_blocks_fail_closed_at_eight_block_limit(tmp_path: 
 @pytest.mark.parametrize(
     ("hook_result", "error_match"),
     [
-        (base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True), "native hook timed out"),
         (base.GuardExecutionResult(returncode=1, stdout="", stderr="failed"), "native hook exited nonzero"),
         (base.GuardExecutionResult(returncode=0, stdout="not json", stderr=""), "native hook emitted malformed JSON"),
     ],
-    ids=("timeout", "nonzero", "malformed"),
+    ids=("nonzero", "malformed"),
 )
-def test_native_pretool_lifecycle_errors_remain_fail_closed(
+def test_native_pretool_non_timeout_errors_remain_fail_closed(
     tmp_path: Path,
     hook_result: base.GuardExecutionResult,
     error_match: str,
@@ -1804,6 +1826,125 @@ def test_native_full_hooks_pretool_block_feeds_reason_to_model(tmp_path: Path) -
 
     assert result == "blocked noted"
     assert hook_payloads[3]["tool_response"] == "ERROR: native hook blocked Read: native denied"
+
+
+def test_native_pretool_timeout_blocks_one_turn_then_rechecks_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    (root / "note.txt").write_text("file body", encoding="utf-8")
+    _write_native_hook_settings(
+        root,
+        {
+            base.NATIVE_HOOK_PRE_TOOL_USE: [
+                {
+                    "matcher": "Read",
+                    "hooks": [
+                        {"type": "command", "command": "slow gate.py", "timeout": 5},
+                        {"type": "command", "command": "later gate.py"},
+                    ],
+                }
+            ]
+        },
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    hook_commands: list[str] = []
+    dispatched_tools: list[str] = []
+    turns: list[dict] = []
+    original_dispatch = base.dispatch_tool_call
+
+    def hook_runner(command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        hook_commands.append(command)
+        if command == "slow gate.py" and hook_commands.count(command) == 1:
+            return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+        return base.GuardExecutionResult(returncode=0, stdout="{}", stderr="")
+
+    def recording_dispatch(tool_name, *args, **kwargs):
+        dispatched_tools.append(tool_name)
+        return original_dispatch(tool_name, *args, **kwargs)
+
+    monkeypatch.setattr(base, "dispatch_tool_call", recording_dispatch)
+
+    def tool_call(call_id: str) -> dict:
+        return {
+            "id": call_id,
+            "function": {"name": "Read", "arguments": {"path": "note.txt"}},
+        }
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            return {"choices": [{"message": {"content": "", "tool_calls": [tool_call("call_1")]}}]}
+        if len(turns) == 2:
+            assert "timeout event=PreToolUse" in str(payload["messages"])
+            assert "file body" not in str(payload["messages"])
+            return {"choices": [{"message": {"content": "", "tool_calls": [tool_call("call_2")]}}]}
+        assert "file body" in str(payload["messages"])
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    result = base.run_tool_loop(
+        "read the note",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        5,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == "done"
+    assert dispatched_tools == ["Read"]
+    assert hook_commands == ["slow gate.py", "slow gate.py", "later gate.py"]
+
+
+def test_repeated_identical_pretool_timeouts_hit_existing_no_progress_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    _write_native_hook_settings(
+        root,
+        {
+            base.NATIVE_HOOK_PRE_TOOL_USE: [
+                {"matcher": "Read", "hooks": [{"type": "command", "command": "slow gate.py", "timeout": 5}]}
+            ]
+        },
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    hook_calls = 0
+    repeated_call = {
+        "id": "same_call",
+        "function": {"name": "Read", "arguments": {"path": "never-read.txt"}},
+    }
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        nonlocal hook_calls
+        hook_calls += 1
+        return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+
+    def forbidden_dispatch(*_args, **_kwargs):
+        raise AssertionError("timed-out PreToolUse must not execute the requested tool")
+
+    monkeypatch.setattr(base, "dispatch_tool_call", forbidden_dispatch)
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        return {"choices": [{"message": {"content": "", "tool_calls": [repeated_call]}}]}
+
+    with pytest.raises(base.CloudHarnessError, match="repeated no-progress tool loop"):
+        base.run_tool_loop(
+            "read forever",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            10,
+            root,
+            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+            chat_func=chat,
+            native_hook_runner=hook_runner,
+        )
+
+    assert hook_calls == base.MAX_REPEATED_TOOL_SIGNATURE_TURNS
 
 
 def test_native_full_hooks_run_tool_loop_still_enforces_guard_floor(tmp_path: Path) -> None:

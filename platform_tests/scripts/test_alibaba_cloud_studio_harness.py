@@ -224,6 +224,62 @@ def test_shared_native_hook_layer_accepts_real_alibaba_empty_pretool_adapter(
     assert result == {}
 
 
+def test_shared_native_hook_layer_converts_real_alibaba_pretool_timeout_to_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = make_root(tmp_path)
+    settings_dir = root / ".claude"
+    settings_dir.mkdir()
+    (settings_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    base.NATIVE_HOOK_PRE_TOOL_USE: [
+                        {
+                            "matcher": "Read",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python .claude/hooks/formal-artifact-approval-gate.py --secret hidden",
+                                    "timeout": 5,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def timed_out_native_hook(*_args, **_kwargs):
+        return base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True)
+
+    monkeypatch.setattr(base, "_default_native_hook_runner", timed_out_native_hook)
+
+    result = base.invoke_native_hooks(
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        base.ModelMetadata(
+            model_id="alibaba-deepseek-v4-pro",
+            model_version="alibaba-deepseek-v4-pro",
+            endpoint="https://example.test/v1",
+            route_key="alib-route",
+        ),
+        root,
+        ach._ALIBABA_PROFILE,
+        tool_name="Read",
+        tool_input={"path": "private-input.txt"},
+        native_hook_runner=ach.run_alibaba_native_hook,
+    )
+
+    assert result == {
+        "decision": "block",
+        "reason": ("timeout event=PreToolUse; tool=Read; hook=formal-artifact-approval-gate.py; timeout_seconds=5"),
+    }
+    assert "private-input" not in result["reason"]
+    assert "hidden" not in result["reason"]
+
+
 def test_alibaba_native_hook_adapter_wraps_non_json_lifecycle_context(monkeypatch: pytest.MonkeyPatch) -> None:
     def text_native_hook(*_args, **_kwargs):
         return base.GuardExecutionResult(returncode=0, stdout="informational lifecycle context", stderr="")

@@ -1356,6 +1356,31 @@ def _native_hook_block_reason(data: Mapping[str, Any] | None) -> str | None:
     return reason
 
 
+def _bounded_native_hook_diagnostic_token(value: str | None, *, fallback: str, max_chars: int = 80) -> str:
+    token = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "").strip()).strip("_.-")
+    return (token or fallback)[:max_chars]
+
+
+def _native_hook_command_label(command: str) -> str:
+    file_tokens = re.findall(
+        r"[A-Za-z0-9_./\\${}%:-]+\.(?:py|ps1|sh|cmd|bat|exe)",
+        command,
+        flags=re.IGNORECASE,
+    )
+    candidate = file_tokens[-1] if file_tokens else command.strip().split(maxsplit=1)[0]
+    basename = candidate.replace("\\", "/").rsplit("/", 1)[-1]
+    return _bounded_native_hook_diagnostic_token(basename, fallback="command")
+
+
+def _native_pretool_timeout_reason(tool_name: str | None, command: str, hook_timeout: float) -> str:
+    bounded_tool = _bounded_native_hook_diagnostic_token(tool_name, fallback="unknown")
+    hook_label = _native_hook_command_label(command)
+    return (
+        f"timeout event={NATIVE_HOOK_PRE_TOOL_USE}; tool={bounded_tool}; "
+        f"hook={hook_label}; timeout_seconds={hook_timeout:g}"
+    )
+
+
 def _load_native_hook_settings(project_root: Path) -> Mapping[str, Any]:
     settings_path = project_root / NATIVE_HOOK_SETTINGS_PATH
     if not settings_path.is_file():
@@ -1530,6 +1555,11 @@ def invoke_native_hooks(
         result = runner(command, payload, env, hook_timeout)
         command_label = command[:120]
         if result.timed_out:
+            if event_name == NATIVE_HOOK_PRE_TOOL_USE:
+                return {
+                    "decision": "block",
+                    "reason": _native_pretool_timeout_reason(tool_name, command, hook_timeout),
+                }
             if fail_soft_execution:
                 continue
             raise CloudHarnessError(f"native hook timed out: {event_name}: {command_label}")
