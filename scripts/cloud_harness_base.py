@@ -63,6 +63,11 @@ except ModuleNotFoundError:  # pragma: no cover
     from scripts.sdk_bridge_bash_guard import bridge_bash_mutation_reason
 
 try:
+    from windows_subprocess import no_window_subprocess_kwargs
+except ModuleNotFoundError:  # pragma: no cover
+    from scripts.windows_subprocess import no_window_subprocess_kwargs
+
+try:
     import tomllib
 except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[import-not-found,no-redef]
@@ -1276,7 +1281,6 @@ def _default_guard_runner(
     env: Mapping[str, str],
     timeout: float,
 ) -> GuardExecutionResult:
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
     try:
         completed = subprocess.run(
             [sys.executable, str(guard_path)],
@@ -1287,7 +1291,7 @@ def _default_guard_runner(
             env=dict(env),
             timeout=timeout,
             check=False,
-            creationflags=creationflags,
+            **no_window_subprocess_kwargs(),
         )
     except subprocess.TimeoutExpired as exc:
         return GuardExecutionResult(-1, exc.stdout or "", exc.stderr or "", timed_out=True)
@@ -1310,7 +1314,6 @@ def _default_native_hook_runner(
     env: Mapping[str, str],
     timeout: float,
 ) -> GuardExecutionResult:
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
     expanded_command = _expand_native_hook_command(command, env)
     try:
         completed = subprocess.run(
@@ -1323,7 +1326,7 @@ def _default_native_hook_runner(
             timeout=timeout,
             check=False,
             shell=True,
-            creationflags=creationflags,
+            **no_window_subprocess_kwargs(),
         )
     except subprocess.TimeoutExpired as exc:
         return GuardExecutionResult(-1, exc.stdout or "", exc.stderr or "", timed_out=True)
@@ -2032,7 +2035,6 @@ def _default_command_runner(
     env: Mapping[str, str],
     timeout: float,
 ) -> subprocess.CompletedProcess[str]:
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
     return subprocess.run(
         command,
         text=True,
@@ -2042,7 +2044,7 @@ def _default_command_runner(
         timeout=timeout,
         shell=True,
         check=False,
-        creationflags=creationflags,
+        **no_window_subprocess_kwargs(),
     )
 
 

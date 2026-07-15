@@ -1,12 +1,70 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from scripts import alibaba_cloud_studio_harness as ach
 from scripts import cloud_harness_base as base
+
+
+@pytest.fixture
+def captured_subprocess_run(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    calls: list[dict[str, object]] = []
+
+    def fake_run(*_args, **kwargs):
+        calls.append(kwargs)
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(base.subprocess, "run", fake_run)
+    return calls
+
+
+def _run_shared_alibaba_subprocess_path(kind: str, tmp_path: Path) -> None:
+    if kind == "guard":
+        base._default_guard_runner(tmp_path / "guard.py", {"cwd": str(tmp_path)}, {}, 5)
+    elif kind == "native_hook":
+        base._default_native_hook_runner("python hook.py", {"cwd": str(tmp_path)}, {}, 5)
+    else:
+        base._default_command_runner("git status --short", tmp_path, {}, 5)
+
+
+@pytest.mark.parametrize("kind", ["guard", "native_hook", "command"])
+def test_alibaba_shared_subprocess_paths_apply_canonical_windows_no_window_kwargs(
+    kind: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    captured_subprocess_run: list[dict[str, object]],
+) -> None:
+    expected = base.no_window_subprocess_kwargs(force_windows=True)
+    monkeypatch.setattr(base, "no_window_subprocess_kwargs", lambda: expected)
+
+    _run_shared_alibaba_subprocess_path(kind, tmp_path)
+
+    assert len(captured_subprocess_run) == 1
+    kwargs = captured_subprocess_run[0]
+    assert kwargs["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    if "startupinfo" in expected:
+        assert kwargs["startupinfo"] is expected["startupinfo"]
+
+
+@pytest.mark.parametrize("kind", ["guard", "native_hook", "command"])
+def test_alibaba_shared_subprocess_paths_preserve_non_windows_kwargs(
+    kind: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    captured_subprocess_run: list[dict[str, object]],
+) -> None:
+    monkeypatch.setattr(base, "no_window_subprocess_kwargs", lambda: {})
+
+    _run_shared_alibaba_subprocess_path(kind, tmp_path)
+
+    assert len(captured_subprocess_run) == 1
+    kwargs = captured_subprocess_run[0]
+    assert "creationflags" not in kwargs
+    assert "startupinfo" not in kwargs
 
 
 def make_root(tmp_path: Path) -> Path:
