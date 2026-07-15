@@ -30,6 +30,15 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
   aggregate queue artifact must not be used as startup authority.
 - **Advisory mode** (opened with `init gtkb advisory`) is the opt-in that
   reports the scan and asks before processing; only advisory mode asks.
+- Advisory Proposals are governed bridge artifacts. `ADVISORY` is
+  non-dispatchable and not implementation approval, but it is the primary Loyal
+  Opposition mechanism for future-work initiation by recommending projects,
+  work items, or lifecycle changes. Workers access these artifacts through
+  governed bridge/TAFE/dispatcher status surfaces and status-bearing files under
+  `bridge/`; interactive Prime Builder sessions progress them through governed
+  advisory intake/disposition. CODEX-INSIGHT-DROPBOX and
+  `independent-progress-assessments` dropbox files are non-canonical session
+  evidence only.
 - Respond by writing the next numbered bridge file with `GO`, `NO-GO`, or
   `VERIFIED`. Skip latest `VERIFIED` as terminal.
 - **Session-context review independence:** formal GO/NO-GO/VERIFIED must come from a

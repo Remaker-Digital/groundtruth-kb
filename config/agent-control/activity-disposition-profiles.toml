@@ -73,6 +73,10 @@ terminology = [
     "owner decision",
     "AskUserQuestion",
     "specification language",
+    "Advisory Proposal",
+    "ADVISORY bridge entry",
+    "governed advisory intake/disposition",
+    "CODEX-INSIGHT-DROPBOX",
 ]
 
 [activities.deliberation.history_state]
@@ -81,6 +85,9 @@ sources = [
     "pending owner decisions",
     "related specifications",
     "open AUQ items",
+    "ADVISORY bridge artifacts from bridge/TAFE/dispatcher status surfaces",
+    "status-bearing versioned files under bridge/",
+    "non-canonical session evidence from CODEX-INSIGHT-DROPBOX and independent-progress-assessments",
 ]
 
 [activities.deliberation.classification]
@@ -95,11 +102,17 @@ guardrails = [
     "do not implement during a deliberation session",
     "every owner decision must go through AskUserQuestion",
     "surface candidate specifications before proposing bridge work",
+    "Advisory Proposals are governed bridge artifacts, not dropbox notes",
+    "ADVISORY entries are non-dispatchable and not implementation approval",
+    "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
+    "interactive workers progress advisories through governed advisory intake/disposition",
+    "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are non-canonical session evidence only",
 ]
 manipulates = [
     "Deliberation Archive records",
     "candidate specifications",
     "pending owner decisions log",
+    "Advisory Proposal dispositions",
 ]
 
 [activities.build]
@@ -123,6 +136,11 @@ terminology = [
     "VERIFIED",
     "target_paths",
     "PAUTH",
+    "Advisory Proposal",
+    "ADVISORY bridge entry",
+    "advisory intake/disposition",
+    "bridge/TAFE/dispatcher status surfaces",
+    "CODEX-INSIGHT-DROPBOX",
 ]
 
 [activities.build.history_state]
@@ -132,6 +150,9 @@ sources = [
     "recent implementation commits",
     "backlog priority order",
     "open NO-GO items",
+    "ADVISORY bridge artifacts from bridge/TAFE/dispatcher status surfaces",
+    "status-bearing versioned files under bridge/",
+    "non-canonical session evidence from CODEX-INSIGHT-DROPBOX and independent-progress-assessments",
 ]
 
 [activities.build.classification]
@@ -147,6 +168,11 @@ guardrails = [
     "stay within target_paths declared in the proposal",
     "run ruff check and ruff format --check before filing an implementation report",
     "acquire work-intent claim before drafting",
+    "Advisory Proposals are governed bridge artifacts available through the bridge",
+    "ADVISORY entries are non-dispatchable and not implementation approval",
+    "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
+    "interactive workers retrieve and progress advisories through governed advisory intake/disposition",
+    "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are non-canonical session evidence only",
 ]
 manipulates = [
     "source files",
@@ -154,6 +180,7 @@ manipulates = [
     "configuration files",
     "bridge implementation reports",
     "MemBase work items",
+    "Advisory Proposal conversion proposals",
 ]
 
 [activities.test]

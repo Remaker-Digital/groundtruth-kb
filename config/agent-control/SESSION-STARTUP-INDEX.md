@@ -44,6 +44,14 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    not be recreated as a startup dependency. Bridge review independence is
    session-context based — see **Session-context review independence (normative)**
    below.
+   Advisory Proposals are governed bridge artifacts: `ADVISORY` entries are
+   non-dispatchable and not implementation approval, but they are not inert.
+   They are the primary Loyal Opposition mechanism for future-work initiation
+   and are accessed through governed bridge/TAFE/dispatcher status surfaces and
+   status-bearing versioned files under `bridge/`. Interactive workers progress
+   them through governed advisory intake/disposition; CODEX-INSIGHT-DROPBOX and
+   `independent-progress-assessments` dropbox files are non-canonical session
+   evidence only, not source-of-truth or durable future-work storage.
 5. **Dashboard / backlog summary** — the generated startup service
    (`scripts/session_self_initialization.py`) emits the current-state summary;
    it is not authoritative after generation.

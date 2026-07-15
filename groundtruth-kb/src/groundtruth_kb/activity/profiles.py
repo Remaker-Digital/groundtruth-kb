@@ -40,6 +40,17 @@ _D4_ELIGIBILITY: dict[str, str] = {
 # Four payload classes required by DCL-ACTIVITY-DISPOSITION-PROFILE-001 A2.
 _REQUIRED_CLASSES: tuple[str, ...] = ("skills", "terminology", "history_state", "direction")
 
+# SPEC-INTAKE-8161dc: stable phrases that generated advisory-aware activity
+# envelopes must keep visible to workers.
+ADVISORY_PROPOSAL_SEMANTIC_MARKERS: tuple[str, ...] = (
+    "Advisory Proposals are governed bridge artifacts",
+    "ADVISORY entries are non-dispatchable and not implementation approval",
+    "access ADVISORY bridge artifacts through bridge/TAFE/dispatcher status surfaces and status-bearing bridge/ files",
+    "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
+    "interactive workers progress advisories through governed advisory intake/disposition",
+    "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are non-canonical session evidence only",
+)
+
 # Path from this file (activity/profiles.py) up to the project root.
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_CONFIG_PATH = _PROJECT_ROOT / "config" / "agent-control" / "activity-disposition-profiles.toml"

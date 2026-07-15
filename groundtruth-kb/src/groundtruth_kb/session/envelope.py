@@ -43,12 +43,43 @@ PRELOAD_STATES = {
         "commands": ["gt projects", "gt backlog"],
     },
     "deliberation": {
-        "sources": ["deliberation_archive"],
-        "commands": ["gt deliberations record", "gt deliberations search"],
+        "sources": [
+            "deliberation_archive",
+            "Advisory Proposals are governed bridge artifacts",
+            "ADVISORY entries are non-dispatchable and not implementation approval",
+            "ADVISORY bridge entries via bridge/TAFE/dispatcher status surfaces",
+            "status-bearing versioned files under bridge/",
+            "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
+            "interactive workers progress advisories through governed advisory intake/disposition",
+            "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are "
+            "non-canonical session evidence only",
+        ],
+        "commands": [
+            "gt deliberations record",
+            "gt deliberations search",
+            "gt bridge show <advisory-slug>",
+            "gt bridge dispatch report --json --compact",
+        ],
     },
     "build": {
-        "sources": ["pyproject.toml", "package_state", "scaffold_state"],
-        "commands": ["python -m build", "npm run build"],
+        "sources": [
+            "pyproject.toml",
+            "package_state",
+            "scaffold_state",
+            "Advisory Proposals are governed bridge artifacts",
+            "ADVISORY bridge entries are non-dispatchable and not implementation approval",
+            "ADVISORY access through bridge/TAFE/dispatcher status surfaces and status-bearing bridge/ files",
+            "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
+            "Advisory Proposal future-work initiation through governed advisory intake/disposition",
+            "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are "
+            "non-canonical session evidence only",
+        ],
+        "commands": [
+            "python -m build",
+            "npm run build",
+            "gt bridge show <advisory-slug>",
+            "gt bridge dispatch report --json --compact",
+        ],
     },
     "test": {
         "sources": ["assertion_history", "failing_assertions", "test_inventory"],
