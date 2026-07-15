@@ -1035,6 +1035,8 @@ def finalize_verified_commit(
     write_bridge_file(slug, next_version, body_to_write, root)
     temp_env: dict[str, str] | None = None
     temp_index: Path | None = None
+    old_head = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
+    created_commit: str | None = None
     try:
         temp_env, temp_index = _create_temporary_index(root)
         _run_git(["read-tree", "HEAD"], cwd=root, check=True, env=temp_env)
@@ -1054,15 +1056,15 @@ def finalize_verified_commit(
             raise VerifiedFinalizationError(
                 "VERIFIED finalization staged-set mismatch. "
                 f"missing={sorted(missing)}; unexpected_new={sorted(unexpected)}; "
-    old_head = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
-    created_commit: str | None = None
                 f"expected_paths={list(expected_paths)}; temp_staged={sorted(temp_staged)}"
             )
+        realignment_plan = _prepare_real_index_realign(root, temp_staged, candidate_env=temp_env)
         commit = _run_git_with_lock_retry(["commit", "-m", commit_message], cwd=root, check=False, env=temp_env)
         if commit.returncode != 0:
             raise VerifiedFinalizationError(
                 f"git commit failed with exit {commit.returncode}: {(commit.stderr or commit.stdout).strip()}"
             )
+        created_commit = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
         committed = set(_git_lines(["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"], cwd=root))
         if committed != temp_staged:
             raise VerifiedFinalizationError(
@@ -1088,13 +1090,11 @@ def finalize_verified_commit(
         if temp_index is not None:
             temp_index.unlink(missing_ok=True)
 
-        realignment_plan = _prepare_real_index_realign(root, temp_staged, candidate_env=temp_env)
     commit_sha = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
     _auto_retire_completed_projects_after_verified(root)
     return VerifiedFinalizationResult(
         commit_sha=commit_sha,
         verdict_path=verdict_rel_path,
-        created_commit = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
         committed_paths=expected_paths,
     )
 
