@@ -20,7 +20,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TELEMETRY_PATH = _REPO_ROOT / "scripts" / "bridge_dispatch_starvation_telemetry.py"
-_TRIGGER_PATH = _REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+_TRIGGER_PATH = _REPO_ROOT / "scripts" / "dispatcher_runtime.py"
 
 
 def _load_module(path: Path, module_name: str) -> ModuleType:
@@ -48,7 +48,7 @@ def telemetry() -> ModuleType:
 
 @pytest.fixture(scope="module")
 def trigger() -> ModuleType:
-    return _load_module(_TRIGGER_PATH, "cross_harness_bridge_trigger")
+    return _load_module(_TRIGGER_PATH, "dispatcher_runtime")
 
 
 _RECIPIENT = "loyal-opposition:A"
@@ -246,7 +246,7 @@ def test_signature_invariant_unaffected(trigger):
     and asserts it does not depend on telemetry state — the WI-4480 detector
     observes selection without altering it.
     """
-    items = [_item("c"), _item("b"), _item("a")]  # INDEX is newest-first
+    items = [_item("a"), _item("b"), _item("c")]  # actionable queue is oldest-first
     selected = trigger._selected_oldest_first(items, 2)
     sig_before = trigger._signature(selected)
 
@@ -255,14 +255,14 @@ def test_signature_invariant_unaffected(trigger):
     selected_again = trigger._selected_oldest_first(items, 2)
     sig_after = trigger._signature(selected_again)
     assert sig_before == sig_after
-    # Oldest-first cap selects the two oldest (reversed-then-capped).
+    # Oldest-first cap selects the first two entries from the queue head.
     assert [it.document_name for it in selected] == ["a", "b"]
 
 
 def test_telemetry_records_starved_oldest_first_starvation(telemetry, trigger):
     """End-to-end: the oldest-first cap-2 selector starves the newest entry,
     and the detector records exactly that."""
-    items = [_item("newest"), _item("mid"), _item("oldest")]  # newest-first INDEX
+    items = [_item("oldest"), _item("mid"), _item("newest")]  # oldest-first queue
     selected = trigger._selected_oldest_first(items, 2)
     selected_keys = [it.document_name for it in selected]
     actionable_keys = [it.document_name for it in items]
