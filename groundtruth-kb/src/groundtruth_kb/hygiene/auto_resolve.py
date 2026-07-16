@@ -225,6 +225,25 @@ def _first_nonblank_token(path: Path) -> str | None:
     return None
 
 
+def _head_first_nonblank_token(root: Path, rel_path: str) -> str | None:
+    result = subprocess.run(
+        ["git", "show", f"HEAD:{rel_path}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped.split(maxsplit=1)[0]
+    return None
+
+
 def _bridge_match(rel_path: str) -> re.Match[str] | None:
     return BRIDGE_VERSION_RE.match(rel_path)
 
@@ -322,8 +341,25 @@ def _action_fields(
     }
 
 
-def _bridge_action(status: str | None) -> tuple[str, str, str, str, tuple[str, ...]]:
+def _bridge_action(
+    status: str | None,
+    *,
+    tracked: bool,
+    change_kind: str,
+) -> tuple[str, str, str, str, tuple[str, ...]]:
     if status == "VERIFIED":
+        if tracked:
+            return (
+                "manual_review_modified_terminal_verdict",
+                "manual_owner_review",
+                "manual_review_required_modified_terminal_verdict",
+                f"tracked {change_kind} terminal verdict requires exact byte ownership and finalization evidence; "
+                "terminal status alone does not authorize the changed artifact",
+                (
+                    "broad_bulk_status_mutation",
+                    "committing_another_session_stale_work_without_specific_apply_evidence",
+                ),
+            )
         return (
             "blocked_commit_requires_specific_apply_evidence",
             "safe_commit",
@@ -370,8 +406,14 @@ def classify_entry(
     match = _bridge_match(rel_path)
     if match:
         token = _first_nonblank_token(root / rel_path)
+        if token is None and entry.tracked and entry.change_kind == "deleted":
+            token = _head_first_nonblank_token(root, rel_path)
         bridge_status = token if token in BRIDGE_STATUS_TOKENS else "UNKNOWN"
-        candidate_action, actuator_action, apply_status, reason, forbidden = _bridge_action(bridge_status)
+        candidate_action, actuator_action, apply_status, reason, forbidden = _bridge_action(
+            bridge_status,
+            tracked=entry.tracked,
+            change_kind=entry.change_kind,
+        )
         item.update(
             {
                 "bucket": "bridge_thread_chain",

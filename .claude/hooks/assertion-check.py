@@ -25,6 +25,7 @@ KB_DIR = PROJECT_DIR / "tools" / "knowledge-db"
 AGENTS_FILE = PROJECT_DIR / "AGENTS.md"
 LOYAL_OPPOSITION_SENTINEL = "This project is in Loyal Opposition mode until the owner revokes it."
 
+
 def _env_flag(name: str) -> bool | None:
     """Parse an environment flag as a boolean when explicitly set."""
     value = os.environ.get(name)
@@ -72,10 +73,7 @@ def _run_assertions(db) -> list[str]:
 
         lines = [f"Knowledge DB assertion check: {passed}/{total} PASS, {failed} FAIL"]
 
-        failures = [
-            d for d in summary.get("details", [])
-            if not d.get("skipped") and not d["overall_passed"]
-        ]
+        failures = [d for d in summary.get("details", []) if not d.get("skipped") and not d["overall_passed"]]
         if failures:
             # Look up actual spec status to classify failures correctly
             regressions = []
@@ -102,6 +100,7 @@ def _run_assertions(db) -> list[str]:
         return lines
     except Exception as e:
         import traceback
+
         traceback.print_exc(file=sys.stderr)
         return [f"Assertion check error: {e}"]
 
@@ -132,8 +131,7 @@ def _check_transport_governance(db) -> list[str]:
             if row["last_result"] == "pass":
                 if not row["test_file"]:
                     violations.append(
-                        f"  PHANTOM: {row['id']} (linked to {spec_id}) has "
-                        f"last_result='pass' but test_file=NULL"
+                        f"  PHANTOM: {row['id']} (linked to {spec_id}) has last_result='pass' but test_file=NULL"
                     )
                 elif not _resolve_test_file(row["test_file"]):
                     violations.append(
@@ -150,7 +148,8 @@ def _check_transport_governance(db) -> list[str]:
                 (spec_id,),
             ).fetchall()
             bad = [
-                r["id"] for r in tests
+                r["id"]
+                for r in tests
                 if not r["test_file"] or not _resolve_test_file(r["test_file"]) or r["last_result"] != "pass"
             ]
             if bad or not tests:
@@ -173,10 +172,7 @@ def _check_untested_work_items(db) -> list[str]:
     try:
         all_wis = db.get_open_work_items()
         # Filter to truly open items (not resolved/verified/retired)
-        open_wis = [
-            wi for wi in all_wis
-            if wi.get("resolution_status") not in ("resolved", "verified", "retired")
-        ]
+        open_wis = [wi for wi in all_wis if wi.get("resolution_status") not in ("resolved", "verified", "retired")]
         if not open_wis:
             return []
 
@@ -247,6 +243,7 @@ def _quality_dashboard(db) -> list[str]:
         try:
             sys.path.insert(0, str(KB_DIR))
             from quality_score_helper import compute_dashboard_metrics
+
             metric_values, composite_score = compute_dashboard_metrics(db)
         except ImportError:
             pass
@@ -286,10 +283,7 @@ def _quality_dashboard(db) -> list[str]:
             # --- Metric 4: Defect Escape Rate ---
             defect_wis = db.list_work_items(origin="defect")
             total_defects = len(defect_wis)
-            open_defects = sum(
-                1 for d in defect_wis
-                if d.get("resolution_status") in ("open", "created", "specified")
-            )
+            open_defects = sum(1 for d in defect_wis if d.get("resolution_status") in ("open", "created", "specified"))
             metric_values["defect_escape_rate"] = (open_defects / total_defects) if total_defects else 0
 
             # --- Metric 5: Change Failure Rate ---
@@ -306,11 +300,18 @@ def _quality_dashboard(db) -> list[str]:
             metric_values["coverage_delta"] = 0.5  # Neutral when no data
 
             # Compute composite
-            weights = {"assertion_coverage": 0.25, "assertion_strength": 0.20, "test_freshness": 0.20,
-                       "defect_escape_rate": 0.15, "change_failure_rate": 0.10, "coverage_delta": 0.10}
+            weights = {
+                "assertion_coverage": 0.25,
+                "assertion_strength": 0.20,
+                "test_freshness": 0.20,
+                "defect_escape_rate": 0.15,
+                "change_failure_rate": 0.10,
+                "coverage_delta": 0.10,
+            }
             composite_score = sum(
                 (1.0 - metric_values[k] if k in ("defect_escape_rate", "change_failure_rate") else metric_values[k])
-                * weights[k] * 100
+                * weights[k]
+                * 100
                 for k in weights
             )
 
@@ -377,6 +378,7 @@ def _quality_dashboard(db) -> list[str]:
         return lines
     except Exception as e:
         import traceback
+
         traceback.print_exc(file=sys.stderr)
         return [f"Quality dashboard error: {e}"]
 
@@ -431,6 +433,7 @@ def _read_handoff_prompt(db, consume: bool = True) -> list[str]:
         if not context_data and prompt.get("context"):
             try:
                 import json as _json
+
                 context_data = _json.loads(prompt["context"])
             except (ValueError, TypeError):
                 context_data = {}
@@ -470,6 +473,7 @@ def _read_handoff_prompt(db, consume: bool = True) -> list[str]:
         return lines
     except Exception as e:
         import traceback
+
         traceback.print_exc(file=sys.stderr)
         return [f"Session handoff read error: {e}"]
 
@@ -487,6 +491,7 @@ def _read_retention_cap(project_dir: Path) -> tuple[int, list[str]]:
         return 50, []
     try:
         import tomllib
+
         data = tomllib.loads(config_path.read_text(encoding="utf-8"))
     except Exception as exc:
         return 50, [f"assertion-runs-retention config fallback to default 50: {exc}"]
@@ -580,7 +585,9 @@ def _check_assertion_triage_advisory() -> list[str]:
     if counts.get("genuine_drift", 0) > 0:
         lines.append("  ^ genuine_drift entries are highest-priority for review.")
     if counts.get("chronic_noise", 0) > 0:
-        lines.append("  ^ review chronic_noise candidates via `python scripts/assertion_retirement_workflow.py review-candidates`")
+        lines.append(
+            "  ^ review chronic_noise candidates via `python scripts/assertion_retirement_workflow.py review-candidates`"
+        )
     return lines
 
 
@@ -634,6 +641,7 @@ def main():
 
     except Exception as e:
         import traceback
+
         traceback.print_exc(file=sys.stderr)
         json.dump({"additionalContext": f"SessionStart hook error: {e}"}, sys.stdout)
 

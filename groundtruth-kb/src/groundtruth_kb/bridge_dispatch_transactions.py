@@ -49,6 +49,7 @@ BUDGET_FLOAT_FIELDS = frozenset(
 HARNESS_FIELD_ORDER = (
     "description",
     "max_items",
+    "max_items_override",
     "tags",
 )
 RULE_FIELD_ORDER = (
@@ -182,6 +183,7 @@ def set_caps(
     def mutate(raw: dict[str, Any]) -> dict[str, Any]:
         harness = _require_harness(raw, harness_id)
         harness["max_items"] = _validate_max_items(max_items)
+        harness["max_items_override"] = True
         return raw
 
     return _apply_transaction(
@@ -315,6 +317,7 @@ def add_harness(
             row["description"] = description
         if max_items is not None:
             row["max_items"] = _validate_max_items(max_items)
+            row["max_items_override"] = True
         if tags:
             row["tags"] = list(_validate_nonempty_strings("tags", tags))
         harnesses[validated_id] = row

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution fallba
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TIMEOUT_SECONDS = 600.0
+TIMEOUT_EXIT_CODE = 124
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 # WI-4933: the harness-registry Cursor invocation surfaces pass canonical
 # Loyal Opposition route keys ('bridge-review', 'verification'), but no SKILL.md
@@ -47,6 +49,10 @@ _CURSOR_AUTH_ENV_KEYS = ("CURSOR_API_KEY",)
 _CURSOR_ADAPTATION_VERSION = "cursor-skill-route-v1"
 _PROVENANCE_DIR = Path(".gtkb-state") / "ops" / "dispatch-provenance"
 _PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
+_TIMEOUT_CAPTURE_LIMIT_BYTES = 4000
+_TIMEOUT_CAPTURE_SECRET_PATTERNS = (
+    re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*([A-Za-z0-9._~+/=-]{8,})"),
+)
 
 
 class CursorHarnessError(RuntimeError):
@@ -394,6 +400,63 @@ def _cursor_agent_env() -> dict[str, str]:
     return env
 
 
+def _timeout_capture_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def _redact_timeout_capture(text: str) -> str:
+    redacted = text
+    for pattern in _TIMEOUT_CAPTURE_SECRET_PATTERNS:
+        redacted = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", redacted)
+    return redacted
+
+
+def _bounded_timeout_capture(value: object, *, label: str) -> str:
+    text = _redact_timeout_capture(_timeout_capture_text(value))
+    if not text:
+        return ""
+    encoded = text.encode("utf-8", errors="replace")
+    if len(encoded) <= _TIMEOUT_CAPTURE_LIMIT_BYTES:
+        return text
+    truncated = encoded[:_TIMEOUT_CAPTURE_LIMIT_BYTES].decode("utf-8", errors="replace")
+    return (
+        f"{truncated}\n"
+        f"[cursor_harness: partial {label} truncated to {_TIMEOUT_CAPTURE_LIMIT_BYTES} "
+        f"bytes from {len(encoded)} bytes]\n"
+    )
+
+
+def _timeout_stdout(exc: subprocess.TimeoutExpired) -> object:
+    return getattr(exc, "stdout", None) if getattr(exc, "stdout", None) is not None else getattr(exc, "output", None)
+
+
+def _timeout_diagnostic(
+    *,
+    timeout_seconds: float,
+    skill: str | None,
+    output_format: str,
+    mode: str | None,
+    command: list[str],
+    stdout_text: str,
+    stderr_text: str,
+) -> str:
+    executable = Path(command[0]).name if command else "<unknown>"
+    stdout_bytes = len(stdout_text.encode("utf-8", errors="replace"))
+    stderr_bytes = len(stderr_text.encode("utf-8", errors="replace"))
+    return (
+        "cursor_harness: Cursor Agent timed out "
+        f"after {timeout_seconds:g}s; exit={TIMEOUT_EXIT_CODE}; executable={executable}; "
+        f"skill={skill or '<none>'}; output_format={output_format}; mode={mode or '<default>'}; "
+        f"partial_stdout_bytes={stdout_bytes}; partial_stderr_bytes={stderr_bytes}"
+    )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Cursor Agent harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="Prompt to send to Cursor Agent.")
@@ -466,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
     except CursorHarnessError as exc:
         print(f"cursor_harness: {exc}", file=sys.stderr)
         return 1
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
         if should_record_cursor_agents:
             _record_new_cursor_agent_provenance(
                 project_root,
@@ -474,8 +537,29 @@ def main(argv: list[str] | None = None) -> int:
                 dispatch_root_pid=dispatch_root_pid,
                 started_at_epoch=cursor_agent_started_at,
             )
-        print("cursor_harness: timed out waiting for Cursor Agent", file=sys.stderr)
-        return 1
+        stdout_text = _bounded_timeout_capture(_timeout_stdout(exc), label="stdout")
+        stderr_text = _bounded_timeout_capture(getattr(exc, "stderr", None), label="stderr")
+        if stdout_text:
+            sys.stdout.write(stdout_text)
+            if not stdout_text.endswith("\n"):
+                sys.stdout.write("\n")
+        if stderr_text:
+            sys.stderr.write(stderr_text)
+            if not stderr_text.endswith("\n"):
+                sys.stderr.write("\n")
+        print(
+            _timeout_diagnostic(
+                timeout_seconds=float(args.timeout),
+                skill=args.skill,
+                output_format=args.output_format,
+                mode=args.mode,
+                command=command,
+                stdout_text=stdout_text,
+                stderr_text=stderr_text,
+            ),
+            file=sys.stderr,
+        )
+        return TIMEOUT_EXIT_CODE
     if should_record_cursor_agents:
         _record_new_cursor_agent_provenance(
             project_root,

@@ -38,6 +38,7 @@ _bridge_writer = importlib.import_module("scripts.gtkb_bridge_writer")
 WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
+no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
 
 
 class BridgeImplReportError(RuntimeError):
@@ -88,7 +89,8 @@ class ImplReportPlan:
     version_chain: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        return payload
 
     def to_compact_dict(self) -> dict[str, Any]:
         return {
@@ -109,6 +111,11 @@ class ImplReportPlan:
 _SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$"
 _BRIDGE_KIND_RE = re.compile(r"^\s*bridge_kind:\s*(?P<kind>[A-Za-z0-9_-]+)\s*$", re.MULTILINE)
 _RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
+_PROJECT_METADATA_LINE_RE = re.compile(
+    r"^(Project Authorization:\s*PAUTH-[A-Z0-9-]+|Project:\s*[A-Z0-9-]+|"
+    r"Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+))$",
+    re.MULTILINE,
+)
 
 
 def _load_bridge_propose_helper():
@@ -148,7 +155,7 @@ def _parse_versions(slug: str, bridge_dir: Path) -> list[BridgeVersion]:
     root = bridge_dir.parent
     pattern = re.compile(rf"^{re.escape(slug)}-(\d{{3}})\.md$")
     status_re = re.compile(
-        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
         re.IGNORECASE,
     )
     for path in bridge_dir.glob(f"{slug}-*.md"):
@@ -229,6 +236,15 @@ def _format_spec_links(specs: tuple[str, ...]) -> str:
     return "\n".join(f"- `{spec}`" for spec in specs)
 
 
+def _extract_project_metadata_lines(proposal_text: str) -> tuple[str, ...]:
+    lines: list[str] = []
+    for match in _PROJECT_METADATA_LINE_RE.finditer(proposal_text):
+        line = match.group(0).strip()
+        if line not in lines:
+            lines.append(line)
+    return tuple(lines)
+
+
 def _table_escape(value: str) -> str:
     return value.replace("|", "\\|").replace("\n", " ")
 
@@ -253,6 +269,7 @@ def _git_lines(args: list[str], *, cwd: Path) -> tuple[str, ...]:
         errors="replace",
         timeout=30,
         check=False,
+        **no_window_subprocess_kwargs(),
     )
     if result.returncode != 0:
         return ()
@@ -349,6 +366,8 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         if acceptance_criteria
         else "- [ ] Reconcile approved proposal acceptance criteria."
     )
+    metadata_lines = "\n".join(_extract_project_metadata_lines(proposal_text))
+    metadata_block = f"{metadata_lines}\n" if metadata_lines else ""
     files_lines = (
         "\n".join(f"- `{path}`" for path in plan.files_changed)
         if plan.files_changed
@@ -364,6 +383,7 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         f"Version: {plan.next_version:03d} (NEW; post-implementation report)\n"
         f"Responds to GO: {plan.go_path}\n"
         f"Approved proposal: {plan.proposal_path}\n"
+        f"{metadata_block}"
         f"Recommended commit type: {commit_type}\n\n"
         "## Implementation Claim\n\n"
         "Describe the completed implementation and the user-visible or governance-visible behavior it changes.\n\n"

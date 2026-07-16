@@ -66,12 +66,14 @@ def _run_main(hook: ModuleType, prompt: str, monkeypatch: pytest.MonkeyPatch, ca
 
 def test_non_topic_prompt_emits_no_context(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     hook = _load_hook()
+    monkeypatch.setattr(hook, "_startup_input_gate_active", lambda: False)
     payload = _run_main(hook, "Please continue the task as normal.", monkeypatch, capsys)
     assert payload == {}
 
 
 def test_topic_open_emits_additional_context(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     hook = _load_hook()
+    monkeypatch.setattr(hook, "_startup_input_gate_active", lambda: False)
     monkeypatch.setattr(hook, "handle_topic_command", lambda *a, **k: {"action": "open"})
     monkeypatch.setattr(hook, "render_topic_context", lambda result: "RENDERED-TOPIC-CONTEXT")
     payload = _run_main(hook, f"::open {_valid_topic_type()}", monkeypatch, capsys)
@@ -93,6 +95,7 @@ def test_startup_gate_suppresses_routing(
 
 def test_envelope_error_emits_bounded_failure(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     hook = _load_hook()
+    monkeypatch.setattr(hook, "_startup_input_gate_active", lambda: False)
     from groundtruth_kb.session.envelope import EnvelopeError
 
     def _raise(*_a, **_k):

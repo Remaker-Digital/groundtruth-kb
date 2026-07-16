@@ -192,7 +192,8 @@ class TestNonMachineAssertions:
             {"type": "human_review", "description": "check the UI manually"},
             project_dir,
         )
-        assert result["passed"] is True
+        assert result["passed"] is False
+        assert result["status"] == "UNASSESSED"
         assert result.get("skipped") is True
 
     def test_missing_pattern(self, project_dir: Path) -> None:
@@ -238,7 +239,8 @@ class TestSpecAssertions:
         )
         spec = db.get_spec("SPEC-T02")
         result = run_spec_assertions(db, spec, "test", project_dir)
-        assert result["overall_passed"] is True
+        assert result["overall_passed"] is False
+        assert result["evaluation_result"] == "NOT_APPLICABLE"
         assert result.get("skipped") is True
 
     def test_spec_with_text_assertion(self, db: KnowledgeDB, project_dir: Path) -> None:
@@ -252,8 +254,27 @@ class TestSpecAssertions:
         )
         spec = db.get_spec("SPEC-T03")
         result = run_spec_assertions(db, spec, "test", project_dir)
-        assert result["overall_passed"] is True
+        assert result["overall_passed"] is False
+        assert result["evaluation_result"] == "UNASSESSED"
         assert result.get("skipped") is True
+
+    def test_mixed_executable_and_unsupported_assertions_are_partial(self, db: KnowledgeDB, project_dir: Path) -> None:
+        db.insert_spec(
+            id="SPEC-T04",
+            title="Partially evaluable",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
+            assertions=[
+                {"type": "file_exists", "file": "README.md"},
+                {"type": "human_review", "description": "manual evidence"},
+            ],
+        )
+
+        result = run_spec_assertions(db, db.get_spec("SPEC-T04"), "test", project_dir)
+
+        assert result["overall_passed"] is False
+        assert result["evaluation_result"] == "PARTIAL"
 
     def test_run_all_assertions(self, db: KnowledgeDB, project_dir: Path) -> None:
         assertions = [{"type": "glob", "pattern": "README.md", "description": "readme exists"}]
@@ -302,6 +323,43 @@ class TestSpecAssertions:
     def test_run_nonexistent_spec(self, db: KnowledgeDB, project_dir: Path) -> None:
         summary = run_all_assertions(db, project_dir, spec_id="NOPE-999")
         assert "error" in summary
+
+    def test_unassessed_only_summary_is_not_a_pass(self, db: KnowledgeDB, project_dir: Path) -> None:
+        db.insert_spec(
+            id="SPEC-U01",
+            title="Manual only",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
+            assertions=[{"type": "human_review", "description": "manual"}],
+        )
+
+        summary = run_all_assertions(db, project_dir, spec_id="SPEC-U01")
+
+        assert summary["aggregate_result"] == "UNASSESSED"
+        assert summary["failed"] == 1
+
+    def test_mixed_pass_and_unassessed_summary_is_partial(self, db: KnowledgeDB, project_dir: Path) -> None:
+        db.insert_spec(
+            id="SPEC-P01",
+            title="Passing",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
+            assertions=[{"type": "file_exists", "file": "README.md"}],
+        )
+        db.insert_spec(
+            id="SPEC-P02",
+            title="Manual",
+            status="implemented",
+            changed_by="test",
+            change_reason="test",
+            assertions=[{"type": "human_review", "description": "manual"}],
+        )
+
+        summary = run_all_assertions(db, project_dir)
+
+        assert summary["aggregate_result"] == "PARTIAL"
 
 
 # ---------------------------------------------------------------------------
@@ -736,6 +794,23 @@ class TestAllOfAssertion:
             project_dir,
         )
         assert result.get("skipped") is True
+        assert result["passed"] is False
+        assert result["status"] == "UNASSESSED"
+
+    def test_mixed_machine_and_unassessed_children_are_partial(self, project_dir: Path) -> None:
+        result = run_single_assertion(
+            {
+                "type": "all_of",
+                "assertions": [
+                    {"type": "file_exists", "file": "src/main.py"},
+                    {"type": "visual", "description": "looks good"},
+                ],
+            },
+            project_dir,
+        )
+
+        assert result["passed"] is False
+        assert result["status"] == "PARTIAL"
 
 
 class TestAnyOfAssertion:

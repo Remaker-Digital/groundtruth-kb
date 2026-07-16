@@ -363,7 +363,7 @@ source_sha256 = "f6541de2552662da17e914786ac9fbd24a2de3e4b0be2ea801e2bb50f7a9542
 surface = ".agent/skills/lo-opportunity-radar/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/lo-opportunity-radar/SKILL.md"
-source_sha256 = "22ccca5fc77e5b8efd70188ff5413ee692dcecdf9ccbc6703b6a8a118f65bacd"
+source_sha256 = "f6541de2552662da17e914786ac9fbd24a2de3e4b0be2ea801e2bb50f7a95429"
 [capabilities.cursor]
 surface = ".cursor/skills/lo-opportunity-radar/SKILL.md"
 status = "fallback"
@@ -391,7 +391,7 @@ source_sha256 = "3c46cefd9bb72f6e25c5285db6e5de06d19a1e0f6869b5c281ad758dbbae450
 surface = ".agent/skills/codex-report/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/codex-report/SKILL.md"
-source_sha256 = "912b6bc5c661ecbf42c2687ce61ae37617d482f249588fd0d9cca630a04e9825"
+source_sha256 = "3c46cefd9bb72f6e25c5285db6e5de06d19a1e0f6869b5c281ad758dbbae4502"
 [capabilities.cursor]
 surface = ".cursor/skills/codex-report/SKILL.md"
 status = "fallback"
@@ -413,13 +413,13 @@ status = "native"
 surface = ".codex/skills/decision-capture/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/decision-capture/SKILL.md"
-source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
+source_sha256 = "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
 
 [capabilities.antigravity]
 surface = ".agent/skills/decision-capture/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/decision-capture/SKILL.md"
-source_sha256 = "8544a4d45af288465b4a96c0b6efda54e2e02344ae9f7ee5dfee07729e5dd179"
+source_sha256 = "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
 [capabilities.cursor]
 surface = ".cursor/skills/decision-capture/SKILL.md"
 status = "fallback"
@@ -850,7 +850,7 @@ source_sha256 = "b35a7e3cd6c2b4bd3976c15a2b0f78ec37b4663fbe2d5063047c77daf0c778c
 surface = ".agent/skills/projects/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/projects/SKILL.md"
-source_sha256 = "0ca28e18fbb6331cb19c0c04a3c69b0b1ce3045d1afaa92a5dcbc91a6c95f155"
+source_sha256 = "b35a7e3cd6c2b4bd3976c15a2b0f78ec37b4663fbe2d5063047c77daf0c778c8"
 [capabilities.cursor]
 surface = ".cursor/skills/projects/SKILL.md"
 status = "fallback"
@@ -1078,7 +1078,7 @@ source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d7
 surface = ".agent/skills/gtkb-benchmarks/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-benchmarks/SKILL.md"
-source_sha256 = "f456f8bf39cbd93300befe37e35a9ef9da2efccd4fe55e06d51d2636d9c36262"
+source_sha256 = "31a83117293b282f51310b01c097559e0c6d4b91c91d90b6ca19aa8a1b837d79"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-benchmarks/SKILL.md"
 status = "fallback"
@@ -1172,9 +1172,9 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 id = "skill.gtkb-hygiene-reclaim"
 kind = "skill"
 canonical_name = "gtkb-hygiene-reclaim"
-canonical_purpose = "Plan deterministic hygiene candidates, inspect immutable history, and orchestrate exact owner-authorized reversible trash and restore through the production gt CLI."
+canonical_purpose = "Ops-envelope-only deep cleaning: plan deterministic hygiene candidates, inspect immutable history, and autonomously trash/purge receipted payloads through the production gt CLI until GT-KB is clean."
 canonical_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
-required_for_roles = ["prime-builder"]
+required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
 [capabilities.claude]
@@ -1185,7 +1185,7 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-reclaim/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
-source_sha256 = "e8c484e6076738972ea98d00749e9a4ca40ff8a2ef07abfb24f9dcefedf3f3cc"
+source_sha256 = "c1c5fadde360a4f0e03a265ef9cd38b6a0f2f366095ee1b77e180f453a1894a1"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -1254,7 +1254,7 @@ source_sha256 = "a77cd8c11da39a0f6f0287883600cd5602a3dc66cd264844d756d254d8a6cb9
 surface = ".agent/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
-source_sha256 = "c817927d765d25f1ba58c4bc6e8d3779c7c15177ae8d87ae13e0abcf1138a705"
+source_sha256 = "a77cd8c11da39a0f6f0287883600cd5602a3dc66cd264844d756d254d8a6cb98"
 [capabilities.cursor]
 surface = ".cursor/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 status = "fallback"

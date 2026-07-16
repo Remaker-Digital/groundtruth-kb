@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,6 +97,10 @@ class BridgeEvidenceAnchorError(BridgeError):
     """
 
 
+class BridgeComplianceError(BridgeError):
+    """Bridge compliance audit denied or could not evaluate candidate content."""
+
+
 class BridgePublicationError(BridgeError):
     """A provider-backed Loyal Opposition verdict could not be published safely."""
 
@@ -116,6 +121,75 @@ class PublishedBridgeVerdict:
             "commit_sha": self.commit_sha,
             "claim_released": self.claim_released,
         }
+
+
+def _relative_to_project(path: Path, project_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _bridge_compliance_gate_path(project_root: Path) -> Path:
+    local_gate = project_root / ".claude" / "hooks" / "bridge-compliance-gate.py"
+    if local_gate.is_file():
+        return local_gate
+    for parent in Path(__file__).resolve().parents:
+        gate = parent / ".claude" / "hooks" / "bridge-compliance-gate.py"
+        if gate.is_file():
+            return gate
+    raise BridgeComplianceError("bridge-compliance-gate.py is unavailable; refusing helper-managed bridge write")
+
+
+def run_bridge_compliance_audit(
+    *,
+    file_path: Path,
+    content: str,
+    project_root: Path,
+) -> dict[str, object]:
+    """Run the bridge-compliance gate in audit mode for in-memory content."""
+
+    gate_path = _bridge_compliance_gate_path(project_root)
+    payload = {
+        "cwd": str(project_root.resolve()),
+        "tool_input": {
+            "file_path": _relative_to_project(file_path, project_root),
+            "content": content,
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="gtkb-bridge-compliance-") as tmp:
+        audit_output = Path(tmp) / "audit.json"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(gate_path),
+                "--audit-only",
+                "--audit-output",
+                str(audit_output),
+            ],
+            cwd=project_root,
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+            **no_window_subprocess_kwargs(),
+        )
+        if result.returncode != 0:
+            raise BridgeComplianceError(
+                "bridge-compliance audit failed to execute: "
+                f"returncode={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}"
+            )
+        try:
+            audit = json.loads(audit_output.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise BridgeComplianceError("bridge-compliance audit did not produce readable JSON") from exc
+    if audit.get("decision") != "pass":
+        reason = audit.get("reason") or "bridge-compliance audit denied the candidate bridge file"
+        raise BridgeComplianceError(str(reason))
+    return audit
 
 
 def _synthetic_session_context_id_for_content(content: str) -> str | None:
@@ -485,6 +559,11 @@ def write_bridge_file(
         else content
     )
     _reject_synthetic_session_context_id(content_to_write)
+    run_bridge_compliance_audit(
+        file_path=target,
+        content=content_to_write,
+        project_root=project_root,
+    )
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         with target.open("x", encoding="utf-8", newline="") as handle:

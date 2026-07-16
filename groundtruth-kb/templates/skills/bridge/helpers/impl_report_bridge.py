@@ -95,6 +95,11 @@ class ImplReportPlan:
 _SECTION_RE_TEMPLATE = r"^##\s+{heading}\s*$"
 _BRIDGE_KIND_RE = re.compile(r"^\s*bridge_kind:\s*(?P<kind>[A-Za-z0-9_-]+)\s*$", re.MULTILINE)
 _RECOMMENDED_COMMIT_TYPE_RE = re.compile(r"Recommended commit type\s*:", re.IGNORECASE)
+_PROJECT_METADATA_LINE_RE = re.compile(
+    r"^(Project Authorization:\s*PAUTH-[A-Z0-9-]+|Project:\s*[A-Z0-9-]+|"
+    r"Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+))$",
+    re.MULTILINE,
+)
 
 
 def _load_bridge_propose_helper():
@@ -213,6 +218,15 @@ def _format_spec_links(specs: tuple[str, ...]) -> str:
     if not specs:
         return "- _No linked specifications found in approved proposal._"
     return "\n".join(f"- `{spec}`" for spec in specs)
+
+
+def _extract_project_metadata_lines(proposal_text: str) -> tuple[str, ...]:
+    lines: list[str] = []
+    for match in _PROJECT_METADATA_LINE_RE.finditer(proposal_text):
+        line = match.group(0).strip()
+        if line not in lines:
+            lines.append(line)
+    return tuple(lines)
 
 
 def _table_escape(value: str) -> str:
@@ -336,6 +350,8 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         if acceptance_criteria
         else "- [ ] Reconcile approved proposal acceptance criteria."
     )
+    metadata_lines = "\n".join(_extract_project_metadata_lines(proposal_text))
+    metadata_block = f"{metadata_lines}\n" if metadata_lines else ""
     files_lines = (
         "\n".join(f"- `{path}`" for path in plan.files_changed)
         if plan.files_changed
@@ -351,6 +367,7 @@ def build_report_skeleton(slug: str, *, bridge_dir: Path | None = None) -> str:
         f"Version: {plan.next_version:03d} (NEW; post-implementation report)\n"
         f"Responds to GO: {plan.go_path}\n"
         f"Approved proposal: {plan.proposal_path}\n"
+        f"{metadata_block}"
         f"Recommended commit type: {commit_type}\n\n"
         "## Implementation Claim\n\n"
         "Describe the completed implementation and the user-visible or governance-visible behavior it changes.\n\n"

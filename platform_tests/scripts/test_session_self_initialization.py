@@ -15,6 +15,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "session_self_initialization.py"
+WORKSTREAM_FOCUS_HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "workstream-focus.py"
+PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
+if str(PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC))
 
 
 @pytest.fixture(autouse=True)
@@ -128,6 +132,51 @@ def _load_module(*, live_dashboard_probes: bool = False):
     return module
 
 
+def _load_workstream_focus_hook_adapter():
+    spec = importlib.util.spec_from_file_location("_test_workstream_focus_hook_adapter", WORKSTREAM_FOCUS_HOOK_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["_test_workstream_focus_hook_adapter"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _seed_session_envelope_harness(
+    root: Path,
+    *,
+    harness_name: str = "claude",
+    harness_id: str = "B",
+    durable_role: str = "loyal-opposition",
+) -> None:
+    state = root / "harness-state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {harness_name: {"id": harness_id}}}),
+        encoding="utf-8",
+    )
+    (state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [{"id": harness_id, "harness_name": harness_name, "role": [durable_role]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _clear_session_id_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "GTKB_BRIDGE_POLLER_RUN_ID",
+        "GTKB_SESSION_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_THREAD_ID",
+        "CLAUDE_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
 def _startup_service_result(module, model: dict, report_text: str) -> dict:
     dashboard_dir = REPO_ROOT / "docs" / "gtkb-dashboard"
     return {
@@ -144,6 +193,159 @@ def _startup_service_result(module, model: dict, report_text: str) -> dict:
         "wrapup_path": dashboard_dir / "session-wrapup-report.md",
         "wrapup_text": "",
     }
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_role", "durable_role"),
+    [
+        ("pb", "prime-builder", "loyal-opposition"),
+        ("lo", "loyal-opposition", "prime-builder"),
+    ],
+)
+def test_wi5328_workstream_focus_init_keyword_writes_authoritative_session_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    expected_role: str,
+    durable_role: str,
+) -> None:
+    _clear_session_id_env(monkeypatch)
+    _seed_session_envelope_harness(tmp_path, durable_role=durable_role)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    adapter = _load_workstream_focus_hook_adapter()
+
+    assert (
+        adapter._persist_interactive_session_envelope(
+            {"prompt": f"::init gtkb {mode}", "session_id": f"session-{mode}"},
+            tmp_path,
+        )
+        is True
+    )
+
+    envelope_path = tmp_path / "harness-state" / "claude" / "session-envelopes" / f"session-{mode}.json"
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    projection = json.loads((tmp_path / ".claude" / "session" / "envelope.json").read_text(encoding="utf-8"))
+
+    assert projection["session_id"] == f"session-{mode}"
+    assert projection["role_resolved"] == expected_role
+    assert envelope["init_keyword"] == f"::init gtkb {mode}"
+    assert envelope["role"] == expected_role
+    assert envelope["role_asserted"] == expected_role
+    assert envelope["role_resolved"] == expected_role
+    assert envelope["role_resolution"]["interactive_resolved_role"] == expected_role
+    assert envelope["role_resolution"]["interactive_role_source"] == "transcript_init_keyword"
+    assert envelope["role_resolution"]["durable_registry_role"] == durable_role
+    assert envelope["role_resolution"]["authority_mode"] == "interactive_transcript"
+    assert "non-overriding" in envelope["role_resolution"]["durable_registry_authority"]
+    assert envelope["worker_role_provenance"]["role"] == expected_role
+    assert envelope["worker_role_provenance"]["role_resolution_source"] == "transcript_init_keyword"
+    assert envelope["worker_role_provenance"]["session_id"] == f"session-{mode}"
+
+
+def test_wi5328_interactive_envelope_writeback_is_session_isolated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_session_id_env(monkeypatch)
+    _seed_session_envelope_harness(tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    adapter = _load_workstream_focus_hook_adapter()
+
+    assert adapter._persist_interactive_session_envelope(
+        {"prompt": "::init gtkb pb", "session_id": "session-one"}, tmp_path
+    )
+    assert adapter._persist_interactive_session_envelope(
+        {"prompt": "::init gtkb lo", "session_id": "session-two"}, tmp_path
+    )
+
+    first = json.loads(
+        (tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-one.json").read_text(encoding="utf-8")
+    )
+    second = json.loads(
+        (tmp_path / "harness-state" / "claude" / "session-envelopes" / "session-two.json").read_text(encoding="utf-8")
+    )
+    projection = json.loads((tmp_path / ".claude" / "session" / "envelope.json").read_text(encoding="utf-8"))
+
+    assert first["role_resolved"] == "prime-builder"
+    assert second["role_resolved"] == "loyal-opposition"
+    assert projection["session_id"] == "session-two"
+    assert projection["role_resolved"] == "loyal-opposition"
+
+
+def test_wi5328_subject_only_or_headless_init_keyword_does_not_write_worker_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_session_id_env(monkeypatch)
+    _seed_session_envelope_harness(tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "claude")
+    monkeypatch.setenv("GTKB_HARNESS_ID", "B")
+    adapter = _load_workstream_focus_hook_adapter()
+
+    assert (
+        adapter._persist_interactive_session_envelope(
+            {"prompt": "::init gtkb", "session_id": "subject-only"},
+            tmp_path,
+        )
+        is False
+    )
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
+    assert (
+        adapter._persist_interactive_session_envelope(
+            {"prompt": "::init gtkb pb", "session_id": "headless"},
+            tmp_path,
+        )
+        is False
+    )
+
+    assert not (tmp_path / "harness-state" / "claude" / "session-envelopes").exists()
+
+
+def test_wi5328_worker_provenance_rejects_transcript_resolution_mismatch(tmp_path: Path) -> None:
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        resolve_worker_role_provenance,
+        worker_session_envelope_path,
+    )
+
+    path = worker_session_envelope_path(tmp_path, "claude", "session-mismatch")
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "status": "open",
+                "session_id": "session-mismatch",
+                "harness_id": "B",
+                "harness_name": "claude",
+                "role": "prime-builder",
+                "role_asserted": "prime-builder",
+                "role_resolved": "prime-builder",
+                "role_resolution": {
+                    "interactive_resolved_role": "prime-builder",
+                    "interactive_role_source": "transcript_init_keyword",
+                    "durable_registry_role": "loyal-opposition",
+                    "durable_registry_authority": "non-overriding",
+                    "authority_mode": "interactive_transcript",
+                },
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": "session-mismatch",
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "role": "prime-builder",
+                    "role_resolution_source": "session_resolver_fallback",
+                    "dispatch_run_id": None,
+                    "issued_at": "2026-07-16T18:00:00Z",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(EnvelopeError, match="claims transcript role resolution"):
+        resolve_worker_role_provenance(tmp_path, current_session_id="session-mismatch", harness_name="claude")
 
 
 def _make_synthetic_doctor_check(status: str = "pass", message: str = "synthetic"):

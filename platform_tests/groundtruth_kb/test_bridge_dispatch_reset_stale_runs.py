@@ -16,9 +16,6 @@ import psutil
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
-for module_name in list(sys.modules):
-    if module_name == "groundtruth_kb" or module_name.startswith("groundtruth_kb."):
-        del sys.modules[module_name]
 
 from groundtruth_kb.bridge_dispatch_reset import DispatchStateDirs, soft_reset  # noqa: E402
 

@@ -51,12 +51,12 @@ tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.C]
 description = "Antigravity"
-max_items = 4
+max_items = 1
 tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.D]
 description = "Ollama"
-max_items = 4
+max_items = 1
 tags = ["loyal-opposition", "low-cost"]
 
 [harnesses.E]

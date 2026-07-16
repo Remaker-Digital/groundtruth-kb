@@ -262,6 +262,40 @@ def _claim_bridge(root: Path, bridge_id: str = "sample-implementation", session_
     assert auth.bridge_work_intent_registry.acquire(bridge_id, holder, project_root=root)
 
 
+def _write_bootstrap_thread(root: Path, bridge_id: str = "bootstrap-implementation") -> None:
+    proposal = (
+        _proposal(bridge_id=bridge_id, target_paths=["groundtruth.db"])
+        + "\nProject: PROJECT-AUTH\n"
+        + "Work Item: WI-AUTH-001\n"
+        + "Project Authorization: PAUTH-BOOTSTRAP\n"
+        + "Owner Decision: DELIB-BOOTSTRAP\n\n"
+        + "## Project Authorization Bootstrap\n\n"
+        + "project_authorization_bootstrap binds DELIB-BOOTSTRAP to PAUTH-BOOTSTRAP.\n"
+    )
+    _write_thread(root, bridge_id=bridge_id, proposal=proposal)
+
+
+def _claim_bootstrap_bridge(
+    root: Path,
+    bridge_id: str = "bootstrap-implementation",
+    session_id: str = "session-bootstrap",
+) -> None:
+    _write_prime_worker_session(root, session_id)
+    assert auth.bridge_work_intent_registry.acquire(
+        bridge_id,
+        session_id,
+        project_root=root,
+        claim_kind=auth.bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        bootstrap_authority={
+            "owner_decision_id": "DELIB-BOOTSTRAP",
+            "project_id": "PROJECT-AUTH",
+            "work_item_id": "WI-AUTH-001",
+            "authorization_id": "PAUTH-BOOTSTRAP",
+            "carrier_targets": ["groundtruth.db"],
+        },
+    )
+
+
 def _apply_patch_payload(
     root: Path, target: str = "scripts/sample.py", session_id: str = "session-1"
 ) -> dict[str, object]:
@@ -286,6 +320,21 @@ def test_go_authorization_packet_without_pauth_blocks_in_scope_apply_patch(tmp_p
 
     assert result["decision"] == "block"
     assert "Project Authorization is required" in result["reason"]
+
+
+def test_bootstrap_packet_blocks_unrelated_source_apply_patch(tmp_path: Path) -> None:
+    bridge_id = "bootstrap-implementation"
+    session_id = "session-bootstrap"
+    _write_bootstrap_thread(tmp_path, bridge_id=bridge_id)
+    _claim_bootstrap_bridge(tmp_path, bridge_id=bridge_id, session_id=session_id)
+    packet = auth.create_authorization_packet(tmp_path, bridge_id, session_id=session_id)
+    finalized = auth.finalize_implementation_start_packet(tmp_path, packet, session_id=session_id)
+    auth.write_started_packets(tmp_path, [finalized])
+
+    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/sample.py", session_id=session_id))
+
+    assert result["decision"] == "block"
+    assert "Target path outside implementation authorization scope" in result["reason"]
 
 
 def test_pauth_backed_go_authorization_allows_in_scope_apply_patch(tmp_path: Path) -> None:

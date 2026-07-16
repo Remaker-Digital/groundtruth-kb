@@ -1,0 +1,94 @@
+diff --git a/platform_tests/scripts/test_cloud_harness_base.py b/platform_tests/scripts/test_cloud_harness_base.py
+index 26d29877..aacabdfe 100644
+--- a/platform_tests/scripts/test_cloud_harness_base.py
++++ b/platform_tests/scripts/test_cloud_harness_base.py
+@@ -804,6 +804,89 @@ def test_native_posttool_explicit_block_remains_fail_closed(tmp_path: Path) -> N
+         )
+
+
++@pytest.mark.parametrize(
++    "first_result",
++    [
++        base.GuardExecutionResult(returncode=-1, stdout="", stderr="", timed_out=True),
++        base.GuardExecutionResult(returncode=1, stdout="", stderr="maintenance failed"),
++        base.GuardExecutionResult(returncode=0, stdout="informational non-json output", stderr=""),
++        base.GuardExecutionResult(returncode=0, stdout="[]", stderr=""),
++    ],
++    ids=("timeout", "nonzero", "malformed", "non-object"),
++)
++def test_native_user_prompt_lifecycle_failures_preserve_prompt_and_run_later_hooks(
++    tmp_path: Path,
++    first_result: base.GuardExecutionResult,
++) -> None:
++    root = _root(tmp_path)
++    _write_native_hook_settings(
++        root,
++        {
++            base.NATIVE_HOOK_USER_PROMPT_SUBMIT: [
++                {
++                    "hooks": [
++                        {"type": "command", "command": "failing enrichment"},
++                        {"type": "command", "command": "later enrichment"},
++                    ]
++                }
++            ]
++        },
++    )
++    commands: list[str] = []
++    provider_payloads: list[dict] = []
++
++    def hook_runner(command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
++        commands.append(command)
++        if command == "failing enrichment":
++            return first_result
++        return base.GuardExecutionResult(returncode=0, stdout='{"context": "available"}', stderr="")
++
++    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
++        provider_payloads.append(payload)
++        return {"choices": [{"message": {"content": "review complete"}}]}
++
++    result = base.run_tool_loop(
++        "original governed assignment",
++        base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",)),
++        "https://test.cloud/api/v1",
++        "key",
++        2,
++        root,
++        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
++        chat_func=chat,
++        native_hook_runner=hook_runner,
++    )
++
++    assert result == "review complete"
++    assert commands[:2] == ["failing enrichment", "later enrichment"]
++    assert {"role": "user", "content": "original governed assignment"} in provider_payloads[0]["messages"]
++
++
++def test_native_user_prompt_explicit_block_remains_fail_closed(tmp_path: Path) -> None:
++    root = _root(tmp_path)
++    _write_native_hook_settings(
++        root,
++        {base.NATIVE_HOOK_USER_PROMPT_SUBMIT: [{"hooks": [{"type": "command", "command": "prompt policy"}]}]},
++    )
++
++    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
++        return base.GuardExecutionResult(
++            returncode=0,
++            stdout='{"decision": "block", "reason": "prompt denied"}',
++            stderr="",
++        )
++
++    with pytest.raises(base.CloudHarnessError, match="native hook blocked UserPromptSubmit.*prompt denied"):
++        base.invoke_native_hooks(
++            base.NATIVE_HOOK_USER_PROMPT_SUBMIT,
++            _meta(),
++            root,
++            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
++            prompt="original governed assignment",
++            native_hook_runner=hook_runner,
++        )
++
++
+ def test_native_posttool_fail_soft_does_not_change_pretool_timeout_enforcement(tmp_path: Path) -> None:
+     root = _root(tmp_path)
+     _write_native_hook_settings(

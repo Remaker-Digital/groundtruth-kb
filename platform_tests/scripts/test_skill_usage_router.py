@@ -65,6 +65,13 @@ def test_activity_envelope_skill_advisory_uses_disposition_profile(router_module
     assert "kb-spec" in result.recommended or "spec-intake" in result.recommended
 
 
+def test_ops_activity_recommends_deep_clean_reclaim_skill(router_module) -> None:
+    result = router_module.suggest(activity="ops")
+    assert result.scenario == "activity:ops"
+    assert result.matched_by == "activity_envelope"
+    assert "gtkb-hygiene-reclaim" in result.recommended
+
+
 def test_ac4_table_edit_changes_output_without_router_code_change(router_module, tmp_path: Path) -> None:
     custom = tmp_path / "skill-scenarios.toml"
     custom.write_text(

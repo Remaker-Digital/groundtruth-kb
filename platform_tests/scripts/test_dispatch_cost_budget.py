@@ -11,11 +11,11 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TRIGGER_PATH = REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+TRIGGER_PATH = REPO_ROOT / "scripts" / "dispatcher_runtime.py"
 
 
 def _load_trigger() -> ModuleType:
-    name = "cross_harness_bridge_trigger_budget_test"
+    name = "dispatcher_runtime_budget_test"
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, TRIGGER_PATH)

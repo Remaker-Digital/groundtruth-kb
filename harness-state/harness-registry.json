@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-07T20:08:48Z",
+  "generated_at": "2026-07-16T20:11:56Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -44,8 +44,8 @@
             "approval_policy=\"never\"",
             "-c",
             "model_reasoning_effort=\"xhigh\"",
-            "--sandbox",
-            "workspace-write",
+            "-c",
+            "default_permissions=\":workspace\"",
             "{{PROMPT}}",
             "--cd",
             "{{PROJECT_ROOT}}",
@@ -60,7 +60,7 @@
         "prime-builder"
       ],
       "status": "active",
-      "version": 52
+      "version": 61
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -115,7 +115,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 47
+      "version": 105
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -174,7 +174,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 36
+      "version": 75
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
@@ -186,7 +186,7 @@
       "dispatch_availability": 90.0,
       "dispatch_cost": 60.0,
       "dispatch_max_items": 2,
-      "dispatch_quality": 90.0,
+      "dispatch_quality": 100.0,
       "dispatch_tags": [
         "low-cost",
         "loyal-opposition"
@@ -203,7 +203,7 @@
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 2,
-          "dispatch_quality": 90,
+          "dispatch_quality": 100,
           "dispatch_tags": [
             "low-cost",
             "loyal-opposition"
@@ -229,12 +229,12 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 31
+      "version": 74
     },
     {
       "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
@@ -253,7 +253,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": false,
+          "can_receive_dispatch": true,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 3,
@@ -282,13 +282,13 @@
       "role": [
         "loyal-opposition"
       ],
-      "status": "suspended",
-      "version": 16
+      "status": "active",
+      "version": 18
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -307,7 +307,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": true,
+          "can_receive_dispatch": false,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_quality": 90,
@@ -323,10 +323,14 @@
             "scripts/openrouter_harness.py",
             "-p",
             "{{PROMPT}}",
+            "--model",
+            "openrouter-cloud-default",
             "--skill",
             "bridge-review",
             "--max-turns",
             "200",
+            "--timeout",
+            "60",
             "--session-timeout",
             "5400"
           ]
@@ -337,7 +341,127 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 35
+      "version": 49
+    },
+    {
+      "activity_envelope_projection_mode": "native",
+      "can_fire_events": false,
+      "can_receive_dispatch": false,
+      "capabilities_ref": null,
+      "compact_result_envelope_mode": "native",
+      "compact_session_envelope_mode": "native",
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 40.0,
+      "dispatch_max_items": 1,
+      "dispatch_quality": 80.0,
+      "dispatch_tags": [
+        "alibaba-deepseek",
+        "loyal-opposition"
+      ],
+      "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
+      "harness_name": "goose",
+      "harness_type": "goose-desktop",
+      "id": "G",
+      "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": false,
+          "dispatch_availability": 90,
+          "dispatch_cost": 40,
+          "dispatch_max_items": 1,
+          "dispatch_quality": 80,
+          "dispatch_tags": [
+            "alibaba-deepseek",
+            "loyal-opposition"
+          ],
+          "event_driven_hooks": false
+        },
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/goose_harness.py",
+            "-p",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review",
+            "--model",
+            "goose-deepseek-v4-pro"
+          ],
+          "max_items": 1
+        },
+        "interactive": {
+          "kind": "desktop",
+          "name": "Goose Desktop"
+        }
+      },
+      "reviewer_precedence": null,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "retired",
+      "version": 9
+    },
+    {
+      "activity_envelope_projection_mode": "compact-provider",
+      "can_fire_events": false,
+      "can_receive_dispatch": false,
+      "capabilities_ref": "config/agent-control/harness-capability-registry.toml",
+      "compact_result_envelope_mode": "compact-provider",
+      "compact_session_envelope_mode": "compact-provider",
+      "dispatch_availability": 90.0,
+      "dispatch_cost": 60.0,
+      "dispatch_max_items": 1,
+      "dispatch_quality": 100.0,
+      "dispatch_tags": [
+        "alibaba-cloud-studio",
+        "loyal-opposition"
+      ],
+      "event_driven_hooks": false,
+      "full_transcript_archive_required": false,
+      "harness_name": "alibaba-cloud-studio",
+      "harness_type": "claude",
+      "id": "H",
+      "invocation_surfaces": {
+        "dispatch": {
+          "can_fire_events": false,
+          "can_receive_dispatch": false,
+          "dispatch_availability": 90,
+          "dispatch_cost": 60,
+          "dispatch_max_items": 1,
+          "dispatch_quality": 100,
+          "dispatch_tags": [
+            "alibaba-cloud-studio",
+            "loyal-opposition"
+          ],
+          "event_driven_hooks": false
+        },
+        "envelope_projection": {
+          "activity_envelope_projection_mode": "compact-provider",
+          "compact_result_envelope_mode": "compact-provider",
+          "compact_session_envelope_mode": "compact-provider",
+          "full_transcript_archive_required": false
+        },
+        "headless": {
+          "argv": [
+            "groundtruth-kb/.venv/Scripts/python.exe",
+            "scripts/alibaba_cloud_studio_harness.py",
+            "--prompt",
+            "{{PROMPT}}",
+            "--skill",
+            "bridge-review",
+            "--model",
+            "alibaba-deepseek-v4-pro"
+          ],
+          "max_items": 1
+        }
+      },
+      "reviewer_precedence": null,
+      "role": [
+        "loyal-opposition"
+      ],
+      "status": "active",
+      "version": 53
     }
   ],
   "schema_version": 1,

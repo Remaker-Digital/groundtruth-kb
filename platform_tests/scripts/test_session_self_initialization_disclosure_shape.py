@@ -339,3 +339,48 @@ def test_wrap_trigger_helper_preserved_for_capstone_reuse() -> None:
     rendered = module._render_wrapup_trigger_commands()
     assert "Accepted wrap-up commands:" in rendered
     assert "`wrap up`" in rendered
+
+
+# ---- TEST-11254: initial skill/knowledge shard migration (WI-4949) ---------
+
+
+def test_test11254_startup_glossary_loads_core_subset_not_full_corpus() -> None:
+    """SPEC-INTAKE-46594e: base startup uses bounded core primer, not full glossary."""
+    from scripts.startup_glossary_load import load_glossary_for_startup
+
+    result = load_glossary_for_startup(REPO_ROOT)
+    assert result["status"] == "loaded"
+    assert result["scope"] == "core_startup"
+    assert int(result["term_count"]) <= int(result["full_term_count"])
+    assert int(result["full_term_count"]) > int(result["term_count"])
+
+
+def test_test11254_global_baseline_excludes_activity_only_codex_surfaces() -> None:
+    """Deferred Codex LO surfaces must not appear in global_baseline allowed_surfaces."""
+    import tomllib
+
+    sharding_path = REPO_ROOT / "config" / "agent-control" / "activity-envelope-sharding.toml"
+    sharding = tomllib.loads(sharding_path.read_text(encoding="utf-8"))
+    global_surfaces = set(sharding["classes"]["global_baseline"]["allowed_surfaces"])
+    deferred = set(sharding["classes"]["activity_only"]["deferred_surfaces"])
+    assert deferred, "activity_only deferred_surfaces must be declared"
+    assert not global_surfaces.intersection(deferred)
+
+
+def test_test11254_readiness_both_roles_build_startup_model() -> None:
+    """Readiness: Prime Builder and LO startup models build without activity shards."""
+    module = _load_module()
+    for role in ("prime-builder", "loyal-opposition"):
+        model = module.build_startup_model(REPO_ROOT, role_profile=role, fast_hook=True)
+        assert isinstance(model, dict)
+        assert model.get("role_profile") == role
+
+
+def test_test11254_init_disclosure_points_to_open_activity() -> None:
+    """Minimized init disclosure routes activity context to ::open <activity>."""
+    module = _load_module()
+    model = module.build_startup_model(REPO_ROOT, role_profile="prime-builder", fast_hook=True)
+    report = module.render_report(model, module.GRAFANA_DASHBOARD_URL, REPO_ROOT)
+    disclosure = module._startup_disclosure(_startup_service_result(module, model, report))
+    assert "`::open <activity>`" in disclosure
+    assert "### Init Scope" in disclosure

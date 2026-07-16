@@ -6,10 +6,54 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
 
 ## Pending
 
-(none)
-
 ## Resolved
 
+- id: DECISION-1489
+  asked_at: 2026-06-27T15:33:31.852077Z
+  question: "Want me to set up live process tracing for WI-4893, dig into the reaper decider for WI-4894, or stop here?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 4fb972858366788c
+  resolved_at: 2026-06-28T04:08:00Z
+  answer: "Dismissed as conversational offering / prose anti-pattern. Superseded by subsequent formal decisions DECISION-1490 and DECISION-1491 in the same session context."
+  notes: "Prose offering anti-pattern resolved and dismissed by Loyal Opposition."
+
+- id: DECISION-1482
+  asked_at: 2026-06-27T07:27:56.454971Z
+  question: "Want me to wait for WI-4880's VERIFIED and finalize its chain, take on the systemic treadmill fix, or stop here?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: edcbbfd3d174e85e
+  resolved_at: 2026-06-27T14:10:00Z
+  answer: "Dismissed as conversational offering / prose anti-pattern. Not blocking active work; superseded by subsequent session context."
+  notes: "Prose offering anti-pattern resolved and dismissed by Loyal Opposition."
+- id: DECISION-1432
+  asked_at: 2026-06-26T17:41:09.167600Z
+  question: "Want me to resume Phase 1 of the go-live, adjust the plan around any of these, or hold?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 2eb67932f7738515
+  resolved_at: 2026-06-27T01:30:00Z
+  answer: "Dismissed as conversational offering / prose anti-pattern. Not blocking active work; superseded by subsequent session context."
+  notes: "Prose offering anti-pattern resolved and dismissed by Loyal Opposition."
+- id: DECISION-1452
+  asked_at: 2026-06-26T22:51:14.958651Z
+  question: "Want me to do anything else from the deliberation seat — refine the advisory, start the ADR/DCL draft text as further..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: c777413bca804a65
+  resolved_at: 2026-06-27T01:30:00Z
+  answer: "Dismissed as conversational offering / prose anti-pattern. Not blocking active work; superseded by subsequent session context."
+  notes: "Prose offering anti-pattern resolved and dismissed by Loyal Opposition."
+- id: DECISION-1454
+  asked_at: 2026-06-26T23:05:47.190417Z
+  question: "Want me to (a) keep feeding NEW proposals into the Cursor-driven pipeline as-is, or (b) shift toward getting the disp..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: c0350df100e8f4c3
+  resolved_at: 2026-06-27T01:30:00Z
+  answer: "Dismissed as conversational offering / prose anti-pattern. Not blocking active work; superseded by subsequent session context."
+  notes: "Prose offering anti-pattern resolved and dismissed by Loyal Opposition."
 - id: DECISION-1332
   asked_at: 2026-06-21T22:20:00.416334Z
   question: "Want me to resume the periodic watch, or leave it parked until you've run Codex?"
@@ -45,15 +89,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-14T23:26:10Z
   answer: "Superseded by the cycle-19 AskUserQuestion; owner chose: dismiss stale decisions, then /kb-session-wrap. The 'stale decisions' (DECISION-1251/1253/1255) were already resolved 2026-06-14T19:45:57Z; this prose precursor is dismissed."
   notes: "Dismissed per owner cycle-19 direction; prose precursor formalized into AUQ."
-- id: DECISION-WI4481-PROJECT-LINKAGE
-  asked_at: 2026-06-13T09:52:00Z
-  question: "WI-4481 (P1 bridge-integrity defect, INDEX atomic-write guard) is implemented + verified green and was GO'd (bridge/gtkb-bridge-index-atomic-write-guard-002.md), but the post-implementation report cannot be filed: WI-4481 is a standalone work item (project_name=None) and is in no active PAUTH's included_work_item_ids list. The bridge-compliance-gate hard-blocks the NEW/REVISED implementation_report via DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 (missing Project Authorization: / Project: lines) and the live membership check (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001). Owner decision needed: admit WI-4481 to a project (candidate: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) and add it to that project's PAUTH included_work_item_ids via AUQ (precedent: PAUTH v4 'add WI-3380' = DELIB-S-LOOP-2026-06-04-WI3380-PAUTH-INCLUSION-AUQ). A dispatched worker cannot run AUQ or amend a PAUTH, so this blocks report-filing → VERIFIED → WI close."
-  detected_via: prime_dispatched_worker_blocker
-  status: resolved
-  resolved_at: 2026-06-14
-  resolved_in_session: 2026-06-13T09-48-16Z-prime-builder-B-9cea65 (dispatched)
-  answer: "OVERTAKEN BY EVENTS — confirmed against live state by interactive PB session 7752bc97 at 2026-06-14T00:19Z. WI-4481 is now a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved); bridge thread gtkb-bridge-index-atomic-write-guard reached VERIFIED (-004) after implementation report -003 was filed. Because report -003 could not be written without passing DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001, WI-4481 was project-homed AND PAUTH-included by the swarm. The project-linkage blocker is fully cleared; no owner AUQ required. (The verbose notes below describe the historical blocker that is now resolved.)"
-  notes: "Implementation artifacts are complete and uncommitted on disk: .claude/hooks/bridge-index-write-serializer.py (+181), platform_tests/hooks/test_bridge_index_write_serializer.py (+164, 16/16 pass), .claude/settings.json (+5 registration on Write|Edit|MultiEdit|Bash), .codex/hooks.json (+28 Bash + apply_patch registrations). Verification green this session: guard 16/16, serialized-writer regression 12/12 (incl. T4 20-thread no-lost-update), ruff check + format clean, both config files valid JSON. Once WI-4481 is project-homed + PAUTH-included, file bridge/gtkb-bridge-index-atomic-write-guard-003.md (implementation_report, NEW) with the carried-forward spec links + spec-to-test mapping already drafted this session. CORROBORATION (2026-06-13T10:01Z, dispatched session 2026-06-13T09-58-18Z-prime-builder-B-20606e): a SECOND dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16, writer 12/12 incl. T4, ruff clean, JSON valid). Both PAUTH-BATCH variants use explicit included_work_item_ids allowlists omitting WI-4481 (membership gate -> wi-not-included-by-authorization); no durable S437/WI-4481 DELIB exists. RECURRING DISPATCH DEAD-END: the cross-harness trigger will keep re-dispatching this latest-GO entry to fresh Prime workers on every fire (burning ~30-50K tokens each) until an owner-present session captures the S437 decision as a DELIB, admits WI-4481 to PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY, and amends a PAUTH to include it. Substrate-hygiene candidate: park/defer this GO entry to stop the re-dispatch loop pending the owner authorization. CORROBORATION-2 (2026-06-13T11:05Z, dispatched session 2026-06-13T11-03-34Z-prime-builder-B-b1274b): a THIRD dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16 in 0.22s, serialized-writer 12/12 incl. T4, ruff check + format clean, gt bridge index CLI present with add-document/set-status). Confirmed PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY is the natural home (already contains sibling WI-3513 'Serialize agent-tool INDEX.md edits' resolved). Deliberation search returned no S437/WI-4481 owner-decision DELIB (only DELIB-20263131, an unrelated advisory thread). Three dispatched workers now blocked at this identical gate (~estimated 90-130K cumulative tokens). The re-dispatch loop will continue until an owner-present session (a) captures the S437 'Proceed' decision as a DELIB, (b) runs `gt projects add-item PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY WI-4481`, and (c) amends a PAUTH (or mints PAUTH-WI-4481-INDEX-ATOMIC-WRITE-GUARD) to include WI-4481, then re-dispatches so a worker can file -003. STRONG RECOMMENDATION: owner should DEFER this GO entry now to halt the loop until the authorization lands."
 - id: DECISION-1199
   asked_at: 2026-06-13T15:41:30.777190Z
   question: ""
@@ -154,586 +189,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-05 interactive PB (harness B, Opus 4.8) AUQ conversion per owner directive
   answer: "Mirror-retirement thread (gtkb-harness-state-sot-consolidation-phase-1-mirror-retirement, NO-GO@-004) scope expansion + writer disposition. Owner selected via AskUserQuestion: (1) SCOPE = Full cleanup sweep -- expand target_paths to remove all ~116 'role-assignments' retired-path references across scripts/, groundtruth-kb/src/, config/, .claude/rules/, CLAUDE.md, AGENTS.md, then delete harness-state/role-assignments.json; satisfies DCL-HARNESS-STATE-SOT-ASSERTION-001 + RETIRE-SPEC-HARNESS-STATE-ROLE-ASSIGNMENTS-001 verbatim, NO spec amendment/waiver. (2) WRITER = Remove writer path -- delete ROLE_ASSIGNMENTS_RELATIVE_PATH (scripts/harness_roles.py:81) and the mirror-write in write_role_assignments() (L260-266) so the deleted file cannot self-resurrect. Implementing session must refile mirror-retirement -005 REVISED with expanded target_paths, spec-derived verification mapped to the live DB assertion text, and post-regeneration zero-match acceptance evidence (line-count-free)."
   notes: "Converted prose anti-pattern DECISION-1095 to AskUserQuestion per owner directive 2026-06-05. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md. Feeds the mirror-retirement thread (claim held by d72ec1d6); this interactive Ollama-mission session did not implement it."
-- id: DECISION-0701
-  asked_at: 2026-05-27T08:49:23.500024Z
-  question: "How should the inventory refresh be handled?"
-  options:
-    - "Look at NO-GO freshness thread first (Recommended)"
-    - "File a small bridge proposal"
-    - "Commit under chore(inventory) precedent"
-    - "Leave uncommitted; report drift only"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b45d709219d9dc43
-  resolved_at: 2026-05-27T08:49:23.500024Z
-  answer: "Your questions have been answered: \"How should the inventory refresh be handled?\"=\"Look at NO-GO freshness thread first (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0702
-  asked_at: 2026-05-27T08:49:23.500024Z
-  question: "The NO-GO is concrete Prime work. How to proceed?"
-  options:
-    - "Implement the F1 fix and revise (Recommended)"
-    - "Scope-read only; brief findings"
-    - "Defer to a focused session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 0b2e3b6ce749dcbd
-  resolved_at: 2026-05-27T08:49:23.500024Z
-  answer: "Your questions have been answered: \"The NO-GO is concrete Prime work. How to proceed?\"=\"Implement the F1 fix and revise (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0703
-  asked_at: 2026-05-27T08:49:23.500024Z
-  question: "Parallel-session conflict: another Prime thread has overlapping target_paths in NEW post-impl state. How to handle?"
-  options:
-    - "Pause + revert my edits (Recommended)"
-    - "Continue + flag the overlap in revised post-impl"
-    - "Investigate the other thread's actual changes first"
-    - "Coordinate via bridge: file an LO advisory"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 7ac5c51218936017
-  resolved_at: 2026-05-27T08:49:23.500024Z
-  answer: "Your questions have been answered: \"Parallel-session conflict: another Prime thread has overlapping target_paths in NEW post-impl state. How to handle?\"=\"Pause + revert my edits (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0704
-  asked_at: 2026-05-27T09:12:09.509952Z
-  question: "Branching drift remediation requires destructive git operations. Which path?"
-  options:
-    - "Cherry-pick to develop + reset main (Recommended)"
-    - "Fast-forward develop to main"
-    - "Switch active branch only; defer history fix"
-    - "Document + defer entirely"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3a72cc9fdd3987b0
-  resolved_at: 2026-05-27T09:12:09.509952Z
-  answer: "Your questions have been answered: \"Branching drift remediation requires destructive git operations. Which path?\"=\"Cherry-pick to develop + reset main (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0705
-  asked_at: 2026-05-27T09:12:09.509952Z
-  question: "Which `main` reset target reflects the intent of `main = production mirror`?"
-  options:
-    - "Reset main to 8a360e85 = develop HEAD (Recommended)"
-    - "Reset main to v1.98.92 (b1990241)"
-    - "Investigate which commits were actually produced via legitimate merge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 79a7e16cf9510888
-  resolved_at: 2026-05-27T09:12:09.509952Z
-  answer: "Your questions have been answered: \"Which `main` reset target reflects the intent of `main = production mirror`?\"=\"Reset main to 8a360e85 = develop HEAD (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0706
-  asked_at: 2026-05-27T09:12:09.509952Z
-  question: "Branching drift remediation failed mid-execution. Direction?"
-  options:
-    - "Retry via PowerShell only (Recommended)"
-    - "Commit the untracked hook script first"
-    - "Defer branching remediation to a clean session"
-    - "Wrap this session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 81e63e3f993bf6b4
-  resolved_at: 2026-05-27T09:12:09.509952Z
-  answer: "Your questions have been answered: \"Branching drift remediation failed mid-execution. Direction?\"=\"Retry via PowerShell only (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0707
-  asked_at: 2026-05-27T09:12:09.509952Z
-  question: "Both remediation attempts blocked by parallel-session contention. Next?"
-  options:
-    - "Wrap session + capture findings (Recommended)"
-    - "Try worktree approach"
-    - "Stop the parallel Codex session first"
-    - "Just commit the lo-file-safety-gate.py file under standing reliability authorization"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: d8428ef0b905b1e7
-  resolved_at: 2026-05-27T09:12:09.509952Z
-  answer: "Your questions have been answered: \"Both remediation attempts blocked by parallel-session contention. Next?\"=\"Wrap session + capture findings (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0708
-  asked_at: 2026-05-27T09:14:57.633339Z
-  question: "Local develop is now caught up to main. Push to origin/develop?"
-  options:
-    - "Push now (Recommended)"
-    - "Defer push"
-    - "Push develop + also push main (no-op confirmation)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 627fe879c4e2a43f
-  resolved_at: 2026-05-27T09:14:57.633339Z
-  answer: "Your questions have been answered: \"Local develop is now caught up to main. Push to origin/develop?\"=\"Push now (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0710
-  asked_at: 2026-05-27T14:14:54.639009Z
-  question: "How should I respond to this LO advisory?"
-  options:
-    - "ADAPT with phased sequencing (Recommended)"
-    - "ADAPT — start with the surgical F2 slice only"
-    - "ADOPT as-is (LO's exact 6-step sequence)"
-    - "DEFER with documented trigger"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: f1c5a6be0986c7ca
-  resolved_at: 2026-05-27T14:14:54.639009Z
-  answer: "Your questions have been answered: \"How should I respond to this LO advisory?\"=\"ADAPT with phased sequencing (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0711
-  asked_at: 2026-05-27T14:14:54.639009Z
-  question: "Codex NO-GO'd the impl_report_bridge proposal with three actionable findings. File REVISED-003 now?"
-  options:
-    - "File REVISED-003 now (Recommended)"
-    - "File REVISED with scope reduction"
-    - "Capture revision plan + defer to next session"
-    - "Defer entirely; let parallel Prime session pick up the NO-GO"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 84145f73ce34c137
-  resolved_at: 2026-05-27T14:14:54.639009Z
-  answer: "Your questions have been answered: \"Codex NO-GO'd the impl_report_bridge proposal with three actionable findings. File REVISED-003 now?\"=\"File REVISED-003 now (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0712
-  asked_at: 2026-05-27T15:40:41.074758Z
-  question: "DECISION-0709 was auto-flagged from a short prose phrase at 09:17Z (this session's startup window) with no recoverable referent in the registry. The precedent for unrecoverable prose flags (DECISION-0596) was dismiss-as-noise. How should I resolve it?"
-  options:
-    - "Dismiss as false positive (Recommended)"
-    - "Reopen with my context"
-    - "Defer for now"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 6ba25b73c8058915
-  resolved_at: 2026-05-27T15:40:41.074758Z
-  answer: "Your questions have been answered: \"DECISION-0709 was auto-flagged from a short prose phrase at 09:17Z (this session's startup window) with no recoverable referent in the registry. The precedent for unrecoverable prose flags (DECISION-0596) was dismiss-as-noise. How should I resolve it?\"=\"Dismiss as false positive (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0713
-  asked_at: 2026-05-27T15:40:41.074758Z
-  question: "DECISION-0700 (asked 08:38Z this morning) is about how to commit the regenerated dev-environment inventory at .groundtruth/inventory/dev-environment-inventory.{json,md}. Bridge protocol technically applies to any repo-state change, but a regenerated deterministic artifact is a thin case. Which path?"
-  options:
-    - "File small bridge proposal (Recommended)"
-    - "Direct chore(inventory) commit, scoped pathspec"
-    - "Defer until next parent slice sweeps it"
-    - "Revert and re-regenerate under bridge later"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a2b466333a290dbe
-  resolved_at: 2026-05-27T15:40:41.074758Z
-  answer: "Your questions have been answered: \"DECISION-0700 (asked 08:38Z this morning) is about how to commit the regenerated dev-environment inventory at .groundtruth/inventory/dev-environment-inventory.{json,md}. Bridge protocol technically applies to any repo-state change, but a regenerated deterministic artifact is a thin case. Which path?\"=\"File small bridge proposal (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0714
-  asked_at: 2026-05-27T15:40:41.074758Z
-  question: "LO Advisory Item 2 (2026-05-27, Open) claims Claude Code (harness B) is structurally incapable of headless Prime Builder duty per claude-file-bridge-scan.ps1 evidence, and suggests setting status to 'suspended'. Live registry shows B as active prime-builder. Accepting implies a multi-harness role reshuffle (Codex A flips to PB; Antigravity C takes LO once WI-3349 verifies). How should I disposition it?"
-  options:
-    - "Defer until WI-3349 verified (Recommended)"
-    - "Accept; plan migration bridge"
-    - "Narrow advisory framing"
-    - "Investigate evidence first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 019c19dddd1ddd64
-  resolved_at: 2026-05-27T15:40:41.074758Z
-  answer: "Your questions have been answered: \"LO Advisory Item 2 (2026-05-27, Open) claims Claude Code (harness B) is structurally incapable of headless Prime Builder duty per claude-file-bridge-scan.ps1 evidence, and suggests setting status to 'suspended'. Live registry shows B as active prime-builder. Accepting implies a multi-harness role reshuffle (Codex A flips to PB; Antigravity C takes LO once WI-3349 verifies). How should I disposition it?\"=\"Defer until WI-3349 verified (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0715
-  asked_at: 2026-05-27T17:03:01.425306Z
-  question: "Given this backlog review, which direction do you want this session to take first?"
-  options:
-    - "Drain bridge actionable queue"
-    - "Address assertion drift (F1)"
-    - "Address data hygiene (F2 + F3)"
-    - "Confirm top-3 startup priorities live state"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e83b541fcccc2a3c
-  resolved_at: 2026-05-27T17:03:01.425306Z
-  answer: "Your questions have been answered: \"Given this backlog review, which direction do you want this session to take first?\"=\"Address data hygiene (F2 + F3)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0716
-  asked_at: 2026-05-27T20:22:40.531648Z
-  question: "Confirm capture of the ::init*/::wrap envelope-convention decision at MEDIUM commitment tier (as stated above), with companion directive to reconsider wrap-procedure contents folded into the same record?"
-  options:
-    - "Confirm MEDIUM + reconsider-wrap, capture as composite DELIB"
-    - "Confirm with edits I'll specify"
-    - "Capture envelope decision now, defer wrap-procedure reconsideration to a separate DELIB"
-    - "Defer the whole capture to a later session"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1cd9fc9a4efc94bd
-  resolved_at: 2026-05-27T20:22:40.531648Z
-  answer: "Your questions have been answered: \"Confirm capture of the ::init*/::wrap envelope-convention decision at MEDIUM commitment tier (as stated above), with companion directive to reconsider wrap-procedure contents folded into the same record?\"=\"Confirm MEDIUM + reconsider-wrap, capture as composite DELIB\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0717
-  asked_at: 2026-05-27T20:41:29.805331Z
-  question: "What continuity capture should I do before actually closing S363, given that my prior \"wrap\" left the open work unreachable from a fresh session?"
-  options:
-    - "Add MEMORY.md project entry pointing at DELIB-2234/2238 + open work inventory"
-    - "Create MemBase work_items rows for the 8 open tasks under PROJECT-GTKB-V1-RELEASE-STRATEGY"
-    - "Both: MEMORY.md entry + MemBase work_items"
-    - "Do nothing — close as-is"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: ca9b536ee6123592
-  resolved_at: 2026-05-27T20:41:29.805331Z
-  answer: "Your questions have been answered: \"What continuity capture should I do before actually closing S363, given that my prior \"wrap\" left the open work unreachable from a fresh session?\"=\"Create MemBase work_items rows for the 8 open tasks under PROJECT-GTKB-V1-RELEASE-STRATEGY\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0718
-  asked_at: 2026-05-27T20:47:36.451821Z
-  question: "Within 'Repair Testing/Tool Integrations', where should I start?"
-  options:
-    - "develop CI staleness (meta-problem)"
-    - "Security Scan family (4 jobs)"
-    - "Docs Quality (recent main failure)"
-    - "axe-core + Playwright no_recent_run"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 3003b002828b01e3
-  resolved_at: 2026-05-27T20:47:36.451821Z
-  answer: "Your questions have been answered: \"Within 'Repair Testing/Tool Integrations', where should I start?\"=\"develop CI staleness (meta-problem)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0719
-  asked_at: 2026-05-27T20:47:36.451821Z
-  question: "Two distinct repair surfaces opened up: probe-level (dashboard misreports CI state) and CI-level (workflows actually red on develop). Which first?"
-  options:
-    - "Fix probe defect first"
-    - "Triage actual CI failures on develop"
-    - "Investigate axe-core / Playwright no_recent_run"
-    - "Both probe + CI in parallel slices"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 1dc0b20b20ef3eb2
-  resolved_at: 2026-05-27T20:47:36.451821Z
-  answer: "Your questions have been answered: \"Two distinct repair surfaces opened up: probe-level (dashboard misreports CI state) and CI-level (workflows actually red on develop). Which first?\"=\"Fix probe defect first\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0720
-  asked_at: 2026-05-27T20:47:36.451821Z
-  question: "The probe coupling is more nuanced than expected: it correctly reports Agent Red CI (per AGENT_RED_GITHUB_REPO env), but the startup banner mislabels it as GT-KB CI. Which fix?"
-  options:
-    - "Work-subject-aware probe"
-    - "Dual rollup"
-    - "Lightweight relabel only"
-    - "Defer to a scoping proposal"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 01dc97abb612822a
-  resolved_at: 2026-05-27T20:47:36.451821Z
-  answer: "Your questions have been answered: \"The probe coupling is more nuanced than expected: it correctly reports Agent Red CI (per AGENT_RED_GITHUB_REPO env), but the startup banner mislabels it as GT-KB CI. Which fix?\"=\"Work-subject-aware probe\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0721
-  asked_at: 2026-05-28T00:10:34.218290Z
-  question: "How would you like me to handle these dashboard findings?"
-  options:
-    - "Acknowledge — no action"
-    - "Backlog both findings"
-    - "Backlog + propose orphan cleanup"
-    - "Focus elsewhere — these are noise"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b18d0e03bf6ce056
-  resolved_at: 2026-05-28T00:10:34.218290Z
-  answer: "Your questions have been answered: \"How would you like me to handle these dashboard findings?\"=\"Acknowledge — no action\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0722
-  asked_at: 2026-05-28T00:29:17.648008Z
-  question: "Codex NO-GO finding P1-003 requires owner input on PAUTH scope. Which path resolves the DB view/schema authorization?"
-  options:
-    - "One-time owner-approval scope packet"
-    - "Extend PAUTH allowed_mutation_classes"
-    - "Split into two threads"
-    - "Withdraw — leave un-committed"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: b09fb0a5fb0ac05c
-  resolved_at: 2026-05-28T00:29:17.648008Z
-  answer: "Your questions have been answered: \"Codex NO-GO finding P1-003 requires owner input on PAUTH scope. Which path resolves the DB view/schema authorization?\"=\"Withdraw — leave un-committed\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0723
-  asked_at: 2026-05-28T05:35:09.219471Z
-  question: "Codex side is idle (lo_actionable=0); Prime side has 19 GO + 26 NO-GO. Which direction this session?"
-  options:
-    - "Unstick a multi-round NO-GO"
-    - "Sweep small NO-GOs"
-    - "Take a fresh GO"
-    - "Investigate SessionStart degradation"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 238e2d42d63b8370
-  resolved_at: 2026-05-28T05:35:09.219471Z
-  answer: "Your questions have been answered: \"Codex side is idle (lo_actionable=0); Prime side has 19 GO + 26 NO-GO. Which direction this session?\"=\"Unstick a multi-round NO-GO\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0724
-  asked_at: 2026-05-28T05:35:09.219471Z
-  question: "Original directive (\"Unstick a multi-round NO-GO\") is fulfilled by the parallel spawn on the git-blob thread. What next this session?"
-  options:
-    - "Pick another multi-round NO-GO"
-    - "Sweep small NO-GOs"
-    - "Stop — you got it"
-    - "Investigate the AXIS-1 race pattern"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 270843d1a24fa99b
-  resolved_at: 2026-05-28T05:35:09.219471Z
-  answer: "Your questions have been answered: \"Original directive (\"Unstick a multi-round NO-GO\") is fulfilled by the parallel spawn on the git-blob thread. What next this session?\"=\"Investigate the AXIS-1 race pattern\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0725
-  asked_at: 2026-05-28T05:35:09.219471Z
-  question: "Integration scope for the bridge work-intent registry into Prime-side write paths?"
-  options:
-    - "A only — hook integration"
-    - "A + B — hook + helper"
-    - "A + B + C — full integration"
-    - "Backlog only — don't file proposal now"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 92d1f773a9f53edf
-  resolved_at: 2026-05-28T05:35:09.219471Z
-  answer: "Your questions have been answered: \"Integration scope for the bridge work-intent registry into Prime-side write paths?\"=\"A + B + C — full integration\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0726
-  asked_at: 2026-05-28T06:37:44.087815Z
-  question: "Codex NO-GO on work-intent-registry integration is substantive. How to respond?"
-  options:
-    - "REVISE with broader acquisition surface"
-    - "REVISE narrowly — templates only"
-    - "Withdraw — re-scope from scratch"
-    - "Withdraw — accept the gap"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: e23bee6b9f729df0
-  resolved_at: 2026-05-28T06:37:44.087815Z
-  answer: "Your questions have been answered: \"Codex NO-GO on work-intent-registry integration is substantive. How to respond?\"=\"REVISE with broader acquisition surface\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0727
-  asked_at: 2026-05-28T07:12:39.067043Z
-  question: "Third Codex NO-GO. The drafting-race closure requires either a process change, a semantic change, or honest scope narrowing. How to proceed?"
-  options:
-    - "REVISE-5 with explicit claim CLI"
-    - "REVISE-5 narrow — accept partial closure"
-    - "Withdraw — accept the gap entirely"
-    - "Withdraw + new advisory thread"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: af9e2463aa9d0ca6
-  resolved_at: 2026-05-28T07:12:39.067043Z
-  answer: "Your questions have been answered: \"Third Codex NO-GO. The drafting-race closure requires either a process change, a semantic change, or honest scope narrowing. How to proceed?\"=\"REVISE-5 with explicit claim CLI\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0728
-  asked_at: 2026-05-28T07:30:20.979039Z
-  question: "What scope should the PROJECT-GTKB-PUSH-GATE PAUTH (project-scoped implementation authorization) cover? This authorizes implementation work to proceed under bridge protocol without per-slice owner approval; you can revoke or narrow scope at any time."
-  options:
-    - "Standing Slice 0-11 (Recommended)"
-    - "Pre-enablement only (Slices 1-3 + 1.5)"
-    - "Audit-only (Slice 1.5 only)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 25d19eb79957de7a
-  resolved_at: 2026-05-28T07:30:20.979039Z
-  answer: "Your questions have been answered: \"What scope should the PROJECT-GTKB-PUSH-GATE PAUTH (project-scoped implementation authorization) cover? This authorizes implementation work to proceed under bridge protocol without per-slice owner approval; you can revoke or narrow scope at any time.\"=\"Standing Slice 0-11 (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0729
-  asked_at: 2026-05-28T13:18:44.560459Z
-  question: "Startup relay is degraded — how should I proceed before any ordinary task work this turn?"
-  options:
-    - "Diagnose cache mismatch first (Recommended)"
-    - "Manual filesystem-based startup"
-    - "Defer startup, take direct task instruction"
-    - "Process Bridge AXIS 2 queue"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 2b0f9a71221ee493
-  resolved_at: 2026-05-28T13:18:44.560459Z
-  answer: "Your questions have been answered: \"Startup relay is degraded — how should I proceed before any ordinary task work this turn?\"=\"Defer startup, take direct task instruction\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0730
-  asked_at: 2026-05-28T13:31:36.294165Z
-  question: "Work-intent registry Prime-write integration is at its third NO-GO (-002, -004, -006), each surfacing a different governance/automation surface the prior proposal didn't account for. The -006 P1 is narrow and fixable, but the recursive pattern is real. How should I proceed?"
-  options:
-    - "File -007 REVISED (address -006 P1 narrowly)"
-    - "Withdraw and re-scope narrow (Codex-suggested direction)"
-    - "Withdraw and re-scope narrower still (handoff option c)"
-    - "Withdraw and file LO-advisory (escalate to architectural review)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 5a90cf7673cb1c16
-  resolved_at: 2026-05-28T13:31:36.294165Z
-  answer: "Your questions have been answered: \"Work-intent registry Prime-write integration is at its third NO-GO (-002, -004, -006), each surfacing a different governance/automation surface the prior proposal didn't account for. The -006 P1 is narrow and fixable, but the recursive pattern is real. How should I proceed?\"=\"File -007 REVISED (address -006 P1 narrowly)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0731
-  asked_at: 2026-05-28T13:35:25.315738Z
-  question: "Which work direction should I take this turn given the parallel-session contamination and pending Codex verdict on WI-3418?"
-  options:
-    - "Draft WI-3420/3421 proposals"
-    - "Implement WI-3417 with isolation"
-    - "Probe Codex on WI-3418"
-    - "Phase 2 lint cleanup scoping"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 9d00010d7d068ac4
-  resolved_at: 2026-05-28T13:35:25.315738Z
-  answer: "Your questions have been answered: \"Which work direction should I take this turn given the parallel-session contamination and pending Codex verdict on WI-3418?\"=\"Implement WI-3417 with isolation\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0732
-  asked_at: 2026-05-28T13:50:31.541424Z
-  question: "The live lint state in platform_tests/ shows 66 violations across 42 files (classes: I001 import-sort, F401 unused-imports, plus pytest-style M-codes and P-codes), not the 23 E501+E741 cited in the S363 resume directive. The owner-cited count and class set were not present in this probe. How should I proceed?"
-  options:
-    - "File proposal for full 66-violation cleanup"
-    - "Diff-against-S363 scope only"
-    - "Wait for owner direction on scope"
-    - "Skip lint; move to next Resume Action"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: fafe4f5bea8dbb22
-  resolved_at: 2026-05-28T13:50:31.541424Z
-  answer: "Your questions have been answered: \"The live lint state in platform_tests/ shows 66 violations across 42 files (classes: I001 import-sort, F401 unused-imports, plus pytest-style M-codes and P-codes), not the 23 E501+E741 cited in the S363 resume directive. The owner-cited count and class set were not present in this probe. How should I proceed?\"=\"File proposal for full 66-violation cleanup\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0733
-  asked_at: 2026-05-28T13:54:35.485473Z
-  question: "4th NO-GO on the thread. -008 P1-001 is narrow: add the approval-packet path to `target_paths` (Codex explicitly frames the thread as GO-able after this one-line fix). The findings-per-round trend is decreasing (2→2→1→1), suggesting convergence, but you built this AUQ into the protocol for exactly this 4-cycle decision point. How should I proceed?"
-  options:
-    - "File -009 REVISED (one-line target_paths fix) (Recommended)"
-    - "Withdraw and re-scope narrow (drop rule-file mutation)"
-    - "Withdraw and file LO-advisory for architectural scoping"
-    - "Withdraw entirely; defer integration as documented debt"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 88631782f7111886
-  resolved_at: 2026-05-28T13:54:35.485473Z
-  answer: "Your questions have been answered: \"4th NO-GO on the thread. -008 P1-001 is narrow: add the approval-packet path to `target_paths` (Codex explicitly frames the thread as GO-able after this one-line fix). The findings-per-round trend is decreasing (2→2→1→1), suggesting convergence, but you built this AUQ into the protocol for exactly this 4-cycle decision point. How should I proceed?\"=\"File -009 REVISED (one-line target_paths fix) (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0734
-  asked_at: 2026-05-28T15:12:47.777397Z
-  question: "How should I proceed on the spec-coherence systemic gap?"
-  options:
-    - "File backlog WI + defer"
-    - "Broader audit first"
-    - "Targeted supersession only"
-    - "Draft validation CLI scoping bridge"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: aceb425dabd3b5db
-  resolved_at: 2026-05-28T15:12:47.777397Z
-  answer: "Your questions have been answered: \"How should I proceed on the spec-coherence systemic gap?\"=\"Draft validation CLI scoping bridge\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0736
-  asked_at: 2026-05-28T15:41:50.277470Z
-  question: "5th NO-GO on the work-intent thread. The defect class has shifted from architecture/governance issues (rounds 1-4) to a fundamental PAUTH-envelope mismatch: the standing reliability fast-lane PAUTH is scope-incompatible with the proposal (new CLI + new protocol rule + 6 test files vs. ~3 source files / ~150 LoC fast-lane envelope). Codex offers two structural paths. How should I proceed?"
-  options:
-    - "Authorize a new project + PAUTH covering bridge-protocol feature work (Codex Path 2)"
-    - "Narrow scope to true reliability fast-lane (Codex Path 1)"
-    - "Withdraw entirely; defer integration as documented debt"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 778a2b7a067e9f7c
-  resolved_at: 2026-05-28T15:41:50.277470Z
-  answer: "Your questions have been answered: \"5th NO-GO on the work-intent thread. The defect class has shifted from architecture/governance issues (rounds 1-4) to a fundamental PAUTH-envelope mismatch: the standing reliability fast-lane PAUTH is scope-incompatible with the proposal (new CLI + new protocol rule + 6 test files vs. ~3 source files / ~150 LoC fast-lane envelope). Codex offers two structural paths. How should I proceed?\"=\"Authorize a new project + PAUTH covering bridge-protocol feature work (Codex Path 2)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0737
-  asked_at: 2026-05-28T15:41:50.277470Z
-  question: "Found an existing PAUTH that's a strong scope match: `PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BATCH` v2 (project: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY). Its scope_summary describes the same family of work as ours (poller, trigger, INDEX-edit race, helper parity) and it already includes WI-3280 (sibling quiesce-window thread). Two missing pieces: WI-3414 not in its WI list, and its mutation classes are `[hook_upgrade, cli_extension, test_addition, spec_status_promotion]` — missing `source`/`rules`/`governance_evidence` for the rule edit + packet artifact. Two paths to a fit-PAUTH:"
-  options:
-    - "Amend the existing PAUTH (v2 → v3): add WI-3414 + 3 mutation classes (Recommended)"
-    - "Create a brand-new project + PAUTH dedicated to bridge-protocol features"
-    - "Other existing PAUTH I missed — specify in custom answer"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: a5268a0084c5973d
-  resolved_at: 2026-05-28T15:41:50.277470Z
-  answer: "Your questions have been answered: \"Found an existing PAUTH that's a strong scope match: `PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BATCH` v2 (project: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY). Its scope_summary describes the same family of work as ours (poller, trigger, INDEX-edit race, helper parity) and it already includes WI-3280 (sibling quiesce-window thread). Two missing pieces: WI-3414 not in its WI list, and its mutation classes are `[hook_upgrade, cli_extension, test_addition, spec_status_promotion]` — missing `source`/`rules`/`governance_evidence` for the rule edit + packet artifact. Two paths to a fit-PAUTH:\"=\"Amend the existing PAUTH (v2 → v3): add WI-3414 + 3 mutation classes (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0738
-  asked_at: 2026-05-28T15:41:50.277470Z
-  question: "Per-artifact approval needed for the PAUTH amendment per GOV-ARTIFACT-APPROVAL-001. Proposed PAUTH v3 amends `PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BATCH` v2 by adding WI-3414 to `included_work_item_ids` and adding `source`, `rules`, `governance_evidence` to `allowed_mutation_classes`. Full amendment text in preview. Approve as-shown, approve with edits you'll describe, or reject?"
-  options:
-    - "Approve as-shown"
-    - "Approve with edits I will describe"
-    - "Reject — try a different PAUTH path"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 0ac1893848afee1b
-  resolved_at: 2026-05-28T15:41:50.277470Z
-  answer: "Your questions have been answered: \"Per-artifact approval needed for the PAUTH amendment per GOV-ARTIFACT-APPROVAL-001. Proposed PAUTH v3 amends `PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BATCH` v2 by adding WI-3414 to `included_work_item_ids` and adding `source`, `rules`, `governance_evidence` to `allowed_mutation_classes`. Full amendment text in preview. Approve as-shown, approve with edits you'll describe, or reject?\"=\"Approve as-shown\" selected preview: # Project Authorization Amendment — PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY  ## Amendment  The implementation authorization PAUTH-PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY-BRIDGE-PROTOCOL-RELIABILITY-BATCH for project PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY is superseded by a new append-only version (v3). The amendment:  1. Adds WI-3414 (work-intent registry Prime-write integration) to included_work_item_ids. 2. Extends allowed_mutation_classes to include `source`, `rules`, and `governance_evidence`.  - Prior included_work_item_ids: [GTKB-BRIDGE-POLLER-001, GTKB-BRIDGE-POLLER-COMPLEXITY-REFACTOR, GTKB-BRIDGE-POLLER-PRIME-CLASSIFICATION-REFINEMENT, GTKB-BRIDGE-PROPOSE-HELPER-INDEX-PARITY, GTKB-BRIDGE-INDEX-ROLE-INTENT-SENTINEL, WI-3256, WI-3267, WI-3280, GTKB-IMPL-AUTH-VERIFICATION-HEADING-GATE-ALIGNMENT] - New included_work_item_ids: prior list + WI-3414 - Added work item: WI-3414 - Prior allowed_mutation_classes: [hook_upgrade, cli_extension, test_addition, spec_status_promotion] - New allowed_mutation_classes: [hook_upgrade, cli_extension, test_addition, spec_status_promotion, source, rules, governance_evidence] - Added mutation classes: source, rules, governance_evidence  ## Owner Approval  Approved by the owner via AskUserQuestion in session S367 (2026-05-28). The owner selected 'Amend the existing PAUTH (v2 -> v3): add WI-3414 + 3 mutation classes (Recommended)' from a 3-option AUQ.  ## Rationale  WI-3414 is bridge-protocol coordination work matching the project's scope. The 5-NO-GO recursion on the bridge thread (-002...-010) was driven by mismatch between proposal scope and the standing reliability-fast-lane PAUTH (GOV-RELIABILITY-FAST-LANE-001: ~3 files / ~150 LoC, no new public API/CLI/behavior). The 3 added mutation classes cover work-types implicitly already in scope: `source` for body changes to scripts beyond CLI extensions; `rules` for protocol-rule narrative-artifact edits; `governance_evidence` for formal-artifact-approval packet JSON artifacts.  ## Governing Constraint  DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001 requires an owner-approved formal-artifact-approval packet for any project-authorization amendment. This packet is that evidence; cited by path in the change_reason of the superseding `gt projects authorize` insert.. You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0739
-  asked_at: 2026-05-28T15:54:33.805338Z
-  question: "WI-3349 Gemini substrate fix — which architecture should resolve the headless command resolution problem?"
-  options:
-    - "Registry stores absolute path"
-    - "Dispatch enriches PATH"
-    - "Scope-reduction REVISED"
-    - "Defer entirely"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 663cf14df7a222ef
-  resolved_at: 2026-05-28T15:54:33.805338Z
-  answer: "Your questions have been answered: \"WI-3349 Gemini substrate fix — which architecture should resolve the headless command resolution problem?\"=\"Registry stores absolute path\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0740
-  asked_at: 2026-05-28T16:13:40.748922Z
-  question: "Which formalization track should capture the new env-SoT topology (separate GT-KB + application SoTs) and CLI-enforcement principle?"
-  options:
-    - "ADR + DCL + revision (Recommended)"
-    - "Revise GOV in place"
-    - "New supersession spec"
-    - "Capture as deliberation first"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 5dd564e961faa70c
-  resolved_at: 2026-05-28T16:13:40.748922Z
-  answer: "Your questions have been answered: \"Which formalization track should capture the new env-SoT topology (separate GT-KB + application SoTs) and CLI-enforcement principle?\"=\"ADR + DCL + revision (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0741
-  asked_at: 2026-05-28T16:13:40.748922Z
-  question: "Agent Red currently has 3 .env.local files (admin/shopify, admin/standalone, admin/provider) under applications/Agent_Red/. Your principle says 'the application's source-of-truth' (singular). How should this split be interpreted in the ADR/DCL/revised-GOV?"
-  options:
-    - "Defer to Agent Red (Recommended)"
-    - "Single Agent Red SoT"
-    - "Per-sub-app SoT (3 apps)"
-    - "Migrate to Agent Red's own repo"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 41b39d22ecf2cfb5
-  resolved_at: 2026-05-28T16:13:40.748922Z
-  answer: "Your questions have been answered: \"Agent Red currently has 3 .env.local files (admin/shopify, admin/standalone, admin/provider) under applications/Agent_Red/. Your principle says 'the application's source-of-truth' (singular). How should this split be interpreted in the ADR/DCL/revised-GOV?\"=\"Defer to Agent Red (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0742
-  asked_at: 2026-05-28T16:14:55.433984Z
-  question: "Triaged 4 actionable NO-GO threads; all need owner input before Prime can file REVISED. Rather than batch-AUQ them, pick ONE to dive into next. (Or pick 'survey more' if you want me to triage additional threads from the 'next 42 not shown'.)"
-  options:
-    - "sonarcloud-config-relink-004 (closest to VERIFIED) (Recommended)"
-    - "platform-tests-ruff-cleanup-002 (PAUTH amendment, same playbook)"
-    - "rc-gate-membase-seed-resilient-fixture-002 (premise-reframe)"
-    - "Survey more threads first — 42 actionable not yet read"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 509e28803f938078
-  resolved_at: 2026-05-28T16:14:55.433984Z
-  answer: "Your questions have been answered: \"Triaged 4 actionable NO-GO threads; all need owner input before Prime can file REVISED. Rather than batch-AUQ them, pick ONE to dive into next. (Or pick 'survey more' if you want me to triage additional threads from the 'next 42 not shown'.)\"=\"sonarcloud-config-relink-004 (closest to VERIFIED) (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0743
-  asked_at: 2026-05-28T16:14:55.433984Z
-  question: "Sonar commit blocked by stale inventory baseline (caused by ~530 parallel-session working-tree changes accumulating since the last inventory regen at commit 1b147634, 2026-05-27). My sonar change itself is innocent. How should I proceed?"
-  options:
-    - "File a new inventory-regen bridge thread first (Recommended)"
-    - "Bundle inventory regen into the sonar commit (one-shot)"
-    - "Skip sonar, move to a different thread"
-    - "Bypass with --no-verify (one-time explicit override)"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: 95fefc3295744044
-  resolved_at: 2026-05-28T16:14:55.433984Z
-  answer: "Your questions have been answered: \"Sonar commit blocked by stale inventory baseline (caused by ~530 parallel-session working-tree changes accumulating since the last inventory regen at commit 1b147634, 2026-05-27). My sonar change itself is innocent. How should I proceed?\"=\"File a new inventory-regen bridge thread first (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
-- id: DECISION-0744
-  asked_at: 2026-05-28T17:17:40.941114Z
-  question: "Codex NO-GO P1-001 on env-SoT: the cited PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING (fast-lane) doesn't authorize formal governance/specification authoring. The WI-3427 origin is `improvement` (not defect/regression), the work creates new/revised specs, and the PAUTH's allowed_mutation_classes = [source, test_addition, hook_upgrade] omits spec mutation. What's the right authorization path?"
-  options:
-    - "New project + PAUTH (Recommended)"
-    - "Per-packet approval only"
-    - "Defer to broader governance project"
-    - "Reuse existing project with amendment"
-  detected_via: ask_user_question
-  status: resolved
-  question_hash: c01600fdc56dfc62
-  resolved_at: 2026-05-28T17:17:40.941114Z
-  answer: "Your questions have been answered: \"Codex NO-GO P1-001 on env-SoT: the cited PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING (fast-lane) doesn't authorize formal governance/specification authoring. The WI-3427 origin is `improvement` (not defect/regression), the work creates new/revised specs, and the PAUTH's allowed_mutation_classes = [source, test_addition, hook_upgrade] omits spec mutation. What's the right authorization path?\"=\"New project + PAUTH (Recommended)\". You can now continue with these answers in mind."
-  notes: ""
 - id: DECISION-0745
   asked_at: 2026-05-28T17:28:55.419044Z
   question: "Codex NO-GO on platform-tests-ruff-cleanup -002: 42-file existing-test lint cleanup (66 ruff violations) exceeds reliability fast-lane size envelope (~3 source files / 150 net lines guide); PAUTH allowed_mutation_classes = [source, test_addition, hook_upgrade] omits test_modification. The lint defect is real and WI-3423 exists. What's the right authorization path?"
@@ -8882,9 +8337,1032 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_at: 2026-06-25T21:26:12.731395Z
   answer: "Your questions have been answered: \"WI-4815 is groomed into WI-4839..4842. Both your directed items this session are done (WI-4813 shipped, WI-4815 split). What next?\"=\"Wrap the session (Recommended)\". You can now continue with these answers in mind."
   notes: ""
+- id: DECISION-1411
+  asked_at: 2026-06-25T21:49:37.784466Z
+  question: "After the Cursor LO session GO'd WI-4807, dispatch was re-enabled (health now PASS) and a Codex Prime worker auto-dispatched to implement the GO — it holds the impl claim until 21:26:29Z, blocking my begin. So a concurrent worker is now implementing the same fix I was directed to build. How should I proceed?"
+  options:
+    - "Stand down; let Codex finish"
+    - "I take over; stop the Codex worker"
+    - "Pause; confirm the re-enable first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 48ac64e84537dcfc
+  resolved_at: 2026-06-25T21:49:37.784466Z
+  answer: "Your questions have been answered: \"After the Cursor LO session GO'd WI-4807, dispatch was re-enabled (health now PASS) and a Codex Prime worker auto-dispatched to implement the GO — it holds the impl claim until 21:26:29Z, blocking my begin. So a concurrent worker is now implementing the same fix I was directed to build. How should I proceed?\"=\"I take over; stop the Codex worker\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1412
+  asked_at: 2026-06-25T21:49:37.784466Z
+  question: "Update: there's no live Codex worker to stop — it finished, staged a CORRECT implementation of my GO'd design (lifecycle.py 3 methods + cli_backlog_update.py hook + a 176-line test), then exited without committing or filing the report. The code matches what I'd write (it's my proposal). Given that, how should I take over?"
+  options:
+    - "Adopt + finalize (recommended)"
+    - "Revert + reimplement clean"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5e8450de8edbbbcb
+  resolved_at: 2026-06-25T21:49:37.784466Z
+  answer: "Your questions have been answered: \"Update: there's no live Codex worker to stop — it finished, staged a CORRECT implementation of my GO'd design (lifecycle.py 3 methods + cli_backlog_update.py hook + a 176-line test), then exited without committing or filing the report. The code matches what I'd write (it's my proposal). Given that, how should I take over?\"=\"Adopt + finalize (recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1413
+  asked_at: 2026-06-25T21:49:37.784466Z
+  question: "WI-4807's code is verified-correct (one fixable test-fixture bug), but I can't finalize: dispatch was re-enabled by the committed WI-4821 'Honest-ON' reconciliation and now loops fresh Codex Prime workers onto the GO'd thread, permanently blocking my begin (a worker always holds the claim). Breaking the loop needs a dispatch re-quiesce that re-creates the drift WI-4821 just fixed. How to proceed?"
+  options:
+    - "Re-quiesce + I finalize"
+    - "Fix the dispatch loop first"
+    - "Let dispatch keep trying"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c82c1cfcd31a6971
+  resolved_at: 2026-06-25T21:49:37.784466Z
+  answer: "Your questions have been answered: \"WI-4807's code is verified-correct (one fixable test-fixture bug), but I can't finalize: dispatch was re-enabled by the committed WI-4821 'Honest-ON' reconciliation and now loops fresh Codex Prime workers onto the GO'd thread, permanently blocking my begin (a worker always holds the claim). Breaking the loop needs a dispatch re-quiesce that re-creates the drift WI-4821 just fixed. How to proceed?\"=\"Fix the dispatch loop first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1414
+  asked_at: 2026-06-25T22:47:51.797301Z
+  question: "The sweep is blocked by 34 red tests from concurrent incomplete work (WI-4829 self-review gate + 1 role-rendering test) — none from my WI-4821/WI-4831 work, which is already committed safely. How should I proceed?"
+  options:
+    - "Commit clean subset, exclude the WIP"
+    - "Hold the sweep entirely"
+    - "Commit everything (fix-forward)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7812eade2126f2f6
+  resolved_at: 2026-06-25T22:47:51.797301Z
+  answer: "Your questions have been answered: \"The sweep is blocked by 34 red tests from concurrent incomplete work (WI-4829 self-review gate + 1 role-rendering test) — none from my WI-4821/WI-4831 work, which is already committed safely. How should I proceed?\"=\"Commit clean subset, exclude the WIP\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1415
+  asked_at: 2026-06-25T22:47:51.797301Z
+  question: "A concurrent session re-quiesced dispatch (working-tree rules.toml → false, health FAIL) after your WI-4821 Honest-ON reconcile — the documented storm-response pattern. Your committed reconcile is intact in HEAD. How should I handle the live conflict?"
+  options:
+    - "Leave it (likely storm response)"
+    - "Investigate the storm"
+    - "Re-assert Honest-ON"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7c633b890da64481
+  resolved_at: 2026-06-25T22:47:51.797301Z
+  answer: "Your questions have been answered: \"A concurrent session re-quiesced dispatch (working-tree rules.toml → false, health FAIL) after your WI-4821 Honest-ON reconcile — the documented storm-response pattern. Your committed reconcile is intact in HEAD. How should I handle the live conflict?\"=\"Investigate the storm\", \"The sweep committed orphaned temp files + scratch litter (8 harness-registry.json.tmp.*, bridge_scan.py, tmp_test/, etc.) into bc750f5e7. Clean it up?\"=\"Yes — clean + gitignore\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1416
+  asked_at: 2026-06-25T22:47:51.797301Z
+  question: "The sweep committed orphaned temp files + scratch litter (8 harness-registry.json.tmp.*, bridge_scan.py, tmp_test/, etc.) into bc750f5e7. Clean it up?"
+  options:
+    - "Yes — clean + gitignore"
+    - "Leave it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f1f67085bd42688b
+  resolved_at: 2026-06-25T22:47:51.797301Z
+  answer: "Your questions have been answered: \"A concurrent session re-quiesced dispatch (working-tree rules.toml → false, health FAIL) after your WI-4821 Honest-ON reconcile — the documented storm-response pattern. Your committed reconcile is intact in HEAD. How should I handle the live conflict?\"=\"Investigate the storm\", \"The sweep committed orphaned temp files + scratch litter (8 harness-registry.json.tmp.*, bridge_scan.py, tmp_test/, etc.) into bc750f5e7. Clean it up?\"=\"Yes — clean + gitignore\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1418
+  asked_at: 2026-06-25T23:57:48.877882Z
+  question: "PROJECT-GTKB-DISPATCHER-COMPLETION = 6 resolved + 12 open. Verified: 3 phases (4790/4791/4792) are blocked on still-backlogged external prereqs; WI-4845 (cloud-LO hang) is hard/open-ended; 4788/4793 are large feature builds; 4803/4804/4805/4818/4834 are targeted reliability fixes (no bridge yet); 4846 is hygiene. Implementing all now is infeasible (blocked deps + the LO-review path is itself broken). How should I drive this to retirement?"
+  options:
+    - "Re-home all → retire now (Rec)"
+    - "Fix defects now, then re-home + retire"
+    - "Supersede aspirational, re-home rest"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d06e002d2d087ac2
+  resolved_at: 2026-06-25T23:57:48.877882Z
+  answer: "Your questions have been answered: \"PROJECT-GTKB-DISPATCHER-COMPLETION = 6 resolved + 12 open. Verified: 3 phases (4790/4791/4792) are blocked on still-backlogged external prereqs; WI-4845 (cloud-LO hang) is hard/open-ended; 4788/4793 are large feature builds; 4803/4804/4805/4818/4834 are targeted reliability fixes (no bridge yet); 4846 is hygiene. Implementing all now is infeasible (blocked deps + the LO-review path is itself broken). How should I drive this to retirement?\"=\"Re-home all → retire now (Rec)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1419
+  asked_at: 2026-06-26T00:20:02.427870Z
+  question: "Headless dispatcher has two confirmed structural blockers (WI-4820 false-green enable path; D/F reviewer 600s timeouts). The B↔Cursor bridge works today via interactive Cursor-LO review. How should we proceed?"
+  options:
+    - "Fix WI-4820 (control plane) first"
+    - "Run interactive bridge now; queue fixes"
+    - "One-off reconcile E, finish headless test"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8c71c13350e1e5eb
+  resolved_at: 2026-06-26T00:20:02.427870Z
+  answer: "Your questions have been answered: \"Headless dispatcher has two confirmed structural blockers (WI-4820 false-green enable path; D/F reviewer 600s timeouts). The B↔Cursor bridge works today via interactive Cursor-LO review. How should we proceed?\"=\"Fix WI-4820 (control plane) first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1421
+  asked_at: 2026-06-26T00:41:33.346458Z
+  question: "WI-4845 root cause confirmed: the hardcoded 600s worker-lifetime cap (run_with_status.py, added by WI-4806 to kill storm-era immortal workers) now guillotines cloud LO workers mid-review — they're doing legitimate work, not pathologically hanging. WI-4806's own comment deferred making it configurable to 'the Phase 2 daemon' (WI-4787), which is shadow-mode. How should I fix it? (Choosing a fix authorizes me to draft the bridge proposal, get it cross-reviewed by a separate harness, and implement.)"
+  options:
+    - "Configurable cap + LO budget (Rec)"
+    - "Reduce review turn-cost"
+    - "Both (cap + turn-cost)"
+    - "Diagnosis only this turn"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c5ead020590e9bb6
+  resolved_at: 2026-06-26T00:41:33.346458Z
+  answer: "Your questions have been answered: \"WI-4845 root cause confirmed: the hardcoded 600s worker-lifetime cap (run_with_status.py, added by WI-4806 to kill storm-era immortal workers) now guillotines cloud LO workers mid-review — they're doing legitimate work, not pathologically hanging. WI-4806's own comment deferred making it configurable to 'the Phase 2 daemon' (WI-4787), which is shadow-mode. How should I fix it? (Choosing a fix authorizes me to draft the bridge proposal, get it cross-reviewed by a separate harness, and implement.)\"=\"Configurable cap + LO budget (Rec)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1422
+  asked_at: 2026-06-26T01:17:52.929661Z
+  question: "WI-4818's GO has a target_paths scope bug (verdict directs the fix to test_harness_storm_watchdog.py, outside the authorized scope), so it needs a scope-correcting REVISED -003 + re-review rather than a direct implement. Both WI-4845 (NEW) and WI-4818 now await cross-review by the Cursor E interactive LO (the working reviewer; headless is quiesced). How should I sequence this?"
+  options:
+    - "File WI-4818 REVISED, queue both (Rec)"
+    - "Focus WI-4845 first (unblock swarm)"
+    - "Implement WI-4818 within current scope"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9c016f4321a25ee3
+  resolved_at: 2026-06-26T01:17:52.929661Z
+  answer: "Your questions have been answered: \"WI-4818's GO has a target_paths scope bug (verdict directs the fix to test_harness_storm_watchdog.py, outside the authorized scope), so it needs a scope-correcting REVISED -003 + re-review rather than a direct implement. Both WI-4845 (NEW) and WI-4818 now await cross-review by the Cursor E interactive LO (the working reviewer; headless is quiesced). How should I sequence this?\"=\"File WI-4818 REVISED, queue both (Rec)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1423
+  asked_at: 2026-06-26T01:21:50.811677Z
+  question: "WI-4820 is VERIFIED+committed. WI-4818 is GO, but the LO's #1 note says the parity test belongs in test_harness_storm_watchdog.py (fixing the existing low-cost-only coverage test that actually missed Cursor) — not my GO'd target_paths (test_storm_watchdog_reap.py). How should I implement WI-4818?"
+  options:
+    - "Revise scope, re-review, implement"
+    - "Implement in current GO scope"
+    - "Pause WI-4818 here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5f8d54108617ec76
+  resolved_at: 2026-06-26T01:21:50.811677Z
+  answer: "Your questions have been answered: \"WI-4820 is VERIFIED+committed. WI-4818 is GO, but the LO's #1 note says the parity test belongs in test_harness_storm_watchdog.py (fixing the existing low-cost-only coverage test that actually missed Cursor) — not my GO'd target_paths (test_storm_watchdog_reap.py). How should I implement WI-4818?\"=\"Revise scope, re-review, implement\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1424
+  asked_at: 2026-06-26T01:21:50.811677Z
+  question: "A concurrent Claude-B session (e6490e91) already claimed WI-4818 implementation and wrote its own revised draft ~1 min ago — doing the same revision you directed me on. I stood down to avoid duplicate/colliding work. How should we handle it?"
+  options:
+    - "Stand down; let e6490e91 finish"
+    - "Pause — e6490e91 is unexpected"
+    - "I take WI-4818 over"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 15b3972ec41576f1
+  resolved_at: 2026-06-26T01:21:50.811677Z
+  answer: "Your questions have been answered: \"A concurrent Claude-B session (e6490e91) already claimed WI-4818 implementation and wrote its own revised draft ~1 min ago — doing the same revision you directed me on. I stood down to avoid duplicate/colliding work. How should we handle it?\"=\"Stand down; let e6490e91 finish\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1417
+  asked_at: 2026-06-25T23:30:21.468737Z
+  question: "Want me to also archive your \"capture as a WI\" directive as a Deliberation Archive record, or leave it on the WI's `s..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 37419019e576b6ec
+  resolved_at: 2026-06-26T01:43:12.324522Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1420
+  asked_at: 2026-06-26T00:33:20.388150Z
+  question: "Want me to stage the next dispatcher-reliability items too (WI-4805 stale-PID/last_launch reap, WI-4804 stale kill-sw..."
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 5d797f86b8110b44
+  resolved_at: 2026-06-26T01:43:12.324546Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1425
+  asked_at: 2026-06-26T02:44:13.042010Z
+  question: "The black-box dispatcher activation gate is fully mapped: ~5 bridge cycles (WI-4790 monitoring → WI-4788 black-box gate → WI-4848 cutover), all available/unclaimed. It's a multi-cycle program I can't finish in one session. How should I drive it to 'ready to activate'?"
+  options:
+    - "Minimum-viable activation, autonomous"
+    - "Full ADR target before cutover"
+    - "Slice-by-slice with check-ins"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ca0b6763ae0e5e2c
+  resolved_at: 2026-06-26T02:44:13.042010Z
+  answer: "Your questions have been answered: \"The black-box dispatcher activation gate is fully mapped: ~5 bridge cycles (WI-4790 monitoring → WI-4788 black-box gate → WI-4848 cutover), all available/unclaimed. It's a multi-cycle program I can't finish in one session. How should I drive it to 'ready to activate'?\"=\"Minimum-viable activation, autonomous\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1426
+  asked_at: 2026-06-26T05:25:39.913122Z
+  question: "My assigned lane (WI-4845 + WI-4818) is VERIFIED + committed. The remaining 7 dispatcher-reliability WIs are the parallel session 130bf9ae's lane per DELIB-20266137, and it's actively mid-implementation right now (WI-4803 has 20 uncommitted lines in cross_harness_bridge_trigger.py; WI-4790's dispatch_monitor.py is untracked). Grabbing WI-4803 or its siblings would collide on the same files. How should I proceed?"
+  options:
+    - "Stand down — lane complete (Rec)"
+    - "Reassign the lane to me"
+    - "Give me separate, non-conflicting work"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 68601ed8fb7fe918
+  resolved_at: 2026-06-26T05:25:39.913122Z
+  answer: "Your questions have been answered: \"My assigned lane (WI-4845 + WI-4818) is VERIFIED + committed. The remaining 7 dispatcher-reliability WIs are the parallel session 130bf9ae's lane per DELIB-20266137, and it's actively mid-implementation right now (WI-4803 has 20 uncommitted lines in cross_harness_bridge_trigger.py; WI-4790's dispatch_monitor.py is untracked). Grabbing WI-4803 or its siblings would collide on the same files. How should I proceed?\"=\"Stand down — lane complete (Rec)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1427
+  asked_at: 2026-06-26T06:50:33.910126Z
+  question: "What's the PRIMARY purpose/audience of the 'GT-KB vs the popular agent' differentiation? (Determines whether it stays one ADR or seeds a derived artifact.)"
+  options:
+    - "Internal design-rationale — fold into the ADR (Recommended)"
+    - "Adopter onboarding explainer"
+    - "External positioning / thought-leadership"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4cec1009e507a988
+  resolved_at: 2026-06-26T06:50:33.910126Z
+  answer: "Your questions have been answered: \"What's the PRIMARY purpose/audience of the 'GT-KB vs the popular agent' differentiation? (Determines whether it stays one ADR or seeds a derived artifact.)\"=\"Internal design-rationale — fold into the ADR (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1428
+  asked_at: 2026-06-26T07:13:46.236229Z
+  question: "Investigating WI-4804 shows its 'watchdog-dormancy auto-restart' half overlaps the swarm's just-VERIFIED WI-4790 (dispatch_monitor detection + health_response framework) and needs the future WI-4848 daemon as the executor, while the 'kill-switch-staleness visibility' half (doctor check + first-seen state) is cleanly standalone now. DELIB-20266140 paired both. How should I scope WI-4804?"
+  options:
+    - "Visibility now; dormancy w/ daemon (rec.)"
+    - "Full 4804 now as WI-4790 extension"
+    - "Defer all of 4804 to WI-4848 daemon"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 93c8acc6899761a6
+  resolved_at: 2026-06-26T07:13:46.236229Z
+  answer: "Your questions have been answered: \"Investigating WI-4804 shows its 'watchdog-dormancy auto-restart' half overlaps the swarm's just-VERIFIED WI-4790 (dispatch_monitor detection + health_response framework) and needs the future WI-4848 daemon as the executor, while the 'kill-switch-staleness visibility' half (doctor check + first-seen state) is cleanly standalone now. DELIB-20266140 paired both. How should I scope WI-4804?\"=\"Visibility now; dormancy w/ daemon (rec.)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1429
+  asked_at: 2026-06-26T07:14:32.326451Z
+  question: "WI-4793 (two-tier dispatcher reset/drain) is GO'd and awaiting implementation — a sibling dispatcher-reliability item outside the approved min-viable activation set. How should I sequence it against the activation drive?"
+  options:
+    - "Stay min-viable"
+    - "Finish WI-4790, then WI-4793"
+    - "WI-4793 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 9b2de5bf71b44f8f
+  resolved_at: 2026-06-26T07:14:32.326451Z
+  answer: "Your questions have been answered: \"WI-4793 (two-tier dispatcher reset/drain) is GO'd and awaiting implementation — a sibling dispatcher-reliability item outside the approved min-viable activation set. How should I sequence it against the activation drive?\"=\"Stay min-viable\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1430
+  asked_at: 2026-06-26T14:39:26.840020Z
+  question: "WI-4848 slice 1 (parity harness) is done. It surfaced a real daemon-vs-trigger divergence to reconcile, and the live parity sample is zero under the current dispatch quiesce. How should I approach the go-live (daemon shadow→live + trigger inert + dispatch re-enable)?"
+  options:
+    - "Pragmatic: reconcile + flip"
+    - "Rigorous: reconcile + un-quiesce soak + flip"
+    - "Hold the flip"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3052a638bc307586
+  resolved_at: 2026-06-26T14:39:26.840020Z
+  answer: "Your questions have been answered: \"WI-4848 slice 1 (parity harness) is done. It surfaced a real daemon-vs-trigger divergence to reconcile, and the live parity sample is zero under the current dispatch quiesce. How should I approach the go-live (daemon shadow→live + trigger inert + dispatch re-enable)?\"=\"Pragmatic: reconcile + flip\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1431
+  asked_at: 2026-06-26T15:56:08.977594Z
+  question: "Every prerequisite for the black-box dispatcher is VERIFIED; only the flip (WI-4848 slice 3: daemon live-spawn + trigger inert + dispatch re-enable) remains. Re-enabling dispatch re-opens the storm surface. How do you want to execute the flip?"
+  options:
+    - "Build flip, hold the switch"
+    - "Park at ready — flip fresh later"
+    - "Go live now"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c45306438f981750
+  resolved_at: 2026-06-26T15:56:08.977594Z
+  answer: "Your questions have been answered: \"Every prerequisite for the black-box dispatcher is VERIFIED; only the flip (WI-4848 slice 3: daemon live-spawn + trigger inert + dispatch re-enable) remains. Re-enabling dispatch re-opens the storm surface. How do you want to execute the flip?\"=\"Build flip, hold the switch\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1433
+  asked_at: 2026-06-26T19:21:38.830783Z
+  question: "The config half of your dispatcher test passed (Cursor=LO, Claude=PB, health PASS). To run the end-to-end half I'll soft-reset the stale state, then fire one live dispatch that spawns a real headless Cursor LO worker. How do you want to run it?"
+  options:
+    - "Dispatch the pending WI-4788 item to Cursor"
+    - "Use a synthetic throwaway test item"
+    - "Stop at the passed config test"
+    - "Soft-reset only, then re-quiesce"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2b7cd8ff1d99b6c1
+  resolved_at: 2026-06-26T19:21:38.830783Z
+  answer: "Your questions have been answered: \"The config half of your dispatcher test passed (Cursor=LO, Claude=PB, health PASS). To run the end-to-end half I'll soft-reset the stale state, then fire one live dispatch that spawns a real headless Cursor LO worker. How do you want to run it?\"=\"Dispatch the pending WI-4788 item to Cursor\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1434
+  asked_at: 2026-06-26T19:21:38.830783Z
+  question: "Black-box test done: config/selection works, but the cross-harness trigger kills every dispatched worker at the 600s lifetime cap (Claude-PB died exit 124), and Cursor-LO is suppressed while Cursor is open. How do you want to proceed?"
+  options:
+    - "Confirm + file the 600s lifetime-cap gap"
+    - "Re-run Cursor-LO test with Cursor closed"
+    - "Clean up the stale dispatcher state"
+    - "Capture all findings + stop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ccd9b6bba5c0b52a
+  resolved_at: 2026-06-26T19:21:38.830783Z
+  answer: "Your questions have been answered: \"Black-box test done: config/selection works, but the cross-harness trigger kills every dispatched worker at the 600s lifetime cap (Claude-PB died exit 124), and Cursor-LO is suppressed while Cursor is open. How do you want to proceed?\"=\"Why is this the case: \"Cursor-LO is suppressed while Cursor is open\"?\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1435
+  asked_at: 2026-06-26T19:21:38.830783Z
+  question: "Now that the suppression behavior is clear (headless Cursor-LO requires Cursor closed; the 600s lifetime-cap kill is the deeper blocker), how do you want to proceed?"
+  options:
+    - "Confirm + file the 600s lifetime-cap gap"
+    - "Re-run Cursor-LO test with Cursor closed"
+    - "Clean up the stale dispatcher state"
+    - "Capture all findings + stop"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f356e0cfeca66434
+  resolved_at: 2026-06-26T19:21:38.830783Z
+  answer: "Your questions have been answered: \"Now that the suppression behavior is clear (headless Cursor-LO requires Cursor closed; the 600s lifetime-cap kill is the deeper blocker), how do you want to proceed?\"=\"[User dismissed — do not proceed, wait for next instruction]\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1436
+  asked_at: 2026-06-26T20:17:03.695185Z
+  question: "The active-session-suppression excision is fully diagnosed, scoped (WI-4858), and drafted (preflights pass); it needs a PAUTH minted to file, then a ~14-file implementation + guard + VERIFY. How do you want to proceed given the session length?"
+  options:
+    - "Mint PAUTH + start the excision now"
+    - "Bank the ready-to-execute removal"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b7ed0d278a3eaef7
+  resolved_at: 2026-06-26T20:17:03.695185Z
+  answer: "Your questions have been answered: \"The active-session-suppression excision is fully diagnosed, scoped (WI-4858), and drafted (preflights pass); it needs a PAUTH minted to file, then a ~14-file implementation + guard + VERIFY. How do you want to proceed given the session length?\"=\"Mint PAUTH + start the excision now\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1437
+  asked_at: 2026-06-26T20:57:40.447248Z
+  question: "WI-4858 implementation is complete and PB-confirmed (keystone guard passes); the thread is at REVISED awaiting LO verification, which I can't perform as a PB session. How should I proceed?"
+  options:
+    - "Await LO verification"
+    - "Tighten 003 before LO"
+    - "Pivot to housekeeping"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ed2823bbfe225840
+  resolved_at: 2026-06-26T20:57:40.447248Z
+  answer: "Your questions have been answered: \"WI-4858 implementation is complete and PB-confirmed (keystone guard passes); the thread is at REVISED awaiting LO verification, which I can't perform as a PB session. How should I proceed?\"=\"Await LO verification\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1438
+  asked_at: 2026-06-26T21:38:52.703436Z
+  question: "You opened a deliberation envelope and I over-ran it. What do you want from this turn now?"
+  options:
+    - "Diagnosis only — hold"
+    - "Also verify Codex parity"
+    - "Capture as governed defects"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 0b3153367313a8f5
+  resolved_at: 2026-06-26T21:38:52.703436Z
+  answer: "Your questions have been answered: \"You opened a deliberation envelope and I over-ran it. What do you want from this turn now?\"=\"Also verify Codex parity\", \"What is the *intended* enforcement contract for activity envelopes / disposition profiles? This decides which of the above are 'defects' vs working-as-designed, and shapes any future fix.\"=\"Specify after diagnosis\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1439
+  asked_at: 2026-06-26T21:38:52.703436Z
+  question: "What is the *intended* enforcement contract for activity envelopes / disposition profiles? This decides which of the above are 'defects' vs working-as-designed, and shapes any future fix."
+  options:
+    - "Mechanically enforced"
+    - "Harness-injected, agent-governed"
+    - "Specify after diagnosis"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 15a1edde9e9b1c0d
+  resolved_at: 2026-06-26T21:38:52.703436Z
+  answer: "Your questions have been answered: \"You opened a deliberation envelope and I over-ran it. What do you want from this turn now?\"=\"Also verify Codex parity\", \"What is the *intended* enforcement contract for activity envelopes / disposition profiles? This decides which of the above are 'defects' vs working-as-designed, and shapes any future fix.\"=\"Specify after diagnosis\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1440
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q1 (keystone) — What does cross-harness 'parity' fundamentally REQUIRE between harnesses? Everything downstream (enforcement, waivers, scope) hangs on this."
+  options:
+    - "Behavioral equivalence (Recommended)"
+    - "Implementation identity"
+    - "Surface-presence only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1baf863312537db9
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q1 (keystone) — What does cross-harness 'parity' fundamentally REQUIRE between harnesses? Everything downstream (enforcement, waivers, scope) hangs on this.\"=\"Behavioral equivalence (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1441
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q2 — Which classes of harness-observable behavior are IN-SCOPE for the parity invariant? (Behavioral-equivalence basis; per-harness applicability is handled later by waivers, so scope here = what the invariant reasons about at all.)"
+  options:
+    - "All harness-observable behaviors (Recommended)"
+    - "Core behavior-shaping + governance subset"
+    - "Just the gap class"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f267e4bf94c4f3be
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q2 — Which classes of harness-observable behavior are IN-SCOPE for the parity invariant? (Behavioral-equivalence basis; per-harness applicability is handled later by waivers, so scope here = what the invariant reasons about at all.)\"=\"All harness-observable behaviors (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1442
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q3 — Does the parity invariant have a privileged source direction, or is it symmetric?"
+  options:
+    - "Bidirectional symmetric (Recommended)"
+    - "Canonical-source-per-class"
+    - "Single global reference harness"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d641acdac49ebfeb
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q3 — Does the parity invariant have a privileged source direction, or is it symmetric?\"=\"Bidirectional symmetric (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1443
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q4 — For a given in-scope capability, across WHICH harnesses must parity hold by default? (Q7 waivers handle exceptions within whatever set you pick here.)"
+  options:
+    - "Applicability-scoped: role-relative + active (Recommended)"
+    - "All active harnesses, uniformly"
+    - "All registered harnesses"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: aeb103a99087d54a
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q4 — For a given in-scope capability, across WHICH harnesses must parity hold by default? (Q7 waivers handle exceptions within whatever set you pick here.)\"=\"Applicability-scoped: role-relative + active (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1444
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q5 — How should parity be ENFORCED, given the core failure was that registry-conformance can't see unregistered capabilities?"
+  options:
+    - "Discovery-diff + registry as waiver/purpose store (Recommended)"
+    - "Forced-registration-on-change gate"
+    - "Discovery-diff only (deprecate registry for parity)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a36fff10e294a6de
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q5 — How should parity be ENFORCED, given the core failure was that registry-conformance can't see unregistered capabilities?\"=\"Discovery-diff + registry as waiver/purpose store (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1445
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q6 — Where should the discovery-diff check run, and with what severity ramp? (This is the mechanical check's home; whether proposals must DECLARE disposition is a separate question, Q8.)"
+  options:
+    - "Layered: doctor (WARN→FAIL) + release/CI hard gate (Recommended)"
+    - "Authoring-time PreToolUse block (+ doctor)"
+    - "Doctor-only (WARN→FAIL)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5beeb09809ea4959
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q6 — Where should the discovery-diff check run, and with what severity ramp? (This is the mechanical check's home; whether proposals must DECLARE disposition is a separate question, Q8.)\"=\"Layered: doctor (WARN→FAIL) + release/CI hard gate (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1446
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q7 — How strict is the waiver that lets a legitimate asymmetry pass the diff? (This is what forces 'hard limitation' to be declared instead of slipping through as oversight.)"
+  options:
+    - "Owner-approved, typed reason + review-trigger (Recommended)"
+    - "Author-declared, LO-reviewed"
+    - "Self-declared, audit-logged only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d2c75b612ce29f2e
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q7 — How strict is the waiver that lets a legitimate asymmetry pass the diff? (This is what forces 'hard limitation' to be declared instead of slipping through as oversight.)\"=\"Owner-approved, typed reason + review-trigger (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1447
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q8 — Should a bridge proposal that touches a harness-surface file be REQUIRED to declare its cross-harness disposition, or do we rely only on the Q6 mechanical diff?"
+  options:
+    - "Required 'Cross-Harness Disposition' section, gate-enforced (Recommended)"
+    - "Advisory authoring prompt (no gate)"
+    - "No authoring gate — diff only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ae72b5e0001a9929
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q8 — Should a bridge proposal that touches a harness-surface file be REQUIRED to declare its cross-harness disposition, or do we rely only on the Q6 mechanical diff?\"=\"Required 'Cross-Harness Disposition' section, gate-enforced (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1448
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "A concurrent Claude-B auto-process session filed a WI-4727 post-impl report that's freezing protected KB mutations (so my interview checkpoints can't persist). Dispatch is quiesced, so it won't auto-clear. How should we proceed?"
+  options:
+    - "Continue grill, persist when gate clears (Recommended)"
+    - "Pause until WI-4727 clears"
+    - "Deal with WI-4727 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: ed3db5ea2633d4b6
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"A concurrent Claude-B auto-process session filed a WI-4727 post-impl report that's freezing protected KB mutations (so my interview checkpoints can't persist). Dispatch is quiesced, so it won't auto-clear. How should we proceed?\"=\"Continue grill, persist when gate clears (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1449
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q9 — What does the advisory recommend BUILDING: just the systemic machinery, or also the immediate envelope fix as a worked case? And is DEFECT-4 (the renderer injecting a do-work briefing into a capture-and-clarify lane) in or out?"
+  options:
+    - "Systemic + envelope as first conformance case; DEFECT-4 separate (Recommended)"
+    - "Systemic only"
+    - "All three together (systemic + envelope + DEFECT-4)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 712d8b5e513e15cc
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q9 — What does the advisory recommend BUILDING: just the systemic machinery, or also the immediate envelope fix as a worked case? And is DEFECT-4 (the renderer injecting a do-work briefing into a capture-and-clarify lane) in or out?\"=\"Systemic + envelope as first conformance case; DEFECT-4 separate (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1450
+  asked_at: 2026-06-26T22:33:35.418010Z
+  question: "Q10 — What artifact altitude should the advisory recommend, and how should it relate to the existing directional parity specs (SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001, DCL-CROSS-HARNESS-ENFORCEMENT-001)?"
+  options:
+    - "ADR + DCL + enforcement bundle, generalizing existing specs (Recommended)"
+    - "ADR + DCL only (enforcement as follow-on)"
+    - "Add a GOV principle on top (GOV + ADR + DCL)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 3e71d967819c7315
+  resolved_at: 2026-06-26T22:33:35.418010Z
+  answer: "Your questions have been answered: \"Q10 — What artifact altitude should the advisory recommend, and how should it relate to the existing directional parity specs (SPEC-CODEX-HARNESS-GOVERNANCE-PARITY-001, DCL-CROSS-HARNESS-ENFORCEMENT-001)?\"=\"ADR + DCL + enforcement bundle, generalizing existing specs (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1451
+  asked_at: 2026-06-26T22:42:37.039105Z
+  question: "The WI-4855 proposal is drafted and clears every bridge gate, but filing it requires a PAUTH (owner implementation-authorization envelope) that includes WI-4855 — none exists. Minting one is a governed owner authorization. How do you want to proceed?"
+  options:
+    - "Mint authorization + file"
+    - "Defer WI-4855 filing"
+    - "Pause §B here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: edeb77a380dd05c8
+  resolved_at: 2026-06-26T22:42:37.039105Z
+  answer: "Your questions have been answered: \"The WI-4855 proposal is drafted and clears every bridge gate, but filing it requires a PAUTH (owner implementation-authorization envelope) that includes WI-4855 — none exists. Minting one is a governed owner authorization. How do you want to proceed?\"=\"Mint authorization + file\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1453
+  asked_at: 2026-06-26T22:58:10.866239Z
+  question: "I verified 3 backlog WIs as already-done or non-reproducing against live code this session (each has zero bridge threads, so the automated reconciler can't touch them). Resolution is append-only and reversible. How should I resolve them? WI-3269 (new): `gt backlog add` is fully implemented in cli.py — premise satisfied. WI-4470 (hygiene): the B007 premise no longer reproduces (a different residual E402 remains, separately trackable). WI-4666 (defect): non-reproducing — `intake_list`/`list_intakes` render intake_status faithfully; defect-origin so closing needs your GOV-15 approval."
+  options:
+    - "Resolve all 3"
+    - "Non-defects only"
+    - "Hold all — assess more first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 91ab3c928bfa8660
+  resolved_at: 2026-06-26T22:58:10.866239Z
+  answer: "Your questions have been answered: \"I verified 3 backlog WIs as already-done or non-reproducing against live code this session (each has zero bridge threads, so the automated reconciler can't touch them). Resolution is append-only and reversible. How should I resolve them? WI-3269 (new): `gt backlog add` is fully implemented in cli.py — premise satisfied. WI-4470 (hygiene): the B007 premise no longer reproduces (a different residual E402 remains, separately trackable). WI-4666 (defect): non-reproducing — `intake_list`/`list_intakes` render intake_status faithfully; defect-origin so closing needs your GOV-15 approval.\"=\"Resolve all 3\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1455
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q1 (root) — What is the acceptance test that proves this goal? i.e., what should I drive end-to-end through the autonomous loop to declare it working?"
+  options:
+    - "Synthetic throwaway, live"
+    - "Real backlog WI, live"
+    - "Shadow/dry-run first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 502afab2b8d9b978
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q1 (root) — What is the acceptance test that proves this goal? i.e., what should I drive end-to-end through the autonomous loop to declare it working?\"=\"Synthetic throwaway, live\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1456
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q2 — Scope of the daemon fixes (Phase X) needed before the live loop test. Which set do I build (each via the current manual bridge path), plus the dispatcher pile-up drain for a clean daemon base?"
+  options:
+    - "Core safe loop"
+    - "Full chain"
+    - "Minimal bisect"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7c69e9ce7e8eb4ea
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q2 — Scope of the daemon fixes (Phase X) needed before the live loop test. Which set do I build (each via the current manual bridge path), plus the dispatcher pile-up drain for a clean daemon base?\"=\"Full chain\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1457
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q3 — How should the worker-lifetime cap be shaped so headless workers finish without the 600s mid-work kill? (The daemon will pass a per-spawn override; today's 600s default kills LO reviews and implementations mid-flight.)"
+  options:
+    - "Per-role, generous"
+    - "Single generous cap (~60 min)"
+    - "Conservative single (~25 min)"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2ecb935c6bb4a6f6
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q3 — How should the worker-lifetime cap be shaped so headless workers finish without the 600s mid-work kill? (The daemon will pass a per-spawn override; today's 600s default kills LO reviews and implementations mid-flight.)\"=\"Per-role, generous\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1458
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q4 — How should the interactive session watch the loop and report completion with zero interaction from you? (Full loop ~ Cursor GO + Claude implement + Cursor VERIFIED+commit, plausibly 1-3 hours wall-clock.)"
+  options:
+    - "Self-paced poll loop"
+    - "Notification hook + push"
+    - "Owner-prompted status check"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 709dbe0c78f491db
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q4 — How should the interactive session watch the loop and report completion with zero interaction from you? (Full loop ~ Cursor GO + Claude implement + Cursor VERIFIED+commit, plausibly 1-3 hours wall-clock.)\"=\"Self-paced poll loop\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1459
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q5 — How should the autonomous loop handle a deviation (LO NO-GO, an AUQ-required decision, or a stall) during the hands-off window?"
+  options:
+    - "GO-first-pass + surface exceptions"
+    - "Bounded auto-revise on NO-GO"
+    - "Halt on any deviation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b366ceab48f2be22
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q5 — How should the autonomous loop handle a deviation (LO NO-GO, an AUQ-required decision, or a stall) during the hands-off window?\"=\"GO-first-pass + surface exceptions\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1460
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q6 — What safety posture for the live test when I re-enable dispatch? (The storm that caused the halt was many unconditional spawns; the daemon now has dedup + health-hold + watchdog + reap.)"
+  options:
+    - "Tight (single-thread)"
+    - "Moderate"
+    - "Full go-live + generator"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: f8d1dbfd3d78779a
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q6 — What safety posture for the live test when I re-enable dispatch? (The storm that caused the halt was many unconditional spawns; the daemon now has dedup + health-hold + watchdog + reap.)\"=\"Tight (single-thread)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1461
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "Q7 — Cost/iteration tolerance for getting the live loop green? (Each live run ≈ 2 Cursor LO + 1 Claude PB headless sessions under the tight cap=1 posture; a first attempt may need diagnose-and-rerun.)"
+  options:
+    - "Bounded, iterate to green"
+    - "Single-shot then report"
+    - "Generous — iterate freely"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 17d70998d678a991
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"Q7 — Cost/iteration tolerance for getting the live loop green? (Each live run ≈ 2 Cursor LO + 1 Claude PB headless sessions under the tight cap=1 posture; a first attempt may need diagnose-and-rerun.)\"=\"Bounded, iterate to green\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1462
+  asked_at: 2026-06-26T23:11:44.555476Z
+  question: "X1 drain: the dispatcher pile-up is tangled — daemon.py/monitor.py are clean VERIFIED dispatcher work, but cli.py co-mingles dispatcher work with an unrelated --description-file tooling change, and rules.toml's only diff is the operational quiesce (which I'll overwrite in Phase Y). How should I drain it for a clean daemon base?"
+  options:
+    - "Clean-base only"
+    - "Full drain w/ hunk surgery"
+    - "Pause — you disposition the tangle"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 2dc6239dff2bfc53
+  resolved_at: 2026-06-26T23:11:44.555476Z
+  answer: "Your questions have been answered: \"X1 drain: the dispatcher pile-up is tangled — daemon.py/monitor.py are clean VERIFIED dispatcher work, but cli.py co-mingles dispatcher work with an unrelated --description-file tooling change, and rules.toml's only diff is the operational quiesce (which I'll overwrite in Phase Y). How should I drain it for a clean daemon base?\"=\"Clean-base only\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1463
+  asked_at: 2026-06-26T23:40:29.996729Z
+  question: "The WI-4855 go_implementation claim is blocked: a parallel ::init gtkb lo session overwrote the shared active-session-role.json, so my Prime Builder session resolves as loyal-opposition. How should I unblock it? (Marker is cache-only; the GO is valid.)"
+  options:
+    - "I correct marker + proceed"
+    - "You re-type ::init gtkb pb"
+    - "Pause — you sort sessions"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4e88ad83080005c0
+  resolved_at: 2026-06-26T23:40:29.996729Z
+  answer: "Your questions have been answered: \"The WI-4855 go_implementation claim is blocked: a parallel ::init gtkb lo session overwrote the shared active-session-role.json, so my Prime Builder session resolves as loyal-opposition. How should I unblock it? (Marker is cache-only; the GO is valid.)\"=\"You re-type ::init gtkb pb\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1464
+  asked_at: 2026-06-27T01:20:53.184944Z
+  question: "Broadened sweep done: reconcilers find 0 auto-resolvable (backlog is healthy; pipeline self-reconciles VERIFIED work). The only confirmed done-but-open items are WI-4651 + WI-4559 (already fixed in handoff.py:244, no thread linkage so must be resolved directly). WI-4304/4762 are stale-framing, not clean 'done'; the 39 link-hygiene gaps fall under existing WI-4832. How to proceed?"
+  options:
+    - "Resolve WI-4651 + WI-4559"
+    - "Resolve pair + close 4304 & 4762"
+    - "Hold cleanup; redirect me"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 56988b23e333ca61
+  resolved_at: 2026-06-27T01:20:53.184944Z
+  answer: "Your questions have been answered: \"Broadened sweep done: reconcilers find 0 auto-resolvable (backlog is healthy; pipeline self-reconciles VERIFIED work). The only confirmed done-but-open items are WI-4651 + WI-4559 (already fixed in handoff.py:244, no thread linkage so must be resolved directly). WI-4304/4762 are stale-framing, not clean 'done'; the 39 link-hygiene gaps fall under existing WI-4832. How to proceed?\"=\"Resolve WI-4651 + WI-4559\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1465
+  asked_at: 2026-06-27T01:43:02.374294Z
+  question: "The operating mode changed mid-session: bridge dispatch is now ENABLED (health PASS; harness B=claude and E=cursor are dispatchable and selected as prime-builder/loyal-opposition) — it was quiesced all session and I did NOT re-enable it. The pipeline is now autonomously implementing GO'd threads: my WI-4665 proposal auto-reached VERIFIED, and a dispatch worker is implementing WI-4667 right now (intake.py already modified, my claim got exit-2-held). So me manually implementing the GO'd threads you pasted would collide with the dispatcher. How should I operate now? (Note: if the dispatch re-enable was NOT intentional, that itself is worth flagging — I left it untouched.)"
+  options:
+    - "Stand down on impl; author proposals"
+    - "I implement; you re-quiesce dispatch"
+    - "Hold — dispatch enable looks unintended"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8b74633b320c10f6
+  resolved_at: 2026-06-27T01:43:02.374294Z
+  answer: "Your questions have been answered: \"The operating mode changed mid-session: bridge dispatch is now ENABLED (health PASS; harness B=claude and E=cursor are dispatchable and selected as prime-builder/loyal-opposition) — it was quiesced all session and I did NOT re-enable it. The pipeline is now autonomously implementing GO'd threads: my WI-4665 proposal auto-reached VERIFIED, and a dispatch worker is implementing WI-4667 right now (intake.py already modified, my claim got exit-2-held). So me manually implementing the GO'd threads you pasted would collide with the dispatcher. How should I operate now? (Note: if the dispatch re-enable was NOT intentional, that itself is worth flagging — I left it untouched.)\"=\"Hold — dispatch enable looks unintended\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1466
+  asked_at: 2026-06-27T01:43:02.374294Z
+  question: "Confirmed: the dispatch re-activation was a side effect of a GOVERNED bridge-substrate rollback (dispatcher_daemon -> cross_harness_trigger, change_reason 'owner rollback from dispatcher_daemon') applied by harness A (Codex) at 01:10:54Z, matching the rollback runbook. The runbook says dispatch should stay quiesced after rollback, but B+E were left can_receive_dispatch=true, so the cross-harness pipeline went live and is auto-implementing GO'd threads. It's governed, not rogue — but the live-dispatch consequence may not have been intended. How do you want to proceed? (I can't confirm from disk whether you directed Codex's rollback or it ran autonomously.)"
+  options:
+    - "Re-quiesce; restore manual mode"
+    - "Keep dispatch live; I stand down"
+    - "Hold; I'll sort the substrate myself"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8651aaa6cd4ea8ed
+  resolved_at: 2026-06-27T01:43:02.374294Z
+  answer: "Your questions have been answered: \"Confirmed: the dispatch re-activation was a side effect of a GOVERNED bridge-substrate rollback (dispatcher_daemon -> cross_harness_trigger, change_reason 'owner rollback from dispatcher_daemon') applied by harness A (Codex) at 01:10:54Z, matching the rollback runbook. The runbook says dispatch should stay quiesced after rollback, but B+E were left can_receive_dispatch=true, so the cross-harness pipeline went live and is auto-implementing GO'd threads. It's governed, not rogue — but the live-dispatch consequence may not have been intended. How do you want to proceed? (I can't confirm from disk whether you directed Codex's rollback or it ran autonomously.)\"=\"Hold; I'll sort the substrate myself\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1467
+  asked_at: 2026-06-27T01:49:56.089049Z
+  question: "Slice 1 is GO'd, but the go_implementation claim needed to implement it is blocked by WI-4868: my session resolves to role None (active-session-role.json marker absent), and the claim strictly requires prime-builder. How should I unblock it?"
+  options:
+    - "Authorize me to write the PB marker (Recommended)"
+    - "You set my session's role"
+    - "Hold implementation; fix WI-4868 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d925addbf737fdf7
+  resolved_at: 2026-06-27T01:49:56.089049Z
+  answer: "Your questions have been answered: \"Slice 1 is GO'd, but the go_implementation claim needed to implement it is blocked by WI-4868: my session resolves to role None (active-session-role.json marker absent), and the claim strictly requires prime-builder. How should I unblock it?\"=\"Authorize me to write the PB marker (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1468
+  asked_at: 2026-06-27T01:49:56.089049Z
+  question: "Approve these two foundation artifacts for insertion into MemBase (per GOV-ARTIFACT-APPROVAL-001)? They formalize the Q1-Q10 design; no enforcement code, no behavior change. The DCL's assertions will fail until later slices build the enforcement (expected for 'specified' status)."
+  options:
+    - "Approve both for insertion (Recommended)"
+    - "Approve with changes"
+    - "Reject / hold"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 4e43211c74a475a2
+  resolved_at: 2026-06-27T01:49:56.089049Z
+  answer: "Your questions have been answered: \"Approve these two foundation artifacts for insertion into MemBase (per GOV-ARTIFACT-APPROVAL-001)? They formalize the Q1-Q10 design; no enforcement code, no behavior change. The DCL's assertions will fail until later slices build the enforcement (expected for 'specified' status).\"=\"Approve both for insertion (Recommended)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1469
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "The B+E cross-harness pipeline is live and demonstrably working — WI-4665 and WI-4667 both auto-reached VERIFIED without me, and WI-4864/WI-4865 are still GO for it to pick up. You're sorting the dispatch/substrate posture yourself. Given that, what should I do now? (My manual implementation would collide with the pipeline, so that's off the table unless you re-quiesce.)"
+  options:
+    - "Resume authoring NEW proposals"
+    - "Pause until you settle dispatch"
+    - "Non-proposal governance/reconciliation"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 7ab31a09bcbcea95
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"The B+E cross-harness pipeline is live and demonstrably working — WI-4665 and WI-4667 both auto-reached VERIFIED without me, and WI-4864/WI-4865 are still GO for it to pick up. You're sorting the dispatch/substrate posture yourself. Given that, what should I do now? (My manual implementation would collide with the pipeline, so that's off the table unless you re-quiesce.)\"=\"Non-proposal governance/reconciliation\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1470
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "Audit finding: WI-4665 and WI-4667 are VERIFIED, but their implementation (intake.py, both changes) is uncommitted and the verdict files are untracked — no finalization commit landed (while daemon threads WI-4855/4845 WERE committed in 99aa43550). This violates the VERIFIED commit-finalization gate; the VERIFIED state isn't durable. It may be async finalization lag (WI-4667 verified moments ago) or a real gap in the Cursor-LO finalization path for these threads. Read-mostly so far — no mutations. How do you want me to handle it?"
+  options:
+    - "Capture as a tracking WI"
+    - "Keep digging — confirm lag vs gap"
+    - "Just flag it; I'll handle it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 5fab5cc4984a19fa
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"Audit finding: WI-4665 and WI-4667 are VERIFIED, but their implementation (intake.py, both changes) is uncommitted and the verdict files are untracked — no finalization commit landed (while daemon threads WI-4855/4845 WERE committed in 99aa43550). This violates the VERIFIED commit-finalization gate; the VERIFIED state isn't durable. It may be async finalization lag (WI-4667 verified moments ago) or a real gap in the Cursor-LO finalization path for these threads. Read-mostly so far — no mutations. How do you want me to handle it?\"=\"Keep digging — confirm lag vs gap\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1471
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "Confirmed: the live Cursor-LO pipeline marks threads VERIFIED but does NOT create the durable finalization commit — WI-4665 has been VERIFIED-but-uncommitted for 3h+, and there are 49 untracked bridge files (proposals/reviews/VERIFIED verdicts) plus uncommitted intake.py. Root pattern: Cursor (harness E) bypasses the Claude-side commit-finalization helper, so verdicts accumulate untracked until a manual git sweep (e.g., commit 99aa43550). This is a real durability/reliability gap in the substrate you're evaluating. How should I dispose of this confirmed finding?"
+  options:
+    - "Capture as a tracking WI (P2)"
+    - "Capture WI + flag durability risk now"
+    - "Just report; I'll handle it"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 907dde5c53d7380e
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"Confirmed: the live Cursor-LO pipeline marks threads VERIFIED but does NOT create the durable finalization commit — WI-4665 has been VERIFIED-but-uncommitted for 3h+, and there are 49 untracked bridge files (proposals/reviews/VERIFIED verdicts) plus uncommitted intake.py. Root pattern: Cursor (harness E) bypasses the Claude-side commit-finalization helper, so verdicts accumulate untracked until a manual git sweep (e.g., commit 99aa43550). This is a real durability/reliability gap in the substrate you're evaluating. How should I dispose of this confirmed finding?\"=\"Capture as a tracking WI (P2)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1472
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "WI-4871 is captured (the Cursor-LO finalization durability gap). You're sorting the substrate, and my read-only audit findings feed directly into that decision. What read-mostly work do you want next? (Still no bridge/source/git mutations from me.)"
+  options:
+    - "Broader pipeline-health audit"
+    - "WI-4869 link-corruption root-cause"
+    - "Pause — I'll direct you"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 6997b64b58e48275
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"WI-4871 is captured (the Cursor-LO finalization durability gap). You're sorting the substrate, and my read-only audit findings feed directly into that decision. What read-mostly work do you want next? (Still no bridge/source/git mutations from me.)\"=\"Broader pipeline-health audit\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1473
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "Pipeline-health audit gives a clear read: functional-but-unreliable — high dispatch failure rate (~dozens/hour, tracked headless-auth gap WI-4706/4708) + non-durable VERIFIED (finalization gap WI-4871). All findings are now tracked; nothing new to capture. What next? (Still read-only, no mutations.)"
+  options:
+    - "One more: implementation-quality spot-check"
+    - "Conclude the audit"
+    - "Pause — I'll direct you"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 35fd496bc846e072
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"Pipeline-health audit gives a clear read: functional-but-unreliable — high dispatch failure rate (~dozens/hour, tracked headless-auth gap WI-4706/4708) + non-durable VERIFIED (finalization gap WI-4871). All findings are now tracked; nothing new to capture. What next? (Still read-only, no mutations.)\"=\"One more: implementation-quality spot-check\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1474
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "The pipeline-health audit is complete across all three dimensions: output correctness GOOD (40 tests pass, design-matching), durability POOR (WI-4871), throughput POOR (WI-4706/4708). The decision-useful conclusion: AI work quality is sound; only the plumbing (worker auth + finalization commit) is broken, and both fixes are already tracked WIs. What next?"
+  options:
+    - "Conclude; I'll take the substrate decision"
+    - "Elevate WI-4708 + WI-4871 priority"
+    - "WI-4869 link-corruption root-cause"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 1cc29b02d86d8a53
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"The pipeline-health audit is complete across all three dimensions: output correctness GOOD (40 tests pass, design-matching), durability POOR (WI-4871), throughput POOR (WI-4706/4708). The decision-useful conclusion: AI work quality is sound; only the plumbing (worker auth + finalization commit) is broken, and both fixes are already tracked WIs. What next?\"=\"WI-4869 link-corruption root-cause\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1475
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "WI-4869 root cause found: it's NOT a bulk mis-assignment migration bug. The WI version history shows each wrong link was written at the WI's creation by the capture flow, recording the 'surfaced-during' context thread as provenance — which the reconciler then mis-reads as implementation-linkage. The reconciler's canonical-evidence guard already prevents wrong resolution, so impact was noise not false closures. WI-4869's description still says 'bulk mis-assignment.' How should I disposition this corrected root cause? (Backlog update is a MemBase write, not bridge/source/git.)"
+  options:
+    - "Update WI-4869 with the real root cause"
+    - "Just report; I'll update WI-4869"
+    - "Quantify the overload first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 8c85494b41a6ec9d
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"WI-4869 root cause found: it's NOT a bulk mis-assignment migration bug. The WI version history shows each wrong link was written at the WI's creation by the capture flow, recording the 'surfaced-during' context thread as provenance — which the reconciler then mis-reads as implementation-linkage. The reconciler's canonical-evidence guard already prevents wrong resolution, so impact was noise not false closures. WI-4869's description still says 'bulk mis-assignment.' How should I disposition this corrected root cause? (Backlog update is a MemBase write, not bridge/source/git.)\"=\"Update WI-4869 with the real root cause\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1476
+  asked_at: 2026-06-27T04:35:53.404612Z
+  question: "WI-4869 root cause is done and the durable record is corrected. I've delivered the substrate-relevant read-only findings (WI-4871 finalization gap, pipeline-health audit, WI-4869 provenance root cause). You're still settling the dispatch/substrate posture. Where do you want me?"
+  options:
+    - "Pause — await your substrate call"
+    - "Continue read-only governance"
+    - "Summarize the whole session"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e0d6a48fde6e18ea
+  resolved_at: 2026-06-27T04:35:53.404612Z
+  answer: "Your questions have been answered: \"WI-4869 root cause is done and the durable record is corrected. I've delivered the substrate-relevant read-only findings (WI-4871 finalization gap, pipeline-health audit, WI-4869 provenance root cause). You're still settling the dispatch/substrate posture. Where do you want me?\"=\"Summarize the whole session\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1478
+  asked_at: 2026-06-27T05:20:33.375679Z
+  question: "The X-chain (WI-4855–4857 + WI-4862) is DONE and committed; WI-4872 (headless-LO fix) is committed and awaiting Cursor VERIFIED. PHASE Y (the synthetic-loop acceptance test) is next, but it needs owner-gated activation (substrate flip to dispatcher_daemon + daemon start + an LO dispatch-posture choice). How should I spend the time while WI-4872 verifies?"
+  options:
+    - "Clear daemon residue WIs first"
+    - "Go straight to PHASE-Y activation"
+    - "Hold here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c89e7a75fd8b72c4
+  resolved_at: 2026-06-27T05:20:33.375679Z
+  answer: "Your questions have been answered: \"The X-chain (WI-4855–4857 + WI-4862) is DONE and committed; WI-4872 (headless-LO fix) is committed and awaiting Cursor VERIFIED. PHASE Y (the synthetic-loop acceptance test) is next, but it needs owner-gated activation (substrate flip to dispatcher_daemon + daemon start + an LO dispatch-posture choice). How should I spend the time while WI-4872 verifies?\"=\"Clear daemon residue WIs first\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1477
+  asked_at: 2026-06-27T05:04:37.547614Z
+  question: "Want me to proceed toward it, or hold here?"
+  detected_via: prose:offering_or_choice
+  status: resolved
+  question_hash: 2438e5a865d4ab8e
+  resolved_at: 2026-06-27T06:11:46.434830Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1479
+  asked_at: 2026-06-27T05:56:03.306572Z
+  question: "owner decision**: DECISION-1477 (\"Want me to proceed toward it, or hold here?"
+  detected_via: prose:your_decision_q
+  status: resolved
+  question_hash: 505b122f0fdd7299
+  resolved_at: 2026-06-27T06:11:46.434848Z
+  answer: "owner cleared without specific answer"
+  notes: "auto-detected prose anti-pattern; review and convert to AskUserQuestion if applicable"
+- id: DECISION-1480
+  asked_at: 2026-06-27T07:14:47.227108Z
+  question: "PHASE-Y daemon go-live is DONE — the synthetic probe was driven through the LIVE dispatcher_daemon loop end-to-end (001 NEW→002 GO→headless-B impl+003 report→004 VERIFIED), autonomously committed as dd5b33737, zero owner interaction. The daemon is still live at the tight first-live posture (B+E dispatchable, per-role cap=1, kill-switch armed) and will keep dispatching the real backlog. What standing posture do you want now?"
+  options:
+    - "Keep live, cap=1"
+    - "Keep live, relax caps"
+    - "Stand down daemon"
+    - "Pause & review first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 67127e457c9b4481
+  resolved_at: 2026-06-27T07:14:47.227108Z
+  answer: "Your questions have been answered: \"PHASE-Y daemon go-live is DONE — the synthetic probe was driven through the LIVE dispatcher_daemon loop end-to-end (001 NEW→002 GO→headless-B impl+003 report→004 VERIFIED), autonomously committed as dd5b33737, zero owner interaction. The daemon is still live at the tight first-live posture (B+E dispatchable, per-role cap=1, kill-switch armed) and will keep dispatching the real backlog. What standing posture do you want now?\"=\"Keep live, relax caps\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1481
+  asked_at: 2026-06-27T07:27:56.454971Z
+  question: "Both (a) and (b) are done. But the live daemon created two new conditions: WI-4880 is GO'd awaiting implementation, and a new untracked VERIFIED verdict appeared (the daemon keeps producing verdicts Cursor-E can't commit, with PB-dispatch FAIL). How should I proceed?"
+  options:
+    - "Implement WI-4880 + sweep verdicts"
+    - "Sweep untracked verdicts only"
+    - "Fix the systemic treadmill"
+    - "Stop here / I'll direct"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: a42db7949b6a6519
+  resolved_at: 2026-06-27T07:27:56.454971Z
+  answer: "Your questions have been answered: \"Both (a) and (b) are done. But the live daemon created two new conditions: WI-4880 is GO'd awaiting implementation, and a new untracked VERIFIED verdict appeared (the daemon keeps producing verdicts Cursor-E can't commit, with PB-dispatch FAIL). How should I proceed?\"=\"Implement WI-4880 + sweep verdicts\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1483
+  asked_at: 2026-06-27T07:33:21.074259Z
+  question: "Q1 of ~6 — LOAD TARGET. \"Maximum reasonable load\" needs a concrete ceiling, because it's the scale the resilience + caps + tests are sized against. With 2 PB (B,E) and 4 LO (A,C,D,F), the binding lever is per-role worker concurrency. What peak concurrency should the daemon be built and tested to sustain?"
+  options:
+    - "Fleet-saturation: 1 worker/harness"
+    - "Oversubscribe: N workers/harness"
+    - "Conservative: cap=2/role"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: e478921c80a259b1
+  resolved_at: 2026-06-27T07:33:21.074259Z
+  answer: "Your questions have been answered: \"Q1 of ~6 — LOAD TARGET. \"Maximum reasonable load\" needs a concrete ceiling, because it's the scale the resilience + caps + tests are sized against. With 2 PB (B,E) and 4 LO (A,C,D,F), the binding lever is per-role worker concurrency. What peak concurrency should the daemon be built and tested to sustain?\"=\"Fleet-saturation: 1 worker/harness\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1484
+  asked_at: 2026-06-27T07:33:21.074259Z
+  question: "Q2 of ~6 — SELF-HEALING POSTURE. You said 'fully resilient and self-healing.' The failure modes are: daemon death, worker hang, worker crash, storm (runaway spawns), corrupt state file, harness saturation, provider outage. The genuine tradeoff is whether EVERY mode auto-acts, or whether data-risk modes pause for you. Which posture?"
+  options:
+    - "Full auto-recovery, all modes"
+    - "Auto-recover, but escalate data-risk modes"
+    - "Bring me a per-mode SLA table"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 547fff4577705a94
+  resolved_at: 2026-06-27T07:33:21.074259Z
+  answer: "Your questions have been answered: \"Q2 of ~6 — SELF-HEALING POSTURE. You said 'fully resilient and self-healing.' The failure modes are: daemon death, worker hang, worker crash, storm (runaway spawns), corrupt state file, harness saturation, provider outage. The genuine tradeoff is whether EVERY mode auto-acts, or whether data-risk modes pause for you. Which posture?\"=\"Full auto-recovery, all modes\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1485
+  asked_at: 2026-06-27T07:33:21.074259Z
+  question: "Q3 of ~6 — SUPERVISION MECHANISM. The daemon can't restart its own death (it's dead), so something external must. The daemon already has single-instance locking, so a periodic 'ensure alive' call is idempotent (no-ops if running, restarts if dead). Which supervisor?"
+  options:
+    - "Dedicated scheduled task"
+    - "Extend the storm-watchdog"
+    - "Dedicated supervisor process"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: d82d6b122f2cfd46
+  resolved_at: 2026-06-27T07:33:21.074259Z
+  answer: "Your questions have been answered: \"Q3 of ~6 — SUPERVISION MECHANISM. The daemon can't restart its own death (it's dead), so something external must. The daemon already has single-instance locking, so a periodic 'ensure alive' call is idempotent (no-ops if running, restarts if dead). Which supervisor?\"=\"Dedicated scheduled task\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1486
+  asked_at: 2026-06-27T07:33:21.074259Z
+  question: "Q4 of ~6 — ESCALATION POLICY. When auto-recovery exhausts its retries for a component (daemon won't stay up after N restarts, or a harness keeps failing post-circuit-break), what's the terminal behavior? This defines the boundary between 'self-healing' and 'needs a human.'"
+  options:
+    - "Alert + keep fleet degraded"
+    - "Halt component silently, log only"
+    - "Fail-safe stop whole daemon"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b85c08e0798c16bc
+  resolved_at: 2026-06-27T07:33:21.074259Z
+  answer: "Your questions have been answered: \"Q4 of ~6 — ESCALATION POLICY. When auto-recovery exhausts its retries for a component (daemon won't stay up after N restarts, or a harness keeps failing post-circuit-break), what's the terminal behavior? This defines the boundary between 'self-healing' and 'needs a human.'\"=\"Alert + keep fleet degraded\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1487
+  asked_at: 2026-06-27T07:33:21.074259Z
+  question: "Q5 of ~6 — TEST COST CEILING. Load + chaos testing at fleet-saturation against REAL cloud harnesses (OpenRouter/Ollama/Cursor) is expensive and non-deterministic — and you can't make a real harness hang/crash/emit-corrupt-output on command, which fault-injection requires. How should we bound test cost while still proving real harnesses work?"
+  options:
+    - "Mock harnesses for load+chaos; real smoke only"
+    - "Real harnesses throughout, capped budget"
+    - "Hybrid: mock load, real chaos sample"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: b35f1822185fa039
+  resolved_at: 2026-06-27T07:33:21.074259Z
+  answer: "Your questions have been answered: \"Q5 of ~6 — TEST COST CEILING. Load + chaos testing at fleet-saturation against REAL cloud harnesses (OpenRouter/Ollama/Cursor) is expensive and non-deterministic — and you can't make a real harness hang/crash/emit-corrupt-output on command, which fault-injection requires. How should we bound test cost while still proving real harnesses work?\"=\"Mock harnesses for load+chaos; real smoke only\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1488
+  asked_at: 2026-06-27T07:33:21.074259Z
+  question: "Q6 of ~6 — PB ROUTING. With two Prime Builders (B Claude, E Cursor), when a thread is GO'd and needs implementation, how should the daemon choose which PB gets it? (Headless workers are stateless — they re-read the thread from disk — so cross-thread 'context' isn't preserved between them.)"
+  options:
+    - "Either PB, by dispatcher ranking"
+    - "Capability/cost-based routing"
+    - "Affinity/sticky routing"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 60c495b8beff3a9a
+  resolved_at: 2026-06-27T07:33:21.074259Z
+  answer: "Your questions have been answered: \"Q6 of ~6 — PB ROUTING. With two Prime Builders (B Claude, E Cursor), when a thread is GO'd and needs implementation, how should the daemon choose which PB gets it? (Headless workers are stateless — they re-read the thread from disk — so cross-thread 'context' isn't preserved between them.)\"=\"Either PB, by dispatcher ranking\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1490
+  asked_at: 2026-06-27T15:44:16.370260Z
+  question: "The daemon-stop investigation is complete (daemon running; flap auto-recovered by WI-4882; storm watchdog exonerated; two defects captured as WI-4893 + WI-4894). What should I do next?"
+  options:
+    - "Trace the hard-killer (WI-4893)"
+    - "Fix the reaper (WI-4894)"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 220c7c5c222f17db
+  resolved_at: 2026-06-27T15:44:16.370260Z
+  answer: "Your questions have been answered: \"The daemon-stop investigation is complete (daemon running; flap auto-recovered by WI-4882; storm watchdog exonerated; two defects captured as WI-4893 + WI-4894). What should I do next?\"=\"Trace the hard-killer (WI-4893)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1491
+  asked_at: 2026-06-27T15:44:16.370260Z
+  question: "The daemon hard-killer is attributed at code level (pid-reuse in the trigger's reaper, missing the WI-4834 provenance guard); a live trace is running to event-confirm on the next ~10-min flap. How should I proceed?"
+  options:
+    - "Wait + read the trace"
+    - "Propose the fix now"
+    - "Stop here"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 54e508471be6152c
+  resolved_at: 2026-06-27T15:44:16.370260Z
+  answer: "Your questions have been answered: \"The daemon hard-killer is attributed at code level (pid-reuse in the trigger's reaper, missing the WI-4834 provenance guard); a live trace is running to event-confirm on the next ~10-min flap. How should I proceed?\"=\"Wait + read the trace\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1492
+  asked_at: 2026-06-27T15:46:58.628852Z
+  question: "Slice 6 (final) has a small mechanical part (CI/release hard gate) and a large part (doctor WARN->FAIL, which first requires auditing/resolving-or-waiving the 26 remaining discovery-diff asymmetries). How should I scope it?"
+  options:
+    - "CI gate now, audit as sub-slices"
+    - "Full Slice 6 (audit all 26 + flip)"
+    - "Pause — review the 26 first"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: bd4bb7fe68b72714
+  resolved_at: 2026-06-27T15:46:58.628852Z
+  answer: "Your questions have been answered: \"Slice 6 (final) has a small mechanical part (CI/release hard gate) and a large part (doctor WARN->FAIL, which first requires auditing/resolving-or-waiving the 26 remaining discovery-diff asymmetries). How should I scope it?\"=\"Full Slice 6 (audit all 26 + flip)\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1493
+  asked_at: 2026-06-27T15:46:58.628852Z
+  question: "For Group C (the ~13 Claude-only governance hooks), how should Slice 6 dispose of them so the doctor can flip WARN->FAIL?"
+  options:
+    - "Batch-waive all as harness-difference"
+    - "Waive most, flag conform-candidates"
+    - "Per-hook review with me"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: 625a4c1fc27a40d8
+  resolved_at: 2026-06-27T15:46:58.628852Z
+  answer: "Your questions have been answered: \"For Group C (the ~13 Claude-only governance hooks), how should Slice 6 dispose of them so the doctor can flip WARN->FAIL?\"=\"Batch-waive all as harness-difference\". You can now continue with these answers in mind."
+  notes: ""
+- id: DECISION-1494
+  asked_at: 2026-06-27T17:25:09.271526Z
+  question: "The final Slice-6 commit (VERIFIED, done) is blocked by an inventory-drift release-blocker caused by a harness role-topology change made outside the parity work: claude(B) + codex(A) flipped to loyal-opposition and cursor(E) is now the sole prime-builder. How should I clear it to finalize the program?"
+  options:
+    - "Refresh inventory + commit (roles are intended)"
+    - "Investigate the role change first"
+    - "Bypass drift gate for parity commit only"
+  detected_via: ask_user_question
+  status: resolved
+  question_hash: c30a3752682a0b71
+  resolved_at: 2026-06-27T17:25:09.271526Z
+  answer: "Your questions have been answered: \"The final Slice-6 commit (VERIFIED, done) is blocked by an inventory-drift release-blocker caused by a harness role-topology change made outside the parity work: claude(B) + codex(A) flipped to loyal-opposition and cursor(E) is now the sole prime-builder. How should I clear it to finalize the program?\"=\"Refresh inventory + commit (roles are intended)\". You can now continue with these answers in mind."
+  notes: ""
 
 ## History
 
+- id: DECISION-WI4481-PROJECT-LINKAGE
+  asked_at: 2026-06-13T09:52:00Z
+  question: "WI-4481 (P1 bridge-integrity defect, INDEX atomic-write guard) is implemented + verified green and was GO'd (bridge/gtkb-bridge-index-atomic-write-guard-002.md), but the post-implementation report cannot be filed: WI-4481 is a standalone work item (project_name=None) and is in no active PAUTH's included_work_item_ids list. The bridge-compliance-gate hard-blocks the NEW/REVISED implementation_report via DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001 (missing Project Authorization: / Project: lines) and the live membership check (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001). Owner decision needed: admit WI-4481 to a project (candidate: PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY) and add it to that project's PAUTH included_work_item_ids via AUQ (precedent: PAUTH v4 'add WI-3380' = DELIB-S-LOOP-2026-06-04-WI3380-PAUTH-INCLUSION-AUQ). A dispatched worker cannot run AUQ or amend a PAUTH, so this blocks report-filing → VERIFIED → WI close."
+  detected_via: prime_dispatched_worker_blocker
+  status: resolved
+  resolved_at: 2026-06-14
+  resolved_in_session: 2026-06-13T09-48-16Z-prime-builder-B-9cea65 (dispatched)
+  answer: "OVERTAKEN BY EVENTS — confirmed against live state by interactive PB session 7752bc97 at 2026-06-14T00:19Z. WI-4481 is now a member of PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY (stage=resolved); bridge thread gtkb-bridge-index-atomic-write-guard reached VERIFIED (-004) after implementation report -003 was filed. Because report -003 could not be written without passing DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001, WI-4481 was project-homed AND PAUTH-included by the swarm. The project-linkage blocker is fully cleared; no owner AUQ required. (The verbose notes below describe the historical blocker that is now resolved.)"
+  notes: "Implementation artifacts are complete and uncommitted on disk: .claude/hooks/bridge-index-write-serializer.py (+181), platform_tests/hooks/test_bridge_index_write_serializer.py (+164, 16/16 pass), .claude/settings.json (+5 registration on Write|Edit|MultiEdit|Bash), .codex/hooks.json (+28 Bash + apply_patch registrations). Verification green this session: guard 16/16, serialized-writer regression 12/12 (incl. T4 20-thread no-lost-update), ruff check + format clean, both config files valid JSON. Once WI-4481 is project-homed + PAUTH-included, file bridge/gtkb-bridge-index-atomic-write-guard-003.md (implementation_report, NEW) with the carried-forward spec links + spec-to-test mapping already drafted this session. CORROBORATION (2026-06-13T10:01Z, dispatched session 2026-06-13T09-58-18Z-prime-builder-B-20606e): a SECOND dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16, writer 12/12 incl. T4, ruff clean, JSON valid). Both PAUTH-BATCH variants use explicit included_work_item_ids allowlists omitting WI-4481 (membership gate -> wi-not-included-by-authorization); no durable S437/WI-4481 DELIB exists. RECURRING DISPATCH DEAD-END: the cross-harness trigger will keep re-dispatching this latest-GO entry to fresh Prime workers on every fire (burning ~30-50K tokens each) until an owner-present session captures the S437 decision as a DELIB, admits WI-4481 to PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY, and amends a PAUTH to include it. Substrate-hygiene candidate: park/defer this GO entry to stop the re-dispatch loop pending the owner authorization. CORROBORATION-2 (2026-06-13T11:05Z, dispatched session 2026-06-13T11-03-34Z-prime-builder-B-b1274b): a THIRD dispatched Prime worker independently hit the identical blocker and re-confirmed all verification green (guard 16/16 in 0.22s, serialized-writer 12/12 incl. T4, ruff check + format clean, gt bridge index CLI present with add-document/set-status). Confirmed PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY is the natural home (already contains sibling WI-3513 'Serialize agent-tool INDEX.md edits' resolved). Deliberation search returned no S437/WI-4481 owner-decision DELIB (only DELIB-20263131, an unrelated advisory thread). Three dispatched workers now blocked at this identical gate (~estimated 90-130K cumulative tokens). The re-dispatch loop will continue until an owner-present session (a) captures the S437 'Proceed' decision as a DELIB, (b) runs `gt projects add-item PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY WI-4481`, and (c) amends a PAUTH (or mints PAUTH-WI-4481-INDEX-ATOMIC-WRITE-GUARD) to include WI-4481, then re-dispatches so a worker can file -003. STRONG RECOMMENDATION: owner should DEFER this GO entry now to halt the loop until the authorization lands."
 - id: DECISION-1138
   asked_at: 2026-06-11T05:37:03.658969Z
   question: "Want me to also write it into the notepad as the current canonical handoff block so it survives without the paste, or..."
@@ -9005,36 +9483,6 @@ This file is owned by .claude/hooks/owner-decision-tracker.py.
   resolved_in_session: 2026-06-03 triage-monitor session (post-S386 loop)
   answer: "Pull context now (owner AUQ 2026-06-03). Triage-monitor session pulled DECISION-0925/-0931/-0936 context and surfaced structured AUQ for resolution."
   notes: "Self-resolving: this decision was itself the AUQ that asked how to handle the older pending entries. Owner selected 'Pull context now'; this sweep is the result. Question text blanked per recursive-re-trigger feedback memory."
-- id: DECISION-0735
-  asked_at: 2026-05-28T15:12:47.777397Z
-  question: ""
-  detected_via: prose:should_i_or
-  status: resolved
-  question_hash: 7a15ab919d512d2b
-  resolved_at: 2026-05-28T15:41:47.686180Z
-  resolved_in_session: S365
-  answer: "Drafted both S364 supersession scoping bridges (WI-3425 gtkb-startup-cache-dcl-supersession-scoping-001; WI-3426 gtkb-gov-08-permitted-markdown-amendment-scoping-001). Both preflights pass (applicability + clause exit 0). Awaiting Codex review. Hygiene seed batch authoring complete."
-  notes: "Resolved at S365 startup per owner session-continuation directive. Tracker false-positive: original prose was Prime self-narration during S364 hygiene-program scoping; owner subsequently authorized the supersession drafts during the same S364 session and both NEW bridges were filed. Codex has since landed NO-GO at -002 on both threads (small REVISED-2 ask: add DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001 advisory citation; -gov-08 thread also needs memory/MEMORY.md path reconciliation per AGENTS.md harness-memory profile). Resolution stands independently of NO-GO state. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0700
-  asked_at: 2026-05-27T08:38:00.946402Z
-  question: ""
-  detected_via: prose:offering_or_choice
-  status: resolved
-  question_hash: 901459aab613d3ff
-  resolved_at: 2026-05-27T14:18:00.000000Z
-  resolved_in_session: S364
-  answer: "File small bridge proposal for the regenerated dev-environment inventory files (owner AskUserQuestion, 2026-05-27). Owner selected bridge-route over direct chore commit; proposal to be filed scoped to .groundtruth/inventory/dev-environment-inventory.json and .groundtruth/inventory/dev-environment-inventory.md with explicit-pathspec commit to avoid sweeping in unrelated parallel-session modifications."
-  notes: "Tracker false-positive transport: original prose at 08:38Z (prior session) offered two paths for the regenerated inventory commit; owner deferred. Resolved this session via formal AskUserQuestion. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md."
-- id: DECISION-0709
-  asked_at: 2026-05-27T09:17:50.897028Z
-  question: ""
-  detected_via: prose:your_decision_q
-  status: resolved
-  question_hash: 4197b0ed0df5dfa5
-  resolved_at: 2026-05-27T14:15:00.000000Z
-  resolved_in_session: S364
-  answer: "Dismiss as unrecoverable false-positive prose flag (owner AskUserQuestion, 2026-05-27). The short prose pattern fired the detector with no recoverable referent; no real owner decision was missed."
-  notes: "Tracker false-positive: short prose pattern in this session's startup window with no recoverable referent. Question text blanked to prevent recursive re-trigger per memory/feedback_avoid_quoting_decision_tracker_fragments.md (same root cause as DECISION-0624: detector re-fires when Pending Owner Decisions surface relays question text back into LLM context). Underlying detector fix tracked by bridge thread gtkb-owner-decision-tracker-startup-relay-known-match-suppression."
 - id: DECISION-0596
   asked_at: 2026-05-15T06:01:05.897121Z
   question: "Want me to fold those into a follow-up commit, or leave them for the next checkpoint? (Stale prose-ask from a prior 2026-05-15 early session. Referent of 'those' not recoverable from the record or session context. Resolved per owner AUQ 2026-05-15 S353: 'Dismiss as unrecoverable' — cleared with no action.)"

@@ -13,6 +13,7 @@ Verifies closure-preserving Option B per Codex F1+F2 findings:
 
 from __future__ import annotations
 
+import glob
 import re
 import subprocess
 import sys
@@ -21,7 +22,6 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INDEX_PATH = PROJECT_ROOT / "bridge" / "INDEX.md"
 DELIB_ID = "DELIB-S333-ISOLATION-017-CITATION-BACKFILL-AUDIT"
 
 AFFECTED_THREADS = (
@@ -37,41 +37,8 @@ AFFECTED_THREADS = (
 
 @pytest.fixture(autouse=True, scope="module")
 def mock_index_entries_for_grandfathered_threads():
-    """Temporarily restore index entries for grandfathered threads so preflight/status tests can query them."""
-    original_text = INDEX_PATH.read_text(encoding="utf-8")
-
-    if "gtkb-isolation-017-slice4-upgrade-2026-05-02" in original_text:
-        yield
-        return
-
-    extra_entries = """
-
-Document: gtkb-isolation-017-slice4-upgrade-2026-05-02
-VERIFIED: bridge/gtkb-isolation-017-slice4-upgrade-2026-05-02-012.md
-
-Document: gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03
-VERIFIED: bridge/gtkb-isolation-017-slice5-clean-adopter-tests-2026-05-03-006.md
-
-Document: gtkb-isolation-017-slice6-docs-2026-05-03
-VERIFIED: bridge/gtkb-isolation-017-slice6-docs-2026-05-03-004.md
-
-Document: gtkb-isolation-017-slice7-examples-2026-05-03
-VERIFIED: bridge/gtkb-isolation-017-slice7-examples-2026-05-03-004.md
-
-Document: gtkb-isolation-017-slice8-release-ops-2026-05-03
-VERIFIED: bridge/gtkb-isolation-017-slice8-release-ops-2026-05-03-012.md
-
-Document: gtkb-bridge-propose-helper-caller-migration-2026-05-02
-VERIFIED: bridge/gtkb-bridge-propose-helper-caller-migration-2026-05-02-008.md
-
-Document: gtkb-bridge-propose-helper-index-parity-2026-05-02
-VERIFIED: bridge/gtkb-bridge-propose-helper-index-parity-2026-05-02-008.md
-"""
-    INDEX_PATH.write_text(original_text + extra_entries, encoding="utf-8")
-    try:
-        yield
-    finally:
-        INDEX_PATH.write_text(original_text, encoding="utf-8")
+    """No-op fixture since bridge/INDEX.md is retired in the no-index era."""
+    yield
 
 
 @pytest.fixture(scope="module")
@@ -124,31 +91,17 @@ def test_delib_documents_grandfathered_distinction(db) -> None:
 
 
 def _latest_status_for_thread(thread_id: str) -> str | None:
-    """Parse INDEX.md for the latest status entry of a given Document thread.
-
-    Latest = first status line after the `Document: <thread_id>` header
-    (per file-bridge-protocol newest-first convention).
-    """
-    text = INDEX_PATH.read_text(encoding="utf-8")
-    block_re = re.compile(
-        rf"^Document:\s+{re.escape(thread_id)}\s*$",
-        re.MULTILINE,
-    )
-    match = block_re.search(text)
-    if not match:
+    """Find the latest version file for thread_id under bridge/ and return its status (the first line)."""
+    files = glob.glob(str(PROJECT_ROOT / "bridge" / f"{thread_id}-*.md"))
+    if not files:
         return None
-    after = text[match.end() :].lstrip("\n")
-    # First non-blank, non-comment line after the Document header
-    for line in after.splitlines():
-        line = line.strip()
-        if not line or line.startswith("<!--"):
-            continue
-        if line.startswith("Document:"):
-            break
-        # Status line is "STATUS: bridge/<file>"
-        if ":" in line:
-            return line.split(":", 1)[0].strip()
-    return None
+    latest_file = max(files, key=lambda f: int(re.search(r"-(\d{3})\.md$", f).group(1)))
+    try:
+        with open(latest_file, encoding="utf-8", errors="ignore") as f:
+            first_line = f.readline().strip()
+            return first_line
+    except Exception:
+        return None
 
 
 @pytest.mark.parametrize("thread_id", AFFECTED_THREADS)

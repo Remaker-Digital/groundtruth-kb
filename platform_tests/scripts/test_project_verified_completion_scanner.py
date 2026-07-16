@@ -133,6 +133,7 @@ def _add_completion_guard(
     project_root: Path,
     *,
     artifact_type: str = "completion_guard",
+    artifact_ref: str = "plan-incomplete-fixture",
     status: str = "active",
     link_id: str = "PAL-PLAN-INCOMPLETE",
 ) -> None:
@@ -141,7 +142,7 @@ def _add_completion_guard(
         db.add_project_artifact_link(
             "PROJECT-X",
             artifact_type,
-            "plan-incomplete-fixture",
+            artifact_ref,
             "test",
             "seed plan_incomplete guard",
             relationship="plan_incomplete",
@@ -162,10 +163,26 @@ def test_scanner_marks_all_verified_authorization_completion_ready(scanner, tmp_
     assert ready[0].unverified_work_item_ids == []
 
 
-@pytest.mark.parametrize("artifact_type", ["completion_guard", "bridge_thread"])
-def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, artifact_type):
+def test_scanner_plan_incomplete_completion_guard_does_not_suppress_completion(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
-    _add_completion_guard(tmp_path, artifact_type=artifact_type)
+    _add_completion_guard(tmp_path, artifact_type="completion_guard")
+
+    ready = scanner.completion_ready(tmp_path)
+    assert [r.authorization_id for r in ready] == ["PAUTH-X"]
+    full = scanner.scan(tmp_path)
+    auth = next(r for r in full if r.authorization_id == "PAUTH-X")
+    assert auth.completion_ready is True
+    assert auth.completion_guarded is True
+    assert auth.unverified_work_item_ids == []
+    assert auth.completion_guard_refs[0]["artifact_type"] == "completion_guard"
+    assert auth.completion_guard_refs[0]["relationship"] == "plan_incomplete"
+    assert auth.as_dict()["completion_guarded"] is True
+    assert auth.as_dict()["completion_guard_refs"] == auth.completion_guard_refs
+
+
+def test_scanner_plan_incomplete_bridge_thread_guard_suppresses_completion(scanner, tmp_path):
+    _seed(tmp_path, wi_statuses={"WI-8001": True, "WI-8002": True})
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread")
 
     assert scanner.completion_ready(tmp_path) == []
     full = scanner.scan(tmp_path)
@@ -173,7 +190,7 @@ def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, 
     assert auth.completion_ready is False
     assert auth.completion_guarded is True
     assert auth.unverified_work_item_ids == []
-    assert auth.completion_guard_refs[0]["artifact_type"] == artifact_type
+    assert auth.completion_guard_refs[0]["artifact_type"] == "bridge_thread"
     assert auth.completion_guard_refs[0]["relationship"] == "plan_incomplete"
     assert auth.as_dict()["completion_guarded"] is True
     assert auth.as_dict()["completion_guard_refs"] == auth.completion_guard_refs
@@ -181,8 +198,8 @@ def test_scanner_plan_incomplete_guard_suppresses_completion(scanner, tmp_path, 
 
 def test_inactive_plan_incomplete_guard_does_not_suppress_completion(scanner, tmp_path):
     _seed(tmp_path, wi_statuses={"WI-8001": True})
-    _add_completion_guard(tmp_path, status="active")
-    _add_completion_guard(tmp_path, status="inactive")
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread", status="active")
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread", status="inactive")
 
     ready = scanner.completion_ready(tmp_path)
     assert [r.authorization_id for r in ready] == ["PAUTH-X"]

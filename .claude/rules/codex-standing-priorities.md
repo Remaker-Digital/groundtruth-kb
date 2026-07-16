@@ -2,6 +2,11 @@
 
 Purpose: persistent priority directives loaded at session initialization.
 
+> **Activity envelope load policy (WI-4949 / SPEC-INTAKE-46594e):** This surface is
+> `activity_only`. Load after `::open project` (or when project/deliberation context
+> is active), not at base session startup. Authority:
+> `config/agent-control/activity-envelope-sharding.toml` § `migration.wi4949`.
+
 > **2026-06-15 bridge cutover note:** After WI-4510 Phase-3, TAFE-backed bridge
 > state and status-bearing numbered bridge files are canonical.
 

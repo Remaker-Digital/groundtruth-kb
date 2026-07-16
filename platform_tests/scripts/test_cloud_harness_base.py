@@ -1143,6 +1143,12 @@ def test_profile_rejects_non_boolean_anthropic_publisher_tool_choice(value: obje
         _profile(force_anthropic_publisher_tool_choice=value)
 
 
+@pytest.mark.parametrize("value", [0, 1, "false", None])
+def test_profile_rejects_non_boolean_anthropic_recovery_thinking_capability(value: object) -> None:
+    with pytest.raises(base.CloudHarnessError, match="disable_anthropic_publisher_recovery_thinking must be a bool"):
+        _profile(disable_anthropic_publisher_recovery_thinking=value)
+
+
 def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1163,10 +1169,12 @@ def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
         payloads.append(payload)
         if len(payloads) == 1:
             assert "tool_choice" not in payload
+            assert "thinking" not in payload
             return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
         if len(payloads) == 2:
             assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
             assert payload["tool_choice"] == {"type": "any"}
+            assert "thinking" not in payload
             return {
                 "model": route.model_id,
                 "content": [
@@ -1179,6 +1187,7 @@ def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
                 ],
             }
         assert "tool_choice" not in payload
+        assert "thinking" not in payload
         return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
 
     assert (
@@ -1190,6 +1199,63 @@ def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
             3,
             root,
             _anthropic_profile(),
+            skill="bridge-review",
+            chat_func=chat,
+        )
+        == "published"
+    )
+
+
+def test_anthropic_publisher_recovery_can_disable_thinking_without_changing_ordinary_payloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-anthropic-nonthinking")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            assert "thinking" not in payload
+            assert "tool_choice" not in payload
+            return {"model": route.model_id, "content": [{"type": "text", "text": "ready but unpublished"}]}
+        if len(payloads) == 2:
+            assert [tool["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            assert payload["thinking"] == {"type": "disabled"}
+            assert payload["tool_choice"] == {"type": "any"}
+            return {
+                "model": route.model_id,
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "publish_nonthinking",
+                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                        "input": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                    }
+                ],
+            }
+        assert "thinking" not in payload
+        assert "tool_choice" not in payload
+        return {"model": route.model_id, "content": [{"type": "text", "text": "published"}]}
+
+    assert (
+        base.run_tool_loop(
+            "review",
+            route,
+            "https://test.cloud/api/v1",
+            "key",
+            3,
+            root,
+            _anthropic_profile(disable_anthropic_publisher_recovery_thinking=True),
             skill="bridge-review",
             chat_func=chat,
         )

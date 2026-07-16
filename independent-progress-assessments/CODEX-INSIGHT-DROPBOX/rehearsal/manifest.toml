@@ -47,11 +47,9 @@ db_reconciliation_strategy = "manifest_driven_filter"
 # Slice 8 Constraint 4 (silent default to adopter is rejected).
 unclassified_disposition = "leave_behind_with_warning"
 
-# Authority matrix path corrected per Codex
-# bridge/gtkb-isolation-016-phase8-wave2-implementation-002.md NO-GO:
-# the file lives under the PHASE1-AUTHORITY-MATRIX-PLAN naming with
-# the 2026-04-22 date suffix.
-phase_1_authority_matrix_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/GTKB-ISOLATION-001-PHASE1-AUTHORITY-MATRIX-PLAN-2026-04-22.md"
+# The Phase 1 planning matrix is retired. The live Agent Red app-root registry
+# is the current root-bound authority consumed by isolation validation.
+phase_1_authority_matrix_path = "applications/Agent_Red/.gtkb-app-isolation.json"
 
 excluded_paths = [
     ".env",

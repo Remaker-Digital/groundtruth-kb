@@ -38,8 +38,10 @@ Read:
 3. Inventory declared surfaces per harness; do not assume cross-harness file reuse
    implies invocation (API/provider harnesses must not PASS on Claude/Codex hook paths
    they do not wire).
-4. Compare role-required capabilities. With `--role`, the checker scopes to harnesses
-   whose registry role set includes that role unless `--harness` or `include_all` overrides.
+4. Compare phase-1 catalog parity with applicability-aware populations:
+   role-relative capabilities are checked against active harnesses assigned the
+   requested role; universal capabilities are checked against the active selected
+   population because they are not proof of one role alone.
 5. Classify each capability:
    - `PASS`: equivalent capability is available natively or adapter hash matches
    - `DEGRADED`: documented fallback exists but is not native
@@ -50,7 +52,10 @@ Read:
    - `OWNER_ACTION_REQUIRED`: install, auth, external setup, or deliberate-deferral waiver
 6. Correct safe drift by updating registry entries, pointers, adapters, or reports.
 7. Escalate owner action only for required installs/auth/setup.
-8. Verify with phase-1 and (when appropriate) phase-2 commands below.
+8. Verify with both phase-1 catalog parity and phase-2 operational readiness
+   before making a role-fitness claim. Discovery-diff applies only where a
+   harness declares an actual hook config; API/provider harness readiness must
+   come from phase-2 or later coverage-audit evidence, not Claude/Codex hook files.
 
 ## Commands
 
@@ -65,6 +70,10 @@ python scripts/check_harness_parity.py --validate-schema
 python -m pytest platform_tests/scripts/test_check_harness_parity.py -q
 ```
 
+Fleet role coverage is a computed phase-1 row. It proves that at least one
+active harness assigned each operating role has no unwaived required
+role-relative blocker; it does not prove hook invocation or end-to-end dispatch.
+
 Phase 2 — operational readiness (complementary):
 
 ```powershell
@@ -74,7 +83,7 @@ python scripts/harness_parity_phase2.py --project-root . --format markdown
 Hook discovery diff (Claude/Codex hook configs):
 
 ```powershell
-python scripts/parity_discovery_diff.py --project-root .
+python scripts/parity_discovery_diff.py --project-root . --markdown
 ```
 
 ## Rules

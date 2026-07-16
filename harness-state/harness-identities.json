@@ -6,6 +6,12 @@
       "assigned_by": "explicit-owner-requested-identity-change",
       "id": "H"
     },
+    "antigravity": {
+      "assigned_at": "2026-05-31T14:25:00Z",
+      "assigned_by": "owner-directed-identity-registration",
+      "id": "C",
+      "status": "active"
+    },
     "claude": {
       "assigned_at": "2026-05-05T00:00:00Z",
       "assigned_by": "owner-directed-initial-identity",
@@ -16,10 +22,16 @@
       "assigned_by": "owner-directed-initial-identity",
       "id": "A"
     },
-    "antigravity": {
-      "assigned_at": "2026-05-31T14:25:00Z",
+    "cursor": {
+      "assigned_at": "2026-06-24T00:00:00Z",
       "assigned_by": "owner-directed-identity-registration",
-      "id": "C",
+      "id": "E",
+      "status": "active"
+    },
+    "goose": {
+      "assigned_at": "2026-07-08T14:08:00Z",
+      "assigned_by": "owner-directed-identity-registration",
+      "id": "G",
       "status": "active"
     },
     "ollama": {
@@ -31,12 +43,6 @@
       "assigned_at": "2026-06-09T15:47:00Z",
       "assigned_by": "owner-directed-identity-registration",
       "id": "F",
-      "status": "active"
-    },
-    "cursor": {
-      "assigned_at": "2026-06-24T00:00:00Z",
-      "assigned_by": "owner-directed-identity-registration",
-      "id": "E",
       "status": "active"
     }
   },

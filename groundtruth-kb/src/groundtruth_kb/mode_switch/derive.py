@@ -1,9 +1,7 @@
 """Pure topology derivation from a role map.
 
-Per ``SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001``. Mirrors the existing
-applicability logic at
-``scripts/single_harness_bridge_dispatcher._is_single_harness_topology_applicable``
-so that dispatcher and startup compute identical results.
+Per ``SPEC-BRIDGE-MODE-CONFIG-TRANSACTIONS-001``. This module derives topology
+only; bridge automation is owned by the dispatcher daemon.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen and Palmeter, LLC. All rights
 reserved.
@@ -62,9 +60,8 @@ def topology_from_role_map(role_map: dict[str, Any]) -> str:
     suspended, retired, and non-event-capable harnesses are ignored for topology
     because role membership, lifecycle status, and bridge-event reception
     capability are orthogonal. All other shapes return ``multi_harness``
-    (including empty/malformed maps; the dispatcher's fail-closed semantics for
-    ambiguous input is preserved by returning the multi-harness default, which
-    makes the cross-harness trigger the active substrate).
+    (including empty/malformed maps; the dispatcher fails closed against
+    ambiguous input by returning the multi-harness default).
     """
     if not isinstance(role_map, dict):
         return MULTI_HARNESS

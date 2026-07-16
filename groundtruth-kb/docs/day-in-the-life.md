@@ -198,7 +198,7 @@ event-driven trigger is scaffolded automatically by
 `gt project init my-project --profile dual-agent` and registered as PostToolUse and Stop
 hooks in `.claude/settings.json` and `.codex/hooks.json`. The setup walkthrough
 is in [Dual-Agent Setup](tutorials/dual-agent-setup.md). Manual bridge-state
-scans remain as a fallback if the trigger is unhealthy. The retired smart
+scans remain as a fallback if the daemon is unhealthy. The retired smart
 poller and OS poller (archived under `archive/smart-poller-2026-05-09/`) are
 no longer the active automation path.
 

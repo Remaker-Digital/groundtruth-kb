@@ -26,6 +26,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 REGISTRY_PATH = SCRIPTS_DIR / "bridge_work_intent_registry.py"
+CLAIM_CLI_PATH = SCRIPTS_DIR / "bridge_claim_cli.py"
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -77,6 +78,30 @@ def _write_project_thread(root: Path, slug: str, status: str, project_id: str = 
     (bridge / f"{slug}-001.md").write_text(proposal, encoding="utf-8")
     if status == "GO":
         (bridge / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+
+
+def _write_bootstrap_thread(root: Path, slug: str) -> None:
+    bridge = root / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    proposal = "\n".join(
+        [
+            "NEW",
+            "",
+            f"# Fixture project authorization bootstrap {slug}",
+            "",
+            "Project: PROJECT-X",
+            "Work Item: WI-5279",
+            "Project Authorization: PAUTH-BOOTSTRAP",
+            'target_paths: ["groundtruth.db"]',
+            "",
+            "## Project Authorization Bootstrap",
+            "",
+            "project_authorization_bootstrap owner decision DELIB-BOOTSTRAP for PAUTH-BOOTSTRAP.",
+            "",
+        ]
+    )
+    (bridge / f"{slug}-001.md").write_text(proposal, encoding="utf-8")
+    (bridge / f"{slug}-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
 
 
 def _write_registry(root: Path, roles: dict[str, str]) -> None:
@@ -267,6 +292,62 @@ def test_work_intent_schema_upgrades_with_role_project_columns(tmp_path: Path, e
     columns = {row[1] for row in conn.execute("PRAGMA table_info(work_intent_claims)").fetchall()}
     conn.close()
     assert {"acting_role", "project_id"} <= columns
+
+
+def test_project_authorization_bootstrap_claim_records_bound_authority(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_bootstrap_thread(tmp_path, "bootstrap-thread")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-bootstrap"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire(
+        "bootstrap-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        bootstrap_authority={
+            "owner_decision_id": "DELIB-BOOTSTRAP",
+            "project_id": "PROJECT-X",
+            "work_item_id": "WI-5279",
+            "authorization_id": "PAUTH-BOOTSTRAP",
+            "carrier_targets": ["groundtruth.db"],
+        },
+    )
+
+    holder = env.current_holder("bootstrap-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP
+    assert holder["bootstrap_owner_decision_id"] == "DELIB-BOOTSTRAP"
+    assert holder["bootstrap_project_id"] == "PROJECT-X"
+    assert holder["bootstrap_work_item_id"] == "WI-5279"
+    assert holder["bootstrap_authorization_id"] == "PAUTH-BOOTSTRAP"
+    assert json.loads(holder["bootstrap_carrier_targets"]) == ["groundtruth.db"]
+    authority = env.bootstrap_authority_from_claim(holder)
+    assert authority is not None
+    assert authority["carrier_targets"] == ["groundtruth.db"]
+    assert authority["single_use"]["consumed"] is False
+
+
+def test_project_authorization_bootstrap_claim_requires_carrier_target(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_bootstrap_thread(tmp_path, "bootstrap-thread")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-bootstrap"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    with pytest.raises(env.WorkIntentRegistryError, match="carrier targets"):
+        env.acquire(
+            "bootstrap-thread",
+            session_id,
+            project_root=tmp_path,
+            claim_kind=env.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+            bootstrap_authority={
+                "owner_decision_id": "DELIB-BOOTSTRAP",
+                "project_id": "PROJECT-X",
+                "work_item_id": "WI-5279",
+                "authorization_id": "PAUTH-BOOTSTRAP",
+                "carrier_targets": ["scripts/not-a-carrier.py"],
+            },
+        )
 
 
 def test_same_role_project_holder_detects_conflicting_same_role_claim(tmp_path: Path, env) -> None:
@@ -467,6 +548,145 @@ def test_no_action_claim_uses_draft_kind_not_go_implementation(tmp_path: Path, e
     holder = env.current_holder("no-action-thread", project_root=tmp_path)
     assert holder is not None
     assert holder["claim_kind"] == env.CLAIM_KIND_DRAFT
+
+
+@pytest.mark.parametrize("latest_status", ["GO", "NO-GO"])
+def test_prime_can_claim_no_action_correction_after_lo_verdict(
+    tmp_path: Path,
+    env,
+    latest_status: str,
+) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "verdict-thread", "NEW", project_id="PROJECT-X")
+    (tmp_path / "bridge" / "verdict-thread-002.md").write_text(
+        f"{latest_status}\n\nFixture verdict.\n",
+        encoding="utf-8",
+    )
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    assert env.acquire(
+        "verdict-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+    )
+
+    holder = env.current_holder("verdict-thread", project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == env.CLAIM_KIND_NO_ACTION_CORRECTION
+    assert holder["acting_role"] == "prime-builder"
+    assert holder["implementation_deadline"] is None
+    assert holder["implementation_grace_expires_at"] is None
+
+
+def test_no_action_correction_is_separate_from_go_implementation_claim(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    _write_project_thread(tmp_path, "implementation-thread", "GO", project_id="PROJECT-X")
+    assert env.acquire("implementation-thread", session_id, project_root=tmp_path)
+    implementation_holder = env.current_holder("implementation-thread", project_root=tmp_path)
+    assert implementation_holder is not None
+    assert implementation_holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+    assert implementation_holder["implementation_deadline"] is not None
+    assert implementation_holder["implementation_grace_expires_at"] is not None
+
+    _write_project_thread(tmp_path, "correction-thread", "GO", project_id="PROJECT-X")
+    assert env.acquire(
+        "correction-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+    )
+    correction_holder = env.current_holder("correction-thread", project_root=tmp_path)
+    assert correction_holder is not None
+    assert correction_holder["claim_kind"] == env.CLAIM_KIND_NO_ACTION_CORRECTION
+    assert correction_holder["implementation_deadline"] is None
+    assert correction_holder["implementation_grace_expires_at"] is None
+    assert correction_holder["extension_cap_seconds"] is None
+    assert correction_holder["bootstrap_owner_decision_id"] is None
+    assert correction_holder["bootstrap_authorization_id"] is None
+
+
+def test_no_action_correction_claim_cannot_authorize_implementation_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env,
+) -> None:
+    from scripts import implementation_authorization
+
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "correction-only-thread", "GO", project_id="PROJECT-X")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+    assert env.acquire(
+        "correction-only-thread",
+        session_id,
+        project_root=tmp_path,
+        claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+    )
+    monkeypatch.setattr(implementation_authorization.bridge_work_intent_registry, "now_utc", env.now_utc)
+    packet = {"bridge_id": "correction-only-thread"}
+    packet["packet_hash"] = implementation_authorization.packet_hash(packet)
+
+    with pytest.raises(implementation_authorization.AuthorizationError, match="GO-implementation claim"):
+        implementation_authorization.finalize_implementation_start_packet(
+            tmp_path,
+            packet,
+            session_id=session_id,
+        )
+
+
+def test_no_action_correction_rejects_non_verdict_and_non_prime_sessions(tmp_path: Path, env) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder", "D": "loyal-opposition"})
+    _write_project_thread(tmp_path, "new-thread", "NEW", project_id="PROJECT-X")
+    prime_session = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    lo_session = "2026-06-22T00-00-00Z-loyal-opposition-D-def456"
+    _write_worker_session(tmp_path, "prime-builder", prime_session)
+    _write_worker_session(tmp_path, "loyal-opposition", lo_session)
+
+    with pytest.raises(env.WorkIntentRegistryError, match="requires latest GO or NO-GO"):
+        env.acquire(
+            "new-thread",
+            prime_session,
+            project_root=tmp_path,
+            claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+        )
+
+    (tmp_path / "bridge" / "new-thread-002.md").write_text("GO\n\nFixture GO.\n", encoding="utf-8")
+    with pytest.raises(env.WorkIntentRegistryError, match="requires prime-builder"):
+        env.acquire(
+            "new-thread",
+            lo_session,
+            project_root=tmp_path,
+            claim_kind=env.CLAIM_KIND_NO_ACTION_CORRECTION,
+        )
+
+
+def test_claim_cli_exposes_no_action_correction_mode(tmp_path: Path, env, capsys) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    _write_project_thread(tmp_path, "cli-verdict-thread", "GO", project_id="PROJECT-X")
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+    cli = _load_module(CLAIM_CLI_PATH, "bridge_claim_cli_wi5249")
+
+    assert (
+        cli.main(
+            [
+                "claim-no-action",
+                "cli-verdict-thread",
+                "--session-id",
+                session_id,
+                "--project-root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["claim_kind"] == env.CLAIM_KIND_NO_ACTION_CORRECTION
 
 
 def test_bridge_file_status_skips_leading_blank_lines(tmp_path: Path, env) -> None:

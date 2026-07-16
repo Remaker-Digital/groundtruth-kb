@@ -33,6 +33,7 @@ _PROJECT_AUTHORIZATION_METADATA_RE = re.compile(
 )
 _PROJECT_METADATA_RE = re.compile(r"^Project:\s*`?(?P<project_id>[A-Za-z0-9_-]+)", re.IGNORECASE | re.MULTILINE)
 _BRIDGE_VERSION_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3,})\.md$")
+_BRIDGE_SLUG_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$")
 _DISPATCH_RECIPIENT_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z-(?P<role>prime-builder|loyal-opposition)-"
     r"(?P<harness_id>[^-]+)-"
@@ -178,7 +179,7 @@ def build_compact_dispatch_workflow(
 
     prime_queues, prime_truncation = _workflow_prime_queues(root, queue.prime_actionable, limit)
     loyal_queues, loyal_truncation = _workflow_loyal_queues(queue.loyal_opposition_actionable, limit)
-    in_flight, in_flight_truncated = _bounded_workflow_records(_workflow_in_flight(full_report), limit)
+    in_flight, in_flight_truncated = _bounded_workflow_records(_workflow_in_flight(root, full_report), limit)
     findings, findings_truncated = _bounded_workflow_records(
         [{"finding": finding} for finding in full_report["reliability"]["findings"]],
         limit,
@@ -609,7 +610,110 @@ def _workflow_json_list(value: Any) -> set[str]:
     return {str(item).strip() for item in decoded if str(item).strip()}
 
 
-def _workflow_in_flight(report: dict[str, Any]) -> list[dict[str, Any]]:
+def _workflow_launch_index(report: dict[str, Any]) -> dict[str, dict[str, Any] | None]:
+    recipients = report.get("live_state", {}).get("recipients", {})
+    if not isinstance(recipients, dict):
+        return {}
+
+    index: dict[str, dict[str, Any] | None] = {}
+    missing = object()
+
+    def add(launch: Any) -> None:
+        if not isinstance(launch, dict):
+            return
+        dispatch_id = launch.get("dispatch_id")
+        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
+            return
+        dispatch_id = dispatch_id.strip()
+        existing = index.get(dispatch_id, missing)
+        if existing is missing:
+            index[dispatch_id] = launch
+        elif existing is not None and existing != launch:
+            index[dispatch_id] = None
+
+    for recipient in recipients.values():
+        if not isinstance(recipient, dict):
+            continue
+        ledger_ids: set[str] = set()
+        ledger = recipient.get("launch_ledger")
+        if isinstance(ledger, dict):
+            ledger_groups: list[dict[str, Any]] = []
+            active = ledger.get("active")
+            completed = ledger.get("completed")
+            if isinstance(active, dict) or isinstance(completed, dict):
+                if isinstance(active, dict):
+                    ledger_groups.append(active)
+                if isinstance(completed, dict):
+                    ledger_groups.append(completed)
+            else:
+                ledger_groups.append(ledger)
+            for group in ledger_groups:
+                for launch in group.values():
+                    if isinstance(launch, dict):
+                        dispatch_id = launch.get("dispatch_id")
+                        if isinstance(dispatch_id, str) and dispatch_id.strip():
+                            ledger_ids.add(dispatch_id.strip())
+                    add(launch)
+
+        last_launch = recipient.get("last_launch")
+        if isinstance(last_launch, dict):
+            dispatch_id = last_launch.get("dispatch_id")
+            if isinstance(dispatch_id, str) and dispatch_id.strip() not in ledger_ids:
+                add(last_launch)
+    return index
+
+
+def _workflow_bridge_slug(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    slug = value.strip()
+    return slug if _BRIDGE_SLUG_RE.fullmatch(slug) else None
+
+
+def _workflow_launch_document(launch: dict[str, Any]) -> str | None:
+    lease_documents: list[str] = []
+    handles = launch.get("document_lease_handles")
+    if isinstance(handles, list):
+        for handle in handles:
+            slug = _workflow_bridge_slug(handle.get("doc_slug")) if isinstance(handle, dict) else None
+            if slug and slug not in lease_documents:
+                lease_documents.append(slug)
+
+    selected_documents: list[str] = []
+    for key in ("selected_documents", "document_names"):
+        values = launch.get(key)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            slug = _workflow_bridge_slug(value)
+            if slug and slug not in selected_documents:
+                selected_documents.append(slug)
+
+    canonical_documents = lease_documents + [slug for slug in selected_documents if slug not in lease_documents]
+    primary = _workflow_bridge_slug(launch.get("primary_bridge_id"))
+    if primary in canonical_documents:
+        return primary
+    return canonical_documents[0] if canonical_documents else None
+
+
+def _workflow_numbered_bridge_file(root: Path, slug: str) -> str | None:
+    bridge_dir = (root / "bridge").resolve()
+    versions: list[tuple[int, Path]] = []
+    for path in bridge_dir.glob(f"{slug}-*.md"):
+        match = _BRIDGE_VERSION_RE.fullmatch(path.name)
+        if match and match.group("slug") == slug:
+            versions.append((int(match.group("version")), path.resolve()))
+    if not versions:
+        return None
+    path = max(versions)[1]
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return None
+
+
+def _workflow_in_flight(root: Path, report: dict[str, Any]) -> list[dict[str, Any]]:
+    launches = _workflow_launch_index(report)
     records: list[dict[str, Any]] = []
     for run in report["history"]["recent_runs"]:
         state = str(run.get("state") or "")
@@ -620,6 +724,14 @@ def _workflow_in_flight(report: dict[str, Any]) -> list[dict[str, Any]]:
         recipient = None
         if recipient_match:
             recipient = f"{recipient_match.group('role')}:{recipient_match.group('harness_id')}"
+        bridge_document = None
+        work_item_id = None
+        launch = launches.get(dispatch_id) if dispatch_id else None
+        if launch is not None:
+            bridge_document = _workflow_launch_document(launch)
+            top_file = _workflow_numbered_bridge_file(root, bridge_document) if bridge_document else None
+            if top_file:
+                work_item_id = _read_workflow_bridge_metadata(root, top_file)["work_item_id"]
         records.append(
             {
                 "dispatch_id": dispatch_id,
@@ -627,8 +739,8 @@ def _workflow_in_flight(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "lifecycle_state": state,
                 "started_at": run.get("started_at"),
                 "age_seconds": run.get("age_seconds"),
-                "bridge_document": None,
-                "work_item_id": None,
+                "bridge_document": bridge_document,
+                "work_item_id": work_item_id,
             }
         )
     return records

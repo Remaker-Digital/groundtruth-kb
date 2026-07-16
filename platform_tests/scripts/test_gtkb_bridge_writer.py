@@ -15,12 +15,14 @@ from scripts import gtkb_bridge_writer as writer
 from scripts.gtkb_bridge_writer import (
     PRIME_STATUSES,
     VALID_STATUSES,
+    BridgeComplianceError,
     BridgeConflictError,
     BridgePublicationError,
     BridgeTransitionError,
     publish_lo_verdict,
     write_bridge_file,
 )
+from scripts.windows_subprocess import no_window_subprocess_kwargs
 
 AUTHOR_METADATA = {
     "author_identity": "Codex",
@@ -41,23 +43,134 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
         encoding="utf-8",
         errors="replace",
         check=check,
+        **no_window_subprocess_kwargs(),
+    )
+
+
+def _author_metadata_lines(session_id: str = "reviewed-session") -> str:
+    return (
+        "author_identity: fixture\n"
+        "author_harness_id: T\n"
+        f"author_session_context_id: {session_id}\n"
+        "author_model: fixture-model\n"
+        "author_model_version: fixture-version\n"
+        "author_model_configuration: fixture-config\n"
+    )
+
+
+def _valid_proposal_body(*, include_requirement_sufficiency: bool = True) -> str:
+    requirement_sufficiency = (
+        "## Requirement Sufficiency\n\nExisting requirements sufficient.\n\n" if include_requirement_sufficiency else ""
+    )
+    return (
+        "NEW\n\n"
+        "# Test Proposal\n\n"
+        "bridge_kind: prime_proposal\n"
+        "Document: docthing\n"
+        "Version: 001\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n"
+        'target_paths: ["scripts/example.py"]\n\n'
+        "## Summary\n\n"
+        "Test proposal.\n\n"
+        "## Specification Links\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001`\n\n"
+        "## Owner Decisions / Input\n\n"
+        "No new owner decision is required.\n\n"
+        "## Prior Deliberations\n\n"
+        "_No prior deliberations: unit test fixture._\n\n"
+        f"{requirement_sufficiency}"
+        "## Spec-Derived Verification Plan\n\n"
+        "- `groundtruth-kb/.venv/Scripts/python.exe -m pytest "
+        "platform_tests/scripts/test_gtkb_bridge_writer.py -q --tb=short`\n\n"
+        "## Risk And Rollback\n\n"
+        "Remove the fixture output.\n"
+    )
+
+
+def _applicability_preflight_section() -> str:
+    return (
+        "## Applicability Preflight\n\n"
+        "- packet_hash: `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`\n"
+        "- missing_required_specs: []\n"
+    )
+
+
+def _valid_go_verdict() -> str:
+    return (
+        "GO\n\n"
+        "# GO Verdict\n\n"
+        "bridge_kind: lo_verdict\n"
+        "Document: docthing\n"
+        "Version: 002\n"
+        "Responds to: bridge/docthing-001.md\n\n"
+        "## Verdict\n\n"
+        "GO.\n\n"
+        f"{_applicability_preflight_section()}"
+    )
+
+
+def _valid_no_go_verdict() -> str:
+    return (
+        "NO-GO\n\n"
+        "# NO-GO Verdict\n\n"
+        "bridge_kind: lo_verdict\n"
+        "Document: nogothing\n"
+        "Version: 002\n"
+        "Responds to: bridge/nogothing-001.md\n\n"
+        "## Verdict\n\n"
+        "NO-GO.\n"
+    )
+
+
+def _valid_verified_verdict() -> str:
+    return (
+        "VERIFIED\n\n"
+        "# VERIFIED Verdict\n\n"
+        "bridge_kind: lo_verdict\n"
+        "Document: verifiedthing\n"
+        "Version: 004\n"
+        "Reviewed report: bridge/verifiedthing-003.md\n"
+        "Recommended commit type: `fix:`\n\n"
+        "## Verdict\n\n"
+        "VERIFIED.\n\n"
+        "## Specification Links\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001`\n\n"
+        f"{_applicability_preflight_section()}\n"
+        "## Spec-to-Test Mapping\n\n"
+        "| Specification | Test or Verification Command | Executed | Result |\n"
+        "| --- | --- | --- | --- |\n"
+        "| `GOV-FILE-BRIDGE-AUTHORITY-001` | "
+        "`pytest platform_tests/scripts/test_gtkb_bridge_writer.py` | yes | PASS |\n\n"
+        "## Commands Executed\n\n"
+        "- `pytest platform_tests/scripts/test_gtkb_bridge_writer.py -q`\n\n"
+        "## Commit Finalization Evidence\n\n"
+        "- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`\n"
+        "- Intended commit subject: `fix: fixture`\n"
+        "- Same-transaction path set:\n"
+        "- `scripts/example.py`\n"
+        "- `bridge/verifiedthing-004.md`\n"
+    )
+
+
+def _stage_reviewed_file(tmp_path: Path, slug: str, version: int = 1, status: str = "NEW") -> None:
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir(exist_ok=True)
+    (bridge_dir / f"{slug}-{version:03d}.md").write_text(
+        f"{status}\n{_author_metadata_lines()}\n# Reviewed artifact\n",
+        encoding="utf-8",
     )
 
 
 def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path) -> None:
-    path = write_bridge_file("docthing", 1, "NEW\n\nhello\n", tmp_path, author_metadata=AUTHOR_METADATA)
+    path = write_bridge_file("docthing", 1, _valid_proposal_body(), tmp_path, author_metadata=AUTHOR_METADATA)
 
     assert path == tmp_path / "bridge" / "docthing-001.md"
-    assert path.read_text(encoding="utf-8") == (
-        "NEW\n"
-        "author_identity: Codex\n"
-        "author_harness_id: A\n"
-        "author_session_context_id: session-123\n"
-        "author_model: GPT-5.5\n"
-        "author_model_version: 5.5\n"
-        "author_model_configuration: Extra High\n"
-        "\nhello\n"
-    )
+    written = path.read_text(encoding="utf-8")
+    assert "author_identity: Codex\n" in written
+    assert "author_session_context_id: session-123\n" in written
+    assert "## Requirement Sufficiency\n\nExisting requirements sufficient." in written
     assert not (tmp_path / "bridge" / "INDEX.md").exists()
 
 
@@ -77,10 +190,13 @@ def test_write_bridge_file_rejects_non_positive_version(tmp_path: Path) -> None:
         write_bridge_file("bad", 0, "NEW\n", tmp_path, require_author_metadata=False)
 
 
-def test_write_bridge_file_can_skip_author_metadata_for_test_fixtures(tmp_path: Path) -> None:
-    path = write_bridge_file("fixture", 2, "GO\n\nfixture body\n", tmp_path, require_author_metadata=False)
+def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(tmp_path: Path) -> None:
+    _stage_reviewed_file(tmp_path, "docthing")
+    content = "GO\n" + _author_metadata_lines("reviewer-session") + "\n" + _valid_go_verdict().split("\n", 1)[1]
 
-    assert path.read_text(encoding="utf-8") == "GO\n\nfixture body\n"
+    path = write_bridge_file("docthing", 2, content, tmp_path, require_author_metadata=False)
+
+    assert path.read_text(encoding="utf-8") == content
 
 
 def test_no_action_is_valid_prime_authored_status() -> None:
@@ -92,24 +208,9 @@ def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> Non
     """write_bridge_file raises BridgeConflictError when the target version exists in
     git history but is absent from disk (deleted-then-recreate attempt, WI-4740)."""
     try:
-        subprocess.run(
-            ["git", "init", "--quiet", str(tmp_path)],
-            check=True,
-            capture_output=True,
-            timeout=10,
-        )
-        subprocess.run(
-            ["git", "config", "user.email", "test@example.com"],
-            cwd=str(tmp_path),
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test Runner"],
-            cwd=str(tmp_path),
-            check=True,
-            capture_output=True,
-        )
+        _git(tmp_path, "init", "--quiet")
+        _git(tmp_path, "config", "user.email", "test@example.com")
+        _git(tmp_path, "config", "user.name", "Test Runner")
     except (subprocess.CalledProcessError, FileNotFoundError):
         pytest.skip("git not available in test environment")
 
@@ -117,13 +218,8 @@ def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> Non
     bridge_dir.mkdir()
     committed = bridge_dir / "gtkb-history-guard-001.md"
     committed.write_text("GO\n\n# Original verdict\n", encoding="utf-8")
-    subprocess.run(["git", "add", "."], cwd=str(tmp_path), check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "initial bridge file"],
-        cwd=str(tmp_path),
-        check=True,
-        capture_output=True,
-    )
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "initial bridge file")
 
     # Delete from disk — now committed in history but absent on disk.
     committed.unlink()
@@ -136,6 +232,47 @@ def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> Non
             project_root=tmp_path,
             require_author_metadata=False,
         )
+
+
+def test_write_bridge_file_rejects_malformed_proposal_before_disk_write(tmp_path: Path) -> None:
+    with pytest.raises(BridgeComplianceError, match="Requirement Sufficiency"):
+        write_bridge_file(
+            "docthing",
+            1,
+            _valid_proposal_body(include_requirement_sufficiency=False),
+            tmp_path,
+            author_metadata=AUTHOR_METADATA,
+        )
+
+    assert not (tmp_path / "bridge" / "docthing-001.md").exists()
+
+
+@pytest.mark.parametrize(
+    ("slug", "content_factory"),
+    [
+        ("docthing", _valid_go_verdict),
+        ("nogothing", _valid_no_go_verdict),
+        ("verifiedthing", _valid_verified_verdict),
+    ],
+)
+def test_write_bridge_file_allows_valid_verdicts_without_proposal_only_sections(
+    tmp_path: Path,
+    slug: str,
+    content_factory,
+) -> None:
+    _stage_reviewed_file(tmp_path, slug)
+    if slug == "verifiedthing":
+        _stage_reviewed_file(tmp_path, slug, version=2, status="GO")
+        _stage_reviewed_file(tmp_path, slug, version=3, status="NEW")
+        version = 4
+    else:
+        version = 2
+
+    path = write_bridge_file(slug, version, content_factory(), tmp_path, author_metadata=AUTHOR_METADATA)
+
+    written = path.read_text(encoding="utf-8")
+    assert "## Requirement Sufficiency" not in written
+    assert "author_session_context_id: session-123" in written
 
 
 PROVIDER_METADATA = {

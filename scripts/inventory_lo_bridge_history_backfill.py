@@ -86,7 +86,7 @@ class InventoryRecord:
     classification_reason: str
     current_da_row_id: str | None
     current_da_content_hash: str | None
-    bridge_status: str | None
+    index_status: str | None
 
 
 @dataclass
@@ -313,7 +313,7 @@ def classify_file(
         classification_reason=reason,
         current_da_row_id=current_da_row_id,
         current_da_content_hash=current_da_content_hash,
-        bridge_status=status,
+        index_status=status,
     )
 
 
@@ -380,7 +380,7 @@ def build_summary(repo_root: Path, records: list[InventoryRecord], snap: DASnaps
     by_class = Counter(r.classification for r in records)
     by_reason = Counter(r.classification_reason for r in records)
     eligible = [r for r in records if r.classification == ELIGIBLE_FOR_HARVEST]
-    unstatused_stems = sorted({r.thread_stem for r in records if r.file_class == "bridge" and r.bridge_status is None})
+    unstatused_stems = sorted({r.thread_stem for r in records if r.file_class == "bridge" and r.index_status is None})
 
     lines: list[str] = []
     lines.append("# LO / Bridge History Backfill — Slice 1 Inventory Summary")

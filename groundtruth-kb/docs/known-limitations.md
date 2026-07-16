@@ -39,7 +39,7 @@ idempotent.
 
 ### Gap 6.x — Hook-registration upgrades are unrepairable for 11 of 12 entries
 
-`.claude/settings.json` contains 12 hook registrations that the scaffold
+`.claude/settings.json` contains 12 daemon configuration that the scaffold
 writes at `gt project init` time. Of those, only 1 (the
 `scanner-safe-writer` PreToolUse hook) is managed by the upgrade path.
 The other 11 are scaffold-only — if an adopter deletes or corrupts them,

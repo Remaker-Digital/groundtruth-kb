@@ -21,7 +21,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from _env import load_env_local  # noqa: E402
-from cross_harness_bridge_trigger import DISPATCH_AUTH_ENV_KEYS  # noqa: E402
+from dispatcher_runtime import DISPATCH_AUTH_ENV_KEYS  # noqa: E402
 
 
 def _inject_dispatch_auth(env: dict[str, str], env_file: Path) -> dict[str, str]:
@@ -95,7 +95,7 @@ class TestDispatchAuthInjection:
         assert result == {"EXISTING_KEY": "existing-value"}
 
     def test_all_allowlisted_keys_injected(self, tmp_path: Path) -> None:
-        """All three DISPATCH_AUTH_ENV_KEYS are injected when present in .env.local."""
+        """All DISPATCH_AUTH_ENV_KEYS are injected when present in .env.local."""
         env_file = tmp_path / ".env.local"
         lines = "\n".join(f"{k}=value-for-{k}" for k in DISPATCH_AUTH_ENV_KEYS)
         env_file.write_text(lines + "\n", encoding="utf-8")
@@ -122,7 +122,7 @@ class TestNoCredentialLogging:
     """GOV-ENV-LOCAL-AUTHORITY-001 / implementation constraint: credential values must never
     appear in logging calls within the injection code path."""
 
-    _SOURCE_FILE = Path(__file__).resolve().parents[2] / "scripts" / "cross_harness_bridge_trigger.py"
+    _SOURCE_FILE = Path(__file__).resolve().parents[2] / "scripts" / "dispatcher_runtime.py"
 
     def _extract_injection_block_lines(self) -> list[str]:
         """Return the source lines of the WI-4707 injection block."""

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -24,9 +25,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from groundtruth_kb.governance.approval_packet import construct_approval_packet
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "implementation_authorization.py"
+TAXONOMY_PATH = REPO_ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
 
 
 @pytest.fixture(scope="module")
@@ -465,11 +468,17 @@ def _seed_project_authorization(
     *,
     project_status: str = "active",
     allowed_mutation_classes: list[str] | None = None,
+    forbidden_operations: list[str] | None = None,
+    included_spec_ids: list[str] | None = None,
+    excluded_spec_ids: list[str] | None = None,
     auth_id: str = "PAUTH-FIXTURE",
     project_id: str = "PROJECT-FIXTURE",
 ) -> str:
     """Seed the minimal project-authorization surface used by the gate."""
     _make_groundtruth_toml(tmp_path)
+    taxonomy_target = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
+    taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(TAXONOMY_PATH, taxonomy_target)
     db_path = tmp_path / "groundtruth.db"
     conn = sqlite3.connect(db_path)
     try:
@@ -515,17 +524,178 @@ def _seed_project_authorization(
                 "Fixture implementation authority.",
                 None,
                 json.dumps(allowed_mutation_classes or []),
+                json.dumps(forbidden_operations or []),
                 json.dumps([]),
                 json.dumps([]),
-                json.dumps([]),
-                json.dumps([]),
-                json.dumps([]),
+                json.dumps(included_spec_ids or []),
+                json.dumps(excluded_spec_ids or []),
             ),
         )
         conn.commit()
     finally:
         conn.close()
     return auth_id
+
+
+def _structured_pauth_proposal(
+    *,
+    auth_id: str = "PAUTH-FIXTURE",
+    project_id: str = "PROJECT-FIXTURE",
+    included_spec_ids: object = None,
+    excluded_spec_ids: object = None,
+    change_reason: object = "fixture amendment",
+) -> str:
+    envelope = {
+        "id": auth_id,
+        "project_id": project_id,
+        "included_spec_ids": ["SPEC-NEW"] if included_spec_ids is None else included_spec_ids,
+        "excluded_spec_ids": [] if excluded_spec_ids is None else excluded_spec_ids,
+        "change_reason": change_reason,
+    }
+    return f"Project: {project_id}\n\n```json\n{json.dumps(envelope)}\n```\n"
+
+
+def _write_amendment_approval_packet(
+    project_root: Path,
+    *,
+    auth_id: str = "PAUTH-FIXTURE",
+    project_id: str = "PROJECT-FIXTURE",
+    amended_specs: tuple[str, ...] = ("SPEC-NEW",),
+    approved_by: str = "owner",
+) -> str:
+    rel_path = ".groundtruth/formal-artifact-approvals/pauth-amendment.json"
+    path = project_root / rel_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    coverage = " ".join((project_id, auth_id, *amended_specs))
+    packet = construct_approval_packet(
+        artifact_type="governance",
+        artifact_id=auth_id,
+        action="update",
+        source_ref="test-fixture",
+        full_content=coverage,
+        approval_mode="approve",
+        presented_to_user=True,
+        transcript_captured=True,
+        explicit_change_request=coverage,
+        changed_by="test",
+        change_reason=coverage,
+        approved_by=approved_by,
+    )
+    path.write_text(json.dumps(packet), encoding="utf-8")
+    return rel_path
+
+
+def test_structured_pauth_amendment_rejects_missing_owner_packet(auth_module, tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, included_spec_ids=["SPEC-OLD"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="No packet path detected"):
+        auth_module.validate_structured_pauth_spec_amendment(
+            tmp_path,
+            _structured_pauth_proposal(included_spec_ids=["SPEC-OLD", "SPEC-NEW"]),
+        )
+
+
+def test_structured_pauth_amendment_allows_no_spec_delta_without_evidence(auth_module, tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, included_spec_ids=["SPEC-OLD"])
+
+    result = auth_module.validate_structured_pauth_spec_amendment(
+        tmp_path,
+        _structured_pauth_proposal(included_spec_ids=["SPEC-OLD"], change_reason=None),
+    )
+
+    assert result == {
+        "authorization_id": "PAUTH-FIXTURE",
+        "project_id": "PROJECT-FIXTURE",
+        "spec_delta": False,
+    }
+
+
+def test_structured_pauth_amendment_accepts_exact_owner_coverage(auth_module, tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path, included_spec_ids=["SPEC-OLD"])
+    rel_path = _write_amendment_approval_packet(tmp_path, amended_specs=("SPEC-NEW",))
+
+    result = auth_module.validate_structured_pauth_spec_amendment(
+        tmp_path,
+        _structured_pauth_proposal(
+            included_spec_ids=["SPEC-OLD", "SPEC-NEW"],
+            change_reason=f"Owner evidence: {rel_path}",
+        ),
+    )
+
+    assert result is not None
+    assert result["spec_delta"] is True
+    assert result["added_spec_ids"] == ["SPEC-NEW"]
+    assert result["approval_packet_path"] == rel_path
+
+
+def test_structured_pauth_amendment_rejects_unreadable_owner_packet(
+    auth_module,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _seed_project_authorization(tmp_path, included_spec_ids=["SPEC-OLD"])
+    rel_path = _write_amendment_approval_packet(tmp_path)
+    packet_path = (tmp_path / rel_path).resolve()
+    original_read_text = Path.read_text
+
+    def fail_packet_read(path: Path, *args, **kwargs):
+        if path.resolve() == packet_path:
+            raise OSError("fixture unreadable")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fail_packet_read)
+    with pytest.raises(auth_module.AuthorizationError, match="not readable JSON"):
+        auth_module.validate_structured_pauth_spec_amendment(
+            tmp_path,
+            _structured_pauth_proposal(
+                included_spec_ids=["SPEC-OLD", "SPEC-NEW"],
+                change_reason=f"Owner evidence: {rel_path}",
+            ),
+        )
+
+
+def test_structured_pauth_amendment_rejects_ambiguous_envelopes(auth_module, tmp_path: Path) -> None:
+    _seed_project_authorization(tmp_path)
+    proposal = _structured_pauth_proposal() + _structured_pauth_proposal()
+
+    with pytest.raises(auth_module.AuthorizationError, match="multiple replacement envelopes"):
+        auth_module.validate_structured_pauth_spec_amendment(tmp_path, proposal)
+
+
+@pytest.mark.parametrize(
+    ("proposal", "error"),
+    [
+        (_structured_pauth_proposal(included_spec_ids="SPEC-NEW"), "included_spec_ids to be a list"),
+        (_structured_pauth_proposal(auth_id="PAUTH-MISSING"), "Project authorization not found"),
+        (_structured_pauth_proposal(project_id="PROJECT-OTHER"), "identity conflict"),
+    ],
+)
+def test_structured_pauth_amendment_rejects_malformed_or_conflicting_identity(
+    auth_module,
+    tmp_path: Path,
+    proposal: str,
+    error: str,
+) -> None:
+    _seed_project_authorization(tmp_path)
+
+    with pytest.raises(auth_module.AuthorizationError, match=error):
+        auth_module.validate_structured_pauth_spec_amendment(tmp_path, proposal)
+
+
+def test_create_authorization_packet_backstops_structured_pauth_amendment(auth_module, tmp_path: Path) -> None:
+    slug = "structured-pauth-backstop"
+    proposal_path = _write_proposal(tmp_path, slug, target_paths=["groundtruth.db"])
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8")
+        + "\n"
+        + _structured_pauth_proposal(included_spec_ids=["SPEC-OLD", "SPEC-NEW"]),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, included_spec_ids=["SPEC-OLD"])
+
+    with pytest.raises(auth_module.AuthorizationError, match="No packet path detected"):
+        auth_module.create_authorization_packet(tmp_path, slug)
 
 
 def _add_project_authorization_metadata(
@@ -573,6 +743,98 @@ def _write_prime_worker_session(tmp_path: Path, session_id: str) -> None:
 def _claim_bridge(auth_module, tmp_path: Path, slug: str, session_id: str = "session-1") -> None:
     _write_prime_worker_session(tmp_path, session_id)
     assert auth_module.bridge_work_intent_registry.acquire(slug, session_id, project_root=tmp_path)
+
+
+def _claim_bootstrap_bridge(auth_module, tmp_path: Path, slug: str, session_id: str = "session-bootstrap") -> None:
+    _write_prime_worker_session(tmp_path, session_id)
+    assert auth_module.bridge_work_intent_registry.acquire(
+        slug,
+        session_id,
+        project_root=tmp_path,
+        claim_kind=auth_module.bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        bootstrap_authority={
+            "owner_decision_id": "DELIB-BOOTSTRAP",
+            "project_id": "PROJECT-AUTH",
+            "work_item_id": "WI-AUTH-001",
+            "authorization_id": "PAUTH-BOOTSTRAP",
+            "carrier_targets": ["groundtruth.db"],
+        },
+    )
+
+
+def _write_bootstrap_bridge(auth_module, tmp_path: Path, slug: str = "bootstrap-bridge") -> str:
+    proposal_path = _write_proposal(
+        tmp_path,
+        slug,
+        version=1,
+        bridge_kind="prime_proposal",
+        target_paths=["groundtruth.db"],
+    )
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8")
+        + "\n".join(
+            [
+                "",
+                "Project: PROJECT-AUTH",
+                "Work Item: WI-AUTH-001",
+                "Project Authorization: PAUTH-BOOTSTRAP",
+                "Owner Decision: DELIB-BOOTSTRAP",
+                "",
+                "## Project Authorization Bootstrap",
+                "",
+                "project_authorization_bootstrap binds DELIB-BOOTSTRAP to PAUTH-BOOTSTRAP.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _claim_bootstrap_bridge(auth_module, tmp_path, slug)
+    return slug
+
+
+def test_bootstrap_claim_creates_schema_v3_start_packet(auth_module, tmp_path):
+    slug = _write_bootstrap_bridge(auth_module, tmp_path)
+
+    packet = auth_module.create_authorization_packet(tmp_path, slug, session_id="session-bootstrap")
+    assert "project_authorization" not in packet
+    assert packet["target_path_globs"] == ["groundtruth.db"]
+    assert packet["bootstrap_authority"]["claim_kind"] == "project_authorization_bootstrap"
+    assert packet["bootstrap_authority"]["owner_decision_id"] == "DELIB-BOOTSTRAP"
+
+    finalized = auth_module.finalize_implementation_start_packet(tmp_path, packet, session_id="session-bootstrap")
+
+    assert finalized["schema_version"] == 3
+    assert (
+        finalized["bootstrap_authority"]["pre_start_packet_hash"]
+        == finalized["implementation_start"]["pre_start_packet_hash"]
+    )
+    assert finalized["bootstrap_authority"]["work_intent_claim"]["claim_kind"] == "project_authorization_bootstrap"
+    auth_module.write_started_packets(tmp_path, [finalized])
+    result = auth_module.validate_targets(tmp_path, ["groundtruth.db"], session_id="session-bootstrap")
+    decision = auth_module.validate_packet_project_authorization_operation(
+        tmp_path,
+        result["packet"],
+        requested_operations=["implementation_start", "protected_mutation"],
+        target_paths=result["targets"],
+    )
+    assert decision is not None
+    assert decision["operation_time_decisions"][0]["reason_code"] == "project_authorization_bootstrap_carrier"
+
+
+def test_bootstrap_packet_rejects_unrelated_target(auth_module, tmp_path):
+    slug = _write_bootstrap_bridge(auth_module, tmp_path)
+    packet = auth_module.create_authorization_packet(tmp_path, slug, session_id="session-bootstrap")
+    finalized = auth_module.finalize_implementation_start_packet(tmp_path, packet, session_id="session-bootstrap")
+
+    with pytest.raises(auth_module.AuthorizationError, match="outside carrier scope"):
+        auth_module.validate_packet_project_authorization_operation(
+            tmp_path,
+            finalized,
+            requested_operations=["protected_mutation"],
+            target_paths=["scripts/dummy.py"],
+        )
 
 
 def test_begin_writes_both_current_and_named_packet(auth_module, tmp_path):
@@ -663,6 +925,51 @@ def test_begin_cli_succeeds_when_work_intent_claim_held(auth_module, tmp_path, c
     assert not auth_module.packet_path(tmp_path).exists()
 
 
+@pytest.mark.parametrize(
+    ("target_path", "mutation_class"),
+    [
+        ("scripts/dummy.py", "source"),
+        ("platform_tests/scripts/test_dummy.py", "test"),
+        ("config/dummy.toml", "configuration"),
+    ],
+)
+def test_implementation_start_requires_project_authorization_for_protected_targets(
+    auth_module,
+    tmp_path,
+    target_path,
+    mutation_class,
+):
+    taxonomy_target = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
+    taxonomy_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(TAXONOMY_PATH, taxonomy_target)
+    packet = {"schema_version": 2, "target_path_globs": [target_path]}
+
+    with pytest.raises(
+        auth_module.AuthorizationError,
+        match=rf"Project Authorization is required.*{re.escape(target_path)} \({mutation_class}\)",
+    ):
+        auth_module.validate_packet_project_authorization_operation(
+            tmp_path,
+            packet,
+            requested_operations=["implementation_start", "protected_mutation"],
+            target_paths=[target_path],
+        )
+
+
+def test_non_start_legacy_packet_does_not_gain_protected_mutation_authority(auth_module, tmp_path):
+    packet = {"schema_version": 2, "target_path_globs": ["scripts/dummy.py"]}
+
+    assert (
+        auth_module.validate_packet_project_authorization_operation(
+            tmp_path,
+            packet,
+            requested_operations=["implementation_packet_load"],
+            target_paths=["scripts/dummy.py"],
+        )
+        is None
+    )
+
+
 def test_project_authorization_accepts_active_project_without_retirement_class(auth_module, tmp_path):
     """Baseline: ordinary active-project PAUTH validation remains unchanged."""
     slug = "project-auth-active"
@@ -675,12 +982,109 @@ def test_project_authorization_accepts_active_project_without_retirement_class(a
 
     assert packet["project_authorization"]["id"] == "PAUTH-FIXTURE"
     assert packet["project_authorization"]["project_id"] == "PROJECT-FIXTURE"
+    assert packet["project_authorization"]["allowed_mutation_classes"] == ["source"]
+    assert packet["project_authorization"]["target_classifications"] == [
+        {"path": "scripts/dummy.py", "mutation_class": "source"}
+    ]
+    assert len(packet["project_authorization"]["evaluator_sha256"]) == 64
+    assert len(packet["project_authorization"]["taxonomy_sha256"]) == 64
+
+
+def test_project_authorization_rejects_source_target_for_bridge_metadata_only(auth_module, tmp_path):
+    """WI-5178: proposal-filing authority cannot escalate into source authority."""
+    slug = "project-auth-filing-only"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(
+        tmp_path,
+        project_status="active",
+        allowed_mutation_classes=["bridge", "metadata"],
+    )
+
+    with pytest.raises(auth_module.AuthorizationError, match=r"scripts/dummy\.py \(source\)"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+
+def test_project_authorization_rejects_explicit_forbidden_operation(auth_module, tmp_path):
+    """WI-5178: an exact forbidden operation wins over an otherwise allowed class."""
+    _seed_project_authorization(
+        tmp_path,
+        allowed_mutation_classes=["source"],
+        forbidden_operations=["production-deployment"],
+    )
+    row = auth_module._project_authorization_row(tmp_path, "PAUTH-FIXTURE")
+
+    with pytest.raises(auth_module.AuthorizationError, match="forbidden_operation"):
+        auth_module.validate_project_authorization_row(
+            tmp_path,
+            row,
+            target_paths=["scripts/dummy.py"],
+            requested_operations=["production_deployment"],
+        )
+
+
+def test_packet_load_rejects_project_authorization_envelope_drift(auth_module, tmp_path):
+    """WI-5178: cached packets bind the PAUTH envelope and fail on current-row drift."""
+    slug = "project-auth-envelope-drift"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    auth_module.write_packet(tmp_path, packet)
+
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "UPDATE current_project_authorizations SET allowed_mutation_classes = ? WHERE id = ?",
+            (json.dumps(["bridge", "metadata"]), "PAUTH-FIXTURE"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(auth_module.AuthorizationError, match="target_mutation_class_not_allowed"):
+        auth_module.load_packet(tmp_path)
+
+
+def test_packet_load_rejects_taxonomy_byte_drift(auth_module, tmp_path):
+    """WI-5178: packet reuse cannot outlive the exact taxonomy bytes."""
+    slug = "project-auth-taxonomy-drift"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    auth_module.write_packet(tmp_path, packet)
+
+    taxonomy = tmp_path / "config" / "governance" / TAXONOMY_PATH.name
+    taxonomy.write_text(taxonomy.read_text(encoding="utf-8") + "\n# test drift\n", encoding="utf-8")
+
+    with pytest.raises(auth_module.AuthorizationError, match="taxonomy_sha256"):
+        auth_module.load_packet(tmp_path)
+
+
+def test_packet_load_rejects_legacy_pauth_packet_schema(auth_module, tmp_path):
+    """WI-5178: PAUTH-backed v1 packets must be reissued with bound envelope evidence."""
+    slug = "project-auth-legacy-packet"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    packet["schema_version"] = 1
+    packet["packet_hash"] = auth_module.packet_hash(packet)
+    auth_module.write_packet(tmp_path, packet)
+
+    with pytest.raises(auth_module.AuthorizationError, match="legacy schema.*reissue"):
+        auth_module.load_packet(tmp_path)
 
 
 def test_project_authorization_accepts_retired_project_for_retirement_reconciliation(auth_module, tmp_path):
-    """Retired-project reconciliation PAUTHs can mint implementation packets."""
+    """Retired-project reconciliation remains limited to metadata effects."""
     slug = "project-auth-retired-reconciliation"
-    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["groundtruth.db"])
     _add_project_authorization_metadata(proposal)
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
     _seed_project_authorization(
@@ -693,6 +1097,9 @@ def test_project_authorization_accepts_retired_project_for_retirement_reconcilia
 
     assert packet["project_authorization"]["id"] == "PAUTH-FIXTURE"
     assert packet["project_authorization"]["project_id"] == "PROJECT-FIXTURE"
+    assert packet["project_authorization"]["target_classifications"] == [
+        {"path": "groundtruth.db", "mutation_class": "metadata"}
+    ]
 
 
 def test_project_authorization_rejects_retired_project_without_retirement_reconciliation(auth_module, tmp_path):

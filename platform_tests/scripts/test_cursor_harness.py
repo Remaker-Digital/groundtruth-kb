@@ -429,6 +429,126 @@ def test_non_bridge_zero_output_success_is_preserved(
     assert captured.err == ""
 
 
+def test_timeout_returns_124_with_safe_context_and_partial_output(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    prompt = "owner prompt must not appear in timeout diagnostic"
+
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd=command,
+            timeout=kwargs["timeout"],
+            output="partial stdout\n",
+            stderr=b"partial stderr\n",
+        )
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    exit_code = harness.main(
+        [
+            "--prompt",
+            prompt,
+            "--skill",
+            "bridge-review",
+            "--output-format",
+            "json",
+            "--mode",
+            "plan",
+            "--timeout",
+            "7",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 124
+    assert "partial stdout" in captured.out
+    assert "partial stderr" in captured.err
+    assert "Cursor Agent timed out after 7s" in captured.err
+    assert "exit=124" in captured.err
+    assert "executable=agent.exe" in captured.err
+    assert "skill=bridge-review" in captured.err
+    assert "output_format=json" in captured.err
+    assert "mode=plan" in captured.err
+    assert prompt not in captured.out
+    assert prompt not in captured.err
+    assert "--workspace" not in captured.err
+
+
+def test_timeout_redacts_and_truncates_partial_output(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    key_name = "api" + "_key"
+    secret_value = "S" * 24
+
+    monkeypatch.setattr(harness, "_TIMEOUT_CAPTURE_LIMIT_BYTES", 64)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd=command,
+            timeout=kwargs["timeout"],
+            output=f"before {key_name}={secret_value} after " + ("x" * 120),
+            stderr=None,
+        )
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness.main(["--prompt", "ordinary prompt", "--timeout", "3"]) == 124
+
+    captured = capsys.readouterr()
+    assert f"{key_name}=[REDACTED]" in captured.out
+    assert secret_value not in captured.out
+    assert "partial stdout truncated to 64 bytes" in captured.out
+    assert "partial_stdout_bytes=" in captured.err
+
+
+def test_dispatch_timeout_records_new_cursor_agent_provenance(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    harness = _load_harness()
+    snapshots = [
+        {},
+        {
+            (21, 300.0): {
+                "pid": 21,
+                "ppid": 1,
+                "name": "cursor-agent.exe",
+                "create_time_epoch": 300.0,
+            }
+        },
+    ]
+    merged: list[dict] = []
+
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-123")
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+    monkeypatch.setattr(harness.os, "getpid", lambda: 901)
+    monkeypatch.setattr(harness.time, "time", lambda: 250.0)
+    monkeypatch.setattr(harness, "_cursor_agent_snapshot", lambda _project_root: snapshots.pop(0))
+    monkeypatch.setattr(
+        harness, "_merge_cursor_agent_provenance", lambda _project_root, records: merged.extend(records)
+    )
+
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=command, timeout=kwargs["timeout"])
+
+    monkeypatch.setattr(harness.subprocess, "run", fake_run)
+
+    assert harness.main(["--prompt", "dispatch prompt", "--timeout", "5"]) == 124
+
+    assert merged == [{"pid": 21, "create_time_epoch": 300.0, "dispatch_root_pid": 901}]
+    assert "Cursor Agent timed out" in capsys.readouterr().err
+
+
 def test_cursor_agent_provenance_records_only_new_processes() -> None:
     harness = _load_harness()
     before = {

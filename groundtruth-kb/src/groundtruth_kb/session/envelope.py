@@ -224,6 +224,47 @@ def _resolve_role(project_root: Path, harness_id: str) -> str | None:
     return None
 
 
+def _role_resolution(
+    project_root: Path,
+    harness_id: str,
+    *,
+    role: str | None,
+    role_source: str | None = None,
+) -> dict[str, str | None]:
+    durable_role = _resolve_role(project_root, harness_id)
+    resolved_role = role or durable_role
+    transcript_source = role_source == "transcript_init_keyword" or (role_source is None and role is not None)
+    if transcript_source:
+        return {
+            "interactive_resolved_role": resolved_role,
+            "interactive_role_source": "transcript_init_keyword",
+            "durable_registry_role": durable_role,
+            "durable_registry_authority": (
+                "headless dispatch routing and interactive fallback only; non-overriding when "
+                "a transcript-defined interactive role is present"
+            ),
+            "authority_mode": "interactive_transcript",
+        }
+    if role_source is not None:
+        return {
+            "interactive_resolved_role": resolved_role,
+            "interactive_role_source": None,
+            "durable_registry_role": durable_role,
+            "durable_registry_authority": "dispatcher routing and audit only; worker behavior comes from this document",
+            "authority_mode": "worker_session_document",
+        }
+    return {
+        "interactive_resolved_role": resolved_role,
+        "interactive_role_source": None,
+        "durable_registry_role": durable_role,
+        "durable_registry_authority": (
+            "headless dispatch routing and interactive fallback only; non-overriding when "
+            "a transcript-defined interactive role is present"
+        ),
+        "authority_mode": "durable_registry_fallback",
+    }
+
+
 def _git_status(project_root: Path) -> dict[str, Any]:
     try:
         result = subprocess.run(
@@ -267,11 +308,9 @@ def _base_envelope(
     session_id: str | None = None,
 ) -> dict[str, Any]:
     opened_at = utc_now_iso()
-    durable_role = _resolve_role(project_root, harness_id)
-    resolved_role = role or durable_role
     resolved_subject = subject or os.environ.get("GTKB_WORK_SUBJECT") or "gtkb_infrastructure"
-    interactive_role_source = "transcript_init_keyword" if role else None
-    authority_mode = "interactive_transcript" if role else "durable_registry_fallback"
+    role_resolution = _role_resolution(project_root, harness_id, role=role)
+    resolved_role = role_resolution["interactive_resolved_role"]
     return {
         "envelope_schema_version": ENVELOPE_SCHEMA_VERSION,
         "session_id": session_id or _session_id(harness_id, opened_at),
@@ -289,16 +328,7 @@ def _base_envelope(
         "role_asserted": role,
         "role_resolved": resolved_role,
         "role": resolved_role,
-        "role_resolution": {
-            "interactive_resolved_role": resolved_role,
-            "interactive_role_source": interactive_role_source,
-            "durable_registry_role": durable_role,
-            "durable_registry_authority": (
-                "headless dispatch routing and interactive fallback only; non-overriding when "
-                "a transcript-defined interactive role is present"
-            ),
-            "authority_mode": authority_mode,
-        },
+        "role_resolution": role_resolution,
         "application_id": None,
         "resource_contract": canonical_resource_contract(),
         "resource_selection": resolve_resource_selection("", selection_source="session_initialization"),
@@ -371,10 +401,34 @@ def _validate_worker_role_provenance(
     role = _require_nonempty_string(provenance.get("role"), "role")
     if role not in WORKER_ROLES:
         raise EnvelopeError(f"Worker role provenance role must be one of {sorted(WORKER_ROLES)}.")
+    for envelope_role_field in ("role", "role_resolved", "role_asserted"):
+        envelope_role = envelope.get(envelope_role_field)
+        if envelope_role is None:
+            continue
+        if _require_nonempty_string(envelope_role, envelope_role_field) != role:
+            raise EnvelopeError(f"Worker role provenance role conflicts with envelope {envelope_role_field}.")
     result["role"] = role
-    result["role_resolution_source"] = _require_nonempty_string(
-        provenance.get("role_resolution_source"), "role_resolution_source"
-    )
+    role_source = _require_nonempty_string(provenance.get("role_resolution_source"), "role_resolution_source")
+    result["role_resolution_source"] = role_source
+    role_resolution = envelope.get("role_resolution")
+    if isinstance(role_resolution, dict):
+        interactive_role = role_resolution.get("interactive_resolved_role")
+        if (
+            interactive_role is not None
+            and _require_nonempty_string(interactive_role, "interactive_resolved_role") != role
+        ):
+            raise EnvelopeError("Worker role provenance role conflicts with envelope role_resolution.")
+        interactive_source = role_resolution.get("interactive_role_source")
+        authority_mode = role_resolution.get("authority_mode")
+        if role_source == "transcript_init_keyword":
+            if interactive_source != "transcript_init_keyword" or authority_mode != "interactive_transcript":
+                raise EnvelopeError(
+                    "Transcript init-keyword worker provenance requires transcript role_resolution metadata."
+                )
+        elif interactive_source == "transcript_init_keyword":
+            raise EnvelopeError(
+                "Session envelope claims transcript role resolution but worker provenance is not transcript-derived."
+            )
     result["issued_at"] = _require_nonempty_string(provenance.get("issued_at"), "issued_at")
     dispatch_run_id = provenance.get("dispatch_run_id")
     if dispatch_run_id is not None:
@@ -548,6 +602,12 @@ def open_session(
     if worker_role_source is not None:
         if role is None:
             raise EnvelopeError("Worker role provenance requires an explicit resolved role.")
+        envelope["role_resolution"] = _role_resolution(
+            project_root,
+            resolved_id,
+            role=role,
+            role_source=worker_role_source,
+        )
         envelope["worker_role_provenance"] = _worker_role_provenance(
             envelope,
             role=role,
@@ -594,13 +654,14 @@ def ensure_worker_session(
     current["role_asserted"] = role
     current["role_resolved"] = role
     current["role"] = role
-    current["role_resolution"] = {
-        "interactive_resolved_role": role,
-        "interactive_role_source": role_source,
-        "durable_registry_role": current.get("role_resolution", {}).get("durable_registry_role"),
-        "durable_registry_authority": "dispatcher routing and audit only; worker behavior comes from this document",
-        "authority_mode": "worker_session_document",
-    }
+    if init_keyword is not None:
+        current["init_keyword"] = init_keyword
+    current["role_resolution"] = _role_resolution(
+        project_root,
+        resolved_id,
+        role=role,
+        role_source=role_source,
+    )
     current["worker_role_provenance"] = _worker_role_provenance(
         current,
         role=role,

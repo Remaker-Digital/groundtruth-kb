@@ -30,13 +30,14 @@ def _parse_override_args(module: HarnessModule, args: Sequence[str]) -> argparse
     return module.build_arg_parser().parse_args(["-p", "hello", *args])
 
 
-def test_lo_harness_routing_max_turns_has_generous_verification_headroom() -> None:
+def test_lo_harness_routing_uses_owner_approved_generous_envelope() -> None:
     root = Path(__file__).resolve().parents[2]
     routing = tomllib.loads((root / ".api-harness" / "routing.toml").read_text(encoding="utf-8"))["routing"]
 
     for provider in ("ollama", "openrouter", "alibaba-cloud-studio"):
-        assert routing[provider]["max_turns"] >= 600
-        assert routing[provider]["session_timeout_seconds"] >= 28800
+        assert routing[provider]["timeout_seconds"] == 900
+        assert routing[provider]["session_timeout_seconds"] == 3600
+        assert routing[provider]["max_turns"] == 600
 
 
 def test_lo_harness_argparse_default_tracks_constant() -> None:

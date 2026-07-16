@@ -32,6 +32,9 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
 - Prime Builder acts only on latest `GO` or `NO-GO` entries for its harness.
 - Never process latest `NEW`, `REVISED`, or `VERIFIED` as actionable queue work
   (that is a role-confusion defect to diagnose).
+- Activity-specific bridge/review skills and LO runbooks load on `::open build`
+  per `config/agent-control/activity-envelope-sharding.toml`; base startup stays
+  on the global baseline only.
 - Advisory Proposals are governed bridge artifacts. Latest `ADVISORY` entries
   are non-dispatchable and not implementation approval, but they are the primary
   Loyal Opposition mechanism for future-work initiation. Retrieve them through

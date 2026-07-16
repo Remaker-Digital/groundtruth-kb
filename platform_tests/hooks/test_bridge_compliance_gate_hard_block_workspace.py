@@ -16,12 +16,15 @@ behavior across all branches).
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -435,6 +438,43 @@ def test_go_with_clean_applicability_preflight_passes() -> None:
     finally:
         if prior_file.exists():
             prior_file.unlink()
+
+
+@pytest.mark.parametrize("hook_path", [ACTIVE_HOOK, TEMPLATE_HOOK])
+def test_hook_blocks_semantic_preflight_failure_without_missing_specs(
+    hook_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_name = f"bridge_compliance_gate_{hook_path.parent.name}_{id(hook_path)}"
+    spec = importlib.util.spec_from_file_location(module_name, hook_path)
+    assert spec is not None and spec.loader is not None
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    completed = subprocess.CompletedProcess(
+        args=[],
+        returncode=5,
+        stdout=json.dumps(
+            {
+                "preflight_passed": False,
+                "missing_required_specs": [],
+                "blocking_errors": ["owner approval evidence is missing"],
+            }
+        ),
+        stderr="",
+    )
+    monkeypatch.setattr(hook.subprocess, "run", lambda *args, **kwargs: completed)
+
+    passed, detail = hook._run_pending_applicability_preflight(
+        cwd=tmp_path,
+        file_path="bridge/fixture-001.md",
+        bridge_id="fixture",
+        content="NEW\n",
+    )
+
+    assert passed is False
+    assert "owner approval evidence is missing" in detail
+    assert '"missing_required_specs": []' in detail
 
 
 def _pending_preflight_content(*, include_application_spec: bool) -> str:

@@ -688,3 +688,19 @@ work_area/
 /*-review-package.md
 /backlog_status_utf8.txt
 /bridge-scan.json
+
+# --- WI-5299: deterministic scratch residue missed by WI-5114 ---
+# Root-only pytest copies and Loyal Opposition inspection helpers.
+/.harness-tmp-unique-*/
+/.tmp_lo_*
+# Throwaway root fixtures created by direct-write and authorization tests.
+/CON
+/strftime
+/temp-direct*.txt
+/temp-test.txt
+/test-auth-root/
+# Narrow verify-helper drafts/scripts; canonical helpers and verdicts stay visible.
+.claude/skills/verify/helpers/tmp_gtkb-wi*-draft.md
+.claude/skills/verify/helpers/write_bridge_*.py
+.codex/skills/verify/helpers/tmp_gtkb-wi*-draft.md
+.codex/skills/verify/helpers/gtkb-wi*-draft-body.md

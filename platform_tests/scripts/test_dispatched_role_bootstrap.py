@@ -7,7 +7,7 @@ from pathlib import Path
 
 from groundtruth_kb.session.envelope import worker_session_envelope_path
 
-from scripts.check_dispatched_role_bootstrap import evaluate
+from scripts.check_dispatched_role_bootstrap import ROLE_BOOTSTRAP_CONTRACT, evaluate
 
 
 def _write_document(root: Path, *, role: str, session_id: str = "run-5171") -> None:
@@ -48,13 +48,20 @@ def test_dispatch_role_bootstrap_accepts_matching_document(tmp_path: Path) -> No
 
     assert result == {
         "ok": True,
+        "decision": "allow",
+        "resolved_role": "prime-builder",
         "role": "prime-builder",
         "harness_name": "codex",
-        "dispatch_audit": {
+        "session_id": "run-5171",
+        "run_id": "run-5171",
+        "role_resolution_source": "dispatcher_composition",
+        "source_classified": "dispatcher-envelope",
+        "mismatch_audit": {
             "status": "match",
             "dispatch_role": "prime-builder",
             "worker_role": "prime-builder",
         },
+        "authority_contract": ROLE_BOOTSTRAP_CONTRACT,
     }
 
 
@@ -70,8 +77,41 @@ def test_dispatch_role_bootstrap_reports_mismatch_without_substituting_worker_ro
 
     assert result["ok"] is True
     assert result["role"] == "loyal-opposition"
-    assert result["dispatch_audit"] == {
+    assert result["mismatch_audit"] == {
         "status": "warning",
         "dispatch_role": "prime-builder",
         "worker_role": "loyal-opposition",
     }
+
+
+def test_dispatch_role_bootstrap_fails_closed_with_classified_recovery(tmp_path: Path) -> None:
+    missing = evaluate(
+        tmp_path,
+        session_id="run-5171",
+        harness_name="codex",
+        dispatch_role="prime-builder",
+    )
+
+    assert missing["ok"] is False
+    assert missing["decision"] == "deny"
+    assert missing["failure_class"] == "missing"
+    assert missing["authority_contract"]["gate"] == "protected-work"
+    assert missing["recovery"]
+
+
+def test_dispatch_role_bootstrap_rejects_non_dispatch_source(tmp_path: Path) -> None:
+    _write_document(tmp_path, role="prime-builder")
+    path = worker_session_envelope_path(tmp_path, "codex", "run-5171")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["worker_role_provenance"]["role_resolution_source"] = "test-fixture"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = evaluate(
+        tmp_path,
+        session_id="run-5171",
+        harness_name="codex",
+        dispatch_role="prime-builder",
+    )
+
+    assert result["ok"] is False
+    assert result["failure_class"] == "malformed"

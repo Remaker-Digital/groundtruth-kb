@@ -82,6 +82,13 @@ def _commit_thread_through_report(
     assert _git(repo, "commit", "-q", "-m", f"{slug} report").returncode == 0
 
 
+def _commit_thread_through_verified(repo: Path, slug: str, *, target_paths: bool = True) -> None:
+    _commit_thread_through_report(repo, slug, target_paths=target_paths)
+    _write(repo, f"bridge/{slug}-004.md", _verified(slug))
+    _git(repo, "add", "-A")
+    assert _git(repo, "commit", "-q", "-m", f"{slug} verified").returncode == 0
+
+
 def _plan_by_slug(repo: Path, *, exclude_wis: list[str] | None = None) -> dict[str | None, dict]:
     plan = repair.build_repair_plan(repo, exclude_wis=exclude_wis)
     return {thread.get("thread_slug"): thread for thread in plan["threads"]}
@@ -117,6 +124,57 @@ def test_terminal_verified_dirty_targets_blocks(tmp_path: Path) -> None:
     assert thread["classification"] == "terminal_verified_blocked_dirty_targets"
     assert thread["stop"] is True
     assert "scripts/tool.py" in thread["dirty_targets"]
+
+
+def test_tracked_modified_terminal_verified_verdict_is_stop(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    slug = "gtkb-wi5116-modified-terminal-verdict"
+    _commit_thread_through_verified(repo, slug)
+    verdict = repo / "bridge" / f"{slug}-004.md"
+    verdict.write_text(verdict.read_text(encoding="utf-8") + "\nChanged after review.\n", encoding="utf-8")
+
+    thread = _plan_by_slug(repo)[slug]
+
+    assert thread["classification"] == "mixed_provenance_stop"
+    assert thread["stop"] is True
+    assert thread["dirty_terminal_verdicts"] == [
+        {
+            "path": f"bridge/{slug}-004.md",
+            "change_kind": "modified",
+            "git_status": " M",
+            "reason": (
+                "tracked modified terminal verdict requires exact byte ownership and finalization evidence; "
+                "terminal status alone does not authorize the changed artifact"
+            ),
+        }
+    ]
+
+
+def test_tracked_deleted_terminal_verified_verdict_is_stop(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    slug = "gtkb-wi5116-deleted-terminal-verdict"
+    _commit_thread_through_verified(repo, slug)
+    (repo / "bridge" / f"{slug}-004.md").unlink()
+
+    thread = _plan_by_slug(repo)[slug]
+
+    assert thread["classification"] == "mixed_provenance_stop"
+    assert thread["stop"] is True
+    assert thread["dirty_terminal_verdicts"] == [
+        {
+            "path": f"bridge/{slug}-004.md",
+            "change_kind": "deleted",
+            "git_status": " D",
+            "reason": (
+                "tracked deleted terminal verdict requires exact byte ownership and finalization evidence; "
+                "terminal status alone does not authorize the changed artifact"
+            ),
+        }
+    ]
 
 
 def test_terminal_verified_missing_scope_blocks(tmp_path: Path) -> None:

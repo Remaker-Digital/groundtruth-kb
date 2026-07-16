@@ -162,6 +162,7 @@ def test_storm_watchdog_launcher_runs_powershell_headless_on_windows(monkeypatch
 
     monkeypatch.setattr(launcher.os, "name", "nt")
     monkeypatch.setattr(launcher.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(launcher, "ensure_snapshot_window_hider", lambda: True)
     monkeypatch.setattr(launcher.subprocess, "run", _fake_run)
 
     assert launcher.main() == 0
@@ -179,6 +180,62 @@ def test_storm_watchdog_launcher_runs_powershell_headless_on_windows(monkeypatch
         assert startupinfo is not None
         assert startupinfo.dwFlags & getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
         assert startupinfo.wShowWindow == getattr(subprocess, "SW_HIDE", 0)
+
+
+def test_storm_watchdog_launcher_starts_snapshot_hider_detached_and_headless(tmp_path, monkeypatch):
+    """Window containment starts via pythonw and never gates watchdog execution."""
+    launcher = _load_watchdog_launcher()
+    expected_no_window = 0x08000000
+    expected_detached = 0x00000008
+    expected_new_group = 0x00000200
+    python_dir = tmp_path / "venv" / "Scripts"
+    python_dir.mkdir(parents=True)
+    python_exe = python_dir / "python.exe"
+    pythonw_exe = python_dir / "pythonw.exe"
+    python_exe.write_text("", encoding="utf-8")
+    pythonw_exe.write_text("", encoding="utf-8")
+    hider = tmp_path / "codex_snapshot_window_hider.py"
+    hider.write_text("", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    class _FakePopen:
+        def __init__(self, args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(launcher.os, "name", "nt")
+    monkeypatch.setattr(launcher.sys, "executable", str(python_exe))
+    monkeypatch.setattr(launcher, "SNAPSHOT_WINDOW_HIDER", hider)
+    monkeypatch.setattr(launcher.subprocess, "CREATE_NO_WINDOW", expected_no_window, raising=False)
+    monkeypatch.setattr(launcher.subprocess, "DETACHED_PROCESS", expected_detached, raising=False)
+    monkeypatch.setattr(launcher.subprocess, "CREATE_NEW_PROCESS_GROUP", expected_new_group, raising=False)
+    monkeypatch.setattr(launcher.subprocess, "Popen", _FakePopen)
+
+    assert launcher.ensure_snapshot_window_hider() is True
+    assert captured["args"] == [str(pythonw_exe), str(hider)]
+    kwargs = captured["kwargs"]
+    flags = int(kwargs["creationflags"])
+    assert flags & expected_no_window
+    assert flags & expected_detached
+    assert flags & expected_new_group
+    assert kwargs["stdin"] == subprocess.DEVNULL
+    assert kwargs["stdout"] == subprocess.DEVNULL
+    assert kwargs["stderr"] == subprocess.DEVNULL
+
+
+def test_storm_watchdog_continues_when_snapshot_hider_cannot_start(monkeypatch):
+    launcher = _load_watchdog_launcher()
+    calls: list[str] = []
+
+    monkeypatch.setattr(launcher, "ensure_snapshot_window_hider", lambda: False)
+    monkeypatch.setattr(
+        launcher.subprocess,
+        "run",
+        lambda args, **kwargs: calls.append(args[0]) or subprocess.CompletedProcess(args, 0),
+    )
+
+    assert launcher.main() == 0
+    assert calls == ["powershell.exe"]
 
 
 def test_dispatcher_supervisor_powershell_probe_runs_headless_on_windows(monkeypatch):

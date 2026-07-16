@@ -9,9 +9,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DISPATCH_SCRIPTS = (
-    REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py",
-    REPO_ROOT / "scripts" / "single_harness_bridge_dispatcher.py",
-    REPO_ROOT / "scripts" / "single_harness_bridge_automation.py",
+    REPO_ROOT / "scripts" / "dispatcher_runtime.py",
+    REPO_ROOT / "scripts" / "gtkb_dispatcher_daemon.py",
+    REPO_ROOT / "scripts" / "gtkb_dispatcher_daemon.py",
 )
 
 FORBIDDEN_PATTERNS = (

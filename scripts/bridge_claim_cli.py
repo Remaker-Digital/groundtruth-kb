@@ -10,6 +10,8 @@ pre-drafting boundary for bridge thread coordination per the
 
 Usage:
     python scripts/bridge_claim_cli.py claim <slug>
+    python scripts/bridge_claim_cli.py claim-bootstrap <slug> --owner-decision <DELIB-ID> --project <PROJECT-ID> --work-item <WI-ID> --authorization-id <PAUTH-ID> --carrier groundtruth.db
+    python scripts/bridge_claim_cli.py claim-no-action <slug>
     python scripts/bridge_claim_cli.py extend <slug>
     python scripts/bridge_claim_cli.py release <slug>
     python scripts/bridge_claim_cli.py status <slug>
@@ -55,6 +57,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from bridge_work_intent_registry import (  # noqa: E402  (path-fix import)
+    CLAIM_KIND_NO_ACTION_CORRECTION,
+    CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
     WorkIntentRegistryError,
     acquire,
     claim_status,
@@ -115,18 +119,53 @@ def _print_holder_or_default(holder: dict[str, str] | None, *, none_repr: str = 
         print(none_repr)
 
 
-def cmd_claim(args: argparse.Namespace) -> int:
+def _cmd_claim_with_kind(
+    args: argparse.Namespace,
+    *,
+    claim_kind: str | None,
+    bootstrap_authority: dict[str, object] | None = None,
+) -> int:
     session_id = _resolve_session_id(args.session_id)
     ttl = _resolve_ttl(args.ttl_seconds)
     project_root = _resolve_project_root(args.project_root)
     try:
-        acquired = acquire(args.slug, session_id, ttl_seconds=ttl, project_root=project_root)
+        acquired = acquire(
+            args.slug,
+            session_id,
+            ttl_seconds=ttl,
+            project_root=project_root,
+            claim_kind=claim_kind,
+            bootstrap_authority=bootstrap_authority,
+        )
     except WorkIntentRegistryError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 3
     holder = current_holder(args.slug, project_root=project_root)
     _print_holder_or_default(holder)
     return 0 if acquired else 2
+
+
+def cmd_claim(args: argparse.Namespace) -> int:
+    return _cmd_claim_with_kind(args, claim_kind=None)
+
+
+def cmd_claim_no_action(args: argparse.Namespace) -> int:
+    return _cmd_claim_with_kind(args, claim_kind=CLAIM_KIND_NO_ACTION_CORRECTION)
+
+
+def cmd_claim_bootstrap(args: argparse.Namespace) -> int:
+    authority = {
+        "owner_decision_id": args.owner_decision,
+        "project_id": args.project,
+        "work_item_id": args.work_item,
+        "authorization_id": args.authorization_id,
+        "carrier_targets": args.carrier,
+    }
+    return _cmd_claim_with_kind(
+        args,
+        claim_kind=CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        bootstrap_authority=authority,
+    )
 
 
 def cmd_release(args: argparse.Namespace) -> int:
@@ -190,6 +229,62 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override default project root (test affordance).",
     )
     p_claim.set_defaults(func=cmd_claim)
+
+    p_claim_bootstrap = sub.add_parser(
+        "claim-bootstrap",
+        help="Claim a project-authorization bootstrap carrier transaction.",
+        description=(
+            "Acquire a non-ordinary project_authorization_bootstrap claim for a latest GO. "
+            "This path is limited to the declared PAUTH carrier target and records the owner "
+            "decision, project, work item, target authorization id, and session evidence."
+        ),
+    )
+    p_claim_bootstrap.add_argument("slug", help="Bridge thread slug (kebab-case).")
+    p_claim_bootstrap.add_argument("--owner-decision", required=True, help="Owner DELIB-* decision id.")
+    p_claim_bootstrap.add_argument("--project", required=True, help="Project id bound to the bootstrap.")
+    p_claim_bootstrap.add_argument("--work-item", required=True, help="Work item id bound to the bootstrap.")
+    p_claim_bootstrap.add_argument("--authorization-id", required=True, help="PAUTH-* id being created or replaced.")
+    p_claim_bootstrap.add_argument(
+        "--carrier",
+        action="append",
+        required=True,
+        help="Carrier target authorized for the bootstrap transaction. Repeat for multiple carriers.",
+    )
+    p_claim_bootstrap.add_argument("--session-id", help="Override harness session env vars.")
+    p_claim_bootstrap.add_argument(
+        "--ttl-seconds",
+        type=int,
+        help=(f"Override GTKB_WORK_INTENT_TTL_SECONDS env var (default {DEFAULT_TTL_SECONDS} seconds)."),
+    )
+    p_claim_bootstrap.add_argument(
+        "--project-root",
+        type=Path,
+        help="Override default project root (test affordance).",
+    )
+    p_claim_bootstrap.set_defaults(func=cmd_claim_bootstrap)
+
+    p_claim_no_action = sub.add_parser(
+        "claim-no-action",
+        help="Claim a Prime NO-ACTION correction for a latest GO or NO-GO.",
+        description=(
+            "Acquire a non-implementation Prime claim used only to append a NO-ACTION "
+            "correction after a latest GO or NO-GO verdict. This mode does not invoke "
+            "implementation PAUTH and cannot authorize implementation start."
+        ),
+    )
+    p_claim_no_action.add_argument("slug", help="Bridge thread slug (kebab-case).")
+    p_claim_no_action.add_argument("--session-id", help="Override harness session env vars.")
+    p_claim_no_action.add_argument(
+        "--ttl-seconds",
+        type=int,
+        help=(f"Override GTKB_WORK_INTENT_TTL_SECONDS env var (default {DEFAULT_TTL_SECONDS} seconds)."),
+    )
+    p_claim_no_action.add_argument(
+        "--project-root",
+        type=Path,
+        help="Override default project root (test affordance).",
+    )
+    p_claim_no_action.set_defaults(func=cmd_claim_no_action)
 
     p_extend = sub.add_parser(
         "extend",

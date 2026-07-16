@@ -41,7 +41,7 @@ The sweep automates that hand-finalization.
 
 `scripts/auto_finalize_sweep.py` is registered as a `Stop` hook in BOTH
 `.claude/settings.json` and `.codex/hooks.json` (the same shared-script,
-dual-registration parity model as `scripts/cross_harness_bridge_trigger.py`).
+dual-registration parity model as `scripts/gtkb_dispatcher_daemon.py`).
 On turn-end it:
 
 1. **Cheap-gate:** enumerates untracked terminal `VERIFIED` verdict files using

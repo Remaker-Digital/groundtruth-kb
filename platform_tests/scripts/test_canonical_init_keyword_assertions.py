@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_HOOK_PATH = PROJECT_ROOT / ".claude" / "hooks" / "session_start_dispatch.py"
 CODEX_HOOK_PATH = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "session_start_dispatch.py"
 CORE_PATH = PROJECT_ROOT / "scripts" / "session_start_dispatch_core.py"
-TRIGGER_PATH = PROJECT_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+TRIGGER_PATH = PROJECT_ROOT / "scripts" / "dispatcher_runtime.py"
 
 
 def _read(path: Path) -> str:

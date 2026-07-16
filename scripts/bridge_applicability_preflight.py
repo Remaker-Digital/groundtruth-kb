@@ -39,12 +39,12 @@ BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
 SPEC_LINK_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     # Strict harvest heading. Tolerates a trailing qualifier ONLY when it is
     # introduced by a separator -- "(" (parenthetical), ":", en-dash, em-dash,
-    # or hyphen -- e.g. "## Specification Links (carried forward)". Bare trailing
-    # words (e.g. "## Specification Format Guide") still do NOT match, so the
-    # widening cannot over-harvest from unrelated headings (WI-4542).
+    # or a whitespace-prefixed hyphen -- e.g. "## Specification Links (carried
+    # forward)". Requiring whitespace before an ASCII hyphen prevents compound
+    # headings such as "Specification-Derived" from matching (WI-5330).
     r"^#{1,6}\s*(?:relevant\s+|linked\s+|governing\s+)?"
     r"specification(?:\s+links?|\s+references?)?"
-    r"(?:\s*[(:–—-].*)?\s*$",
+    r"(?:\s*[(:–—].*|\s+-.*)?\s*$",
     re.IGNORECASE,
 )
 # Loose detector for spec-links-like headings the STRICT regex rejects (e.g. the

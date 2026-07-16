@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sqlite3
 import sys
 from pathlib import Path
+
+from groundtruth_kb.governance.approval_packet import construct_approval_packet
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "bridge_applicability_preflight.py"
@@ -25,7 +28,7 @@ spec.loader.exec_module(preflight)
 
 def _write_bridge(root: Path, bridge_id: str, content: str) -> None:
     bridge = root / "bridge"
-    bridge.mkdir()
+    bridge.mkdir(exist_ok=True)
     (bridge / f"{bridge_id}-001.md").write_text(f"NEW\n\n{content}", encoding="utf-8")
 
 
@@ -46,6 +49,185 @@ applies_when_content_matches = ["requirement"]
 """,
         encoding="utf-8",
     )
+
+
+def _write_pauth_db(root: Path) -> Path:
+    db_path = root / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """CREATE TABLE current_project_authorizations (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL, status TEXT NOT NULL,
+                included_spec_ids TEXT, excluded_spec_ids TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO current_project_authorizations VALUES (?, ?, ?, ?, ?)",
+            ("PAUTH-FIXTURE", "PROJECT-FIXTURE", "active", json.dumps(["SPEC-OLD"]), json.dumps([])),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return db_path
+
+
+def _pauth_amendment_content(change_reason: str) -> str:
+    envelope = {
+        "id": "PAUTH-FIXTURE",
+        "project_id": "PROJECT-FIXTURE",
+        "included_spec_ids": ["SPEC-OLD", "SPEC-NEW"],
+        "excluded_spec_ids": [],
+        "change_reason": change_reason,
+    }
+    return (
+        "# Proposal\n\n"
+        "Project: PROJECT-FIXTURE\n\n"
+        'target_paths: ["groundtruth.db"]\n\n'
+        "## Specification Links\n\n"
+        "- DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001\n\n"
+        f"```json\n{json.dumps(envelope)}\n```\n"
+    )
+
+
+def _approval_packet(
+    *,
+    approved_by: str = "owner",
+    coverage: str = "SPEC-NEW",
+    identity: str = "PROJECT-FIXTURE PAUTH-FIXTURE",
+    artifact_id: str = "PAUTH-FIXTURE",
+) -> dict[str, object]:
+    full_content = f"{identity} {coverage}"
+    return construct_approval_packet(
+        artifact_type="governance",
+        artifact_id=artifact_id,
+        action="update",
+        source_ref="test-fixture",
+        full_content=full_content,
+        approval_mode="approve",
+        presented_to_user=True,
+        transcript_captured=True,
+        explicit_change_request=full_content,
+        changed_by="test",
+        change_reason=full_content,
+        approved_by=approved_by,
+    )
+
+
+def test_preflight_reports_structured_pauth_amendment_blocking_error(tmp_path: Path) -> None:
+    bridge_id = "pauth-amendment"
+    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content("missing owner evidence"))
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = _write_pauth_db(tmp_path)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+    )
+
+    assert packet["missing_required_specs"] == []
+    assert packet["preflight_passed"] is False
+    assert len(packet["blocking_errors"]) == 1
+    assert "No packet path detected" in packet["blocking_errors"][0]
+    assert "blocking_errors:" in preflight.format_markdown(packet)
+
+
+def test_preflight_accepts_structured_pauth_amendment_with_exact_owner_evidence(tmp_path: Path) -> None:
+    bridge_id = "pauth-amendment"
+    rel_path = ".groundtruth/formal-artifact-approvals/pauth-amendment.json"
+    packet_path = tmp_path / rel_path
+    packet_path.parent.mkdir(parents=True)
+    packet_path.write_text(json.dumps(_approval_packet()), encoding="utf-8")
+    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = _write_pauth_db(tmp_path)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+    )
+
+    assert packet["blocking_errors"] == []
+    assert packet["preflight_passed"] is True
+
+
+def test_preflight_rejects_out_of_root_pauth_approval_path(tmp_path: Path) -> None:
+    bridge_id = "pauth-amendment"
+    rel_path = ".groundtruth/formal-artifact-approvals/../../../outside.json"
+    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = _write_pauth_db(tmp_path)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+    )
+
+    assert packet["preflight_passed"] is False
+    assert "outside the in-root approval directory" in packet["blocking_errors"][0]
+
+
+def test_preflight_rejects_malformed_pauth_approval_json(tmp_path: Path) -> None:
+    bridge_id = "pauth-amendment"
+    rel_path = ".groundtruth/formal-artifact-approvals/pauth-amendment.json"
+    packet_path = tmp_path / rel_path
+    packet_path.parent.mkdir(parents=True)
+    packet_path.write_text("{malformed", encoding="utf-8")
+    _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = _write_pauth_db(tmp_path)
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+    )
+
+    assert packet["preflight_passed"] is False
+    assert "not readable JSON" in packet["blocking_errors"][0]
+
+
+def test_preflight_rejects_invalid_nonowner_or_noncovering_pauth_packet(tmp_path: Path) -> None:
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = _write_pauth_db(tmp_path)
+    rel_path = ".groundtruth/formal-artifact-approvals/pauth-amendment.json"
+    packet_path = tmp_path / rel_path
+    packet_path.parent.mkdir(parents=True)
+
+    cases = [
+        ({}, "fails schema validation"),
+        (_approval_packet(approved_by="reviewer"), "not owner-approved"),
+        (
+            _approval_packet(identity="PROJECT-OTHER PAUTH-OTHER", artifact_id="GOV-OTHER"),
+            "does not mention project",
+        ),
+        (_approval_packet(coverage="SPEC-OTHER"), "does not cover the amendment"),
+    ]
+    for index, (approval_packet, expected) in enumerate(cases, start=1):
+        bridge_id = f"pauth-amendment-{index}"
+        packet_path.write_text(json.dumps(approval_packet), encoding="utf-8")
+        _write_bridge(tmp_path, bridge_id, _pauth_amendment_content(f"Owner evidence: {rel_path}"))
+
+        packet = preflight.build_packet(
+            bridge_id=bridge_id,
+            bridge_dir=tmp_path / "bridge",
+            config_path=config,
+            db_path=db_path,
+        )
+
+        assert packet["preflight_passed"] is False
+        assert expected in packet["blocking_errors"][0]
 
 
 def test_preflight_flags_missing_required_cross_cutting_spec(tmp_path: Path) -> None:
@@ -454,6 +636,31 @@ def test_extract_spec_links_does_not_over_harvest_unrelated_heading() -> None:
     """
     content = "# Proposal\n\n## Specification Format Guide\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
     assert preflight.extract_spec_links(content) == set()
+
+
+def test_spec_link_heading_rejects_bare_hyphen_compound_headings() -> None:
+    """WI-5330: a compound heading is not a spec-links qualifier heading."""
+    for heading in (
+        "## Specification-Derived Verification Plan",
+        "## Specification-Driven Design Notes",
+    ):
+        assert preflight.SPEC_LINK_HEADING_RE.match(heading) is None
+
+
+def test_extract_spec_links_skips_compound_heading_before_real_section() -> None:
+    """WI-5330: harvesting reaches the real section after a compound heading."""
+    content = """# Proposal
+
+## Specification-Derived Verification Plan
+
+- SPEC-WRONG-SECTION
+
+## Specification Links
+
+- GOV-FILE-BRIDGE-AUTHORITY-001
+"""
+
+    assert preflight.extract_spec_links(content) == {"GOV-FILE-BRIDGE-AUTHORITY-001"}
 
 
 def test_classify_spec_links_section_distinguishes_statuses() -> None:

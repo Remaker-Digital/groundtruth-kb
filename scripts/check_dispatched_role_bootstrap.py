@@ -6,6 +6,49 @@ import argparse
 import json
 from pathlib import Path
 
+ROLE_BOOTSTRAP_CONTRACT = {
+    "phase": "role-bootstrap",
+    "ordering": "before-activity",
+    "gate": "protected-work",
+    "behavior_role_source": "envelope-role",
+    "source_classification": "source-classified",
+    "registry_read_policy": "registry-read-classification",
+    "registry_read_classification": "no-dispatcher-config-read",
+    "mismatch_policy": "mismatch-audit",
+    "substitution_policy": "no-role-substitution",
+    "activity_policy": "cannot-alter-role",
+    "scope": "applicable-harnesses",
+    "interactive_authority": "interactive-transcript",
+    "interactive_persistence": "persists-boundaries",
+    "subject_init_policy": "subject-only",
+    "fallback_policy": "resolver-fallback",
+    "marker_policy": "session-matched-marker",
+    "registry_mutation_policy": "no-registry-mutation",
+    "registry_authority_policy": "registry-not-behavior-authority",
+}
+
+
+def _failure_class(message: str) -> str:
+    lowered = message.lower()
+    if "missing" in lowered or "does not exist" in lowered:
+        return "missing"
+    if "malformed" in lowered or "unsupported" in lowered or "must be" in lowered:
+        return "malformed"
+    if "conflict" in lowered or "ambiguous" in lowered or "does not match" in lowered:
+        return "conflict"
+    return "invalid"
+
+
+def _denied(reason: str, *, failure_class: str) -> dict[str, object]:
+    return {
+        "ok": False,
+        "decision": "deny",
+        "failure_class": failure_class,
+        "reason": reason,
+        "recovery": "refresh the explicit worker session envelope before work",
+        "authority_contract": ROLE_BOOTSTRAP_CONTRACT,
+    }
+
 
 def evaluate(
     project_root: Path,
@@ -24,26 +67,38 @@ def evaluate(
             harness_name=harness_name,
         )
     except EnvelopeError as exc:
-        return {"ok": False, "reason": str(exc), "recovery": "refresh the explicit worker session envelope before work"}
+        reason = str(exc)
+        return _denied(reason, failure_class=_failure_class(reason))
     if not provenance["dispatch_run_id"]:
-        return {
-            "ok": False,
-            "reason": "Worker role provenance is missing dispatch run evidence.",
-            "recovery": "refresh the explicit worker session envelope before work",
-        }
+        return _denied(
+            "Worker role provenance is missing dispatch run evidence.",
+            failure_class="missing",
+        )
+    if provenance["role_resolution_source"] != "dispatcher_composition":
+        return _denied(
+            "Worker role provenance is malformed: dispatched work requires dispatcher_composition source evidence.",
+            failure_class="malformed",
+        )
 
     # Registry-selected dispatcher intent is an audit comparison only. A mismatch
     # must never substitute or block the explicit worker behavior role.
     audit_status = "match" if provenance["role"] == dispatch_role else "warning"
     return {
         "ok": True,
+        "decision": "allow",
+        "resolved_role": provenance["role"],
         "role": provenance["role"],
         "harness_name": provenance["harness_name"],
-        "dispatch_audit": {
+        "session_id": provenance["session_id"],
+        "run_id": provenance["dispatch_run_id"],
+        "role_resolution_source": provenance["role_resolution_source"],
+        "source_classified": "dispatcher-envelope",
+        "mismatch_audit": {
             "status": audit_status,
             "dispatch_role": dispatch_role,
             "worker_role": provenance["role"],
         },
+        "authority_contract": ROLE_BOOTSTRAP_CONTRACT,
     }
 
 

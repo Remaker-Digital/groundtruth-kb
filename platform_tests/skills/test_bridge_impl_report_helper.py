@@ -43,9 +43,16 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "tes
     (bridge_dir / f"{slug}-001.md").write_text(
         "NEW\n\n"
         "# Test Proposal\n\n"
+        "bridge_kind: prime_proposal\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n"
+        'target_paths: ["scripts/example.py"]\n\n'
         "## Specification Links\n\n"
         "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
         "- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001\n\n"
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements sufficient.\n\n"
         "## Acceptance Criteria\n\n"
         "- [ ] Helper files a post-implementation report.\n"
         "- [ ] Helper carries specification links forward.\n",
@@ -70,6 +77,9 @@ def _completed_report() -> str:
         "NEW\n\n"
         "# Test Implementation Report\n\n"
         "bridge_kind: implementation_report\n\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n\n"
         "## Implementation Claim\n\n"
         "Implemented the helper.\n\n"
         "## Specification Links\n\n"
@@ -293,6 +303,9 @@ def test_proposal_spec_links_are_carried_forward_into_skeleton(helper, tmp_path)
 
     skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
 
+    assert "Project Authorization: PAUTH-PROJECT-TEST" in skeleton
+    assert "Project: PROJECT-TEST" in skeleton
+    assert "Work Item: WI-1234" in skeleton
     assert "## Specification Links" in skeleton
     assert "- `GOV-FILE-BRIDGE-AUTHORITY-001`" in skeleton
     assert "- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`" in skeleton

@@ -14,7 +14,7 @@ from groundtruth_kb.session import envelope
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OWNER_DECISION_TRACKER = REPO_ROOT / ".claude" / "hooks" / "owner-decision-tracker.py"
-TRIGGER = REPO_ROOT / "scripts" / "cross_harness_bridge_trigger.py"
+TRIGGER = REPO_ROOT / "scripts" / "dispatcher_runtime.py"
 
 
 def _load_module(path: Path, name: str) -> ModuleType:
@@ -33,7 +33,7 @@ def _load_owner_tracker() -> ModuleType:
 
 
 def _load_trigger() -> ModuleType:
-    return _load_module(TRIGGER, "fab13_cross_harness_bridge_trigger")
+    return _load_module(TRIGGER, "fab13_dispatcher_runtime")
 
 
 def _write_retention_config(project_root: Path) -> None:

@@ -47,6 +47,11 @@ def _write_index(root: Path, statuses: dict[str, str]) -> None:
     lines: list[str] = []
     for slug, status in statuses.items():
         version = "002" if status == "GO" else "001"
+        if status == "GO":
+            (bridge / f"{slug}-001.md").write_text(
+                "NEW\n\n# Fixture proposal\n",
+                encoding="utf-8",
+            )
         lines.extend([f"Document: {slug}", f"{status}: bridge/{slug}-{version}.md", ""])
         # Also write the versioned file containing the status as its first line
         (bridge / f"{slug}-{version}.md").write_text(
@@ -169,7 +174,7 @@ def test_no_extend_for_draft_claim(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_auto_extend_fail_soft_at_cap(tmp_path: Path, monkeypatch) -> None:
-    """Fail-soft at the 2 h cap (GOV bound preserved): returns None, no raise."""
+    """Fail-soft at the 2 h cap without persisting a denial-side event."""
     registry = _registry()
     base = datetime(2026, 6, 13, 0, 0, tzinfo=UTC)
     now = {"value": base}
@@ -190,7 +195,7 @@ def test_auto_extend_fail_soft_at_cap(tmp_path: Path, monkeypatch) -> None:
 
     assert result is None
     status = registry.claim_status("go-thread", project_root=tmp_path)
-    assert status["extension_capped"] is True
+    assert status["extension_capped"] is False
     assert status["implementation_deadline"] == "2026-06-13T02:00:00Z"
 
 
@@ -224,11 +229,8 @@ def test_repeated_auto_extend_bounded_by_max_hold(tmp_path: Path, monkeypatch) -
 # --- Gate-verdict invariant --------------------------------------------------
 
 
-def test_gate_verdict_unchanged_when_auto_extend_raises(monkeypatch) -> None:
-    """PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001: the impl-start gate's
-    allow/deny verdict on an authorized edit is identical whether the auto-extend
-    side-effect raises or succeeds (the error is swallowed; the edit is allowed).
-    """
+def test_gate_does_not_auto_extend_an_allowed_mutation(monkeypatch) -> None:
+    """An allowed protected mutation has no hidden lease-extension side effect."""
     import scripts.bridge_work_intent_registry as registry_pkg
     import scripts.implementation_start_gate as gate
 
@@ -241,17 +243,8 @@ def test_gate_verdict_unchanged_when_auto_extend_raises(monkeypatch) -> None:
     )
     monkeypatch.setattr(gate, "work_intent_claim_block_reason", lambda root, bridge_id, session_id: None)
 
-    # Baseline: auto-extend succeeds (returns a record) -> allow.
-    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", lambda *a, **k: {"ok": True})
-    allow_baseline = gate.gate_decision({})
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", lambda *args, **kwargs: calls.append((args, kwargs)))
 
-    # Side-effect raises -> still allow; verdict must be byte-identical.
-    def _raise(*_a, **_k):
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(registry_pkg, "maybe_auto_extend", _raise)
-    allow_when_raises = gate.gate_decision({})
-
-    assert allow_baseline == {}
-    assert allow_when_raises == {}
-    assert allow_when_raises == allow_baseline
+    assert gate.gate_decision({}) == {}
+    assert calls == []

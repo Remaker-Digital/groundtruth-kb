@@ -76,6 +76,27 @@ def _write_prime_marker(root: Path, session_id: str) -> None:
         ),
         encoding="utf-8",
     )
+    harness_name = "codex"
+    harness_id = "A"
+    envelope = {
+        "status": "open",
+        "session_id": session_id,
+        "harness_id": harness_id,
+        "harness_name": harness_name,
+        "worker_role_provenance": {
+            "schema_version": 1,
+            "session_id": session_id,
+            "harness_id": harness_id,
+            "harness_name": harness_name,
+            "role": "prime-builder",
+            "role_resolution_source": "test-fixture",
+            "issued_at": "2026-06-14T00:00:00Z",
+            "dispatch_run_id": None,
+        },
+    }
+    envelope_path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+    envelope_path.parent.mkdir(parents=True, exist_ok=True)
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
 
 
 def test_resolve_session_id_uses_harness_neutral_fallbacks(monkeypatch) -> None:

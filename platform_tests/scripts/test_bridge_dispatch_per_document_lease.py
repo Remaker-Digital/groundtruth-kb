@@ -30,8 +30,12 @@ from test_dispatcher_runtime import (  # noqa: E402
     _load_trigger,
     _make_synthetic_project,
     _write_bridge_file,
-    _write_index,
 )
+
+
+def _write_index(project_root: Path, content: str) -> None:
+    (project_root / "bridge").mkdir(parents=True, exist_ok=True)
+    (project_root / "bridge" / "INDEX.md").write_text(content, encoding="utf-8")
 
 
 def test_active_lease_on_x_does_not_suppress_y(tmp_path: Path) -> None:

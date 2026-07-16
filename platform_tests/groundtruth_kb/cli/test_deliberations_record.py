@@ -14,6 +14,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.cli import main  # noqa: E402
+from groundtruth_kb.cli_deliberations_record import (  # noqa: E402
+    DeliberationRecordRequest,
+    record_deliberation,
+)
+from groundtruth_kb.config import GTConfig  # noqa: E402
 
 HOOK = REPO_ROOT / ".claude" / "hooks" / "formal-artifact-approval-gate.py"
 
@@ -70,6 +75,10 @@ def _packet_files(root: Path) -> list[Path]:
     if not packet_dir.exists():
         return []
     return sorted(packet_dir.glob("*.json"))
+
+
+def _service_config(root: Path) -> GTConfig:
+    return GTConfig(db_path=root / "groundtruth.db", project_root=root)
 
 
 def test_record_requires_owner_presented_before_db_write(tmp_path: Path) -> None:
@@ -137,6 +146,44 @@ def test_successful_record_creates_packet_and_row(tmp_path: Path) -> None:
     packet = json.loads(packets[0].read_text(encoding="utf-8"))
     assert packet["artifact_id"] == delib_id
     assert packet["approved_by"] == "owner"
+
+
+def test_gap_state_deliberation_capture_persists_packet_and_row(tmp_path: Path) -> None:
+    root, _config, content = _project(tmp_path)
+    request = DeliberationRecordRequest(
+        source_type="owner_conversation",
+        source_ref="conversation:S344:gap-state",
+        title="Gap-state owner decision",
+        summary="Owner approved recording a gap-state deliberation.",
+        content_file=content,
+        change_reason="record gap-state owner-approved deliberation",
+        auq_id="S344-AUQ-GAP-1",
+        auq_answer="Approved",
+        owner_presented=True,
+        approved_by="Mike",
+        spec_id=None,
+        work_item_id="WI-3378",
+        participants=["Mike", "Prime Builder"],
+        outcome="owner_decision",
+        session_id="session-gap-state",
+        gap_state_capture=True,
+        gap_state_bridge_id="gtkb-gap-state-deliberation-capture",
+        gap_state_reason="requirement sufficiency gap-state proposal needs formal deliberation capture",
+        dry_run=False,
+    )
+
+    result = record_deliberation(_service_config(root), request)
+
+    assert result["created"] is True
+    assert result["gap_state_capture"] is True
+    assert _deliberation_count(root / "groundtruth.db") == 1
+    packets = _packet_files(root)
+    assert len(packets) == 1
+    packet = json.loads(packets[0].read_text(encoding="utf-8"))
+    assert packet["capture_context"] == "gap_state"
+    assert packet["gap_state_bridge_id"] == "gtkb-gap-state-deliberation-capture"
+    assert packet["intended_db_operation"]["method"] == "insert_deliberation"
+    assert packet["intended_db_operation"]["source_ref"] == "conversation:S344:gap-state"
 
 
 def test_duplicate_source_ref_and_content_returns_existing_id_without_second_row_or_packet(tmp_path: Path) -> None:

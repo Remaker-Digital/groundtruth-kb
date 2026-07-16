@@ -150,14 +150,38 @@ def test_write_verdict_refuses_self_review(tmp_path):
     _write(tmp_path / "bridge" / "slug-003.md", _bridge_file("NEW\nauthor_session_context_id: SAME"))
     verdict = _bridge_file("VERIFIED\nauthor_session_context_id: SAME\nResponds to: bridge/slug-003.md")
     with pytest.raises(_WRITE_VERDICT.VerifiedFinalizationError):
-        _WRITE_VERDICT._assert_verdict_review_independence("slug", verdict, tmp_path)
+        _WRITE_VERDICT._assert_verdict_review_independence(
+            "slug",
+            verdict,
+            tmp_path,
+            latest_report_rel_path="bridge/slug-003.md",
+        )
 
 
 def test_write_verdict_allows_independent(tmp_path):
     _write(tmp_path / "bridge" / "slug-003.md", _bridge_file("NEW\nauthor_session_context_id: REPORT"))
     verdict = _bridge_file("VERIFIED\nauthor_session_context_id: LO\nResponds to: bridge/slug-003.md")
     # Must not raise.
-    _WRITE_VERDICT._assert_verdict_review_independence("slug", verdict, tmp_path)
+    _WRITE_VERDICT._assert_verdict_review_independence(
+        "slug",
+        verdict,
+        tmp_path,
+        latest_report_rel_path="bridge/slug-003.md",
+    )
+
+
+def test_write_verdict_fails_closed_when_independence_helper_cannot_load(tmp_path, monkeypatch):
+    _write(tmp_path / "bridge" / "slug-003.md", _bridge_file("NEW\nauthor_session_context_id: REPORT"))
+    verdict = _bridge_file("VERIFIED\nauthor_session_context_id: LO\nResponds to: bridge/slug-003.md")
+    monkeypatch.setitem(sys.modules, "scripts.bridge_review_independence", None)
+
+    with pytest.raises(_WRITE_VERDICT.VerifiedFinalizationError, match="helper could not load"):
+        _WRITE_VERDICT._assert_verdict_review_independence(
+            "slug",
+            verdict,
+            tmp_path,
+            latest_report_rel_path="bridge/slug-003.md",
+        )
 
 
 # --------------------------------------------------------------------------

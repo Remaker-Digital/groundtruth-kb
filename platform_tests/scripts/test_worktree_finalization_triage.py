@@ -117,6 +117,48 @@ def test_plan_groups_dirty_paths_and_blocks_forbidden_actions(tmp_path: Path) ->
     assert plan["counts"]["actuator_actions"]["safe_commit"] == 1
 
 
+def test_tracked_modified_terminal_verdict_requires_manual_review(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    verdict = repo / "bridge" / "thread-b-001.md"
+    verdict.parent.mkdir()
+    verdict.write_text("VERIFIED\nDocument: thread-b\nVersion: 001\n", encoding="utf-8")
+    _git(repo, "add", "bridge/thread-b-001.md")
+    _git(repo, "commit", "-q", "-m", "verified verdict")
+    verdict.write_text("VERIFIED\nDocument: thread-b\nVersion: 001\nchanged: true\n", encoding="utf-8")
+
+    item = _items_by_path(triage.build_plan(repo))["bridge/thread-b-001.md"]
+
+    assert item["tracked"] is True
+    assert item["change_kind"] == "modified"
+    assert item["bridge_status"] == "VERIFIED"
+    assert item["candidate_action"] == "manual_review_modified_terminal_verdict"
+    assert item["actuator_action"] == "manual_owner_review"
+    assert item["apply_status"] == "manual_review_required_modified_terminal_verdict"
+
+
+def test_tracked_deleted_terminal_verdict_requires_manual_review(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    verdict = repo / "bridge" / "thread-c-001.md"
+    verdict.parent.mkdir()
+    verdict.write_text("VERIFIED\nDocument: thread-c\nVersion: 001\n", encoding="utf-8")
+    _git(repo, "add", "bridge/thread-c-001.md")
+    _git(repo, "commit", "-q", "-m", "verified verdict")
+    verdict.unlink()
+
+    item = _items_by_path(triage.build_plan(repo))["bridge/thread-c-001.md"]
+
+    assert item["tracked"] is True
+    assert item["change_kind"] == "deleted"
+    assert item["bridge_status"] == "VERIFIED"
+    assert item["candidate_action"] == "manual_review_modified_terminal_verdict"
+    assert item["actuator_action"] == "manual_owner_review"
+    assert item["apply_status"] == "manual_review_required_modified_terminal_verdict"
+
+
 def test_cursor_runtime_projection_detection_keeps_durable_hooks_visible(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()

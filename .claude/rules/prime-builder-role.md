@@ -105,6 +105,13 @@ unaffected and remains keyed to the dispatcher role set. See
 `GOV-SESSION-ROLE-AUTHORITY-001` (authority split) and
 `ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001` (decision + rejected alternatives).
 
+When the owner authorizes an LO-only headless surge, the role-switch validator
+may use the current session's per-session Prime Builder role marker as Prime
+Builder lane coverage. This does not change the interactive session's resolved
+role and does not permit same-session Loyal Opposition review; it only prevents
+the durable/default registry partition from blocking LO dispatch while a real
+interactive Prime Builder session remains responsible.
+
 ## Bridge Review Independence
 
 Prime Builder treats a Loyal Opposition `GO` or `NO-GO` as actionable only when

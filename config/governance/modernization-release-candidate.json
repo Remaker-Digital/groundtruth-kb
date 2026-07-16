@@ -1,0 +1,378 @@
+{
+  "schema_version": 1,
+  "program": {
+    "id": "GTKB-PLATFORM-MODERNIZATION-RC-001",
+    "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION",
+    "title": "GT-KB Platform Modernization Release Candidate",
+    "scope_source": "DELIB-20260710-GTKB-MODERNIZATION-GATE-0-HANDLE-MAP",
+    "scope_source_version": 1,
+    "expected_handle_count": 94,
+    "required_clean_passes": 2,
+    "clean_run_max_age_hours": 168,
+    "blocking_severities": ["P0", "P1", "P2"],
+    "new_finding_default": "post_modernization_backlog",
+    "scope_change_authority": "owner_only",
+    "owner_acceptance_required": true,
+    "production_deployment_separate": true,
+    "frozen_scope_digest_sha256": "AD70C6D61C01500DBDF11BA8AFD5C1A42AD8C00D4EB63BDBF0EEC2423D1EB240"
+  },
+  "scope_families": [
+    {
+      "id": "PROGRAM",
+      "handle_prefix": "MOD-P",
+      "first": 1,
+      "last": 6,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION"
+    },
+    {
+      "id": "AUTHORITY_FOUNDATIONS",
+      "handle_prefix": "MOD-AF",
+      "first": 1,
+      "last": 9,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-AUTHORITY-FOUNDATIONS"
+    },
+    {
+      "id": "CONTEXT_MANIFESTS",
+      "handle_prefix": "MOD-CM",
+      "first": 1,
+      "last": 10,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-CONTEXT-MANIFESTS"
+    },
+    {
+      "id": "ARTIFACT_DECONTAMINATION",
+      "handle_prefix": "MOD-AD",
+      "first": 1,
+      "last": 12,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-ARTIFACT-DECONTAMINATION"
+    },
+    {
+      "id": "RUNTIME_INTERFACES",
+      "handle_prefix": "MOD-RI",
+      "first": 1,
+      "last": 16,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-RUNTIME-INTERFACES"
+    },
+    {
+      "id": "HARNESS_PARITY",
+      "handle_prefix": "MOD-HP",
+      "first": 1,
+      "last": 14,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-HARNESS-PARITY"
+    },
+    {
+      "id": "ASSURANCE",
+      "handle_prefix": "MOD-AS",
+      "first": 1,
+      "last": 14,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-ASSURANCE"
+    },
+    {
+      "id": "GIT_LIFECYCLE",
+      "handle_prefix": "MOD-GL",
+      "first": 1,
+      "last": 13,
+      "width": 2,
+      "project_id": "PROJECT-GTKB-PLATFORM-MODERNIZATION-GIT-LIFECYCLE"
+    }
+  ],
+  "scope_handles": [
+    {"id": "MOD-P01", "scope_family": "PROGRAM", "objective": "Create the eight-record modernization project hierarchy.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/project/lifecycle.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-PROGRAM-TRACEABILITY", "AT-RELEASE-CANDIDATE-GATE"], "semantic_assertion_ids": ["MSA-MOD-P01"]},
+    {"id": "MOD-P02", "scope_family": "PROGRAM", "objective": "Reconcile predecessor work and advisory inputs.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-PROGRAM-TRACEABILITY", "AT-RELEASE-CANDIDATE-GATE"], "semantic_assertion_ids": ["MSA-MOD-P02"]},
+    {"id": "MOD-P03", "scope_family": "PROGRAM", "objective": "Create the governed child backlog and dependency graph.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/project/lifecycle.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-PROGRAM-TRACEABILITY", "AT-RELEASE-CANDIDATE-GATE"], "semantic_assertion_ids": ["MSA-MOD-P03"]},
+    {"id": "MOD-P04", "scope_family": "PROGRAM", "objective": "File the umbrella modernization bridge proposal.", "implementation_evidence_paths": ["bridge/gtkb-modernization-gate-1-25-execution-design-001.md", "scripts/check_modernization_release_candidate.py"], "acceptance_test_ids": ["AT-PROGRAM-TRACEABILITY", "AT-RELEASE-CANDIDATE-GATE"], "semantic_assertion_ids": ["MSA-MOD-P04"]},
+    {"id": "MOD-P05", "scope_family": "PROGRAM", "objective": "Maintain program gate and dependency evidence as canonical projections.", "implementation_evidence_paths": ["scripts/check_modernization_release_candidate.py", "platform_tests/scripts/test_modernization_release_candidate.py"], "acceptance_test_ids": ["AT-PROGRAM-TRACEABILITY", "AT-RELEASE-CANDIDATE-GATE"], "semantic_assertion_ids": ["MSA-MOD-P05"]},
+    {"id": "MOD-P06", "scope_family": "PROGRAM", "objective": "Reconcile and close the modernization program.", "implementation_evidence_paths": ["scripts/check_modernization_release_candidate.py", "scripts/release_candidate_gate.py"], "acceptance_test_ids": ["AT-PROGRAM-TRACEABILITY", "AT-RELEASE-CANDIDATE-GATE"], "semantic_assertion_ids": ["MSA-MOD-P06"]},
+
+    {"id": "MOD-AF01", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Audit existing authority and classify every proposed carrier as reuse, amend, new, supersede, or retire.", "implementation_evidence_paths": ["scripts/check_artifact_evaluability.py", "platform_tests/scripts/test_modernization_authority_foundations.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS"], "semantic_assertion_ids": ["MSA-MOD-AF01"]},
+    {"id": "MOD-AF02", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Formalize modernization non-impairment governance.", "implementation_evidence_paths": ["scripts/check_modernization_nonimpairment.py", "platform_tests/scripts/test_modernization_nonimpairment.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS"], "semantic_assertion_ids": ["MSA-MOD-AF02"]},
+    {"id": "MOD-AF03", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Formalize intuitive context architecture and the obvious-correct-action principle.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/context/manifest.py", "platform_tests/scripts/test_modernization_authority_foundations.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS"], "semantic_assertion_ids": ["MSA-MOD-AF03"]},
+    {"id": "MOD-AF04", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Make canonical-carrier and non-authority boundaries executable.", "implementation_evidence_paths": ["scripts/check_artifact_evaluability.py", "platform_tests/scripts/test_modernization_authority_foundations.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS"], "semantic_assertion_ids": ["MSA-MOD-AF04"]},
+    {"id": "MOD-AF05", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Formalize superseded-source-of-truth leakage prevention.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "platform_tests/scripts/test_modernization_authority_foundations.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS"], "semantic_assertion_ids": ["MSA-MOD-AF05"]},
+    {"id": "MOD-AF06", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Formalize the mechanical-concern leak test.", "implementation_evidence_paths": ["scripts/check_modernization_nonimpairment.py", "platform_tests/scripts/test_modernization_hard_invariants.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS"], "semantic_assertion_ids": ["MSA-MOD-AF06"]},
+    {"id": "MOD-AF07", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Formalize explicit session-envelope role authority without dispatcher-role hints.", "implementation_evidence_paths": ["scripts/check_dispatched_role_bootstrap.py", "groundtruth-kb/src/groundtruth_kb/session/envelope.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS", "AT-AUTHORITY-OPERATION-TIME"], "semantic_assertion_ids": ["MSA-MOD-AF07"]},
+    {"id": "MOD-AF08", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Implement executable positive and negative authority assertions.", "implementation_evidence_paths": ["scripts/check_artifact_evaluability.py", "platform_tests/scripts/test_modernization_authority_foundations.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS", "AT-AUTHORITY-OPERATION-TIME"], "semantic_assertion_ids": ["MSA-MOD-AF08"]},
+    {"id": "MOD-AF09", "scope_family": "AUTHORITY_FOUNDATIONS", "objective": "Verify and close Authority Foundations at Gate 1.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_authority_foundations.py", "groundtruth-kb/tests/test_project_authorization_operation_time_enforcement.py"], "acceptance_test_ids": ["AT-AUTHORITY-CARRIERS", "AT-AUTHORITY-OPERATION-TIME"], "semantic_assertion_ids": ["MSA-MOD-AF09"]},
+
+    {"id": "MOD-CM01", "scope_family": "CONTEXT_MANIFESTS", "objective": "Inventory context sources and registry ownership.", "implementation_evidence_paths": ["config/registry/context-manifests.toml", "scripts/check_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM01"]},
+    {"id": "MOD-CM02", "scope_family": "CONTEXT_MANIFESTS", "objective": "Formalize DCL-ACTIVITY-CONTEXT-MANIFEST-001 or the reconciled equivalent.", "implementation_evidence_paths": ["config/registry/context-manifests.toml", "platform_tests/scripts/test_modernization_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM02"]},
+    {"id": "MOD-CM03", "scope_family": "CONTEXT_MANIFESTS", "objective": "Define the versioned session-baseline and activity-overlay manifest schema.", "implementation_evidence_paths": ["config/registry/context-manifests.toml", "groundtruth-kb/src/groundtruth_kb/context/manifest.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM03"]},
+    {"id": "MOD-CM04", "scope_family": "CONTEXT_MANIFESTS", "objective": "Extend canonical registries with missing authority, lifecycle, freshness, access, applicability, token, and projection metadata.", "implementation_evidence_paths": ["config/registry/context-manifests.toml", "groundtruth-kb/src/groundtruth_kb/context/freshness.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM04"]},
+    {"id": "MOD-CM05", "scope_family": "CONTEXT_MANIFESTS", "objective": "Generate one session manifest and six activity overlays deterministically.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/context/manifest.py", "platform_tests/scripts/test_modernization_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM05"]},
+    {"id": "MOD-CM06", "scope_family": "CONTEXT_MANIFESTS", "objective": "Implement stacking, prioritization, deduplication, soft-budget handling, and explicit conflict reporting.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/context/manifest.py", "platform_tests/scripts/test_modernization_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM06"]},
+    {"id": "MOD-CM07", "scope_family": "CONTEXT_MANIFESTS", "objective": "Implement churn classification, freshness, TTL, and embedding eligibility.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/context/freshness.py", "platform_tests/scripts/test_modernization_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM07"]},
+    {"id": "MOD-CM08", "scope_family": "CONTEXT_MANIFESTS", "objective": "Add manifest validation, doctor checks, shadow defect reporting, and production fail-closed behavior.", "implementation_evidence_paths": ["scripts/check_context_manifests.py", "platform_tests/scripts/test_modernization_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM08"]},
+    {"id": "MOD-CM09", "scope_family": "CONTEXT_MANIFESTS", "objective": "Run report-only generation and correct discrepancies at source registries.", "implementation_evidence_paths": ["scripts/check_context_manifests.py", "config/registry/context-manifests.toml"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM09"]},
+    {"id": "MOD-CM10", "scope_family": "CONTEXT_MANIFESTS", "objective": "Verify schema, determinism, freshness, budget, source closure, seven-category completeness, and Gate 2 readiness.", "implementation_evidence_paths": ["scripts/check_context_manifests.py", "platform_tests/scripts/test_modernization_context_manifests.py"], "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"], "semantic_assertion_ids": ["MSA-MOD-CM10"]},
+
+    {"id": "MOD-AD01", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Inventory artifact classes and every active worker-loading path.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "scripts/check_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD01"]},
+    {"id": "MOD-AD02", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Reconcile lifecycle, currentness, singleton authority, retirement, supersession, and archive rules.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD02"]},
+    {"id": "MOD-AD03", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Build deterministic currentness and supersession resolution across registered surfaces.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "scripts/check_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD03"]},
+    {"id": "MOD-AD04", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Scan stale authority, obsolete terms, retired commands, conflicting routes, unlabeled projections, live archive dependencies, and superseded information presented as current.", "implementation_evidence_paths": ["scripts/check_artifact_decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD04"]},
+    {"id": "MOD-AD05", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Clean governance and specification surfaces in bounded batches after Gate 1.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD05"]},
+    {"id": "MOD-AD06", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Clean terminology, rules, documentation, skills, and CLI guidance, including semantically stale skills that pass hash checks.", "implementation_evidence_paths": ["scripts/check_artifact_decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD06"]},
+    {"id": "MOD-AD07", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Clean startup, activity, scaffold, and generated producers so they cannot recreate retired narratives.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD07"]},
+    {"id": "MOD-AD08", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Reconcile bridge, project, backlog, membership, and executable-test lifecycle state.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "scripts/check_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD08"]},
+    {"id": "MOD-AD09", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Quarantine history, reports, memory, and deliberation evidence behind explicit provenance access with no live dependency.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD09"]},
+    {"id": "MOD-AD10", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Reconcile existing work items and selected advisories without duplication.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py", "scripts/check_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD10"]},
+    {"id": "MOD-AD11", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Install lifecycle-trigger and residual-reference guards in doctor, CI, or governed preflight.", "implementation_evidence_paths": ["scripts/check_artifact_decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD11"]},
+    {"id": "MOD-AD12", "scope_family": "ARTIFACT_DECONTAMINATION", "objective": "Re-run active-path, source-closure, lifecycle, generation, and independent verification checks.", "implementation_evidence_paths": ["scripts/check_artifact_decontamination.py", "platform_tests/scripts/test_modernization_artifact_decontamination.py"], "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-AD12"]},
+
+    {"id": "MOD-RI01", "scope_family": "RUNTIME_INTERFACES", "objective": "Audit init, dispatch, resume, compaction, open, startup-cache, hook, and native-harness producers and consumers.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/session/envelope.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW", "AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI01"]},
+    {"id": "MOD-RI02", "scope_family": "RUNTIME_INTERFACES", "objective": "Define and enforce stack ordering and precedence.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/activity/profiles.py", "groundtruth-kb/src/groundtruth_kb/context/manifest.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI02"]},
+    {"id": "MOD-RI03", "scope_family": "RUNTIME_INTERFACES", "objective": "Assemble and deliver the generated session baseline for interactive and dispatched sessions.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/context/manifest.py", "groundtruth-kb/src/groundtruth_kb/session/envelope.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI03"]},
+    {"id": "MOD-RI04", "scope_family": "RUNTIME_INTERFACES", "objective": "Enforce explicit session-envelope role bootstrap, exclude dispatcher mappings, and preserve role through resume and compaction.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/session/envelope.py", "scripts/session_role_resolution.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW", "AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI04"]},
+    {"id": "MOD-RI05", "scope_family": "RUNTIME_INTERFACES", "objective": "Implement uniform resource availability, authority, read, mutation, installation, startup, and recovery descriptors.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py", "platform_tests/scripts/test_modernization_runtime_recovery.py"], "acceptance_test_ids": ["AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI05"]},
+    {"id": "MOD-RI06", "scope_family": "RUNTIME_INTERFACES", "objective": "Enforce TTL, embedding eligibility, expiration labeling, and live-query requirements.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/context/freshness.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI06"]},
+    {"id": "MOD-RI07", "scope_family": "RUNTIME_INTERFACES", "objective": "Provide focused degraded and failure diagnostics without plausible incomplete payloads.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py", "platform_tests/scripts/test_modernization_runtime_recovery.py"], "acceptance_test_ids": ["AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI07"]},
+    {"id": "MOD-RI08", "scope_family": "RUNTIME_INTERFACES", "objective": "Instrument size, latency, omissions, conflicts, first-tool timing, and degraded states.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py", "platform_tests/scripts/test_modernization_runtime_recovery.py"], "acceptance_test_ids": ["AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI08"]},
+    {"id": "MOD-RI09", "scope_family": "RUNTIME_INTERFACES", "objective": "Implement one typed, single-active common activity-envelope runtime.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/activity/profiles.py", "groundtruth-kb/src/groundtruth_kb/session/envelope.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI09"]},
+    {"id": "MOD-RI10", "scope_family": "RUNTIME_INTERFACES", "objective": "Integrate ops activity context.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/activity/ops.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI10"]},
+    {"id": "MOD-RI11", "scope_family": "RUNTIME_INTERFACES", "objective": "Integrate deliberation context and preserve its no-implementation boundary.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/activity/profiles.py", "groundtruth-kb/src/groundtruth_kb/session/envelope.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI11"]},
+    {"id": "MOD-RI12", "scope_family": "RUNTIME_INTERFACES", "objective": "Integrate build context including authorization, bridge, work intent, branch binding, and mutation routes.", "implementation_evidence_paths": ["scripts/implementation_authorization.py", "scripts/implementation_start_gate.py", "scripts/bridge_work_intent_registry.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW", "AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI12"]},
+    {"id": "MOD-RI13", "scope_family": "RUNTIME_INTERFACES", "objective": "Integrate test context including linked specs, executable tests, environment, results, and evidence routes.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW", "AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI13"]},
+    {"id": "MOD-RI14", "scope_family": "RUNTIME_INTERFACES", "objective": "Integrate spec context including intake, confirmation, approval, authority, and testability.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/spec_scaffold.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI14"]},
+    {"id": "MOD-RI15", "scope_family": "RUNTIME_INTERFACES", "objective": "Integrate project context including hierarchy, authorization, backlog, dependencies, branch state, and project CLI.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/project/lifecycle.py", "platform_tests/scripts/test_modernization_end_to_end_workflow.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW"], "semantic_assertion_ids": ["MSA-MOD-RI15"]},
+    {"id": "MOD-RI16", "scope_family": "RUNTIME_INTERFACES", "objective": "Verify runtime stacking, role, freshness, resources, degradation, all six activities, non-impairment, and Gate 3.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_end_to_end_workflow.py", "platform_tests/scripts/test_modernization_runtime_recovery.py"], "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW", "AT-RUNTIME-RECOVERY"], "semantic_assertion_ids": ["MSA-MOD-RI16"]},
+
+    {"id": "MOD-HP01", "scope_family": "HARNESS_PARITY", "objective": "Audit native prompts, rules, memory, hooks, skills, plugins, MCP, CLI, session/activity/result envelopes, and evidence capabilities for every registered harness.", "implementation_evidence_paths": ["scripts/check_harness_parity.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP01"]},
+    {"id": "MOD-HP02", "scope_family": "HARNESS_PARITY", "objective": "Define the normalized minimum worker-visible session, role, activity, resource, access, degradation, and result contract.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/session/envelope.py", "groundtruth-kb/src/groundtruth_kb/harness_projection.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP02"]},
+    {"id": "MOD-HP03", "scope_family": "HARNESS_PARITY", "objective": "Implement and verify Claude Code delivery without competing authority.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/harness_projection.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP03"]},
+    {"id": "MOD-HP04", "scope_family": "HARNESS_PARITY", "objective": "Implement and verify Codex delivery across native differences and fallback hooks.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/harness_projection.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP04"]},
+    {"id": "MOD-HP05", "scope_family": "HARNESS_PARITY", "objective": "Implement and verify Cursor delivery and close its weak transcript/effectiveness evidence.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/harness_projection.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP05"]},
+    {"id": "MOD-HP06", "scope_family": "HARNESS_PARITY", "objective": "Implement and verify Antigravity while preserving its optimized startup.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/harness_projection.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP06"]},
+    {"id": "MOD-HP07", "scope_family": "HARNESS_PARITY", "objective": "Verify Ollama, OpenRouter, and remaining registered API/headless harnesses through static conformance and live evidence when available.", "implementation_evidence_paths": ["scripts/check_harness_parity.py", "platform_tests/scripts/test_cross_harness_protocol_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP07"]},
+    {"id": "MOD-HP08", "scope_family": "HARNESS_PARITY", "objective": "Enforce semantic skill parity beyond generated-adapter hashes.", "implementation_evidence_paths": ["scripts/check_harness_parity.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP08"]},
+    {"id": "MOD-HP09", "scope_family": "HARNESS_PARITY", "objective": "Enforce CLI, plugin, MCP, installation, service availability, and recovery-route discoverability parity.", "implementation_evidence_paths": ["scripts/check_harness_parity.py", "platform_tests/scripts/test_cross_harness_protocol_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP09"]},
+    {"id": "MOD-HP10", "scope_family": "HARNESS_PARITY", "objective": "Isolate concurrent, resumed, compacted, interactive, and headless session state.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/session/envelope.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP10"]},
+    {"id": "MOD-HP11", "scope_family": "HARNESS_PARITY", "objective": "Verify explicit role envelopes and pre-activity role bootstrap on every harness; exclude identity and dispatcher hints.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/session/envelope.py", "platform_tests/scripts/test_session_role_resolution_table.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP11"]},
+    {"id": "MOD-HP12", "scope_family": "HARNESS_PARITY", "objective": "Build and replay the Codex, Claude Code, and Cursor confusion corpus.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_harness_parity.py", "platform_tests/scripts/test_cross_harness_protocol_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP12"]},
+    {"id": "MOD-HP13", "scope_family": "HARNESS_PARITY", "objective": "Implement explicit, testable, authority-preserving fallback and degradation behavior.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/session/envelope.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP13"]},
+    {"id": "MOD-HP14", "scope_family": "HARNESS_PARITY", "objective": "Run contract, semantic, resource, isolation, role, activity, transcript, fallback, and result-envelope verification.", "implementation_evidence_paths": ["scripts/check_harness_parity.py", "platform_tests/scripts/test_modernization_harness_parity.py"], "acceptance_test_ids": ["AT-HARNESS-PARITY"], "semantic_assertion_ids": ["MSA-MOD-HP14"]},
+
+    {"id": "MOD-AS01", "scope_family": "ASSURANCE", "objective": "Capture a reproducible pre-modernization baseline from transcripts, payloads, confusion, tokens, latency, first-tool behavior, failures, and regressions.", "implementation_evidence_paths": ["scripts/benchmarks/activity_envelope_load.py", "platform_tests/scripts/test_modernization_fresh_worker.py"], "acceptance_test_ids": ["AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS01"]},
+    {"id": "MOD-AS02", "scope_family": "ASSURANCE", "objective": "Create a hard-invariant registry mapping every governing carrier and charter rule to executable evidence.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_hard_invariants.py", "scripts/check_artifact_evaluability.py"], "acceptance_test_ids": ["AT-HARD-INVARIANTS"], "semantic_assertion_ids": ["MSA-MOD-AS02"]},
+    {"id": "MOD-AS03", "scope_family": "ASSURANCE", "objective": "Build a fresh-worker simulator using only generated context and bounded task prompts.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py", "groundtruth-kb/src/groundtruth_kb/context/manifest.py"], "acceptance_test_ids": ["AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS03"]},
+    {"id": "MOD-AS04", "scope_family": "ASSURANCE", "objective": "Build seven-category orientation scenarios with positive, absent, stale, conflicting, and degraded fixtures.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py", "platform_tests/scripts/test_modernization_hard_invariants.py"], "acceptance_test_ids": ["AT-FRESH-WORKER", "AT-HARD-INVARIANTS"], "semantic_assertion_ids": ["MSA-MOD-AS04"]},
+    {"id": "MOD-AS05", "scope_family": "ASSURANCE", "objective": "Build six-activity behavior scenarios with expected authority, actions, prohibitions, resources, routes, and next steps.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py", "groundtruth-kb/src/groundtruth_kb/activity/profiles.py"], "acceptance_test_ids": ["AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS05"]},
+    {"id": "MOD-AS06", "scope_family": "ASSURANCE", "objective": "Build role, harness, session, concurrency, resume/compaction, and two-tier branch scenarios.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_hard_invariants.py", "platform_tests/scripts/test_modernization_fresh_worker.py"], "acceptance_test_ids": ["AT-HARD-INVARIANTS", "AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS06"]},
+    {"id": "MOD-AS07", "scope_family": "ASSURANCE", "objective": "Convert known transcript and advisory confusion cases into regression fixtures.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py", "platform_tests/scripts/test_modernization_hard_invariants.py"], "acceptance_test_ids": ["AT-FRESH-WORKER", "AT-HARD-INVARIANTS"], "semantic_assertion_ids": ["MSA-MOD-AS07"]},
+    {"id": "MOD-AS08", "scope_family": "ASSURANCE", "objective": "Build the non-impairment regression orchestrator across bridge, dispatcher, role, project, backlog, Git, skill, CLI, startup, activity, assertion, doctor, and governance suites.", "implementation_evidence_paths": ["scripts/check_modernization_nonimpairment.py", "platform_tests/scripts/test_modernization_hard_invariants.py"], "acceptance_test_ids": ["AT-HARD-INVARIANTS"], "semantic_assertion_ids": ["MSA-MOD-AS08"]},
+    {"id": "MOD-AS09", "scope_family": "ASSURANCE", "objective": "Collect orientation, lookup, stale-leakage, route, token, latency, degradation, and recurrence measurements.", "implementation_evidence_paths": ["scripts/benchmarks/activity_envelope_load.py", "platform_tests/scripts/test_modernization_fresh_worker.py"], "acceptance_test_ids": ["AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS09"]},
+    {"id": "MOD-AS10", "scope_family": "ASSURANCE", "objective": "Evaluate report-only and shadow operation across all six activities and primary harnesses.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py", "groundtruth-kb/src/groundtruth_kb/activity/profiles.py"], "acceptance_test_ids": ["AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS10"]},
+    {"id": "MOD-AS11", "scope_family": "ASSURANCE", "objective": "Calibrate activation thresholds from baseline and shadow data while retaining zero-tolerance hard failures.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_hard_invariants.py", "platform_tests/scripts/test_modernization_fresh_worker.py"], "acceptance_test_ids": ["AT-HARD-INVARIANTS", "AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS11"]},
+    {"id": "MOD-AS12", "scope_family": "ASSURANCE", "objective": "Evaluate reversible activation slices with before/after evidence and rollback proof.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py", "platform_tests/scripts/test_modernization_hard_invariants.py"], "acceptance_test_ids": ["AT-FRESH-WORKER", "AT-HARD-INVARIANTS"], "semantic_assertion_ids": ["MSA-MOD-AS12"]},
+    {"id": "MOD-AS13", "scope_family": "ASSURANCE", "objective": "Run recurrence and operational observation across activities, harnesses, branch promotion, and bounded quiescence.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_hard_invariants.py", "platform_tests/scripts/test_modernization_fresh_worker.py"], "acceptance_test_ids": ["AT-HARD-INVARIANTS", "AT-FRESH-WORKER"], "semantic_assertion_ids": ["MSA-MOD-AS13"]},
+    {"id": "MOD-AS14", "scope_family": "ASSURANCE", "objective": "Reconcile all program evidence and request independent Loyal Opposition verification.", "implementation_evidence_paths": ["scripts/check_modernization_release_candidate.py", "platform_tests/scripts/test_modernization_hard_invariants.py"], "acceptance_test_ids": ["AT-HARD-INVARIANTS"], "semantic_assertion_ids": ["MSA-MOD-AS14"]},
+
+    {"id": "MOD-GL01", "scope_family": "GIT_LIFECYCLE", "objective": "Audit current Git, GitHub, commit, worktree, protection, merge, dispatcher-pause, and housekeeping controls.", "implementation_evidence_paths": ["scripts/check_modernization_git_lifecycle.py", "platform_tests/scripts/test_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL01"]},
+    {"id": "MOD-GL02", "scope_family": "GIT_LIFECYCLE", "objective": "Confirm INTAKE-c5792b0c and formalize two-tier branch, promotion, commit-scope, lease, recovery, and forbidden-operation authority.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/models.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL02"]},
+    {"id": "MOD-GL03", "scope_family": "GIT_LIFECYCLE", "objective": "Define versioned project/work-item branch-binding records.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/models.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/state.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL03"]},
+    {"id": "MOD-GL04", "scope_family": "GIT_LIFECYCLE", "objective": "Implement dry-run, create, attach, show, validate, close, and recovery branch-lifecycle CLI operations.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/__main__.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py", "scripts/check_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL04"]},
+    {"id": "MOD-GL05", "scope_family": "GIT_LIFECYCLE", "objective": "Enforce branch-aware worker routing and block mutation on unbound or incorrect branches.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/repository.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL05"]},
+    {"id": "MOD-GL06", "scope_family": "GIT_LIFECYCLE", "objective": "Implement scoped automated commits that preserve unrelated dirty work and cite governed evidence.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py", "platform_tests/scripts/test_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL06"]},
+    {"id": "MOD-GL07", "scope_family": "GIT_LIFECYCLE", "objective": "Merge only VERIFIED work-item branches into their project branch.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py", "scripts/check_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL07"]},
+    {"id": "MOD-GL08", "scope_family": "GIT_LIFECYCLE", "objective": "Promote completed project branches into develop through governed GitHub pull requests.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/commands.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py", "platform_tests/scripts/test_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL08"]},
+    {"id": "MOD-GL09", "scope_family": "GIT_LIFECYCLE", "objective": "Promote integrated develop into stage after integration and non-impairment gates.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py", "scripts/check_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL09"]},
+    {"id": "MOD-GL10", "scope_family": "GIT_LIFECYCLE", "objective": "Implement bounded dispatcher drain/quiescence lease CLI operations.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/__main__.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/quiescence.py", "scripts/check_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL10"]},
+    {"id": "MOD-GL11", "scope_family": "GIT_LIFECYCLE", "objective": "Require authorized Git remediation and housekeeping to acquire and release appropriate leases.", "implementation_evidence_paths": ["groundtruth-kb/src/groundtruth_kb/git_lifecycle/quiescence.py", "groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL11"]},
+    {"id": "MOD-GL12", "scope_family": "GIT_LIFECYCLE", "objective": "Test wrong ancestry, conflicts, partial commits, failed pull requests, stale or expired leases, crashes, concurrency, rollback, and unrelated-change preservation.", "implementation_evidence_paths": ["scripts/check_modernization_git_lifecycle.py", "platform_tests/scripts/test_modernization_git_lifecycle.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL12"]},
+    {"id": "MOD-GL13", "scope_family": "GIT_LIFECYCLE", "objective": "Pilot the complete lifecycle on modernization work and obtain independent verification.", "implementation_evidence_paths": ["platform_tests/scripts/test_modernization_git_lifecycle.py", "scripts/check_modernization_release_candidate.py"], "acceptance_test_ids": ["AT-GIT-LIFECYCLE"], "semantic_assertion_ids": ["MSA-MOD-GL13"]}
+  ],
+  "capabilities": [
+    {
+      "id": "CAP-AUTHORITY",
+      "scope_family": "AUTHORITY_FOUNDATIONS",
+      "objective": "Canonical authority, PAUTH operation bounds, work-intent ownership, and durable implementation start fail closed at operation time.",
+      "acceptance_test_ids": ["AT-AUTHORITY-OPERATION-TIME", "AT-AUTHORITY-CARRIERS"]
+    },
+    {
+      "id": "CAP-CONTEXT-MANIFESTS",
+      "scope_family": "CONTEXT_MANIFESTS",
+      "objective": "Registry-derived session and activity manifests are deterministic, bounded, fresh, explainable, and validated.",
+      "acceptance_test_ids": ["AT-CONTEXT-MANIFESTS"]
+    },
+    {
+      "id": "CAP-ARTIFACT-LIFECYCLE",
+      "scope_family": "ARTIFACT_DECONTAMINATION",
+      "objective": "Current authority is mechanically distinguishable from superseded history and stale authority cannot enter active worker paths.",
+      "acceptance_test_ids": ["AT-ARTIFACT-LIFECYCLE"]
+    },
+    {
+      "id": "CAP-RUNTIME",
+      "scope_family": "RUNTIME_INTERFACES",
+      "objective": "Startup, selection, authorization, implementation, verification, interruption recovery, and failure handling use deterministic observable services.",
+      "acceptance_test_ids": ["AT-END-TO-END-WORKFLOW", "AT-RUNTIME-RECOVERY"]
+    },
+    {
+      "id": "CAP-HARNESS-PARITY",
+      "scope_family": "HARNESS_PARITY",
+      "objective": "Supported interactive and headless harnesses receive equivalent authority, context, routes, fallback behavior, and session isolation.",
+      "acceptance_test_ids": ["AT-HARNESS-PARITY"]
+    },
+    {
+      "id": "CAP-ASSURANCE",
+      "scope_family": "ASSURANCE",
+      "objective": "Hard invariants, fresh-worker simulations, concurrency cases, and non-impairment checks provide objective closure evidence.",
+      "acceptance_test_ids": ["AT-HARD-INVARIANTS", "AT-FRESH-WORKER"]
+    },
+    {
+      "id": "CAP-GIT-LIFECYCLE",
+      "scope_family": "GIT_LIFECYCLE",
+      "objective": "Branch binding, scoped change preservation, promotion gates, and bounded dispatcher quiescence are recoverable and fail closed.",
+      "acceptance_test_ids": ["AT-GIT-LIFECYCLE"]
+    },
+    {
+      "id": "CAP-PROGRAM-CLOSURE",
+      "scope_family": "PROGRAM",
+      "objective": "Traceability, clean install, upgrade, rollback, Agent Red portability, two clean release-candidate passes, defect closure, and owner acceptance are proven without authorizing deployment.",
+      "acceptance_test_ids": [
+        "AT-SCOPE-SEMANTICS",
+        "AT-PROGRAM-TRACEABILITY",
+        "AT-INSTALL-UPGRADE-ROLLBACK",
+        "AT-AGENT-RED-PORTABILITY",
+        "AT-RELEASE-CANDIDATE-GATE"
+      ]
+    }
+  ],
+  "acceptance_tests": [
+    {
+      "id": "AT-AUTHORITY-OPERATION-TIME",
+      "command": [
+        "{python}", "-m", "pytest",
+        "groundtruth-kb/tests/test_project_authorization_operation_time_enforcement.py",
+        "platform_tests/scripts/test_implementation_authorization.py",
+        "platform_tests/scripts/test_implementation_start_gate.py",
+        "platform_tests/scripts/test_bridge_work_intent_registry.py",
+        "-q", "--tb=short"
+      ],
+      "required_paths": [
+        "groundtruth-kb/tests/test_project_authorization_operation_time_enforcement.py",
+        "platform_tests/scripts/test_implementation_authorization.py",
+        "platform_tests/scripts/test_implementation_start_gate.py",
+        "platform_tests/scripts/test_bridge_work_intent_registry.py"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-AUTHORITY-CARRIERS",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_authority_foundations.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_authority_foundations.py"],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "AT-CONTEXT-MANIFESTS",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_context_manifests.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_context_manifests.py"],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "AT-ARTIFACT-LIFECYCLE",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_artifact_decontamination.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_artifact_decontamination.py"],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "AT-END-TO-END-WORKFLOW",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_end_to_end_workflow.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_end_to_end_workflow.py"],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-RUNTIME-RECOVERY",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_runtime_recovery.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_runtime_recovery.py"],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-HARNESS-PARITY",
+      "command": [
+        "{python}", "-m", "pytest",
+        "platform_tests/scripts/test_modernization_harness_parity.py",
+        "platform_tests/scripts/test_cross_harness_protocol_parity.py",
+        "platform_tests/scripts/test_session_role_resolution_table.py",
+        "-q", "--tb=short"
+      ],
+      "required_paths": [
+        "platform_tests/scripts/test_modernization_harness_parity.py",
+        "platform_tests/scripts/test_cross_harness_protocol_parity.py",
+        "platform_tests/scripts/test_session_role_resolution_table.py"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "AT-HARD-INVARIANTS",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_hard_invariants.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_hard_invariants.py"],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "AT-FRESH-WORKER",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_fresh_worker.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_fresh_worker.py"],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-GIT-LIFECYCLE",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_git_lifecycle.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_git_lifecycle.py"],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-SCOPE-SEMANTICS",
+      "command": ["{python}", "scripts/check_modernization_scope_semantics.py", "run", "--phase", "clean-suite"],
+      "required_paths": [
+        "scripts/check_modernization_scope_semantics.py",
+        "config/governance/modernization-release-candidate.json"
+      ],
+      "timeout_seconds": 2400
+    },
+    {
+      "id": "AT-PROGRAM-TRACEABILITY",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_release_candidate.py", "-q", "--tb=short"],
+      "required_paths": ["platform_tests/scripts/test_modernization_release_candidate.py"],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "AT-INSTALL-UPGRADE-ROLLBACK",
+      "command": [
+        "{python}", "-m", "pytest", "--rootdir=groundtruth-kb", "--override-ini=testpaths=tests",
+        "groundtruth-kb/tests/test_scaffold_project.py",
+        "groundtruth-kb/tests/test_upgrade.py",
+        "groundtruth-kb/tests/test_upgrade_rollback.py",
+        "groundtruth-kb/tests/adopter/test_existing_adopter_migration_kit.py",
+        "groundtruth-kb/tests/adopter/test_upgrade_rollback_restores_prior_state.py",
+        "-q", "--tb=short"
+      ],
+      "required_paths": [
+        "groundtruth-kb/tests/test_scaffold_project.py",
+        "groundtruth-kb/tests/test_upgrade.py",
+        "groundtruth-kb/tests/test_upgrade_rollback.py",
+        "groundtruth-kb/tests/adopter/test_existing_adopter_migration_kit.py",
+        "groundtruth-kb/tests/adopter/test_upgrade_rollback_restores_prior_state.py"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-AGENT-RED-PORTABILITY",
+      "command": ["{python}", "-m", "pytest", "platform_tests/scripts/test_modernization_agent_red_portability.py", "platform_tests/scripts/test_rehearse_isolation.py", "-q", "--tb=short"],
+      "required_paths": [
+        "platform_tests/scripts/test_modernization_agent_red_portability.py",
+        "platform_tests/scripts/test_rehearse_isolation.py"
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "AT-RELEASE-CANDIDATE-GATE",
+      "command": ["{python}", "scripts/release_candidate_gate.py", "--modernization-scope", "--include-frontend"],
+      "required_paths": ["scripts/release_candidate_gate.py"],
+      "timeout_seconds": 2400
+    }
+  ]
+}

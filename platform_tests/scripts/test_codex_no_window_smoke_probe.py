@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,15 +20,20 @@ def _load_module():
     return module
 
 
-def test_run_probe_writes_schema_v2_multi_command_marker_evidence(tmp_path: Path) -> None:
+def test_run_probe_writes_schema_v3_workspace_sentinel_evidence(tmp_path: Path) -> None:
     module = _load_module()
     commands: list[list[str]] = []
 
     def fake_runner(command, **kwargs):
         commands.append(command)
         prompt = " ".join(str(part) for part in command)
-        markers = [part for part in prompt.split() if part.startswith("GTKB-WI5135-")]
-        return subprocess.CompletedProcess(command, 0, stdout="\n".join(markers), stderr="")
+        markers = re.findall(r"GTKB-WI5135-[A-Za-z0-9-]+", prompt)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="\n".join(marker for marker in dict.fromkeys(markers) for _ in range(2)),
+            stderr="sandbox: workspace-write [workdir, test]\n",
+        )
 
     payload = module.run_probe(
         project_root=tmp_path,
@@ -36,7 +42,7 @@ def test_run_probe_writes_schema_v2_multi_command_marker_evidence(tmp_path: Path
         window_observer=lambda: [{"visible_count": 0}],
     )
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["result"] == "pass"
     assert payload["visible_window_detected"] is False
     assert payload["run_count"] == 2
@@ -45,6 +51,10 @@ def test_run_probe_writes_schema_v2_multi_command_marker_evidence(tmp_path: Path
     assert all(len(run["command_steps"]) == 3 for run in payload["runs"])
     assert all(step["stdout_contains_marker"] for run in payload["runs"] for step in run["command_steps"])
     assert len(commands) == 2
+    assert all('default_permissions=":workspace"' in command for command in commands)
+    assert all("--sandbox" not in command for command in commands)
+    assert payload["effective_profile_ok"] is True
+    assert payload["sentinel_lifecycle_ok"] is True
 
     path = module.write_payload(tmp_path, payload)
     assert path == tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
@@ -55,7 +65,9 @@ def test_run_probe_fails_when_marker_chain_is_missing(tmp_path: Path) -> None:
     module = _load_module()
 
     def fake_runner(command, **kwargs):
-        return subprocess.CompletedProcess(command, 0, stdout="no markers here", stderr="")
+        return subprocess.CompletedProcess(
+            command, 0, stdout="no markers here", stderr="sandbox: workspace-write [workdir, test]\n"
+        )
 
     payload = module.run_probe(
         project_root=tmp_path,
@@ -74,8 +86,13 @@ def test_run_probe_fails_when_visible_window_is_observed(tmp_path: Path) -> None
 
     def fake_runner(command, **kwargs):
         prompt = " ".join(str(part) for part in command)
-        markers = [part for part in prompt.split() if part.startswith("GTKB-WI5135-")]
-        return subprocess.CompletedProcess(command, 0, stdout="\n".join(markers), stderr="")
+        markers = re.findall(r"GTKB-WI5135-[A-Za-z0-9-]+", prompt)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="\n".join(marker for marker in dict.fromkeys(markers) for _ in range(2)),
+            stderr="sandbox: workspace-write [workdir, test]\n",
+        )
 
     payload = module.run_probe(
         project_root=tmp_path,
@@ -87,3 +104,54 @@ def test_run_probe_fails_when_visible_window_is_observed(tmp_path: Path) -> None
     assert payload["result"] == "fail"
     assert payload["marker_chain_ok"] is True
     assert payload["visible_window_detected"] is True
+
+
+def test_run_probe_fails_on_read_only_effective_profile(tmp_path: Path) -> None:
+    module = _load_module()
+
+    def fake_runner(command, **kwargs):
+        markers = re.findall(r"GTKB-WI5135-[A-Za-z0-9-]+", " ".join(command))
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="\n".join(marker for marker in dict.fromkeys(markers) for _ in range(2)),
+            stderr="sandbox: read-only [workdir]\n",
+        )
+
+    payload = module.run_probe(
+        project_root=tmp_path,
+        codex_executable="codex",
+        command_runner=fake_runner,
+        window_observer=lambda: [{"visible_count": 0}],
+    )
+
+    assert payload["result"] == "fail"
+    assert payload["effective_profile_ok"] is False
+
+
+def test_run_probe_fails_and_cleans_residual_sentinel(tmp_path: Path) -> None:
+    module = _load_module()
+
+    def fake_runner(command, **kwargs):
+        prompt = " ".join(command)
+        markers = re.findall(r"GTKB-WI5135-[A-Za-z0-9-]+", prompt)
+        sentinel = Path(prompt.split("p=Path(r'")[1].split("')")[0].replace("\\\\", "\\"))
+        sentinel.write_text("residual", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="\n".join(marker for marker in dict.fromkeys(markers) for _ in range(2)),
+            stderr="sandbox: workspace-write [workdir, test]\n",
+        )
+
+    payload = module.run_probe(
+        project_root=tmp_path,
+        codex_executable="codex",
+        command_runner=fake_runner,
+        window_observer=lambda: [{"visible_count": 0}],
+    )
+
+    assert payload["result"] == "fail"
+    assert payload["sentinel_lifecycle_ok"] is False
+    assert all(run["sentinel_residual_before_cleanup"] for run in payload["runs"])
+    assert all(run["sentinel_residual_after_cleanup"] is False for run in payload["runs"])

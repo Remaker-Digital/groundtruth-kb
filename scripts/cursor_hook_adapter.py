@@ -69,6 +69,12 @@ def main() -> int:
     env = os.environ.copy()
     env.setdefault("GTKB_HARNESS_NAME", "cursor")
     env.setdefault("GTKB_HARNESS_ID", "E")
+    env.setdefault("GTKB_AUTHOR_MODEL", "Composer")
+    env.setdefault("GTKB_AUTHOR_MODEL_VERSION", "cursor-agent")
+    env.setdefault(
+        "GTKB_AUTHOR_MODEL_CONFIGURATION",
+        "Cursor interactive; cursor_hook_adapter; bridge author metadata runtime envelope",
+    )
 
     run_kwargs: dict[str, Any] = {
         "input": json.dumps(adapted_in),

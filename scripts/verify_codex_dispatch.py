@@ -26,8 +26,9 @@ HARNESS_TYPE = "codex"
 REQUIRED_MODEL = "gpt-5.5"
 REQUIRED_APPROVAL_CONFIG = 'approval_policy="never"'
 REQUIRED_REASONING_CONFIG = 'model_reasoning_effort="xhigh"'
-REQUIRED_SANDBOX_MODE = "workspace-write"
-FORBIDDEN_SANDBOX_MODES = {"danger-full-access"}
+REQUIRED_PERMISSIONS_CONFIG = 'default_permissions=":workspace"'
+REQUIRED_PERMISSIONS_PROFILE = ":workspace"
+REQUIRED_EFFECTIVE_PROFILE = "workspace-write"
 FORBIDDEN_FLAGS = {"--dangerously-bypass-approvals-and-sandbox"}
 CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH = (
     ".gtkb-state",
@@ -36,7 +37,7 @@ CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH = (
 )
 CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
 CODEX_WINDOWS_SANDBOX_SETUP_STATUS = "0xc0000142"
-CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION = 2
+CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION = 3
 CODEX_NO_WINDOW_MIN_RUNS = 2
 CODEX_NO_WINDOW_MIN_COMMAND_STEPS = 3
 
@@ -83,6 +84,15 @@ def _has_flag_value(argv: list[str], flag: str, expected: str) -> bool:
 
 def _has_config(argv: list[str], expected: str) -> bool:
     return expected in argv
+
+
+def _config_values(argv: list[str], key: str) -> list[str]:
+    values: list[str] = []
+    for raw in _flag_values(argv, "-c"):
+        name, separator, value = raw.partition("=")
+        if separator and name.strip() == key:
+            values.append(value.strip().strip('"').strip("'"))
+    return values
 
 
 def _is_codex_helper_add_dir(value: str, project_root: Path) -> bool:
@@ -254,12 +264,36 @@ def _codex_no_window_schema_failure(payload: dict[str, Any]) -> str | None:
     runs = payload.get("runs")
     if not isinstance(runs, list) or len(runs) < CODEX_NO_WINDOW_MIN_RUNS:
         return "codex_no_window_verification_insufficient_run_count"
+    if payload.get("dispatcher_wrapper_path") is not True or payload.get("wrapper_ok") is not True:
+        return "codex_no_window_verification_missing_dispatch_wrapper"
+    if payload.get("containment_mechanism") != "windows_private_desktop":
+        return "codex_no_window_verification_missing_private_desktop"
+    if payload.get("requested_permissions_profile") != REQUIRED_PERMISSIONS_PROFILE:
+        return "codex_no_window_verification_requested_profile_mismatch"
+    if payload.get("effective_profile_ok") is not True:
+        return "codex_no_window_verification_effective_profile_mismatch"
+    if payload.get("sentinel_lifecycle_ok") is not True:
+        return "codex_no_window_verification_incomplete_sentinel_lifecycle"
     for run in runs:
         steps = _codex_no_window_run_steps(run)
         if len(steps) < CODEX_NO_WINDOW_MIN_COMMAND_STEPS:
             return "codex_no_window_verification_insufficient_command_count"
         if not all(_codex_no_window_step_has_marker_proof(step) for step in steps):
             return "codex_no_window_verification_missing_marker_chain"
+        if run.get("requested_permissions_profile") != REQUIRED_PERMISSIONS_PROFILE:
+            return "codex_no_window_verification_requested_profile_mismatch"
+        if run.get("observed_effective_profile") != REQUIRED_EFFECTIVE_PROFILE:
+            return "codex_no_window_verification_effective_profile_mismatch"
+        if run.get("effective_profile_ok") is not True:
+            return "codex_no_window_verification_effective_profile_mismatch"
+        if run.get("sentinel_lifecycle_ok") is not True:
+            return "codex_no_window_verification_incomplete_sentinel_lifecycle"
+        if run.get("sentinel_residual_before_cleanup") is not False:
+            return "codex_no_window_verification_sentinel_residue"
+        if run.get("sentinel_residual_after_cleanup") is not False:
+            return "codex_no_window_verification_sentinel_residue"
+        if run.get("wrapper_returncode") not in {0, "0"}:
+            return "codex_no_window_verification_dispatch_wrapper_failed"
     return None
 
 
@@ -373,9 +407,16 @@ def evaluate_readiness(
     model_ok = _has_flag_value(argv, "--model", REQUIRED_MODEL)
     approval_policy_ok = _has_config(argv, REQUIRED_APPROVAL_CONFIG)
     reasoning_effort_ok = _has_config(argv, REQUIRED_REASONING_CONFIG)
-    sandbox_mode = _flag_value(argv, "--sandbox")
-    sandbox_forbidden = sandbox_mode in FORBIDDEN_SANDBOX_MODES
-    sandbox_ok = sandbox_mode == REQUIRED_SANDBOX_MODE and not sandbox_forbidden
+    legacy_sandbox_values = _flag_values(argv, "--sandbox")
+    legacy_sandbox_present = "--sandbox" in argv or bool(legacy_sandbox_values)
+    permissions_profiles = _config_values(argv, "default_permissions")
+    permissions_profile = permissions_profiles[0] if len(permissions_profiles) == 1 else None
+    permissions_profile_ok = (
+        permissions_profiles == [REQUIRED_PERMISSIONS_PROFILE]
+        and _has_config(argv, REQUIRED_PERMISSIONS_CONFIG)
+        and not legacy_sandbox_present
+    )
+    permissions_profile_forbidden = bool(permissions_profiles) and not permissions_profile_ok
     project_root_selector = _flag_value(argv, "--cd")
     project_root_selector_ok = project_root_selector in {"{{PROJECT_ROOT}}", str(project_root)}
     add_dir_values = _flag_values(argv, "--add-dir")
@@ -400,19 +441,20 @@ def evaluate_readiness(
         and model_ok
         and approval_policy_ok
         and reasoning_effort_ok
-        and sandbox_ok
+        and permissions_profile_ok
         and project_root_selector_ok
         and codex_helper_add_dir_ok
         and codex_dotdir_acl_ok
         and not forbidden_flags_present
     )
-    dispatchable = (
+    static_dispatchable = (
         static_ok
         and record.get("status") == "active"
         and bool(record.get("can_receive_dispatch"))
         and HARNESS_NAME in {str(record.get("harness_name")), str(record.get("harness_type"))}
     )
     live_headless = evaluate_live_headless_readiness(project_root)
+    dispatchable = static_dispatchable and live_headless.get("ready") is True
     return {
         "can_receive_dispatch": bool(record.get("can_receive_dispatch")),
         "codex_dotdir_acl": codex_dotdir_acl,
@@ -436,13 +478,19 @@ def evaluate_readiness(
         "project_root_selector_ok": project_root_selector_ok,
         "require_executable": require_executable,
         "reasoning_effort_ok": reasoning_effort_ok,
+        "legacy_sandbox_present": legacy_sandbox_present,
+        "permissions_profile": permissions_profile,
+        "permissions_profiles": permissions_profiles,
+        "permissions_profile_forbidden": permissions_profile_forbidden,
+        "permissions_profile_ok": permissions_profile_ok,
+        "required_permissions_profile": REQUIRED_PERMISSIONS_PROFILE,
         "resolved_executable": resolved_executable,
         "required_model": REQUIRED_MODEL,
-        "required_sandbox_mode": REQUIRED_SANDBOX_MODE,
-        "sandbox_forbidden": sandbox_forbidden,
-        "sandbox_mode": sandbox_mode,
-        "sandbox_ok": sandbox_ok,
-        "static_dispatchable": dispatchable,
+        "required_sandbox_mode": REQUIRED_EFFECTIVE_PROFILE,
+        "sandbox_forbidden": permissions_profile_forbidden or legacy_sandbox_present,
+        "sandbox_mode": permissions_profile,
+        "sandbox_ok": permissions_profile_ok,
+        "static_dispatchable": static_dispatchable,
         "static_ok": static_ok,
         "status": record.get("status"),
     }

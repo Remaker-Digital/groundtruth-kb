@@ -1329,8 +1329,8 @@ def test_daemon_stop_ignores_unverified_pid_and_clears_state(tmp_path: Path, mon
 
 
 # ---------------------------------------------------------------------------
-# WI-4845/WI-5003: daemon passes a per-role worker --lifetime override so headless
-# workers complete (LO Opus floor, PB ~5400s, env-configurable). The cap is
+# WI-4845/WI-5003/WI-5222: daemon passes a per-role worker --lifetime override
+# so headless workers complete with the 4,200-second generous floor. The cap is
 # resolved by runtime.worker_lifetime_seconds and threaded into the spawn
 # command (run_with_status.py --lifetime) by runtime._spawn_harness, which the
 # daemon's live-spawn path reuses.
@@ -1984,7 +1984,7 @@ def test_daemon_live_skips_headless_ineligible_prime_no_go(
 
 
 def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The daemon live-spawn command carries the 29,400-second generous
+    """The daemon live-spawn command carries the 4,200-second generous
     lifetime for both Loyal Opposition and Prime Builder targets."""
     daemon = _load_daemon()
     runtime = daemon._load_dispatch_runtime()
@@ -1992,13 +1992,13 @@ def test_daemon_spawn_passes_per_role_lifetime(tmp_path: Path, monkeypatch: pyte
     monkeypatch.delenv(runtime.PB_WORKER_LIFETIME_ENV_VAR, raising=False)
 
     lo_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "loyal-opposition", "lo"), tmp_path, monkeypatch)
-    assert runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS == runtime.GENEROUS_WORKER_LIFETIME_SECONDS == 29400
+    assert runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS == runtime.GENEROUS_WORKER_LIFETIME_SECONDS == 4200
     lo_command, lo_env = lo_cmd
     assert _lifetime_value(runtime, lo_command, lo_env) == str(runtime.LO_REVIEW_WORKER_LIFETIME_SECONDS)
 
     pb_cmd = _capture_worker_command(runtime, _spawn_target(runtime, "prime-builder", "pb"), tmp_path, monkeypatch)
     pb_command, pb_env = pb_cmd
-    assert _lifetime_value(runtime, pb_command, pb_env) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "29400"
+    assert _lifetime_value(runtime, pb_command, pb_env) == str(runtime.PB_IMPL_WORKER_LIFETIME_SECONDS) == "4200"
 
 
 def test_daemon_worker_lifetime_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

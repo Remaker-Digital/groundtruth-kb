@@ -376,6 +376,8 @@ def _run_bridge_compliance_audit(
     }
     with tempfile.TemporaryDirectory(prefix="gtkb-bridge-compliance-") as tmp:
         audit_output = Path(tmp) / "audit.json"
+        from scripts.windows_subprocess import no_window_subprocess_kwargs
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -389,6 +391,7 @@ def _run_bridge_compliance_audit(
             text=True,
             capture_output=True,
             check=False,
+            **no_window_subprocess_kwargs(),
         )
         if result.returncode != 0:
             raise BridgeComplianceError(

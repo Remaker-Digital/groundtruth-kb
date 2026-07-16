@@ -9,6 +9,7 @@ import base64
 import datetime as dt
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -29,12 +30,16 @@ from scripts.windows_subprocess import (  # noqa: E402
     private_desktop_popen_kwargs,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DEFAULT_RUNS = 2
 DEFAULT_COMMANDS_PER_RUN = 3
 DEFAULT_TIMEOUT_SECONDS = 180
+REQUESTED_PERMISSIONS_PROFILE = ":workspace"
+EXPECTED_EFFECTIVE_PROFILE = "workspace-write"
 VERIFICATION_RELATIVE_PATH = Path(".gtkb-state") / "bridge-poller" / "codex-no-window-verification.json"
 RUN_WITH_STATUS_CONFIG_ENV_VAR = "GTKB_RUN_WITH_STATUS_CONFIG_B64"
+_EFFECTIVE_PROFILE_RE = re.compile(r"(?im)^\s*sandbox:\s*([^\s\[]+)")
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def _now() -> dt.datetime:
@@ -46,7 +51,7 @@ def _iso(value: dt.datetime) -> str:
 
 
 def _preview(value: str, limit: int = 2000) -> str:
-    return value[:limit]
+    return _ANSI_ESCAPE_RE.sub("", value)[:limit]
 
 
 def verification_path(project_root: Path) -> Path:
@@ -109,8 +114,30 @@ def _markers(run_index: int, command_count: int, nonce: str) -> list[str]:
     return [f"GTKB-WI5135-R{run_index}-C{index}-{nonce}" for index in range(1, command_count + 1)]
 
 
-def build_prompt(markers: list[str]) -> str:
-    commands = "\n".join(f"{index}. echo {marker}" for index, marker in enumerate(markers, start=1))
+def build_prompt(markers: list[str], sentinel_path: Path, sentinel_value: str) -> str:
+    if len(markers) != 3:
+        raise ValueError("sentinel lifecycle requires exactly three markers")
+    path = str(sentinel_path).replace("\\", "\\\\").replace("'", "\\'")
+    value = sentinel_value.replace("'", "\\'")
+    create_marker, read_marker, remove_marker = (marker.replace("'", "\\'") for marker in markers)
+    commands = "\n".join(
+        [
+            (
+                '1. python -c "from pathlib import Path; '
+                f"p=Path(r'{path}'); p.write_text('{value}', encoding='utf-8'); "
+                f"assert p.is_file(); print('{create_marker}')\""
+            ),
+            (
+                '2. python -c "from pathlib import Path; '
+                f"p=Path(r'{path}'); assert p.read_text(encoding='utf-8') == '{value}'; "
+                f"print('{read_marker}')\""
+            ),
+            (
+                '3. python -c "from pathlib import Path; '
+                f"p=Path(r'{path}'); p.unlink(); assert not p.exists(); print('{remove_marker}')\""
+            ),
+        ]
+    )
     return (
         "Run the following shell commands exactly, in order, and then stop. "
         "Do not summarize; let the command output appear in stdout.\n"
@@ -128,8 +155,8 @@ def build_codex_command(codex_executable: str, prompt: str, project_root: Path) 
         'approval_policy="never"',
         "-c",
         'model_reasoning_effort="xhigh"',
-        "--sandbox",
-        "workspace-write",
+        "-c",
+        'default_permissions=":workspace"',
         prompt,
         "--cd",
         str(project_root),
@@ -141,17 +168,25 @@ def build_codex_command(codex_executable: str, prompt: str, project_root: Path) 
 def _step_records(markers: list[str], transcript: str, returncode: int | None) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for index, marker in enumerate(markers, start=1):
-        contains = marker in transcript
+        occurrence_count = transcript.count(marker)
+        contains = occurrence_count >= 2
         records.append(
             {
                 "index": index,
                 "marker": marker,
                 "returncode": returncode,
                 "stdout_contains_marker": contains,
+                "marker_occurrence_count": occurrence_count,
                 "transcript_preview": _preview(transcript),
             }
         )
     return records
+
+
+def observed_effective_profile(transcript: str) -> tuple[str | None, list[str]]:
+    profiles = [match.group(1).strip().lower() for match in _EFFECTIVE_PROFILE_RE.finditer(transcript)]
+    unique = list(dict.fromkeys(profiles))
+    return (unique[0] if len(unique) == 1 else None), profiles
 
 
 def _visible_detected(observations: list[dict[str, Any]]) -> bool:
@@ -255,10 +290,20 @@ def run_probe(
     all_observations: list[dict[str, Any]] = []
 
     for run_index in range(1, runs + 1):
+        if commands_per_run != 3:
+            raise ValueError("commands_per_run must be 3 for the sentinel lifecycle")
         markers = _markers(run_index, commands_per_run, nonce)
+        sentinel_dir = project_root / ".gtkb-state" / "bridge-poller" / "codex-no-window-smoke"
+        sentinel_dir.mkdir(parents=True, exist_ok=True)
+        sentinel_path = sentinel_dir / f"wi5310-{run_index}-{uuid.uuid4().hex}.sentinel"
+        sentinel_value = f"GTKB-WI5310-SENTINEL-{run_index}-{nonce}"
         before = window_observer()
         all_observations.extend(before)
-        command = build_codex_command(codex_executable, build_prompt(markers), project_root)
+        command = build_codex_command(
+            codex_executable,
+            build_prompt(markers, sentinel_path, sentinel_value),
+            project_root,
+        )
         wrapper_returncode = None
         wrapper_stdout_path = None
         wrapper_stderr_path = None
@@ -301,6 +346,23 @@ def run_probe(
             stdout = ""
             stderr = ""
             error = str(exc)
+        transcript = f"{stdout}\n{stderr}"
+        effective_profile, observed_profiles = observed_effective_profile(transcript)
+        steps = _step_records(markers, transcript, returncode)
+        residual_before_cleanup = sentinel_path.exists()
+        cleanup_error = None
+        if residual_before_cleanup:
+            try:
+                sentinel_path.unlink()
+            except OSError as exc:
+                cleanup_error = str(exc)
+        residual_after_cleanup = sentinel_path.exists()
+        sentinel_lifecycle_ok = (
+            returncode == 0
+            and all(step["stdout_contains_marker"] for step in steps)
+            and not residual_before_cleanup
+            and not residual_after_cleanup
+        )
         after = window_observer()
         all_observations.extend(after)
         run_records.append(
@@ -308,10 +370,22 @@ def run_probe(
                 "run_index": run_index,
                 "command": command[:10] + ["..."],
                 "returncode": returncode,
-                "stdout_preview": _preview(stdout),
-                "stderr_preview": _preview(stderr),
+                "stdout_preview": _preview(stdout.replace(str(project_root), "{{PROJECT_ROOT}}")),
+                "stderr_preview": _preview(stderr.replace(str(project_root), "{{PROJECT_ROOT}}")),
                 "error": error,
-                "command_steps": _step_records(markers, f"{stdout}\n{stderr}", returncode),
+                "command_steps": steps,
+                "requested_permissions_profile": REQUESTED_PERMISSIONS_PROFILE,
+                "observed_effective_profile": effective_profile,
+                "observed_effective_profiles": observed_profiles,
+                "effective_profile_ok": effective_profile == EXPECTED_EFFECTIVE_PROFILE,
+                "sentinel_relative_path": sentinel_path.relative_to(project_root).as_posix(),
+                "sentinel_create_ok": steps[0]["stdout_contains_marker"],
+                "sentinel_read_ok": steps[1]["stdout_contains_marker"],
+                "sentinel_remove_ok": steps[2]["stdout_contains_marker"],
+                "sentinel_lifecycle_ok": sentinel_lifecycle_ok,
+                "sentinel_residual_before_cleanup": residual_before_cleanup,
+                "sentinel_residual_after_cleanup": residual_after_cleanup,
+                "sentinel_cleanup_error": cleanup_error,
                 "window_observations": [*before, *after],
                 "wrapper_returncode": wrapper_returncode,
                 "wrapper_stdout_path": wrapper_stdout_path,
@@ -326,12 +400,28 @@ def run_probe(
         for run in run_records
         for step in run["command_steps"]
     )
-    result = "pass" if marker_chain_ok and not visible_window_detected else "fail"
+    effective_profile_ok = all(run["effective_profile_ok"] for run in run_records)
+    sentinel_lifecycle_ok = all(run["sentinel_lifecycle_ok"] for run in run_records)
+    wrapper_ok = all(run["wrapper_returncode"] == 0 for run in run_records) if use_dispatch_wrapper else True
+    result = (
+        "pass"
+        if marker_chain_ok
+        and effective_profile_ok
+        and sentinel_lifecycle_ok
+        and wrapper_ok
+        and not visible_window_detected
+        else "fail"
+    )
     verified_at = _now()
     return {
         "schema_version": SCHEMA_VERSION,
-        "probe": "codex_no_window_schema_v2_multi_command",
+        "probe": "codex_no_window_schema_v3_workspace_sentinel",
         "result": result,
+        "requested_permissions_profile": REQUESTED_PERMISSIONS_PROFILE,
+        "expected_effective_profile": EXPECTED_EFFECTIVE_PROFILE,
+        "effective_profile_ok": effective_profile_ok,
+        "sentinel_lifecycle_ok": sentinel_lifecycle_ok,
+        "wrapper_ok": wrapper_ok,
         "visible_window_detected": visible_window_detected,
         "verified_at": _iso(verified_at),
         "expires_at": _iso(verified_at + dt.timedelta(hours=4)),

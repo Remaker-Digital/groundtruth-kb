@@ -43,10 +43,17 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "NO-GO", slug: str = "
     (bridge_dir / f"{slug}-001.md").write_text(
         "NEW\n\n"
         "# Test Proposal\n\n"
+        "bridge_kind: prime_proposal\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n"
+        'target_paths: ["scripts/example.py"]\n\n'
         "## Specification Links\n\n"
         "- GOV-FILE-BRIDGE-AUTHORITY-001\n\n"
         "## Owner Decisions / Input\n\n"
-        "- Carry this section forward.\n",
+        "- Carry this section forward; no new owner decision is required.\n\n"
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements sufficient.\n",
         encoding="utf-8",
     )
     (bridge_dir / f"{slug}-002.md").write_text(
@@ -69,6 +76,11 @@ def _completed_revision() -> str:
     return (
         "REVISED\n\n"
         "# Test Revision\n\n"
+        "bridge_kind: prime_proposal\n"
+        "Project Authorization: PAUTH-PROJECT-TEST\n"
+        "Project: PROJECT-TEST\n"
+        "Work Item: WI-1234\n"
+        'target_paths: ["scripts/example.py"]\n\n'
         "## Revision Claim\n\n"
         "This completed revision addresses the findings while preserving versioned bridge files as canonical.\n\n"
         "## Specification Links\n\n"
@@ -79,6 +91,8 @@ def _completed_revision() -> str:
         "- bridge/test-revision-002.md - prior review finding.\n\n"
         "## Owner Decisions / Input\n\n"
         "- Carried forward from the prior proposal; no new owner decision.\n\n"
+        "## Requirement Sufficiency\n\n"
+        "Existing requirements sufficient.\n\n"
         "## Findings Addressed\n\n"
         "### F1 - P1 - Missing concrete correction\n\n"
         "Completed correction is documented here.\n\n"

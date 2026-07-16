@@ -1,0 +1,152 @@
+diff --git a/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py b/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py
+index 195c3330..f9cfb77a 100644
+--- a/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py
++++ b/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py
+@@ -361,10 +361,109 @@ def _role_provenance(
+     legacy_document = Path("harness-state") / harness_name / "session-envelope.json"
+     document_id = session_document if (project_root / session_document).is_file() else legacy_document
+     return role, document_id.as_posix(), True
+
+
++def _trusted_worker_context_details(
++    project_root: Path,
++    dispatch_id: str,
++    context: Mapping[str, Any],
++) -> tuple[dict[str, Any], str | None, str | None, str | None]:
++    """Validate dispatcher-selected worker context against the session document."""
++
++    trusted = {
++        "dispatch_id": _nonempty_string(context.get("dispatch_id")),
++        "session_id": _nonempty_string(context.get("session_id")),
++        "harness_id": _nonempty_string(context.get("harness_id")),
++        "harness_name": _nonempty_string(context.get("harness_name")),
++        "provider": _nonempty_string(context.get("provider")),
++        "model_id": _nonempty_string(context.get("model_id")),
++        "model_version": _nonempty_string(context.get("model_version")),
++        "turn_budget": _safe_int(context.get("turn_budget")),
++        "role": _nonempty_string(context.get("role")),
++    }
++    required = ("dispatch_id", "session_id", "harness_id", "harness_name", "role")
++    if any(trusted[field] is None for field in required):
++        return trusted, None, None, "worker_context_incomplete"
++    if trusted["dispatch_id"] != dispatch_id:
++        return trusted, None, None, "worker_context_dispatch_mismatch"
++
++    try:
++        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
++
++        provenance = resolve_worker_role_provenance(
++            project_root.resolve(),
++            current_session_id=str(trusted["session_id"]),
++            harness_name=str(trusted["harness_name"]),
++        )
++    except (EnvelopeError, OSError, ValueError):
++        return trusted, None, None, "worker_session_invalid"
++
++    for field in ("session_id", "harness_id", "harness_name", "role"):
++        if _nonempty_string(provenance.get(field)) != trusted[field]:
++            return trusted, None, None, f"worker_session_{field}_mismatch"
++    if _nonempty_string(provenance.get("dispatch_run_id")) != trusted["dispatch_id"]:
++        return trusted, None, None, "worker_session_dispatch_mismatch"
++
++    session_document = (
++        Path("harness-state") / str(trusted["harness_name"]) / "session-envelopes" / f"{trusted['session_id']}.json"
++    )
++    legacy_document = Path("harness-state") / str(trusted["harness_name"]) / "session-envelope.json"
++    document_id = session_document if (project_root / session_document).is_file() else legacy_document
++    return trusted, str(trusted["role"]), document_id.as_posix(), None
++
++
++def _fill_missing_worker_context(
++    payload: dict[str, Any],
++    *,
++    project_root: Path,
++    dispatch_id: str,
++    worker_context: Mapping[str, Any] | None,
++) -> str | None:
++    if worker_context is None:
++        return None
++    trusted, role, role_source_document_id, diagnostic = _trusted_worker_context_details(
++        project_root,
++        dispatch_id,
++        worker_context,
++    )
++    if trusted.get("dispatch_id") != dispatch_id:
++        return diagnostic
++
++    worker = dict(_mapping(payload.get("worker")))
++    for field in ("harness_id", "harness_name", "provider", "model_id", "model_version"):
++        value = trusted.get(field)
++        if value is not None and _nonempty_string(worker.get(field)) is None:
++            worker[field] = value
++    if role is not None and role_source_document_id is not None:
++        existing_role = _nonempty_string(worker.get("role"))
++        existing_role_source = _nonempty_string(worker.get("role_source_document_id"))
++        if existing_role is None and existing_role_source is None:
++            worker["role"] = role
++            worker["role_source_document_id"] = role_source_document_id
++        elif existing_role == role and existing_role_source is None:
++            worker["role_source_document_id"] = role_source_document_id
++        elif existing_role is None and existing_role_source == role_source_document_id:
++            worker["role"] = role
++        elif existing_role is not None and existing_role != role:
++            diagnostic = diagnostic or "worker_role_conflict_preserved"
++        elif existing_role_source is not None and existing_role_source != role_source_document_id:
++            diagnostic = diagnostic or "worker_role_source_conflict_preserved"
++    payload["worker"] = worker
++
++    correlation = dict(_mapping(payload.get("correlation")))
++    if _nonempty_string(correlation.get("session_context_id")) is None and trusted.get("session_id") is not None:
++        correlation["session_context_id"] = trusted["session_id"]
++    payload["correlation"] = correlation
++
++    budget = dict(_mapping(payload.get("budget")))
++    if budget.get("turn_budget") is None and trusted.get("turn_budget") is not None:
++        budget["turn_budget"] = trusted["turn_budget"]
++    payload["budget"] = budget
++    return diagnostic
++
++
+ class NullDispatchTelemetry:
+     """No-op observer used for ordinary non-dispatch shim invocation."""
+
+     enabled = False
+     diagnostic: str | None = None
+@@ -602,10 +701,11 @@ def reconcile_dispatch_telemetry(
+     exit_code: int | None = None,
+     exit_status: str | None = None,
+     stop_reason: str | None = None,
+     bridge_status: str | None = None,
+     bridge_document_id: str | None = None,
++    worker_context: Mapping[str, Any] | None = None,
+ ) -> TelemetryWriteResult:
+     """Merge only known dispatcher facts, creating a partial record if necessary."""
+
+     path = telemetry_path(project_root, dispatch_id)
+     payload = _read_json_object(path)
+@@ -648,16 +748,24 @@ def reconcile_dispatch_telemetry(
+     if isinstance(exit_code, int) and not isinstance(exit_code, bool):
+         outcome["exit_code"] = exit_code
+     if bridge_status in SUCCESSFUL_REVIEW_STATUSES:
+         outcome["bridge_status"] = bridge_status
+     payload["outcome"] = outcome
++    diagnostic = _fill_missing_worker_context(
++        payload,
++        project_root=project_root,
++        dispatch_id=dispatch_id,
++        worker_context=worker_context,
++    )
++    if diagnostic is not None:
++        payload["diagnostic"] = diagnostic
+
+     try:
+         _atomic_write_json(path, payload)
+     except Exception:
+         return TelemetryWriteResult(written=False, path=path, diagnostic="telemetry_write_failed")
+-    return TelemetryWriteResult(written=True, path=path)
++    return TelemetryWriteResult(written=True, path=path, diagnostic=diagnostic)
+
+
+ def _record_group_value(record: Mapping[str, Any], group_by: str) -> str:
+     worker = _mapping(record.get("worker"))
+     outcome = _mapping(record.get("outcome"))

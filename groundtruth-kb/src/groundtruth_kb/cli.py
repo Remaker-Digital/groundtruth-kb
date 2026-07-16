@@ -3432,7 +3432,7 @@ def hygiene_auto_resolve(root: str, fmt: str, apply_changes: bool, evidence_refs
 
 @hygiene_group.group("reclaim")
 def hygiene_reclaim_group() -> None:
-    """Plan and execute exact, reversible repository hygiene batches."""
+    """Plan and execute exact repository hygiene batches."""
 
 
 def _reclaim_now(value: str | None) -> datetime | None:
@@ -3580,6 +3580,108 @@ def hygiene_reclaim_trash(
         click.echo(f"error: {exc}", err=True)
         raise SystemExit(2) from exc
     _emit_reclaim_result("trash", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("purge")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", required=True, help="Exact planned run identifier.")
+@click.option("--plan-hash", required=True, help="Immutable plan hash from the selected run.")
+@click.option("--item-id", "item_ids", multiple=True, required=True, help="Exact trashed item; repeatable.")
+@click.option(
+    "--owner-evidence",
+    multiple=True,
+    required=True,
+    help="Batch-specific owner/purge evidence reference; repeatable.",
+)
+@click.option(
+    "--quiescence-evidence",
+    multiple=True,
+    required=True,
+    help="Operation-time quiescence evidence reference; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_purge(
+    root: Path,
+    state_root: Path | None,
+    run_id: str,
+    plan_hash: str,
+    item_ids: tuple[str, ...],
+    owner_evidence: tuple[str, ...],
+    quiescence_evidence: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Permanently delete exact receipted trash payloads to reclaim disk."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, purge_reclaim
+
+    try:
+        payload = purge_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            plan_hash=plan_hash,
+            item_ids=item_ids,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("purge", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("deep-clean")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--min-age-hours", type=click.IntRange(min=1), default=168, show_default=True)
+@click.option("--max-cycles", type=click.IntRange(min=1), default=25, show_default=True)
+@click.option("--batch-size", type=click.IntRange(min=1), default=250, show_default=True)
+@click.option(
+    "--owner-evidence",
+    multiple=True,
+    required=True,
+    help="Ops-envelope owner/deep-clean evidence reference; repeatable.",
+)
+@click.option(
+    "--quiescence-evidence",
+    multiple=True,
+    required=True,
+    help="Operation-time quiescence evidence reference; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+@click.option("--actor", default=None, hidden=True)
+@click.option("--session-id", default=None, hidden=True)
+def hygiene_reclaim_deep_clean(
+    root: Path,
+    state_root: Path | None,
+    min_age_hours: int,
+    max_cycles: int,
+    batch_size: int,
+    owner_evidence: tuple[str, ...],
+    quiescence_evidence: tuple[str, ...],
+    json_output: bool,
+    actor: str | None,
+    session_id: str | None,
+) -> None:
+    """Autonomously plan, trash, and purge until the reclaim plan is clean."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, deep_clean_reclaim
+
+    try:
+        payload = deep_clean_reclaim(
+            root.resolve(),
+            state_root=state_root.resolve() if state_root else None,
+            min_age_hours=min_age_hours,
+            max_cycles=max_cycles,
+            batch_size=batch_size,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            actor=actor,
+            session_id=session_id,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("deep-clean", payload, json_output=json_output)
 
 
 @hygiene_reclaim_group.command("restore")
@@ -3873,7 +3975,7 @@ def assert_cmd(ctx: click.Context, spec_id: str | None, triggered_by: str) -> No
         project_root = config.project_root.resolve()
         summary = run_all_assertions(db, project_root, triggered_by=triggered_by, spec_id=spec_id)
         click.echo(format_summary(summary))
-        if summary.get("failed", 0) > 0:
+        if summary.get("aggregate_result") != "PASS":
             raise SystemExit(1)
     finally:
         db.close()

@@ -298,6 +298,7 @@ class AdopterProfile:
     max_tokens: int = DEFAULT_ANTHROPIC_MAX_TOKENS
     publish_bridge_verdict_tool: bool = False
     force_anthropic_publisher_tool_choice: bool = True
+    disable_anthropic_publisher_recovery_thinking: bool = False
 
     def __post_init__(self) -> None:
         if self.dialect not in SUPPORTED_DIALECTS:
@@ -312,6 +313,8 @@ class AdopterProfile:
             )
         if type(self.force_anthropic_publisher_tool_choice) is not bool:
             raise CloudHarnessError("force_anthropic_publisher_tool_choice must be a bool")
+        if type(self.disable_anthropic_publisher_recovery_thinking) is not bool:
+            raise CloudHarnessError("disable_anthropic_publisher_recovery_thinking must be a bool")
         # Slice 2 direct-cloud invariant (SPEC-INTAKE-9ec893): an adopter must declare a
         # direct-cloud endpoint; the base has no local-service bridge path.
         if not self.default_endpoint or not str(self.default_endpoint).strip():
@@ -2319,9 +2322,11 @@ def run_tool_loop(
                 publisher_only_recovery
                 and profile.dialect == DIALECT_ANTHROPIC_MESSAGES
                 and active_tools == (PUBLISH_BRIDGE_VERDICT_TOOL,)
-                and profile.force_anthropic_publisher_tool_choice
             ):
-                payload["tool_choice"] = {"type": "any"}
+                if profile.disable_anthropic_publisher_recovery_thinking:
+                    payload["thinking"] = {"type": "disabled"}
+                if profile.force_anthropic_publisher_tool_choice:
+                    payload["tool_choice"] = {"type": "any"}
 
             operation_timeout = min(
                 timeout,

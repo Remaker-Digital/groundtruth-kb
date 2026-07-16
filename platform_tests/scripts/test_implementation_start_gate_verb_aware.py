@@ -246,11 +246,9 @@ def test_classify_git_rm() -> None:
     assert relevant[0] == "git"
 
 
-def test_classify_git_commit_non_mutating() -> None:
+def test_classify_git_commit_is_not_in_read_only_allowlist() -> None:
     classification = _classify_command_verb(["git", "commit", "-m", "msg"])
-    assert classification is not None
-    extractor, relevant = classification
-    assert extractor(relevant) == []
+    assert classification is None
 
 
 def test_classify_unknown_verb_returns_none() -> None:
@@ -315,10 +313,14 @@ def test_mutating_verb_table_contains_core_git_verbs() -> None:
         assert v in git_mut
 
 
-def test_mutating_verb_table_git_commit_non_mutating() -> None:
-    assert "commit" in MUTATING_VERB_TABLE["git_non_mutating"]
-    assert "push" in MUTATING_VERB_TABLE["git_non_mutating"]
-    assert "merge" in MUTATING_VERB_TABLE["git_non_mutating"]
+def test_mutating_verb_table_git_non_mutating_is_read_only_allowlist() -> None:
+    read_only = MUTATING_VERB_TABLE["git_non_mutating"]
+    assert "status" in read_only
+    assert "diff" in read_only
+    assert "commit" not in read_only
+    assert "push" not in read_only
+    assert "merge" not in read_only
+    assert "branch" not in read_only
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +403,7 @@ def test_gate_decision_blocks_git_add_protected_path(tmp_path: Path) -> None:
     payload = _no_auth_payload(tmp_path, "git add scripts/protected.py")
     result = gate_decision(payload)
     assert result.get("decision") == "block", f"expected block, got {result}"
-    assert "scripts/" in result.get("reason", "")
+    assert result.get("reason_code") == "direct_git_effect_requires_lifecycle"
 
 
 def test_gate_decision_blocks_git_rm_protected_path(tmp_path: Path) -> None:
@@ -411,7 +413,7 @@ def test_gate_decision_blocks_git_rm_protected_path(tmp_path: Path) -> None:
     payload = _no_auth_payload(tmp_path, "git rm scripts/protected.py")
     result = gate_decision(payload)
     assert result.get("decision") == "block", f"expected block, got {result}"
-    assert "scripts/" in result.get("reason", "")
+    assert result.get("reason_code") == "direct_git_effect_requires_lifecycle"
 
 
 def test_gate_decision_blocks_git_restore_staged_protected_path(tmp_path: Path) -> None:
@@ -421,7 +423,7 @@ def test_gate_decision_blocks_git_restore_staged_protected_path(tmp_path: Path) 
     payload = _no_auth_payload(tmp_path, "git restore --staged scripts/protected.py")
     result = gate_decision(payload)
     assert result.get("decision") == "block", f"expected block, got {result}"
-    assert "scripts/" in result.get("reason", "")
+    assert result.get("reason_code") == "direct_git_effect_requires_lifecycle"
 
 
 def test_gate_decision_allows_git_status(tmp_path: Path) -> None:

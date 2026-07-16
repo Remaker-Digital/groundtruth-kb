@@ -38,7 +38,7 @@ Required follow-on: a Deliberation Archive record (per `.claude/rules/deliberati
 
 Prime defers a decision on the peer solution to a later session. Use when the peer solution may become relevant after a specific GT-KB milestone (e.g., "after release readiness lands", "after multi-tenant story stabilizes"), when more evidence is needed, or when the GT-KB problem the peer would solve is itself not yet specified.
 
-Required follow-on: a Deliberation Archive record with an explicit DEFER-TRIGGER CONDITION (e.g., "Revisit after `GTKB-DASHBOARD-002` Slice 3 lands", or "Revisit if `GOV-RELEASE-READINESS-001` blockers reach P0"). When the trigger condition is met, the procedure resumes from the original advisory.
+Required follow-on: a Deliberation Archive record with an explicit DEFER-TRIGGER CONDITION (e.g., "Revisit after `GTKB-DASHBOARD-002` Slice 3 lands", or "Revisit if `GOV-RELEASE-READINESS-001` blockers reach P0"). When the daemon condition is met, the procedure resumes from the original advisory.
 
 ### `monitor`
 

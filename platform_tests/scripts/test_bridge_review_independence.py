@@ -1,54 +1,122 @@
-"""Regression tests for bridge review-independence artifact resolution."""
+"""Fail-closed tests for exact bridge report review-independence binding."""
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = REPO_ROOT / "scripts" / "bridge_review_independence.py"
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPTS = ROOT / "scripts"
+for candidate in (ROOT, SCRIPTS):
+    if str(candidate) not in sys.path:
+        sys.path.insert(0, str(candidate))
+
+import bridge_review_independence as independence  # noqa: E402
 
 
-def _load_helper():
-    spec = importlib.util.spec_from_file_location("bridge_review_independence_test", HELPER_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["bridge_review_independence_test"] = module
-    spec.loader.exec_module(module)
-    return module
+def _write_report(root: Path, relative_path: str, author: str = "REPORT-SESSION") -> None:
+    path = root / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"NEW\n\nauthor_session_context_id: {author}\n\nbridge_kind: implementation_report\n",
+        encoding="utf-8",
+    )
 
 
-def test_versioned_bridge_files_excludes_prefix_superset_slug(tmp_path: Path) -> None:
-    helper = _load_helper()
-    bridge = tmp_path / "bridge"
-    bridge.mkdir()
-    for name in (
-        "gtkb-finalization-tooling-batch-001.md",
-        "gtkb-finalization-tooling-batch-002.md",
-        "gtkb-finalization-tooling-batch-exact-target-amendment-003.md",
-        "gtkb-finalization-tooling-batch-004-draft.md",
-    ):
-        (bridge / name).write_text("NEW\n", encoding="utf-8")
-
-    paths = helper._versioned_bridge_files("gtkb-finalization-tooling-batch", tmp_path)
-
-    assert [path.name for path in paths] == [
-        "gtkb-finalization-tooling-batch-001.md",
-        "gtkb-finalization-tooling-batch-002.md",
-    ]
+def _verdict(reference: str | None, reviewer: str = "REVIEW-SESSION") -> str:
+    lines = ["VERIFIED", "", f"author_session_context_id: {reviewer}"]
+    if reference is not None:
+        lines.extend(["", f"Responds to: `{reference}`"])
+    return "\n".join(lines) + "\n"
 
 
-def test_reviewed_artifact_reference_accepts_trailing_descriptor(tmp_path: Path) -> None:
-    helper = _load_helper()
-    bridge = tmp_path / "bridge"
-    bridge.mkdir()
-    reviewed = bridge / "gtkb-thread-003.md"
-    reviewed.write_text("NEW\nauthor_session_context_id: prime-session\n", encoding="utf-8")
-    verdict = """VERIFIED
-author_session_context_id: lo-session
+def test_exact_latest_same_thread_report_proves_independence(tmp_path: Path) -> None:
+    expected = "bridge/subject-003.md"
+    _write_report(tmp_path, expected)
 
-Responds to: bridge/gtkb-thread-003.md (NEW implementation report)
-"""
+    assert (
+        independence.reviewed_artifact_path(
+            _verdict(expected),
+            "subject",
+            tmp_path,
+            expected_artifact_path=expected,
+        )
+        == (tmp_path / expected).resolve()
+    )
+    assert (
+        independence.verdict_self_review_reason(
+            _verdict(expected),
+            "subject",
+            tmp_path,
+            expected_artifact_path=expected,
+        )
+        is None
+    )
 
-    assert helper.reviewed_artifact_path(verdict, "gtkb-thread", tmp_path) == reviewed.resolve()
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        None,
+        "bridge/../subject-003.md",
+        "../bridge/subject-003.md",
+        "outside/subject-003.md",
+        "bridge/other-subject-003.md",
+        "bridge/subject-001.md",
+        "C:\\outside\\subject-003.md",
+        "/outside/subject-003.md",
+    ],
+    ids=[
+        "missing",
+        "bridge-traversal",
+        "root-traversal",
+        "out-of-bridge",
+        "wrong-subject-thread",
+        "wrong-version",
+        "absolute-windows",
+        "absolute-posix",
+    ],
+)
+def test_exact_report_binding_rejects_invalid_reference(tmp_path: Path, reference: str | None) -> None:
+    expected = "bridge/subject-003.md"
+    _write_report(tmp_path, expected)
+    _write_report(tmp_path, "bridge/subject-001.md", author="OLDER-REPORT")
+    _write_report(tmp_path, "bridge/other-subject-003.md", author="OTHER-SUBJECT")
+
+    verdict = _verdict(reference)
+
+    assert (
+        independence.reviewed_artifact_path(
+            verdict,
+            "subject",
+            tmp_path,
+            expected_artifact_path=expected,
+        )
+        is None
+    )
+    assert (
+        independence.verdict_self_review_reason(
+            verdict,
+            "subject",
+            tmp_path,
+            expected_artifact_path=expected,
+        )
+        == independence.REVIEWED_ARTIFACT_REFERENCE_INVALID
+    )
+
+
+def test_exact_report_binding_still_refuses_same_session(tmp_path: Path) -> None:
+    expected = "bridge/subject-003.md"
+    _write_report(tmp_path, expected, author="SAME-SESSION")
+
+    assert (
+        independence.verdict_self_review_reason(
+            _verdict(expected, reviewer="SAME-SESSION"),
+            "subject",
+            tmp_path,
+            expected_artifact_path=expected,
+        )
+        == independence.AUTHOR_MEETS_REVIEWER_REFUSED
+    )

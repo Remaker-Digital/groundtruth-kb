@@ -160,6 +160,18 @@ def test_skills_and_terminology_are_lists() -> None:
         assert isinstance(profile.terminology, list), f"'{name}'.terminology must be a list"
 
 
+def test_ops_profile_surfaces_deep_clean_reclaim_skill_only_in_ops() -> None:
+    profiles = load_activity_profiles(_SHIPPED_CONFIG)
+    skill_name = "gtkb-hygiene-reclaim"
+
+    assert skill_name in profiles["ops"].skills
+    for name, profile in profiles.items():
+        if name != "ops":
+            assert skill_name not in profile.skills
+    assert any("deep-clean" in guardrail for guardrail in profiles["ops"].direction["guardrails"])
+    assert any("ops-envelope-only" in guardrail for guardrail in profiles["ops"].direction["guardrails"])
+
+
 def test_history_state_and_direction_are_dicts() -> None:
     profiles = load_activity_profiles(_SHIPPED_CONFIG)
     for name, profile in profiles.items():
@@ -287,3 +299,18 @@ def test_loader_raises_on_invalid_toml(tmp_path: Path) -> None:
     p.write_text("this is not [ valid toml !!!!", encoding="utf-8")
     with pytest.raises(ActivityProfileError, match="Invalid TOML"):
         load_activity_profiles(p)
+
+
+def test_wi4949_migration_inventory_declares_deferred_surfaces() -> None:
+    """TEST-11254: WI-4949 migration inventory lists deferred surfaces and activity map."""
+    import tomllib
+
+    raw = tomllib.loads(_SHARDING_CONFIG.read_text(encoding="utf-8"))
+    migration = raw.get("migration", {}).get("wi4949", {})
+    assert migration.get("work_item") == "WI-4949"
+    assert migration.get("readiness_check")
+    deferred = raw["classes"]["activity_only"]["deferred_surfaces"]
+    assert ".claude/rules/codex-review-operating-contract.md" in deferred
+    activity_map = migration.get("activity_map", {})
+    assert "build" in activity_map
+    assert "test" in activity_map

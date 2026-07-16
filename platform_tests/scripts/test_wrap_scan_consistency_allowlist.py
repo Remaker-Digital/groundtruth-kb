@@ -5,8 +5,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import wrap_scan_consistency as w2  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def mock_git_head(monkeypatch) -> None:
+    monkeypatch.setattr(w2, "_git_head_bridge_files", lambda _: set())
 
 
 def _make_project_with_allowlist(tmp_path: Path, allowlist_text: str) -> Path:

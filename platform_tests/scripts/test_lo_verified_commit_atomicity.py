@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from scripts import gtkb_bridge_writer as provider_writer
+from scripts.windows_subprocess import no_window_subprocess_kwargs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFY_HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
@@ -41,6 +42,7 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
         encoding="utf-8",
         errors="replace",
         check=check,
+        **no_window_subprocess_kwargs(),
     )
 
 
@@ -50,6 +52,7 @@ def _git_bytes(repo: Path, *args: str, check: bool = True) -> subprocess.Complet
         cwd=repo,
         capture_output=True,
         check=check,
+        **no_window_subprocess_kwargs(),
     )
 
 
@@ -1052,6 +1055,29 @@ def test_verify_helper_codex_twin_matches_claude_and_has_retry() -> None:
     assert b"def _assert_verdict_evidence_anchors" in claude_bytes
     assert b"def _assert_verdict_evidence_anchors" in codex_bytes
     assert b"def _assert_verdict_evidence_anchors" in cursor_bytes
+
+
+def test_run_git_forwards_no_window_subprocess_kwargs(
+    verify_helper,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    startupinfo = object()
+    expected = {"creationflags": 0x08000000, "startupinfo": startupinfo}
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(verify_helper, "no_window_subprocess_kwargs", lambda: expected)
+    monkeypatch.setattr(verify_helper.subprocess, "run", fake_run)
+
+    result = verify_helper._run_git(["status", "--short"], cwd=tmp_path)
+
+    assert result.returncode == 0
+    assert captured["creationflags"] == expected["creationflags"]
+    assert captured["startupinfo"] is startupinfo
 
 
 def test_verified_body_requires_executed_spec_to_test_mapping(verify_helper, tmp_path: Path) -> None:

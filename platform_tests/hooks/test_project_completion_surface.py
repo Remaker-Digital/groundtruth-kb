@@ -116,13 +116,18 @@ def _seed(
         db.close()
 
 
-def _add_completion_guard(project_root: Path) -> None:
+def _add_completion_guard(
+    project_root: Path,
+    *,
+    artifact_type: str = "completion_guard",
+    artifact_ref: str = "plan-incomplete-fixture",
+) -> None:
     db = KnowledgeDB(project_root / "groundtruth.db")
     try:
         db.add_project_artifact_link(
             "PROJECT-X",
-            "completion_guard",
-            "plan-incomplete-fixture",
+            artifact_type,
+            artifact_ref,
             "test",
             "seed plan_incomplete guard",
             relationship="plan_incomplete",
@@ -199,9 +204,23 @@ def test_hook_silent_when_no_completion_ready_authorization(tmp_path, monkeypatc
 
 
 @pytest.mark.parametrize("hook_path", [CLAUDE_HOOK, CODEX_HOOK])
-def test_hook_silent_when_project_has_plan_incomplete_guard(tmp_path, monkeypatch, hook_path):
+def test_hook_completes_authorization_but_keeps_project_open_with_completion_guard(tmp_path, monkeypatch, hook_path):
     _seed(tmp_path, {"PAUTH-X": {"WI-8001": True}})
-    _add_completion_guard(tmp_path)
+    _add_completion_guard(tmp_path, artifact_type="completion_guard", artifact_ref="PAUTH-X-keepopen")
+    hook = _load_hook(hook_path, tmp_path, monkeypatch)
+
+    output = hook._user_prompt_handler()
+    assert "PAUTH-X" in output
+    assert "Auto-Completed" in output
+    assert "project retired" not in output
+    assert _authorization_status(tmp_path, "PAUTH-X") == "completed"
+    assert _project_status(tmp_path, "PROJECT-X") == "active"
+
+
+@pytest.mark.parametrize("hook_path", [CLAUDE_HOOK, CODEX_HOOK])
+def test_hook_silent_when_project_has_bridge_thread_plan_incomplete_guard(tmp_path, monkeypatch, hook_path):
+    _seed(tmp_path, {"PAUTH-X": {"WI-8001": True}})
+    _add_completion_guard(tmp_path, artifact_type="bridge_thread")
     hook = _load_hook(hook_path, tmp_path, monkeypatch)
 
     assert hook._user_prompt_handler() == ""

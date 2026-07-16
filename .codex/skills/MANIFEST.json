@@ -271,7 +271,7 @@
       "canonical_name": "gtkb-hygiene-reclaim",
       "capability_id": "skill.gtkb-hygiene-reclaim",
       "source_relative_path": ".claude/skills/gtkb-hygiene-reclaim/SKILL.md",
-      "source_sha256": "e8c484e6076738972ea98d00749e9a4ca40ff8a2ef07abfb24f9dcefedf3f3cc"
+      "source_sha256": "c1c5fadde360a4f0e03a265ef9cd38b6a0f2f366095ee1b77e180f453a1894a1"
     },
     {
       "adapter_relative_path": ".codex/skills/gtkb-sweep-commit/SKILL.md",

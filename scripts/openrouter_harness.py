@@ -96,6 +96,7 @@ _OPENROUTER_PROFILE = base.AdopterProfile(
     routing_config_path=ROUTING_CONFIG_PATH,
     dialect=base.DIALECT_OPENAI_CHAT,
     hook_tier=base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
+    publish_bridge_verdict_tool=True,
     extra_headers=_OPENROUTER_HEADERS,
 )
 
@@ -173,6 +174,7 @@ def dispatch_tool_call(
     *,
     guard_runner: GuardRunner | None = None,
     command_runner: CommandRunner | None = None,
+    skill: str | None = None,
 ) -> str:
     # Thread this module's (monkeypatchable) collaborators so tests that patch
     # ``openrouter_harness._relative_path`` / ``._iter_text_files`` still take effect.
@@ -187,6 +189,7 @@ def dispatch_tool_call(
         relative_path=_relative_path,
         iter_text_files=_iter_text_files,
         iter_bounded_paths=_iter_bounded_paths,
+        skill=skill,
     )
 
 
@@ -198,6 +201,7 @@ def run_tool_loop(
     max_turns: int,
     project_root: Path,
     *,
+    skill: str | None = None,
     system_prompt: str | None = None,
     chat_func: ChatFunc | None = None,
     guard_runner: GuardRunner | None = None,
@@ -214,6 +218,7 @@ def run_tool_loop(
         max_turns,
         project_root,
         _OPENROUTER_PROFILE,
+        skill=skill,
         system_prompt=system_prompt,
         chat_func=chat_func or call_openrouter_chat,
         guard_runner=guard_runner,
@@ -232,21 +237,24 @@ def build_system_prompt(skill: str | None, model_route: ModelRoute) -> str | Non
     session_id = resolve_openrouter_session_id(os.environ) or "<dispatch-session-id-required>"
     return f"""You are OpenRouter harness F operating as Loyal Opposition for GT-KB.
 
-Before you can write any bridge verdict, you MUST acquire the work-intent claim: python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command reports an existing holder, treat that JSON output as claim evidence — not as a harness crash. Do not proceed to Write until the claim command returns success.
+Before publishing any bridge verdict, you MUST acquire the work-intent claim:
+python scripts\\bridge_claim_cli.py claim <document-slug>. If the claim command
+reports an existing holder, treat that JSON output as claim evidence. Do not
+invoke PublishBridgeVerdict until the claim succeeds.
 
-Before final Write/Edit of any bridge verdict, assemble a draft verdict body
-with the required status token and sections, then run the shared verify helper:
-python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <draft-body-file>
-Review and prune the helper-seeded Prior Deliberations before writing the next
-numbered bridge verdict file. If the helper cannot run, preserve its failure
-output in the verdict evidence instead of silently omitting Prior Deliberations.
+Publish numbered GO, NO-GO, and VERIFIED artifacts only through
+PublishBridgeVerdict. Supply the document slug, verdict, and complete reviewed
+body; VERIFIED additionally requires include_paths and commit_message, with
+hunk_patch_paths only when reviewed hunk isolation is needed. The governed
+publisher computes the next path/version and performs atomic VERIFIED
+finalization. Never use raw Write, Edit, or Bash for a numbered bridge verdict.
 
 Use the GT-KB file bridge as the authoritative workflow surface. Read the full
 versioned bridge-file chain for the target document before acting, and use
 gt bridge dispatch config, gt bridge dispatch status, and gt bridge dispatch
 health for dispatcher topology and readiness. Respond to latest NEW, REVISED,
-or NO-ACTION bridge entries by writing the next numbered bridge verdict file
-through the guarded bridge writer path. A NO-ACTION entry requires a corrected,
+or NO-ACTION bridge entries by publishing the next numbered bridge verdict file
+through PublishBridgeVerdict. A NO-ACTION entry requires a corrected,
 governance-compliant verdict through review_no_action. Do not encode an
 exclusive corrected-verdict status set. Do not stop with prose when a bridge verdict is
 required.
@@ -256,13 +264,11 @@ of truth. Do not treat harness-local operating-role.md files as live role author
 For proposal reviews, write GO or NO-GO. For post-implementation reports, write VERIFIED or
 NO-GO. Run preflight checks and include their raw output in the verdict as advisory context for the Prime Builder. A nonzero preflight exit is a note to attach to the verdict body, not a rejection criterion. Your verdict (GO / NO-GO / VERIFIED) evaluates the substantive quality of the proposal or implementation report being reviewed — not whether every applicable cross-cutting spec appears in the linked specs list.
 
-For a positive post-implementation VERIFIED verdict, do not write the bridge
-file directly. Use the reviewed verdict body with the atomic finalization helper:
-python .claude/skills/verify/helpers/write_verdict.py --slug <document-slug> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
-The helper must create the local commit containing the verified path set and the
-new VERIFIED verdict artifact. If you cannot identify the verified path set or
-the helper cannot commit, fail closed and report NO-GO/blocker evidence instead
-of leaving a terminal VERIFIED file in the worktree.
+For a positive post-implementation VERIFIED verdict, provide the reviewed body,
+exact verified include_paths, and commit_message to PublishBridgeVerdict. If you
+cannot identify the verified path set or publication cannot commit atomically,
+fail closed and publish/report blocker evidence instead of leaving a terminal
+VERIFIED file without its commit.
 
 Run the preflight checks with Bash:
 python scripts\\bridge_applicability_preflight.py --bridge-id <document-slug>
@@ -347,6 +353,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             api_key,
             max_turns,
             project_root,
+            skill=args.skill,
             system_prompt=system_prompt,
             timeout=operation_timeout,
             session_timeout=session_timeout,

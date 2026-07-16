@@ -13,12 +13,15 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
+
 sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
 
 OUT_DIR = PROJECT_ROOT / ".cursor" / "gtkb-hooks"
 GUARD_PATH = PROJECT_ROOT / "harness-state" / "cursor" / "session-lifecycle-guard.json"
 DISPATCH = PROJECT_ROOT / ".cursor" / "gtkb-hooks" / "session_start_dispatch.py"
-PYTHON = PROJECT_ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe"
+PYTHONW = PROJECT_ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "pythonw.exe"
+RUN_PY_NO_WINDOW = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "run_py_no_window.py"
 CODEX_LO = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "last-user-visible-startup-lo.md"
 
 
@@ -77,13 +80,14 @@ def _write_lo_relay_cache_fallback() -> None:
 def _run_session_start_dispatch() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
-        [str(PYTHON), str(DISPATCH)],
+        [str(PYTHONW), str(RUN_PY_NO_WINDOW), str(DISPATCH)],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
         encoding="utf-8",
         timeout=300,
         check=False,
+        **no_window_subprocess_kwargs(),
     )
     if completed.stdout.strip():
         print(completed.stdout.strip()[:500])

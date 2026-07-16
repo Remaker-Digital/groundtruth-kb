@@ -41,6 +41,7 @@ STATUS_TOKENS = {
 }
 IN_FLIGHT_STATUSES = {"ADVISORY", "DEFERRED", "GO", "NEW", "NO-ACTION", "NO-GO", "REVISED"}
 DOCUMENTATION_TERMINAL_STATUSES = {"ACCEPTED", "BLOCKED", "WITHDRAWN"}
+TRACKED_TERMINAL_VERDICT_CHANGE_KINDS = {"deleted", "modified"}
 
 
 @dataclass(frozen=True)
@@ -196,6 +197,27 @@ def _non_bridge_dirty_paths(plan: dict[str, Any]) -> list[str]:
     return sorted(paths)
 
 
+def _tracked_terminal_verified_verdict_dirt(dirty_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    hazards: list[dict[str, Any]] = []
+    for item in dirty_items:
+        if not item.get("tracked"):
+            continue
+        if str(item.get("bridge_status") or "").upper() != "VERIFIED":
+            continue
+        change_kind = str(item.get("change_kind") or "").lower()
+        if change_kind not in TRACKED_TERMINAL_VERDICT_CHANGE_KINDS:
+            continue
+        hazards.append(
+            {
+                "path": item.get("path"),
+                "change_kind": change_kind,
+                "git_status": item.get("git_status"),
+                "reason": item.get("reason"),
+            }
+        )
+    return hazards
+
+
 def _thread_base(slug: str, versions: list[BridgeVersion], dirty_items: list[dict[str, Any]]) -> dict[str, Any]:
     latest = versions[-1] if versions else None
     return {
@@ -301,6 +323,18 @@ def _classify_thread(
                 "classification": "excluded_active_program",
                 "stop": True,
                 "reason": "thread matches an explicitly excluded active handoff scope",
+            }
+        )
+        return base
+
+    terminal_verdict_dirt = _tracked_terminal_verified_verdict_dirt(dirty_items)
+    if terminal_verdict_dirt:
+        base.update(
+            {
+                "classification": "mixed_provenance_stop",
+                "stop": True,
+                "dirty_terminal_verdicts": terminal_verdict_dirt,
+                "reason": "tracked modified or deleted terminal VERIFIED verdict requires exact byte ownership before finalization",
             }
         )
         return base

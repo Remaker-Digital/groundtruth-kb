@@ -291,7 +291,7 @@ def test_orphan_bridge_thread_recorded(tmp_path):
     _write_bridge(
         repo,
         "orphan-thread-001.md",
-        "NEW\n\n# orphaned bridge file not present in any INDEX entry, beyond size floor.\n",
+        "# orphaned bridge file with no status token, beyond size floor.\n",
     )
     # Empty INDEX.md => no status for the file.
     (repo / "bridge" / "INDEX.md").write_text("# Bridge Index\n", encoding="utf-8")

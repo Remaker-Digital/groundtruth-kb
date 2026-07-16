@@ -15,15 +15,23 @@ from groundtruth_kb.cli import main  # noqa: E402
 from groundtruth_kb.session.envelope import ensure_worker_session  # noqa: E402
 
 
-def _worker_document(root: Path, *, session_id: str, role: str = "loyal-opposition") -> None:
+def _worker_document(
+    root: Path,
+    *,
+    session_id: str,
+    role: str = "loyal-opposition",
+    harness_name: str = "openrouter",
+    harness_id: str = "F",
+    dispatch_run_id: str | None = None,
+) -> None:
     ensure_worker_session(
         root,
-        harness_name="openrouter",
-        harness_id="F",
+        harness_name=harness_name,
+        harness_id=harness_id,
         session_id=session_id,
         role=role,
         role_source="dispatch_session_document",
-        dispatch_run_id=session_id,
+        dispatch_run_id=session_id if dispatch_run_id is None else dispatch_run_id,
     )
 
 
@@ -316,6 +324,208 @@ def test_reconciliation_creates_partial_and_query_is_bounded_to_successful_revie
         limit=2,
     )
     assert complexity_filtered["distribution"] == [{"value": "2", "count": 1}]
+
+
+def test_reconciliation_populates_native_worker_from_trusted_context(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-native-b"
+    _worker_document(
+        root,
+        session_id=dispatch_id,
+        harness_name="claude",
+        harness_id="B",
+        dispatch_run_id=dispatch_id,
+    )
+
+    result = telemetry.reconcile_dispatch_telemetry(
+        root,
+        dispatch_id,
+        exit_code=0,
+        exit_status="succeeded",
+        stop_reason="verdict_emitted",
+        bridge_status="VERIFIED",
+        bridge_document_id="telemetry-thread",
+        worker_context={
+            "schema_version": 1,
+            "dispatch_id": dispatch_id,
+            "session_id": dispatch_id,
+            "harness_id": "B",
+            "harness_name": "claude",
+            "provider": "claude",
+            "model_id": "claude-sonnet-test",
+            "model_version": "2026-07",
+            "turn_budget": 5,
+            "role": "loyal-opposition",
+        },
+    )
+
+    assert result.diagnostic is None
+    payload = json.loads(telemetry.telemetry_path(root, dispatch_id).read_text(encoding="utf-8"))
+    assert payload["worker"] == {
+        "harness_id": "B",
+        "harness_name": "claude",
+        "provider": "claude",
+        "model_id": "claude-sonnet-test",
+        "model_version": "2026-07",
+        "role": "loyal-opposition",
+        "role_source_document_id": f"harness-state/claude/session-envelopes/{dispatch_id}.json",
+    }
+    assert payload["budget"]["turn_budget"] == 5
+    assert "diagnostic" not in payload
+
+
+def test_reconciliation_fails_closed_on_mismatched_worker_session(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-native-mismatch"
+    _worker_document(
+        root,
+        session_id=dispatch_id,
+        role="prime-builder",
+        harness_name="claude",
+        harness_id="B",
+        dispatch_run_id=dispatch_id,
+    )
+
+    result = telemetry.reconcile_dispatch_telemetry(
+        root,
+        dispatch_id,
+        exit_code=1,
+        exit_status="failed",
+        stop_reason="process_error",
+        bridge_document_id="telemetry-thread",
+        worker_context={
+            "schema_version": 1,
+            "dispatch_id": dispatch_id,
+            "session_id": dispatch_id,
+            "harness_id": "B",
+            "harness_name": "claude",
+            "provider": "claude",
+            "model_id": "claude-sonnet-test",
+            "role": "loyal-opposition",
+        },
+    )
+
+    assert result.diagnostic == "worker_session_role_mismatch"
+    payload = json.loads(telemetry.telemetry_path(root, dispatch_id).read_text(encoding="utf-8"))
+    assert payload["diagnostic"] == "worker_session_role_mismatch"
+    assert payload["worker"]["harness_id"] == "B"
+    assert payload["worker"]["harness_name"] == "claude"
+    assert payload["worker"]["role"] is None
+    assert payload["worker"]["role_source_document_id"] is None
+
+
+def test_reconciliation_preserves_provider_observer_worker_fields(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-provider-preserved"
+    observer = _observer(root, dispatch_id)
+    observer.finish(stop_reason="final_response")
+
+    telemetry.reconcile_dispatch_telemetry(
+        root,
+        dispatch_id,
+        exit_code=0,
+        exit_status="succeeded",
+        stop_reason="verdict_emitted",
+        bridge_status="GO",
+        bridge_document_id="telemetry-thread",
+        worker_context={
+            "schema_version": 1,
+            "dispatch_id": dispatch_id,
+            "session_id": dispatch_id,
+            "harness_id": "F",
+            "harness_name": "openrouter",
+            "provider": "weaker-provider",
+            "model_id": "weaker/model",
+            "model_version": "weaker-version",
+            "role": "loyal-opposition",
+        },
+    )
+
+    payload = json.loads(telemetry.telemetry_path(root, dispatch_id).read_text(encoding="utf-8"))
+    assert payload["worker"]["provider"] == "openrouter"
+    assert payload["worker"]["model_id"] == "provider/model-v1"
+    assert payload["worker"]["model_version"] == "v1"
+    assert payload["worker"]["role"] == "loyal-opposition"
+
+
+def test_reconciliation_preserves_conflicting_role_without_attaching_dispatcher_source(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-role-conflict"
+    observer = _observer(root, dispatch_id)
+    observer.finish(stop_reason="final_response")
+    path = telemetry.telemetry_path(root, dispatch_id)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["worker"]["role"] = "prime-builder"
+    payload["worker"]["role_source_document_id"] = None
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = telemetry.reconcile_dispatch_telemetry(
+        root,
+        dispatch_id,
+        exit_code=0,
+        exit_status="succeeded",
+        stop_reason="verdict_emitted",
+        bridge_status="GO",
+        bridge_document_id="telemetry-thread",
+        worker_context={
+            "schema_version": 1,
+            "dispatch_id": dispatch_id,
+            "session_id": dispatch_id,
+            "harness_id": "F",
+            "harness_name": "openrouter",
+            "role": "loyal-opposition",
+        },
+    )
+
+    assert result.diagnostic == "worker_role_conflict_preserved"
+    reconciled = json.loads(path.read_text(encoding="utf-8"))
+    assert reconciled["worker"]["role"] == "prime-builder"
+    assert reconciled["worker"]["role_source_document_id"] is None
+
+
+def test_reconciliation_preserves_conflicting_role_source_without_attaching_dispatcher_role(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _bridge(root)
+    dispatch_id = "dispatch-role-source-conflict"
+    observer = _observer(root, dispatch_id)
+    observer.finish(stop_reason="final_response")
+    path = telemetry.telemetry_path(root, dispatch_id)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["worker"]["role"] = None
+    payload["worker"]["role_source_document_id"] = "harness-state/other/session-envelope.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = telemetry.reconcile_dispatch_telemetry(
+        root,
+        dispatch_id,
+        exit_code=0,
+        exit_status="succeeded",
+        stop_reason="verdict_emitted",
+        bridge_status="GO",
+        bridge_document_id="telemetry-thread",
+        worker_context={
+            "schema_version": 1,
+            "dispatch_id": dispatch_id,
+            "session_id": dispatch_id,
+            "harness_id": "F",
+            "harness_name": "openrouter",
+            "role": "loyal-opposition",
+        },
+    )
+
+    assert result.diagnostic == "worker_role_source_conflict_preserved"
+    reconciled = json.loads(path.read_text(encoding="utf-8"))
+    assert reconciled["worker"]["role"] is None
+    assert reconciled["worker"]["role_source_document_id"] == "harness-state/other/session-envelope.json"
 
 
 def test_reconciliation_preserves_worker_failure_reason_when_dispatcher_falls_back_to_process_error(

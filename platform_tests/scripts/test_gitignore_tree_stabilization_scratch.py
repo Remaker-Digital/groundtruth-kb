@@ -29,11 +29,33 @@ IGNORED_SCRATCH_PATHS = (
     "bridge-scan.json",
 )
 
+WI5299_IGNORED_SCRATCH_PATHS = (
+    ".harness-tmp-unique-1234/test_case/bridge/INDEX.md",
+    ".tmp_lo_diff_filter.py",
+    ".tmp_lo_hunk_example.patch",
+    "CON",
+    "strftime",
+    "temp-direct.txt",
+    "temp-direct3.txt",
+    "temp-test.txt",
+    "test-auth-root/bridge/x.md",
+    "test-auth-root/harness-state/harness-identities.json",
+    ".claude/skills/verify/helpers/tmp_gtkb-wi5061-draft.md",
+    ".claude/skills/verify/helpers/write_bridge_5171.py",
+    ".codex/skills/verify/helpers/tmp_gtkb-wi5061-draft.md",
+    ".codex/skills/verify/helpers/gtkb-wi5069-draft-body.md",
+)
+
 VISIBLE_CONTROL_PATHS = (
     ".gitignore",
     ".gitattributes",
     "bridge/gtkb-wi5114-scratch-ignore-hygiene-004.md",
+    "bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-002.md",
     ".codex/skills/verify/helpers/write_verdict.py",
+    ".claude/skills/verify/helpers/write_bridge.py",
+    ".codex/skills/verify/helpers/gtkb-wi5069-final.md",
+    "nested/.tmp_lo_keep.py",
+    "test-auth-root-canonical/groundtruth.toml",
 )
 
 
@@ -56,9 +78,18 @@ def test_tree_stabilization_scratch_paths_are_gitignored() -> None:
         )
 
 
+def test_wi5299_residue_classes_are_gitignored() -> None:
+    for test_path in WI5299_IGNORED_SCRATCH_PATHS:
+        result = _git("check-ignore", "-v", test_path)
+
+        assert result.returncode == 0, (
+            f"Expected {test_path!r} to be gitignored. stdout: {result.stdout!r} stderr: {result.stderr!r}"
+        )
+
+
 def test_control_paths_are_not_hidden_by_scratch_ignores() -> None:
     for test_path in VISIBLE_CONTROL_PATHS:
-        result = _git("check-ignore", "-v", test_path)
+        result = _git("check-ignore", "-q", test_path)
 
         assert result.returncode == 1, (
             f"Expected {test_path!r} to remain visible to git. stdout: {result.stdout!r} stderr: {result.stderr!r}"

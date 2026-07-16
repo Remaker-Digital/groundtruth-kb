@@ -37,6 +37,7 @@ PRIME_ROLE_SLOT = _bridge_writer.PRIME_ROLE_SLOT
 WriterBridgeConflictError = _bridge_writer.BridgeConflictError
 WriterBridgeTransitionError = _bridge_writer.BridgeTransitionError
 write_bridge_file = _bridge_writer.write_bridge_file
+no_window_subprocess_kwargs = importlib.import_module("scripts.windows_subprocess").no_window_subprocess_kwargs
 
 
 class BridgeRevisionError(RuntimeError):
@@ -118,7 +119,7 @@ def _parse_versions(slug: str, bridge_dir: Path) -> list[BridgeVersion]:
     root = bridge_dir.parent
     pattern = re.compile(rf"^{re.escape(slug)}-(\d{{3}})\.md$")
     status_re = re.compile(
-        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
+        r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
         re.IGNORECASE,
     )
     for path in bridge_dir.glob(f"{slug}-*.md"):
@@ -287,6 +288,7 @@ def _run_preflight_command(command: list[str], *, cwd: Path) -> subprocess.Compl
         errors="replace",
         timeout=30,
         check=False,
+        **no_window_subprocess_kwargs(),
     )
 
 

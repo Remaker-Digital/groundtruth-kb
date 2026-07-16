@@ -9,7 +9,7 @@ documented in WI-4480 — and to size the deferred Slice-B selection-fairness
 fix — WITHOUT changing dispatch selection, the byte-identical actionable
 ``_signature`` invariant, or any dispatch decision.
 
-The cross-harness trigger calls :func:`record_starvation` immediately after it
+The dispatcher daemon runtime calls :func:`record_starvation` immediately after it
 has computed (and signed) the ``filtered`` and ``selected`` lists. The call is
 exception-swallowed at the call site, and :func:`record_starvation` is itself
 fail-safe: any load/parse/write error returns silently. Telemetry must never

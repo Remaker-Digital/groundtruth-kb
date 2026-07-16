@@ -266,6 +266,83 @@ def test_secret_ci_workflow_presence_fails_when_path_filtered(tmp_path, monkeypa
         gate._check_secret_ci_workflow_present()
 
 
+def test_tracked_secret_scan_executes_gate_and_retains_machine_evidence(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        assert kwargs["cwd"] == tmp_path
+        assert kwargs["capture_output"] is True
+        report_path = tmp_path / gate.TRACKED_SECRET_REPORT
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"mode": "tracked", "paths_scanned": 41, "finding_count": 0, "findings": []}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="redacted scan passed", stderr="")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    gate._check_tracked_secret_scan()
+
+    expected = [
+        sys.executable,
+        "-m",
+        "groundtruth_kb",
+        "secrets",
+        "scan",
+        "--tracked",
+        "--redacted",
+        "--fail-on",
+        "verified-provider",
+        "--report-json",
+        gate.TRACKED_SECRET_REPORT.as_posix(),
+    ]
+    assert commands == [expected]
+    evidence = json.loads((tmp_path / gate.TRACKED_SECRET_REPORT).read_text(encoding="utf-8"))
+    assert evidence == {
+        "schema_version": "gtkb-release-tracked-secret-scan-v1",
+        "command": expected,
+        "fail_on": "verified-provider",
+        "exit_code": 0,
+        "scan": {"mode": "tracked", "paths_scanned": 41, "finding_count": 0, "findings": []},
+    }
+
+
+def test_tracked_secret_scan_fails_closed_and_retains_finding_evidence(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    finding = {
+        "provider_class": "test-provider",
+        "severity": "verified-provider",
+        "path": "tracked-fixture.txt",
+        "line": 1,
+        "fingerprint_prefix": "sha256:test",
+        "description": "verified provider credential",
+    }
+
+    def fake_run(command, **_kwargs):
+        report_path = tmp_path / gate.TRACKED_SECRET_REPORT
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"mode": "tracked", "paths_scanned": 42, "finding_count": 1, "findings": [finding]}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 5, stdout="redacted finding", stderr="")
+
+    monkeypatch.setattr(gate.subprocess, "run", fake_run)
+
+    with pytest.raises(gate.GateFailure, match=r"failed \(exit 5, 1 finding\(s\)\)"):
+        gate._check_tracked_secret_scan()
+
+    retained = json.loads((tmp_path / gate.TRACKED_SECRET_REPORT).read_text(encoding="utf-8"))
+    assert retained["exit_code"] == 5
+    assert retained["fail_on"] == "verified-provider"
+    assert retained["scan"]["findings"] == [finding]
+
+
 def test_dev_environment_inventory_gate_passes_valid_public_inventory(tmp_path, monkeypatch):
     gate = _load_gate_module()
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
@@ -612,6 +689,7 @@ def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypa
     monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_tracked_secret_scan", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
@@ -666,6 +744,7 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
+    monkeypatch.setattr(gate, "_check_tracked_secret_scan", lambda: None)
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)

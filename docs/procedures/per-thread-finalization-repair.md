@@ -58,8 +58,9 @@ python scripts/per_thread_finalization_repair.py --format markdown --exclude-wi 
 - `excluded_active_program`: the thread matches an explicitly excluded active
   handoff, such as WI-5320/WI-5328/WI-5330.
 - `mixed_provenance_stop`: ownership is ambiguous, unsupported, unattributed,
-  or shared by multiple dirty terminal threads. Stop and ask for owner or
-  bridge disposition.
+  shared by multiple dirty terminal threads, or attached to a tracked modified
+  or deleted terminal `VERIFIED` verdict. Stop and ask for owner or bridge
+  disposition.
 
 ## STOP Conditions
 
@@ -69,6 +70,8 @@ Stop immediately when:
 - A dirty source/test/config path is not attributable to exactly one terminal
   verified thread.
 - A latest bridge status is in flight rather than terminal `VERIFIED`.
+- A terminal `VERIFIED` bridge verdict file is tracked and modified or deleted;
+  terminal status proves lifecycle state, not ownership of those changed bytes.
 - `target_paths` cannot be parsed from the approved/report artifact.
 - The thread belongs to a separately active handoff program.
 - The finalization helper, finalizer source, or its tests are themselves dirty

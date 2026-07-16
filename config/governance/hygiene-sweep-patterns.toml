@@ -192,7 +192,7 @@ exclusion_globs = [
     "config/governance/hygiene-sweep-patterns.toml",
 ]
 classification = "retired_mechanism"
-remediation_hint = "Retired poller reference found; replace with cross-harness event-driven trigger. References should be archived or deleted."
+remediation_hint = "Retired poller reference found; replace with dispatcher daemon wording or delete the obsolete reference."
 
 [[patterns]]
 id = "claude-playground"

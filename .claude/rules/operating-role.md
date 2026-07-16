@@ -68,10 +68,14 @@ change.
   `ADR-SINGLE-HARNESS-OPERATING-MODE-001` +
   `SPEC-SINGLE-HARNESS-BRIDGE-DISPATCHER-001` +
   `DCL-SINGLE-HARNESS-DISPATCHER-DESKTOP-TASK-001`).
-- **Active dispatcher partition validation:** When a requested role metadata update
-  would leave the active dispatcher partition without at least one active Prime Builder
-  and at least one active Loyal Opposition, the command fails closed and no audit
-  or registry write is made. Multiple active harnesses may hold the same operating
+- **Active lane-coverage validation:** When a requested role metadata update
+  would leave active dispatch without Loyal Opposition coverage, the command
+  fails closed and no audit or registry write is made. Prime Builder coverage
+  normally comes from at least one active durable Prime Builder assignment. For
+  an owner-authorized LO-only headless surge, a current owner-declared
+  interactive Prime Builder session may satisfy Prime Builder coverage through
+  its per-session role marker; absent, stale, unreadable, or non-Prime marker
+  evidence fails closed. Multiple active harnesses may hold the same operating
   role concurrently.
 - **Dispatchability is separate from role:** holding an operating role does not
   imply receiving headless bridge dispatch. Dispatch eligibility and final

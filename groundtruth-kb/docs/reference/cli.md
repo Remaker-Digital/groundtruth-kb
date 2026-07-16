@@ -145,7 +145,7 @@ Bridge-related components use the standard read-only bridge status driver.
 actionable queues: Prime Builder sees only latest `GO` / `NO-GO`; Loyal
 Opposition sees only latest `NEW` / `REVISED`; latest `VERIFIED`, `WITHDRAWN`,
 and `ADVISORY` are non-actionable. `bridge-dispatch` reports local
-cross-harness trigger state, hook registration evidence, active-session locks,
+dispatcher daemon state, hook registration evidence, active-session locks,
 dispatch-state recipients, and retired/external automation inventory without
 spawning harnesses or mutating bridge state.
 

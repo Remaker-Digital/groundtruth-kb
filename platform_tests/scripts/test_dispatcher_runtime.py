@@ -402,23 +402,42 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] | 
 
 def _write_prime_worker_session_document(root: Path, session_id: str) -> None:
     """Provide document-authoritative role evidence for GO-claim fixtures."""
+    _write_worker_session_document(
+        root,
+        session_id=session_id,
+        harness_id="B",
+        harness_name="claude",
+        role="prime-builder",
+    )
+
+
+def _write_worker_session_document(
+    root: Path,
+    *,
+    session_id: str,
+    harness_id: str,
+    harness_name: str,
+    role: str,
+    dispatch_run_id: str | None = None,
+) -> None:
+    """Provide document-authoritative role evidence for dispatcher fixtures."""
     document = {
         "status": "open",
         "session_id": session_id,
-        "harness_id": "B",
-        "harness_name": "claude",
+        "harness_id": harness_id,
+        "harness_name": harness_name,
         "worker_role_provenance": {
             "schema_version": 1,
             "session_id": session_id,
-            "harness_id": "B",
-            "harness_name": "claude",
-            "role": "prime-builder",
+            "harness_id": harness_id,
+            "harness_name": harness_name,
+            "role": role,
             "role_resolution_source": "test-fixture",
             "issued_at": "2026-06-22T00:00:00Z",
-            "dispatch_run_id": None,
+            "dispatch_run_id": dispatch_run_id,
         },
     }
-    path = root / "harness-state" / "claude" / "session-envelopes" / f"{session_id}.json"
+    path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document), encoding="utf-8")
 
@@ -2229,6 +2248,21 @@ def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
 
     monkeypatch.setattr(_impl_auth, "_dirty_worktree_paths", lambda project_root: set())
     monkeypatch.setattr(_subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(
+        trigger,
+        "finalize_implementation_start_packet",
+        lambda _root, packet, *, session_id: packet,
+    )
+
+    def _fake_write_started_packets(project_root: Path, packets: list[dict[str, object]]) -> None:
+        auth_dir = project_root / ".gtkb-state" / "implementation-authorizations"
+        by_bridge = auth_dir / "by-bridge"
+        by_bridge.mkdir(parents=True, exist_ok=True)
+        current = packets[0]
+        (auth_dir / "current.json").write_text(json.dumps(current), encoding="utf-8")
+        (by_bridge / f"{current['bridge_id']}.json").write_text(json.dumps(current), encoding="utf-8")
+
+    monkeypatch.setattr(trigger, "write_started_packets", _fake_write_started_packets)
 
     fake_item = type(
         "FakeItem",
@@ -2246,6 +2280,14 @@ def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
         command_handle="claude",
         canonical_mode="pb",
         invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+    _write_worker_session_document(
+        root,
+        session_id=trigger._work_intent_session_id("dispatch-prime"),
+        harness_id="B",
+        harness_name="claude",
+        role="prime-builder",
+        dispatch_run_id="dispatch-prime",
     )
 
     meta = trigger._spawn_harness(
@@ -2393,7 +2435,7 @@ def test_issue_dispatch_auth_uses_go_items_from_mixed_list(tmp_path: Path, monke
     trigger = _load_trigger()
     captured_bridge_ids: list[str] = []
 
-    def _fake_create(_root, bridge_id):
+    def _fake_create(_root, bridge_id, **_kwargs):
         captured_bridge_ids.append(str(bridge_id))
         return {
             "bridge_id": bridge_id,
@@ -2402,8 +2444,12 @@ def test_issue_dispatch_auth_uses_go_items_from_mixed_list(tmp_path: Path, monke
         }
 
     monkeypatch.setattr(trigger, "create_authorization_packet", _fake_create)
-    monkeypatch.setattr(trigger, "write_named_packet", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(trigger, "write_packet", lambda *_args, **_kwargs: root / "auth-current.json")
+    monkeypatch.setattr(
+        trigger,
+        "finalize_implementation_start_packet",
+        lambda _root, packet, *, session_id: packet,
+    )
+    monkeypatch.setattr(trigger, "write_started_packets", lambda *_args, **_kwargs: None)
 
     result = trigger._issue_dispatch_authorization_for_selected(
         [
@@ -2414,6 +2460,7 @@ def test_issue_dispatch_auth_uses_go_items_from_mixed_list(tmp_path: Path, monke
         state_dir=tmp_path / "state",
         recipient="prime-builder",
         dispatch_id="dispatch-mixed",
+        session_id="session-mixed",
     )
 
     assert result["ok"] is True
@@ -2432,7 +2479,7 @@ def test_issue_dispatch_auth_quarantines_bad_go_and_continues_healthy(
     state_dir = tmp_path / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    def _fake_create(_root, bridge_id):
+    def _fake_create(_root, bridge_id, **_kwargs):
         if bridge_id == "bad-go-thread":
             raise trigger.AuthorizationError("missing approved proposal")
         return {
@@ -2442,8 +2489,12 @@ def test_issue_dispatch_auth_quarantines_bad_go_and_continues_healthy(
         }
 
     monkeypatch.setattr(trigger, "create_authorization_packet", _fake_create)
-    monkeypatch.setattr(trigger, "write_named_packet", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(trigger, "write_packet", lambda *_args, **_kwargs: root / "auth-current.json")
+    monkeypatch.setattr(
+        trigger,
+        "finalize_implementation_start_packet",
+        lambda _root, packet, *, session_id: packet,
+    )
+    monkeypatch.setattr(trigger, "write_started_packets", lambda *_args, **_kwargs: None)
 
     result = trigger._issue_dispatch_authorization_for_selected(
         [
@@ -2454,6 +2505,7 @@ def test_issue_dispatch_auth_quarantines_bad_go_and_continues_healthy(
         state_dir=state_dir,
         recipient="prime-builder",
         dispatch_id="dispatch-mixed-auth",
+        session_id="session-mixed-auth",
     )
 
     assert result["ok"] is True
@@ -5238,7 +5290,7 @@ session_timeout_seconds = 36000
     assert env["GTKB_DISPATCH_WORKER_LIFETIME_ROUTING_SESSION_TIMEOUT_SECONDS"] == "36000.0"
 
 
-def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
+def test_antigravity_stdin_dispatch_replaces_prompt_with_sidecar_pointer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     trigger = _load_trigger()
@@ -5320,9 +5372,12 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
     prompt = stdin_path.read_text(encoding="utf-8")
     assert "gtkb-antigravity-stdin-prompt" in prompt
     child_argv = config["cmd_args"]
+    expected_sidecar_ref = stdin_path.resolve().relative_to(tmp_path.resolve()).as_posix()
+    pointer_prompt = child_argv[2]
     assert child_argv == [
         "agy",
         "--print",
+        pointer_prompt,
         "--print-timeout",
         "30m",
         "--model",
@@ -5331,7 +5386,26 @@ def test_antigravity_stdin_dispatch_removes_prompt_from_child_argv(
         "--add-dir",
         str(tmp_path),
     ]
+    assert pointer_prompt.startswith("::init gtkb lo\n")
+    assert expected_sidecar_ref in pointer_prompt
+    assert "Read and execute the complete dispatcher assignment" in pointer_prompt
+    assert child_argv[child_argv.index("--print") + 1] != "--print-timeout"
     assert prompt not in child_argv
+
+
+def test_antigravity_print_prompt_scrub_keeps_timeout_from_becoming_prompt() -> None:
+    trigger = _load_trigger()
+    prompt = "full dispatcher assignment"
+    pointer_prompt = "::init gtkb lo\nRead the sidecar before acting."
+
+    child_argv = trigger._command_without_prompt_payload(
+        ["agy", "--print", prompt, "--print-timeout", "30m"],
+        prompt,
+        replacement=pointer_prompt,
+    )
+
+    assert child_argv == ["agy", "--print", pointer_prompt, "--print-timeout", "30m"]
+    assert child_argv[child_argv.index("--print") + 1] == pointer_prompt
 
 
 def test_spawn_harness_forwards_openrouter_key_from_env_local_allowlist(
@@ -8005,6 +8079,67 @@ def test_exit_reconciliation_writes_partial_shim_telemetry_without_worker_output
     assert recipients["prime-builder:A"]["last_launch"]["telemetry_reconciliation"] == "reconciled"
 
 
+def test_wi5255_exit_reconciliation_uses_trusted_worker_context(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = tmp_path / "project"
+    root.mkdir()
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "telemetry-thread-001.md").write_text("NEW\nWork Item: WI-5255\n", encoding="utf-8")
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    runs_dir = state_dir / "dispatch-runs"
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "dispatch-exit-worker-context"
+    _write_worker_session_document(
+        root,
+        session_id=dispatch_id,
+        harness_id="B",
+        harness_name="claude",
+        role="loyal-opposition",
+        dispatch_run_id=dispatch_id,
+    )
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stdout_path.write_text("", encoding="utf-8")
+    stderr_path.write_text("", encoding="utf-8")
+    recipients = {
+        "loyal-opposition:B": {
+            "last_launch": {
+                "dispatch_id": dispatch_id,
+                "launched": True,
+                "launched_at": "2026-07-10T10:00:00Z",
+                "stdout_path": str(stdout_path),
+                "stderr_path": str(stderr_path),
+                "signature": "signature",
+                "needed_role_label": "loyal-opposition",
+                "primary_bridge_id": "telemetry-thread",
+                "trusted_worker_context": {
+                    "schema_version": 1,
+                    "dispatch_id": dispatch_id,
+                    "session_id": dispatch_id,
+                    "harness_id": "B",
+                    "harness_name": "claude",
+                    "provider": "claude",
+                    "model_id": "claude-sonnet-test",
+                    "role": "loyal-opposition",
+                },
+            }
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients, state_dir, root)
+
+    telemetry_path = runs_dir / f"{dispatch_id}.telemetry.json"
+    payload = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    assert payload["worker"]["harness_id"] == "B"
+    assert payload["worker"]["harness_name"] == "claude"
+    assert payload["worker"]["model_id"] == "claude-sonnet-test"
+    assert payload["worker"]["role"] == "loyal-opposition"
+    assert payload["worker"]["role_source_document_id"].endswith(f"{dispatch_id}.json")
+    assert recipients["loyal-opposition:B"]["last_launch"]["telemetry_reconciliation"] == "reconciled"
+
+
 def test_wi5221_prime_worker_session_writes_exact_dispatch_authority(tmp_path: Path) -> None:
     trigger = _load_trigger()
     root = _make_synthetic_project(tmp_path)
@@ -8035,6 +8170,41 @@ def test_wi5221_prime_worker_session_writes_exact_dispatch_authority(tmp_path: P
     assert envelope["init_keyword"] == "::init gtkb pb"
     assert envelope["role_resolved"] == "prime-builder"
     assert envelope["worker_role_provenance"]["role"] == "prime-builder"
+    assert envelope["worker_role_provenance"]["role_resolution_source"] == "dispatcher_composition"
+    assert envelope["worker_role_provenance"]["dispatch_run_id"] == dispatch_id
+
+
+def test_wi5255_lo_worker_session_writes_exact_dispatch_authority(tmp_path: Path) -> None:
+    trigger = _load_trigger()
+    root = _make_synthetic_project(tmp_path)
+    state_dir = root / ".gtkb-state" / "bridge-poller"
+    dispatch_id = "2026-07-15T03-00-00Z-loyal-opposition-A-wi5255"
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+    )
+
+    result = trigger._ensure_dispatch_worker_session(
+        project_root=root,
+        state_dir=state_dir,
+        target=target,
+        recipient=target.dispatch_state_key,
+        dispatch_id=dispatch_id,
+        session_id=dispatch_id,
+    )
+
+    assert result["ok"] is True
+    assert result["trusted_worker_context"]["role"] == "loyal-opposition"
+    envelope_path = root / "harness-state" / "codex" / "session-envelopes" / f"{dispatch_id}.json"
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    assert envelope["session_id"] == dispatch_id
+    assert envelope["harness_id"] == "A"
+    assert envelope["harness_name"] == "codex"
+    assert envelope["init_keyword"] == "::init gtkb lo"
+    assert envelope["role_resolved"] == "loyal-opposition"
+    assert envelope["worker_role_provenance"]["role"] == "loyal-opposition"
     assert envelope["worker_role_provenance"]["role_resolution_source"] == "dispatcher_composition"
     assert envelope["worker_role_provenance"]["dispatch_run_id"] == dispatch_id
 
@@ -8078,8 +8248,8 @@ def test_wi5221_prime_worker_session_failure_is_classified(tmp_path: Path, monke
 
 def test_wi5221_runtime_establishes_authority_before_claim_and_spawn() -> None:
     source = _SCRIPT_PATH.read_text(encoding="utf-8")
-    start = source.index('if target.needed_role_label == "prime-builder" and not dry_run:')
-    authority = source.index("worker_session_result = _ensure_prime_worker_session(", start)
+    start = source.index("trusted_worker_context: dict[str, Any] | None = None")
+    authority = source.index("worker_session_result = _ensure_dispatch_worker_session(", start)
     claim = source.index("acquire_result = _acquire_prime_work_intent_batch(", authority)
     spawn = source.index("launch = _spawn_harness(", claim)
 

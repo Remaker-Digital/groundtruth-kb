@@ -198,7 +198,7 @@ workflow.
 
 ### Gap 2.3 — Settings repair is limited to one `PreToolUse` hook
 
-Scaffold writes 12 hook registrations across four event classes
+Scaffold writes 12 daemon configuration across four event classes
 (`src/groundtruth_kb/project/scaffold.py:370` through `:387`); upgrade
 repairs exactly one of them — `scanner-safe-writer.py` under
 `PreToolUse` — because `_MANAGED_SETTINGS_PRETOOLUSE_HOOKS`
@@ -474,7 +474,7 @@ current evidence:
 - `.claude/settings.json` — scaffold writes it
   (`src/groundtruth_kb/project/scaffold.py:298`); it is **tracked** in
   git (test at `tests/test_scaffold_settings.py:121`); it currently
-  holds 12 governance hook registrations across 4 event classes
+  holds 12 governance daemon configuration across 4 event classes
   (`scaffold.py:370`-`:387`).
 - `.claude/settings.local.json` — scaffold copies the template
   (`scaffold.py:293`-`:295`); it is **ignored** by git (bootstrap.py:27
@@ -711,7 +711,7 @@ Classification codes:
 | 36 | `.claude/skills/bridge-propose/helpers/write_bridge.py` | dual-agent | Same path + `upgrade.py:60` | M | Same. |
 | 37 | `.claude/skills/spec-intake/SKILL.md` | dual-agent | Same path + `upgrade.py:61` | M | Same. |
 | 38 | `.claude/skills/spec-intake/helpers/spec_intake.py` | dual-agent | Same path + `upgrade.py:62` | M | Same. |
-| 39 | `.claude/settings.json` | dual-agent | `scaffold._write_settings_json` via `scaffold.py:298`, `:353` | **Partial M / Partial U** | `_plan_settings_registration` (`upgrade.py:294`) manages 1 of 12 hook registrations (scanner-safe-writer under PreToolUse). Deleted or corrupted entries for the other 11 are unrecoverable. Tracked in git. |
+| 39 | `.claude/settings.json` | dual-agent | `scaffold._write_settings_json` via `scaffold.py:298`, `:353` | **Partial M / Partial U** | `_plan_settings_registration` (`upgrade.py:294`) manages 1 of 12 daemon configuration (scanner-safe-writer under PreToolUse). Deleted or corrupted entries for the other 11 are unrecoverable. Tracked in git. |
 | 40 | `.claude/settings.local.json` | dual-agent | `scaffold.py:292`-`:295` (copies `templates/project/settings.local.json`) | A | Codex GO -004 Condition 2: classified **separately** from `settings.json` (row 39). Adopter-owned, ignored by git (`.gitignore` pattern at `bootstrap.py:27`); scaffold template contains permissions only (`templates/project/settings.local.json`). Upgrade never touches it. Doctor reports on adopter-placed classifier hooks (`doctor.py:432`). |
 | 41 | `bridge/INDEX.md` | dual-agent | `scaffold.py:319`-`:324` via `_generate_bridge_index` | A | After first scaffold, holds live bridge history and must never be overwritten. Upgrade correctly does not touch it. |
 | 42 | `BRIDGE-INVENTORY.md` | dual-agent | `scaffold.py:254`-`:256` | U | Copied at scaffold time; no upgrade planner coverage. Required by `_check_file_bridge_setup` (`doctor.py:751`). |

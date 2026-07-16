@@ -42,6 +42,7 @@ from scripts.verdict_evidence_anchor_preflight import (  # noqa: E402
     validate_verdict_evidence_anchors,
     violation_summary,
 )
+from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 DEFAULT_VERDICT_PREPOPULATION_LOG = Path(".gtkb-state/bridge-verify-helper/last-prepopulation.json")
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY|IMPLEMENTED)$")
@@ -493,6 +494,7 @@ def _run_git(
         encoding="utf-8",
         errors="replace",
         check=False,
+        **no_window_subprocess_kwargs(),
     )
     if check and result.returncode != 0:
         raise VerifiedFinalizationError(
@@ -925,22 +927,36 @@ def _auto_retire_completed_projects_after_verified(project_root: Path) -> tuple[
     return retired
 
 
-def _assert_verdict_review_independence(slug: str, body: str, project_root: Path) -> None:
+def _assert_verdict_review_independence(
+    slug: str,
+    body: str,
+    project_root: Path,
+    *,
+    latest_report_rel_path: str,
+) -> None:
     """Fail closed if a verdict body is a self-review (WI-4829 write-time helper guard).
 
     The verify helper writes verdicts via ``write_bridge_file`` (``write_bytes``),
     which bypasses the bridge-compliance PreToolUse Write hook, so the same
     self-review check is enforced here. A verdict whose ``author_session_context_id``
-    equals the reviewed artifact's (resolved via ``Responds to:``) is invalid under
-    the session-context review-independence rule. The comparator import is defensive
-    so an unavailable module never breaks finalization (the impl-start backstop
-    remains).
+    equals the exact latest implementation report's author session is invalid under
+    the session-context review-independence rule. The report path comes from
+    ``_assert_verification_ready`` and must match the verdict's explicit reference.
+    Comparator loading is itself fail-closed because no independent verdict may be
+    finalized when the enforcement helper is unavailable.
     """
     try:
         from scripts.bridge_review_independence import verdict_self_review_reason
-    except ImportError:
-        return
-    reason = verdict_self_review_reason(body, slug, project_root)
+    except (ImportError, AttributeError) as exc:
+        raise VerifiedFinalizationError(
+            "Review-independence enforcement helper could not load; VERIFIED finalization is denied."
+        ) from exc
+    reason = verdict_self_review_reason(
+        body,
+        slug,
+        project_root,
+        expected_artifact_path=latest_report_rel_path,
+    )
     if reason is not None:
         raise VerifiedFinalizationError(
             f"Self-review verdict refused ({reason}): the verdict author session must be present "
@@ -1027,7 +1043,12 @@ def finalize_verified_commit(
         paths=expected_paths,
     )
 
-    _assert_verdict_review_independence(slug, body_to_write, root)
+    _assert_verdict_review_independence(
+        slug,
+        body_to_write,
+        root,
+        latest_report_rel_path=latest_report,
+    )
     _assert_verdict_author_session_context_is_real(body_to_write)
 
     from scripts.gtkb_bridge_writer import write_bridge_file

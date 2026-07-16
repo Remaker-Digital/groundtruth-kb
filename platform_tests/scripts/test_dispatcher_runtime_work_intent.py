@@ -30,6 +30,12 @@ from test_dispatcher_runtime import (  # noqa: E402
     _load_trigger as _load_base_trigger,
 )
 
+
+def _write_index(project_root: Path, content: str) -> None:
+    (project_root / "bridge").mkdir(parents=True, exist_ok=True)
+    (project_root / "bridge" / "INDEX.md").write_text(content, encoding="utf-8")
+
+
 _BRIDGE_KIND_BODY = (
     "bridge_kind: implementation_proposal\n"
     'target_paths: ["scripts/dispatcher_runtime.py"]\n'
@@ -137,8 +143,8 @@ def _index_with_go_documents(
 
 
 def _prime_selected(trigger, root: Path, max_items: int = 2) -> list[object]:
-    bridge_state = trigger._read_bridge_state_live(root)
-    prime_items, _ = trigger._compute_actionable(bridge_state, root)
+    index_text = (root / "bridge" / "INDEX.md").read_text(encoding="utf-8")
+    prime_items, _ = trigger._compute_actionable(index_text, root)
     filtered = [item for item in prime_items if getattr(item, "dispatchable", True)]
     return trigger._selected_oldest_first(filtered, max_items)
 
@@ -163,7 +169,7 @@ def test_prime_dispatch_filters_held_work_intent_and_signs_unheld_batch(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _index_with_go_documents(root, "held-thread", "free-thread")
+    _write_index(root, _index_with_go_documents(root, "held-thread", "free-thread"))
     _write_prime_worker_session(root, "foreground-session")
     assert acquire("held-thread", "foreground-session", ttl_seconds=120, project_root=root)
 
@@ -208,14 +214,17 @@ def test_prime_dispatch_suppresses_same_batch_target_path_overlap(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     shared_target = "scripts/shared.py"
-    _index_with_go_documents(
+    _write_index(
         root,
-        "first-thread",
-        "second-thread",
-        target_paths_by_slug={
-            "first-thread": [shared_target],
-            "second-thread": [shared_target],
-        },
+        _index_with_go_documents(
+            root,
+            "first-thread",
+            "second-thread",
+            target_paths_by_slug={
+                "first-thread": [shared_target],
+                "second-thread": [shared_target],
+            },
+        ),
     )
     trigger = _load_trigger()
     monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
@@ -249,14 +258,17 @@ def test_prime_dispatch_keeps_disjoint_go_items_fanning_out_to_cap(
     """WI-4996: target serialization preserves normal fan-out for disjoint paths."""
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _index_with_go_documents(
+    _write_index(
         root,
-        "first-thread",
-        "second-thread",
-        target_paths_by_slug={
-            "first-thread": ["scripts/first.py"],
-            "second-thread": ["platform_tests/scripts/test_second.py"],
-        },
+        _index_with_go_documents(
+            root,
+            "first-thread",
+            "second-thread",
+            target_paths_by_slug={
+                "first-thread": ["scripts/first.py"],
+                "second-thread": ["platform_tests/scripts/test_second.py"],
+            },
+        ),
     )
     trigger = _load_trigger()
     monkeypatch.setattr(trigger.subprocess, "Popen", _fake_popen)
@@ -284,20 +296,26 @@ def test_prime_dispatch_suppresses_later_tick_inflight_target_path_overlap(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     shared_target = "scripts/shared.py"
-    _index_with_go_documents(
+    _write_index(
         root,
-        "inflight-thread",
-        target_paths_by_slug={"inflight-thread": [shared_target]},
+        _index_with_go_documents(
+            root,
+            "inflight-thread",
+            target_paths_by_slug={"inflight-thread": [shared_target]},
+        ),
     )
     trigger = _load_trigger()
     packet = trigger.create_authorization_packet(root, "inflight-thread")
     trigger.write_named_packet(root, packet, "inflight-thread")
     _write_prime_worker_session(root, "foreground-session")
     assert acquire("inflight-thread", "foreground-session", ttl_seconds=120, project_root=root)
-    _index_with_go_documents(
+    _write_index(
         root,
-        "later-thread",
-        target_paths_by_slug={"later-thread": [shared_target]},
+        _index_with_go_documents(
+            root,
+            "later-thread",
+            target_paths_by_slug={"later-thread": [shared_target]},
+        ),
     )
     popen_calls: list[object] = []
 
@@ -331,7 +349,7 @@ def test_prime_acquire_failure_releases_batch_and_preserves_signature(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _index_with_go_documents(root, "first-thread", "second-thread")
+    _write_index(root, _index_with_go_documents(root, "first-thread", "second-thread"))
     state_dir.mkdir(parents=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps(
@@ -389,7 +407,7 @@ def test_prime_spawn_failure_releases_claims_and_preserves_signature(
 ) -> None:
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
-    _index_with_go_documents(root, "spawn-fail-thread")
+    _write_index(root, _index_with_go_documents(root, "spawn-fail-thread"))
     state_dir.mkdir(parents=True)
     (state_dir / "dispatch-state.json").write_text(
         json.dumps(
@@ -432,6 +450,7 @@ def test_loyal_opposition_dispatch_ignores_work_intent_holders(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_bridge_file(root, "review-thread-001.md", _BRIDGE_KIND_BODY)
+    _write_index(root, "# bridge index\n\nDocument: review-thread\nNEW: bridge/review-thread-001.md\n")
     assert acquire("review-thread", "foreground-session", ttl_seconds=120, project_root=root)
 
     trigger = _load_trigger()
@@ -452,7 +471,7 @@ def test_dispatcher_mediated_codex_exec_composition_remains_launchable(
     root = _make_synthetic_project(tmp_path)
     state_dir = tmp_path / "state"
     _write_registry(root, [_rec("A", "codex", ["prime-builder"], "active", _CODEX_INVOCATION_SURFACES)])
-    _index_with_go_documents(root, "codex-dispatch-thread")
+    _write_index(root, _index_with_go_documents(root, "codex-dispatch-thread"))
     trigger = _load_trigger()
     popen_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 

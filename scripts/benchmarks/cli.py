@@ -64,14 +64,26 @@ BENCHMARK_MODULES = [
     "versions_per_landed_change",
 ]
 
+_BENCHMARK_LOADERS = {
+    "assertion_signal_noise": lambda: importlib.import_module("scripts.benchmarks.assertion_signal_noise"),
+    "advisory_latency": lambda: importlib.import_module("scripts.benchmarks.advisory_latency"),
+    "backlog_triage": lambda: importlib.import_module("scripts.benchmarks.backlog_triage"),
+    "deliberation_recall": lambda: importlib.import_module("scripts.benchmarks.deliberation_recall"),
+    "harness_observed_scorecard": lambda: importlib.import_module("scripts.benchmarks.harness_observed_scorecard"),
+    "harness_role_protocol_smoke": lambda: importlib.import_module("scripts.benchmarks.harness_role_protocol_smoke"),
+    "linkage_heatmap": lambda: importlib.import_module("scripts.benchmarks.linkage_heatmap"),
+    "recall_coverage": lambda: importlib.import_module("scripts.benchmarks.recall_coverage"),
+    "tool_identification": lambda: importlib.import_module("scripts.benchmarks.tool_identification"),
+    "versions_per_landed_change": lambda: importlib.import_module("scripts.benchmarks.versions_per_landed_change"),
+}
+
 
 def _resolve_root():
     return Path(__file__).resolve().parents[2]
 
 
 def _import_benchmark(name):
-    mod = importlib.import_module("scripts.benchmarks." + name)
-    return mod
+    return _BENCHMARK_LOADERS[name]()
 
 
 def _default_window():

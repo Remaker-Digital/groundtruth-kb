@@ -13,6 +13,7 @@ skills = [
     "open-items",
     "codex-report",
     "gtkb-hygiene-investigation",
+    "gtkb-hygiene-reclaim",
     "kb-assert",
 ]
 terminology = [
@@ -24,6 +25,8 @@ terminology = [
     "platform",
     "doctor",
     "dashboard",
+    "hygiene reclaim",
+    "deep clean",
 ]
 
 [activities.ops.history_state]
@@ -33,6 +36,7 @@ sources = [
     "doctor check results",
     "release blockers",
     "active deployment artifacts",
+    "hygiene reclaim history",
 ]
 
 [activities.ops.classification]
@@ -47,12 +51,16 @@ guardrails = [
     "no unreviewed implementations",
     "surface blockers to owner via AUQ before acting on release-gating items",
     "prefer read-only investigation in headless mode",
+    "ops-envelope deep cleaning uses the production gt hygiene reclaim deep-clean CLI and does not require per-batch owner interaction once exact ops evidence and quiescence evidence are present",
+    "hygiene reclaim skills are ops-envelope-only and must not be used from the global baseline or another activity envelope",
 ]
 manipulates = [
     "bridge state",
     "operational artifacts",
     "doctor reports",
     "release evidence",
+    "hygiene reclaim ledgers",
+    "receipted hygiene trash payloads",
 ]
 
 [activities.deliberation]

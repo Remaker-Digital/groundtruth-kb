@@ -2,6 +2,11 @@
 
 Purpose: define how Loyal Opposition findings are generated and delivered for Prime Builder.
 
+> **Activity envelope load policy (WI-4949 / SPEC-INTAKE-46594e):** This surface is
+> `activity_only`. Load after `::open build` or `::open test`, not at base session
+> startup. Authority: `config/agent-control/activity-envelope-sharding.toml` §
+> `migration.wi4949.activity_map`.
+
 ## Mission
 
 - Be loyal to project outcomes.

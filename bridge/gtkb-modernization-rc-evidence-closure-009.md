@@ -1,0 +1,1210 @@
+NEW
+
+author_identity: prime-builder/codex/A
+author_harness_id: A
+author_session_context_id: 019f6610-1bc5-7781-88bf-900dccbc6010
+author_model: GPT-5
+author_model_version: gpt-5
+author_model_configuration: Codex Desktop interactive Prime Builder; transcript override ::init gtkb pb; governed bridge heartbeat implementation
+
+# GT-KB Bridge Implementation Report - Modernization RC Evidence Closure
+
+bridge_kind: implementation_report
+Document: gtkb-modernization-rc-evidence-closure
+Version: 009
+Responds to GO: bridge/gtkb-modernization-rc-evidence-closure-008.md
+Approved proposal: bridge/gtkb-modernization-rc-evidence-closure-007.md
+Project Authorization: PAUTH-PROJECT-GTKB-PLATFORM-MODERNIZATION-ASSURANCE-WI-5165-RC-BLOCKER-REPAIR-20260715
+Project: PROJECT-GTKB-PLATFORM-MODERNIZATION-ASSURANCE
+Work Item: WI-5165
+Recommended commit type: chore(governance):
+
+## Implementation Claim
+
+Executed the existing fixed 26-objective modernization semantic-evidence collector exactly once under the approved GO, matching work-intent claim, and implementation-start packet. The run appended current evidence for 13 objectives and left the 13 unavailable or failing objectives explicitly blocked. It did not modify source, tests, database, dispatcher, harness, Git, credentials, deployment, release state, or any pre-existing file beneath the approved evidence roots.
+
+The collector run began at `2026-07-15T16:35:26.3829081Z` and completed at `2026-07-15T16:37:24.7646098Z`. Its invocation ID is `20260715163526-76461cb465c3`.
+
+## Authorization Evidence
+
+- Reviewed proposal: `bridge/gtkb-modernization-rc-evidence-closure-007.md`.
+- Independent GO: `bridge/gtkb-modernization-rc-evidence-closure-008.md`, reviewer session `019f65fb-4219-7150-ac09-26f12b650337`.
+- Prime Builder session: `019f6610-1bc5-7781-88bf-900dccbc6010`, open, harness A, role `prime-builder`.
+- Work-intent claim acquired at `2026-07-15T16:33:53Z`, rowid `31344`.
+- Implementation authorization created at `2026-07-15T16:34:00Z`.
+- Implementation packet hash: `sha256:760bac2c6e6d3fa02616734300903ea5582eabb5c1c32cd12d69cb2206849c0b`.
+- Pre-start packet hash: `sha256:f6b5d4c86edc9281745891dfbdf7f674e9220e380f5f63227a99b2116153c96d`.
+- Operation-time PAUTH decision: PASS; all 28 target roots classified as allowed `runtime_state`.
+
+## Specification Links
+
+- `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001`
+- `DCL-GIT-BRANCH-BINDING-PROMOTION-001`
+- `GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
+- `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`
+- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
+
+## Owner Decisions / Input
+
+No new owner decision was required or inferred. The active WI-5165 PAUTH and cited modernization decisions authorized this bounded collector operation. Missing live-harness, pilot, clean-run, activation, operational, and independent-verification prerequisites remain unresolved rather than synthesized.
+
+## Prior Deliberations
+
+- `DELIB-20260710-GTKB-MODERNIZATION-NONIMPAIRMENT-GOV-FORMALIZATION-RESULT`
+- `DELIB-20260710-GTKB-MODERNIZATION-GATE-1-READINESS-AUTHORIZATION`
+- `DELIB-20260710-FIRST-STABILIZATION-BATCH-APPROVAL`
+- `bridge/gtkb-modernization-rc-evidence-closure-005.md` - complete fixed write envelope and verification plan.
+- `bridge/gtkb-modernization-rc-evidence-closure-006.md` - baseline correction request.
+- `bridge/gtkb-modernization-rc-evidence-closure-007.md` - approved current-baseline proposal.
+- `bridge/gtkb-modernization-rc-evidence-closure-008.md` - independent GO.
+
+## Pre/Post State
+
+| Field | Before | After collector | Post-verification status |
+| --- | --- | --- | --- |
+| Git HEAD | `0a8877c8fe21b017c5c3d2f6df0dbd4734ab375b` | same | same |
+| Scope digest | `AD70C6D61C01500DBDF11BA8AFD5C1A42AD8C00D4EB63BDBF0EEC2423D1EB240` | same | same |
+| Semantic status | `BLOCKED=12 INVALID=14 COLLECTED=0` | `BLOCKED=13 COLLECTED=13` | `BLOCKED=12 INVALID=1 COLLECTED=13` |
+| Existing approved-root files | 2,792 | 2,792 unchanged | 2,792 unchanged |
+| New approved-root files | 0 | 944 | 1,027 including focused-test runtime |
+| Modified pre-existing approved-root files | 0 | 0 | 0 |
+| Deleted approved-root files | 0 | 0 | 0 |
+
+The collector exit code was 0. The post-status exit code is 1 because unresolved evidence remains; this is the expected fail-closed semantic result.
+
+## Collected Objectives
+
+The following 13 receipts are current, hash-valid, and bound to the reviewed HEAD, digest, and canonical Prime Builder session:
+
+- `predecessor-reconciliation`
+- `authority-carrier-classification`
+- `artifact-cleanup-batches`
+- `semantic-guidance-cleanup`
+- `lifecycle-state-reconciliation`
+- `work-item-advisory-deduplication`
+- `runtime-interface-inventory`
+- `pre-modernization-baseline`
+- `seven-category-scenario-matrix`
+- `six-activity-behavior-matrix`
+- `role-harness-session-branch-scenarios`
+- `confusion-regression-fixtures`
+- `modernization-measurements`
+
+## Remaining Blockers
+
+The clean-suite gate remains FAIL with these 13 unresolved semantic assertions:
+
+- `MSA-MOD-P06` program closure: clean-run and independent-audit prerequisites remain absent.
+- `MSA-MOD-HP03` Claude live invocation evidence absent.
+- `MSA-MOD-HP04` Codex live invocation evidence absent.
+- `MSA-MOD-HP05` Cursor live invocation evidence absent.
+- `MSA-MOD-HP06` Antigravity optimized-startup evidence absent.
+- `MSA-MOD-HP07` headless-provider conformance remains INVALID because the old receipt is stale and current harness-parity evidence is non-passing.
+- `MSA-MOD-HP12` cross-harness confusion corpus evidence absent.
+- `MSA-MOD-AS08` independently attested clean non-impairment run absent.
+- `MSA-MOD-AS10` shadow six-activity observations incomplete.
+- `MSA-MOD-AS11` activation thresholds blocked by AS10.
+- `MSA-MOD-AS12` reversible activation evidence absent.
+- `MSA-MOD-AS13` real modernization Git-lifecycle pilot receipt absent.
+- `MSA-MOD-AS14` independent Loyal Opposition verification evidence absent.
+
+No retry, synthetic receipt, harness contact, routing change, activation, pilot fabrication, or external mutation was attempted.
+
+## Commands Run
+
+- `git rev-parse HEAD` - PASS before claim, before collection, after collection, and after verification; exact reviewed HEAD retained.
+- `python scripts/collect_modernization_semantic_evidence.py --json status` - pre-run expected exit 1 with `BLOCKED=12 INVALID=14`; post-run expected exit 1 with `COLLECTED=13 BLOCKED=12 INVALID=1`.
+- `python scripts/bridge_claim_cli.py claim gtkb-modernization-rc-evidence-closure --session-id 019f6610-1bc5-7781-88bf-900dccbc6010 --ttl-seconds 3600` - PASS.
+- `python scripts/implementation_authorization.py begin --bridge-id gtkb-modernization-rc-evidence-closure --session-id 019f6610-1bc5-7781-88bf-900dccbc6010 --expires-minutes 45` - PASS.
+- `python scripts/collect_modernization_semantic_evidence.py --json all` - PASS, executed exactly once; 13 COLLECTED and 13 BLOCKED during the run.
+- `python scripts/check_modernization_scope_semantics.py run --phase clean-suite --json` - expected FAIL; 13 unresolved semantic assertions listed above, with no new impairment.
+- `python scripts/check_modernization_git_lifecycle.py --json` - PASS; all 26 `GIT-LIFECYCLE-A1` through `A26` assertions passed.
+- `python -m pytest platform_tests/scripts/test_collect_modernization_semantic_evidence.py -q --tb=short --basetemp .gtkb-state/mrc-pytest/verification-202607151638` - PASS; 19 passed, 1 unrelated pytest configuration warning.
+- `python -m ruff check scripts/collect_modernization_semantic_evidence.py` - PASS.
+- `python -m ruff format --check scripts/collect_modernization_semantic_evidence.py` - FAIL; Ruff reports the unchanged source file would be reformatted. The source path is outside this GO's target paths and was not modified.
+
+## Specification-Derived Verification
+
+| Governing requirement | Executed evidence | Result |
+| --- | --- | --- |
+| `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001` | Exact pre/post inventory, unchanged HEAD/digest, honest residual blockers | PASS |
+| `DCL-GIT-BRANCH-BINDING-PROMOTION-001` | Git-lifecycle checker, 26/26 assertions | PASS; real pilot remains absent and blocked |
+| `GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001` | Clean-suite checker and focused 19-test collector suite | PARTIAL: focused tests pass; 13 RC assertions remain fail-closed |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Exact GO, distinct reviewer session, numbered report filing | PASS |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | All proposal links carried forward | PASS |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Exact command/result mapping in this report | PASS for evidence completeness; substantive failures remain visible |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | PAUTH/project/WI metadata retained | PASS |
+| `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | Matching claim and implementation-start packet | PASS |
+| `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001` | Evaluator allowed all 28 roots for packet creation and start | PASS |
+| `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001` | No work before GO/claim/start; exact target inventory | PASS |
+| Artifact-oriented governance trio | Append-only receipts and numbered implementation report | PASS |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Every generated path is within `E:/GT-KB` and an approved root | PASS |
+| `ADR-CODEX-HOOK-PARITY-FALLBACK-001` | Governed implementation-report helper used | PASS |
+| Python quality gates | Ruff lint PASS; Ruff format check FAIL on unchanged out-of-scope source | PARTIAL |
+
+## Acceptance Criteria Status
+
+- PASS: implementation started only at the reviewed HEAD, digest, counts, and session provenance.
+- PASS: all 13 collected receipts are current, objective-specific, hash-valid, and append-only.
+- PASS: unavailable objectives remained BLOCKED or INVALID with exact reasons.
+- PASS: all generated project paths are inside the 28 approved roots.
+- PASS: every generated path is enumerated below.
+- PASS: no pre-existing approved-root file was changed or deleted.
+- PARTIAL: the RC is not closed; 13 semantic assertions remain unresolved.
+- FAIL: the required Ruff format check does not pass for the unchanged collector source. No out-of-scope source edit was made.
+
+## Complete Generated-Path Inventory
+
+Exactly 1027 files were generated in the reviewed roots: 944 under collector invocation `20260715163526-76461cb465c3` and 83 under focused verification root `verification-202607151638`. The 392 unrelated dirty worktree paths reported by the generic helper plan predate or are independent of this implementation and are explicitly excluded from this claim.
+
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/activity-envelope-load/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/artifact-decontamination/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/authority-carrier-classification/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/confusion-regression-fixtures/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/harness-parity-live/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/role-harness-session-branch-scenarios/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/runtime-interface-inventory/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/seven-category-scenario-matrix/20260715163526-76461cb465c3/output.log`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/artifact-cleanup-batches/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/artifact-cleanup-batches/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/artifact-cleanup-batches/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/authority-carrier-classification/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/authority-carrier-classification/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/authority-carrier-classification/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/confusion-regression-fixtures/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/confusion-regression-fixtures/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/confusion-regression-fixtures/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/lifecycle-state-reconciliation/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/lifecycle-state-reconciliation/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/lifecycle-state-reconciliation/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/modernization-measurements/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/modernization-measurements/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/modernization-measurements/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/pre-modernization-baseline/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/pre-modernization-baseline/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/pre-modernization-baseline/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/predecessor-reconciliation/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/predecessor-reconciliation/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/predecessor-reconciliation/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/role-harness-session-branch-scenarios/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/role-harness-session-branch-scenarios/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/role-harness-session-branch-scenarios/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/runtime-interface-inventory/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/runtime-interface-inventory/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/runtime-interface-inventory/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/semantic-guidance-cleanup/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/semantic-guidance-cleanup/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/semantic-guidance-cleanup/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/seven-category-scenario-matrix/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/seven-category-scenario-matrix/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/seven-category-scenario-matrix/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/work-item-advisory-deduplication/20260715163526-76461cb465c3/issuance.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/work-item-advisory-deduplication/20260715163526-76461cb465c3/measurement.json`
+- `.gtkb-state/modernization-release-candidate/semantic-evidence/issues/work-item-advisory-deduplication/20260715163526-76461cb465c3/receipt.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_assertion4_compaction_res0/.claude/session/active-session-role.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_assertion4_compaction_res1/.claude/session/active-session-role.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_concurrent_attempts_have_0/recovery.db`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/.claude/session/envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/alibaba-cloud-studio/session-envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/alibaba-cloud-studio/session-envelopes/H-worker-one.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/alibaba-cloud-studio/session-envelopes/H-worker-two.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/antigravity/session-envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/antigravity/session-envelopes/C-worker-one.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/antigravity/session-envelopes/C-worker-two.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/claude/session-envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/claude/session-envelopes/B-worker-one.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/claude/session-envelopes/B-worker-two.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/claude/session-envelopes/cross-harness-collision.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/codex/session-envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/codex/session-envelopes/A-worker-one.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/codex/session-envelopes/A-worker-two.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/codex/session-envelopes/cross-harness-collision.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/ollama/session-envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/ollama/session-envelopes/D-worker-one.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/ollama/session-envelopes/D-worker-two.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/openrouter/session-envelope.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/openrouter/session-envelopes/F-worker-one.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_headless_worker_authority0/harness-state/openrouter/session-envelopes/F-worker-two.json`
+- `.gtkb-state/mrc-pytest/9155c7a8/20260715163526-76461cb465c3/test_interrupted_attempt_resum0/recovery.db`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/.claude/session/envelope.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/claude/session-envelope.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/claude/session-envelopes/shared-session-id.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/codex/session-envelope.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/codex/session-envelopes/shared-session-id.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_hard_invariant_rejects_in0/missing-source.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_malformed_marker_json_tre0/.claude/session/active-session-role.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_malformed_marker_json_tre1/.claude/session/active-session-role.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/.claude/session/envelope.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/activity-disposition-profiles.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/activity-envelope-sharding.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/command-surface.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/system-interface-map.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/governance/project-authorization-operation-taxonomy.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/registry/context-manifests.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/registry/sot-artifacts.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/fresh_worker_probe.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__main__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/assertion_schema.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/assertions.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/config.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/db.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/gates.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/harness_projection.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_adr_instance_templates.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_cicd_templates.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_iac_templates.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_spec_templates.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_logging.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_phase_y_loop_probe.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/active_workspace.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/ops.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/profiles.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/ops.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/profiles.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adoption/deployability_preservation_gate.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adr_harness.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adr_scaffold.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/agent_role_manifest.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/assertion_schema.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/assertions.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/authority.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/approval_state.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/query.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bootstrap.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_reset.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_transactions.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/audit.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/checkpoint.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/context.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/detector.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/disposition.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/handshake.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/launcher.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/notify.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/paths.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/poller.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/prior_deliberations.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/proposal_autoload.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/read_commands.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/registry.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/role_state.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/routing.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/runtime.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/state_report.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/status_driver.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/versioned_files.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/worker.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/canonical_terms.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cicd_scaffold.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_approval_packet.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_add_work_item.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_add.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_authorize_implementation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_status.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_update.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_deliberations_record.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_skills.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_spec_record.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_spec_update.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/coherence/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/coherence/checker.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/config.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/freshness.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/manifest.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/freshness.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/manifest.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-envelope-sharding.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/system-interface-map.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/governance/canonical-terms-sync.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/context-manifests.toml`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dashboard_service.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dashboard.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/db_snapshot.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/db.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/design_import.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatch_default_metrics.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatch_tuning_advisory.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_complex.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_disable_guard.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_supervisor.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_watchdog.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/lane_scoring.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/rules_loader.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/scheduler.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/env_sot.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/gates_transport.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/gates.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/__main__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/commands.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/models.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/quiescence.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/repository.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/state.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/approval_packet.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/credential_patterns.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/project_authorization_operation_time.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/approval_packet.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/commit_preflight.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/context.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/credential_patterns.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/mutation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/narrative_artifact_packet.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/output.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/preflight_evidence.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/project_authorization_operation_time.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/push_preflight.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/push_readiness.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_diagnostic.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_ops.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_projection.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/health.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hooks/code_quality_baseline_proposal_check.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/auto_resolve.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/strays.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/supersession.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/iac_scaffold.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/impact.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/intake.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/inventory/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/inventory/string_scan.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/allowlist.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/app_root_minimization.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/doctor_verdicts.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/occupancy_detector.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/registry_check.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/strong_markers.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/validation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/authority.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/boundary.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/roles.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/server.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/membase_effective_use_audit.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/audit.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/bridge_substrate.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/derive.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/pending.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/transaction.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/__main__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/workflow.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/operating_state.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_approval_surface.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/auto_archive.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/resolution_signals.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/engine.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/registry.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/authorization.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/lifecycle.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/managed_registry.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/manifest.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/ownership.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/profiles.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/sot_registry.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/application_scope.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/authorization.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/baseline_audit.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/gt_cli_availability.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/stale_test_slots.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/chroma.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/core_spec_intake.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/doctor_isolation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/doctor.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/lifecycle.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/managed_registry.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/manifest.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/ownership.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/preflight.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/profiles.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/rollback.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/scaffold.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/session_start_orientation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/sot_audit.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/sot_registry.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/upgrade.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/providers/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/providers/schema.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reconciliation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reporting/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/runtime_recovery/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/allowlist.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/patterns.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/redaction.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/scanner.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/seed.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/envelope.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/handoff.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/topic_router.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/wrap.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/envelope.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/handoff.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/topic_router.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/wrap.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/spec_scaffold.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_dispatch_policy.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_dispatch_runtime.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_stuck_flow.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/term_disambiguation.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/typed_artifact_flow.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/resource_limits.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/restore_policy.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/service_sot.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/__init__.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/app.py`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/static/style.css`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/assertions.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/base.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/dashboard.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/env_detail.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/env.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/history.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/op_detail.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/ops.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/pipeline.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/spec_detail.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/specs.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/test_detail.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/tests.html`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/codex/session-envelope.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/codex/session-envelopes/fresh-worker-001.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/d30fe63b/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/.claude/session/envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/agent-control/activity-disposition-profiles.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/agent-control/activity-envelope-sharding.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/agent-control/command-surface.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/agent-control/system-interface-map.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/governance/canonical-terms-sync.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/governance/project-authorization-operation-taxonomy.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/config/registry/sot-artifacts.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/fresh_worker_probe.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__main__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/assertion_schema.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/assertions.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/config.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/db.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/gates.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/harness_projection.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_adr_instance_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_cicd_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_iac_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_spec_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_logging.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_phase_y_loop_probe.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/active_workspace.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/ops.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/profiles.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/ops.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/profiles.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adoption/deployability_preservation_gate.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adr_harness.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adr_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/agent_role_manifest.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/assertion_schema.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/assertions.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/authority.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/approval_state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/query.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bootstrap.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_reset.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_transactions.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/checkpoint.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/context.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/detector.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/disposition.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/handshake.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/launcher.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/notify.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/paths.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/poller.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/prior_deliberations.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/proposal_autoload.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/read_commands.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/role_state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/routing.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/runtime.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/state_report.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/status_driver.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/versioned_files.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/worker.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/canonical_terms.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cicd_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_approval_packet.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_add_work_item.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_add.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_authorize_implementation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_status.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_update.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_deliberations_record.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_skills.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_spec_record.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_spec_update.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/coherence/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/coherence/checker.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/config.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/freshness.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/manifest.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/freshness.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/manifest.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-envelope-sharding.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/system-interface-map.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/governance/canonical-terms-sync.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/context-manifests.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dashboard_service.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dashboard.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/db_snapshot.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/db.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/design_import.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatch_default_metrics.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatch_tuning_advisory.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_complex.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_disable_guard.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_supervisor.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_watchdog.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/lane_scoring.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/rules_loader.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/scheduler.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/env_sot.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/gates_transport.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/gates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/__main__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/commands.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/models.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/quiescence.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/repository.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/approval_packet.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/credential_patterns.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/project_authorization_operation_time.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/approval_packet.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/commit_preflight.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/context.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/credential_patterns.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/mutation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/narrative_artifact_packet.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/output.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/preflight_evidence.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/project_authorization_operation_time.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/push_preflight.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/push_readiness.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_diagnostic.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_ops.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_projection.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/health.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hooks/code_quality_baseline_proposal_check.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/auto_resolve.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/strays.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/supersession.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/iac_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/impact.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/intake.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/inventory/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/inventory/string_scan.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/allowlist.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/app_root_minimization.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/doctor_verdicts.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/occupancy_detector.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/registry_check.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/strong_markers.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/validation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/authority.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/boundary.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/roles.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/server.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/membase_effective_use_audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/bridge_substrate.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/derive.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/pending.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/transaction.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/__main__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/workflow.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/operating_state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_approval_surface.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/auto_archive.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/resolution_signals.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/engine.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/authorization.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/lifecycle.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/managed_registry.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/manifest.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/ownership.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/profiles.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/sot_registry.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/application_scope.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/authorization.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/baseline_audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/gt_cli_availability.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/stale_test_slots.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/chroma.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/core_spec_intake.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/doctor_isolation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/doctor.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/lifecycle.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/managed_registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/manifest.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/ownership.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/preflight.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/profiles.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/rollback.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/session_start_orientation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/sot_audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/sot_registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/upgrade.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/providers/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/providers/schema.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reconciliation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reporting/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/runtime_recovery/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/allowlist.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/patterns.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/redaction.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/scanner.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/seed.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/envelope.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/handoff.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/topic_router.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/wrap.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/envelope.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/handoff.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/topic_router.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/wrap.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/spec_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_dispatch_policy.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_dispatch_runtime.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_stuck_flow.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/term_disambiguation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/typed_artifact_flow.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/resource_limits.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/restore_policy.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/service_sot.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/app.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/static/style.css`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/assertions.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/base.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/dashboard.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/env_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/env.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/history.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/op_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/ops.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/pipeline.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/spec_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/specs.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/test_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/tests.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/harness-state/codex/session-envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/harness-state/codex/session-envelopes/fresh-worker-001.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_fresh_worker_bootstraps_f0/fresh-gtkb-host/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/.claude/session/envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/claude/session-envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/claude/session-envelopes/shared-session-id.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/codex/session-envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/codex/session-envelopes/shared-session-id.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_hard_invariant_rejects_am0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/.claude/session/envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/activity-disposition-profiles.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/activity-envelope-sharding.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/command-surface.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/agent-control/system-interface-map.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/governance/project-authorization-operation-taxonomy.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/registry/context-manifests.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/config/registry/sot-artifacts.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/fresh_worker_probe.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__main__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/assertion_schema.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/assertions.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/config.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/db.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/gates.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/__pycache__/harness_projection.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_adr_instance_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_cicd_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_iac_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_azure_spec_templates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_logging.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/_phase_y_loop_probe.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/active_workspace.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/ops.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/__pycache__/profiles.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/ops.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/activity/profiles.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adoption/deployability_preservation_gate.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adr_harness.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/adr_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/agent_role_manifest.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/assertion_schema.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/assertions.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/authority.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/approval_state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/backlog/query.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bootstrap.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_reset.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge_dispatch_transactions.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/checkpoint.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/context.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/detector.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/disposition.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/handshake.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/launcher.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/notify.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/paths.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/poller.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/prior_deliberations.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/proposal_autoload.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/read_commands.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/role_state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/routing.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/runtime.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/state_report.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/status_driver.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/versioned_files.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/bridge/worker.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/canonical_terms.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cicd_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_approval_packet.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_add_work_item.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_add.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_authorize_implementation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_status.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_backlog_update.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_deliberations_record.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_skills.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_spec_record.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli_spec_update.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/cli.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/coherence/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/coherence/checker.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/config.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/freshness.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/__pycache__/manifest.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/freshness.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/manifest.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-envelope-sharding.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/system-interface-map.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/governance/canonical-terms-sync.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/context/registries/v1/context-manifests.toml`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dashboard_service.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dashboard.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/db_snapshot.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/db.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/design_import.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatch_default_metrics.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatch_tuning_advisory.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_complex.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_disable_guard.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_supervisor.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher_watchdog.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/lane_scoring.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/rules_loader.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/dispatcher/scheduler.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/env_sot.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/gates_transport.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/gates.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/__main__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/commands.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/models.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/quiescence.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/repository.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/git_lifecycle/state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/approval_packet.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/credential_patterns.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/__pycache__/project_authorization_operation_time.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/approval_packet.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/commit_preflight.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/context.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/credential_patterns.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/mutation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/narrative_artifact_packet.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/output.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/preflight_evidence.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/project_authorization_operation_time.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/push_preflight.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/governance/push_readiness.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_diagnostic.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_ops.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/harness_projection.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/health.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hooks/code_quality_baseline_proposal_check.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/auto_resolve.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/strays.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/supersession.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/iac_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/impact.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/intake.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/inventory/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/inventory/string_scan.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/allowlist.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/app_root_minimization.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/doctor_verdicts.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/occupancy_detector.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/registry_check.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/strong_markers.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/isolation/validation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/authority.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/boundary.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/roles.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mcp_surface/server.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/membase_effective_use_audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/bridge_substrate.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/derive.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/pending.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/transaction.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/__main__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/modernization/workflow.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/operating_state.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_approval_surface.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/auto_archive.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/owner_decision/resolution_signals.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/engine.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/policy/registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/authorization.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/lifecycle.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/managed_registry.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/manifest.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/ownership.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/profiles.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/__pycache__/sot_registry.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/application_scope.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/authorization.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/baseline_audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/gt_cli_availability.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/checks/stale_test_slots.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/chroma.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/core_spec_intake.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/doctor_isolation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/doctor.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/lifecycle.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/managed_registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/manifest.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/ownership.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/preflight.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/profiles.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/rollback.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/session_start_orientation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/sot_audit.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/sot_registry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/project/upgrade.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/providers/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/providers/schema.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reconciliation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reporting/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/runtime_recovery/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/allowlist.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/patterns.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/redaction.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/secrets/scanner.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/seed.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/__init__.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/envelope.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/handoff.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/topic_router.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/__pycache__/wrap.cpython-314.pyc`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/envelope.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/handoff.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/topic_router.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/session/wrap.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/spec_scaffold.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_dispatch_policy.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_dispatch_runtime.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/tafe_stuck_flow.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/term_disambiguation.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/typed_artifact_flow.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/resource_limits.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/restore_policy.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/watchdog/service_sot.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/__init__.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/app.py`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/static/style.css`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/assertions.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/base.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/dashboard.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/env_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/env.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/history.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/op_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/ops.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/pipeline.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/spec_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/specs.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/test_detail.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/groundtruth-kb/src/groundtruth_kb/web/templates/tests.html`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/codex/session-envelope.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/codex/session-envelopes/fresh-worker-001.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_project_context_override_0/fresh-gtkb-host/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/e10461a6/20260715163526-76461cb465c3/test_retry_budget_is_bounded_a0/recovery.db`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163805-c193b0da1e54/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-c193b0da1e54/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-c193b0da1e54/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-c193b0da1e54/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_append_only_issue_path_re0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_failed_measurement_never_0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163804-dc85b7b496b9/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_failed_measurement_never_0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_failed_measurement_never_0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_failed_measurement_never_0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163804-09dfeb504711/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-09dfeb504711/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-09dfeb504711/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-09dfeb504711/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163805-ce025b8bf2cd/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-ce025b8bf2cd/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-ce025b8bf2cd/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-ce025b8bf2cd/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or1/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163805-a9f3d29efd4a/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-a9f3d29efd4a/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-a9f3d29efd4a/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163805-a9f3d29efd4a/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_forged_session_harness_or2/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_parity_failu0/.gtkb-state/bridge-poller/dispatch-runs/2026-07-13T18-00-00Z-prime-builder-A-parity.telemetry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_parity_failu0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_parity_failu0/harness-state/codex/session-envelopes/2026-07-13T18-00-00Z-prime-builder-A-parity.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_parity_failu0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_parity_failu0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/.gtkb-state/bridge-poller/dispatch-runs/2026-07-13T18-00-00Z-prime-builder-A-observed.telemetry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/harness-parity-live/20260715163804-c6e0994c2030/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/harness-codex-live/20260715163804-c6e0994c2030/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/harness-codex-live/20260715163804-c6e0994c2030/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/harness-codex-live/20260715163804-c6e0994c2030/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/harness-state/codex/session-envelopes/2026-07-13T18-00-00Z-prime-builder-A-observed.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_live_harness_requires_mat0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_missing_canonical_runtime0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_missing_canonical_runtime0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163804-c39f5d5f12a2/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-c39f5d5f12a2/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-c39f5d5f12a2/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-c39f5d5f12a2/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_nested_raw_output_tamperi0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pre_modernization_baselin0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pre_modernization_baselin0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pre_modernization_baselin0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_stays_blo0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_stays_blo0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_stays_blo0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_uses_vers0/.gtkb-state/modernization-release-candidate/audits/000001.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_uses_vers0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_uses_vers0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_program_closure_uses_vers0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pytest_temp_path_uses_for0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/portable-pytest-temp/20260715163804-89852fdaa41e/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pytest_temp_path_uses_for0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pytest_temp_path_uses_for0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_pytest_temp_path_uses_for0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163804-1054f272007b/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-1054f272007b/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-1054f272007b/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-1054f272007b/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_stale_git_head_invalidate0/harness-state/harness-registry.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/.gtkb-state/modernization-release-candidate/semantic-evidence/command-runs/focused-observation/20260715163804-9d8c296d2ec3/output.log`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-9d8c296d2ec3/issuance.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-9d8c296d2ec3/measurement.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/.gtkb-state/modernization-release-candidate/semantic-evidence/issues/six-activity-behavior-matrix/20260715163804-9d8c296d2ec3/receipt.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/harness-state/codex/session-envelopes/019f5ce7-b9f0-7d32-9920-687e057013b8.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/harness-state/harness-identities.json`
+- `.gtkb-state/mrc-pytest/verification-202607151638/test_successful_executable_mea0/harness-state/harness-registry.json`
+
+## Risk And Rollback
+
+Residual risk is explicit: the RC remains blocked on real live-harness, clean-run, activation, pilot, operational, and independent-verification evidence. The existing collector source also fails Ruff format check but is outside this GO. No deletion is authorized. If any appended evidence is found invalid, preserve it and file a separately governed correction; bridge and receipt history remain append-only.
+
+## Recommended Commit Type
+
+`chore(governance):` if an independently reviewed evidence-carrier commit is later authorized. This PAUTH forbids Git commit, and this report requests no staging or commit.
+
+## Loyal Opposition Asks
+
+1. Verify the exact invocation evidence, current receipt hashes, path inventory, and command results.
+2. Confirm that the source-format failure and 13 remaining RC assertions are correctly reported without scope broadening.
+3. Return VERIFIED only if the bounded collection operation satisfies the approved proposal despite the explicitly partial RC status; otherwise return NO-GO with precise corrective findings.

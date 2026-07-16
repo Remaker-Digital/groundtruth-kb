@@ -87,6 +87,45 @@ def test_backstop_allows_documented_cross_scope_references(tmp_path: Path) -> No
     assert reasons == {"bridge history", "governance and operating-model rule", "platform test fixture"}
 
 
+def test_backstop_allows_only_named_reference_adopter_deploy_helpers(tmp_path: Path) -> None:
+    mod = _load_backstop_module()
+    deploy = tmp_path / "scripts" / "deploy"
+    deploy.mkdir(parents=True)
+    reference = "applications/Agent_Red/docs-site/docs\n"
+    (deploy / "build-context.ps1").write_text(reference, encoding="utf-8")
+    (deploy / "build-and-deploy-staging.ps1").write_text(reference, encoding="utf-8")
+    (deploy / "other.ps1").write_text(reference, encoding="utf-8")
+
+    payload = mod.scan(tmp_path)
+
+    assert payload["status"] == "fail"
+    assert payload["allowed_references"] == [
+        {
+            "path": "scripts/deploy/build-and-deploy-staging.ps1",
+            "line": 1,
+            "column": 1,
+            "reference": "applications/Agent_Red/docs-site/docs",
+            "reason": "reference-adopter release build-context helper",
+        },
+        {
+            "path": "scripts/deploy/build-context.ps1",
+            "line": 1,
+            "column": 1,
+            "reference": "applications/Agent_Red/docs-site/docs",
+            "reason": "reference-adopter release build-context helper",
+        },
+    ]
+    assert payload["violations"] == [
+        {
+            "path": "scripts/deploy/other.ps1",
+            "line": 1,
+            "column": 1,
+            "reference": "applications/Agent_Red/docs-site/docs",
+            "reason": None,
+        }
+    ]
+
+
 def test_backstop_prunes_generated_temp_directories(tmp_path: Path) -> None:
     mod = _load_backstop_module()
     temp_dir = tmp_path / ".pytest-basetemp-codex"

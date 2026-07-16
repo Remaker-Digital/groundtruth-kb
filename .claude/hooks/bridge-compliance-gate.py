@@ -234,6 +234,34 @@ HARNESS_SURFACE_PATH_MARKERS = (
 # placeholder line is not mistaken for substantive content.
 DISPOSITION_NONCONTENT_PREFIX_RE = re.compile(r"^[\s>*`_:\-]+")
 
+# Modernization intuitiveness/non-impairment proposal gate. The exact heading
+# is part of GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001's executable contract.
+NONIMPAIRMENT_DISPOSITION_HEADING_RE = re.compile(
+    r"^#{1,6}\s*intuitiveness\s*/\s*non[-\s]?impairment\s+disposition\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+NONIMPAIRMENT_REQUIRED_FIELDS = frozenset(
+    {
+        "applicability",
+        "provenance",
+        "canonical_authority",
+        "primary_route",
+        "before_behavior",
+        "after_behavior",
+        "self_descriptive_naming",
+        "obsolete_guidance_disposition",
+        "history_preservation",
+        "baseline",
+        "expected_result",
+        "rollback",
+        "hard_invariants",
+        "fail_closed_conditions",
+        "essential_context_preservation",
+    }
+)
+NONIMPAIRMENT_PLACEHOLDERS = frozenset({"", "n/a", "none", "tbd", "todo", "unknown"})
+NONIMPAIRMENT_GOV_ID = "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001"
+
 # Project-linkage metadata gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001).
 # WI-3314: metadata-presence enabling slice. Implementation bridge proposals
 # (NEW/REVISED status, not bridge_kind-exempt) must carry three machine-readable
@@ -1088,6 +1116,51 @@ def _has_concrete_cross_harness_disposition_section(content: str) -> bool:
         if re.search(r"[A-Za-z0-9]", residue):
             return True
     return False
+
+
+def _nonimpairment_value_is_concrete(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() not in NONIMPAIRMENT_PLACEHOLDERS
+    if isinstance(value, list):
+        return bool(value) and all(_nonimpairment_value_is_concrete(item) for item in value)
+    if isinstance(value, dict):
+        return bool(value) and all(_nonimpairment_value_is_concrete(item) for item in value.values())
+    return value is not None
+
+
+def _nonimpairment_disposition_gap(content: str) -> str | None:
+    """Validate the structured Intuitiveness/Non-Impairment Disposition."""
+    lines = content.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if NONIMPAIRMENT_DISPOSITION_HEADING_RE.match(line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        return "section absent"
+    section = "\n".join(_collect_section_lines(lines, start)).strip()
+    fenced_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", section, flags=re.IGNORECASE)
+    if len(fenced_blocks) != 1:
+        return "section must contain exactly one fenced JSON object"
+    try:
+        disposition = json.loads(fenced_blocks[0])
+    except json.JSONDecodeError as exc:
+        return f"disposition JSON is malformed: {exc.msg}"
+    if not isinstance(disposition, dict):
+        return "disposition JSON root must be an object"
+    if disposition.get("schema_version") != 1:
+        return "schema_version must be 1"
+    if disposition.get("applicability") not in {"applicable", "not_applicable"}:
+        return "applicability must be applicable or not_applicable"
+    missing = sorted(NONIMPAIRMENT_REQUIRED_FIELDS - disposition.keys())
+    if missing:
+        return "missing fields: " + ", ".join(missing)
+    nonconcrete = sorted(
+        field for field in NONIMPAIRMENT_REQUIRED_FIELDS if not _nonimpairment_value_is_concrete(disposition.get(field))
+    )
+    if nonconcrete:
+        return "placeholder or empty fields: " + ", ".join(nonconcrete)
+    return None
 
 
 def _prior_deliberations_has_unedited_placeholder(content: str) -> bool:
@@ -1954,6 +2027,20 @@ def _deny_reason_for_content(
                     f"Gap: {req_suff_gap}. "
                     "(Hard-block per .claude/rules/file-bridge-protocol.md "
                     "'Mandatory Implementation-Start Authorization Metadata'; WI-3439.)"
+                )
+            nonimpairment_gap = _nonimpairment_disposition_gap(content) if NONIMPAIRMENT_GOV_ID in content else None
+            if nonimpairment_gap is not None:
+                _record_gate_denial(
+                    "modernization-nonimpairment-disposition-missing",
+                    file_path,
+                    nonimpairment_gap,
+                    root=cwd_path,
+                )
+                return (
+                    "[Governance] Cross-cutting implementation proposals must include one "
+                    "structured ## Intuitiveness/Non-Impairment Disposition JSON object. "
+                    f"Gap: {nonimpairment_gap}. "
+                    "(Hard-block per GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001.)"
                 )
         if (
             first_line in PROJECT_METADATA_STATUSES

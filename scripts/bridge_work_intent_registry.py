@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
+import tomllib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -32,6 +34,15 @@ GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS: Final[int] = GO_IMPLEMENTATION_
 
 CLAIM_KIND_DRAFT: Final[str] = "draft"
 CLAIM_KIND_GO_IMPLEMENTATION: Final[str] = "go_implementation"
+# Explicit non-implementation claim for Prime NO-ACTION corrections after
+# Loyal Opposition GO/NO-GO verdicts.
+CLAIM_KIND_NO_ACTION_CORRECTION: Final[str] = "no_action_correction"
+CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP: Final[str] = "project_authorization_bootstrap"
+BOOTSTRAP_REQUIRED_CARRIER_TARGET: Final[str] = "groundtruth.db"
+BRIDGE_WORK_ITEM_RE: Final[re.Pattern[str]] = re.compile(
+    r"^(?:Work Item|Work Item ID|Backlog Item|Backlog Item ID):\s*`?([^`\s]+)`?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 class WorkIntentRegistryError(RuntimeError):
@@ -98,6 +109,21 @@ def _root(project_root: Path | None = None) -> Path:
     return (project_root or PROJECT_ROOT).resolve()
 
 
+def _database_path(project_root: Path | None = None) -> Path:
+    root = _root(project_root)
+    config_path = root / "groundtruth.toml"
+    if config_path.is_file():
+        try:
+            data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+            raise WorkIntentRegistryError(f"Could not read GroundTruth configuration {config_path}: {exc}") from exc
+        configured = data.get("groundtruth", {}).get("db_path")
+        if isinstance(configured, str) and configured.strip():
+            path = Path(configured)
+            return path if path.is_absolute() else root / path
+    return root / "groundtruth.db"
+
+
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     import sys
 
@@ -133,6 +159,12 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         "extension_capped": "INTEGER DEFAULT 0",
         "acting_role": "TEXT",
         "project_id": "TEXT",
+        "bootstrap_owner_decision_id": "TEXT",
+        "bootstrap_project_id": "TEXT",
+        "bootstrap_work_item_id": "TEXT",
+        "bootstrap_authorization_id": "TEXT",
+        "bootstrap_carrier_targets": "TEXT",
+        "bootstrap_consumed_at": "TEXT",
     }
     for name, column_type in additive_columns.items():
         if name not in columns:
@@ -146,8 +178,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
 
 def _get_conn(project_root: Path | None = None) -> sqlite3.Connection:
-    root = _root(project_root)
-    db_path = root / "groundtruth.db"
+    db_path = _database_path(project_root)
     try:
         conn = sqlite3.connect(str(db_path), timeout=10)
         conn.row_factory = sqlite3.Row
@@ -243,6 +274,24 @@ def _latest_status(thread_slug: str, *, project_root: Path | None = None) -> str
     return entries[0][1] if entries else None
 
 
+def _approved_proposal_path_for_go(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+    entries = _thread_version_entries(thread_slug, project_root=project_root)
+    go_index = next((index for index, entry in enumerate(entries) if entry[1] == "GO"), None)
+    if go_index is None:
+        return None
+    return next((entry[2] for entry in entries[go_index + 1 :] if entry[1] in {"NEW", "REVISED"}), None)
+
+
+def _approved_proposal_text_for_go(thread_slug: str, *, project_root: Path | None = None) -> str:
+    proposal_path = _approved_proposal_path_for_go(thread_slug, project_root=project_root)
+    if proposal_path is None:
+        raise WorkIntentRegistryError(f"Bridge {thread_slug!r} has no approved proposal before GO")
+    try:
+        return (_root(project_root) / proposal_path).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as exc:
+        raise WorkIntentRegistryError(f"Could not read approved proposal {proposal_path}: {exc}") from exc
+
+
 def project_id_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
     """Return the bridge proposal ``Project:`` metadata for ``thread_slug``.
 
@@ -263,6 +312,172 @@ def project_id_for_thread(thread_slug: str, *, project_root: Path | None = None)
             project_id = match.group(1).strip()
             return project_id or None
     return None
+
+
+def _work_item_for_thread(thread_slug: str, *, project_root: Path | None = None) -> str | None:
+    try:
+        text = _approved_proposal_text_for_go(thread_slug, project_root=project_root)
+    except WorkIntentRegistryError:
+        return None
+    match = BRIDGE_WORK_ITEM_RE.search(text)
+    return match.group(1).strip() if match else None
+
+
+def _bootstrap_carrier_list(raw_targets: Any) -> list[str]:
+    if isinstance(raw_targets, str):
+        targets = [raw_targets]
+    elif isinstance(raw_targets, list):
+        targets = [str(item) for item in raw_targets if str(item).strip()]
+    else:
+        targets = []
+    normalized: list[str] = []
+    for target in targets:
+        clean = target.strip().replace("\\", "/").lstrip("./")
+        if clean and clean not in normalized:
+            normalized.append(clean)
+    return normalized
+
+
+def _bootstrap_claim_payload(record: dict[str, Any]) -> dict[str, Any]:
+    raw_targets = record.get("bootstrap_carrier_targets")
+    parsed_targets: Any = []
+    if isinstance(raw_targets, str) and raw_targets.strip():
+        try:
+            parsed_targets = json.loads(raw_targets)
+        except json.JSONDecodeError:
+            parsed_targets = []
+    return {
+        "claim_kind": record.get("claim_kind"),
+        "owner_decision_id": record.get("bootstrap_owner_decision_id"),
+        "project_id": record.get("bootstrap_project_id"),
+        "work_item_id": record.get("bootstrap_work_item_id"),
+        "bridge_id": record.get("thread_slug"),
+        "authorization_id": record.get("bootstrap_authorization_id"),
+        "carrier_targets": _bootstrap_carrier_list(parsed_targets),
+        "consumed_at": record.get("bootstrap_consumed_at"),
+    }
+
+
+def bootstrap_authority_from_claim(record: dict[str, Any]) -> dict[str, Any] | None:
+    """Return stable bootstrap authority metadata for a persisted claim."""
+    if record.get("claim_kind") != CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
+        return None
+    payload = _bootstrap_claim_payload(record)
+    return {
+        "schema_version": 1,
+        "claim_kind": CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        "owner_decision_id": payload["owner_decision_id"],
+        "project_id": payload["project_id"],
+        "work_item_id": payload["work_item_id"],
+        "bridge_id": payload["bridge_id"],
+        "authorization_id": payload["authorization_id"],
+        "carrier_targets": payload["carrier_targets"],
+        "single_use": {
+            "state": "available" if not payload["consumed_at"] else "consumed",
+            "consumed": bool(payload["consumed_at"]),
+            "consumed_at": payload["consumed_at"],
+        },
+    }
+
+
+def _validate_bootstrap_authority_request(
+    slug: str,
+    *,
+    project_root: Path | None,
+    acting_role: str | None,
+    project_id: str | None,
+    bootstrap_authority: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if _latest_status(slug, project_root=project_root) != "GO":
+        raise WorkIntentRegistryError(f"Project-authorization bootstrap claim requires latest GO for {slug!r}")
+    if acting_role != "prime-builder":
+        raise WorkIntentRegistryError(
+            f"Project-authorization bootstrap claim requires prime-builder worker provenance; "
+            f"session resolves to {acting_role or '<missing>'}"
+        )
+    if not isinstance(bootstrap_authority, dict):
+        raise WorkIntentRegistryError("Project-authorization bootstrap claim requires explicit authority metadata")
+
+    owner_decision_id = str(bootstrap_authority.get("owner_decision_id") or "").strip()
+    requested_project_id = str(bootstrap_authority.get("project_id") or "").strip()
+    work_item_id = str(bootstrap_authority.get("work_item_id") or "").strip()
+    authorization_id = str(bootstrap_authority.get("authorization_id") or "").strip()
+    carrier_targets = _bootstrap_carrier_list(bootstrap_authority.get("carrier_targets"))
+    missing = [
+        name
+        for name, value in (
+            ("owner_decision_id", owner_decision_id),
+            ("project_id", requested_project_id),
+            ("work_item_id", work_item_id),
+            ("authorization_id", authorization_id),
+        )
+        if not value
+    ]
+    if missing:
+        raise WorkIntentRegistryError(
+            "Project-authorization bootstrap claim is missing required field(s): " + ", ".join(missing)
+        )
+    if not owner_decision_id.startswith("DELIB-"):
+        raise WorkIntentRegistryError("Project-authorization bootstrap owner decision must cite a DELIB-* record")
+    if not authorization_id.startswith("PAUTH-"):
+        raise WorkIntentRegistryError("Project-authorization bootstrap authorization id must cite a PAUTH-* id")
+    if BOOTSTRAP_REQUIRED_CARRIER_TARGET not in carrier_targets:
+        raise WorkIntentRegistryError(
+            f"Project-authorization bootstrap carrier targets must include {BOOTSTRAP_REQUIRED_CARRIER_TARGET!r}"
+        )
+    if project_id and requested_project_id != project_id:
+        raise WorkIntentRegistryError(
+            f"Project-authorization bootstrap project drift: proposal has {project_id!r}, claim requested "
+            f"{requested_project_id!r}"
+        )
+    proposal_work_item = _work_item_for_thread(slug, project_root=project_root)
+    if proposal_work_item and work_item_id != proposal_work_item:
+        raise WorkIntentRegistryError(
+            f"Project-authorization bootstrap work-item drift: proposal has {proposal_work_item!r}, claim requested "
+            f"{work_item_id!r}"
+        )
+
+    proposal = _approved_proposal_text_for_go(slug, project_root=project_root)
+    marker_text = proposal.lower().replace("-", "_")
+    if "project_authorization_bootstrap" not in marker_text and "project authorization bootstrap" not in marker_text:
+        raise WorkIntentRegistryError("Approved proposal does not declare a project-authorization bootstrap marker")
+    return {
+        "owner_decision_id": owner_decision_id,
+        "project_id": requested_project_id,
+        "work_item_id": work_item_id,
+        "authorization_id": authorization_id,
+        "carrier_targets": carrier_targets,
+    }
+
+
+def _validate_no_action_correction_request(
+    slug: str,
+    *,
+    project_root: Path | None,
+    acting_role: str | None,
+) -> None:
+    latest_status = _latest_status(slug, project_root=project_root)
+    if latest_status not in {"GO", "NO-GO"}:
+        raise WorkIntentRegistryError(
+            f"NO-ACTION correction claim requires latest GO or NO-GO for {slug!r}; "
+            f"latest is {latest_status or '<missing>'}"
+        )
+    if acting_role != "prime-builder":
+        raise WorkIntentRegistryError(
+            f"NO-ACTION correction claim requires prime-builder worker provenance; "
+            f"session resolves to {acting_role or '<missing>'}"
+        )
+
+
+def _bootstrap_metadata_matches(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
+    if existing.get("claim_kind") != CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
+        return True
+    existing_payload = _bootstrap_claim_payload(existing)
+    incoming_payload = _bootstrap_claim_payload(incoming)
+    return all(
+        existing_payload.get(key) == incoming_payload.get(key)
+        for key in ("owner_decision_id", "project_id", "work_item_id", "authorization_id", "carrier_targets")
+    )
 
 
 def current_holder(thread_slug: str, *, project_root: Path | None = None) -> dict[str, Any] | None:
@@ -319,7 +534,9 @@ def current_claimed_bridge_id(session_id: str, *, project_root: Path | None = No
         return None
     active.sort(
         key=lambda rec: (
-            1 if rec.get("claim_kind") == CLAIM_KIND_GO_IMPLEMENTATION else 0,
+            1
+            if rec.get("claim_kind") in {CLAIM_KIND_GO_IMPLEMENTATION, CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP}
+            else 0,
             str(rec.get("acquired_at") or ""),
         ),
         reverse=True,
@@ -420,12 +637,72 @@ def _claim_values(
     ttl_seconds: int,
     project_root: Path | None,
     now: datetime,
+    claim_kind: str | None,
+    bootstrap_authority: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    latest_status = _latest_status(slug, project_root=project_root)
     acquired_at = now
     acting_role = _resolve_acting_role(session_id, project_root=project_root)
     project_id = project_id_for_thread(slug, project_root=project_root)
-    if latest_status == "GO":
+    if claim_kind is not None:
+        if claim_kind == CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
+            bootstrap = _validate_bootstrap_authority_request(
+                slug,
+                project_root=project_root,
+                acting_role=acting_role,
+                project_id=project_id,
+                bootstrap_authority=bootstrap_authority,
+            )
+            ttl_expires_at = acquired_at + timedelta(seconds=ttl_seconds)
+            return {
+                "thread_slug": slug,
+                "session_id": session_id,
+                "acquired_at": _iso(acquired_at),
+                "ttl_expires_at": _iso(ttl_expires_at),
+                "claim_kind": CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+                "acting_role": acting_role,
+                "project_id": project_id,
+                "implementation_deadline": None,
+                "implementation_grace_expires_at": None,
+                "extensions_used": 0,
+                "extension_cap_seconds": None,
+                "extension_capped": 0,
+                "bootstrap_owner_decision_id": bootstrap["owner_decision_id"],
+                "bootstrap_project_id": bootstrap["project_id"],
+                "bootstrap_work_item_id": bootstrap["work_item_id"],
+                "bootstrap_authorization_id": bootstrap["authorization_id"],
+                "bootstrap_carrier_targets": json.dumps(bootstrap["carrier_targets"], sort_keys=True),
+                "bootstrap_consumed_at": None,
+            }
+        if claim_kind == CLAIM_KIND_NO_ACTION_CORRECTION:
+            _validate_no_action_correction_request(
+                slug,
+                project_root=project_root,
+                acting_role=acting_role,
+            )
+            ttl_expires_at = acquired_at + timedelta(seconds=ttl_seconds)
+            return {
+                "thread_slug": slug,
+                "session_id": session_id,
+                "acquired_at": _iso(acquired_at),
+                "ttl_expires_at": _iso(ttl_expires_at),
+                "claim_kind": CLAIM_KIND_NO_ACTION_CORRECTION,
+                "acting_role": acting_role,
+                "project_id": project_id,
+                "implementation_deadline": None,
+                "implementation_grace_expires_at": None,
+                "extensions_used": 0,
+                "extension_cap_seconds": None,
+                "extension_capped": 0,
+                "bootstrap_owner_decision_id": None,
+                "bootstrap_project_id": None,
+                "bootstrap_work_item_id": None,
+                "bootstrap_authorization_id": None,
+                "bootstrap_carrier_targets": None,
+                "bootstrap_consumed_at": None,
+            }
+        else:
+            raise WorkIntentRegistryError(f"Unsupported explicit claim kind: {claim_kind!r}")
+    if _latest_status(slug, project_root=project_root) == "GO":
         deadline = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_DEADLINE_SECONDS)
         grace_expires = deadline + timedelta(seconds=GO_IMPLEMENTATION_GRACE_SECONDS)
         return {
@@ -441,6 +718,12 @@ def _claim_values(
             "extensions_used": 0,
             "extension_cap_seconds": GO_IMPLEMENTATION_MAX_HOLD_SECONDS,
             "extension_capped": 0,
+            "bootstrap_owner_decision_id": None,
+            "bootstrap_project_id": None,
+            "bootstrap_work_item_id": None,
+            "bootstrap_authorization_id": None,
+            "bootstrap_carrier_targets": None,
+            "bootstrap_consumed_at": None,
         }
     ttl_expires_at = acquired_at + timedelta(seconds=ttl_seconds)
     return {
@@ -456,6 +739,12 @@ def _claim_values(
         "extensions_used": 0,
         "extension_cap_seconds": None,
         "extension_capped": 0,
+        "bootstrap_owner_decision_id": None,
+        "bootstrap_project_id": None,
+        "bootstrap_work_item_id": None,
+        "bootstrap_authorization_id": None,
+        "bootstrap_carrier_targets": None,
+        "bootstrap_consumed_at": None,
     }
 
 
@@ -482,12 +771,52 @@ def _can_preempt_lingering_draft(existing: dict[str, Any], incoming: dict[str, A
     )
 
 
+def _read_claim_without_schema(thread_slug: str, *, project_root: Path | None) -> dict[str, Any] | None:
+    """Read a claim without creating a database, table, column, or index."""
+    db_path = _database_path(project_root)
+    if not db_path.is_file():
+        return None
+    try:
+        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True, timeout=10)
+        conn.row_factory = sqlite3.Row
+        try:
+            row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (thread_slug,)).fetchone()
+        except sqlite3.OperationalError as exc:
+            if "no such table" in str(exc).lower():
+                return None
+            raise
+        return _row_to_record(row) if row is not None else None
+    except sqlite3.Error as exc:
+        raise WorkIntentRegistryError(f"Database error during pre-mutation claim read: {exc}") from exc
+    finally:
+        if "conn" in locals():
+            conn.close()
+
+
+def _claim_operation(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any],
+    *,
+    session_id: str,
+    now: datetime,
+) -> str | None:
+    if existing is None or _is_expired(existing, now=now) or _is_lapsed_go_implementation(existing, now=now):
+        return "work_intent_acquire"
+    if existing["session_id"] != session_id and not _can_preempt_lingering_draft(existing, incoming):
+        return None
+    if existing.get("claim_kind") != incoming.get("claim_kind"):
+        return "work_intent_reclassify"
+    return "work_intent_renew"
+
+
 def acquire(
     thread_slug: str,
     session_id: str,
     ttl_seconds: int = DEFAULT_DRAFT_TTL_SECONDS,
     *,
     project_root: Path | None = None,
+    claim_kind: str | None = None,
+    bootstrap_authority: dict[str, Any] | None = None,
 ) -> bool:
     """Acquire a per-thread work-intent record.
 
@@ -499,41 +828,82 @@ def acquire(
     if not session_id.strip():
         raise WorkIntentRegistryError("session_id must be non-empty")
     slug = _validate_slug(thread_slug)
+    now = now_utc()
+    values = _claim_values(
+        slug,
+        session_id,
+        ttl_seconds=ttl_seconds,
+        project_root=project_root,
+        now=now,
+        claim_kind=claim_kind,
+        bootstrap_authority=bootstrap_authority,
+    )
+    existing = _read_claim_without_schema(slug, project_root=project_root)
+    operation = _claim_operation(existing, values, session_id=session_id, now=now)
+    if operation is None:
+        return False
+    if existing is not None and not _bootstrap_metadata_matches(existing, values):
+        raise WorkIntentRegistryError("Existing project-authorization bootstrap claim metadata differs; release first")
+    if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
+        eligible, detail = _resolve_go_implementation_eligibility(session_id, project_root=project_root)
+        if not eligible:
+            raise WorkIntentRegistryError(
+                f"go_implementation claim requires a prime-builder harness; "
+                f"session {session_id!r} resolves to {detail} (not prime-eligible)"
+            )
+    if operation == "work_intent_renew" and values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
+        return True
     conn = _get_conn(project_root)
     try:
         with conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute("SELECT * FROM work_intent_claims WHERE thread_slug = ?", (slug,)).fetchone()
-            now = now_utc()
-            values = _claim_values(slug, session_id, ttl_seconds=ttl_seconds, project_root=project_root, now=now)
-            if values["claim_kind"] == CLAIM_KIND_GO_IMPLEMENTATION:
-                # WI-5189: only the validated worker-session document may
-                # authorize a GO-implementation claim. Draft claims remain
-                # unaffected because this branch only fires for GO-latest
-                # threads.
-                eligible, detail = _resolve_go_implementation_eligibility(session_id, project_root=project_root)
-                if not eligible:
-                    raise WorkIntentRegistryError(
-                        f"go_implementation claim requires a prime-builder harness; "
-                        f"session {session_id!r} resolves to {detail} (not prime-eligible)"
-                    )
-            if row:
-                existing = _row_to_record(row)
-                if not _is_expired(existing, now=now) and existing["session_id"] != session_id:
-                    if not _can_preempt_lingering_draft(existing, values):
-                        return False
+            transaction_existing = _row_to_record(row) if row is not None else None
+            transaction_operation = _claim_operation(transaction_existing, values, session_id=session_id, now=now)
+            if transaction_operation is None:
+                return False
+            if transaction_operation != operation:
+                raise WorkIntentRegistryError("Work-intent claim changed during authorization; retry the operation")
+            if operation == "work_intent_renew":
+                conn.execute(
+                    "UPDATE work_intent_claims SET ttl_expires_at = ? WHERE thread_slug = ? AND session_id = ?",
+                    (values["ttl_expires_at"], slug, session_id),
+                )
+                return True
             conn.execute(
                 """
-                INSERT OR REPLACE INTO work_intent_claims
+                INSERT INTO work_intent_claims
                 (thread_slug, session_id, acquired_at, ttl_expires_at, claim_kind,
                  acting_role, project_id,
                  implementation_deadline, implementation_grace_expires_at,
-                 extensions_used, extension_cap_seconds, extension_capped)
+                 extensions_used, extension_cap_seconds, extension_capped,
+                 bootstrap_owner_decision_id, bootstrap_project_id, bootstrap_work_item_id,
+                 bootstrap_authorization_id, bootstrap_carrier_targets, bootstrap_consumed_at)
                 VALUES
                 (:thread_slug, :session_id, :acquired_at, :ttl_expires_at, :claim_kind,
                  :acting_role, :project_id,
                  :implementation_deadline, :implementation_grace_expires_at,
-                 :extensions_used, :extension_cap_seconds, :extension_capped)
+                 :extensions_used, :extension_cap_seconds, :extension_capped,
+                 :bootstrap_owner_decision_id, :bootstrap_project_id, :bootstrap_work_item_id,
+                 :bootstrap_authorization_id, :bootstrap_carrier_targets, :bootstrap_consumed_at)
+                ON CONFLICT(thread_slug) DO UPDATE SET
+                    session_id = excluded.session_id,
+                    acquired_at = excluded.acquired_at,
+                    ttl_expires_at = excluded.ttl_expires_at,
+                    claim_kind = excluded.claim_kind,
+                    acting_role = excluded.acting_role,
+                    project_id = excluded.project_id,
+                    implementation_deadline = excluded.implementation_deadline,
+                    implementation_grace_expires_at = excluded.implementation_grace_expires_at,
+                    extensions_used = excluded.extensions_used,
+                    extension_cap_seconds = excluded.extension_cap_seconds,
+                    extension_capped = excluded.extension_capped,
+                    bootstrap_owner_decision_id = excluded.bootstrap_owner_decision_id,
+                    bootstrap_project_id = excluded.bootstrap_project_id,
+                    bootstrap_work_item_id = excluded.bootstrap_work_item_id,
+                    bootstrap_authorization_id = excluded.bootstrap_authorization_id,
+                    bootstrap_carrier_targets = excluded.bootstrap_carrier_targets,
+                    bootstrap_consumed_at = excluded.bootstrap_consumed_at
                 """,
                 values,
             )
@@ -564,7 +934,9 @@ def extend(
         if record["session_id"] != session_id:
             raise WorkIntentRegistryError(f"Thread {slug!r} is claimed by {record['session_id']!r}")
         if _latest_status(slug, project_root=project_root) != "GO":
-            raise WorkIntentRegistryError(f"Thread {slug!r} is not latest GO; implementation timer no longer applies")
+            raise WorkIntentRegistryError(
+                f"Thread {slug!r} is not implementation-actionable; implementation timer no longer applies"
+            )
         if record.get("claim_kind") != CLAIM_KIND_GO_IMPLEMENTATION:
             raise WorkIntentRegistryError(f"Thread {slug!r} is not a GO-implementation claim")
 
@@ -578,11 +950,6 @@ def extend(
         cap_at = acquired_at + timedelta(seconds=GO_IMPLEMENTATION_MAX_HOLD_SECONDS)
         new_deadline = current_deadline + timedelta(seconds=GO_IMPLEMENTATION_EXTENSION_SECONDS)
         if new_deadline > cap_at:
-            conn.execute(
-                "UPDATE work_intent_claims SET extension_capped = 1 WHERE thread_slug = ?",
-                (slug,),
-            )
-            conn.commit()
             raise WorkIntentRegistryError(
                 f"Extension cap reached for {slug!r}; maximum total hold is "
                 f"{GO_IMPLEMENTATION_MAX_HOLD_SECONDS // 60} minutes"
@@ -786,6 +1153,8 @@ def revalidate_thread_version(thread_slug: str, project_root: Path) -> dict[str,
 __all__ = [
     "CLAIM_KIND_DRAFT",
     "CLAIM_KIND_GO_IMPLEMENTATION",
+    "CLAIM_KIND_NO_ACTION_CORRECTION",
+    "CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP",
     "GO_IMPLEMENTATION_AUTO_EXTEND_THRESHOLD_SECONDS",
     "GO_IMPLEMENTATION_DEADLINE_SECONDS",
     "GO_IMPLEMENTATION_EXTENSION_SECONDS",
@@ -793,6 +1162,7 @@ __all__ = [
     "GO_IMPLEMENTATION_MAX_HOLD_SECONDS",
     "WorkIntentRegistryError",
     "acquire",
+    "bootstrap_authority_from_claim",
     "claim_status",
     "current_holder",
     "extend",

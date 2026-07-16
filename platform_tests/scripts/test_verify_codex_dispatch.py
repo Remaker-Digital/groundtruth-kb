@@ -37,8 +37,8 @@ def _codex_headless_argv() -> list[str]:
         'approval_policy="never"',
         "-c",
         'model_reasoning_effort="xhigh"',
-        "--sandbox",
-        "workspace-write",
+        "-c",
+        'default_permissions=":workspace"',
         "{{PROMPT}}",
         "--cd",
         "{{PROJECT_ROOT}}",
@@ -76,14 +76,27 @@ def _write_live_verification(root: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _schema_v2_payload(**overrides: object) -> dict[str, object]:
+def _schema_v3_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "result": "pass",
         "visible_window_detected": False,
         "verified_at": "2999-01-01T00:00:00Z",
+        "dispatcher_wrapper_path": True,
+        "wrapper_ok": True,
+        "containment_mechanism": "windows_private_desktop",
+        "requested_permissions_profile": ":workspace",
+        "effective_profile_ok": True,
+        "sentinel_lifecycle_ok": True,
         "runs": [
             {
+                "requested_permissions_profile": ":workspace",
+                "observed_effective_profile": "workspace-write",
+                "effective_profile_ok": True,
+                "sentinel_lifecycle_ok": True,
+                "sentinel_residual_before_cleanup": False,
+                "sentinel_residual_after_cleanup": False,
+                "wrapper_returncode": 0,
                 "command_steps": [
                     {
                         "marker": f"marker-{run}-{step}",
@@ -91,7 +104,7 @@ def _schema_v2_payload(**overrides: object) -> dict[str, object]:
                         "stdout_contains_marker": True,
                     }
                     for step in range(3)
-                ]
+                ],
             }
             for run in range(2)
         ],
@@ -115,7 +128,7 @@ def test_evaluate_readiness_reports_dispatchable_when_static_requirements_pass(t
     result = _evaluate(module, tmp_path, lambda _name: "codex.exe")
 
     assert result["static_ok"] is True
-    assert result["dispatchable"] is True
+    assert result["dispatchable"] is False
     assert result["static_dispatchable"] is True
     assert result["live_headless_ready"] is False
     assert result["live_headless_reason"] == "missing_codex_no_window_verification"
@@ -124,7 +137,8 @@ def test_evaluate_readiness_reports_dispatchable_when_static_requirements_pass(t
     assert result["approval_policy_ok"] is True
     assert result["reasoning_effort_ok"] is True
     assert result["sandbox_ok"] is True
-    assert result["sandbox_mode"] == "workspace-write"
+    assert result["permissions_profile"] == ":workspace"
+    assert result["legacy_sandbox_present"] is False
     assert result["project_root_selector_ok"] is True
     assert result["codex_helper_add_dir_ok"] is True
     assert result["codex_helper_add_dir"] == ".codex"
@@ -149,22 +163,23 @@ def test_evaluate_readiness_reports_live_headless_failure_separately(tmp_path: P
 
     assert result["static_ok"] is True
     assert result["static_dispatchable"] is True
-    assert result["dispatchable"] is True
+    assert result["dispatchable"] is False
     assert result["live_headless_ready"] is False
     assert result["live_headless_reason"] == "codex_no_window_probe_detected_visible_window"
     assert result["live_headless_failure_class"] == "codex_windows_sandbox_setup_failed_0xc0000142"
     assert result["live_headless_verification"]["visible_window_detected"] is True
 
 
-def test_evaluate_readiness_accepts_schema_v2_multi_command_proof(tmp_path: Path) -> None:
+def test_evaluate_readiness_accepts_schema_v3_workspace_sentinel_proof(tmp_path: Path) -> None:
     module = _load_module()
     _write_registry(tmp_path, _codex_record())
-    _write_live_verification(tmp_path, _schema_v2_payload())
+    _write_live_verification(tmp_path, _schema_v3_payload())
 
     result = _evaluate(module, tmp_path, lambda _name: "codex.exe")
 
     assert result["static_ok"] is True
     assert result["live_headless_ready"] is True
+    assert result["dispatchable"] is True
     assert result["live_headless_reason"] == "codex_no_window_verification_current"
 
 
@@ -199,11 +214,11 @@ def test_evaluate_readiness_fails_when_executable_required_and_missing(tmp_path:
     assert result["executable_ok"] is False
 
 
-def test_evaluate_readiness_fails_without_workspace_write_sandbox(tmp_path: Path) -> None:
+def test_evaluate_readiness_fails_without_workspace_permissions_profile(tmp_path: Path) -> None:
     module = _load_module()
     argv = _codex_headless_argv()
-    sandbox_index = argv.index("--sandbox")
-    del argv[sandbox_index : sandbox_index + 2]
+    config_index = argv.index('default_permissions=":workspace"')
+    del argv[config_index - 1 : config_index + 1]
     _write_registry(tmp_path, _codex_record(invocation_surfaces={"headless": {"argv": argv}}))
 
     result = _evaluate(module, tmp_path, lambda _name: "codex.exe")
@@ -214,18 +229,43 @@ def test_evaluate_readiness_fails_without_workspace_write_sandbox(tmp_path: Path
     assert result["sandbox_mode"] is None
 
 
-def test_evaluate_readiness_fails_on_full_access_sandbox(tmp_path: Path) -> None:
+@pytest.mark.parametrize("profile", [":full-access", ":read-only", ":unknown"])
+def test_evaluate_readiness_fails_on_non_workspace_permissions_profile(tmp_path: Path, profile: str) -> None:
     module = _load_module()
     argv = _codex_headless_argv()
-    argv[argv.index("--sandbox") + 1] = "danger-full-access"
+    argv[argv.index('default_permissions=":workspace"')] = f'default_permissions="{profile}"'
     _write_registry(tmp_path, _codex_record(invocation_surfaces={"headless": {"argv": argv}}))
 
     result = _evaluate(module, tmp_path, lambda _name: "codex.exe")
 
     assert result["static_ok"] is False
     assert result["dispatchable"] is False
-    assert result["sandbox_forbidden"] is True
+    assert result["permissions_profile_forbidden"] is True
     assert result["sandbox_ok"] is False
+
+
+def test_evaluate_readiness_rejects_legacy_sandbox_selector(tmp_path: Path) -> None:
+    module = _load_module()
+    argv = _codex_headless_argv() + ["--sandbox", "workspace-write"]
+    _write_registry(tmp_path, _codex_record(invocation_surfaces={"headless": {"argv": argv}}))
+
+    result = _evaluate(module, tmp_path, lambda _name: "codex.exe")
+
+    assert result["static_ok"] is False
+    assert result["legacy_sandbox_present"] is True
+    assert result["permissions_profile_ok"] is False
+
+
+def test_evaluate_readiness_rejects_incomplete_sentinel_proof(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry(tmp_path, _codex_record())
+    _write_live_verification(tmp_path, _schema_v3_payload(sentinel_lifecycle_ok=False))
+
+    result = _evaluate(module, tmp_path, lambda _name: "codex.exe")
+
+    assert result["static_ok"] is True
+    assert result["dispatchable"] is False
+    assert result["live_headless_reason"] == "codex_no_window_verification_incomplete_sentinel_lifecycle"
 
 
 def test_evaluate_readiness_fails_on_broad_sandbox_bypass_flag(tmp_path: Path) -> None:

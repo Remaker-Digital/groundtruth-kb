@@ -151,9 +151,14 @@ class LiveLease:
 
 def is_drain_marker_active(state_dir: Path) -> bool:
     """Return True when ``dispatch-drain.json`` is active under ``state_dir``."""
-    data = _read_json(state_dir / DRAIN_MARKER_FILENAME)
-    if data is None:
+    marker_path = state_dir / DRAIN_MARKER_FILENAME
+    if not marker_path.exists():
         return False
+    data = _read_json(marker_path)
+    if data is None:
+        # An existing marker that cannot be interpreted must stop dispatch. The
+        # lifecycle recovery command is the only surface allowed to clear it.
+        return True
     return bool(data.get("active"))
 
 

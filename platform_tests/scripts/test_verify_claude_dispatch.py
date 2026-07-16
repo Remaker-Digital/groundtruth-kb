@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -67,3 +68,64 @@ def test_evaluate_readiness_errors_for_wrong_harness_type(tmp_path: Path) -> Non
 
     with pytest.raises(module.VerificationError, match="is not claude"):
         module.evaluate_readiness(project_root=tmp_path, executable_resolver=lambda _name: "claude.exe")
+
+
+def test_live_readiness_runs_bounded_prompt_probe(tmp_path: Path) -> None:
+    module = _load_module()
+
+    def fake_run(command, **kwargs):
+        assert command == ["claude.exe", "-p", "Reply READY", "--add-dir", str(tmp_path)]
+        assert kwargs["cwd"] == tmp_path
+        assert kwargs["stdin"] == subprocess.DEVNULL
+        assert kwargs["capture_output"] is True
+        assert kwargs["text"] is True
+        assert kwargs["timeout"] == 3
+        if sys.platform.startswith("win"):
+            assert kwargs["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        return subprocess.CompletedProcess(command, 0, stdout="READY\n", stderr="")
+
+    _write_registry(
+        tmp_path,
+        _claude_record(
+            status="active",
+            can_receive_dispatch=True,
+            invocation_surfaces={"headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}"]}},
+        ),
+    )
+
+    result = module.evaluate_readiness(
+        project_root=tmp_path,
+        executable_resolver=lambda _name: "claude.exe",
+        require_live=True,
+        live_prompt="Reply READY",
+        timeout=3,
+        live_runner=fake_run,
+    )
+
+    assert result["static_ok"] is True
+    assert result["ready"] is True
+    assert result["dispatchable"] is True
+    assert result["dispatchable_now"] is True
+    assert result["live_probe"]["stdout_bytes"] == len("READY\n")
+
+
+def test_live_readiness_fails_closed_on_timeout(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry(tmp_path, _claude_record(status="active", can_receive_dispatch=True))
+
+    def timeout_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    result = module.evaluate_readiness(
+        project_root=tmp_path,
+        executable_resolver=lambda _name: "claude.exe",
+        require_live=True,
+        timeout=1,
+        live_runner=timeout_run,
+    )
+
+    assert result["static_ok"] is True
+    assert result["ready"] is False
+    assert result["dispatchable"] is True
+    assert result["dispatchable_now"] is False
+    assert result["first_failed_check"].startswith("live claude prompt probe")

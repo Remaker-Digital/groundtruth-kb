@@ -1,8 +1,9 @@
 """Deterministic, reversible hygiene reclaim planning and actuation.
 
-Planning is metadata-only apart from its durable run ledger. Reclaim never
-purges data: selected files are atomically renamed into same-volume storage and
-can be restored through the recorded, hash-chained receipts.
+Planning is metadata-only apart from its durable run ledger. Reclaim first
+moves selected files into same-volume reversible trash. A separate, governed
+purge actuator can then permanently delete exact receipted payloads to reclaim
+physical disk space while retaining the hash-chained audit trail.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ _SCHEMA_VERSION = 1
 _GENESIS_HASH = "GENESIS"
 _HEX_FANOUT_RE = re.compile(r"^[0-9a-f]{2}$")
 _LOOSE_NAME_RE = re.compile(r"^[0-9a-f]{38}$")
+_GIT_TMP_OBJECT_RE = re.compile(r"^tmp_obj_[A-Za-z0-9]+$")
 _OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 _EXTERNAL_STORAGE_SCHEMES = ("membase:", "windows-scheduled-task:")
 _SCRATCH_COMPONENTS = frozenset({".harness-tmp", ".loyal-opposition"})
@@ -45,6 +47,63 @@ _SCRATCH_NAME_PREFIXES = (
     "_temp_draft",
     "_draft_verdict_body_",
 )
+_DETRITUS_CLASSES = frozenset(
+    {
+        "stale_workspace_detritus",
+        "stale_runtime_detritus",
+    }
+)
+_DIRECTORY_SOURCE_KINDS = frozenset({"worktree_directory"})
+_ROOT_DETRITUS_EXACT = frozenset(
+    {
+        "__pycache__",
+        ".harness-tmp",
+        ".hypothesis",
+        ".loyal-opposition",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".test-tmp",
+        ".tmp",
+        ".gtkb-tmp",
+    }
+)
+_ROOT_DETRITUS_PREFIXES = (
+    "__tmp_",
+    ".harness-tmp-",
+    ".pytest",
+    ".tmp-",
+    "GT-KB.gtkb-statepytest-",
+    "GT-KB.gtkb-statemodernization-release-candidatesemantic-evidencepytest-temp",
+)
+_STATE_DETRITUS_EXACT = frozenset(
+    {
+        "__pycache__",
+        "bridge-revisions",
+        "database-carrier-restoration",
+        "headless-temp",
+        "release-worktrees",
+        "tmp",
+        "uv-cache",
+        "verification-temp",
+    }
+)
+_STATE_DETRITUS_PREFIXES = (
+    "antigravity-wi",
+    "codex-pytest",
+    "codex-wi",
+    "lo-wi",
+    "modernization-db-reconstruction",
+    "pytest",
+    "tmp",
+)
+_STATE_DETRITUS_SUFFIXES = (
+    ".tar",
+    ".patch",
+    ".index",
+    ".out",
+    ".err",
+)
+_STATE_WORK_ITEM_DETRITUS_RE = re.compile(r"^(?:antigravity-wi|codex-wi|lo-wi|wi)\d")
 _PROTECTED_PREFIXES = (
     ".claude/hooks/",
     ".claude/rules/",
@@ -83,6 +142,8 @@ _ALLOWED_EVENTS = frozenset(
         "planned",
         "trash_started",
         "trashed",
+        "purge_started",
+        "purged",
         "restore_started",
         "restored",
         "refused",
@@ -349,7 +410,8 @@ def _collect_git_evidence(root: Path) -> dict[str, Any]:
             add_root(line.strip(), "stash")
 
     worktrees = _parse_worktrees(root, defects)
-    worktree_summary: list[dict[str, str | None]] = []
+    worktree_summary: list[dict[str, str | bool | None]] = []
+    outside_worktrees: list[str] = []
     for record in worktrees:
         raw_path = record["path"]
         head = record["head"]
@@ -362,9 +424,6 @@ def _collect_git_evidence(root: Path) -> dict[str, Any]:
         except OSError as exc:
             defects.append({"code": "git_worktree_unreadable", "detail": f"{raw_path}: {exc}"})
             continue
-        if not _is_within(worktree_path, root):
-            defects.append({"code": "git_worktree_outside_root", "detail": str(worktree_path)})
-            continue
         try:
             index_output = _git_bytes(root, ["ls-files", "--stage", "-z"], cwd=worktree_path)
         except ReclaimError as exc:
@@ -372,11 +431,19 @@ def _collect_git_evidence(root: Path) -> dict[str, Any]:
             continue
         for oid in _parse_index_oids(index_output, str(worktree_path), defects):
             add_root(oid, f"index:{worktree_path}")
+        outside_root = not _is_within(worktree_path, root)
+        if outside_root:
+            outside_worktrees.append(str(worktree_path))
         worktree_summary.append(
             {
-                "path": worktree_path.relative_to(root).as_posix() if worktree_path != root else ".",
+                "path": worktree_path.relative_to(root).as_posix()
+                if not outside_root and worktree_path != root
+                else "."
+                if worktree_path == root
+                else str(worktree_path),
                 "head": head,
                 "branch": record["branch"],
+                "outside_root": outside_root,
             }
         )
 
@@ -386,14 +453,22 @@ def _collect_git_evidence(root: Path) -> dict[str, Any]:
 
     root_info = _batch_object_info(root, set(root_sources))
     valid_roots: set[str] = set()
+    missing_index_roots: list[dict[str, str]] = []
+    missing_reflog_roots: list[dict[str, str]] = []
     for oid, sources in sorted(root_sources.items()):
         if root_info.get(oid) is None:
-            defects.append(
-                {
-                    "code": "git_root_object_missing",
-                    "detail": f"{oid}:{','.join(sorted(sources))}",
-                }
-            )
+            sorted_sources = sorted(sources)
+            if all(source.startswith("index:") for source in sorted_sources):
+                missing_index_roots.append({"oid": oid, "sources": ",".join(sorted_sources)})
+            elif sorted_sources == ["reflog"]:
+                missing_reflog_roots.append({"oid": oid, "sources": "reflog"})
+            else:
+                defects.append(
+                    {
+                        "code": "git_root_object_missing",
+                        "detail": f"{oid}:{','.join(sorted_sources)}",
+                    }
+                )
         else:
             valid_roots.add(oid)
 
@@ -425,6 +500,11 @@ def _collect_git_evidence(root: Path) -> dict[str, Any]:
         "reachable_count": len(reachable),
         "reachable_digest": _digest_strings(reachable),
         "worktrees": sorted(worktree_summary, key=lambda item: str(item["path"])),
+        "outside_worktrees": sorted(outside_worktrees),
+        "missing_index_roots": missing_index_roots,
+        "missing_index_root_count": len(missing_index_roots),
+        "missing_reflog_roots": missing_reflog_roots,
+        "missing_reflog_root_count": len(missing_reflog_roots),
         "defects": sorted(defects, key=lambda item: (item["code"], item["detail"])),
         "complete": not defects,
     }
@@ -571,6 +651,35 @@ def _registry_matches(rel_path: str, records: tuple[SoTArtifact, ...]) -> list[s
     return sorted(matches)
 
 
+def _registry_preservation_ids(
+    rel_path: str,
+    records: tuple[SoTArtifact, ...],
+    *,
+    candidate_class: str | None = None,
+) -> list[str]:
+    matches: list[str] = []
+    for record in records:
+        storage = _registry_local_path(record.storage_path)
+        if storage is None or Path(storage).is_absolute() or ".." in Path(storage).parts:
+            continue
+        if storage.endswith("/"):
+            matched = rel_path == storage.rstrip("/") or rel_path.startswith(storage)
+        elif _has_glob(storage):
+            matched = fnmatch.fnmatchcase(rel_path, storage)
+        else:
+            matched = rel_path == storage
+        if not matched:
+            continue
+        if (
+            candidate_class in _DETRITUS_CLASSES
+            and record.lifecycle == "generated"
+            and record.backup_policy in {"gitignored_runtime", "regenerable_from_source"}
+        ):
+            continue
+        matches.append(record.id)
+    return sorted(matches)
+
+
 def _state_relative(root: Path, state: Path) -> str:
     return state.relative_to(root).as_posix().rstrip("/") + "/"
 
@@ -579,8 +688,34 @@ def _is_protected(rel_path: str, state_prefix: str, candidate_class: str | None 
     if rel_path in _PROTECTED_EXACT or rel_path.startswith(_PROTECTED_PREFIXES):
         return True
     if rel_path == state_prefix.rstrip("/") or rel_path.startswith(state_prefix):
-        return True
-    return rel_path.startswith(".git/") and candidate_class != "unreachable_loose_object"
+        return candidate_class not in _DETRITUS_CLASSES
+    return rel_path.startswith(".git/") and candidate_class not in {
+        "unreachable_loose_object",
+        "malformed_git_object_garbage",
+    }
+
+
+def _is_root_detritus_name(name: str) -> bool:
+    return name in _ROOT_DETRITUS_EXACT or name.startswith(_ROOT_DETRITUS_PREFIXES)
+
+
+def _is_state_detritus_name(name: str) -> bool:
+    return (
+        name in _STATE_DETRITUS_EXACT
+        or name.startswith(_STATE_DETRITUS_PREFIXES)
+        or name.endswith(_STATE_DETRITUS_SUFFIXES)
+        or _STATE_WORK_ITEM_DETRITUS_RE.match(name) is not None
+    )
+
+
+def _direct_detritus_class(rel_path: str, _state_prefix: str) -> str | None:
+    path = Path(rel_path)
+    parts = path.parts
+    if len(parts) == 1 and _is_root_detritus_name(parts[0]):
+        return "stale_workspace_detritus"
+    if len(parts) == 2 and parts[0] == ".gtkb-state" and _is_state_detritus_name(parts[1]):
+        return "stale_runtime_detritus"
+    return None
 
 
 def _scratch_class(rel_path: str) -> str | None:
@@ -592,6 +727,15 @@ def _scratch_class(rel_path: str) -> str | None:
     return None
 
 
+def _path_is_covered_by_prefix(rel_path: str, prefixes: set[str]) -> bool:
+    rel_dir = rel_path.rstrip("/") + "/"
+    return any(rel_path == prefix.rstrip("/") or rel_dir.startswith(prefix) for prefix in prefixes)
+
+
+def _prune_scratch_walk_path(rel_path: str, state_prefix: str, covered_prefixes: set[str]) -> bool:
+    return _path_is_covered_by_prefix(rel_path, covered_prefixes) or _is_protected(rel_path, state_prefix)
+
+
 def _stat_evidence(value: os.stat_result) -> dict[str, int]:
     return {
         "device": int(value.st_dev),
@@ -600,6 +744,94 @@ def _stat_evidence(value: os.stat_result) -> dict[str, int]:
         "size": int(value.st_size),
         "mtime_ns": int(value.st_mtime_ns),
         "ctime_ns": int(value.st_ctime_ns),
+    }
+
+
+def _tree_fingerprint(path: Path) -> dict[str, Any]:
+    root_stat = path.lstat()
+    if path.is_symlink():
+        raise ReclaimError(f"tree_root_symlink:{path}")
+    if stat.S_ISREG(root_stat.st_mode):
+        return {
+            "kind": "file",
+            "digest": _stable_hash({"path": "", "stat": _stat_evidence(root_stat)}),
+            "logical_bytes": int(root_stat.st_size),
+            "file_count": 1,
+            "directory_count": 0,
+        }
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise ReclaimError(f"tree_root_unsupported:{path}")
+
+    digest = hashlib.sha256()
+    logical_bytes = 0
+    file_count = 0
+    directory_count = 1
+
+    def update(rel: str, entry_stat: os.stat_result, kind: str) -> None:
+        digest.update(
+            _canonical_bytes(
+                {
+                    "path": rel,
+                    "kind": kind,
+                    "stat": _stat_evidence(entry_stat),
+                }
+            )
+        )
+
+    update("", root_stat, "directory")
+    for current, dir_names, file_names in os.walk(path, topdown=True, followlinks=False):
+        current_path = Path(current)
+        dir_names.sort()
+        file_names.sort()
+        for dir_name in list(dir_names):
+            child = current_path / dir_name
+            rel = child.relative_to(path).as_posix()
+            try:
+                child_stat = child.lstat()
+            except OSError as exc:
+                raise ReclaimError(f"tree_stat_failed:{child}:{exc}") from exc
+            if child.is_symlink():
+                update(rel, child_stat, "symlink")
+                dir_names.remove(dir_name)
+                continue
+            if not stat.S_ISDIR(child_stat.st_mode):
+                raise ReclaimError(f"tree_directory_entry_unsupported:{child}")
+            directory_count += 1
+            update(rel, child_stat, "directory")
+        for file_name in file_names:
+            child = current_path / file_name
+            rel = child.relative_to(path).as_posix()
+            try:
+                child_stat = child.lstat()
+            except OSError as exc:
+                raise ReclaimError(f"tree_stat_failed:{child}:{exc}") from exc
+            if child.is_symlink():
+                update(rel, child_stat, "symlink")
+                continue
+            if not stat.S_ISREG(child_stat.st_mode):
+                raise ReclaimError(f"tree_file_entry_unsupported:{child}")
+            file_count += 1
+            logical_bytes += int(child_stat.st_size)
+            update(rel, child_stat, "file")
+    return {
+        "kind": "directory",
+        "digest": "sha256:" + digest.hexdigest(),
+        "logical_bytes": int(logical_bytes),
+        "file_count": int(file_count),
+        "directory_count": int(directory_count),
+    }
+
+
+def _shallow_directory_fingerprint(path: Path, file_stat: os.stat_result | None = None) -> dict[str, Any]:
+    current_stat = file_stat or path.lstat()
+    if path.is_symlink() or not stat.S_ISDIR(current_stat.st_mode):
+        raise ReclaimError(f"directory_root_unsupported:{path}")
+    return {
+        "kind": "directory",
+        "digest": _stable_hash({"kind": "directory", "stat": _stat_evidence(current_stat)}),
+        "logical_bytes": int(current_stat.st_size),
+        "file_count": 0,
+        "directory_count": 1,
     }
 
 
@@ -619,6 +851,10 @@ def _make_item(
     candidate_class: str,
     source_kind: str,
     file_stat: os.stat_result,
+    logical_bytes: int | None = None,
+    tree_digest: str | None = None,
+    file_count: int | None = None,
+    directory_count: int | None = None,
     ignored: bool = False,
     git_oid: str | None = None,
     git_object_type: str | None = None,
@@ -628,6 +864,7 @@ def _make_item(
         "candidate_class": candidate_class,
         "source_kind": source_kind,
         "stat": _stat_evidence(file_stat),
+        "tree_digest": tree_digest,
         "git_oid": git_oid,
         "git_object_type": git_object_type,
     }
@@ -636,7 +873,9 @@ def _make_item(
         "item_id": item_id,
         **identity,
         "ignored": ignored,
-        "logical_bytes": int(file_stat.st_size),
+        "logical_bytes": int(logical_bytes if logical_bytes is not None else file_stat.st_size),
+        "file_count": file_count,
+        "directory_count": directory_count,
     }
     item["item_hash"] = _stable_hash(item)
     return item
@@ -655,6 +894,91 @@ def _candidate_source(root: Path, rel_path: str) -> Path | None:
     return source
 
 
+def _collect_direct_detritus_candidates(
+    root: Path,
+    state: Path,
+    registry: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[str]]:
+    items: list[dict[str, Any]] = []
+    observations: list[dict[str, Any]] = []
+    covered_prefixes: set[str] = set()
+    state_prefix = _state_relative(root, state)
+    runtime_state = root / ".gtkb-state"
+    scan_roots = [root]
+    if runtime_state.is_dir():
+        scan_roots.append(runtime_state)
+
+    for scan_root in scan_roots:
+        try:
+            entries = sorted(scan_root.iterdir(), key=lambda entry: entry.name)
+        except OSError as exc:
+            rel_root = scan_root.relative_to(root).as_posix() if scan_root != root else "."
+            observations.append(_observation(rel_root, "detritus_scan_failed", str(exc)))
+            continue
+        for entry in entries:
+            try:
+                rel_path = entry.relative_to(root).as_posix()
+            except ValueError:
+                continue
+            candidate_class = _direct_detritus_class(rel_path, state_prefix)
+            if candidate_class is None:
+                continue
+            source = _candidate_source(root, rel_path)
+            if source is None:
+                observations.append(_observation(rel_path, "ambiguous_detritus", "path_escape_or_unreadable"))
+                continue
+            try:
+                file_stat = source.lstat()
+            except OSError as exc:
+                observations.append(_observation(rel_path, "ambiguous_detritus", f"stat_failed:{exc}"))
+                continue
+            if source.is_symlink() or not (stat.S_ISREG(file_stat.st_mode) or stat.S_ISDIR(file_stat.st_mode)):
+                observations.append(_observation(rel_path, "ambiguous_detritus", "unsupported_file_type"))
+                continue
+            registry_ids = _registry_preservation_ids(
+                rel_path,
+                registry["records"],
+                candidate_class=candidate_class,
+            )
+            if registry_ids:
+                observations.append(
+                    _observation(
+                        rel_path,
+                        "registered_veto",
+                        "registry_match_preserves_path",
+                        registry_ids=registry_ids,
+                    )
+                )
+                continue
+            if _is_protected(rel_path, state_prefix, candidate_class):
+                observations.append(_observation(rel_path, "protected_veto", "protected path"))
+                continue
+            try:
+                if stat.S_ISDIR(file_stat.st_mode):
+                    fingerprint = _shallow_directory_fingerprint(source, file_stat)
+                else:
+                    fingerprint = _tree_fingerprint(source)
+            except ReclaimError as exc:
+                observations.append(_observation(rel_path, "ambiguous_detritus", str(exc)))
+                continue
+            source_kind = "worktree_directory" if fingerprint["kind"] == "directory" else "worktree_file"
+            items.append(
+                _make_item(
+                    rel_path=rel_path,
+                    candidate_class=candidate_class,
+                    source_kind=source_kind,
+                    file_stat=file_stat,
+                    logical_bytes=int(fingerprint["logical_bytes"]),
+                    tree_digest=str(fingerprint["digest"]),
+                    file_count=int(fingerprint["file_count"]),
+                    directory_count=int(fingerprint["directory_count"]),
+                )
+            )
+            if source_kind in _DIRECTORY_SOURCE_KINDS:
+                covered_prefixes.add(rel_path.rstrip("/") + "/")
+    return items, observations, covered_prefixes
+
+
 def _collect_scratch_candidates(
     root: Path,
     state: Path,
@@ -663,56 +987,78 @@ def _collect_scratch_candidates(
     *,
     now: datetime,
     min_age_hours: int,
+    covered_prefixes: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     items: list[dict[str, Any]] = []
     observations: list[dict[str, Any]] = []
     state_prefix = _state_relative(root, state)
-    paths = sorted(git["untracked"] | git["ignored"])
-    for rel_path in paths:
-        candidate_class = _scratch_class(rel_path)
-        if candidate_class is None:
-            continue
-        source = _candidate_source(root, rel_path)
-        if source is None:
-            observations.append(_observation(rel_path, "ambiguous_scratch", "path_escape_or_unreadable"))
-            continue
+    covered = covered_prefixes or set()
+    for current, dir_names, file_names in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current)
         try:
-            file_stat = source.lstat()
-        except OSError as exc:
-            observations.append(_observation(rel_path, "ambiguous_scratch", f"stat_failed:{exc}"))
+            rel_current = current_path.relative_to(root).as_posix()
+        except ValueError:
+            dir_names[:] = []
             continue
-        if source.is_symlink() or not stat.S_ISREG(file_stat.st_mode):
-            observations.append(_observation(rel_path, "ambiguous_scratch", "unsupported_file_type"))
+        rel_current = "" if rel_current == "." else rel_current
+        dir_names.sort()
+        file_names.sort()
+
+        for dir_name in list(dir_names):
+            child = current_path / dir_name
+            rel_path = child.relative_to(root).as_posix()
+            if _prune_scratch_walk_path(rel_path, state_prefix, covered):
+                dir_names.remove(dir_name)
+                continue
+
+        if rel_current and _prune_scratch_walk_path(rel_current, state_prefix, covered):
+            dir_names[:] = []
             continue
-        registry_ids = _registry_matches(rel_path, registry["records"])
-        if registry_ids:
-            observations.append(
-                _observation(
-                    rel_path,
-                    "registered_veto",
-                    "registry_match_preserves_path",
-                    registry_ids=registry_ids,
+
+        for file_name in file_names:
+            source = current_path / file_name
+            rel_path = source.relative_to(root).as_posix()
+            candidate_class = _scratch_class(rel_path)
+            if candidate_class is None or _prune_scratch_walk_path(rel_path, state_prefix, covered):
+                continue
+            try:
+                file_stat = source.lstat()
+            except OSError as exc:
+                observations.append(_observation(rel_path, "ambiguous_scratch", f"stat_failed:{exc}"))
+                continue
+            if source.is_symlink() or not stat.S_ISREG(file_stat.st_mode):
+                observations.append(_observation(rel_path, "ambiguous_scratch", "unsupported_file_type"))
+                continue
+            registry_ids = _registry_preservation_ids(
+                rel_path,
+                registry["records"],
+                candidate_class=candidate_class,
+            )
+            if registry_ids:
+                observations.append(
+                    _observation(
+                        rel_path,
+                        "registered_veto",
+                        "registry_match_preserves_path",
+                        registry_ids=registry_ids,
+                    )
+                )
+                continue
+            if _is_protected(rel_path, state_prefix, candidate_class):
+                observations.append(_observation(rel_path, "protected_veto", "protected path"))
+                continue
+            if _age_hours(file_stat, now) < min_age_hours:
+                observations.append(_observation(rel_path, "age_veto", "candidate is too recent"))
+                continue
+            items.append(
+                _make_item(
+                    rel_path=rel_path,
+                    candidate_class=candidate_class,
+                    source_kind="worktree_file",
+                    file_stat=file_stat,
+                    ignored=rel_path in git["ignored"],
                 )
             )
-            continue
-        if rel_path in git["tracked"]:
-            observations.append(_observation(rel_path, "tracked_veto", "Git tracked path"))
-            continue
-        if _is_protected(rel_path, state_prefix, candidate_class):
-            observations.append(_observation(rel_path, "protected_veto", "protected path"))
-            continue
-        if _age_hours(file_stat, now) < min_age_hours:
-            observations.append(_observation(rel_path, "age_veto", "candidate is too recent"))
-            continue
-        items.append(
-            _make_item(
-                rel_path=rel_path,
-                candidate_class=candidate_class,
-                source_kind="worktree_file",
-                file_stat=file_stat,
-                ignored=rel_path in git["ignored"],
-            )
-        )
     return items, observations
 
 
@@ -734,6 +1080,7 @@ def _collect_loose_object_candidates(
         return items, observations
 
     valid_names: dict[str, tuple[Path, os.stat_result]] = {}
+    state_prefix = _state_relative(root, state)
     for fanout in sorted(objects_dir.iterdir(), key=lambda path: path.name):
         if not fanout.is_dir() or fanout.is_symlink() or not _HEX_FANOUT_RE.fullmatch(fanout.name):
             continue
@@ -747,12 +1094,16 @@ def _collect_loose_object_candidates(
             if artifact.is_symlink() or not stat.S_ISREG(file_stat.st_mode):
                 observations.append(_observation(rel_path, "ambiguous_git_object", "unsupported_file_type"))
                 continue
-            if artifact.name.startswith("tmp_obj_"):
-                observations.append(
-                    _observation(
-                        rel_path,
-                        "ambiguous_git_temp_object",
-                        "Git temporary objects are preserved",
+            if _GIT_TMP_OBJECT_RE.fullmatch(artifact.name):
+                if _is_protected(rel_path, state_prefix, "malformed_git_object_garbage"):
+                    observations.append(_observation(rel_path, "protected_veto", "protected path"))
+                    continue
+                items.append(
+                    _make_item(
+                        rel_path=rel_path,
+                        candidate_class="malformed_git_object_garbage",
+                        source_kind="git_garbage_file",
+                        file_stat=file_stat,
                     )
                 )
                 continue
@@ -768,7 +1119,6 @@ def _collect_loose_object_candidates(
             valid_names[fanout.name + artifact.name] = (artifact, file_stat)
 
     object_info = _batch_object_info(root, set(valid_names))
-    state_prefix = _state_relative(root, state)
     for oid, (artifact, file_stat) in sorted(valid_names.items()):
         rel_path = artifact.relative_to(root).as_posix()
         info = object_info.get(oid)
@@ -923,6 +1273,11 @@ def plan_reclaim(
     git = _collect_git_evidence(root)
     registry = _collect_registry(root)
 
+    detritus_items, detritus_observations, covered_prefixes = _collect_direct_detritus_candidates(
+        root,
+        state,
+        registry,
+    )
     scratch_items, scratch_observations = _collect_scratch_candidates(
         root,
         state,
@@ -930,6 +1285,7 @@ def plan_reclaim(
         registry,
         now=observed_at,
         min_age_hours=min_age_hours,
+        covered_prefixes=covered_prefixes,
     )
     object_items, object_observations = _collect_loose_object_candidates(
         root,
@@ -938,9 +1294,9 @@ def plan_reclaim(
         now=observed_at,
         min_age_hours=min_age_hours,
     )
-    items = sorted([*scratch_items, *object_items], key=lambda item: (item["path"], item["item_id"]))
+    items = sorted([*detritus_items, *scratch_items, *object_items], key=lambda item: (item["path"], item["item_id"]))
     observations = sorted(
-        [*scratch_observations, *object_observations],
+        [*detritus_observations, *scratch_observations, *object_observations],
         key=lambda item: (item["path"], item["classification"]),
     )
     blockers = [
@@ -1210,6 +1566,19 @@ def _reconstruct_states(
             state["pending"] = None
             state["receipt"] = event.get("details")
             state["last_refusal"] = None
+        elif action == "purge_started":
+            if state["payload_state"] != "trashed" or state["pending"] is not None:
+                errors.append(f"invalid_purge_transition:{event.get('sequence')}")
+            state["pending"] = "purge"
+            state["status"] = "partial"
+        elif action == "purged":
+            if state["pending"] != "purge":
+                errors.append(f"purge_receipt_without_start:{event.get('sequence')}")
+            state["payload_state"] = "purged"
+            state["status"] = "purged"
+            state["pending"] = None
+            state["receipt"] = event.get("details")
+            state["last_refusal"] = None
         elif action == "restore_started":
             if state["payload_state"] != "trashed" or state["pending"] is not None:
                 errors.append(f"invalid_restore_transition:{event.get('sequence')}")
@@ -1436,8 +1805,14 @@ def _prepare_payload_paths(run_dir: Path, state: Path, item_ids: list[str]) -> d
         for item_id in item_ids:
             item_dir = trash_root / item_id
             if item_dir.exists() or item_dir.is_symlink():
-                if item_dir.is_symlink() or not item_dir.is_dir() or any(item_dir.iterdir()):
+                if item_dir.is_symlink() or not item_dir.is_dir():
                     raise ReclaimError(f"trash_collision:{item_dir}")
+                contents = list(item_dir.iterdir())
+                if contents:
+                    if len(contents) != 1 or contents[0].name != "payload":
+                        raise ReclaimError(f"trash_collision:{item_dir}")
+                    if contents[0].is_symlink() or not (contents[0].is_file() or contents[0].is_dir()):
+                        raise ReclaimError(f"trash_collision:{contents[0]}")
             else:
                 item_dir.mkdir()
             resolved_item_dir = item_dir.resolve(strict=True)
@@ -1493,6 +1868,130 @@ def _file_sha256(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def _payload_fingerprint(path: Path, item: dict[str, Any]) -> str:
+    if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS:
+        return str(_shallow_directory_fingerprint(path)["digest"])
+    return _file_sha256(path)
+
+
+def _add_write_permission(path: Path) -> int:
+    """Make a regular file unlinkable on Windows and return its prior permission bits."""
+    current = path.lstat()
+    if path.is_symlink() or not stat.S_ISREG(current.st_mode):
+        raise ReclaimError(f"unlink_target_unsupported:{path}")
+    previous_mode = stat.S_IMODE(current.st_mode)
+    os.chmod(path, previous_mode | stat.S_IWRITE)
+    return previous_mode
+
+
+def _restore_permission_bits(path: Path, mode: int) -> None:
+    with suppress(OSError):
+        os.chmod(path, stat.S_IMODE(mode))
+
+
+def _unlink_regular_with_write_retry(path: Path) -> None:
+    try:
+        path.unlink()
+        return
+    except PermissionError:
+        _add_write_permission(path)
+        path.unlink()
+
+
+def _repair_windows_directory_acl(path: Path) -> None:
+    if os.name != "nt":
+        return
+    username = os.environ.get("USERNAME")
+    if not username:
+        return
+    grant = f"{username}:(OI)(CI)F"
+    subprocess.run(["takeown", "/F", str(path), "/R", "/D", "Y"], capture_output=True, text=True, check=False)
+    subprocess.run(["icacls", str(path), "/reset", "/T", "/C"], capture_output=True, text=True, check=False)
+    subprocess.run(["icacls", str(path), "/grant", grant, "/T", "/C"], capture_output=True, text=True, check=False)
+
+
+def _rmtree_bottom_up_once(path: Path) -> None:
+    for current, dir_names, file_names in os.walk(path, topdown=False, followlinks=False):
+        current_path = Path(current)
+        for file_name in file_names:
+            child = current_path / file_name
+            if not child.exists() and not child.is_symlink():
+                continue
+            with suppress(OSError):
+                os.chmod(child, stat.S_IWRITE | stat.S_IREAD)
+            with suppress(FileNotFoundError):
+                _unlink_regular_with_write_retry(child)
+        for dir_name in dir_names:
+            child = current_path / dir_name
+            if not child.exists() and not child.is_symlink():
+                continue
+            with suppress(OSError):
+                os.chmod(child, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+            try:
+                if child.is_symlink():
+                    child.unlink()
+                else:
+                    child.rmdir()
+            except PermissionError:
+                os.chmod(child, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+                child.rmdir()
+            except FileNotFoundError:
+                pass
+    with suppress(OSError):
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+    with suppress(FileNotFoundError):
+        path.rmdir()
+
+
+def _rmtree_with_write_retry(path: Path) -> None:
+    last_error: OSError | None = None
+    for _attempt in range(3):
+        try:
+            _rmtree_bottom_up_once(path)
+            return
+        except OSError as exc:
+            last_error = exc
+    escaped = str(path).replace("'", "''")
+    script = f"Remove-Item -LiteralPath '{escaped}' -Recurse -Force -ErrorAction Stop"
+    for executable in ("pwsh", "powershell"):
+        try:
+            result = subprocess.run(
+                [executable, "-NoProfile", "-Command", script],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+        except FileNotFoundError:
+            continue
+        if result.returncode == 0 or not path.exists():
+            return
+        last_error = OSError(result.stderr.strip() or result.stdout.strip() or f"{executable} Remove-Item failed")
+    if os.name == "nt" and os.environ.get("USERNAME"):
+        _repair_windows_directory_acl(path)
+        for _attempt in range(2):
+            try:
+                _rmtree_bottom_up_once(path)
+                return
+            except OSError as exc:
+                last_error = exc
+        for executable in ("pwsh", "powershell"):
+            try:
+                result = subprocess.run(
+                    [executable, "-NoProfile", "-Command", script],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=False,
+                )
+            except FileNotFoundError:
+                continue
+            if result.returncode == 0 or not path.exists():
+                return
+            last_error = OSError(result.stderr.strip() or result.stdout.strip() or f"{executable} Remove-Item failed")
+    raise ReclaimError(f"recursive_remove_failed:{path}:{last_error}")
+
+
 def _move_no_replace(source: Path, destination: Path, *, expected_stat: dict[str, int]) -> None:
     """Move a regular file without ever replacing an existing destination."""
     if destination.exists() or destination.is_symlink():
@@ -1505,6 +2004,7 @@ def _move_no_replace(source: Path, destination: Path, *, expected_stat: dict[str
         raise ReclaimError(f"source_unsupported:{source}")
     if _stat_evidence(source_stat) != expected_stat:
         raise ReclaimError(f"source_changed:{source}")
+    original_mode = stat.S_IMODE(source_stat.st_mode)
     try:
         os.link(source, destination, follow_symlinks=False)
         linked_stat = destination.lstat()
@@ -1514,14 +2014,99 @@ def _move_no_replace(source: Path, destination: Path, *, expected_stat: dict[str
         current = _stat_evidence(current_stat)
         if any(linked[key] != current[key] for key in identity_fields):
             raise ReclaimError(f"linked_identity_mismatch:{source}")
-        source.unlink()
+        _unlink_regular_with_write_retry(source)
+        _restore_permission_bits(destination, original_mode)
     except (OSError, ReclaimError) as exc:
         try:
             if destination.exists() and source.exists():
-                destination.unlink()
+                _unlink_regular_with_write_retry(destination)
+                _restore_permission_bits(source, original_mode)
         except OSError:
             pass
         raise ReclaimError(f"no_replace_move_failed:{source}:{destination}:{exc}") from exc
+
+
+def _move_directory_no_replace(source: Path, destination: Path, *, expected_stat: dict[str, int]) -> None:
+    """Move a directory tree without replacing an existing destination."""
+    if destination.exists() or destination.is_symlink():
+        raise ReclaimError(f"destination_exists:{destination}")
+    try:
+        source_stat = source.lstat()
+    except OSError as exc:
+        raise ReclaimError(f"source_missing:{source}:{exc}") from exc
+    if source.is_symlink() or not stat.S_ISDIR(source_stat.st_mode):
+        raise ReclaimError(f"source_unsupported:{source}")
+    if _stat_evidence(source_stat) != expected_stat:
+        raise ReclaimError(f"source_changed:{source}")
+    try:
+        source.rename(destination)
+    except PermissionError:
+        _repair_windows_directory_acl(source)
+        try:
+            source.rename(destination)
+        except OSError as retry_exc:
+            raise ReclaimError(f"directory_move_failed:{source}:{destination}:{retry_exc}") from retry_exc
+        try:
+            moved_stat = destination.lstat()
+        except OSError as stat_exc:
+            raise ReclaimError(f"destination_unreadable:{destination}:{stat_exc}") from stat_exc
+        if _stat_evidence(moved_stat) != expected_stat:
+            raise ReclaimError(f"destination_changed:{destination}") from None
+    except OSError as exc:
+        raise ReclaimError(f"directory_move_failed:{source}:{destination}:{exc}") from exc
+
+
+def _move_payload_no_replace(
+    source: Path,
+    destination: Path,
+    item: dict[str, Any],
+    *,
+    expected_stat: dict[str, int],
+) -> None:
+    if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS:
+        _move_directory_no_replace(source, destination, expected_stat=expected_stat)
+        return
+    _move_no_replace(source, destination, expected_stat=expected_stat)
+
+
+def _state_allows_existing_payload_recovery(state: dict[str, Any]) -> bool:
+    refusal = state.get("last_refusal")
+    return (
+        state.get("status") == "refused"
+        and isinstance(refusal, dict)
+        and refusal.get("operation") == "trash"
+        and refusal.get("code") == "atomic_move_failed"
+    )
+
+
+def _complete_existing_payload_move(
+    source: Path,
+    payload: Path,
+    *,
+    expected_stat: dict[str, int],
+    expected_sha256: str,
+) -> None:
+    """Complete a previous link-then-unlink move that left source and payload present."""
+    if payload.is_symlink() or source.is_symlink():
+        raise ReclaimError(f"retry_payload_unsupported:{payload}")
+    try:
+        source_stat = source.lstat()
+        payload_stat = payload.lstat()
+    except OSError as exc:
+        raise ReclaimError(f"retry_payload_state_unreadable:{exc}") from exc
+    if not stat.S_ISREG(source_stat.st_mode) or not stat.S_ISREG(payload_stat.st_mode):
+        raise ReclaimError(f"retry_payload_unsupported:{payload}")
+    if _stat_evidence(source_stat) != expected_stat:
+        raise ReclaimError(f"source_changed:{source}")
+    if int(payload_stat.st_dev) != int(source_stat.st_dev):
+        raise ReclaimError(f"retry_payload_cross_device:{payload}")
+    if int(payload_stat.st_size) != int(source_stat.st_size):
+        raise ReclaimError(f"retry_payload_size_mismatch:{payload}")
+    if _file_sha256(payload) != expected_sha256:
+        raise ReclaimError(f"retry_payload_hash_mismatch:{payload}")
+    original_mode = stat.S_IMODE(source_stat.st_mode)
+    _unlink_regular_with_write_retry(source)
+    _restore_permission_bits(payload, original_mode)
 
 
 def _has_symlink_parent(root: Path, path: Path) -> bool:
@@ -1565,23 +2150,33 @@ def _prevalidate_trash_item(
         current_stat = source.lstat()
     except OSError as exc:
         raise ReclaimError(f"candidate_missing:{rel_path}:{exc}") from exc
-    if not stat.S_ISREG(current_stat.st_mode):
+    source_kind = str(item.get("source_kind", "worktree_file"))
+    if source_kind in {"worktree_file", "git_loose_object", "git_garbage_file"} and not stat.S_ISREG(
+        current_stat.st_mode
+    ):
         raise ReclaimError(f"unsupported_file_type:{rel_path}")
+    if source_kind == "worktree_directory" and not stat.S_ISDIR(current_stat.st_mode):
+        raise ReclaimError(f"unsupported_file_type:{rel_path}")
+    if source_kind not in {"worktree_file", "worktree_directory", "git_loose_object", "git_garbage_file"}:
+        raise ReclaimError(f"unsupported_source_kind:{rel_path}:{source_kind}")
     if _stat_evidence(current_stat) != item["stat"]:
         raise ReclaimError(f"candidate_changed:{rel_path}")
-    if rel_path in git["tracked"]:
-        raise ReclaimError(f"candidate_became_tracked:{rel_path}")
-    registry_ids = _registry_matches(rel_path, registry["records"])
+    registry_ids = _registry_preservation_ids(
+        rel_path,
+        registry["records"],
+        candidate_class=str(item["candidate_class"]),
+    )
     if registry_ids:
         raise ReclaimError(f"candidate_became_registered:{rel_path}:{','.join(registry_ids)}")
     state_prefix = _state_relative(root, state)
     if _is_protected(rel_path, state_prefix, item["candidate_class"]):
         raise ReclaimError(f"candidate_is_protected:{rel_path}")
-    if item["candidate_class"] in {"stale_harness_scratch", "stale_draft_scratch"}:
+    if item["candidate_class"] in _DETRITUS_CLASSES:
+        if _direct_detritus_class(rel_path, state_prefix) != item["candidate_class"]:
+            raise ReclaimError(f"candidate_class_changed:{rel_path}")
+    elif item["candidate_class"] in {"stale_harness_scratch", "stale_draft_scratch"}:
         if _scratch_class(rel_path) != item["candidate_class"]:
             raise ReclaimError(f"candidate_class_changed:{rel_path}")
-        if rel_path not in git["untracked"] and rel_path not in git["ignored"]:
-            raise ReclaimError(f"candidate_is_active_or_unsupported:{rel_path}")
     elif item["candidate_class"] == "unreachable_loose_object":
         common_dir: Path = git["common_dir"]
         expected = common_dir / "objects" / str(item["git_oid"])[:2] / str(item["git_oid"])[2:]
@@ -1592,6 +2187,19 @@ def _prevalidate_trash_item(
             raise ReclaimError(f"loose_object_invalid:{rel_path}")
         if item["git_oid"] in git["reachable"]:
             raise ReclaimError(f"loose_object_newly_reachable:{rel_path}")
+    elif item["candidate_class"] == "malformed_git_object_garbage":
+        common_dir = git["common_dir"]
+        objects_dir = common_dir / "objects"
+        try:
+            relative_object = source.relative_to(objects_dir)
+        except ValueError as exc:
+            raise ReclaimError(f"git_garbage_path_changed:{rel_path}") from exc
+        if (
+            len(relative_object.parts) != 2
+            or not _HEX_FANOUT_RE.fullmatch(relative_object.parts[0])
+            or not _GIT_TMP_OBJECT_RE.fullmatch(relative_object.parts[1])
+        ):
+            raise ReclaimError(f"git_garbage_path_changed:{rel_path}")
     else:
         raise ReclaimError(f"candidate_class_unsupported:{item['candidate_class']}")
     if int(current_stat.st_dev) != int(state.stat().st_dev):
@@ -1606,9 +2214,51 @@ def _prevalidate_trash_item(
         or int(payload_parent.stat().st_dev) != int(current_stat.st_dev)
     ):
         raise ReclaimError(f"trash_parent_unsafe:{payload.parent}")
-    if payload.exists() or payload.is_symlink():
+    if payload.is_symlink():
         raise ReclaimError(f"trash_collision:{payload}")
+    if payload.exists():
+        try:
+            payload_stat = payload.lstat()
+        except OSError as exc:
+            raise ReclaimError(f"trash_collision:{payload}:{exc}") from exc
+        payload_kind_ok = (
+            source_kind == "worktree_directory"
+            and stat.S_ISDIR(payload_stat.st_mode)
+            or source_kind != "worktree_directory"
+            and stat.S_ISREG(payload_stat.st_mode)
+        )
+        if not payload_kind_ok or int(payload_stat.st_dev) != int(current_stat.st_dev):
+            raise ReclaimError(f"trash_collision:{payload}")
     return source
+
+
+def _prevalidate_existing_payload_recovery(
+    source: Path,
+    payload: Path,
+    *,
+    item_state: dict[str, Any],
+    expected_source_stat: dict[str, int],
+    expected_sha256: str,
+) -> None:
+    if not _state_allows_existing_payload_recovery(item_state):
+        raise ReclaimError(f"unexpected_existing_payload:{payload}")
+    if payload.is_symlink() or not payload.exists():
+        raise ReclaimError(f"trash_collision:{payload}")
+    try:
+        payload_stat = payload.lstat()
+        source_stat = source.lstat()
+    except OSError as exc:
+        raise ReclaimError(f"existing_payload_unreadable:{payload}:{exc}") from exc
+    if not stat.S_ISREG(payload_stat.st_mode):
+        raise ReclaimError(f"trash_collision:{payload}")
+    if _stat_evidence(source_stat) != expected_source_stat:
+        raise ReclaimError(f"candidate_changed:{source}")
+    if int(payload_stat.st_dev) != int(source_stat.st_dev):
+        raise ReclaimError(f"existing_payload_cross_device:{payload}")
+    if int(payload_stat.st_size) != int(source_stat.st_size):
+        raise ReclaimError(f"existing_payload_size_mismatch:{payload}")
+    if _file_sha256(payload) != expected_sha256:
+        raise ReclaimError(f"existing_payload_hash_mismatch:{payload}")
 
 
 def _trash_reclaim_locked(
@@ -1692,7 +2342,7 @@ def _trash_reclaim_locked(
     try:
         for item_id in requested:
             source = sources[item_id]
-            content_hashes[item_id] = _file_sha256(source)
+            content_hashes[item_id] = _payload_fingerprint(source, item_by_id[item_id])
             if _stat_evidence(source.lstat()) != item_by_id[item_id]["stat"]:
                 raise ReclaimError(f"candidate_changed_while_hashing:{item_by_id[item_id]['path']}")
     except (OSError, ReclaimError) as exc:
@@ -1730,31 +2380,50 @@ def _trash_reclaim_locked(
         item = item_by_id[item_id]
         source = sources[item_id]
         payload = payloads[item_id]
+        existing_payload = False
         try:
             if _stat_evidence(source.lstat()) != item["stat"]:
                 raise ReclaimError(f"candidate_changed_immediately_before_move:{item['path']}")
             payload_parent = payload.parent.resolve(strict=True)
-            if (
-                not _is_within(payload_parent, run_dir)
-                or _has_symlink_parent(run_dir, payload)
-                or payload.exists()
-                or payload.is_symlink()
-            ):
+            if not _is_within(payload_parent, run_dir) or _has_symlink_parent(run_dir, payload) or payload.is_symlink():
                 raise ReclaimError(f"trash_destination_changed:{payload}")
+            existing_payload = payload.exists()
+            if existing_payload:
+                _prevalidate_existing_payload_recovery(
+                    source,
+                    payload,
+                    item_state=states[item_id],
+                    expected_source_stat=item["stat"],
+                    expected_sha256=content_hashes[item_id],
+                )
         except (OSError, ReclaimError) as exc:
             _refuse(run_dir, events, [item_id], code="immediate_revalidation_failed", detail=str(exc))
+        started_details: dict[str, Any] = {
+            "path": item["path"],
+            "payload_path": payload.relative_to(run_dir).as_posix(),
+        }
+        if existing_payload:
+            started_details["existing_payload_recovery"] = True
         _append_event(
             run_dir,
             events,
             action="trash_started",
             item_id=item_id,
-            details={"path": item["path"], "payload_path": payload.relative_to(run_dir).as_posix()},
+            details=started_details,
         )
         try:
-            _move_no_replace(source, payload, expected_stat=item["stat"])
-            if _file_sha256(payload) != content_hashes[item_id]:
+            if existing_payload:
+                _complete_existing_payload_move(
+                    source,
+                    payload,
+                    expected_stat=item["stat"],
+                    expected_sha256=content_hashes[item_id],
+                )
+            else:
+                _move_payload_no_replace(source, payload, item, expected_stat=item["stat"])
+            if _payload_fingerprint(payload, item) != content_hashes[item_id]:
                 if not source.exists():
-                    _move_no_replace(payload, source, expected_stat=_stat_evidence(payload.lstat()))
+                    _move_payload_no_replace(payload, source, item, expected_stat=_stat_evidence(payload.lstat()))
                 raise ReclaimError(f"payload_changed_during_move:{item['path']}")
         except (OSError, ReclaimError) as exc:
             _append_event(
@@ -1834,12 +2503,12 @@ def _prevalidate_restore_item(
         resolved_payload = payload.resolve(strict=True)
     except OSError as exc:
         raise ReclaimError(f"payload_missing:{item['item_id']}:{exc}") from exc
-    if (
-        not _is_within(resolved_payload, run_dir)
-        or _has_symlink_parent(run_dir, payload)
-        or payload.is_symlink()
-        or not payload.is_file()
-    ):
+    if not _is_within(resolved_payload, run_dir) or _has_symlink_parent(run_dir, payload) or payload.is_symlink():
+        raise ReclaimError(f"payload_path_escape_or_unsupported:{item['item_id']}")
+    if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS:
+        if not payload.is_dir():
+            raise ReclaimError(f"payload_path_escape_or_unsupported:{item['item_id']}")
+    elif not payload.is_file():
         raise ReclaimError(f"payload_path_escape_or_unsupported:{item['item_id']}")
     destination = root / item["path"]
     if not _safe_relative_path(item["path"]):
@@ -1857,11 +2526,51 @@ def _prevalidate_restore_item(
     payload_stat = payload.stat()
     if int(payload_stat.st_dev) != int(root.stat().st_dev):
         raise ReclaimError(f"restore_cross_device:{item['path']}")
-    if int(payload_stat.st_size) != int(item["logical_bytes"]):
+    if item.get("source_kind") not in _DIRECTORY_SOURCE_KINDS and int(payload_stat.st_size) != int(
+        item["logical_bytes"]
+    ):
         raise ReclaimError(f"payload_size_changed:{item['path']}")
-    if _file_sha256(payload) != receipt.get("payload_sha256"):
+    if _payload_fingerprint(payload, item) != receipt.get("payload_sha256"):
         raise ReclaimError(f"payload_hash_changed:{item['path']}")
     return payload, destination, receipt
+
+
+def _prevalidate_purge_item(
+    root: Path,
+    run_dir: Path,
+    item: dict[str, Any],
+    state_info: dict[str, Any],
+) -> tuple[Path, dict[str, Any], os.stat_result]:
+    if state_info["payload_state"] != "trashed":
+        raise ReclaimError(f"item_state_not_purgeable:{item['item_id']}")
+    receipt = state_info.get("receipt")
+    if not isinstance(receipt, dict) or receipt.get("operation") != "trash":
+        raise ReclaimError(f"trash_receipt_missing:{item['item_id']}")
+    payload_rel = receipt.get("payload_path")
+    if not isinstance(payload_rel, str) or not _safe_relative_path(payload_rel):
+        raise ReclaimError(f"payload_path_invalid:{item['item_id']}")
+    payload = run_dir / payload_rel
+    try:
+        resolved_payload = payload.resolve(strict=True)
+    except OSError as exc:
+        raise ReclaimError(f"payload_missing:{item['item_id']}:{exc}") from exc
+    if not _is_within(resolved_payload, run_dir) or _has_symlink_parent(run_dir, payload) or payload.is_symlink():
+        raise ReclaimError(f"payload_path_escape_or_unsupported:{item['item_id']}")
+    if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS:
+        if not payload.is_dir():
+            raise ReclaimError(f"payload_path_escape_or_unsupported:{item['item_id']}")
+    elif not payload.is_file():
+        raise ReclaimError(f"payload_path_escape_or_unsupported:{item['item_id']}")
+    if not _safe_relative_path(item["path"]):
+        raise ReclaimError(f"source_path_invalid:{item['item_id']}")
+    payload_stat = payload.stat()
+    if item.get("source_kind") not in _DIRECTORY_SOURCE_KINDS and int(payload_stat.st_size) != int(
+        item["logical_bytes"]
+    ):
+        raise ReclaimError(f"payload_size_changed:{item['path']}")
+    if _payload_fingerprint(payload, item) != receipt.get("payload_sha256"):
+        raise ReclaimError(f"payload_hash_changed:{item['path']}")
+    return payload, receipt, payload_stat
 
 
 def _restore_reclaim_locked(
@@ -1903,7 +2612,7 @@ def _restore_reclaim_locked(
         try:
             payload_stat = payload.lstat()
             if (
-                _file_sha256(payload) != trash_receipt["payload_sha256"]
+                _payload_fingerprint(payload, item) != trash_receipt["payload_sha256"]
                 or destination.exists()
                 or destination.is_symlink()
                 or _has_symlink_parent(root, destination)
@@ -1920,10 +2629,15 @@ def _restore_reclaim_locked(
             details={"path": item["path"], "payload_path": payload.relative_to(run_dir).as_posix()},
         )
         try:
-            _move_no_replace(payload, destination, expected_stat=_stat_evidence(payload_stat))
-            if _file_sha256(destination) != trash_receipt["payload_sha256"]:
+            _move_payload_no_replace(payload, destination, item, expected_stat=_stat_evidence(payload_stat))
+            if _payload_fingerprint(destination, item) != trash_receipt["payload_sha256"]:
                 if not payload.exists():
-                    _move_no_replace(destination, payload, expected_stat=_stat_evidence(destination.lstat()))
+                    _move_payload_no_replace(
+                        destination,
+                        payload,
+                        item,
+                        expected_stat=_stat_evidence(destination.lstat()),
+                    )
                 raise ReclaimError(f"restored_payload_changed:{item['path']}")
         except (OSError, ReclaimError) as exc:
             _append_event(
@@ -1953,6 +2667,264 @@ def _restore_reclaim_locked(
     }
 
 
+def _purge_reclaim_locked(
+    root: Path,
+    *,
+    run_id: str,
+    plan_hash: str,
+    item_ids: tuple[str, ...] | list[str],
+    owner_evidence: tuple[str, ...] | list[str],
+    quiescence_evidence: tuple[str, ...] | list[str],
+    state_root: Path | None = None,
+) -> dict[str, Any]:
+    """Permanently delete exact, receipted trash payloads and retain receipts."""
+    root = _root_path(Path(root))
+    state = _state_path(root, state_root)
+    run_dir, manifest, events = _validated_run(root, state, run_id)
+    requested = _normalize_item_ids(item_ids)
+    owner_refs = _normalize_nonempty(owner_evidence, "owner_evidence")
+    quiescence_refs = _normalize_nonempty(quiescence_evidence, "quiescence_evidence")
+    if manifest["plan_hash"] != plan_hash:
+        _refuse(run_dir, events, requested, code="plan_hash_mismatch", detail="requested plan hash does not match run")
+    item_by_id = {item["item_id"]: item for item in manifest["items"]}
+    unknown = [item_id for item_id in requested if item_id not in item_by_id]
+    if unknown:
+        _refuse(run_dir, events, [], code="unknown_item_id", detail=",".join(unknown))
+    states, transition_errors, partial = _reconstruct_states(manifest, events)
+    if transition_errors or partial:
+        raise ReclaimError("event state is corrupt or partial")
+
+    prepared: dict[str, tuple[Path, dict[str, Any], os.stat_result]] = {}
+    try:
+        for item_id in requested:
+            prepared[item_id] = _prevalidate_purge_item(
+                root,
+                run_dir,
+                item_by_id[item_id],
+                states[item_id],
+            )
+    except ReclaimError as exc:
+        _refuse(run_dir, events, requested, code="purge_revalidation_failed", detail=str(exc))
+
+    purged: list[dict[str, Any]] = []
+    for item_id in requested:
+        item = item_by_id[item_id]
+        payload, trash_receipt, payload_stat = prepared[item_id]
+        try:
+            if payload.is_symlink():
+                raise ReclaimError(f"purge_payload_changed:{item['path']}")
+            if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS:
+                if not payload.is_dir():
+                    raise ReclaimError(f"purge_payload_changed:{item['path']}")
+            elif not payload.is_file():
+                raise ReclaimError(f"purge_payload_changed:{item['path']}")
+            current_stat = payload.lstat()
+            if _stat_evidence(current_stat) != _stat_evidence(payload_stat):
+                raise ReclaimError(f"purge_payload_changed:{item['path']}")
+        except (OSError, ReclaimError) as exc:
+            _refuse(run_dir, events, [item_id], code="immediate_purge_revalidation_failed", detail=str(exc))
+        payload_rel = payload.relative_to(run_dir).as_posix()
+        _append_event(
+            run_dir,
+            events,
+            action="purge_started",
+            item_id=item_id,
+            details={"path": item["path"], "payload_path": payload_rel},
+        )
+        try:
+            if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS:
+                _rmtree_with_write_retry(payload)
+            else:
+                _unlink_regular_with_write_retry(payload)
+            with suppress(OSError):
+                payload.parent.rmdir()
+        except (OSError, ReclaimError) as exc:
+            _append_event(
+                run_dir,
+                events,
+                action="refused",
+                item_id=item_id,
+                details={"operation": "purge", "code": "atomic_purge_failed", "detail": str(exc)},
+            )
+            raise ReclaimError(f"atomic_purge_failed: {item['path']}: {exc}") from exc
+        receipt = {
+            "operation": "purge",
+            "source_path": item["path"],
+            "payload_path": payload_rel,
+            "payload_sha256": trash_receipt["payload_sha256"],
+            "item_hash": item["item_hash"],
+            "logical_bytes_purged": int(item["logical_bytes"]),
+            "physical_bytes_reclaimed": int(
+                item["logical_bytes"] if item.get("source_kind") in _DIRECTORY_SOURCE_KINDS else payload_stat.st_size
+            ),
+            "owner_evidence": owner_refs,
+            "quiescence_evidence": quiescence_refs,
+        }
+        _append_event(run_dir, events, action="purged", item_id=item_id, details=receipt)
+        purged.append({"item_id": item_id, **receipt})
+    return {
+        "run_id": run_id,
+        "plan_hash": manifest["plan_hash"],
+        "status": "purged",
+        "requested_item_ids": requested,
+        "purged": purged,
+        "logical_bytes_purged": sum(item["logical_bytes_purged"] for item in purged),
+        "physical_bytes_reclaimed": sum(item["physical_bytes_reclaimed"] for item in purged),
+    }
+
+
+def purge_reclaim(
+    root: Path,
+    *,
+    run_id: str,
+    plan_hash: str,
+    item_ids: tuple[str, ...] | list[str],
+    owner_evidence: tuple[str, ...] | list[str],
+    quiescence_evidence: tuple[str, ...] | list[str],
+    state_root: Path | None = None,
+) -> dict[str, Any]:
+    """Lock and permanently delete exact, receipted trash payloads."""
+    resolved_root = _root_path(Path(root))
+    resolved_state = _state_path(resolved_root, state_root)
+    run_dir = _run_dir(resolved_state, run_id)
+    with _operation_lock(run_dir, "purge"):
+        return _purge_reclaim_locked(
+            resolved_root,
+            run_id=run_id,
+            plan_hash=plan_hash,
+            item_ids=item_ids,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            state_root=resolved_state,
+        )
+
+
+def _chunks(values: list[str], size: int) -> Iterator[list[str]]:
+    if isinstance(size, bool) or size <= 0:
+        raise ReclaimError("batch_size must be a positive integer")
+    for offset in range(0, len(values), size):
+        yield values[offset : offset + size]
+
+
+def deep_clean_reclaim(
+    root: Path,
+    *,
+    owner_evidence: tuple[str, ...] | list[str],
+    quiescence_evidence: tuple[str, ...] | list[str],
+    state_root: Path | None = None,
+    min_age_hours: int = 168,
+    max_cycles: int = 25,
+    batch_size: int = 250,
+    now: datetime | None = None,
+    actor: str | None = None,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    """Plan, trash, and purge until the production reclaim planner is clean."""
+    resolved_root = _root_path(Path(root))
+    resolved_state = _state_path(resolved_root, state_root)
+    owner_refs = _normalize_nonempty(owner_evidence, "owner_evidence")
+    quiescence_refs = _normalize_nonempty(quiescence_evidence, "quiescence_evidence")
+    if isinstance(max_cycles, bool) or max_cycles <= 0:
+        raise ReclaimError("max_cycles must be a positive integer")
+    if isinstance(batch_size, bool) or batch_size <= 0:
+        raise ReclaimError("batch_size must be a positive integer")
+
+    cycles: list[dict[str, Any]] = []
+    total_trashed = 0
+    total_purged = 0
+    total_logical_bytes_removed = 0
+    total_physical_bytes_reclaimed = 0
+    blocked_purges: list[dict[str, str]] = []
+    final_plan: dict[str, Any] | None = None
+
+    for cycle_index in range(1, max_cycles + 1):
+        plan = plan_reclaim(
+            resolved_root,
+            state_root=resolved_state,
+            min_age_hours=min_age_hours,
+            now=now,
+            actor=actor,
+            session_id=session_id,
+        )
+        final_plan = plan
+        candidate_count = int(plan["candidate_count"])
+        cycle: dict[str, Any] = {
+            "cycle": cycle_index,
+            "run_id": plan["run_id"],
+            "plan_hash": plan["plan_hash"],
+            "candidate_count": candidate_count,
+            "logical_bytes": int(plan["logical_bytes"]),
+            "trashed": 0,
+            "purged": 0,
+            "blocked_purges": [],
+            "physical_bytes_reclaimed": 0,
+        }
+        if candidate_count == 0:
+            cycles.append(cycle)
+            status = "clean" if not blocked_purges else "blocked_purges"
+            return {
+                "status": status,
+                "cycles": cycles,
+                "cycle_count": len(cycles),
+                "final_run_id": plan["run_id"],
+                "final_plan_hash": plan["plan_hash"],
+                "final_candidate_count": 0,
+                "total_trashed": total_trashed,
+                "total_purged": total_purged,
+                "blocked_purge_count": len(blocked_purges),
+                "blocked_purges": blocked_purges,
+                "logical_bytes_removed": total_logical_bytes_removed,
+                "physical_bytes_reclaimed": total_physical_bytes_reclaimed,
+            }
+        if not bool(plan["executable"]):
+            raise ReclaimError(f"deep_clean_plan_not_executable:{plan['run_id']}:{plan['blockers']}")
+
+        manifest = _load_manifest(Path(str(plan["manifest_path"])).parent)
+        item_ids = sorted(str(item["item_id"]) for item in manifest["items"])
+        for chunk in _chunks(item_ids, batch_size):
+            trashed = trash_reclaim(
+                resolved_root,
+                run_id=str(plan["run_id"]),
+                plan_hash=str(plan["plan_hash"]),
+                item_ids=chunk,
+                owner_evidence=owner_refs,
+                quiescence_evidence=quiescence_refs,
+                state_root=resolved_state,
+            )
+            trashed_count = len(trashed.get("trashed", []))
+            cycle["trashed"] += trashed_count
+            total_trashed += trashed_count
+            total_logical_bytes_removed += int(trashed.get("logical_bytes_removed", 0))
+            for item_id in chunk:
+                try:
+                    purged = purge_reclaim(
+                        resolved_root,
+                        run_id=str(plan["run_id"]),
+                        plan_hash=str(plan["plan_hash"]),
+                        item_ids=[item_id],
+                        owner_evidence=owner_refs,
+                        quiescence_evidence=quiescence_refs,
+                        state_root=resolved_state,
+                    )
+                except ReclaimError as exc:
+                    blocked = {"run_id": str(plan["run_id"]), "item_id": item_id, "detail": str(exc)}
+                    blocked_purges.append(blocked)
+                    cycle["blocked_purges"].append(blocked)
+                    continue
+                purged_count = len(purged.get("purged", []))
+                reclaimed = int(purged.get("physical_bytes_reclaimed", 0))
+                cycle["purged"] += purged_count
+                cycle["physical_bytes_reclaimed"] += reclaimed
+                total_purged += purged_count
+                total_physical_bytes_reclaimed += reclaimed
+        cycles.append(cycle)
+
+    raise ReclaimError(
+        "deep_clean_max_cycles_reached:"
+        f"{max_cycles}:final_run_id={final_plan.get('run_id') if final_plan else '<none>'}"
+    )
+
+
 def restore_reclaim(
     root: Path,
     *,
@@ -1974,9 +2946,11 @@ def restore_reclaim(
 
 
 __all__ = [
+    "deep_clean_reclaim",
     "ReclaimError",
     "history_reclaim",
     "plan_reclaim",
+    "purge_reclaim",
     "restore_reclaim",
     "trash_reclaim",
 ]

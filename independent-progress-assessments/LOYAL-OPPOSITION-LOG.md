@@ -1785,3 +1785,160 @@ Loyal Opposition (Antigravity/lo role, auto-dispatched).
 | Area | Finding | Evidence / context | Suggested action | Status |
 |------|---------|-------------------|------------------|--------|
 | Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-001.md`. Verified that it correctly limits changes to `.gitignore` and `platform_tests/scripts/test_gitignore_tree_stabilization_scratch.py` to handle the specified seven deterministic scratch classes. Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-001.md | Issued GO verdict at version -002.md to authorize implementing the narrow ignore patterns. | Resolved (GO) |
+
+---
+
+### 2026-07-15 - WI-5301 Keep Preflight Capture Helpers Out of Protected Source Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5301-retire-one-shot-preflight-helper-001.md`. Verified that it targets the removal of the stale, untracked helper `scripts/_capture_preflight_outputs.py`. Confirmed that the file has no codebase references or active consumers. Preflights and DCL clause applicability gates passed successfully. | bridge/gtkb-wi5301-retire-one-shot-preflight-helper-001.md | Issued GO verdict at version -002.md to authorize the destructive removal of the helper. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5316 Adopt Frozen Modernization Release-Candidate Contract and Checker Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5316-frozen-modernization-rc-contract-001.md`. Verified that all three target files match their designated SHA-256 digests exactly without modification. Manifest validation passes with exactly 8 capabilities and 94 handles. All 46 pytest checker tests pass successfully. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5316-frozen-modernization-rc-contract-001.md, bridge/gtkb-wi5316-frozen-modernization-rc-contract-002.md | Issued GO verdict at version -002.md to authorize adoption. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5318 Modified Terminal-Verdict Provenance Guard Proposal Review
+
+Loyal Opposition (Antigravity/lo role, auto-dispatched).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5318-modified-terminal-verdict-provenance-001.md`. Verified that it corrects the worktree auto-resolve planner so that tracked modified/deleted terminal verdicts remain `manual_owner_review` instead of mapping to `safe_commit`. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. Executed pytest suite and confirmed all 8 tests pass successfully. | bridge/gtkb-wi5318-modified-terminal-verdict-provenance-001.md, bridge/gtkb-wi5318-modified-terminal-verdict-provenance-002.md | Issued GO verdict at version -002.md to authorize implementation. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5298 Codex Snapshot Git Window Containment Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5298-codex-snapshot-git-window-containment-001.md`. Verified that it correctly isolates the ChatGPT.exe git window containment handler under a mutex-based monitor. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5298-codex-snapshot-git-window-containment-001.md, bridge/gtkb-wi5298-codex-snapshot-git-window-containment-002.md | Issued GO verdict at version -002.md to authorize implementation. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5300 Synchronize Packaged Context Registry Snapshots Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5300-context-registry-packaged-snapshot-sync-001.md`. Verified that it targets the synchronization of packaged registries with source context input. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5300-context-registry-packaged-snapshot-sync-001.md, bridge/gtkb-wi5300-context-registry-packaged-snapshot-sync-002.md | Issued GO verdict at version -002.md to authorize implementation. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5302 Alibaba Non-Thinking Forced Publisher Recovery Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5302-alibaba-nonthinking-publisher-recovery-001.md`. Verified that it disables thinking mode and forces the single exposed `PublishBridgeVerdict` tool during Alibaba (H) publisher-only recovery. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5302-alibaba-nonthinking-publisher-recovery-001.md, bridge/gtkb-wi5302-alibaba-nonthinking-publisher-recovery-002.md | Issued GO verdict at version -002.md to authorize implementation. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5299 Deterministic Scratch Ignore Closure Verification Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW post-implementation report `bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-003.md`. Verified that it correctly ignores the seven deterministic scratch classes and that focused gitignore regression tests pass. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-003.md, bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-004.md | Issued VERIFIED verdict at version -004.md to finalize. | Resolved (VERIFIED) |
+
+---
+
+### 2026-07-16 - WI-5307 Clear Non-Terminal Shared Enforcement-File Foreign Work Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-001.md`. Verified that it clears dirty hunks from shared files back to committed HEAD baseline to satisfy WI-5268 conditions. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-001.md, bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-002.md | Issued GO verdict at version -002.md to authorize cleanup. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5304 Non-impairing Dispatcher Disable-Guard Lifecycle Repair Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5304-nonimpairing-disable-guard-lifecycle-001.md`. Verified that it fixes stale disable-guard records and TTL transitions without changing harness eligibility or routing. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5304-nonimpairing-disable-guard-lifecycle-001.md, bridge/gtkb-wi5304-nonimpairing-disable-guard-lifecycle-002.md | Issued GO verdict at version -002.md to authorize implementation. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5312 Bounded Protected-Commit Authorization Preflight Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5312-bounded-protected-commit-preflight-001.md`. Verified that it optimizes scaling check-ignore lookups via a single snapshot evidence load. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5312-bounded-protected-commit-preflight-001.md, bridge/gtkb-wi5312-bounded-protected-commit-preflight-002.md | Issued GO verdict at version -002.md to authorize implementation. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5317 Orphaned WI-4978 Source-Hunk Recovery Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5317-orphaned-wi4978-source-hunk-recovery-001.md`. Verified that it isolates the uncommitted WI-4978 compliance-gate source/test hunks under a distinct work item. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5317-orphaned-wi4978-source-hunk-recovery-001.md, bridge/gtkb-wi5317-orphaned-wi4978-source-hunk-recovery-002.md | Issued GO verdict at version -002.md to authorize recovery. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5325 Lossless Git Disposition for Runtime Session-Envelope Histories Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW implementation proposal `bridge/gtkb-wi5325-runtime-session-envelope-git-disposition-001.md`. Verified that it ignores mutable runtime session envelopes in `.gitignore` while keeping all working-tree bytes intact. Preflights and DCL clause applicability gates passed successfully with zero blocking gaps. | bridge/gtkb-wi5325-runtime-session-envelope-git-disposition-001.md, bridge/gtkb-wi5325-runtime-session-envelope-git-disposition-002.md | Issued GO verdict at version -002.md to authorize metadata changes. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5312 Bounded Protected-Commit Authorization Preflight Verification
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the NEW post-implementation report `bridge/gtkb-wi5312-bounded-protected-commit-preflight-003.md`. Verified that the protected-commit checker compiles snapshots of live GO and terminal VERIFIED evidence once per evaluation. Passed all 20 decision-parity tests, Ruff linting, and formatting checks cleanly. Staged checker execution timing is well below the 300-second wrapper limit. | bridge/gtkb-wi5312-bounded-protected-commit-preflight-003.md, bridge/gtkb-wi5312-bounded-protected-commit-preflight-004.md | Issued VERIFIED verdict at version -004.md via atomic finalization helper. | Resolved (VERIFIED) |
+
+---
+
+### 2026-07-16 - WI-5314 Bounded Compare-and-Restore Non-Spawn Worker Envelope Suppression Review
+
+Loyal Opposition (Antigravity/lo role, interactive session).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Technical | Reviewed the REVISED implementation proposal `bridge/gtkb-wi5314-nonspawn-session-envelope-suppression-003.md`. Verified that it correctly addresses both the acquisition-failure and spawn-failure envelope leaks using a compare-and-restore token that avoids overwriting concurrent writes. Mechanical preflights and DCL applicability gates pass with zero blocking gaps. | bridge/gtkb-wi5314-nonspawn-session-envelope-suppression-003.md, bridge/gtkb-wi5314-nonspawn-session-envelope-suppression-004.md | Issued GO verdict at version -004.md. | Resolved (GO) |
+
+---
+
+### 2026-07-16 - WI-5307 Authorization-Chain Review (V3 scope gap, V4 mutation-class gap) + WI-5333 Unverified GO Premise + PAUTH-Narrowing Advisory
+
+Loyal Opposition (Claude/harness B, `::init gtkb lo` session-stated role, interactive + `/loop` auto-process).
+
+| Area | Finding | Evidence / context | Suggested action | Status |
+|------|---------|-------------------|------------------|--------|
+| Governance | WI-5307 V3 project authorization's four-file target scope exceeded its cited owner decision `DELIB-202666317`, which named only two files verbatim; independently confirmed the underlying dependency-ordering technical plan was sound. | bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-009.md, -010.md | Issued NO-GO at version -010.md requiring a fresh, explicit owner decision naming all four files. | Resolved (owner captured `DELIB-20260716-WI5307-FOUR-FILE-SCOPE-AUTHORIZATION`) |
+| Governance | WI-5307 V4 project authorization (successor to V3) silently omitted the `configuration` mutation class needed for `.claude/hooks/bridge-compliance-gate.py`, which the earlier V2 authorization had included; confirmed via direct classifier-source inspection and DB query. | bridge/gtkb-wi5307-shared-enforcement-baseline-disposition-012.md through -014.md; groundtruth_kb/governance/project_authorization_operation_time.py | Independently re-verified Prime's NO-ACTION (-013.md); a peer (Antigravity/C) filed the corrected NO-GO at -014.md before I did; stood down rather than duplicate. | Resolved by peer (NO-GO at -014.md); successor V5 PAUTH still pending as of wrap |
+| Technical | WI-5333's proposal claims a test fails only via a 30s global pytest timeout and passes cleanly at 120s; empirically re-ran the exact test twice and it failed in ~10-11s via an unrelated `WorkIntentRegistryError`, traced to ~1200 uncommitted lines in the same two shared-enforcement scripts central to the WI-5307 thread above. | bridge/gtkb-wi5333-modernization-e2e-timeout-001.md, -002.md | Filed formal Advisory `gtkb-wi5333-unverified-go-premise-advisory-001.md` (per new owner directive: findings always become Advisory Proposals). | Open — undispositioned by Prime as of wrap |
+| Process | Successor project authorizations (V2->V3->V4 on the same WI-5307 thread) have no mechanical check against a new authorization silently dropping a mutation class its predecessor allowed for the same in-scope file; this specific instance cost a full GO->NO-ACTION->NO-GO cycle. | bridge/gtkb-pauth-successor-mutation-class-narrowing-advisory-001.md | Filed as formal Advisory recommending a lightweight predecessor-vs-successor allowed-classes comparison check (candidate backlog item, not yet actioned). | Open — undispositioned by Prime as of wrap |
+
+---
+
+*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

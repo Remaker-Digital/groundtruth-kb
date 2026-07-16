@@ -11,6 +11,7 @@ import argparse
 import fnmatch
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import subprocess
@@ -83,6 +84,7 @@ TARGET_PATHS_RE = re.compile(
     r"(?:\*\*)?target_paths(?:\*\*)?\s*:(?:\*\*)?\s*(\[[^\n]+\])",
     re.IGNORECASE,
 )
+JSON_FENCE_RE = re.compile(r"```json\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 GLOB_META_RE = re.compile(r"[*?\[]")
 PROJECT_AUTHORIZATION_KEYS = frozenset({"project authorization", "project authorization id"})
 PROJECT_KEYS = frozenset({"project", "project id"})
@@ -850,6 +852,8 @@ def governance_review_forbidden_targets(target_paths: list[str]) -> list[str]:
 
 
 def _json_list(row: sqlite3.Row, field: str) -> list[str]:
+    if field not in set(row.keys()):
+        return []
     raw = row[field]
     if not raw:
         return []
@@ -862,8 +866,13 @@ def _json_list(row: sqlite3.Row, field: str) -> list[str]:
     return [str(value) for value in parsed]
 
 
-def _project_authorization_row(project_root: Path, authorization_id: str) -> sqlite3.Row:
-    db_path = groundtruth_db_path(project_root)
+def _project_authorization_row(
+    project_root: Path,
+    authorization_id: str,
+    *,
+    db_path: Path | None = None,
+) -> sqlite3.Row:
+    db_path = db_path or groundtruth_db_path(project_root)
     if not db_path.is_file():
         raise AuthorizationError(f"GroundTruth DB not found for project authorization: {db_path}")
     conn = sqlite3.connect(db_path)
@@ -1077,6 +1086,8 @@ def validate_project_authorization_row(
     proposal_project_id: str | None = None,
     work_item_id: str | None = None,
     spec_links: list[str] | None = None,
+    target_paths: list[str] | None = None,
+    requested_operations: list[str] | None = None,
 ) -> dict[str, Any]:
     authorization_id = str(row["id"])
     project_id = str(row["project_id"])
@@ -1146,6 +1157,9 @@ def extract_and_validate_project_authorization(
     project_root: Path,
     proposal: str,
     spec_links: list[str],
+    *,
+    target_paths: list[str] | None = None,
+    requested_operations: list[str] | None = None,
 ) -> dict[str, Any] | None:
     authorization_id = extract_metadata_value(proposal, PROJECT_AUTHORIZATION_KEYS)
     if not authorization_id:
@@ -1157,6 +1171,8 @@ def extract_and_validate_project_authorization(
         proposal_project_id=extract_metadata_value(proposal, PROJECT_KEYS),
         work_item_id=extract_metadata_value(proposal, WORK_ITEM_KEYS),
         spec_links=spec_links,
+        target_paths=target_paths,
+        requested_operations=requested_operations,
     )
 
 
@@ -1507,6 +1523,123 @@ def _go_self_review_error(proposal_content: str, go_path: Path, bridge_id: str |
         )
 
 
+def _structured_pauth_amendment_envelope(proposal: str) -> dict[str, Any] | None:
+    envelopes: list[dict[str, Any]] = []
+    required_keys = {"id", "project_id", "included_spec_ids", "excluded_spec_ids"}
+    for match in JSON_FENCE_RE.finditer(proposal):
+        try:
+            payload = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and required_keys <= set(payload):
+            envelopes.append(payload)
+    if len(envelopes) > 1:
+        raise AuthorizationError("Structured PAUTH amendment proposal contains multiple replacement envelopes")
+    return envelopes[0] if envelopes else None
+
+
+def _validated_spec_list(envelope: dict[str, Any], field: str) -> list[str]:
+    value = envelope.get(field)
+    if not isinstance(value, list):
+        raise AuthorizationError(f"Structured PAUTH amendment expected {field} to be a list")
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _approval_packet_path(project_root: Path, rel_path: str) -> Path:
+    relative = Path(rel_path.replace("\\", "/"))
+    if relative.is_absolute():
+        raise AuthorizationError("Approval packet path must be relative to the project root")
+    approvals_dir = (project_root / ".groundtruth" / "formal-artifact-approvals").resolve()
+    packet_path = (project_root / relative).resolve()
+    try:
+        packet_path.relative_to(approvals_dir)
+    except ValueError as exc:
+        raise AuthorizationError("Approval packet path is outside the in-root approval directory") from exc
+    return packet_path
+
+
+def _load_approval_packet(project_root: Path, rel_path: str) -> dict[str, Any]:
+    packet_path = _approval_packet_path(project_root, rel_path)
+    try:
+        payload = json.loads(packet_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise AuthorizationError(f"Approval packet {rel_path!r} is not readable JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise AuthorizationError(f"Approval packet {rel_path!r} fails schema validation: packet must be an object")
+    return payload
+
+
+def validate_structured_pauth_spec_amendment(project_root: Path, proposal: str) -> dict[str, Any] | None:
+    """Validate a structured project-authorization specification-set amendment."""
+    envelope = _structured_pauth_amendment_envelope(proposal)
+    if envelope is None:
+        return None
+
+    authorization_id = str(envelope.get("id") or "").strip()
+    project_id = str(envelope.get("project_id") or "").strip()
+    if not authorization_id or not project_id:
+        raise AuthorizationError("Structured PAUTH amendment requires non-empty id and project_id")
+    included_spec_ids = _validated_spec_list(envelope, "included_spec_ids")
+    excluded_spec_ids = _validated_spec_list(envelope, "excluded_spec_ids")
+
+    row = _project_authorization_row(project_root, authorization_id)
+    current_project_id = str(row["project_id"])
+    if current_project_id != project_id:
+        raise AuthorizationError(
+            f"Structured PAUTH amendment identity conflict: row project_id {current_project_id!r} "
+            f"does not match envelope project_id {project_id!r}"
+        )
+
+    current_included = set(_json_list(row, "included_spec_ids"))
+    current_excluded = set(_json_list(row, "excluded_spec_ids"))
+    proposed_included = set(included_spec_ids)
+    proposed_excluded = set(excluded_spec_ids)
+    added_specs = (proposed_included - current_included) | (proposed_excluded - current_excluded)
+    removed_specs = (current_included - proposed_included) | (current_excluded - proposed_excluded)
+    if not added_specs and not removed_specs:
+        return {
+            "authorization_id": authorization_id,
+            "project_id": project_id,
+            "spec_delta": False,
+        }
+
+    from groundtruth_kb.governance.approval_packet import (
+        packet_covers_amendment,
+        parse_packet_path_from_change_reason,
+        validate_packet,
+    )
+
+    rel_path = parse_packet_path_from_change_reason(str(envelope.get("change_reason") or ""))
+    if rel_path is None:
+        raise AuthorizationError("No packet path detected for structured PAUTH amendment owner approval packet")
+    approval_packet = _load_approval_packet(project_root, rel_path)
+    validation = validate_packet(approval_packet)
+    if not validation.is_valid:
+        raise AuthorizationError(
+            f"Approval packet {rel_path!r} fails schema validation: " + "; ".join(validation.errors)
+        )
+    if approval_packet.get("approved_by") != "owner" and approval_packet.get("auto_approval_activated_by") != "owner":
+        raise AuthorizationError(f"Approval packet {rel_path!r} is not owner-approved")
+    covers, reason = packet_covers_amendment(
+        approval_packet,
+        project_id,
+        authorization_id,
+        added_specs,
+        removed_specs,
+    )
+    if not covers:
+        raise AuthorizationError(f"Approval packet {rel_path!r} does not cover the amendment: {reason}")
+
+    return {
+        "authorization_id": authorization_id,
+        "project_id": project_id,
+        "spec_delta": True,
+        "added_spec_ids": sorted(added_specs),
+        "removed_spec_ids": sorted(removed_specs),
+        "approval_packet_path": rel_path,
+    }
+
+
 def create_authorization_packet(
     project_root: Path,
     bridge_id: str,
@@ -1524,6 +1657,15 @@ def create_authorization_packet(
     except (OSError, UnicodeError) as exc:
         raise AuthorizationError("Approved proposal file is unreadable or has invalid encoding") from exc
 
+    bootstrap_authority: dict[str, Any] | None = None
+    if session_id:
+        try:
+            holder = bridge_work_intent_registry.current_holder(bridge_id, project_root=project_root)
+        except bridge_work_intent_registry.WorkIntentRegistryError:
+            holder = None
+        if holder and holder.get("session_id") == session_id:
+            bootstrap_authority = bridge_work_intent_registry.bootstrap_authority_from_claim(holder)
+
     # Accumulate all format-check failures in a single pass so authors see every
     # issue at once instead of discovering them serially. Per owner directive
     # 2026-05-14 S350 "When you find a problem, fix it" addressing the
@@ -1538,6 +1680,7 @@ def create_authorization_packet(
     bridge_kind = proposal_bridge_kind(proposal)
     owner_sufficiency_evidence: dict[str, Any] | None = None
     authorization_submode: str | None = None
+    structured_pauth_amendment: dict[str, Any] | None = None
 
     try:
         spec_links = extract_spec_links(proposal)
@@ -1549,8 +1692,18 @@ def create_authorization_packet(
     except AuthorizationError as exc:
         errors.append(str(exc))
 
+    if bootstrap_authority is None:
+        try:
+            project_authorization = extract_and_validate_project_authorization(
+                project_root,
+                proposal,
+                spec_links,
+            )
+        except AuthorizationError as exc:
+            errors.append(str(exc))
+
     try:
-        project_authorization = extract_and_validate_project_authorization(project_root, proposal, spec_links)
+        structured_pauth_amendment = validate_structured_pauth_spec_amendment(project_root, proposal)
     except AuthorizationError as exc:
         errors.append(str(exc))
 
@@ -1614,12 +1767,21 @@ def create_authorization_packet(
         if peer_report_reason:
             errors.append(peer_report_reason)
 
+    if bootstrap_authority is not None:
+        bootstrap_errors = _bootstrap_authority_binding_errors(
+            project_root,
+            proposal,
+            bootstrap_authority,
+            target_paths=target_paths,
+        )
+        errors.extend(bootstrap_errors)
+
     if errors:
         raise AuthorizationError("; ".join(errors))
 
     created_at = now_utc()
     packet = {
-        "schema_version": 1,
+        "schema_version": 2,
         "bridge_id": bridge_id,
         "proposal_file": proposal_rel,
         "go_file": go_rel,
@@ -1634,12 +1796,77 @@ def create_authorization_packet(
     }
     if project_authorization is not None:
         packet["project_authorization"] = project_authorization
+    if bootstrap_authority is not None:
+        packet["bootstrap_authority"] = bootstrap_authority
     if owner_sufficiency_evidence is not None:
         packet["requirement_sufficiency_evidence"] = owner_sufficiency_evidence
     if authorization_submode is not None:
         packet["authorization_submode"] = authorization_submode
+    if structured_pauth_amendment is not None:
+        packet["structured_pauth_spec_amendment"] = structured_pauth_amendment
     packet["packet_hash"] = packet_hash(packet)
     return packet
+
+
+def _bootstrap_authority_binding_errors(
+    project_root: Path,
+    proposal: str,
+    bootstrap_authority: dict[str, Any],
+    *,
+    target_paths: list[str],
+) -> list[str]:
+    del project_root
+    errors: list[str] = []
+    if bootstrap_authority.get("claim_kind") != bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
+        errors.append("Bootstrap authority has an invalid claim_kind")
+    fields = {
+        "owner_decision_id": str(bootstrap_authority.get("owner_decision_id") or "").strip(),
+        "project_id": str(bootstrap_authority.get("project_id") or "").strip(),
+        "work_item_id": str(bootstrap_authority.get("work_item_id") or "").strip(),
+        "bridge_id": str(bootstrap_authority.get("bridge_id") or "").strip(),
+        "authorization_id": str(bootstrap_authority.get("authorization_id") or "").strip(),
+    }
+    missing = [name for name, value in fields.items() if not value]
+    if missing:
+        errors.append("Bootstrap authority is missing required field(s): " + ", ".join(missing))
+
+    proposal_project = extract_metadata_value(proposal, PROJECT_KEYS)
+    proposal_work_item = extract_metadata_value(proposal, WORK_ITEM_KEYS)
+    if proposal_project and proposal_project != fields["project_id"]:
+        errors.append(
+            f"Bootstrap authority project drift: proposal has {proposal_project!r}, claim has {fields['project_id']!r}"
+        )
+    if proposal_work_item and proposal_work_item != fields["work_item_id"]:
+        errors.append(
+            f"Bootstrap authority work-item drift: proposal has {proposal_work_item!r}, claim has "
+            f"{fields['work_item_id']!r}"
+        )
+
+    proposal_text = proposal.lower()
+    if fields["owner_decision_id"] and fields["owner_decision_id"].lower() not in proposal_text:
+        errors.append("Bootstrap authority owner decision is not cited in the approved proposal")
+    if fields["authorization_id"] and fields["authorization_id"].lower() not in proposal_text:
+        errors.append("Bootstrap authority authorization id is not cited in the approved proposal")
+
+    marker_text = proposal_text.replace("-", "_")
+    if "project_authorization_bootstrap" not in marker_text and "project authorization bootstrap" not in marker_text:
+        errors.append("Approved proposal does not declare a project-authorization bootstrap marker")
+
+    carrier_targets = [
+        normalize_target_pattern(str(target))
+        for target in bootstrap_authority.get("carrier_targets", [])
+        if str(target).strip()
+    ]
+    if not carrier_targets:
+        errors.append("Bootstrap authority declares no carrier targets")
+    unauthorized = [
+        target
+        for target in target_paths
+        if not any(_target_pattern_authorizes_path(carrier, target) for carrier in carrier_targets)
+    ]
+    if unauthorized:
+        errors.append("Bootstrap authority target outside carrier scope: " + ", ".join(unauthorized))
+    return errors
 
 
 def write_packet(project_root: Path, packet: dict[str, Any]) -> Path:
@@ -1662,6 +1889,139 @@ def write_named_packet(project_root: Path, packet: dict[str, Any], bridge_id: st
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+def _worker_harness_selector() -> str | None:
+    """Return the acting harness only as a worker-document selector."""
+    configured = os.environ.get("GTKB_HARNESS_NAME", "").strip()
+    if configured:
+        return configured
+    if os.environ.get("GTKB_BRIDGE_POLLER_RUN_ID"):
+        return None
+    if os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDECODE"):
+        return "claude"
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_HOME"):
+        return "codex"
+    return None
+
+
+def finalize_implementation_start_packet(
+    project_root: Path,
+    packet: dict[str, Any],
+    *,
+    session_id: str,
+) -> dict[str, Any]:
+    """Bind live PAUTH, claim, and worker-role evidence before durable start."""
+    if packet_hash(packet) != packet.get("packet_hash"):
+        raise AuthorizationError("Cannot finalize an implementation-start packet with a hash mismatch")
+    bridge_id = str(packet.get("bridge_id") or "")
+    if not bridge_id:
+        raise AuthorizationError("Cannot finalize implementation start without a bridge_id")
+    if not session_id.strip():
+        raise AuthorizationError("Cannot finalize implementation start without a session id")
+
+    block_reason = work_intent_claim_block_reason(project_root, bridge_id, session_id)
+    if block_reason:
+        raise AuthorizationError(block_reason)
+    try:
+        holder = bridge_work_intent_registry.current_holder(bridge_id, project_root=project_root)
+    except bridge_work_intent_registry.WorkIntentRegistryError as exc:
+        raise AuthorizationError(f"Could not read work-intent evidence for {bridge_id!r}: {exc}") from exc
+    if holder is None:
+        raise AuthorizationError(f"No active work-intent evidence exists for {bridge_id!r}")
+    claim_kind = holder.get("claim_kind")
+    if claim_kind not in {
+        bridge_work_intent_registry.CLAIM_KIND_GO_IMPLEMENTATION,
+        bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+    }:
+        raise AuthorizationError(
+            f"Bridge {bridge_id!r} does not have a GO-implementation claim or project_authorization_bootstrap claim"
+        )
+
+    try:
+        from groundtruth_kb.session.envelope import EnvelopeError, resolve_worker_role_provenance
+
+        provenance = resolve_worker_role_provenance(
+            project_root,
+            current_session_id=session_id,
+            harness_name=_worker_harness_selector(),
+        )
+    except (EnvelopeError, OSError, ValueError) as exc:
+        raise AuthorizationError(f"Could not validate worker-session provenance for {session_id!r}: {exc}") from exc
+    if provenance.get("role") != "prime-builder":
+        raise AuthorizationError(
+            f"Implementation start requires prime-builder worker provenance, found {provenance.get('role')!r}"
+        )
+    if holder.get("acting_role") != provenance.get("role"):
+        raise AuthorizationError("Work-intent acting role does not match the validated worker-session provenance")
+
+    target_paths = [str(path) for path in packet.get("target_path_globs", [])]
+    current_authorization = validate_packet_project_authorization_operation(
+        project_root,
+        packet,
+        requested_operations=["implementation_start"],
+        target_paths=target_paths,
+    )
+    pre_start_packet_hash = str(packet["packet_hash"])
+    claim_fields = (
+        "thread_slug",
+        "session_id",
+        "acquired_at",
+        "ttl_expires_at",
+        "claim_kind",
+        "acting_role",
+        "project_id",
+        "implementation_deadline",
+        "implementation_grace_expires_at",
+        "extensions_used",
+        "extension_cap_seconds",
+        "bootstrap_owner_decision_id",
+        "bootstrap_project_id",
+        "bootstrap_work_item_id",
+        "bootstrap_authorization_id",
+        "bootstrap_carrier_targets",
+        "bootstrap_consumed_at",
+    )
+    finalized = dict(packet)
+    finalized.pop("packet_hash", None)
+    finalized["schema_version"] = 3
+    bootstrap_authority = finalized.get("bootstrap_authority")
+    if isinstance(bootstrap_authority, dict):
+        bootstrap_authority = dict(bootstrap_authority)
+        bootstrap_authority["pre_start_packet_hash"] = pre_start_packet_hash
+        bootstrap_authority["work_intent_claim"] = {field: holder.get(field) for field in claim_fields}
+        finalized["bootstrap_authority"] = bootstrap_authority
+    finalized["implementation_start"] = {
+        "schema_version": 1,
+        "finalized_at": now_iso(),
+        "bridge_id": bridge_id,
+        "session_id": session_id,
+        "pre_start_packet_hash": pre_start_packet_hash,
+        "target_path_globs": target_paths,
+        "work_intent_claim": {field: holder.get(field) for field in claim_fields},
+        "worker_role_provenance": dict(provenance),
+        "project_authorization_decision": (
+            current_authorization.get("operation_time_decisions", [None])[0]
+            if current_authorization is not None
+            else None
+        ),
+    }
+    finalized["packet_hash"] = packet_hash(finalized)
+    return finalized
+
+
+def write_started_packets(project_root: Path, packets: list[dict[str, Any]]) -> None:
+    """Write an already-finalized packet set named-first and current-last."""
+    if not packets:
+        return
+    for packet in packets:
+        if packet.get("schema_version") != 3 or not isinstance(packet.get("implementation_start"), dict):
+            raise AuthorizationError("Durable implementation-start writes require a finalized schema-v3 packet")
+        if packet_hash(packet) != packet.get("packet_hash"):
+            raise AuthorizationError("Durable implementation-start packet hash mismatch")
+    for packet in packets:
+        write_named_packet(project_root, packet, str(packet["bridge_id"]))
+    write_packet(project_root, packets[0])
 
 
 def issue_dispatch_authorization_packets(
@@ -1697,9 +2057,10 @@ def issue_dispatch_authorization_packets(
         )
         for bridge_id in bridge_ids
     ]
-    for bridge_id, packet in zip(bridge_ids, packets, strict=True):
-        write_named_packet(project_root, packet, bridge_id)
-    write_packet(project_root, packets[0])
+    if not session_id:
+        raise AuthorizationError("Automated dispatch packet issuance requires a worker session id")
+    packets = [finalize_implementation_start_packet(project_root, packet, session_id=session_id) for packet in packets]
+    write_started_packets(project_root, packets)
     return {
         "dispatch_id": dispatch_id,
         "bridge_ids": list(bridge_ids),
@@ -1713,6 +2074,142 @@ def issue_dispatch_authorization_packets(
             for packet in packets
         ],
     }
+
+
+def _validate_bootstrap_packet_authority(
+    project_root: Path,
+    packet: dict[str, Any],
+    *,
+    requested_operations: list[str],
+    target_paths: list[str],
+) -> dict[str, Any] | None:
+    authority = packet.get("bootstrap_authority")
+    if authority is None:
+        return None
+    if not isinstance(authority, dict):
+        raise AuthorizationError("Bootstrap authority metadata is invalid")
+    if packet.get("schema_version") not in {2, 3}:
+        raise AuthorizationError("Bootstrap implementation authorization packet uses a legacy schema")
+    if authority.get("claim_kind") != bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
+        raise AuthorizationError("Bootstrap authority has an invalid claim_kind")
+
+    bridge_id = str(packet.get("bridge_id") or "")
+    authority_bridge_id = str(authority.get("bridge_id") or "")
+    if not bridge_id or authority_bridge_id != bridge_id:
+        raise AuthorizationError("Bootstrap authority bridge_id drifted from the packet bridge_id")
+    required_fields = ("owner_decision_id", "project_id", "work_item_id", "authorization_id")
+    missing = [field for field in required_fields if not str(authority.get(field) or "").strip()]
+    if missing:
+        raise AuthorizationError("Bootstrap authority missing required field(s): " + ", ".join(missing))
+
+    single_use = authority.get("single_use")
+    if not isinstance(single_use, dict):
+        raise AuthorizationError("Bootstrap authority missing single_use state")
+    if single_use.get("consumed"):
+        raise AuthorizationError("Bootstrap authority has already been consumed")
+
+    carrier_targets = [str(target) for target in authority.get("carrier_targets", []) if str(target).strip()]
+    if not carrier_targets:
+        raise AuthorizationError("Bootstrap authority declares no carrier targets")
+    unauthorized = [
+        target
+        for target in target_paths
+        if not any(_target_pattern_authorizes_path(carrier, target) for carrier in carrier_targets)
+    ]
+    if unauthorized:
+        raise AuthorizationError("Bootstrap authority target outside carrier scope: " + ", ".join(unauthorized))
+
+    try:
+        holder = bridge_work_intent_registry.current_holder(bridge_id, project_root=project_root)
+    except bridge_work_intent_registry.WorkIntentRegistryError as exc:
+        raise AuthorizationError(f"Could not read bootstrap work-intent evidence for {bridge_id!r}: {exc}") from exc
+    if holder is None:
+        raise AuthorizationError(f"No active bootstrap work-intent claim exists for {bridge_id!r}")
+    if holder.get("claim_kind") != bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP:
+        raise AuthorizationError(f"Bridge {bridge_id!r} does not have a project_authorization_bootstrap claim")
+    holder_authority = bridge_work_intent_registry.bootstrap_authority_from_claim(holder)
+    if holder_authority is None:
+        raise AuthorizationError(f"Bridge {bridge_id!r} has no readable bootstrap authority claim metadata")
+    drifted = [
+        field
+        for field in ("owner_decision_id", "project_id", "work_item_id", "bridge_id", "authorization_id")
+        if holder_authority.get(field) != authority.get(field)
+    ]
+    if holder_authority.get("carrier_targets") != authority.get("carrier_targets"):
+        drifted.append("carrier_targets")
+    if drifted:
+        raise AuthorizationError("Bootstrap authority drifted since packet creation: " + ", ".join(drifted))
+
+    start = packet.get("implementation_start")
+    if packet.get("schema_version") == 3:
+        if not isinstance(start, dict):
+            raise AuthorizationError("Bootstrap schema-v3 packet is missing implementation_start")
+        if str(start.get("session_id") or "") != str(holder.get("session_id") or ""):
+            raise AuthorizationError("Bootstrap authority session drifted from the active claim")
+        if authority.get("pre_start_packet_hash") != start.get("pre_start_packet_hash"):
+            raise AuthorizationError("Bootstrap authority pre-start packet hash drifted")
+    normalized_operations = [
+        re.sub(r"[^a-z0-9]+", "_", operation.strip().lower()).strip("_") for operation in requested_operations
+    ]
+    return {
+        "id": authority["authorization_id"],
+        "project_id": authority["project_id"],
+        "work_item_id": authority["work_item_id"],
+        "bootstrap_authority": dict(authority),
+        "target_classifications": [
+            {"path": normalize_target_pattern(path), "mutation_class": "project_authorization_carrier"}
+            for path in target_paths
+        ],
+        "requested_operations": normalized_operations,
+        "operation_time_decisions": [
+            {
+                "allowed": True,
+                "normalized_operation": operation,
+                "reason_code": "project_authorization_bootstrap_carrier",
+                "reason": "Bootstrap authority permits only the declared project-authorization carrier target(s).",
+            }
+            for operation in normalized_operations
+        ],
+    }
+
+
+def validate_packet_project_authorization_operation(
+    project_root: Path,
+    packet: dict[str, Any],
+    *,
+    requested_operations: list[str],
+    target_paths: list[str],
+) -> dict[str, Any] | None:
+    """Reevaluate a packet-bound PAUTH against current state and exact targets."""
+    bootstrap_decision = _validate_bootstrap_packet_authority(
+        project_root,
+        packet,
+        requested_operations=requested_operations,
+        target_paths=target_paths,
+    )
+    if bootstrap_decision is not None:
+        return bootstrap_decision
+    project_authorization = packet.get("project_authorization")
+    if not isinstance(project_authorization, dict):
+        return None
+    if packet.get("schema_version") not in {2, 3}:
+        raise AuthorizationError(
+            "PAUTH-backed implementation authorization packet uses a legacy schema; reissue the packet."
+        )
+    authorization_id = str(project_authorization.get("id") or "")
+    if not authorization_id:
+        raise AuthorizationError("Implementation authorization packet has invalid project_authorization metadata")
+    row = _project_authorization_row(project_root, authorization_id)
+    current = validate_project_authorization_row(
+        project_root,
+        row,
+        proposal_project_id=project_authorization.get("proposal_project_id"),
+        work_item_id=project_authorization.get("work_item_id"),
+        spec_links=packet_spec_links(packet),
+    )
+    if current["project_id"] != project_authorization.get("project_id"):
+        raise AuthorizationError("Project authorization project_id drifted since packet creation")
+    return current
 
 
 def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
@@ -1778,21 +2275,12 @@ def _validate_packet(project_root: Path, packet: dict[str, Any]) -> None:
             f"Bridge thread is NO-ACTION (at {entry.latest_path}); the pinned GO "
             f"is non-dispatchable until a later corrected GO becomes latest."
         )
-    project_authorization = packet.get("project_authorization")
-    if isinstance(project_authorization, dict):
-        authorization_id = str(project_authorization.get("id") or "")
-        if not authorization_id:
-            raise AuthorizationError("Implementation authorization packet has invalid project_authorization metadata")
-        row = _project_authorization_row(project_root, authorization_id)
-        current = validate_project_authorization_row(
-            project_root,
-            row,
-            proposal_project_id=project_authorization.get("proposal_project_id"),
-            work_item_id=project_authorization.get("work_item_id"),
-            spec_links=packet_spec_links(packet),
-        )
-        if current["project_id"] != project_authorization.get("project_id"):
-            raise AuthorizationError("Project authorization project_id drifted since packet creation")
+    validate_packet_project_authorization_operation(
+        project_root,
+        packet,
+        requested_operations=["implementation_packet_load"],
+        target_paths=[str(path) for path in packet.get("target_path_globs", [])],
+    )
 
 
 def load_packet(project_root: Path) -> dict[str, Any]:
@@ -2238,8 +2726,8 @@ def main(argv: list[str] | None = None) -> int:
                 session_id=session_id,
             )
             if not args.no_write:
-                write_packet(root, packet)
-                write_named_packet(root, packet, args.bridge_id)
+                packet = finalize_implementation_start_packet(root, packet, session_id=session_id)
+                write_started_packets(root, [packet])
             print(json.dumps(packet, indent=2, sort_keys=True))
             return 0
         if args.command == "validate":

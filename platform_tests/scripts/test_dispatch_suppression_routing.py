@@ -7,15 +7,14 @@ A last-24h analysis found 1,997 ``work_intent_already_held`` rows polluting the
 failure log versus 233 real ``implementation_authorization_packet_failed`` rows,
 burying actionable failures in the dispatch ``diagnose`` "Recent failures" view.
 The fix routes expected, non-actionable lease/contention suppressions by
-``reason`` at the single shared writer ``_record_dispatch_failure`` so both
-dispatch substrates (the cross-harness trigger and the single-harness
-dispatcher, which reuses the same writer) are covered with no call-site changes.
+``reason`` at the single shared writer ``_record_dispatch_failure`` in the
+dispatcher runtime.
 
 Authority: bridge ``gtkb-wi4396-dispatch-suppression-routing`` GO at ``-004``.
 
 Specs:
 - GOV-STANDING-BACKLOG-001 (WI-4396 backlog authority)
-- .claude/rules/bridge-essential.md § "Dual-Substrate Coexistence"
+- .claude/rules/bridge-essential.md § "Dispatcher-Only Substrate"
   (fire-and-forget audit-log discipline preserved for both files)
 - DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001
 """
@@ -31,7 +30,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import cross_harness_bridge_trigger as cht  # noqa: E402
+import dispatcher_runtime as cht  # noqa: E402
 
 FAILURES = "dispatch-failures.jsonl"
 SUPPRESSIONS = "dispatch-suppressions.jsonl"
@@ -88,21 +87,16 @@ def test_real_failure_stays_in_failures(tmp_path: Path) -> None:
     assert _records(state_dir / SUPPRESSIONS) == []
 
 
-def test_single_harness_dispatcher_uses_shared_chokepoint() -> None:
-    """Acceptance criterion #3: the single-harness dispatcher REUSES
-    ``trigger._record_dispatch_failure`` (no independent failure/suppression
-    writer of its own), so the reason-based routing applies to both substrates.
-
-    Verified by source inspection: the dispatcher calls
-    ``trigger._record_dispatch_failure(`` and defines neither
-    ``_record_dispatch_failure`` nor ``_record_dispatch_suppression``."""
-    dispatcher_src = (REPO_ROOT / "scripts" / "single_harness_bridge_dispatcher.py").read_text(encoding="utf-8")
-    assert "trigger._record_dispatch_failure(" in dispatcher_src
+def test_daemon_uses_runtime_shared_chokepoint() -> None:
+    """Acceptance criterion #3: the daemon loads the dispatcher runtime instead
+    of defining an independent failure/suppression writer."""
+    dispatcher_src = (REPO_ROOT / "scripts" / "gtkb_dispatcher_daemon.py").read_text(encoding="utf-8")
+    assert "_load_dispatch_runtime" in dispatcher_src
     assert "def _record_dispatch_failure(" not in dispatcher_src
     assert "def _record_dispatch_suppression(" not in dispatcher_src
 
     # The shared writer is the canonical routing point; confirm the routing
-    # constant + helper it depends on exist on the trigger module the dispatcher
+    # constant + helper it depends on exist on the runtime module the dispatcher
     # imports.
     assert "work_intent_already_held" in cht.EXPECTED_SUPPRESSION_REASONS
     assert hasattr(cht, "_record_dispatch_suppression")

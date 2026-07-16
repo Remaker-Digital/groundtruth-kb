@@ -20,11 +20,13 @@ EXPECTED_IDENTITIES = {
     "ollama": "D",
     "cursor": "E",
     "openrouter": "F",
+    "goose": "G",
+    "alibaba-cloud-studio": "H",
 }
 VALID_ROLES = {"prime-builder", "loyal-opposition"}
 VALID_STATUSES = {"active", "suspended", "retired"}
 EXPECTED_EVENT_SOURCES: set[str] = set()
-EXPECTED_DISPATCH_TARGETS = {"A", "B", "C"}
+EXPECTED_RULE_HARNESS_IDS = {"A", "B", "C", "D", "E", "F", "H"}
 
 
 def _read_json(relative_path: str) -> dict[str, Any]:
@@ -73,7 +75,12 @@ def test_durable_harness_identity_and_role_surfaces_cover_expected_harnesses() -
     assert all(row["status"] in {"suspended", "retired"} for row in suspended_or_retired_rows)
 
     assert {row["id"] for row in registry["harnesses"] if row["can_fire_events"]} == EXPECTED_EVENT_SOURCES
-    assert {row["id"] for row in registry["harnesses"] if row["can_receive_dispatch"]} == EXPECTED_DISPATCH_TARGETS
+    dispatch_targets = [row for row in registry["harnesses"] if row["can_receive_dispatch"]]
+    assert dispatch_targets
+    assert all(row["status"] == "active" for row in dispatch_targets)
+    assert any("prime-builder" in row["role"] for row in dispatch_targets)
+    assert any("loyal-opposition" in row["role"] for row in dispatch_targets)
+    assert any("low-cost" in row["dispatch_tags"] for row in dispatch_targets)
     for harness_id, row in registry_by_id.items():
         assert row["event_driven_hooks"] is (harness_id in EXPECTED_EVENT_SOURCES)
 
@@ -82,7 +89,7 @@ def test_dispatcher_status_rules_match_prime_and_lo_bridge_boundaries() -> None:
     rules_config = _read_toml("config/dispatcher/rules.toml")
 
     harness_ids = set(rules_config["harnesses"])
-    assert set(EXPECTED_IDENTITIES.values()).issubset(harness_ids)
+    assert EXPECTED_RULE_HARNESS_IDS.issubset(harness_ids)
 
     rule_by_id = {rule["id"]: rule for rule in rules_config["rules"]}
     prime_rule = rule_by_id["bridge-prime-builder-default"]
@@ -202,11 +209,15 @@ def test_hook_fallback_surfaces_distinguish_event_sources_from_dispatch_targets(
 
     assert event_sources == EXPECTED_EVENT_SOURCES
     assert dispatch_only == set(EXPECTED_IDENTITIES.values())
-    assert dispatch_targets == EXPECTED_DISPATCH_TARGETS
+    assert dispatch_targets
+    assert all(by_id[harness_id]["status"] == "active" for harness_id in dispatch_targets)
+    assert any("prime-builder" in by_id[harness_id]["role"] for harness_id in dispatch_targets)
+    assert any("loyal-opposition" in by_id[harness_id]["role"] for harness_id in dispatch_targets)
+    assert any("low-cost" in by_id[harness_id]["dispatch_tags"] for harness_id in dispatch_targets)
     inactive_targets = {
         harness_id for harness_id in EXPECTED_IDENTITIES.values() if not by_id[harness_id]["can_receive_dispatch"]
     }
-    assert inactive_targets == {"D", "E", "F"}
+    assert inactive_targets == set(EXPECTED_IDENTITIES.values()) - dispatch_targets
 
     forbidden_hook_dispatch = (
         "cross_" + "harness_" + "bridge_" + "trigger.py",

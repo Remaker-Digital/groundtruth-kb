@@ -1,0 +1,191 @@
+diff --git a/platform_tests/scripts/test_dispatcher_runtime.py b/platform_tests/scripts/test_dispatcher_runtime.py
+index 2ca5e99a..b5ef52b9 100644
+--- a/platform_tests/scripts/test_dispatcher_runtime.py
++++ b/platform_tests/scripts/test_dispatcher_runtime.py
+@@ -400,27 +400,46 @@ def _write_authorized_go_thread(root: Path, doc: str, target_paths: list[str] |
+     return f"# bridge index\n\nDocument: {doc}\nGO: bridge/{doc}-002.md\nNEW: bridge/{doc}.md\n"
+
+
+ def _write_prime_worker_session_document(root: Path, session_id: str) -> None:
+     """Provide document-authoritative role evidence for GO-claim fixtures."""
++    _write_worker_session_document(
++        root,
++        session_id=session_id,
++        harness_id="B",
++        harness_name="claude",
++        role="prime-builder",
++    )
++
++
++def _write_worker_session_document(
++    root: Path,
++    *,
++    session_id: str,
++    harness_id: str,
++    harness_name: str,
++    role: str,
++    dispatch_run_id: str | None = None,
++) -> None:
++    """Provide document-authoritative role evidence for dispatcher fixtures."""
+     document = {
+         "status": "open",
+         "session_id": session_id,
+-        "harness_id": "B",
+-        "harness_name": "claude",
++        "harness_id": harness_id,
++        "harness_name": harness_name,
+         "worker_role_provenance": {
+             "schema_version": 1,
+             "session_id": session_id,
+-            "harness_id": "B",
+-            "harness_name": "claude",
+-            "role": "prime-builder",
++            "harness_id": harness_id,
++            "harness_name": harness_name,
++            "role": role,
+             "role_resolution_source": "test-fixture",
+             "issued_at": "2026-06-22T00:00:00Z",
+-            "dispatch_run_id": None,
++            "dispatch_run_id": dispatch_run_id,
+         },
+     }
+-    path = root / "harness-state" / "claude" / "session-envelopes" / f"{session_id}.json"
++    path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+     path.parent.mkdir(parents=True, exist_ok=True)
+     path.write_text(json.dumps(document), encoding="utf-8")
+
+
+ def _index_with_one_new(root: Path, doc: str = "example-thread") -> str:
+@@ -8003,10 +8077,71 @@ def test_exit_reconciliation_writes_partial_shim_telemetry_without_worker_output
+     assert payload["usage"]["coverage"] == "unavailable"
+     assert payload["usage"]["input_tokens"] is None
+     assert recipients["prime-builder:A"]["last_launch"]["telemetry_reconciliation"] == "reconciled"
+
+
++def test_wi5255_exit_reconciliation_uses_trusted_worker_context(tmp_path: Path) -> None:
++    trigger = _load_trigger()
++    root = tmp_path / "project"
++    root.mkdir()
++    bridge_dir = root / "bridge"
++    bridge_dir.mkdir()
++    (bridge_dir / "telemetry-thread-001.md").write_text("NEW\nWork Item: WI-5255\n", encoding="utf-8")
++    state_dir = root / ".gtkb-state" / "bridge-poller"
++    runs_dir = state_dir / "dispatch-runs"
++    runs_dir.mkdir(parents=True)
++    dispatch_id = "dispatch-exit-worker-context"
++    _write_worker_session_document(
++        root,
++        session_id=dispatch_id,
++        harness_id="B",
++        harness_name="claude",
++        role="loyal-opposition",
++        dispatch_run_id=dispatch_id,
++    )
++    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
++    stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
++    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
++    stdout_path.write_text("", encoding="utf-8")
++    stderr_path.write_text("", encoding="utf-8")
++    recipients = {
++        "loyal-opposition:B": {
++            "last_launch": {
++                "dispatch_id": dispatch_id,
++                "launched": True,
++                "launched_at": "2026-07-10T10:00:00Z",
++                "stdout_path": str(stdout_path),
++                "stderr_path": str(stderr_path),
++                "signature": "signature",
++                "needed_role_label": "loyal-opposition",
++                "primary_bridge_id": "telemetry-thread",
++                "trusted_worker_context": {
++                    "schema_version": 1,
++                    "dispatch_id": dispatch_id,
++                    "session_id": dispatch_id,
++                    "harness_id": "B",
++                    "harness_name": "claude",
++                    "provider": "claude",
++                    "model_id": "claude-sonnet-test",
++                    "role": "loyal-opposition",
++                },
++            }
++        }
++    }
++
++    trigger._process_pending_exit_codes(recipients, state_dir, root)
++
++    telemetry_path = runs_dir / f"{dispatch_id}.telemetry.json"
++    payload = json.loads(telemetry_path.read_text(encoding="utf-8"))
++    assert payload["worker"]["harness_id"] == "B"
++    assert payload["worker"]["harness_name"] == "claude"
++    assert payload["worker"]["model_id"] == "claude-sonnet-test"
++    assert payload["worker"]["role"] == "loyal-opposition"
++    assert payload["worker"]["role_source_document_id"].endswith(f"{dispatch_id}.json")
++    assert recipients["loyal-opposition:B"]["last_launch"]["telemetry_reconciliation"] == "reconciled"
++
++
+ def test_wi5221_prime_worker_session_writes_exact_dispatch_authority(tmp_path: Path) -> None:
+     trigger = _load_trigger()
+     root = _make_synthetic_project(tmp_path)
+     state_dir = root / ".gtkb-state" / "bridge-poller"
+     dispatch_id = "2026-07-13T03-00-00Z-prime-builder-B-wi5221"
+@@ -8037,10 +8172,45 @@ def test_wi5221_prime_worker_session_writes_exact_dispatch_authority(tmp_path: P
+     assert envelope["worker_role_provenance"]["role"] == "prime-builder"
+     assert envelope["worker_role_provenance"]["role_resolution_source"] == "dispatcher_composition"
+     assert envelope["worker_role_provenance"]["dispatch_run_id"] == dispatch_id
+
+
++def test_wi5255_lo_worker_session_writes_exact_dispatch_authority(tmp_path: Path) -> None:
++    trigger = _load_trigger()
++    root = _make_synthetic_project(tmp_path)
++    state_dir = root / ".gtkb-state" / "bridge-poller"
++    dispatch_id = "2026-07-15T03-00-00Z-loyal-opposition-A-wi5255"
++    target = trigger.DispatchTarget(
++        needed_role_label="loyal-opposition",
++        harness_id="A",
++        command_handle="codex",
++        canonical_mode="lo",
++    )
++
++    result = trigger._ensure_dispatch_worker_session(
++        project_root=root,
++        state_dir=state_dir,
++        target=target,
++        recipient=target.dispatch_state_key,
++        dispatch_id=dispatch_id,
++        session_id=dispatch_id,
++    )
++
++    assert result["ok"] is True
++    assert result["trusted_worker_context"]["role"] == "loyal-opposition"
++    envelope_path = root / "harness-state" / "codex" / "session-envelopes" / f"{dispatch_id}.json"
++    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
++    assert envelope["session_id"] == dispatch_id
++    assert envelope["harness_id"] == "A"
++    assert envelope["harness_name"] == "codex"
++    assert envelope["init_keyword"] == "::init gtkb lo"
++    assert envelope["role_resolved"] == "loyal-opposition"
++    assert envelope["worker_role_provenance"]["role"] == "loyal-opposition"
++    assert envelope["worker_role_provenance"]["role_resolution_source"] == "dispatcher_composition"
++    assert envelope["worker_role_provenance"]["dispatch_run_id"] == dispatch_id
++
++
+ def test_wi5221_prime_worker_session_failure_is_classified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+     trigger = _load_trigger()
+     root = _make_synthetic_project(tmp_path)
+     state_dir = root / ".gtkb-state" / "bridge-poller"
+     dispatch_id = "2026-07-13T03-01-00Z-prime-builder-B-wi5221"
+@@ -8076,12 +8246,12 @@ def test_wi5221_prime_worker_session_failure_is_classified(tmp_path: Path, monke
+     assert failures[-1]["dispatch_id"] == dispatch_id
+
+
+ def test_wi5221_runtime_establishes_authority_before_claim_and_spawn() -> None:
+     source = _SCRIPT_PATH.read_text(encoding="utf-8")
+-    start = source.index('if target.needed_role_label == "prime-builder" and not dry_run:')
+-    authority = source.index("worker_session_result = _ensure_prime_worker_session(", start)
++    start = source.index("trusted_worker_context: dict[str, Any] | None = None")
++    authority = source.index("worker_session_result = _ensure_dispatch_worker_session(", start)
+     claim = source.index("acquire_result = _acquire_prime_work_intent_batch(", authority)
+     spawn = source.index("launch = _spawn_harness(", claim)
+
+     assert authority < claim < spawn
+     failure_branch = source[authority:claim]

@@ -346,6 +346,7 @@ class HarnessDispatchConfig:
     dispatch_quality: float | None = None
     dispatch_availability: float | None = None
     max_items: int | None = None
+    max_items_override: bool = False
     tags: tuple[str, ...] = ()
 
     @classmethod
@@ -357,7 +358,8 @@ class HarnessDispatchConfig:
             dispatch_cost=_optional_float(raw.get("dispatch_cost", raw.get("cost"))),
             dispatch_quality=_optional_float(raw.get("dispatch_quality", raw.get("quality"))),
             dispatch_availability=_optional_float(raw.get("dispatch_availability", raw.get("availability"))),
-            max_items=_optional_int(raw.get("max_items")),
+            max_items=_valid_dispatch_max_items(raw.get("max_items")),
+            max_items_override=_optional_bool(raw.get("max_items_override")) is True,
             tags=_string_tuple(raw.get("tags")),
         )
 
@@ -370,6 +372,7 @@ class HarnessDispatchConfig:
             "dispatch_quality": self.dispatch_quality,
             "dispatch_availability": self.dispatch_availability,
             "max_items": self.max_items,
+            "max_items_override": self.max_items_override,
             "tags": list(self.tags),
         }
 
@@ -611,8 +614,22 @@ def apply_dispatch_config_to_record(
     if overlay is None:
         return record
     updated = dict(record)
-    if overlay.max_items is not None:
+    canonical_max_items = _valid_dispatch_max_items(updated.get("dispatch_max_items"))
+    existing_source = str(updated.get("dispatch_max_items_source") or "").strip()
+    if existing_source == "dispatcher_config_fallback":
+        # collect_bridge_dispatch_status() applies the overlay before candidate
+        # selection applies it again. Do not relabel our own fallback as a
+        # canonical registry value on the second pass.
+        canonical_max_items = None
+    if overlay.max_items_override and overlay.max_items is not None:
         updated["dispatch_max_items"] = overlay.max_items
+        updated["dispatch_max_items_source"] = "dispatcher_config_override"
+    elif canonical_max_items is not None:
+        updated["dispatch_max_items"] = canonical_max_items
+        updated["dispatch_max_items_source"] = "harness_registry"
+    elif overlay.max_items is not None:
+        updated["dispatch_max_items"] = overlay.max_items
+        updated["dispatch_max_items_source"] = "dispatcher_config_fallback"
     if overlay.tags:
         updated["dispatch_tags"] = list(overlay.tags)
     return updated
@@ -1908,6 +1925,7 @@ def _candidate_summary(record: dict[str, Any]) -> dict[str, Any]:
         "dispatch_quality": record.get("dispatch_quality"),
         "dispatch_availability": record.get("dispatch_availability"),
         "dispatch_max_items": record.get("dispatch_max_items"),
+        "dispatch_max_items_source": record.get("dispatch_max_items_source"),
         "dispatch_quality_evidence_status": record.get("dispatch_quality_evidence_status"),
         "dispatch_quality_evidence_ref": record.get("dispatch_quality_evidence_ref"),
     }
@@ -2042,6 +2060,11 @@ def _optional_int(value: Any) -> int | None:
         except ValueError:
             return None
     return None
+
+
+def _valid_dispatch_max_items(value: Any) -> int | None:
+    parsed = _optional_int(value)
+    return parsed if parsed is not None and parsed >= 1 else None
 
 
 def _float_value(value: Any, *, default: float) -> float:

@@ -101,6 +101,8 @@ ALLOWED_REFERENCE_PATTERNS: tuple[tuple[str, str], ...] = (
     ("groundtruth-kb/tests/**", "upstream test fixture"),
     ("platform_tests/**", "platform test fixture"),
     ("scripts/clean_adopter_validation.py", "adopter validation sandbox helper"),
+    ("scripts/deploy/build-context.ps1", "reference-adopter release build-context helper"),
+    ("scripts/deploy/build-and-deploy-staging.ps1", "reference-adopter release build-context helper"),
     ("scripts/rehearse/**", "isolation rehearsal helper"),
     ("scripts/rollback_e1_write_set.py", "isolation migration rollback helper"),
     ("scripts/run_e1_step*.py", "isolation migration helper"),
