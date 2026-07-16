@@ -6492,17 +6492,21 @@ def _check_da_harvest_coverage(target: Path) -> ToolCheck:
 # ── Main entry point ──────────────────────────────────────────────────
 
 
+def _read_bridge_file_status(path: Path) -> str | None:
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _BRIDGE_FILE_STATUS_RE.match(stripped)
+        return match.group(1).upper() if match else None
+    return None
+
+
 def _status_from_bridge_file(path: Path) -> str | None:
     try:
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            match = _BRIDGE_FILE_STATUS_RE.match(stripped)
-            return match.group(1).upper() if match else None
+        return _read_bridge_file_status(path)
     except OSError:
         return None
-    return None
 
 
 def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
@@ -6514,7 +6518,7 @@ def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
         match = _BRIDGE_VERSION_FILE_RE.match(path.name)
         if match is None:
             continue
-        status = _status_from_bridge_file(path)
+        status = _read_bridge_file_status(path)
         if status is None:
             continue
         grouped.setdefault(match.group(1), []).append((int(match.group(2)), status, f"bridge/{path.name}"))
@@ -6534,15 +6538,13 @@ def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
 
 
 def _bridge_file_date(path: Path) -> datetime | None:
-    if not path.is_file():
-        return None
-    try:
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[:80]:
-            match = _BRIDGE_DATE_RE.match(line.strip())
-            if match:
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[:80]:
+        match = _BRIDGE_DATE_RE.match(line.strip())
+        if match:
+            try:
                 return datetime.fromisoformat(match.group(1)).replace(tzinfo=UTC)
-    except OSError:
-        return None
+            except ValueError:
+                continue
     return None
 
 
@@ -6577,7 +6579,8 @@ def check_standing_backlog_health(
     Findings use the severity taxonomy required by GTKB-GOV-010, calibrated by
     GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001:
     implementation-active orphaned-WI=WARN, stale-NO-GO=WARN,
-    missing-evidence=FAIL. Unapproved/future WIs do not require PAUTH coverage.
+    missing-verdict-date=WARN, missing-evidence=FAIL. Unapproved/future WIs do
+    not require PAUTH coverage.
     """
 
     from groundtruth_kb.db import KnowledgeDB
@@ -6654,11 +6657,14 @@ def check_standing_backlog_health(
                 if decided_at is None:
                     findings.append(
                         {
-                            "kind": "missing-evidence",
-                            "severity": "FAIL",
+                            "kind": "missing-verdict-date",
+                            "severity": "WARN",
                             "document": entry["document"],
                             "path": entry["path"],
-                            "message": f"Latest NO-GO file {entry['path']} has no parseable Date line.",
+                            "message": (
+                                f"Latest NO-GO file {entry['path']} has no parseable explicit Date line; "
+                                "add governed verdict metadata before including it in stale-age calculation."
+                            ),
                         }
                     )
                     continue
@@ -6703,6 +6709,7 @@ def check_standing_backlog_health(
             "orphaned_wi_count": sum(1 for finding in findings if finding["kind"] == "orphaned-WI"),
             "non_implementation_uncovered_count": non_implementation_uncovered_count,
             "stale_no_go_count": sum(1 for finding in findings if finding["kind"] == "stale-NO-GO"),
+            "missing_verdict_date_count": sum(1 for finding in findings if finding["kind"] == "missing-verdict-date"),
             "missing_evidence_count": sum(1 for finding in findings if finding["kind"] == "missing-evidence"),
         },
         "findings": findings,
