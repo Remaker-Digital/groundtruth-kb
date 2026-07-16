@@ -141,18 +141,28 @@ def _verified_bridge_finalization_finding(root: Path, rel_path: str) -> dict[str
     }
 
 
-def _live_go_authorization(root: Path, rel_path: str) -> tuple[bool, str | None, list[str]]:
+def _load_live_go_evidence(root: Path) -> tuple[list[dict[str, Any]], list[str], int]:
     errors: list[str] = []
     try:
         packets = list_named_packets(root)
     except Exception as exc:  # noqa: BLE001 - fail closed on authorization subsystem errors.
-        return False, None, [f"could not list implementation authorization packets: {exc}"]
+        return [], [f"could not list implementation authorization packets: {exc}"], 0
 
+    valid_packets: list[dict[str, Any]] = []
     for packet in packets:
         if packet.get("error"):
             errors.append(f"{packet.get('path', '<unknown-packet>')}: {packet['error']}")
             continue
-        if packet.get("valid") is True and path_authorized(packet, rel_path):
+        if packet.get("valid") is True:
+            valid_packets.append(packet)
+    return valid_packets, errors, len(packets)
+
+
+def _live_go_authorization(
+    packets: list[dict[str, Any]], errors: list[str], rel_path: str
+) -> tuple[bool, str | None, list[str]]:
+    for packet in packets:
+        if path_authorized(packet, rel_path):
             return True, str(packet.get("bridge_id") or packet.get("path") or "<unknown-packet>"), errors
     return False, None, errors
 
@@ -167,13 +177,15 @@ def _approved_proposal_after_go(versions: list[tuple[str, str]]) -> str | None:
     return None
 
 
-def _verified_authorization(root: Path, rel_path: str) -> tuple[bool, str | None, list[str]]:
+def _load_verified_evidence(root: Path) -> tuple[list[tuple[str, list[str]]], list[str], int]:
     errors: list[str] = []
+    evidence: list[tuple[str, list[str]]] = []
     by_bridge_dir = root / BY_BRIDGE_PACKETS_REL
     if not by_bridge_dir.is_dir():
-        return False, None, errors
+        return evidence, errors, 0
 
-    for packet_path in sorted(by_bridge_dir.glob("*.json")):
+    packet_paths = sorted(by_bridge_dir.glob("*.json"))
+    for packet_path in packet_paths:
         try:
             packet = json.loads(packet_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -199,18 +211,35 @@ def _verified_authorization(root: Path, rel_path: str) -> tuple[bool, str | None
         except (OSError, AuthorizationError) as exc:
             errors.append(f"{bridge_id}: could not resolve approved proposal target_paths: {exc}")
             continue
+        evidence.append((bridge_id, target_paths))
+    return evidence, errors, len(packet_paths)
+
+
+def _verified_authorization(
+    evidence: list[tuple[str, list[str]]], errors: list[str], rel_path: str
+) -> tuple[bool, str | None, list[str]]:
+    for bridge_id, target_paths in evidence:
         if path_authorized({"target_path_globs": target_paths}, rel_path):
             return True, bridge_id, errors
     return False, None, errors
 
 
-def _evaluate_protected_path(root: Path, rel_path: str) -> dict[str, Any]:
-    go_allowed, go_source, go_errors = _live_go_authorization(root, rel_path)
+def _evaluate_protected_path(
+    rel_path: str,
+    *,
+    live_go_packets: list[dict[str, Any]],
+    live_go_errors: list[str],
+    verified_evidence: list[tuple[str, list[str]]],
+    verified_errors: list[str],
+) -> dict[str, Any]:
+    go_allowed, go_source, go_errors = _live_go_authorization(live_go_packets, live_go_errors, rel_path)
     if go_allowed:
         return {"path": rel_path, "status": "cleared", "evidence": "live_go_packet", "source": go_source}
 
-    verified_allowed, verified_source, verified_errors = _verified_authorization(root, rel_path)
-    if verified_allowed:
+    terminal_allowed, verified_source, terminal_errors = _verified_authorization(
+        verified_evidence, verified_errors, rel_path
+    )
+    if terminal_allowed:
         return {
             "path": rel_path,
             "status": "cleared",
@@ -218,7 +247,7 @@ def _evaluate_protected_path(root: Path, rel_path: str) -> dict[str, Any]:
             "source": verified_source,
         }
 
-    errors = go_errors + verified_errors
+    errors = go_errors + terminal_errors
     finding: dict[str, Any] = {
         "path": rel_path,
         "reason": "protected path lacks live GO authorization packet or terminal VERIFIED bridge evidence",
@@ -244,12 +273,34 @@ def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
             "cleared": [],
             "skipped_unprotected": skipped_unprotected,
             "protected_paths": [],
+            "evidence_summary": {
+                "live_go_packets_scanned": 0,
+                "live_go_packets_valid": 0,
+                "terminal_verified_packets_scanned": 0,
+                "terminal_verified_threads_loaded": 0,
+            },
         }
+
+    live_go_packets: list[dict[str, Any]] = []
+    live_go_errors: list[str] = []
+    live_go_count = 0
+    verified_evidence: list[tuple[str, list[str]]] = []
+    verified_errors: list[str] = []
+    verified_packet_count = 0
+    if protected_paths:
+        live_go_packets, live_go_errors, live_go_count = _load_live_go_evidence(root)
+        verified_evidence, verified_errors, verified_packet_count = _load_verified_evidence(root)
 
     findings: list[dict[str, Any]] = list(bridge_findings)
     cleared: list[dict[str, Any]] = []
     for rel_path in protected_paths:
-        result = _evaluate_protected_path(root, rel_path)
+        result = _evaluate_protected_path(
+            rel_path,
+            live_go_packets=live_go_packets,
+            live_go_errors=live_go_errors,
+            verified_evidence=verified_evidence,
+            verified_errors=verified_errors,
+        )
         if result.get("status") == "cleared":
             cleared.append(result)
         else:
@@ -261,6 +312,12 @@ def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
         "cleared": cleared,
         "skipped_unprotected": skipped_unprotected,
         "protected_paths": protected_paths,
+        "evidence_summary": {
+            "live_go_packets_scanned": live_go_count,
+            "live_go_packets_valid": len(live_go_packets),
+            "terminal_verified_packets_scanned": verified_packet_count,
+            "terminal_verified_threads_loaded": len(verified_evidence),
+        },
     }
 
 

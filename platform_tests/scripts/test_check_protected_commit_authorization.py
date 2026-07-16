@@ -269,3 +269,124 @@ def test_json_shape_for_cli_paths(tmp_path: Path, capsys, monkeypatch: pytest.Mo
     assert exit_code == 1
     assert parsed["status"] == "fail"
     assert parsed["protected_paths"] == ["scripts/foo.py"]
+
+
+def test_evidence_sources_are_loaded_once_for_343_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module()
+    calls = {"live": 0, "verified": 0}
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-verified-001.md").write_text(
+        'NEW\n\ntarget_paths: ["scripts/verified-*.py"]\n', encoding="utf-8"
+    )
+    _packet(tmp_path, "gtkb-verified")
+
+    def live_packets(root):
+        calls["live"] += 1
+        return [
+            {
+                "bridge_id": "gtkb-live",
+                "path": ".gtkb-state/implementation-authorizations/by-bridge/gtkb-live.json",
+                "valid": True,
+                "target_path_globs": ["scripts/live-*.py"],
+                "error": None,
+            }
+        ]
+
+    def verified_entry(root, bridge_id):
+        calls["verified"] += 1
+        return SimpleNamespace(
+            latest_status="VERIFIED",
+            versions=[
+                ("VERIFIED", "bridge/gtkb-verified-003.md"),
+                ("GO", "bridge/gtkb-verified-002.md"),
+                ("NEW", "bridge/gtkb-verified-001.md"),
+            ],
+        )
+
+    monkeypatch.setattr(module, "list_named_packets", live_packets)
+    monkeypatch.setattr(module, "bridge_entry", verified_entry)
+    paths = [f"scripts/live-{index}.py" for index in range(172)] + [
+        f"scripts/verified-{index}.py" for index in range(171)
+    ]
+
+    result = module.evaluate(tmp_path, paths=paths)
+
+    assert result["status"] == "pass"
+    assert len(result["cleared"]) == 343
+    assert calls == {"live": 1, "verified": 1}
+    assert result["evidence_summary"] == {
+        "live_go_packets_scanned": 1,
+        "live_go_packets_valid": 1,
+        "terminal_verified_packets_scanned": 1,
+        "terminal_verified_threads_loaded": 1,
+    }
+
+
+def test_live_go_precedence_and_errors_match_snapshot_decisions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    (bridge_dir / "gtkb-verified-001.md").write_text(
+        'NEW\n\ntarget_paths: ["scripts/shared.py", "scripts/verified.py"]\n', encoding="utf-8"
+    )
+    _packet(tmp_path, "gtkb-verified")
+    monkeypatch.setattr(
+        module,
+        "list_named_packets",
+        lambda root: [
+            {
+                "bridge_id": None,
+                "path": ".gtkb-state/implementation-authorizations/by-bridge/bad.json",
+                "valid": False,
+                "target_path_globs": [],
+                "error": "corrupt or unreadable",
+            },
+            {
+                "bridge_id": "gtkb-live",
+                "path": ".gtkb-state/implementation-authorizations/by-bridge/gtkb-live.json",
+                "valid": True,
+                "target_path_globs": ["scripts/shared.py"],
+                "error": None,
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        module,
+        "bridge_entry",
+        lambda root, bridge_id: SimpleNamespace(
+            latest_status="VERIFIED",
+            versions=[
+                ("VERIFIED", "bridge/gtkb-verified-003.md"),
+                ("GO", "bridge/gtkb-verified-002.md"),
+                ("NEW", "bridge/gtkb-verified-001.md"),
+            ],
+        ),
+    )
+
+    result = module.evaluate(
+        tmp_path,
+        paths=["scripts/shared.py", "scripts/verified.py", "scripts/unauthorized.py"],
+    )
+
+    assert result["status"] == "fail"
+    assert result["cleared"] == [
+        {
+            "path": "scripts/shared.py",
+            "status": "cleared",
+            "evidence": "live_go_packet",
+            "source": "gtkb-live",
+        },
+        {
+            "path": "scripts/verified.py",
+            "status": "cleared",
+            "evidence": "terminal_verified_bridge_thread",
+            "source": "gtkb-verified",
+        },
+    ]
+    assert result["findings"][0]["path"] == "scripts/unauthorized.py"
+    assert result["findings"][0]["evidence_errors"] == [
+        ".gtkb-state/implementation-authorizations/by-bridge/bad.json: corrupt or unreadable"
+    ]
