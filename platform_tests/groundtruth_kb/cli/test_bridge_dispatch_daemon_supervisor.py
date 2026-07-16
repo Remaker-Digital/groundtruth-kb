@@ -335,3 +335,54 @@ def test_cli_supervisor_disable_accepts_ttl_guard(monkeypatch):
     payload = json.loads(result.output)
     assert payload["disable_guard"]["ok"] is True
     assert payload["disable_guard"]["records"][0]["task_name"] == "GTKB-DispatcherDaemon"
+
+
+def test_cli_supervisor_enable_supersedes_guard_and_reports_write_warning(monkeypatch):
+    from groundtruth_kb.cli import main
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.enable_supervisor",
+        lambda *, task_name: {"action": "enable", "task_name": task_name},
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(DispatcherDisableGuardError("write failed")),
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.disable_supervisor",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not compensate with disable")),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "daemon", "supervisor", "enable", "--task-name", "exact-task"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Enabled supervisor task exact-task." in result.output
+    assert "Warning: write failed" in result.output
+
+
+def test_cli_supervisor_enable_failure_does_not_supersede_guard(monkeypatch):
+    from groundtruth_kb.cli import main
+    from groundtruth_kb.dispatcher_supervisor import DispatcherSupervisorError
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_supervisor.enable_supervisor",
+        lambda **_kwargs: (_ for _ in ()).throw(DispatcherSupervisorError("enable failed")),
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not supersede")),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "daemon", "supervisor", "enable"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code != 0
+    assert "enable failed" in result.output

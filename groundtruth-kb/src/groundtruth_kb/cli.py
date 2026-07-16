@@ -1382,6 +1382,27 @@ def _record_dispatch_disable_guard(
         raise click.ClickException(str(exc)) from exc
 
 
+def _supersede_dispatch_disable_guard(ctx: click.Context, *, task_names: list[str]) -> dict[str, Any]:
+    from groundtruth_kb.dispatcher_disable_guard import DispatcherDisableGuardError, supersede_guarded_disable
+
+    config = _resolve_config(ctx)
+    try:
+        return supersede_guarded_disable(
+            config.project_root,
+            task_names=task_names,
+            actor="gt-bridge-dispatch-cli",
+            reason="successful governed enable",
+        )
+    except DispatcherDisableGuardError as exc:
+        return {"ok": False, "changed": False, "warning": str(exc), "records": []}
+
+
+def _emit_disable_guard_resolution_warning(payload: dict[str, Any]) -> None:
+    resolution = payload.get("disable_guard_resolution")
+    if isinstance(resolution, dict) and resolution.get("warning"):
+        click.echo(f"Warning: {resolution['warning']}", err=True)
+
+
 def _validate_dispatch_disable_guard(
     *,
     task_names: list[str],
@@ -1465,7 +1486,14 @@ def bridge_dispatch_complex_enable_cmd(
     from groundtruth_kb.dispatcher_complex import enable_complex
 
     payload = enable_complex(supervisor_task_name=supervisor_task_name, watchdog_task_name=watchdog_task_name)
+    if payload.get("ok"):
+        payload["disable_guard_resolution"] = _supersede_dispatch_disable_guard(
+            ctx,
+            task_names=[supervisor_task_name, watchdog_task_name],
+        )
     _emit_complex_action_result(ctx, payload, json_output=json_output)
+    if not json_output:
+        _emit_disable_guard_resolution_warning(payload)
 
 
 @bridge_dispatch_complex_group.command("disable")
@@ -1669,10 +1697,12 @@ def bridge_dispatch_daemon_supervisor_enable_cmd(ctx: click.Context, task_name: 
         result = enable_supervisor(task_name=task_name)
     except DispatcherSupervisorError as exc:
         raise click.ClickException(str(exc)) from exc
+    result["disable_guard_resolution"] = _supersede_dispatch_disable_guard(ctx, task_names=[task_name])
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True))
         return
     click.echo(f"Enabled supervisor task {task_name}.")
+    _emit_disable_guard_resolution_warning(result)
 
 
 @bridge_dispatch_daemon_supervisor_group.command("disable")
@@ -1824,10 +1854,12 @@ def bridge_dispatch_daemon_watchdog_enable_cmd(ctx: click.Context, task_name: st
         result = enable_watchdog(task_name=task_name)
     except DispatcherWatchdogError as exc:
         raise click.ClickException(str(exc)) from exc
+    result["disable_guard_resolution"] = _supersede_dispatch_disable_guard(ctx, task_names=[task_name])
     if json_output:
         click.echo(json.dumps(result, indent=2, sort_keys=True))
         return
     click.echo(f"Enabled watchdog task {task_name}.")
+    _emit_disable_guard_resolution_warning(result)
 
 
 @bridge_dispatch_daemon_watchdog_group.command("disable")

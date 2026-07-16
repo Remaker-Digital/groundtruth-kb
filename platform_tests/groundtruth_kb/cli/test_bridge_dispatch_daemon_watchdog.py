@@ -79,6 +79,10 @@ def test_cli_watchdog_control_commands_dispatch(monkeypatch) -> None:
         lambda project_root, **kwargs: {"ok": True, "records": [{"task_name": kwargs["task_names"][0]}]},
     )
     monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda project_root, **kwargs: {"ok": True, "changed": False, "records": []},
+    )
+    monkeypatch.setattr(
         "groundtruth_kb.dispatcher_watchdog.uninstall_watchdog",
         lambda *, task_name, dry_run: (
             calls.append(f"uninstall:{task_name}:{dry_run}")
@@ -117,6 +121,33 @@ def test_cli_watchdog_control_commands_dispatch(monkeypatch) -> None:
         "disable:GTKB-WD-Test",
         "uninstall:GTKB-WD-Test:True",
     ]
+
+
+def test_cli_watchdog_enable_supersedes_exact_guard(monkeypatch) -> None:
+    from groundtruth_kb.cli import main
+
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_watchdog.enable_watchdog",
+        lambda *, task_name: {"action": "enable", "task_name": task_name},
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda project_root, **kwargs: (
+            captured.update(kwargs)
+            or {"ok": True, "changed": True, "records": [{"task_name": kwargs["task_names"][0]}]}
+        ),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "daemon", "watchdog", "enable", "--task-name", "watchdog-exact", "--json"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["task_names"] == ["watchdog-exact"]
+    assert json.loads(result.output)["disable_guard_resolution"]["changed"] is True
 
 
 def test_cli_watchdog_disable_refuses_unbounded_disable(monkeypatch) -> None:

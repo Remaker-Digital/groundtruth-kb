@@ -118,6 +118,10 @@ def test_cli_complex_enable_disable_dispatch(monkeypatch) -> None:
         "groundtruth_kb.dispatcher_disable_guard.record_guarded_disable",
         lambda project_root, **kwargs: {"ok": True, "records": [{"task_name": item} for item in kwargs["task_names"]]},
     )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda project_root, **kwargs: {"ok": True, "changed": False, "records": []},
+    )
     runner = CliRunner()
     env = {"GTKB_PROJECT_ROOT": str(_REPO_ROOT)}
 
@@ -160,6 +164,73 @@ def test_cli_complex_enable_disable_dispatch(monkeypatch) -> None:
         "enable:GTKB-Supervisor-Test:GTKB-Watchdog-Test",
         "disable:GTKB-Supervisor-Test:GTKB-Watchdog-Test",
     ]
+
+
+def test_cli_complex_enable_supersedes_exact_guards_after_success(monkeypatch) -> None:
+    from groundtruth_kb.cli import main
+
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.enable_complex",
+        lambda **_kwargs: {
+            "action": "enable",
+            "ok": True,
+            "components": {"supervisor": {"ok": True}, "watchdog": {"ok": True}},
+        },
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda project_root, **kwargs: (
+            captured.update(kwargs)
+            or {"ok": True, "changed": True, "records": [{"task_name": item} for item in kwargs["task_names"]]}
+        ),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "bridge",
+            "dispatch",
+            "complex",
+            "enable",
+            "--supervisor-task-name",
+            "supervisor-exact",
+            "--watchdog-task-name",
+            "watchdog-exact",
+            "--json",
+        ],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["task_names"] == ["supervisor-exact", "watchdog-exact"]
+    assert json.loads(result.output)["disable_guard_resolution"]["changed"] is True
+
+
+def test_cli_complex_partial_enable_does_not_supersede_guards(monkeypatch) -> None:
+    from groundtruth_kb.cli import main
+
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_complex.enable_complex",
+        lambda **_kwargs: {
+            "action": "enable",
+            "ok": False,
+            "components": {"supervisor": {"ok": True}, "watchdog": {"ok": False, "error": "failed"}},
+        },
+    )
+    monkeypatch.setattr(
+        "groundtruth_kb.dispatcher_disable_guard.supersede_guarded_disable",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not supersede")),
+    )
+
+    result = CliRunner().invoke(
+        main,
+        ["bridge", "dispatch", "complex", "enable", "--json"],
+        env={"GTKB_PROJECT_ROOT": str(_REPO_ROOT)},
+    )
+
+    assert result.exit_code == 1
+    assert "disable_guard_resolution" not in json.loads(result.output)
 
 
 def test_cli_complex_disable_refuses_unbounded_disable(monkeypatch) -> None:

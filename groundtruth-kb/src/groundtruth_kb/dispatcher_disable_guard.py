@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +62,31 @@ def _read_doc(path: Path) -> tuple[dict[str, Any], str | None]:
     return payload, None
 
 
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            temporary_path = Path(stream.name)
+            json.dump(payload, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, path)
+    except OSError as exc:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise DispatcherDisableGuardError(f"disable guard state could not be persisted: {exc}") from exc
+
+
 def _record_status(record: dict[str, Any] | None, *, path: Path, task_name: str, now: dt.datetime) -> dict[str, Any]:
     base: dict[str, Any] = {
         "path": str(path),
@@ -72,19 +99,22 @@ def _record_status(record: dict[str, Any] | None, *, path: Path, task_name: str,
     if record is None:
         return base
 
+    superseded_at = str(record.get("superseded_at") or "").strip()
     expires_at = _parse_iso(record.get("expires_at"))
     owner_quiesce_record = str(record.get("owner_quiesce_record") or "").strip()
-    active = bool(owner_quiesce_record)
+    active = bool(owner_quiesce_record) and expires_at is None
     expired = False
     if expires_at is not None:
         expired = expires_at <= now
-        active = active or not expired
+        active = not expired
+    if superseded_at:
+        active = False
 
     base.update(
         {
             "active": active,
             "expired": expired,
-            "status": "active" if active else "expired" if expired else "invalid",
+            "status": "superseded" if superseded_at else "active" if active else "expired" if expired else "invalid",
             "component": record.get("component"),
             "reason": record.get("reason"),
             "actor": record.get("actor"),
@@ -92,6 +122,9 @@ def _record_status(record: dict[str, Any] | None, *, path: Path, task_name: str,
             "expires_at": record.get("expires_at"),
             "ttl_seconds": record.get("ttl_seconds"),
             "owner_quiesce_record": owner_quiesce_record or None,
+            "superseded_at": superseded_at or None,
+            "superseded_by": record.get("superseded_by"),
+            "supersession_reason": record.get("supersession_reason"),
         }
     )
     return base
@@ -209,10 +242,64 @@ def record_guarded_disable(
     }
 
 
+def supersede_guarded_disable(
+    project_root: Path,
+    *,
+    task_names: list[str] | tuple[str, ...],
+    actor: str,
+    reason: str,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Supersede existing task guards after a successful governed enable."""
+    clean_task_names = list(dict.fromkeys(str(item).strip() for item in task_names if str(item).strip()))
+    clean_actor = str(actor or "").strip()
+    clean_reason = str(reason or "").strip()
+    if not clean_task_names:
+        raise DispatcherDisableGuardError("at least one task name is required")
+    if not clean_actor:
+        raise DispatcherDisableGuardError("supersession actor is required")
+    if not clean_reason:
+        raise DispatcherDisableGuardError("supersession reason is required")
+
+    path = default_guard_path(project_root)
+    payload, error = _read_doc(path)
+    if error is not None:
+        raise DispatcherDisableGuardError(error)
+    records = payload.get("records")
+    if not isinstance(records, dict):
+        records = {}
+
+    now_utc = now or _now_utc()
+    changed = False
+    resolved_records: list[dict[str, Any]] = []
+    for task_name in clean_task_names:
+        record = records.get(task_name)
+        if not isinstance(record, dict):
+            resolved_records.append(_record_status(None, path=path, task_name=task_name, now=now_utc))
+            continue
+        if not str(record.get("superseded_at") or "").strip():
+            record["superseded_at"] = _iso(now_utc)
+            record["superseded_by"] = clean_actor
+            record["supersession_reason"] = clean_reason
+            changed = True
+        resolved_records.append(_record_status(record, path=path, task_name=task_name, now=now_utc))
+
+    if changed:
+        payload["updated_at"] = _iso(now_utc)
+        _atomic_write_json(path, payload)
+    return {
+        "ok": True,
+        "changed": changed,
+        "guard_path": str(path),
+        "records": resolved_records,
+    }
+
+
 __all__ = [
     "DispatcherDisableGuardError",
     "default_guard_path",
     "disable_guard_status",
     "record_guarded_disable",
+    "supersede_guarded_disable",
     "validate_guarded_disable_request",
 ]
