@@ -1,0 +1,191 @@
+---
+name: gtkb-hygiene-reclaim
+description: Use when planning, reviewing, trashing, restoring, or auditing GT-KB hygiene-reclaim candidates through the production gt hygiene reclaim plan/history/trash/restore CLI with registry, Git-root, owner-evidence, and quiescence gates.
+allowed-tools: Bash, Read
+license: "Proprietary - Remaker Digital"
+metadata:
+  project: groundtruth-kb
+  category: hygiene-reclaim
+---
+
+# GT-KB Hygiene Reclaim
+
+Use this skill to orchestrate the production `gt hygiene reclaim` command
+family. Keep repeatable discovery, hashing, revalidation, state transitions,
+and history reconstruction in the deterministic CLI rather than reproducing
+them in model context.
+
+## When To Use
+
+- Create a compact, read-only reclaim plan and inspect registry/Git readiness.
+- List reclaim history or inspect one exact run or item when needed.
+- Prepare one exact, reversible trash batch for owner decision.
+- Restore exact previously trashed items after validating their recorded state.
+- Verify trash or restore results against append-only history.
+
+## When Not To Use
+
+- Do not use this skill for general configured-string hygiene scans; use
+  `gtkb-hygiene-sweep` for that workflow.
+- Do not create or invoke a private reclaim script or duplicate CLI. The
+  production `gt hygiene reclaim` interface is the only execution surface.
+- Do not add this operator-invoked skill to, or claim a change to, the scenario
+  router table. Router integration is outside this skill.
+- Do not use this skill as cleanup approval. Planning and history are read-only;
+  actuators require separate, exact evidence and authorization.
+
+## Compact Read-Only Start
+
+Start with a fresh compact plan:
+
+```powershell
+gt hygiene reclaim plan --json
+```
+
+Initially ingest only the compact summary: run ID, plan hash, candidate count,
+logical bytes, registry readiness, Git readiness, executable status, and blocker
+codes. Do not load the complete manifest or every candidate payload into model
+context. Read-only planning may continue when readiness is non-passing, but a
+known or newly discovered non-passing registry state blocks live trash until
+the registry is corrected and a fresh plan passes.
+
+Use compact history to orient without opening all run payloads:
+
+```powershell
+gt hygiene reclaim history --json
+```
+
+Inspect exact details only when they are needed for a proposed batch or a
+verification question:
+
+```powershell
+gt hygiene reclaim history --run-id <run-id> --json
+gt hygiene reclaim history --run-id <run-id> --item-id <item-id> --json
+```
+
+Keep the read-only `plan` and `history` phase separate from the `trash` and
+`restore` actuator phase. A candidate count, size, age, ignored status,
+untracked status, or unreachable status is never actuation authority.
+
+## Preservation Invariants
+
+Every registry match is a preservation veto; absence from the registry is not
+trash authority. Preserve all Git roots, including refs, worktree HEADs,
+stashes, valid reflog object IDs, and every index stage. Preserve bridge files,
+numbered bridge history, manifests, append-only events, receipts, and other
+audit history. Refuse ambiguous, malformed, contradictory, newly reachable,
+changed, out-of-root, cross-device, active-session, tracked, registered, or
+protected candidates.
+
+## Exact Trash Decision
+
+Before presenting a trash decision, inspect only the exact run and proposed
+item IDs. Confirm all of the following:
+
+- the immutable plan hash exactly matches the selected run;
+- the exact item IDs and their identity hashes are fixed for this batch;
+- registry readiness and Git-root readiness are passing and current;
+- batch-specific owner evidence and apply evidence can bind the same run ID,
+  plan hash, and item IDs;
+- fresh quiescence evidence can cover the operation window;
+- the current authorization permits this exact live actuator operation.
+
+Present one owner decision at a time in this form, then stop and wait:
+
+> [!IMPORTANT]
+> **OWNER ACTION REQUIRED**
+>
+> **Decision:** Approve or reject this exact reversible trash batch.
+>
+> **Why it matters:** Trash moves only the listed items out of active scan paths.
+> A same-volume trash move frees zero physical bytes.
+>
+> **Exact batch:** Run `<run-id>`; plan hash `<plan-hash>`; item IDs
+> `<item-id-1>, <item-id-2>`; logical bytes `<bytes>`; physical bytes reclaimed
+> `0`.
+>
+> **Evidence:** Registry/Git readiness `<result>`; quiescence `<reference>`;
+> owner/apply record target `<reference>`.
+>
+> **Reply:** `APPROVE <run-id> <plan-hash> <comma-separated-item-ids>` or
+> `REJECT <brief reason>`.
+
+Approval in conversation is not itself sufficient actuator input. Capture or
+obtain non-empty, batch-specific owner and apply evidence through the governed
+path required by the current authorization. Both references must bind the exact
+run ID, plan hash, and item IDs shown to the owner.
+
+## Actuator Contract
+
+Use command help to confirm the installed contract, then pass the exact run,
+plan hash, repeated exact item IDs, batch-specific owner and apply evidence,
+and quiescence evidence to the production command. The production CLI carries
+the owner and apply references as repeatable `--owner-evidence` values:
+
+```powershell
+gt hygiene reclaim trash --help
+gt hygiene reclaim trash --run-id <run-id> --plan-hash <plan-hash> --item-id <item-id> --owner-evidence <owner-evidence-ref> --owner-evidence <apply-evidence-ref> --quiescence-evidence <quiescence-evidence-ref> --json
+```
+
+Immediately before each move, require the CLI's operation-time revalidation of
+root identity, plan/item hashes, registry matches, Git roots, candidate state,
+destination safety, authorization, and quiescence. Stop on any refused or
+partial result. Same-volume reversible trash removes logical bytes from active
+scan paths but reclaims **zero physical bytes** from the volume.
+
+Restore only exact recorded items, never an inferred directory or wildcard:
+
+```powershell
+gt hygiene reclaim restore --help
+gt hygiene reclaim restore --run-id <run-id> --item-id <item-id> --json
+```
+
+Require operation-time validation of payload identity, event history, original
+path, destination absence, path containment, and current authorization. Refuse
+overwrite, missing or changed payload, path escape, or an active destination.
+
+After either `trash` or `restore`, verify append-only history for every exact
+item and the batch receipt:
+
+```powershell
+gt hygiene reclaim history --run-id <run-id> --json
+gt hygiene reclaim history --run-id <run-id> --item-id <item-id> --json
+```
+
+Report planned, trashed, restored, refused, partial, stale, corrupt, or
+unsupported state exactly as recorded. Do not reinterpret a non-passing state
+as success.
+
+## Current GO Boundary
+
+Bridge `gtkb-wi5142-hygiene-reclaim-cli-skill-phase1` GO 002 authorizes
+implementation and disposable-repository actuator tests only. It authorizes no
+live `trash` or `restore`. Under this implementation GO, stop after read-only
+planning/history and exact-batch preparation; live actuation requires a later
+authorization covering that exact operation and evidence set.
+
+## Forbidden Operations
+
+This skill must never perform or recommend:
+
+- permanent purge or deletion of reversible trash;
+- `git gc`, Git prune/worktree prune, or `git reflog expire`;
+- stash deletion (`git stash drop` or `git stash clear`);
+- branch deletion, including `git branch -d` or `git branch -D`;
+- commit, push, release, or deployment;
+- credential creation, reading, changing, rotation, upload, or disclosure.
+
+The skill does not mutate the SoT registry, Git roots, bridge history, audit
+history, generated Codex adapter, manifest, capability registry, or scenario
+router. Route any needed correction or integration through its separately
+authorized owner.
+
+## Verification Evidence
+
+Record the compact plan result, exact run ID and plan hash, exact item IDs,
+registry/Git readiness, decision evidence, apply evidence, quiescence evidence,
+operation-time revalidation result, actuator receipt when authorized, and
+post-operation history verification. Clearly separate logical bytes moved from
+physical bytes reclaimed.
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

@@ -12,19 +12,31 @@ def _git(root: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
 
 
+def _artifact_toml(artifact_id: str, domain: str, lifecycle: str, storage_path: str) -> str:
+    versioning = "regenerated_from_source" if lifecycle == "generated" else "git_tracked"
+    backup = "regenerable_from_source" if lifecycle == "generated" else "git_tracked"
+    restore = "regenerate_from_source" if lifecycle == "generated" else "git_restore"
+    return f'''[[artifacts]]
+id = "{artifact_id}"
+domain = "{domain}"
+lifecycle = "{lifecycle}"
+storage_path = "{storage_path}"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "approved test mutation"
+versioning_policy = "{versioning}"
+backup_policy = "{backup}"
+restore_action = "{restore}"
+health_check_function = ""
+owner_role = "shared"
+'''
+
+
 def _write_project(root: Path) -> Path:
     (root / "config" / "registry").mkdir(parents=True)
     (root / "docs").mkdir()
     (root / "docs" / "rule.md").write_text("bridge/INDEX.md\n", encoding="utf-8")
     (root / "config" / "registry" / "sot-artifacts.toml").write_text(
-        """
-[[artifacts]]
-id = "rule"
-domain = "narrative_authority"
-lifecycle = "active"
-storage_path = "docs/rule.md"
-""".strip()
-        + "\n",
+        _artifact_toml("rule", "narrative_authority", "active", "docs/rule.md"),
         encoding="utf-8",
     )
     config = root / "groundtruth.toml"
@@ -87,14 +99,8 @@ def test_inventory_refresh_counts_gitignored_registered_artifact(tmp_path: Path)
     registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
     registry.write_text(
         registry.read_text(encoding="utf-8")
-        + """
-
-[[artifacts]]
-id = "owner-local-env"
-domain = "runtime_state"
-lifecycle = "active"
-storage_path = ".env.local"
-""",
+        + "\n"
+        + _artifact_toml("owner-local-env", "runtime_state", "active", ".env.local"),
         encoding="utf-8",
     )
     (tmp_path / ".gitignore").write_text(".env.local\n", encoding="utf-8")
@@ -108,3 +114,36 @@ storage_path = ".env.local"
     payload = json.loads(result.output)
     assert payload["summary"]["artifact_count"] == 2
     assert payload["summary"]["scanned_file_count"] == 2
+
+
+def test_inventory_refresh_reports_compact_path_classes_and_blockers(tmp_path: Path) -> None:
+    config = _write_project(tmp_path)
+    generated = tmp_path / ".gtkb-state"
+    generated.mkdir()
+    for index in range(25):
+        (generated / f"runtime-{index}.json").write_text("{}\n", encoding="utf-8")
+    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    registry.write_text(
+        registry.read_text(encoding="utf-8")
+        + "\n"
+        + _artifact_toml("generated-state", "runtime_state", "generated", ".gtkb-state/")
+        + "\n"
+        + _artifact_toml("missing-active", "control_surface", "active", "config/missing.toml"),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(main, ["--config", str(config), "admin", "inventory", "refresh", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    by_id = {item["artifact_id"]: item for item in payload["artifact_statuses"]}
+    assert payload["summary"]["scanned_file_count"] == 1
+    assert payload["summary"]["blocking_finding_count"] == 1
+    assert payload["summary"]["path_class_counts"] == {"file": 2, "generated": 1}
+    assert by_id["generated-state"]["expanded_file_count"] == 0
+    assert by_id["missing-active"]["blocking"] is True
+
+    human = CliRunner().invoke(main, ["--config", str(config), "admin", "inventory", "refresh"])
+    assert human.exit_code == 0, human.output
+    assert "blocking findings: 1" in human.output
+    assert "path classes: file=2, generated=1" in human.output

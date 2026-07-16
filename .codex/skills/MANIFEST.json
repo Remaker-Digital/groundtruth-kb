@@ -267,6 +267,13 @@
       "source_sha256": "a836a16b551bca526c1b7457433aa704383544abb4b3823b10e9c2222396179f"
     },
     {
+      "adapter_relative_path": ".codex/skills/gtkb-hygiene-reclaim/SKILL.md",
+      "canonical_name": "gtkb-hygiene-reclaim",
+      "capability_id": "skill.gtkb-hygiene-reclaim",
+      "source_relative_path": ".claude/skills/gtkb-hygiene-reclaim/SKILL.md",
+      "source_sha256": "e8c484e6076738972ea98d00749e9a4ca40ff8a2ef07abfb24f9dcefedf3f3cc"
+    },
+    {
       "adapter_relative_path": ".codex/skills/gtkb-sweep-commit/SKILL.md",
       "canonical_name": "gtkb-sweep-commit",
       "capability_id": "skill.gtkb-sweep-commit",

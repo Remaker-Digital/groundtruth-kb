@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -469,6 +470,10 @@ def admin_inventory_refresh_cmd(ctx: click.Context, json_output: bool) -> None:
     click.echo(f"- artifacts: {summary['artifact_count']}")
     click.echo(f"- scanned files: {summary['scanned_file_count']}")
     click.echo(f"- missing artifacts: {summary['missing_artifact_count']}")
+    click.echo(f"- blocking findings: {summary.get('blocking_finding_count', 0)}")
+    path_classes = summary.get("path_class_counts", {})
+    if path_classes:
+        click.echo("- path classes: " + ", ".join(f"{key}={value}" for key, value in path_classes.items()))
 
 
 @admin_inventory_group.command("scan-strings")
@@ -3391,6 +3396,187 @@ def hygiene_auto_resolve(root: str, fmt: str, apply_changes: bool, evidence_refs
         click.echo(format_markdown(plan), nl=False)
     else:
         click.echo(json.dumps(plan, indent=2, sort_keys=True))
+
+
+@hygiene_group.group("reclaim")
+def hygiene_reclaim_group() -> None:
+    """Plan and execute exact, reversible repository hygiene batches."""
+
+
+def _reclaim_now(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise click.BadParameter("must be an ISO-8601 timestamp", param_hint="--now") from exc
+    if parsed.tzinfo is None:
+        raise click.BadParameter("must include timezone information", param_hint="--now")
+    return parsed
+
+
+def _emit_reclaim_result(action: str, payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else payload
+    fields = []
+    for key in (
+        "run_id",
+        "status",
+        "executable",
+        "candidate_count",
+        "logical_bytes",
+        "physical_bytes_reclaimed",
+        "integrity",
+    ):
+        if key in summary:
+            fields.append(f"{key}={summary[key]}")
+        elif key in payload:
+            fields.append(f"{key}={payload[key]}")
+    click.echo(f"hygiene reclaim {action}: " + (", ".join(fields) if fields else "complete"))
+
+
+@hygiene_reclaim_group.command("plan")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--min-age-hours", type=click.IntRange(min=1), default=168, show_default=True)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+@click.option("--now", default=None, hidden=True, help="Timezone-aware ISO timestamp for deterministic tests.")
+@click.option("--actor", default=None, hidden=True)
+@click.option("--session-id", default=None, hidden=True)
+def hygiene_reclaim_plan(
+    root: Path,
+    state_root: Path | None,
+    min_age_hours: int,
+    json_output: bool,
+    now: str | None,
+    actor: str | None,
+    session_id: str | None,
+) -> None:
+    """Create a read-only, hash-addressed reclaim plan and durable run ledger."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, plan_reclaim
+
+    try:
+        payload = plan_reclaim(
+            root.resolve(),
+            state_root=state_root.resolve() if state_root else None,
+            min_age_hours=min_age_hours,
+            now=_reclaim_now(now),
+            actor=actor,
+            session_id=session_id,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("plan", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("history")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", default=None, help="Show one exact run; omit to list runs compactly.")
+@click.option("--item-id", default=None, help="Limit an exact run to one item.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_history(
+    root: Path,
+    state_root: Path | None,
+    run_id: str | None,
+    item_id: str | None,
+    json_output: bool,
+) -> None:
+    """List reclaim runs or validate one exact run and its event history."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, history_reclaim
+
+    try:
+        payload = history_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            item_id=item_id,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("history", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("trash")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", required=True, help="Exact planned run identifier.")
+@click.option("--plan-hash", required=True, help="Immutable plan hash from the selected run.")
+@click.option("--item-id", "item_ids", multiple=True, required=True, help="Exact candidate item; repeatable.")
+@click.option(
+    "--owner-evidence",
+    multiple=True,
+    required=True,
+    help="Batch-specific owner/apply evidence reference; repeatable.",
+)
+@click.option(
+    "--quiescence-evidence",
+    multiple=True,
+    required=True,
+    help="Operation-time quiescence evidence reference; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_trash(
+    root: Path,
+    state_root: Path | None,
+    run_id: str,
+    plan_hash: str,
+    item_ids: tuple[str, ...],
+    owner_evidence: tuple[str, ...],
+    quiescence_evidence: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Move one exact approved batch into same-volume reversible trash."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, trash_reclaim
+
+    try:
+        payload = trash_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            plan_hash=plan_hash,
+            item_ids=item_ids,
+            owner_evidence=owner_evidence,
+            quiescence_evidence=quiescence_evidence,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("trash", payload, json_output=json_output)
+
+
+@hygiene_reclaim_group.command("restore")
+@click.option("--root", type=click.Path(file_okay=False, path_type=Path), default=Path("."), show_default=True)
+@click.option("--state-root", type=click.Path(file_okay=False, path_type=Path), default=None)
+@click.option("--run-id", required=True, help="Exact run identifier containing trashed items.")
+@click.option("--item-id", "item_ids", multiple=True, required=True, help="Exact trashed item; repeatable.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit compact machine-readable output.")
+def hygiene_reclaim_restore(
+    root: Path,
+    state_root: Path | None,
+    run_id: str,
+    item_ids: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Restore exact items from reversible trash without overwriting paths."""
+    from groundtruth_kb.hygiene.reclaim import ReclaimError, restore_reclaim
+
+    try:
+        payload = restore_reclaim(
+            root.resolve(),
+            run_id=run_id,
+            item_ids=item_ids,
+            state_root=state_root.resolve() if state_root else None,
+        )
+    except ReclaimError as exc:
+        click.echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    _emit_reclaim_result("restore", payload, json_output=json_output)
 
 
 # ---------------------------------------------------------------------------

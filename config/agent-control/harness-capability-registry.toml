@@ -1167,6 +1167,42 @@ source_sha256 = "a836a16b551bca526c1b7457433aa704383544abb4b3823b10e9c2222396179
 surface = ".cursor/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
+
+[[capabilities]]
+id = "skill.gtkb-hygiene-reclaim"
+kind = "skill"
+canonical_name = "gtkb-hygiene-reclaim"
+canonical_purpose = "Plan deterministic hygiene candidates, inspect immutable history, and orchestrate exact owner-authorized reversible trash and restore through the production gt CLI."
+canonical_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/skills/gtkb-hygiene-reclaim/SKILL.md"
+status = "adapter"
+adapter_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
+source_sha256 = "e8c484e6076738972ea98d00749e9a4ca40ff8a2ef07abfb24f9dcefedf3f3cc"
+
+[capabilities.antigravity]
+status = "unsupported"
+reason = "WI-5142 phase 1 authorizes only the canonical Claude source and generated Codex adapter; Antigravity projection requires a separate target-path-covered proposal."
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "WI-5142 phase 1 authorizes only the canonical Claude source and generated Codex adapter; Cursor projection requires a separate target-path-covered proposal."
+
+[capabilities.ollama]
+status = "unsupported"
+reason = "WI-5142 phase 1 authorizes only the canonical Claude source and generated Codex adapter; Ollama projection requires a separate target-path-covered proposal."
+
+[capabilities.openrouter]
+status = "unsupported"
+reason = "WI-5142 phase 1 authorizes only the canonical Claude source and generated Codex adapter; OpenRouter projection requires a separate target-path-covered proposal."
+
 [[capabilities]]
 id = "skill.gtkb-sweep-commit"
 kind = "skill"
