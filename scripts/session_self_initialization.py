@@ -2711,7 +2711,7 @@ def _testing_service_integrations(project_root: Path, plugins: list[str], *, fas
     accessibility_tests_present = (
         (project_root / "platform_tests" / "accessibility").is_dir()
         or (project_root / "tests" / "accessibility").is_dir()
-        or (application_subject and (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir())
+        or (project_root / "applications" / "Agent_Red" / "tests" / "accessibility").is_dir()
     )
     locust_profile_present = (
         (project_root / "tests" / "performance" / "locustfile.py").is_file()
