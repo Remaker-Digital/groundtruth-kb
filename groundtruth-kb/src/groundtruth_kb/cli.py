@@ -624,6 +624,36 @@ def _emit_bridge_dispatch_report(ctx: click.Context, *, json_output: bool, compa
     click.echo(format_compact_dispatch_workflow(workflow))
 
 
+@bridge_dispatch_group.command("worker-context")
+@click.option("--self", "self_only", is_flag=True, default=False, help="Resolve the acting worker dispatch context.")
+@click.option("--dispatch-id", default=None, help="Dispatch id to resolve.")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_worker_context_cmd(
+    ctx: click.Context, self_only: bool, dispatch_id: str | None, json_output: bool
+) -> None:
+    """Show the worker-safe assigned-content dispatch packet."""
+    from groundtruth_kb.bridge_dispatch_worker_context import (
+        WorkerContextError,
+        build_worker_context_packet,
+        format_worker_context_packet,
+    )
+
+    config = _resolve_config(ctx)
+    try:
+        packet = build_worker_context_packet(
+            config.project_root,
+            dispatch_id=dispatch_id,
+            self_only=self_only,
+        )
+    except WorkerContextError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(packet, indent=2, sort_keys=True))
+        return
+    click.echo(format_worker_context_packet(packet))
+
+
 def _import_benchmark_cli() -> Any:
     """Import the repo-local benchmark CLI module for bridge wrappers."""
     try:
@@ -1311,6 +1341,65 @@ def bridge_dispatch_tuning_evaluate_cmd(ctx: click.Context, input_path: Path, js
     click.echo(f"Advisory ID: {payload['advisory_id']}")
     click.echo("Advisory only: yes")
     click.echo(f"Rationale: {payload['rationale']}")
+
+
+def _load_dispatch_black_box_boundary_scanner(project_root: Path) -> Any:
+    script_path = project_root / "scripts" / "dispatch_blackbox_boundary_scanner.py"
+    spec = importlib.util.spec_from_file_location("dispatch_blackbox_boundary_scanner", script_path)
+    if spec is None or spec.loader is None:
+        raise click.ClickException(f"Unable to load black-box boundary scanner: {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@bridge_dispatch_group.group("black-box")
+def bridge_dispatch_black_box_group() -> None:
+    """Read-only dispatcher black-box boundary checks."""
+
+
+@bridge_dispatch_black_box_group.command("closure")
+@click.option("--project-id", required=True, help="Project id to evaluate for verified closure readiness.")
+@click.option(
+    "--evidence",
+    "evidence_paths",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="In-root evidence file to boundary-scan; repeatable.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def bridge_dispatch_black_box_closure_cmd(
+    ctx: click.Context,
+    project_id: str,
+    evidence_paths: tuple[Path, ...],
+    json_output: bool,
+) -> None:
+    """Gate black-box project closure on VERIFIED members and clean boundary evidence."""
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root).resolve()
+    resolved_evidence: list[Path] = []
+    for evidence_path in evidence_paths:
+        resolved = evidence_path.resolve()
+        try:
+            resolved.relative_to(project_root)
+        except ValueError as exc:
+            raise click.ClickException("black-box closure evidence must be inside the project root") from exc
+        resolved_evidence.append(resolved)
+
+    scanner = _load_dispatch_black_box_boundary_scanner(project_root)
+    report = scanner.closure_status(
+        project_root=project_root,
+        project_id=project_id,
+        evidence_paths=resolved_evidence,
+    )
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        click.echo(scanner.format_text(report), nl=False)
+    if not report.get("ready"):
+        ctx.exit(1)
 
 
 @bridge_dispatch_group.group("complex")
