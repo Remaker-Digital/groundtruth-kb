@@ -278,17 +278,42 @@ def _normalize_assertion(assertion: dict[str, Any]) -> dict[str, Any]:
 
 def _fail(a_type: str, description: str, detail: str) -> dict[str, Any]:
     """Build a FAIL result dict."""
-    return {"type": a_type, "description": description, "passed": False, "detail": detail}
+    return {"type": a_type, "description": description, "passed": False, "status": "FAIL", "detail": detail}
 
 
 def _pass(a_type: str, description: str, detail: str) -> dict[str, Any]:
     """Build a PASS result dict."""
-    return {"type": a_type, "description": description, "passed": True, "detail": detail}
+    return {"type": a_type, "description": description, "passed": True, "status": "PASS", "detail": detail}
 
 
 def _skip(a_type: str, description: str, detail: str) -> dict[str, Any]:
-    """Build a skipped result dict."""
-    return {"type": a_type, "description": description, "passed": True, "detail": detail, "skipped": True}
+    """Build an UNASSESSED execution result for unsupported evidence."""
+    return {
+        "type": a_type,
+        "description": description,
+        "passed": False,
+        "status": "UNASSESSED",
+        "detail": detail,
+        "skipped": True,
+    }
+
+
+def _result_status(result: dict[str, Any]) -> str:
+    status = result.get("status")
+    if isinstance(status, str):
+        return status
+    return "PASS" if result.get("passed") else "FAIL"
+
+
+def _composition_status(results: list[dict[str, Any]], *, any_of: bool) -> str:
+    statuses = [_result_status(result) for result in results]
+    if statuses and all(status == "UNASSESSED" for status in statuses):
+        return "UNASSESSED"
+    if any(status in {"UNASSESSED", "PARTIAL"} for status in statuses):
+        return "PARTIAL"
+    if any_of:
+        return "PASS" if any(status == "PASS" for status in statuses) else "FAIL"
+    return "PASS" if all(status == "PASS" for status in statuses) else "FAIL"
 
 
 # ---------------------------------------------------------------------------
@@ -597,19 +622,19 @@ def _run_all_of(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
 
     child_ctx = AssertionContext(project_root=ctx.project_root, depth=ctx.depth + 1, max_depth=ctx.max_depth)
     child_results = [_dispatch_single(c, child_ctx) for c in children]
-    machine_results = [r for r in child_results if not r.get("skipped")]
-
-    if not machine_results:
+    status = _composition_status(child_results, any_of=False)
+    if status == "UNASSESSED":
         return _skip("all_of", description, "All children are non-machine — skipped")
 
-    all_passed = all(r["passed"] for r in machine_results)
-    failed_count = sum(1 for r in machine_results if not r["passed"])
-    detail = f"{len(machine_results)} machine assertion(s), {failed_count} failed"
+    evaluated_count = sum(_result_status(result) in {"PASS", "FAIL"} for result in child_results)
+    failed_count = sum(_result_status(result) == "FAIL" for result in child_results)
+    detail = f"{evaluated_count} evaluated assertion(s), {failed_count} failed; result {status}"
 
     return {
         "type": "all_of",
         "description": description,
-        "passed": all_passed,
+        "passed": status == "PASS",
+        "status": status,
         "detail": detail,
         "children": child_results,
     }
@@ -630,19 +655,19 @@ def _run_any_of(a: dict[str, Any], ctx: AssertionContext) -> dict[str, Any]:
 
     child_ctx = AssertionContext(project_root=ctx.project_root, depth=ctx.depth + 1, max_depth=ctx.max_depth)
     child_results = [_dispatch_single(c, child_ctx) for c in children]
-    machine_results = [r for r in child_results if not r.get("skipped")]
-
-    if not machine_results:
+    status = _composition_status(child_results, any_of=True)
+    if status == "UNASSESSED":
         return _skip("any_of", description, "All children are non-machine — skipped")
 
-    any_passed = any(r["passed"] for r in machine_results)
-    passed_count = sum(1 for r in machine_results if r["passed"])
-    detail = f"{len(machine_results)} machine assertion(s), {passed_count} passed"
+    evaluated_count = sum(_result_status(result) in {"PASS", "FAIL"} for result in child_results)
+    passed_count = sum(_result_status(result) == "PASS" for result in child_results)
+    detail = f"{evaluated_count} evaluated assertion(s), {passed_count} passed; result {status}"
 
     return {
         "type": "any_of",
         "description": description,
-        "passed": any_passed,
+        "passed": status == "PASS",
+        "status": status,
         "detail": detail,
         "children": child_results,
     }
@@ -684,7 +709,9 @@ def _dispatch_single(assertion: Any, ctx: AssertionContext) -> dict[str, Any]:
     if runner is None:  # pragma: no cover — defensive
         return _fail(a_type, description, f"No handler registered for type: {a_type!r}")
 
-    return runner(normalized, ctx)
+    result = runner(normalized, ctx)
+    result.setdefault("status", "PASS" if result.get("passed") else "FAIL")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -727,7 +754,8 @@ def run_spec_assertions(
         return {
             "spec_id": spec_id,
             "title": spec["title"],
-            "overall_passed": True,
+            "overall_passed": False,
+            "evaluation_result": "NOT_APPLICABLE",
             "results": [],
             "assertion_count": 0,
             "skipped": True,
@@ -736,9 +764,16 @@ def run_spec_assertions(
     ctx = AssertionContext(project_root=project_root)
     results = [_dispatch_single(a, ctx) for a in assertions]
 
-    # Only machine-checkable assertions determine overall_passed
-    machine_results = [r for r in results if not r.get("skipped")]
-    overall_passed = all(r["passed"] for r in machine_results) if machine_results else True
+    statuses = [_result_status(result) for result in results]
+    if all(status == "PASS" for status in statuses):
+        evaluation_result = "PASS"
+    elif any(status == "FAIL" for status in statuses):
+        evaluation_result = "FAIL"
+    elif all(status == "UNASSESSED" for status in statuses):
+        evaluation_result = "UNASSESSED"
+    else:
+        evaluation_result = "PARTIAL"
+    overall_passed = evaluation_result == "PASS"
 
     # Record in database
     db.insert_assertion_run(
@@ -753,9 +788,11 @@ def run_spec_assertions(
         "spec_id": spec_id,
         "title": spec["title"],
         "overall_passed": overall_passed,
+        "evaluation_result": evaluation_result,
         "results": results,
-        "assertion_count": len(machine_results),
-        "skipped": len(machine_results) == 0 and len(results) > 0,
+        "assertion_count": len(results),
+        "evaluated_count": sum(status in {"PASS", "FAIL"} for status in statuses),
+        "skipped": evaluation_result == "UNASSESSED",
     }
 
 
@@ -783,16 +820,37 @@ def run_all_assertions(
     passed = 0
     failed = 0
     skipped = 0
+    partial = 0
+    unassessed = 0
+    direct_failures = 0
 
     for spec in specs:
         result = run_spec_assertions(db, spec, triggered_by, project_root)
         details.append(result)
-        if result.get("skipped"):
+        evaluation_result = result.get("evaluation_result")
+        if evaluation_result == "NOT_APPLICABLE":
             skipped += 1
-        elif result["overall_passed"]:
+        elif evaluation_result == "PASS":
             passed += 1
         else:
             failed += 1
+            if evaluation_result == "PARTIAL":
+                partial += 1
+            elif evaluation_result == "UNASSESSED":
+                unassessed += 1
+            else:
+                direct_failures += 1
+
+    if direct_failures:
+        aggregate_result = "FAIL"
+    elif partial or (unassessed and passed):
+        aggregate_result = "PARTIAL"
+    elif unassessed:
+        aggregate_result = "UNASSESSED"
+    elif passed:
+        aggregate_result = "PASS"
+    else:
+        aggregate_result = "NOT_APPLICABLE"
 
     return {
         "total_specs": len(specs),
@@ -800,6 +858,9 @@ def run_all_assertions(
         "passed": passed,
         "failed": failed,
         "skipped": skipped,
+        "partial": partial,
+        "unassessed": unassessed,
+        "aggregate_result": aggregate_result,
         "triggered_by": triggered_by,
         "details": details,
     }
@@ -818,27 +879,32 @@ def format_summary(summary: dict[str, Any]) -> str:
     lines.append(f"  With assertions:   {summary['specs_with_assertions']}")
     lines.append(f"  PASSED:            {summary['passed']}")
     lines.append(f"  FAILED:            {summary['failed']}")
+    lines.append(f"  PARTIAL:           {summary.get('partial', 0)}")
+    lines.append(f"  UNASSESSED:        {summary.get('unassessed', 0)}")
     lines.append(f"  Skipped (no def):  {summary['skipped']}")
+    lines.append(f"  Aggregate result:  {summary.get('aggregate_result', 'UNASSESSED')}")
     lines.append(f"{'=' * 60}\n")
 
     # Show failures in detail
-    failures = [d for d in summary["details"] if not d.get("skipped") and not d["overall_passed"]]
+    failures = [
+        detail for detail in summary["details"] if detail.get("evaluation_result") not in {"PASS", "NOT_APPLICABLE"}
+    ]
     if failures:
         lines.append("FAILURES:\n")
         for f in failures:
             lines.append(f"  [{f['spec_id']}] {f['title']}")
             for r in f["results"]:
-                status = "PASS" if r["passed"] else "FAIL"
+                status = _result_status(r)
                 lines.append(f"    [{status}] {r['description']}: {r['detail']}")
                 # Show composition children
                 if "children" in r:
                     for child in r["children"]:
-                        c_status = "PASS" if child["passed"] else ("SKIP" if child.get("skipped") else "FAIL")
+                        c_status = _result_status(child)
                         lines.append(f"      [{c_status}] {child['description']}: {child['detail']}")
             lines.append("")
 
     # Show passes briefly
-    passes = [d for d in summary["details"] if not d.get("skipped") and d["overall_passed"]]
+    passes = [detail for detail in summary["details"] if detail.get("evaluation_result") == "PASS"]
     if passes:
         lines.append("PASSED:\n")
         for p in passes:
