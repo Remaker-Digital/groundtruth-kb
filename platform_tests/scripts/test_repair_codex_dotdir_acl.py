@@ -9,6 +9,11 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
+
 SCRIPT_PATH = REPO_ROOT / "scripts" / "repair_codex_dotdir_acl.ps1"
 
 
@@ -16,13 +21,20 @@ def _powershell() -> str | None:
     return shutil.which("powershell") or shutil.which("pwsh")
 
 
-def _run_ps(args: list[str], *, cwd: Path = REPO_ROOT, check: bool = False) -> subprocess.CompletedProcess[str]:
+def _run_ps(
+    args: list[str],
+    *,
+    cwd: Path = REPO_ROOT,
+    check: bool = False,
+    no_window: bool = False,
+) -> subprocess.CompletedProcess[str]:
     exe = _powershell()
     if exe is None:
         pytest.skip("PowerShell is required for ACL repair tests")
     shell_args = ["-NoProfile"]
     if Path(exe).name.lower() == "powershell.exe":
         shell_args.extend(["-ExecutionPolicy", "Bypass"])
+    hidden_kwargs = no_window_subprocess_kwargs() if no_window else {}
     return subprocess.run(
         [exe, *shell_args, *args],
         cwd=cwd,
@@ -31,6 +43,7 @@ def _run_ps(args: list[str], *, cwd: Path = REPO_ROOT, check: bool = False) -> s
         encoding="utf-8",
         errors="replace",
         check=check,
+        **hidden_kwargs,
     )
 
 
@@ -52,6 +65,23 @@ if ($LASTEXITCODE -ne 0) {{
 }}
 """
     _run_ps(["-Command", add_deny], check=True)
+
+    no_window_check = _run_ps(
+        [
+            "-File",
+            str(SCRIPT_PATH),
+            "-ProjectRoot",
+            str(project_root),
+            "-Mode",
+            "Check",
+            "-Json",
+        ],
+        no_window=True,
+    )
+    assert no_window_check.returncode == 1
+    no_window_payload = json.loads(no_window_check.stdout)
+    assert no_window_payload["errors"] == []
+    assert no_window_payload["risky_deny_count"] >= 1
 
     check = _run_ps(
         [

@@ -42,13 +42,20 @@ function Test-RiskyDenyRule {
 
 function Get-AccessOnlyAcl {
     param([Parameter(Mandatory = $true)] [string] $Path)
-    # Get-Acl works on BOTH Windows PowerShell 5.1 (.NET Framework) and
-    # PowerShell 7 (.NET Core). The former [System.IO.Directory]::GetAccessControl
-    # / [System.IO.File]::GetAccessControl statics were removed in .NET Core and
-    # threw under pwsh (WI-5065), which made the ACL check falsely report
-    # risky_deny_count=0 for every path. Get-Acl returns a FileSystemSecurity
-    # whose .Access DACL is exactly what the risky-Deny logic inspects, and whose
-    # PurgeAccessRules/AddAccessRule methods the repair path uses.
+    # Windows PowerShell can fail module auto-loading when launched with
+    # CREATE_NO_WINDOW; use .NET ACL statics there and fall back for PowerShell 7,
+    # where those statics were removed.
+    try {
+        if (Test-Path -LiteralPath $Path -PathType Container) {
+            return [System.IO.Directory]::GetAccessControl($Path)
+        }
+        return [System.IO.File]::GetAccessControl($Path)
+    }
+    catch {
+        if ($_.Exception.Message -notmatch "does not contain a method named 'GetAccessControl'") {
+            throw
+        }
+    }
     return Get-Acl -LiteralPath $Path
 }
 
@@ -57,10 +64,19 @@ function Set-AccessOnlyAcl {
         [Parameter(Mandatory = $true)] [string] $Path,
         [Parameter(Mandatory = $true)] $Acl
     )
-    # Set-Acl is the cross-version writer (PS5.1 + PS7), replacing the .NET
-    # Core-removed [System.IO.Directory]/[System.IO.File]::SetAccessControl
-    # statics (WI-5065). The $Acl was read via Get-Acl, so owner/group round-trip
-    # unchanged and only the modified DACL is written back.
+    try {
+        if (Test-Path -LiteralPath $Path -PathType Container) {
+            [System.IO.Directory]::SetAccessControl($Path, $Acl)
+            return
+        }
+        [System.IO.File]::SetAccessControl($Path, $Acl)
+        return
+    }
+    catch {
+        if ($_.Exception.Message -notmatch "does not contain a method named 'SetAccessControl'") {
+            throw
+        }
+    }
     Set-Acl -LiteralPath $Path -AclObject $Acl
 }
 
@@ -198,6 +214,31 @@ function Test-ModifyAllow {
     }
 }
 
+function Get-LocalPrincipalSid {
+    param([Parameter(Mandatory = $true)] [string] $IdentityName)
+    $candidates = @($IdentityName)
+    if ($env:COMPUTERNAME) {
+        $candidates += "$env:COMPUTERNAME\$IdentityName"
+    }
+    foreach ($candidate in $candidates) {
+        try {
+            $account = New-Object System.Security.Principal.NTAccount($candidate)
+            return $account.Translate([System.Security.Principal.SecurityIdentifier])
+        }
+        catch {
+        }
+    }
+    try {
+        $group = Get-LocalGroup -Name $IdentityName -ErrorAction SilentlyContinue
+        if ($null -ne $group) {
+            return $group.SID
+        }
+    }
+    catch {
+    }
+    return $null
+}
+
 function Ensure-ModifyAllow {
     param(
         [Parameter(Mandatory = $true)] [string] $Path,
@@ -227,8 +268,8 @@ function Ensure-ModifyAllow {
 
 function Get-CodexSandboxAllowStatus {
     param([Parameter(Mandatory = $true)] [string] $Path)
-    $group = Get-LocalGroup -Name "CodexSandboxUsers" -ErrorAction SilentlyContinue
-    if ($null -eq $group) {
+    $sid = Get-LocalPrincipalSid -IdentityName "CodexSandboxUsers"
+    if ($null -eq $sid) {
         return @{
             present = $false
             allow_present = $false
@@ -237,13 +278,13 @@ function Get-CodexSandboxAllowStatus {
             sid = $null
         }
     }
-    return Test-ModifyAllow -Path $Path -IdentitySid $group.SID -IdentityName "CodexSandboxUsers"
+    return Test-ModifyAllow -Path $Path -IdentitySid $sid -IdentityName "CodexSandboxUsers"
 }
 
 function Ensure-CodexSandboxAllow {
     param([Parameter(Mandatory = $true)] [string] $Path)
-    $group = Get-LocalGroup -Name "CodexSandboxUsers" -ErrorAction SilentlyContinue
-    if ($null -eq $group) {
+    $sid = Get-LocalPrincipalSid -IdentityName "CodexSandboxUsers"
+    if ($null -eq $sid) {
         return @{
             present = $false
             allow_present = $false
@@ -252,7 +293,7 @@ function Ensure-CodexSandboxAllow {
             sid = $null
         }
     }
-    return Ensure-ModifyAllow -Path $Path -IdentitySid $group.SID -IdentityName "CodexSandboxUsers"
+    return Ensure-ModifyAllow -Path $Path -IdentitySid $sid -IdentityName "CodexSandboxUsers"
 }
 
 function Get-CurrentIdentityAllowStatus {
@@ -359,57 +400,59 @@ if (-not $rootCheck.Error) {
     }
 }
 
-# After repairing the root, recursive child access may become available. Check
-# descendants for explicit Deny ACEs too; ignore inaccessible children in Check
-# mode and report them as errors.
-$children = @()
-try {
-    $children = Get-ChildItem -LiteralPath $target -Recurse -Force -ErrorAction Stop
-}
-catch {
-    $errors += @{
-        path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $target
-        error = "child enumeration failed: $($_.Exception.Message)"
+if (-not $rootCheck.Error) {
+    # After repairing the root, recursive child access may become available.
+    # Check descendants for explicit Deny ACEs too; if root ACL access itself
+    # fails, avoid emitting the same launcher/capability error for every child.
+    $children = @()
+    try {
+        $children = Get-ChildItem -LiteralPath $target -Recurse -Force -ErrorAction Stop
     }
-}
-
-foreach ($child in $children) {
-    $checked += $child.FullName
-    $childCheck = Get-RepairableDenyRules -Path $child.FullName
-    if ($childCheck.Error) {
+    catch {
         $errors += @{
-            path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $child.FullName
-            error = $childCheck.Error
+            path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $target
+            error = "child enumeration failed: $($_.Exception.Message)"
         }
-        continue
     }
-    if ($childCheck.Rules.Count -eq 0) {
-        continue
-    }
-    $childEntries = @()
-    foreach ($rule in $childCheck.Rules) {
-        $entry = @{
-            path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $child.FullName
-            identity = $rule.IdentityReference.Value
-            rights = $rule.FileSystemRights.ToString()
-            inheritance = $rule.InheritanceFlags.ToString()
-            propagation = $rule.PropagationFlags.ToString()
-            applied = $false
-        }
-        $childEntries += $entry
-        $removed += $entry
-    }
-    if ($Mode -eq "Apply") {
-        try {
-            [void](Remove-RepairableDenyRules -Path $child.FullName -Acl $childCheck.Acl -Rules $childCheck.Rules)
-            foreach ($entry in $childEntries) {
-                $entry.applied = $true
-            }
-        }
-        catch {
+
+    foreach ($child in $children) {
+        $checked += $child.FullName
+        $childCheck = Get-RepairableDenyRules -Path $child.FullName
+        if ($childCheck.Error) {
             $errors += @{
                 path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $child.FullName
-                error = "deny removal failed: $($_.Exception.Message)"
+                error = $childCheck.Error
+            }
+            continue
+        }
+        if ($childCheck.Rules.Count -eq 0) {
+            continue
+        }
+        $childEntries = @()
+        foreach ($rule in $childCheck.Rules) {
+            $entry = @{
+                path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $child.FullName
+                identity = $rule.IdentityReference.Value
+                rights = $rule.FileSystemRights.ToString()
+                inheritance = $rule.InheritanceFlags.ToString()
+                propagation = $rule.PropagationFlags.ToString()
+                applied = $false
+            }
+            $childEntries += $entry
+            $removed += $entry
+        }
+        if ($Mode -eq "Apply") {
+            try {
+                [void](Remove-RepairableDenyRules -Path $child.FullName -Acl $childCheck.Acl -Rules $childCheck.Rules)
+                foreach ($entry in $childEntries) {
+                    $entry.applied = $true
+                }
+            }
+            catch {
+                $errors += @{
+                    path = Convert-ToRelativePath -BasePath $resolvedRoot -TargetPath $child.FullName
+                    error = "deny removal failed: $($_.Exception.Message)"
+                }
             }
         }
     }

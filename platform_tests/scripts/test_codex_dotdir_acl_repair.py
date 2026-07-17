@@ -79,6 +79,26 @@ def test_no_apply_when_check_is_clean(monkeypatch):
     assert modes == ["Check"]
 
 
+def test_acl_check_preserves_no_window_launcher(monkeypatch):
+    monkeypatch.setattr(verify.sys, "platform", "win32")
+    monkeypatch.setattr(verify.shutil, "which", _fake_powershell)
+    monkeypatch.setattr(verify, "no_window_subprocess_kwargs", lambda: {"creationflags": 0x08000000})
+    observed_kwargs = []
+
+    def fake_run(command, **kwargs):
+        observed_kwargs.append(kwargs)
+        payload = {"ok": True, "needs_repair": False, "risky_deny_count": 0, "errors": []}
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr(verify.subprocess, "run", fake_run)
+
+    result = verify._check_codex_dotdir_acl(Path("E:/GT-KB"), repair=False)
+
+    assert result["ok"] is True
+    assert observed_kwargs
+    assert observed_kwargs[0]["creationflags"] == 0x08000000
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows .codex ACL script")
 def test_repair_script_check_mode_is_pwsh7_compatible(tmp_path):
     pwsh = shutil.which("pwsh")
