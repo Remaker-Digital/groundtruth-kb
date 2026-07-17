@@ -550,6 +550,35 @@ def test_no_action_claim_uses_draft_kind_not_go_implementation(tmp_path: Path, e
     assert holder["claim_kind"] == env.CLAIM_KIND_DRAFT
 
 
+def test_latest_no_go_after_prior_go_remains_draft_while_latest_go_is_implementation(
+    tmp_path: Path,
+    env,
+) -> None:
+    _write_registry(tmp_path, {"B": "prime-builder"})
+    session_id = "2026-06-22T00-00-00Z-prime-builder-B-abc123"
+    _write_worker_session(tmp_path, "prime-builder", session_id)
+
+    _write_project_thread(tmp_path, "no-go-thread", "NEW", project_id="PROJECT-X")
+    _write_bridge_file(tmp_path, "no-go-thread", 2, "GO\n\nFixture GO.\n")
+    _write_bridge_file(tmp_path, "no-go-thread", 3, "NO-ACTION\n\nFixture correction.\n")
+    _write_bridge_file(tmp_path, "no-go-thread", 4, "NO-GO\n\nFixture corrected verdict.\n")
+
+    assert env.acquire("no-go-thread", session_id, project_root=tmp_path)
+    draft_holder = env.current_holder("no-go-thread", project_root=tmp_path)
+    assert draft_holder is not None
+    assert draft_holder["claim_kind"] == env.CLAIM_KIND_DRAFT
+    assert draft_holder["implementation_deadline"] is None
+    assert draft_holder["implementation_grace_expires_at"] is None
+
+    _write_project_thread(tmp_path, "go-thread", "GO", project_id="PROJECT-X")
+    assert env.acquire("go-thread", session_id, project_root=tmp_path)
+    implementation_holder = env.current_holder("go-thread", project_root=tmp_path)
+    assert implementation_holder is not None
+    assert implementation_holder["claim_kind"] == env.CLAIM_KIND_GO_IMPLEMENTATION
+    assert implementation_holder["implementation_deadline"] is not None
+    assert implementation_holder["implementation_grace_expires_at"] is not None
+
+
 @pytest.mark.parametrize("latest_status", ["GO", "NO-GO"])
 def test_prime_can_claim_no_action_correction_after_lo_verdict(
     tmp_path: Path,
