@@ -535,17 +535,21 @@ def test_frontend_gate_syncs_admin_env_once_and_disables_admin_lifecycle(monkeyp
 
     gate._frontend_gates()
 
-    sync_commands = [cmd for cmd in commands if cmd[:4] == ["powershell", "-ExecutionPolicy", "Bypass", "-File"]]
-    admin_build_envs = [
-        env
-        for cmd, env in zip(commands, envs)
-        if cmd[:3] == ["npm", "--prefix", os.path.join("admin", "standalone")]
-        or cmd[:3] == ["npm", "--prefix", os.path.join("admin", "provider")]
-        or cmd[:3] == ["npm", "--prefix", os.path.join("admin", "shopify")]
+    agent_red_root = os.path.join("applications", "Agent_Red")
+    widget_project = os.path.join(agent_red_root, "widget")
+    admin_projects = [
+        os.path.join(agent_red_root, "admin", "standalone"),
+        os.path.join(agent_red_root, "admin", "provider"),
+        os.path.join(agent_red_root, "admin", "shopify"),
     ]
-    assert len(sync_commands) == 1
-    assert len(admin_build_envs) == 3
-    assert all(env and env.get("npm_config_ignore_scripts") == "true" for env in admin_build_envs)
+    assert commands == [
+        ["npm", "--prefix", widget_project, "test"],
+        ["npm", "--prefix", widget_project, "run", "build"],
+        ["powershell", "-ExecutionPolicy", "Bypass", "-File", "scripts/sync-admin-env.ps1"],
+        *[["npm", "--prefix", project, "run", "build"] for project in admin_projects],
+    ]
+    assert envs[:3] == [None, None, None]
+    assert all(env and env.get("npm_config_ignore_scripts") == "true" for env in envs[3:])
 
 
 def test_python_gate_runs_codex_hook_parity_before_pytest(monkeypatch):

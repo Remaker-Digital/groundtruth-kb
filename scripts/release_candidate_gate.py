@@ -559,24 +559,20 @@ def _frontend_gates() -> None:
     powershell = shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
     if not powershell:
         raise GateFailure("PowerShell executable not found on PATH")
-    frontend_projects = [
-        "widget",
-        os.path.join("admin", "standalone"),
-        os.path.join("admin", "provider"),
-        os.path.join("admin", "shopify"),
+    agent_red_root = os.path.join("applications", "Agent_Red")
+    widget_project = os.path.join(agent_red_root, "widget")
+    admin_projects = [
+        os.path.join(agent_red_root, "admin", "standalone"),
+        os.path.join(agent_red_root, "admin", "provider"),
+        os.path.join(agent_red_root, "admin", "shopify"),
     ]
-    _run([npm, "--prefix", "widget", "test"], timeout=180)
-    for project in frontend_projects:
-        if project.startswith("admin"):
-            break
-        _run([npm, "--prefix", project, "run", "build"], timeout=240)
+    _run([npm, "--prefix", widget_project, "test"], timeout=180)
+    _run([npm, "--prefix", widget_project, "run", "build"], timeout=240)
 
     _run([powershell, "-ExecutionPolicy", "Bypass", "-File", "scripts/sync-admin-env.ps1"], timeout=60)
     admin_build_env = os.environ.copy()
     admin_build_env["npm_config_ignore_scripts"] = "true"
-    for project in frontend_projects:
-        if not project.startswith("admin"):
-            continue
+    for project in admin_projects:
         _run([npm, "--prefix", project, "run", "build"], timeout=240, env=admin_build_env)
 
 
