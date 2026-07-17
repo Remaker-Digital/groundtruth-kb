@@ -34,6 +34,7 @@ if str(PACKAGE_SRC) not in sys.path:
 
 from groundtruth_kb.session.envelope import (  # noqa: E402
     EnvelopeError,
+    _validate_worker_role_provenance,
     resolve_worker_role_provenance,
     worker_session_envelope_path,
 )
@@ -285,11 +286,21 @@ def validate_plan_coverage() -> list[str]:
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+    with open(_native_io_path(path), "rb") as stream:
+        return hashlib.sha256(stream.read()).hexdigest().upper()
 
 
 def _json_bytes(payload: object) -> bytes:
     return (json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode("utf-8")
+
+
+def _native_io_path(path: Path) -> str:
+    resolved = str(path.resolve())
+    if os.name != "nt" or resolved.startswith("\\\\?\\"):
+        return resolved
+    if resolved.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + resolved[2:]
+    return "\\\\?\\" + resolved
 
 
 def _exclusive_write_json(path: Path, payload: object) -> None:
@@ -308,6 +319,23 @@ def _exclusive_write_text(path: Path, value: str) -> None:
             stream.write(value)
     except FileExistsError as exc:
         raise CollectionError(f"append-only evidence path already exists: {path}") from exc
+
+
+def _write_content_addressed_snapshot(path: Path, content: bytes) -> None:
+    Path(_native_io_path(path.parent)).mkdir(parents=True, exist_ok=True)
+    try:
+        with open(_native_io_path(path), "xb") as stream:
+            stream.write(content)
+    except FileExistsError:
+        try:
+            with open(_native_io_path(path), "rb") as stream:
+                existing = stream.read()
+        except OSError as exc:
+            raise CollectionError(f"cannot read existing session-envelope snapshot {path}: {exc}") from exc
+        if existing != content:
+            raise CollectionError(f"conflicting bytes at session-envelope snapshot path: {path}")
+    except OSError as exc:
+        raise CollectionError(f"cannot write session-envelope snapshot {path}: {exc}") from exc
 
 
 def _new_issue_id() -> str:
@@ -365,7 +393,7 @@ def _registry_rows(project_root: Path) -> tuple[dict[str, dict[str, Any]], dict[
     return rows, identity_map
 
 
-def resolve_session_authority(project_root: Path, session_id: str) -> dict[str, Any]:
+def resolve_session_authority(project_root: Path, session_id: str, *, evidence_dir: Path) -> dict[str, Any]:
     if _SESSION_RE.fullmatch(session_id) is None:
         raise CollectionError("a real runtime session context id is required")
     try:
@@ -375,16 +403,52 @@ def resolve_session_authority(project_root: Path, session_id: str) -> dict[str, 
         raise CollectionError(f"canonical runtime session provenance is unavailable: {exc}") from exc
     if not envelope_path.is_file():
         raise CollectionError("canonical exact-session envelope must pre-exist before evidence collection")
+    try:
+        envelope_bytes = envelope_path.read_bytes()
+        envelope = json.loads(envelope_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CollectionError(f"canonical exact-session envelope is unreadable: {exc}") from exc
+    if not isinstance(envelope, dict):
+        raise CollectionError("canonical exact-session envelope must contain a JSON object")
+    try:
+        captured_session = _validate_worker_role_provenance(
+            envelope,
+            current_session_id=session_id,
+            expected_harness_name=str(session["harness_name"]),
+        )
+    except EnvelopeError as exc:
+        raise CollectionError(f"captured session-envelope provenance is invalid: {exc}") from exc
+    if captured_session != session:
+        raise CollectionError("captured session-envelope provenance changed during evidence collection")
+
+    resolved_evidence_dir = evidence_dir.resolve()
+    _relative(project_root, resolved_evidence_dir)
+    envelope_sha256 = hashlib.sha256(envelope_bytes).hexdigest().upper()
+    snapshot_path = (
+        resolved_evidence_dir
+        / "session-envelope-snapshots"
+        / str(session["harness_name"])
+        / session_id
+        / f"{envelope_sha256}.json"
+    )
+    _relative(project_root, snapshot_path)
+    _write_content_addressed_snapshot(snapshot_path, envelope_bytes)
     return {
         "session": session,
         "session_envelope": {
             "path": _relative(project_root, envelope_path),
-            "sha256": _sha256(envelope_path),
+            "sha256": envelope_sha256,
+            "snapshot_path": _relative(project_root, snapshot_path),
         },
     }
 
 
-def resolve_runtime_provenance(project_root: Path, environ: Mapping[str, str] | None = None) -> dict[str, Any]:
+def resolve_runtime_provenance(
+    project_root: Path,
+    *,
+    evidence_dir: Path,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
     env = dict(environ or os.environ)
     session_id = (
         env.get("GTKB_AUTHOR_SESSION_CONTEXT_ID")
@@ -392,7 +456,7 @@ def resolve_runtime_provenance(project_root: Path, environ: Mapping[str, str] | 
         or env.get("CODEX_THREAD_ID")
         or ""
     ).strip()
-    authority = resolve_session_authority(project_root, session_id)
+    authority = resolve_session_authority(project_root, session_id, evidence_dir=evidence_dir)
     return {
         "schema_version": semantic_checker.ISSUER_SCHEMA_VERSION,
         "service_id": semantic_checker.COLLECTOR_SERVICE_ID,
@@ -418,7 +482,11 @@ class Collector:
         self.git_head = _git_head(self.project_root)
         self.invocation_id = _new_issue_id()
         try:
-            self.issuer: dict[str, Any] | None = resolve_runtime_provenance(self.project_root, self.environ)
+            self.issuer: dict[str, Any] | None = resolve_runtime_provenance(
+                self.project_root,
+                evidence_dir=self.evidence_dir,
+                environ=self.environ,
+            )
             self.issuer_error: str | None = None
         except CollectionError as exc:
             self.issuer = None
@@ -682,7 +750,11 @@ class Collector:
                 )
                 try:
                     envelope = _read_object(envelope_path)
-                    authority = resolve_session_authority(self.project_root, session_id)
+                    authority = resolve_session_authority(
+                        self.project_root,
+                        session_id,
+                        evidence_dir=self.evidence_dir,
+                    )
                 except CollectionError:
                     continue
                 session = authority["session"]
@@ -712,10 +784,7 @@ class Collector:
                     "sha256": _sha256(telemetry_path),
                     "exit_status": payload.get("outcome", {}).get("exit_status"),
                 },
-                "session_envelope": {
-                    "path": _relative(self.project_root, envelope_path),
-                    "sha256": _sha256(envelope_path),
-                },
+                "session_authority": authority,
             }
         try:
             parity = self._run_command(
@@ -1141,7 +1210,11 @@ class Collector:
         producer_authorities: list[dict[str, Any]] = []
         try:
             for session_id in producer_sessions:
-                authority = resolve_session_authority(self.project_root, str(session_id))
+                authority = resolve_session_authority(
+                    self.project_root,
+                    str(session_id),
+                    evidence_dir=self.evidence_dir,
+                )
                 if authority["session"].get("role") != "prime-builder":
                     raise CollectionError(f"producer session {session_id} is not canonically Prime Builder")
                 producer_authorities.append(authority)
@@ -1359,6 +1432,7 @@ class Collector:
             semantic_assertion_id=plan.semantic_assertion_id,
             manifest=self.manifest,
             project_root=self.project_root,
+            evidence_dir=self.evidence_dir,
         )
         return errors
 

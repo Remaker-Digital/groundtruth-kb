@@ -13,6 +13,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import subprocess
@@ -34,7 +35,7 @@ if str(PACKAGE_SRC) not in sys.path:
 
 from groundtruth_kb.session.envelope import (  # noqa: E402
     EnvelopeError,
-    resolve_worker_role_provenance,
+    _validate_worker_role_provenance,
     worker_session_envelope_path,
 )
 
@@ -43,7 +44,7 @@ _GIT_HEAD_RE = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
 _ISSUE_ID_RE = re.compile(r"^[0-9]{14}-[0-9a-f]{12}$")
 _PR_URL_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/pull/[1-9][0-9]*$")
 COLLECTOR_SERVICE_ID = "gtkb.modernization-semantic-evidence.collector.v1"
-ISSUER_SCHEMA_VERSION = 1
+ISSUER_SCHEMA_VERSION = 2
 RECEIPT_SCHEMA_VERSION = 2
 MEASUREMENT_SCHEMA_VERSION = 2
 ISSUANCE_SCHEMA_VERSION = 1
@@ -524,7 +525,21 @@ def _project_ref(project_root: Path, path: Path) -> dict[str, str]:
     return {"path": relative, "sha256": hashlib.sha256(path.read_bytes()).hexdigest().upper()}
 
 
-def _canonical_session_authority_errors(project_root: Path, authority: object) -> list[str]:
+def _native_io_path(path: Path) -> str:
+    resolved = str(path.resolve())
+    if os.name != "nt" or resolved.startswith("\\\\?\\"):
+        return resolved
+    if resolved.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + resolved[2:]
+    return "\\\\?\\" + resolved
+
+
+def _canonical_session_authority_errors(
+    project_root: Path,
+    authority: object,
+    *,
+    evidence_dir: Path,
+) -> list[str]:
     if not isinstance(authority, dict):
         return ["session authority must be an object"]
     session = authority.get("session")
@@ -535,28 +550,69 @@ def _canonical_session_authority_errors(project_root: Path, authority: object) -
     harness_name = session.get("harness_name")
     if not isinstance(session_id, str) or not isinstance(harness_name, str):
         return ["session authority lacks session_id or harness_name"]
+    if harness_name in {".", ".."} or Path(harness_name).name != harness_name:
+        return ["session authority harness_name is not a safe path component"]
     try:
-        resolved = resolve_worker_role_provenance(project_root, current_session_id=session_id)
         envelope_path = worker_session_envelope_path(project_root, harness_name, session_id)
     except EnvelopeError as exc:
         return [f"canonical session provenance is invalid: {exc}"]
-    if not envelope_path.is_file():
-        return ["canonical exact-session envelope does not pre-exist"]
     errors: list[str] = []
-    if session != resolved:
-        errors.append("stored session provenance differs from canonical runtime authority")
+    if not isinstance(envelope_ref, dict):
+        return ["session authority lacks a session-envelope reference"]
+    source_path = envelope_ref.get("path")
+    snapshot_path = envelope_ref.get("snapshot_path")
+    expected_sha256 = envelope_ref.get("sha256")
     try:
-        expected_ref = _project_ref(project_root, envelope_path)
-    except (OSError, ValueError) as exc:
-        return [f"canonical session envelope is outside the project root or unreadable: {exc}"]
-    if envelope_ref != expected_ref:
-        errors.append("session envelope exact path/hash binding mismatch")
-    elif (error := _safe_evidence_error(project_root, envelope_ref)) is not None:
-        errors.append(error)
+        canonical_source = envelope_path.resolve().relative_to(project_root.resolve()).as_posix()
+        resolved_evidence_dir = evidence_dir.resolve()
+        resolved_evidence_dir.relative_to(project_root.resolve())
+    except ValueError as exc:
+        return [f"canonical session authority path escapes the project root: {exc}"]
+    if source_path != canonical_source:
+        errors.append("session envelope canonical source path mismatch")
+    if not isinstance(expected_sha256, str) or _SHA256_RE.fullmatch(expected_sha256) is None:
+        errors.append("session envelope captured SHA-256 is missing or malformed")
+        return errors
+    expected_snapshot = (
+        resolved_evidence_dir / "session-envelope-snapshots" / harness_name / session_id / f"{expected_sha256}.json"
+    )
+    expected_snapshot_ref = expected_snapshot.resolve().relative_to(project_root.resolve()).as_posix()
+    if snapshot_path != expected_snapshot_ref:
+        errors.append("session envelope snapshot path is not the exact content-addressed authority path")
+        return errors
+    try:
+        with open(_native_io_path(expected_snapshot), "rb") as stream:
+            snapshot_bytes = stream.read()
+    except OSError as exc:
+        errors.append(f"session envelope snapshot is missing or unreadable: {exc}")
+        return errors
+    actual_sha256 = hashlib.sha256(snapshot_bytes).hexdigest().upper()
+    if actual_sha256 != expected_sha256:
+        errors.append("session envelope snapshot path/hash mismatch")
+        return errors
+    try:
+        snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        errors.append(f"session envelope snapshot is not valid UTF-8 JSON: {exc}")
+        return errors
+    if not isinstance(snapshot, dict):
+        errors.append("session envelope snapshot must contain a JSON object")
+        return errors
+    try:
+        resolved = _validate_worker_role_provenance(
+            snapshot,
+            current_session_id=session_id,
+            expected_harness_name=harness_name,
+        )
+    except EnvelopeError as exc:
+        errors.append(f"session envelope snapshot provenance is invalid: {exc}")
+        return errors
+    if session != resolved:
+        errors.append("stored session provenance differs from the captured snapshot authority")
     return errors
 
 
-def _canonical_issuer_errors(project_root: Path, issuer: object) -> list[str]:
+def _canonical_issuer_errors(project_root: Path, issuer: object, *, evidence_dir: Path) -> list[str]:
     if not isinstance(issuer, dict):
         return ["collector issuer must be an object"]
     errors: list[str] = []
@@ -564,15 +620,30 @@ def _canonical_issuer_errors(project_root: Path, issuer: object) -> list[str]:
         errors.append("collector issuer schema version mismatch")
     if issuer.get("service_id") != COLLECTOR_SERVICE_ID:
         errors.append("receipt was not issued by the canonical collector service")
-    errors.extend(_canonical_session_authority_errors(project_root, issuer))
+    errors.extend(_canonical_session_authority_errors(project_root, issuer, evidence_dir=evidence_dir))
     return errors
 
 
-def _nested_measurement_errors(project_root: Path, value: object, current_head: str) -> list[str]:
+def _nested_measurement_errors(
+    project_root: Path,
+    value: object,
+    current_head: str,
+    *,
+    evidence_dir: Path,
+) -> list[str]:
     errors: list[str] = []
 
     def visit(item: object) -> None:
         if isinstance(item, dict):
+            if {"session", "session_envelope"} <= set(item):
+                errors.extend(
+                    _canonical_session_authority_errors(
+                        project_root,
+                        item,
+                        evidence_dir=evidence_dir,
+                    )
+                )
+                return
             if "sha256" in item:
                 if error := _safe_evidence_error(project_root, item):
                     errors.append(error)
@@ -598,6 +669,7 @@ def _validate_receipt_issue(
     semantic_assertion_id: str,
     manifest: dict[str, Any],
     project_root: Path,
+    evidence_dir: Path,
 ) -> tuple[list[str], dict[str, Any] | None]:
     receipt_path = issue_dir / "receipt.json"
     measurement_path = issue_dir / "measurement.json"
@@ -669,8 +741,15 @@ def _validate_receipt_issue(
     issuer = receipt.get("issuer")
     if measurement.get("issuer") != issuer or issuance.get("issuer") != issuer:
         errors.append("receipt, measurement, and issuance issuer provenance differ")
-    errors.extend(_canonical_issuer_errors(project_root, issuer))
-    errors.extend(_nested_measurement_errors(project_root, measurement.get("observed"), current_head))
+    errors.extend(_canonical_issuer_errors(project_root, issuer, evidence_dir=evidence_dir))
+    errors.extend(
+        _nested_measurement_errors(
+            project_root,
+            measurement.get("observed"),
+            current_head,
+            evidence_dir=evidence_dir,
+        )
+    )
 
     if name == "independent-verification":
         session = issuer.get("session", {}) if isinstance(issuer, dict) else {}
@@ -695,7 +774,13 @@ def _validate_receipt_issue(
         else:
             authority_ids: list[str] = []
             for authority in authorities:
-                errors.extend(_canonical_session_authority_errors(project_root, authority))
+                errors.extend(
+                    _canonical_session_authority_errors(
+                        project_root,
+                        authority,
+                        evidence_dir=evidence_dir,
+                    )
+                )
                 authority_session = authority.get("session", {}) if isinstance(authority, dict) else {}
                 authority_ids.append(str(authority_session.get("session_id", "")))
                 if authority_session.get("role") != "prime-builder":
@@ -727,6 +812,7 @@ def _check_receipt(
             semantic_assertion_id=semantic_assertion_id,
             manifest=manifest,
             project_root=project_root,
+            evidence_dir=evidence_dir,
         )
         if not errors:
             return CheckResult(

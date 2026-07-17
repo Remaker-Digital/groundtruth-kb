@@ -140,9 +140,19 @@ def test_successful_executable_measurement_binds_output_scope_head_and_runtime_p
     assert receipt["issuer"]["session"]["harness_name"] == "codex"
     assert receipt["issuer"]["session"]["role"] == "prime-builder"
     assert receipt["issuer"]["session"]["session_id"] == SESSION
+    envelope_ref = receipt["issuer"]["session_envelope"]
+    snapshot_path = collector.project_root / envelope_ref["snapshot_path"]
+    assert Path(collector_module._native_io_path(snapshot_path)).is_file()
+    assert collector_module._sha256(snapshot_path) == envelope_ref["sha256"]
     assert receipt["issue_id"] == collector.invocation_id
     assert (receipt_path.parent / "issuance.json").is_file()
     assert measurement["observed"]["command"]["return_code"] == 0
+    assert collector.validate_receipt(plan) == []
+
+    live_path = collector.project_root / envelope_ref["path"]
+    closed = json.loads(live_path.read_text(encoding="utf-8"))
+    closed["status"] = "closed"
+    _write(live_path, closed)
     assert collector.validate_receipt(plan) == []
 
 
@@ -310,7 +320,9 @@ def test_live_harness_requires_matching_successful_invocation_and_canonical_enve
     observed = measurement["observed"]["harnesses"]["codex"]
     assert observed["session_context_id"] == invocation_session
     assert observed["invocation"]["exit_status"] == "succeeded"
-    assert observed["session_envelope"]["path"] == relative_envelope
+    assert observed["session_authority"]["session_envelope"]["path"] == relative_envelope
+    snapshot_path = collector.project_root / observed["session_authority"]["session_envelope"]["snapshot_path"]
+    assert Path(collector_module._native_io_path(snapshot_path)).is_file()
 
 
 def test_live_harness_parity_failure_is_blocked_without_minting_a_receipt(
@@ -471,6 +483,42 @@ def test_forged_session_harness_or_role_is_rejected_even_when_hashes_are_rebound
     errors = collector.validate_receipt(plan)
 
     assert any("canonical" in error or "session provenance" in error for error in errors)
+
+
+def test_tampered_session_envelope_snapshot_invalidates_existing_receipt(
+    collector: collector_module.Collector,
+) -> None:
+    plan = _command_plan()
+    result = collector.collect(plan)
+    assert result.status == "COLLECTED"
+    receipt = json.loads((collector.project_root / str(result.receipt_path)).read_text(encoding="utf-8"))
+    snapshot_path = collector.project_root / receipt["issuer"]["session_envelope"]["snapshot_path"]
+    with open(collector_module._native_io_path(snapshot_path), "w", encoding="utf-8", newline="\n") as stream:
+        stream.write('{"status":"tampered"}\n')
+
+    errors = collector.validate_receipt(plan)
+
+    assert any("snapshot path/hash mismatch" in error for error in errors)
+
+
+def test_content_addressed_session_snapshot_rejects_conflicting_existing_bytes(
+    collector: collector_module.Collector,
+) -> None:
+    authority = collector_module.resolve_session_authority(
+        collector.project_root,
+        SESSION,
+        evidence_dir=collector.evidence_dir,
+    )
+    snapshot_path = collector.project_root / authority["session_envelope"]["snapshot_path"]
+    with open(collector_module._native_io_path(snapshot_path), "w", encoding="utf-8", newline="\n") as stream:
+        stream.write('{"conflict":true}\n')
+
+    with pytest.raises(collector_module.CollectionError, match="conflicting bytes"):
+        collector_module.resolve_session_authority(
+            collector.project_root,
+            SESSION,
+            evidence_dir=collector.evidence_dir,
+        )
 
 
 def test_append_only_issue_path_refuses_overwrite(collector: collector_module.Collector) -> None:

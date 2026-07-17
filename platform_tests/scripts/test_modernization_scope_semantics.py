@@ -246,6 +246,20 @@ def test_collector_issued_observed_event_binds_current_head_session_and_nested_o
 
     assert result.status == "PASS", result.evidence
     measurement = json.loads((tmp_path / str(collected.measurement_path)).read_text(encoding="utf-8"))
+    live_path = tmp_path / collector.issuer["session_envelope"]["path"]
+    closed = json.loads(live_path.read_text(encoding="utf-8"))
+    closed["status"] = "closed"
+    _write(live_path, closed)
+    assert (
+        checker._check_receipt(
+            "pre-modernization-baseline",
+            semantic_assertion_id="MSA-MOD-AS01",
+            manifest=manifest,
+            project_root=tmp_path,
+            evidence_dir=collector.evidence_dir,
+        ).status
+        == "PASS"
+    )
     output_path = tmp_path / measurement["observed"]["command"]["output"]["path"]
     output_path.write_text("tampered\n", encoding="utf-8")
     assert (
@@ -322,7 +336,11 @@ def test_independent_verification_requires_distinct_canonical_loyal_opposition_i
         harness_id="B",
         role="loyal-opposition",
     )
-    producer = collector_module.resolve_session_authority(tmp_path, PB_SESSION)
+    producer = collector_module.resolve_session_authority(
+        tmp_path,
+        PB_SESSION,
+        evidence_dir=collector.evidence_dir,
+    )
     observed = {
         "measurement_kind": "independent_audit_and_clean_run_reconciliation",
         "producer_session_context_ids": [PB_SESSION],
@@ -336,16 +354,29 @@ def test_independent_verification_requires_distinct_canonical_loyal_opposition_i
     result = collector.collect(plan)
 
     assert result.status == "COLLECTED", result.reason
-    assert (
-        checker._check_receipt(
+
+    def receipt_check() -> checker.CheckResult:
+        return checker._check_receipt(
             "independent-verification",
             semantic_assertion_id="MSA-MOD-AS14",
             manifest=_manifest(),
             project_root=tmp_path,
             evidence_dir=collector.evidence_dir,
-        ).status
-        == "PASS"
-    )
+        )
+
+    assert receipt_check().status == "PASS"
+
+    for session_id, harness_name in ((PB_SESSION, "codex"), (LO_SESSION, "claude")):
+        live_path = tmp_path / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
+        closed = json.loads(live_path.read_text(encoding="utf-8"))
+        closed["status"] = "closed"
+        _write(live_path, closed)
+    assert receipt_check().status == "PASS"
+
+    producer_snapshot = tmp_path / producer["session_envelope"]["snapshot_path"]
+    with open(checker._native_io_path(producer_snapshot), "w", encoding="utf-8", newline="\n") as stream:
+        stream.write('{"status":"tampered"}\n')
+    assert receipt_check().status == "FAIL"
 
     non_independent = _collector(
         monkeypatch,
@@ -355,7 +386,11 @@ def test_independent_verification_requires_distinct_canonical_loyal_opposition_i
         harness_id="B",
         role="loyal-opposition",
     )
-    lo_authority = collector_module.resolve_session_authority(tmp_path, LO_SESSION)
+    lo_authority = collector_module.resolve_session_authority(
+        tmp_path,
+        LO_SESSION,
+        evidence_dir=non_independent.evidence_dir,
+    )
     same_session_observation = {
         **observed,
         "producer_session_context_ids": [LO_SESSION],
@@ -367,3 +402,63 @@ def test_independent_verification_requires_distinct_canonical_loyal_opposition_i
 
     assert rejected.status == "FAIL"
     assert "distinct canonical producer sessions" in rejected.reason
+
+
+@pytest.mark.parametrize(
+    "snapshot_path",
+    [
+        "../outside.json",
+        "semantic-evidence/session-envelope-snapshots/codex/wrong-session/" + "A" * 64 + ".json",
+    ],
+)
+def test_session_authority_rejects_noncanonical_snapshot_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    snapshot_path: str,
+) -> None:
+    collector = _collector(monkeypatch, tmp_path)
+    authority = copy.deepcopy(collector.issuer)
+    authority["session_envelope"]["snapshot_path"] = snapshot_path
+
+    errors = checker._canonical_session_authority_errors(
+        tmp_path,
+        authority,
+        evidence_dir=collector.evidence_dir,
+    )
+
+    assert "session envelope snapshot path is not the exact content-addressed authority path" in errors
+
+
+def test_session_authority_rejects_missing_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    collector = _collector(monkeypatch, tmp_path)
+    authority = copy.deepcopy(collector.issuer)
+    snapshot_path = tmp_path / authority["session_envelope"]["snapshot_path"]
+    Path(checker._native_io_path(snapshot_path)).unlink()
+
+    errors = checker._canonical_session_authority_errors(
+        tmp_path,
+        authority,
+        evidence_dir=collector.evidence_dir,
+    )
+
+    assert any("snapshot is missing or unreadable" in error for error in errors)
+
+
+def test_session_authority_rejects_unsafe_harness_path_component(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    collector = _collector(monkeypatch, tmp_path)
+    authority = copy.deepcopy(collector.issuer)
+    authority["session"]["harness_name"] = "../codex"
+
+    errors = checker._canonical_session_authority_errors(
+        tmp_path,
+        authority,
+        evidence_dir=collector.evidence_dir,
+    )
+
+    assert errors == ["session authority harness_name is not a safe path component"]
