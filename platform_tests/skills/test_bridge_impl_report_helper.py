@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,7 +39,26 @@ def author_metadata_env(monkeypatch):
     monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "Extra High")
 
 
-def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "test-impl-report") -> Path:
+@pytest.fixture(autouse=True)
+def temp_bridge_writer(helper, monkeypatch):
+    def fake_write_bridge_file(slug, version, content, project_root, *, require_author_metadata=True):
+        target = project_root / "bridge" / f"{slug}-{version:03d}.md"
+        if target.exists():
+            raise helper.WriterBridgeConflictError(f"already exists: {target}")
+        target.write_text(content, encoding="utf-8", newline="\n")
+        return target
+
+    monkeypatch.setattr(helper, "write_bridge_file", fake_write_bridge_file)
+
+
+def _stage_thread(
+    tmp_path: Path,
+    *,
+    latest_status: str = "GO",
+    slug: str = "test-impl-report",
+    target_paths: list[str] | None = None,
+) -> Path:
+    targets = target_paths or ["scripts/example.py"]
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / f"{slug}-001.md").write_text(
@@ -47,10 +68,10 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "tes
         "Project Authorization: PAUTH-PROJECT-TEST\n"
         "Project: PROJECT-TEST\n"
         "Work Item: WI-1234\n"
-        'target_paths: ["scripts/example.py"]\n\n'
+        f"target_paths: {json.dumps(targets)}\n\n"
         "## Specification Links\n\n"
-        "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
-        "- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001\n\n"
+        "- `GOV-FILE-BRIDGE-AUTHORITY-001` - bridge authority.\n"
+        "- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` - spec-derived testing.\n\n"
         "## Requirement Sufficiency\n\n"
         "Existing requirements sufficient.\n\n"
         "## Acceptance Criteria\n\n"
@@ -70,6 +91,10 @@ def _stage_thread(tmp_path: Path, *, latest_status: str = "GO", slug: str = "tes
     (bridge_dir / "test-impl-report-extra-001.md").write_text("NEW\n\n# Extra Proposal\n", encoding="utf-8")
     (bridge_dir / "test-impl-report-extra-002.md").write_text("GO\n\n# Extra Review\n", encoding="utf-8")
     return bridge_dir
+
+
+def _git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
 def _completed_report() -> str:
@@ -320,6 +345,52 @@ def test_files_changed_and_recommended_commit_type_sections_are_present(helper, 
     assert "## Files Changed" in skeleton
     assert "## Recommended Commit Type" in skeleton
     assert "Recommended commit type:" in skeleton
+    assert "Excluded out-of-scope dirty paths:" in skeleton
+
+
+def test_plan_report_scopes_dirty_files_to_approved_target_paths(helper, tmp_path):
+    bridge_dir = _stage_thread(
+        tmp_path,
+        target_paths=["scripts/example.py", "scripts/staged.py", "docs/approved/"],
+    )
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "example.py").write_text("print('old')\n", encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "tests@example.invalid")
+    _git(tmp_path, "config", "user.name", "Tests")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "baseline")
+
+    (tmp_path / "scripts" / "example.py").write_text("print('new')\n", encoding="utf-8")
+    (tmp_path / "scripts" / "staged.py").write_text("print('staged')\n", encoding="utf-8")
+    _git(tmp_path, "add", "scripts/staged.py")
+    (tmp_path / "docs" / "approved").mkdir(parents=True)
+    (tmp_path / "docs" / "approved" / "note.md").write_text("approved\n", encoding="utf-8")
+    (tmp_path / "outside.py").write_text("print('outside')\n", encoding="utf-8")
+
+    plan = helper.plan_report("test-impl-report", bridge_dir=bridge_dir)
+    skeleton = helper.build_report_skeleton("test-impl-report", bridge_dir=bridge_dir)
+
+    assert set(plan.files_changed) == {
+        "scripts/example.py",
+        "scripts/staged.py",
+        "docs/approved/note.md",
+    }
+    assert plan.excluded_dirty_count == 1
+    assert "- `outside.py`" not in skeleton
+    assert "Excluded out-of-scope dirty paths: 1." in skeleton
+
+
+def test_missing_target_paths_fails_closed(helper, tmp_path):
+    bridge_dir = _stage_thread(tmp_path)
+    proposal_path = bridge_dir / "test-impl-report-001.md"
+    proposal_path.write_text(
+        proposal_path.read_text(encoding="utf-8").replace('target_paths: ["scripts/example.py"]\n\n', ""),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(helper.BridgeImplReportError, match="target_paths"):
+        helper.plan_report("test-impl-report", bridge_dir=bridge_dir)
 
 
 # ---------------------------------------------------------------------------
