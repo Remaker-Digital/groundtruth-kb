@@ -14,14 +14,20 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 GT_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
 if str(GT_SRC) not in sys.path:
     sys.path.insert(0, str(GT_SRC))
 if str(PROJECT_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "verify" / "helpers"
+if str(VERIFY_HELPERS) not in sys.path:
+    sys.path.insert(0, str(VERIFY_HELPERS))
 
 import worktree_finalization_triage as triage  # noqa: E402
 from implementation_authorization import AuthorizationError, extract_target_paths  # noqa: E402
+from write_verdict import VerifiedFinalizationError, validate_verified_body  # noqa: E402
 
 BRIDGE_VERSION_RE = re.compile(r"^bridge/(?P<slug>.+)-(?P<version>\d{3})\.md$")
 RESPONDS_TO_RE = re.compile(r"^Responds to:\s*(?:GO\s+)?(?P<path>bridge/[^\s]+-\d{3}\.md)", re.MULTILINE)
@@ -218,6 +224,14 @@ def _tracked_terminal_verified_verdict_dirt(dirty_items: list[dict[str, Any]]) -
     return hazards
 
 
+def _verified_body_validation_error(root: Path, text: str) -> str | None:
+    try:
+        validate_verified_body(text, project_root=root)
+    except VerifiedFinalizationError as exc:
+        return str(exc)
+    return None
+
+
 def _thread_base(slug: str, versions: list[BridgeVersion], dirty_items: list[dict[str, Any]]) -> dict[str, Any]:
     latest = versions[-1] if versions else None
     return {
@@ -287,6 +301,23 @@ def _terminal_verified_plan(
                 "stop": True,
                 "dirty_targets": dirty_targets,
                 "reason": "implementation/report target paths are still dirty or untracked",
+            }
+        )
+        return base
+
+    validation_error = _verified_body_validation_error(root, latest.text)
+    if validation_error:
+        base.update(
+            {
+                "classification": "terminal_verified_blocked_invalid_verdict_body",
+                "stop": True,
+                "reason": "terminal VERIFIED verdict body is not accepted by the canonical finalizer",
+                "finalizer_validation_error": validation_error,
+                "suggested_next_steps": [
+                    "Archive and remove the invalid terminal verdict only through a GO-approved per-thread repair.",
+                    "Restore the original thread to its latest implementation report.",
+                    "Have Loyal Opposition reissue VERIFIED through write_verdict.py --finalize-verified with a helper-valid body.",
+                ],
             }
         )
         return base

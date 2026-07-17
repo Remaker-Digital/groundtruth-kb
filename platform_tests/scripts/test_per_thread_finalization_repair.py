@@ -69,6 +69,32 @@ def _report(slug: str, *, target_paths: bool = True) -> str:
 
 
 def _verified(slug: str) -> str:
+    return "\n".join(
+        [
+            "VERIFIED",
+            f"Document: {slug}",
+            f"Responds to: bridge/{slug}-003.md",
+            "Recommended commit type: fix",
+            "",
+            "## Verdict",
+            "",
+            "VERIFIED.",
+            "",
+            "## Spec-to-Test Mapping",
+            "",
+            "| Specification | Test or Verification Command | Executed | Result |",
+            "| --- | --- | --- | --- |",
+            "| `GOV-WORK-TREE-HYGIENE-001` | `python -m pytest platform_tests/scripts/test_per_thread_finalization_repair.py -q --tb=short` | yes | passed |",
+            "",
+            "## Commands Executed",
+            "",
+            "- `python -m pytest platform_tests/scripts/test_per_thread_finalization_repair.py -q --tb=short` - passed.",
+            "",
+        ]
+    )
+
+
+def _invalid_verified(slug: str) -> str:
     return f"VERIFIED\nDocument: {slug}\nResponds to: bridge/{slug}-003.md\n"
 
 
@@ -124,6 +150,22 @@ def test_terminal_verified_dirty_targets_blocks(tmp_path: Path) -> None:
     assert thread["classification"] == "terminal_verified_blocked_dirty_targets"
     assert thread["stop"] is True
     assert "scripts/tool.py" in thread["dirty_targets"]
+
+
+def test_terminal_verified_invalid_body_blocks(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    slug = "gtkb-wi5116-invalid-body"
+    _commit_thread_through_report(repo, slug)
+    _write(repo, f"bridge/{slug}-004.md", _invalid_verified(slug))
+
+    thread = _plan_by_slug(repo)[slug]
+
+    assert thread["classification"] == "terminal_verified_blocked_invalid_verdict_body"
+    assert thread["stop"] is True
+    assert "Recommended commit type" in thread["finalizer_validation_error"]
+    assert "archive" in " ".join(thread["suggested_next_steps"]).lower()
 
 
 def test_tracked_modified_terminal_verified_verdict_is_stop(tmp_path: Path) -> None:

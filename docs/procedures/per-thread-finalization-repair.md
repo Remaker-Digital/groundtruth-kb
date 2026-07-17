@@ -41,8 +41,14 @@ python scripts/per_thread_finalization_repair.py --format markdown --exclude-wi 
 
 - `terminal_verified_repair_candidate`: latest status is `VERIFIED`, the
   verdict points at a readable report, target paths are parseable, and those
-  target paths are clean at runtime. Re-run immediately before acting, then use
-  the approved per-thread finalization path.
+  target paths are clean at runtime, and the terminal verdict body is accepted
+  by the canonical finalizer's evidence-floor validation. Re-run immediately
+  before acting, then use the approved per-thread finalization path.
+- `terminal_verified_blocked_invalid_verdict_body`: latest status is
+  `VERIFIED`, target paths are parseable and clean, but the terminal verdict
+  body fails `write_verdict.validate_verified_body()`. Stop; route through a
+  bounded archive/remove repair and have Loyal Opposition reissue `VERIFIED`
+  through `write_verdict.py --finalize-verified` with a helper-valid body.
 - `terminal_verified_blocked_dirty_targets`: latest status is `VERIFIED`, but
   one or more implementation/report target paths are still dirty or untracked.
   Stop and resolve that thread's source ownership first.
@@ -70,6 +76,9 @@ Stop immediately when:
 - A dirty source/test/config path is not attributable to exactly one terminal
   verified thread.
 - A latest bridge status is in flight rather than terminal `VERIFIED`.
+- A terminal `VERIFIED` body fails the canonical finalizer's validation floor
+  (for example missing `Recommended commit type`, `## Spec-to-Test Mapping`, or
+  `## Commands Executed` evidence).
 - A terminal `VERIFIED` bridge verdict file is tracked and modified or deleted;
   terminal status proves lifecycle state, not ownership of those changed bytes.
 - `target_paths` cannot be parsed from the approved/report artifact.
