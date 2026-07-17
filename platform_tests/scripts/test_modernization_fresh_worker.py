@@ -486,8 +486,9 @@ print(json.dumps({
         "registry_version": 1,
         "root_config_exists": False,
     }
-    assert Path(payload["module"]).is_relative_to(venv)
-    assert not Path(payload["module"]).is_relative_to(REPO_ROOT)
+    module_path = Path(payload["module"]).resolve()
+    assert module_path.is_relative_to(venv.resolve())
+    assert not module_path.is_relative_to((BUILD_PROJECT / "src").resolve())
 
 
 def test_fresh_worker_cannot_fall_back_to_host_authority_taxonomy(fresh_host: Path) -> None:
