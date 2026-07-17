@@ -142,6 +142,7 @@ SKIPPED_SCAN_DIR_NAMES = frozenset(
 )
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
+PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT = "provider_verdict_claim_peer_stand_down"
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash", PUBLISH_BRIDGE_VERDICT_TOOL})
 MUTATING_TOOLS = frozenset({"Write", "Edit", "Bash"})
 DISPATCH_KEYWORD_ROLES = {
@@ -218,6 +219,29 @@ BASH_GUARDS = (
 
 class CloudHarnessError(RuntimeError):
     """Raised for fail-closed cloud-harness errors."""
+
+
+class BridgeVerdictClaimStandDown(CloudHarnessError):
+    """Neutral LO verdict publication stand-down for peer-held claim races."""
+
+    def __init__(
+        self,
+        *,
+        slug: str,
+        session_id: str,
+        holder: Mapping[str, Any] | None,
+        detail: str,
+    ) -> None:
+        self.payload = {
+            "status": "neutral_stand_down",
+            "reason": PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT,
+            "slug": slug,
+            "session_id": session_id,
+            "holder_session_id": str((holder or {}).get("session_id") or ""),
+            "holder_ttl_expires_at": (holder or {}).get("ttl_expires_at"),
+            "detail": _bounded_bridge_verdict_recovery_reason(detail),
+        }
+        super().__init__(json.dumps(self.payload, sort_keys=True))
 
 
 class FileScanLimitExceeded(CloudHarnessError):
@@ -1806,6 +1830,43 @@ def _load_provider_verdict_publisher(project_root: Path) -> Callable[..., Any]:
     return publish_lo_verdict
 
 
+def _provider_verdict_claim_holder(project_root: Path, slug: str) -> Mapping[str, Any] | None:
+    try:
+        from scripts.bridge_work_intent_registry import current_holder
+    except ModuleNotFoundError:  # pragma: no cover
+        from bridge_work_intent_registry import current_holder  # type: ignore[no-redef]
+
+    return current_holder(slug, project_root=project_root)
+
+
+def _ensure_provider_verdict_claim(project_root: Path, slug: str, session_id: str) -> None:
+    try:
+        from scripts.bridge_work_intent_registry import acquire
+    except ModuleNotFoundError:  # pragma: no cover
+        from bridge_work_intent_registry import acquire  # type: ignore[no-redef]
+
+    try:
+        acquired = acquire(slug, session_id, project_root=project_root)
+    except Exception as exc:
+        detail = str(exc)
+        if "held by another session" in detail:
+            raise BridgeVerdictClaimStandDown(
+                slug=slug,
+                session_id=session_id,
+                holder=_provider_verdict_claim_holder(project_root, slug),
+                detail=detail,
+            ) from exc
+        raise
+    if acquired:
+        return
+    raise BridgeVerdictClaimStandDown(
+        slug=slug,
+        session_id=session_id,
+        holder=_provider_verdict_claim_holder(project_root, slug),
+        detail=f"provider verdict claim for {slug!r} is held by another session",
+    )
+
+
 def ensure_dispatch_worker_role_document(project_root: Path, profile: AdopterProfile) -> None:
     keyword = os.environ.get("GTKB_BRIDGE_DISPATCH_KEYWORD", "").strip().lower()
     if not keyword:
@@ -1891,6 +1952,7 @@ def _dispatch_publish_bridge_verdict(
     commit_message = str(arguments.get("commit_message") or "")
 
     try:
+        _ensure_provider_verdict_claim(project_root, slug, session_id)
         publish_lo_verdict = _load_provider_verdict_publisher(project_root)
         published = publish_lo_verdict(
             slug,
@@ -1912,7 +1974,16 @@ def _dispatch_publish_bridge_verdict(
             hunk_patch_paths=hunk_patch_paths,
             commit_message=commit_message,
         )
+    except BridgeVerdictClaimStandDown:
+        raise
     except Exception as exc:
+        if "provider verdict claim" in str(exc) and "held by another session" in str(exc):
+            raise BridgeVerdictClaimStandDown(
+                slug=slug,
+                session_id=session_id,
+                holder=_provider_verdict_claim_holder(project_root, slug),
+                detail=str(exc),
+            ) from exc
         raise CloudHarnessError(f"governed bridge verdict publication failed: {exc}") from exc
     return json.dumps(published.to_dict(), sort_keys=True)
 
@@ -2526,6 +2597,8 @@ def run_tool_loop(
                             command_runner=command_runner,
                             skill=skill,
                         )
+                    except BridgeVerdictClaimStandDown:
+                        raise
                     except CloudHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"
                 if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
@@ -2575,6 +2648,9 @@ def run_tool_loop(
                     )
         stop_reason = "max_turn_exhaustion"
         raise CloudHarnessError("max-turn exhaustion before final assistant text")
+    except BridgeVerdictClaimStandDown as exc:
+        stop_reason = PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
+        return json.dumps(exc.payload, sort_keys=True)
     except CloudHarnessError as exc:
         message = str(exc).lower()
         if "max-turn" in message:

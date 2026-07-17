@@ -89,6 +89,16 @@ def _meta() -> base.ModelMetadata:
     )
 
 
+def _allow_provider_verdict_claim(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    calls: list[dict[str, object]] = []
+
+    def fake_ensure(project_root: Path, slug: str, session_id: str) -> None:
+        calls.append({"project_root": project_root, "slug": slug, "session_id": session_id})
+
+    monkeypatch.setattr(base, "_ensure_provider_verdict_claim", fake_ensure)
+    return calls
+
+
 def _root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
@@ -793,6 +803,7 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
         return Published()
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    claim_calls = _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-completion")
@@ -849,6 +860,7 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
     )
     assert len(published) == 1
     assert published[0]["session_id"] == "dispatch-H-completion"
+    assert claim_calls == [{"project_root": root, "slug": "example", "session_id": "dispatch-H-completion"}]
 
 
 def test_bridge_review_recovers_publisher_result_without_verdict_path(
@@ -873,6 +885,7 @@ def test_bridge_review_recovers_publisher_result_without_verdict_path(
         return MissingPath() if publish_calls == 1 else Published()
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-missing-path")
@@ -915,6 +928,75 @@ def test_bridge_review_recovers_publisher_result_without_verdict_path(
     assert publish_calls == 2
 
 
+def test_bridge_review_peer_held_publish_claim_stands_down_neutrally(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    calls = 0
+    publisher_loaded = False
+
+    def peer_claim(_project_root: Path, slug: str, session_id: str) -> None:
+        raise base.BridgeVerdictClaimStandDown(
+            slug=slug,
+            session_id=session_id,
+            holder={"session_id": "peer-session", "ttl_expires_at": "2999-01-01T00:00:00Z"},
+            detail="provider verdict claim for 'example' is held by another session",
+        )
+
+    def load_publisher(_root: Path):
+        nonlocal publisher_loaded
+        publisher_loaded = True
+        raise AssertionError("peer-held claim must stand down before loading the publisher")
+
+    monkeypatch.setattr(base, "_ensure_provider_verdict_claim", peer_claim)
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", load_publisher)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-peer-held")
+
+    def chat(_endpoint: str, _api_key: str, _payload: dict, _timeout: float) -> dict:
+        nonlocal calls
+        calls += 1
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "id": "publish_peer_held",
+                                "function": {
+                                    "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                    "arguments": {"slug": "example", "verdict": "GO", "content": "GO\n"},
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+
+    result = base.run_tool_loop(
+        "review",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        10,
+        root,
+        _profile(),
+        skill="bridge-review",
+        chat_func=chat,
+    )
+
+    payload = json.loads(result)
+    assert payload["status"] == "neutral_stand_down"
+    assert payload["reason"] == base.PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
+    assert payload["holder_session_id"] == "peer-session"
+    assert calls == 1
+    assert publisher_loaded is False
+
+
 def test_bridge_review_fails_closed_after_repeated_publisher_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -926,6 +1008,7 @@ def test_bridge_review_fails_closed_after_repeated_publisher_failures(
         raise RuntimeError("claim\n contention\t")
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fail_publish)
+    _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-failure")
@@ -1010,6 +1093,7 @@ def test_bridge_review_rejects_mixed_publisher_recovery_turn_atomically(
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
     monkeypatch.setattr(base, "dispatch_tool_call", recording_dispatch)
+    _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-mixed-recovery")
@@ -1161,6 +1245,7 @@ def test_anthropic_publisher_only_recovery_forces_tool_choice_by_default(
             return {"verdict_path": "bridge/example-002.md"}
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-anthropic-default")
@@ -1218,6 +1303,7 @@ def test_anthropic_publisher_recovery_can_disable_thinking_without_changing_ordi
             return {"verdict_path": "bridge/example-002.md"}
 
     monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: lambda *_args, **_kwargs: Published())
+    _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-anthropic-nonthinking")
@@ -2350,6 +2436,7 @@ def test_dispatch_publish_bridge_verdict_uses_trusted_runtime_metadata(
         return _Published()
 
     monkeypatch.setattr(writer, "publish_lo_verdict", fake_publish)
+    claim_calls = _allow_provider_verdict_claim(monkeypatch)
     for key in base.BRIDGE_WORK_INTENT_ORDER:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-H-1")
@@ -2374,6 +2461,7 @@ def test_dispatch_publish_bridge_verdict_uses_trusted_runtime_metadata(
     assert isinstance(metadata, dict)
     assert metadata["author_harness_id"] == "H"
     assert metadata["author_model"] == "testvendor/tc-model"
+    assert claim_calls == [{"project_root": root, "slug": "example", "session_id": "dispatch-H-1"}]
 
 
 def test_dispatch_publish_bridge_verdict_denies_non_lo_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

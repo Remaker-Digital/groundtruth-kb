@@ -322,6 +322,9 @@ WORK_SUBJECT_APPLICATION_SUSPENDED_REASON = "work_subject_application_suspended"
 TARGET_PATH_OVERLAP_SELECTED_REASON = "target_path_overlap_selected"
 TARGET_PATH_OVERLAP_INFLIGHT_REASON = "target_path_overlap_inflight"
 THREAD_REOFFER_BACKOFF_RESULT = "thread_reoffer_backoff_active"
+LO_VERDICT_CLAIM_HELD_RESULT = "lo_verdict_claim_held"
+LO_VERDICT_CLAIM_ACQUIRE_FAILED_RESULT = "lo_verdict_claim_acquire_failed"
+PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT = "provider_verdict_claim_peer_stand_down"
 DEFAULT_THREAD_REOFFER_BACKOFF_THRESHOLD = 3
 DEFAULT_THREAD_REOFFER_BACKOFF_WINDOW_SECONDS = 3600
 # WI-4396: expected, non-actionable lease/contention suppression reasons. These
@@ -340,6 +343,8 @@ EXPECTED_SUPPRESSION_REASONS = frozenset(
         TARGET_PATH_OVERLAP_INFLIGHT_REASON,
         WORK_SUBJECT_APPLICATION_SUSPENDED_REASON,
         THREAD_REOFFER_BACKOFF_RESULT,
+        LO_VERDICT_CLAIM_HELD_RESULT,
+        PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT,
     }
 )
 DEFAULT_DISPATCH_RUNS_RETENTION_DAYS = 14
@@ -1608,6 +1613,20 @@ def _matched_worker_output_markers(launch: dict[str, Any]) -> tuple[list[dict[st
     return matched, inspected_paths
 
 
+def _worker_output_contains(launch: dict[str, Any], marker: str) -> tuple[bool, dict[str, str]]:
+    inspected_paths: dict[str, str] = {}
+    marker_lower = marker.lower()
+    for field in ("stdout_path", "stderr_path"):
+        raw_path = launch.get(field)
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        path = Path(raw_path)
+        inspected_paths[field] = str(path)
+        if marker_lower in _read_recent_text(path).lower():
+            return True, inspected_paths
+    return False, inspected_paths
+
+
 def _detect_previous_launch_failure(
     prior: dict[str, Any],
     *,
@@ -2139,6 +2158,122 @@ def _release_prime_work_intents(slugs: list[str], *, project_root: Path, session
             release_work_intent(slug, session_id, project_root=project_root)
         except WorkIntentRegistryError:
             pass
+
+
+def _lo_verdict_claim_ttl_seconds(lifetime_seconds: int | float | None) -> int:
+    """Return a verdict-claim TTL at least as long as the worker/document lease."""
+    lifetime = int(math.ceil(lifetime_seconds)) if isinstance(lifetime_seconds, (int, float)) else None
+    return max(WORK_INTENT_TRIGGER_TTL_SECONDS, _document_lease_ttl_seconds("loyal-opposition", lifetime))
+
+
+def _record_lo_verdict_claim_held(
+    *,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    item: Any,
+    holder: dict[str, Any] | None,
+    ttl_seconds: int,
+) -> None:
+    holder_session_id = str((holder or {}).get("session_id") or "")
+    if holder_session_id and not _mark_work_intent_held_recorded(
+        state_dir,
+        document_name=item.document_name,
+        holder_session_id=holder_session_id,
+    ):
+        return
+    _record_dispatch_suppression(
+        state_dir,
+        {
+            "ts": _now_iso(),
+            "dispatch_id": dispatch_id,
+            "recipient": recipient,
+            "launched": False,
+            "reason": LO_VERDICT_CLAIM_HELD_RESULT,
+            "document_name": item.document_name,
+            "top_status": item.top_status,
+            "top_file": item.top_file,
+            "holder_session_id": holder_session_id,
+            "holder_ttl_expires_at": (holder or {}).get("ttl_expires_at"),
+            "ttl_seconds": ttl_seconds,
+        },
+    )
+
+
+def _acquire_lo_verdict_work_intent_batch(
+    selected: list[Any],
+    *,
+    project_root: Path,
+    state_dir: Path,
+    recipient: str,
+    dispatch_id: str,
+    session_id: str,
+    ttl_seconds: int,
+) -> dict[str, Any]:
+    """Acquire LO verdict claims before provider launch.
+
+    These are draft-kind work-intent claims for latest NEW/REVISED/NO-ACTION
+    review work. A peer-held claim is normal fleet contention, so it suppresses
+    launch neutrally instead of feeding retry or breaker state.
+    """
+    acquired_slugs: list[str] = []
+    for item in selected:
+        slug = item.document_name
+        try:
+            with _dispatcher_work_intent_environment(dispatch_id):
+                acquired = acquire_work_intent(
+                    slug,
+                    session_id,
+                    ttl_seconds=ttl_seconds,
+                    project_root=project_root,
+                )
+        except WorkIntentRegistryError as exc:
+            _release_prime_work_intents(acquired_slugs, project_root=project_root, session_id=session_id)
+            _record_dispatch_failure(
+                state_dir,
+                {
+                    "ts": _now_iso(),
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": LO_VERDICT_CLAIM_ACQUIRE_FAILED_RESULT,
+                    "document_name": slug,
+                    "released_slugs": acquired_slugs,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "ttl_seconds": ttl_seconds,
+                },
+            )
+            return {
+                "ok": False,
+                "reason": LO_VERDICT_CLAIM_ACQUIRE_FAILED_RESULT,
+                "acquired_slugs": acquired_slugs,
+                "failed_slug": slug,
+                "error_message": str(exc),
+            }
+        if not acquired:
+            _release_prime_work_intents(acquired_slugs, project_root=project_root, session_id=session_id)
+            try:
+                holder = current_work_intent_holder(slug, project_root=project_root)
+            except WorkIntentRegistryError:
+                holder = None
+            _record_lo_verdict_claim_held(
+                state_dir=state_dir,
+                recipient=recipient,
+                dispatch_id=dispatch_id,
+                item=item,
+                holder=holder,
+                ttl_seconds=ttl_seconds,
+            )
+            return {
+                "ok": False,
+                "reason": LO_VERDICT_CLAIM_HELD_RESULT,
+                "acquired_slugs": acquired_slugs,
+                "failed_slug": slug,
+                "holder": holder,
+            }
+        acquired_slugs.append(slug)
+    return {"ok": True, "reason": None, "acquired_slugs": acquired_slugs, "ttl_seconds": ttl_seconds}
 
 
 @contextlib.contextmanager
@@ -5860,6 +5995,7 @@ def _process_pending_exit_codes_for_last_launch(
         failure_extra: dict[str, Any] = {}
         post_verdict_exit_reconciled = False
         selected_documents_incomplete = False
+        provider_verdict_claim_peer_stand_down = False
         selected_document_outcomes: dict[str, dict[str, Any]] = {}
         completed_documents: list[str] = []
         incomplete_documents: list[str] = []
@@ -5912,7 +6048,15 @@ def _process_pending_exit_codes_for_last_launch(
                     last_launch["verified_commit_sha"] = verified_commit_shas[primary_bridge_id]
 
             if failure_reason is None and incomplete_documents:
-                if len(selected_bridge_ids) > 1 and exit_code == 0:
+                stand_down_detected, stand_down_paths = _worker_output_contains(
+                    last_launch,
+                    PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT,
+                )
+                if stand_down_detected and exit_code == 0:
+                    provider_verdict_claim_peer_stand_down = True
+                    last_launch["neutral_stand_down_reason"] = PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
+                    last_launch["neutral_stand_down_inspected_paths"] = stand_down_paths
+                elif len(selected_bridge_ids) > 1 and exit_code == 0:
                     selected_documents_incomplete = True
                 elif exit_code == 0:
                     failure_reason = "no_verdict_produced"
@@ -5960,13 +6104,49 @@ def _process_pending_exit_codes_for_last_launch(
             (exit_code == 0 or post_verdict_exit_reconciled)
             and failure_reason is None
             and not selected_documents_incomplete
+            and not provider_verdict_claim_peer_stand_down
         )
         document_signatures = _selected_document_signatures_for_launch(last_launch)
         prior_document_signatures = recipient_state.get("last_dispatched_signatures_by_document")
         if not isinstance(prior_document_signatures, dict):
             prior_document_signatures = {}
         retained_document_signatures = dict(prior_document_signatures)
-        if selected_documents_incomplete:
+        if provider_verdict_claim_peer_stand_down:
+            for bridge_id in incomplete_documents:
+                retained_document_signatures.pop(bridge_id, None)
+            if retained_document_signatures:
+                recipient_state["last_dispatched_signatures_by_document"] = retained_document_signatures
+            else:
+                recipient_state.pop("last_dispatched_signatures_by_document", None)
+            recipient_state["last_dispatched_signature"] = None
+            recipient_state["signature"] = None
+            recipient_state["last_suppressed_signature"] = launch_signature
+            recipient_state["pending_count"] = len(incomplete_documents)
+            recipient_state["selected_count"] = 0
+            recipient_state["failure_count"] = 0
+            recipient_state["circuit_breaker_tripped"] = False
+            recipient_state.pop("circuit_breaker_tripped_at", None)
+            recipient_state.pop("circuit_breaker_half_open", None)
+            recipient_state.pop("last_failure_reason", None)
+            recipient_state.pop("failure_class", None)
+            recipient_state.pop("non_retryable_failure", None)
+            recipient_state.pop("previous_launch_failed_logged_at", None)
+            recipient_state.pop("previous_launch_failed", None)
+            recipient_state["last_result"] = PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
+            _record_dispatch_suppression(
+                state_dir,
+                {
+                    "ts": _now_iso(),
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": True,
+                    "reason": PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT,
+                    "exit_code": exit_code,
+                    "document_names": incomplete_documents,
+                    **last_launch.get("neutral_stand_down_inspected_paths", {}),
+                },
+            )
+        elif selected_documents_incomplete:
             for bridge_id in completed_documents:
                 if bridge_id in document_signatures:
                     retained_document_signatures[bridge_id] = document_signatures[bridge_id]
@@ -6103,6 +6283,21 @@ def _process_pending_exit_codes_for_last_launch(
                     session_id=str(wi_session),
                 )
                 last_launch["work_intent_released_on_failure"] = True
+
+        verdict_claim_slugs = last_launch.get("verdict_claim_slugs")
+        verdict_claim_session = last_launch.get("verdict_claim_session_id")
+        if (
+            (provider_verdict_claim_peer_stand_down or selected_documents_incomplete or not dispatch_succeeded)
+            and verdict_claim_slugs
+            and verdict_claim_session
+            and not last_launch.get("verdict_claims_released_on_incomplete_exit")
+        ):
+            _release_prime_work_intents(
+                list(verdict_claim_slugs),
+                project_root=project_root,
+                session_id=str(verdict_claim_session),
+            )
+            last_launch["verdict_claims_released_on_incomplete_exit"] = True
 
         # Reconciliation is observational. A missing/corrupt worker envelope
         # becomes a partial record with only dispatcher-observed facts; a
@@ -6857,6 +7052,7 @@ def run_dispatch_cycle(
                     dispatch_id: str | None = None
                     work_intent_session_id: str | None = None
                     acquired_work_intent_slugs: list[str] = []
+                    acquired_lo_verdict_claim_slugs: list[str] = []
                     acquired_document_leases: list[dict[str, Any]] = []
 
                     recipient_state["selected_count"] = len(dispatched_selected)
@@ -7237,6 +7433,48 @@ def run_dispatch_cycle(
                                     recipients_state[recipient] = recipient_state
                                     continue
                                 trusted_worker_context = dict(worker_session_result["trusted_worker_context"])
+                                if target.needed_role_label == "loyal-opposition" and dispatched_selected:
+                                    lo_claim_ttl_seconds = _lo_verdict_claim_ttl_seconds(
+                                        worker_lifetime_profile(target, project_root=project_root).get("seconds")
+                                    )
+                                    lo_claim_result = _acquire_lo_verdict_work_intent_batch(
+                                        dispatched_selected,
+                                        project_root=project_root,
+                                        state_dir=state_dir,
+                                        recipient=recipient,
+                                        dispatch_id=dispatch_id,
+                                        session_id=worker_session_id,
+                                        ttl_seconds=lo_claim_ttl_seconds,
+                                    )
+                                    recipient_state["lo_verdict_claim_ttl_seconds"] = lo_claim_ttl_seconds
+                                    if not lo_claim_result["ok"]:
+                                        if acquired_document_leases:
+                                            released_leases = _release_document_lease_records(acquired_document_leases)
+                                        else:
+                                            released_leases = []
+                                        recipient_state["last_result"] = lo_claim_result["reason"]
+                                        failed_attempt = {
+                                            "dispatch_id": dispatch_id,
+                                            "recipient": recipient,
+                                            "launched": False,
+                                            "reason": lo_claim_result["reason"],
+                                            "verdict_claim_session_id": worker_session_id,
+                                            "failed_slug": lo_claim_result.get("failed_slug"),
+                                            "released_slugs": lo_claim_result.get("acquired_slugs", []),
+                                            "document_leases_released_on_claim_failure": released_leases,
+                                            "ttl_seconds": lo_claim_ttl_seconds,
+                                        }
+                                        holder = lo_claim_result.get("holder")
+                                        if isinstance(holder, dict):
+                                            failed_attempt["holder_session_id"] = holder.get("session_id")
+                                            failed_attempt["holder_ttl_expires_at"] = holder.get("ttl_expires_at")
+                                        if lo_claim_result.get("error_message"):
+                                            failed_attempt["error_message"] = lo_claim_result["error_message"]
+                                        _record_recipient_attempt(recipient_state, failed_attempt)
+                                        results[recipient] = failed_attempt
+                                        recipients_state[recipient] = recipient_state
+                                        continue
+                                    acquired_lo_verdict_claim_slugs = list(lo_claim_result["acquired_slugs"])
                             if target.needed_role_label == "prime-builder" and not dry_run:
                                 acquire_result = _acquire_prime_work_intent_batch(
                                     dispatched_selected,
@@ -7289,6 +7527,9 @@ def run_dispatch_cycle(
                                 launch["work_intent_session_id"] = work_intent_session_id
                             if acquired_work_intent_slugs:
                                 launch["work_intent_slugs"] = acquired_work_intent_slugs
+                            if acquired_lo_verdict_claim_slugs:
+                                launch["verdict_claim_session_id"] = dispatch_id
+                                launch["verdict_claim_slugs"] = acquired_lo_verdict_claim_slugs
                             if acquired_document_leases:
                                 launch["document_lease_handles"] = acquired_document_leases
                                 launch["document_lease_slugs"] = [
@@ -7308,6 +7549,13 @@ def run_dispatch_cycle(
                                 launch["document_leases_released_on_launch_failure"] = _release_document_lease_records(
                                     acquired_document_leases
                                 )
+                            if acquired_lo_verdict_claim_slugs and not launch.get("launched"):
+                                _release_prime_work_intents(
+                                    acquired_lo_verdict_claim_slugs,
+                                    project_root=project_root,
+                                    session_id=dispatch_id or "",
+                                )
+                                launch["verdict_claims_released_on_launch_failure"] = True
                             recipient_state["last_result"] = "launched" if launch.get("launched") else "launch_failed"
                             _record_recipient_attempt(recipient_state, launch)
                             if launch.get("launched") and not dry_run and dispatched_selected:

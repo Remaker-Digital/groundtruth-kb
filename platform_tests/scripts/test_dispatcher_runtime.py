@@ -3990,6 +3990,87 @@ def test_lo_live_spawn_acquires_document_lease_or_suppresses_duplicate(
     assert second["results"]["loyal-opposition:A"]["reason"] == "document_lease_held"
 
 
+def test_wi5400_lo_live_spawn_acquires_verdict_claim_before_provider_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _index_with_one_new(root)
+    trigger = _load_trigger()
+    acquired: list[dict[str, object]] = []
+    spawned: list[list[str]] = []
+
+    def fake_acquire(slug, session_id, *, ttl_seconds, project_root):
+        acquired.append(
+            {
+                "slug": slug,
+                "session_id": session_id,
+                "ttl_seconds": ttl_seconds,
+                "project_root": project_root,
+            }
+        )
+        return True
+
+    def fake_spawn_harness(**kwargs: object) -> dict[str, object]:
+        items = kwargs["items"]  # type: ignore[index]
+        spawned.append([item.document_name for item in items])  # type: ignore[union-attr]
+        return {
+            "dispatch_id": kwargs.get("dispatch_id"),
+            "recipient": kwargs["target"].dispatch_state_key,  # type: ignore[index, union-attr]
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(trigger, "acquire_work_intent", fake_acquire)
+    monkeypatch.setattr(trigger, "_spawn_harness", fake_spawn_harness)
+    monkeypatch.setattr(trigger, "_post_dispatch_poll", lambda **_kwargs: None)
+
+    result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
+
+    launch = result["dispatch_state"]["recipients"]["loyal-opposition:A"]["last_launch"]
+    assert spawned == [["example-thread"]]
+    assert len(acquired) == 1
+    assert acquired[0]["slug"] == "example-thread"
+    assert acquired[0]["session_id"] == launch["dispatch_id"]
+    assert acquired[0]["ttl_seconds"] >= trigger.WORK_INTENT_TRIGGER_TTL_SECONDS
+    assert launch["verdict_claim_session_id"] == launch["dispatch_id"]
+    assert launch["verdict_claim_slugs"] == ["example-thread"]
+
+
+def test_wi5400_lo_peer_held_verdict_claim_suppresses_provider_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _make_synthetic_project(tmp_path)
+    state_dir = tmp_path / "state"
+    _index_with_one_new(root)
+    trigger = _load_trigger()
+
+    monkeypatch.setattr(trigger, "acquire_work_intent", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        trigger,
+        "current_work_intent_holder",
+        lambda *_args, **_kwargs: {"session_id": "peer-session", "ttl_expires_at": "2999-01-01T00:00:00Z"},
+    )
+    monkeypatch.setattr(
+        trigger,
+        "_spawn_harness",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("peer-held claim must suppress spawn")),
+    )
+
+    result = trigger.run_dispatch_cycle(project_root=root, state_dir=state_dir, dry_run=False)
+
+    assert result["results"]["loyal-opposition:A"]["reason"] == trigger.LO_VERDICT_CLAIM_HELD_RESULT
+    attempt = result["dispatch_state"]["recipients"]["loyal-opposition:A"]["last_attempt"]
+    assert attempt["holder_session_id"] == "peer-session"
+    assert attempt["document_leases_released_on_claim_failure"] == ["example-thread"]
+    assert _failure_records(state_dir) == []
+    suppressions = _read_jsonl(state_dir / trigger.DISPATCH_SUPPRESSIONS_FILENAME)
+    assert suppressions[-1]["reason"] == trigger.LO_VERDICT_CLAIM_HELD_RESULT
+    assert suppressions[-1]["holder_session_id"] == "peer-session"
+
+
 def test_diagnostic_classifies_dispatched(tmp_path: Path) -> None:
     """WI-3265 IP-2: when the dispatch branch is entered for a recipient, its
     diagnostic record classifies as `dispatched`. dry-run yields a
@@ -6641,6 +6722,75 @@ def test_wi5207_single_document_no_verdict_keeps_legacy_failure(tmp_path: Path) 
     assert state["last_result"] == "no_verdict_produced"
     assert state["failure_count"] == 1
     assert state["last_launch"]["incomplete_documents"] == ["single-thread"]
+
+
+def test_wi5400_peer_claim_stand_down_exit_zero_is_neutral_not_missing_verdict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "wi5400-peer-stand-down"
+    stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
+    stdout_path.write_text(
+        json.dumps(
+            {
+                "status": "neutral_stand_down",
+                "reason": trigger.PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT,
+                "holder_session_id": "peer-session",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("0", encoding="utf-8")
+    (bridge_dir / "single-thread-001.md").write_text("NEW\n", encoding="utf-8")
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=5)).isoformat(),
+        documents=["single-thread"],
+        top_versions=[1],
+    )
+    launch.pop("document_lease_handles")
+    launch["stdout_path"] = str(stdout_path)
+    launch["verdict_claim_slugs"] = ["single-thread"]
+    launch["verdict_claim_session_id"] = dispatch_id
+    released: list[tuple[list[str], str]] = []
+    monkeypatch.setattr(
+        trigger,
+        "_release_prime_work_intents",
+        lambda slugs, *, project_root, session_id: released.append((list(slugs), session_id)),
+    )
+    recipients_state = {
+        "loyal-opposition:B": {
+            "last_launch": launch,
+            "failure_count": 2,
+            "circuit_breaker_tripped": True,
+            "last_failure_reason": "provider_failure",
+            "failure_class": "provider_failure",
+        }
+    }
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:B"]
+    assert state["last_result"] == trigger.PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
+    assert state["failure_count"] == 0
+    assert state["circuit_breaker_tripped"] is False
+    assert "failure_class" not in state
+    assert state["last_dispatched_signature"] is None
+    assert state["last_launch"]["neutral_stand_down_reason"] == trigger.PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
+    assert state["last_launch"]["verdict_claims_released_on_incomplete_exit"] is True
+    assert released == [(["single-thread"], dispatch_id)]
+    assert _failure_records(state_dir) == []
+    suppressions = _read_jsonl(state_dir / trigger.DISPATCH_SUPPRESSIONS_FILENAME)
+    assert suppressions[-1]["reason"] == trigger.PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT
 
 
 def test_wi5207_late_verdict_is_snapshotted_before_recipient_state_mutation(
