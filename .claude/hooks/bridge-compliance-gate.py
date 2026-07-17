@@ -78,6 +78,22 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
 
 
+try:
+    from scripts.gtkb_bridge_writer import BridgeEnvelopeError, validate_bridge_envelope_head
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+
+    class BridgeEnvelopeError(RuntimeError):
+        pass
+
+    def validate_bridge_envelope_head(
+        _content: str,
+        *,
+        require_dispatchable: bool = False,
+        activity: str | None = None,
+    ) -> None:
+        return None
+
+
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
 BRIDGE_STATUS_TOKENS = (
@@ -1849,6 +1865,20 @@ def _no_action_prior_verdict_deny(file_path: str, content: str) -> str | None:
     )
 
 
+def _bridge_envelope_head_deny_reason(content: str) -> str | None:
+    try:
+        validate_bridge_envelope_head(content, require_dispatchable=True)
+    except BridgeEnvelopeError as exc:
+        return (
+            "[Governance] Bridge artifact-head envelope invalid: "
+            f"{exc}. Status-bearing dispatchable bridge files must keep the status token on line 1, "
+            "then `::init gtkb <pb|lo>` on line 2 and `::open <activity>` on line 3. "
+            "(Hard-block per ADR-BRIDGE-ARTIFACT-HEAD-ENVELOPE-001 and "
+            "DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001.)"
+        )
+    return None
+
+
 def _deny_reason_for_content(
     *,
     cwd_path: Path,
@@ -1892,6 +1922,9 @@ def _deny_reason_for_content(
                 "body-status-token rule; see .claude/rules/file-bridge-protocol.md "
                 "section 'Body Status-Token Rule'.)"
             )
+        envelope_deny = _bridge_envelope_head_deny_reason(content)
+        if envelope_deny:
+            return envelope_deny
         kind_err = _bridge_kind_validation_error(content)
         if kind_err:
             return kind_err

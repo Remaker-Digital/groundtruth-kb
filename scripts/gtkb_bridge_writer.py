@@ -57,10 +57,20 @@ def _bridge_file_committed_in_git(target: Path, project_root: Path) -> bool:
 
 
 VALID_STATUSES: frozenset[str] = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED"}
+    {"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION", "VERIFIED", "ADVISORY", "DEFERRED", "WITHDRAWN"}
 )
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "NO-ACTION"})
 LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
+ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
+    "NEW": "lo",
+    "REVISED": "lo",
+    "NO-ACTION": "lo",
+    "GO": "pb",
+    "NO-GO": "pb",
+    "VERIFIED": "pb",
+}
+ENVELOPE_ACTIVITY_VALUES: frozenset[str] = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
+LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_opposition_review", "verification_verdict"})
 
 PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
@@ -72,6 +82,8 @@ PROVIDER_VERDICT_GUARDS: tuple[Path, ...] = (
 _DOCUMENT_LINE_RE = re.compile(r"(?im)^\s*Document:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$")
 _VERSION_LINE_RE = re.compile(r"(?im)^\s*Version:\s*`?(?P<value>\d{3})\b")
 _BRIDGE_KIND_RE = re.compile(r"(?im)^\s*bridge_kind:\s*`?(?P<value>[A-Za-z0-9_.-]+)`?\s*$")
+_ENVELOPE_INIT_RE = re.compile(r"^::init gtkb (?P<role>pb|lo)$")
+_ENVELOPE_OPEN_RE = re.compile(r"^::open (?P<activity>ops|deliberation|build|test|spec|project)$")
 _SAFE_SLUG_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _PATCH_PATH_RE = re.compile(r"(?m)^(?:---|\+\+\+) (?P<path>[^\r\n]+)$")
 _DIFF_GIT_PATH_RE = re.compile(r"(?m)^diff --git a/(?P<old>.*?) b/(?P<new>[^\r\n]*)$")
@@ -102,6 +114,10 @@ class BridgeEvidenceAnchorError(BridgeError):
 
 class BridgeComplianceError(BridgeError):
     """Bridge compliance audit denied or could not evaluate candidate content."""
+
+
+class BridgeEnvelopeError(BridgeError):
+    """Bridge artifact-head envelope lines are missing, malformed, or inconsistent."""
 
 
 class BridgePublicationError(BridgeError):
@@ -222,6 +238,155 @@ def _first_status(content: str) -> str:
         if value:
             return value.split(maxsplit=1)[0].upper()
     return ""
+
+
+def _bridge_kind(content: str) -> str:
+    match = _BRIDGE_KIND_RE.search(content)
+    return match.group("value").lower() if match else ""
+
+
+def default_bridge_envelope_activity(content: str, status: str) -> str:
+    """Return the Slice B default activity for a status-bearing bridge artifact."""
+
+    normalized_status = status.strip().upper()
+    bridge_kind = _bridge_kind(content)
+    if normalized_status in {"GO", "NO-GO", "VERIFIED"} or bridge_kind in LO_ENVELOPE_BRIDGE_KINDS:
+        return "test"
+    return "build"
+
+
+def _validate_activity(activity: str) -> str:
+    normalized = activity.strip()
+    if normalized not in ENVELOPE_ACTIVITY_VALUES:
+        allowed = ", ".join(sorted(ENVELOPE_ACTIVITY_VALUES))
+        raise BridgeEnvelopeError(f"invalid bridge envelope activity {activity!r}; expected one of: {allowed}")
+    return normalized
+
+
+def _bridge_envelope_indices(lines: Sequence[str]) -> tuple[list[int], list[int]]:
+    init_indices: list[int] = []
+    open_indices: list[int] = []
+    for idx, line in enumerate(lines[1:], start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            break
+        if stripped.startswith("::init"):
+            init_indices.append(idx)
+        if stripped.startswith("::open"):
+            open_indices.append(idx)
+    return init_indices, open_indices
+
+
+def _validated_existing_envelope(
+    *,
+    lines: Sequence[str],
+    status: str,
+    expected_role: str,
+    expected_activity: str,
+) -> set[int]:
+    init_indices, open_indices = _bridge_envelope_indices(lines)
+    if not init_indices and not open_indices:
+        return set()
+    if len(init_indices) != 1 or len(open_indices) != 1:
+        raise BridgeEnvelopeError(
+            "bridge artifact-head envelope must contain exactly one ::init line and exactly one ::open line"
+        )
+    init_idx = init_indices[0]
+    open_idx = open_indices[0]
+    if open_idx != init_idx + 1:
+        raise BridgeEnvelopeError("bridge artifact-head envelope lines must be adjacent")
+
+    init_line = lines[init_idx].strip()
+    open_line = lines[open_idx].strip()
+    init_match = _ENVELOPE_INIT_RE.fullmatch(init_line)
+    if init_match is None:
+        raise BridgeEnvelopeError(f"malformed bridge envelope ::init line for {status}: {init_line!r}")
+    actual_role = init_match.group("role")
+    if actual_role != expected_role:
+        raise BridgeEnvelopeError(
+            f"bridge envelope responder-role mismatch for {status}: got {actual_role!r}, expected {expected_role!r}"
+        )
+
+    open_match = _ENVELOPE_OPEN_RE.fullmatch(open_line)
+    if open_match is None:
+        raise BridgeEnvelopeError(f"malformed or invalid bridge envelope ::open line for {status}: {open_line!r}")
+    actual_activity = open_match.group("activity")
+    if actual_activity != expected_activity:
+        raise BridgeEnvelopeError(
+            f"bridge envelope activity mismatch for {status}: got {actual_activity!r}, expected {expected_activity!r}"
+        )
+    return {init_idx, open_idx}
+
+
+def validate_bridge_envelope_head(
+    content: str,
+    *,
+    require_dispatchable: bool = False,
+    activity: str | None = None,
+) -> None:
+    """Validate bridge artifact-head envelope lines without modifying content."""
+
+    lines = content.splitlines()
+    if not lines:
+        return
+    status = _first_status(content)
+    if status not in VALID_STATUSES:
+        return
+
+    init_indices, open_indices = _bridge_envelope_indices(lines)
+    expected_role = ENVELOPE_RESPONDER_BY_STATUS.get(status)
+    if expected_role is None:
+        if init_indices or open_indices:
+            raise BridgeEnvelopeError(f"bridge status {status} has no formal responder-role envelope mapping")
+        return
+
+    selected_activity = _validate_activity(activity or default_bridge_envelope_activity(content, status))
+    if not init_indices and not open_indices:
+        if require_dispatchable:
+            raise BridgeEnvelopeError(
+                f"dispatchable bridge status {status} requires line 2 '::init gtkb {expected_role}' "
+                f"and line 3 '::open {selected_activity}'"
+            )
+        return
+    kept = _validated_existing_envelope(
+        lines=lines,
+        status=status,
+        expected_role=expected_role,
+        expected_activity=selected_activity,
+    )
+    if require_dispatchable and kept != {1, 2}:
+        raise BridgeEnvelopeError("bridge artifact-head envelope must occupy fixed lines 2 and 3")
+
+
+def normalize_bridge_envelope_head(content: str, *, activity: str | None = None) -> str:
+    """Materialize or canonicalize the Slice B bridge artifact-head envelope."""
+
+    lines = content.splitlines()
+    if not lines:
+        return content
+    status = _first_status(content)
+    if status not in VALID_STATUSES:
+        return content
+
+    init_indices, open_indices = _bridge_envelope_indices(lines)
+    expected_role = ENVELOPE_RESPONDER_BY_STATUS.get(status)
+    if expected_role is None:
+        if init_indices or open_indices or activity is not None:
+            raise BridgeEnvelopeError(f"bridge status {status} has no formal responder-role envelope mapping")
+        return content
+
+    selected_activity = _validate_activity(activity or default_bridge_envelope_activity(content, status))
+    remove_indices = _validated_existing_envelope(
+        lines=lines,
+        status=status,
+        expected_role=expected_role,
+        expected_activity=selected_activity,
+    )
+    body_lines = [line.rstrip("\r") for idx, line in enumerate(lines) if idx not in remove_indices]
+    envelope_lines = [f"::init gtkb {expected_role}", f"::open {selected_activity}"]
+    normalized_lines = [body_lines[0], *envelope_lines, *body_lines[1:]]
+    trailing_newline = "\n" if content.endswith(("\n", "\r")) else ""
+    return "\n".join(normalized_lines) + trailing_newline
 
 
 def _provider_relative_path(path: Path, project_root: Path) -> str:
@@ -689,6 +854,7 @@ def write_bridge_file(
         if require_author_metadata
         else content
     )
+    content_to_write = normalize_bridge_envelope_head(content_to_write)
     _reject_synthetic_session_context_id(content_to_write)
     run_bridge_compliance_audit(
         file_path=target,
@@ -779,6 +945,7 @@ def publish_lo_verdict(
         project_root=root,
         author_metadata=trusted_metadata,
     )
+    content_to_publish = normalize_bridge_envelope_head(content_to_publish)
     target = _bridge_dir(root) / f"{document_name}-{next_version:03d}.md"
     _run_provider_verdict_guards(
         project_root=root,

@@ -34,3 +34,16 @@ def test_latest_status_uses_exact_canonical_chain(tmp_path: Path) -> None:
     (bridge / "example-thread-002.md").write_text("GO\n", encoding="utf-8")
 
     assert helper.latest_bridge_status_for_thread(tmp_path, "example-thread") == "GO"
+
+
+def test_status_reader_ignores_envelope_lines_after_status(tmp_path: Path) -> None:
+    bridge = tmp_path / "bridge"
+    bridge.mkdir()
+    (bridge / "enveloped-thread-001.md").write_text(
+        "NEW\n::init gtkb lo\n::open build\n\n# Proposal\n",
+        encoding="utf-8",
+    )
+    (bridge / "legacy-thread-001.md").write_text("NO-GO\n\n# Legacy verdict\n", encoding="utf-8")
+
+    assert helper.latest_bridge_status_for_thread(tmp_path, "enveloped-thread") == "NEW"
+    assert helper.latest_bridge_status_for_thread(tmp_path, "legacy-thread") == "NO-GO"

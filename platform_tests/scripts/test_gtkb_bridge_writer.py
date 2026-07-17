@@ -17,6 +17,7 @@ from scripts.gtkb_bridge_writer import (
     VALID_STATUSES,
     BridgeComplianceError,
     BridgeConflictError,
+    BridgeEnvelopeError,
     BridgePublicationError,
     BridgeTransitionError,
     publish_lo_verdict,
@@ -163,11 +164,14 @@ def _stage_reviewed_file(tmp_path: Path, slug: str, version: int = 1, status: st
     )
 
 
-def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path) -> None:
+def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+
     path = write_bridge_file("docthing", 1, _valid_proposal_body(), tmp_path, author_metadata=AUTHOR_METADATA)
 
     assert path == tmp_path / "bridge" / "docthing-001.md"
     written = path.read_text(encoding="utf-8")
+    assert written.startswith("NEW\n::init gtkb lo\n::open build\n")
     assert "author_identity: Codex\n" in written
     assert "author_session_context_id: session-123\n" in written
     assert "## Requirement Sufficiency\n\nExisting requirements sufficient." in written
@@ -190,18 +194,72 @@ def test_write_bridge_file_rejects_non_positive_version(tmp_path: Path) -> None:
         write_bridge_file("bad", 0, "NEW\n", tmp_path, require_author_metadata=False)
 
 
-def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(tmp_path: Path) -> None:
+def test_write_bridge_file_accepts_pre_metadata_content_when_injection_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+
     _stage_reviewed_file(tmp_path, "docthing")
     content = "GO\n" + _author_metadata_lines("reviewer-session") + "\n" + _valid_go_verdict().split("\n", 1)[1]
 
     path = write_bridge_file("docthing", 2, content, tmp_path, require_author_metadata=False)
 
-    assert path.read_text(encoding="utf-8") == content
+    written = path.read_text(encoding="utf-8")
+    assert written.startswith("GO\n::init gtkb pb\n::open test\n")
+    assert _author_metadata_lines("reviewer-session") in written
+    assert "# GO Verdict" in written
 
 
 def test_no_action_is_valid_prime_authored_status() -> None:
     assert "NO-ACTION" in VALID_STATUSES
     assert "NO-ACTION" in PRIME_STATUSES
+
+
+def test_write_bridge_file_materializes_no_action_envelope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+
+    path = write_bridge_file(
+        "no-action-thread",
+        3,
+        "NO-ACTION\n\nbridge_kind: prime_response\nDocument: no-action-thread\n",
+        tmp_path,
+        author_metadata=AUTHOR_METADATA,
+    )
+
+    assert path.read_text(encoding="utf-8").startswith("NO-ACTION\n::init gtkb lo\n::open build\n")
+
+
+def test_write_bridge_file_rejects_mismatched_envelope_role(tmp_path: Path) -> None:
+    with pytest.raises(BridgeEnvelopeError, match="responder-role mismatch"):
+        write_bridge_file(
+            "bad-envelope",
+            1,
+            "NEW\n::init gtkb pb\n::open build\n\nbridge_kind: prime_proposal\n",
+            tmp_path,
+            author_metadata=AUTHOR_METADATA,
+        )
+
+
+def test_write_bridge_file_rejects_invalid_envelope_activity(tmp_path: Path) -> None:
+    with pytest.raises(BridgeEnvelopeError, match="invalid"):
+        write_bridge_file(
+            "bad-activity",
+            1,
+            "NEW\n::init gtkb lo\n::open unknown\n\nbridge_kind: prime_proposal\n",
+            tmp_path,
+            author_metadata=AUTHOR_METADATA,
+        )
+
+
+def test_write_bridge_file_rejects_envelope_for_unmapped_status(tmp_path: Path) -> None:
+    with pytest.raises(BridgeEnvelopeError, match="no formal responder-role"):
+        write_bridge_file(
+            "advisory-envelope",
+            1,
+            "ADVISORY\n::init gtkb lo\n::open deliberation\n\nbridge_kind: loyal_opposition_advisory\n",
+            tmp_path,
+            author_metadata=AUTHOR_METADATA,
+        )
 
 
 def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> None:
@@ -234,7 +292,14 @@ def test_write_bridge_file_rejects_version_in_git_history(tmp_path: Path) -> Non
         )
 
 
-def test_write_bridge_file_rejects_malformed_proposal_before_disk_write(tmp_path: Path) -> None:
+def test_write_bridge_file_rejects_malformed_proposal_before_disk_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def deny_requirement_sufficiency(**_kwargs):
+        raise BridgeComplianceError("Requirement Sufficiency")
+
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", deny_requirement_sufficiency)
+
     with pytest.raises(BridgeComplianceError, match="Requirement Sufficiency"):
         write_bridge_file(
             "docthing",
@@ -259,7 +324,10 @@ def test_write_bridge_file_allows_valid_verdicts_without_proposal_only_sections(
     tmp_path: Path,
     slug: str,
     content_factory,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+
     _stage_reviewed_file(tmp_path, slug)
     if slug == "verifiedthing":
         _stage_reviewed_file(tmp_path, slug, version=2, status="GO")
@@ -378,7 +446,7 @@ def test_publish_lo_verdict_computes_next_path_and_releases_claim_after_success(
     assert result.verdict_path == "bridge/provider-thread-002.md"
     assert result.claim_released is True
     assert released == [("provider-thread", "dispatch-H-1")]
-    assert (tmp_path / result.verdict_path).read_text(encoding="utf-8").startswith("GO\n")
+    assert (tmp_path / result.verdict_path).read_text(encoding="utf-8").startswith("GO\n::init gtkb pb\n::open test\n")
 
 
 def test_publish_lo_verdict_denies_wrong_role_before_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
