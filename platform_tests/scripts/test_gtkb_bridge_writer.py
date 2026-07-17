@@ -536,3 +536,49 @@ def test_provider_hunk_coverage_recognizes_binary_patch_diff_git_header(tmp_path
     covered = writer._hunk_patch_covered_paths(tmp_path, ["groundtruth-db.patch"])
 
     assert covered == {"groundtruth.db"}
+
+
+def test_provider_hunk_coverage_rejects_declared_size_mismatch(tmp_path: Path) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "feature.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(tmp_path, "add", "--", "scripts/feature.py")
+    _git(tmp_path, "commit", "-m", "chore: seed feature fixture")
+    (tmp_path / "scripts" / "feature.py").write_text("VALUE = 2\n", encoding="utf-8")
+    patch_text = _git(tmp_path, "diff", "--", "scripts/feature.py").stdout
+    patch_path = tmp_path / "feature.patch"
+    patch_path.write_text(patch_text, encoding="utf-8", newline="\n")
+    latest_content = (
+        "NEW\n\nbridge_kind: implementation_report\n\n## Hunk Patch Evidence\n\n"
+        "- Hunk patch: `feature.patch`\n"
+        "- Patch SHA-256: `" + __import__("hashlib").sha256(patch_path.read_bytes()).hexdigest() + "`\n"
+        f"- Patch size: `{len(patch_path.read_bytes()) + 1}` bytes\n"
+    )
+
+    with pytest.raises(BridgePublicationError, match="size mismatch"):
+        writer._hunk_patch_covered_paths(tmp_path, ["feature.patch"], latest_content=latest_content)
+
+
+def test_provider_hunk_coverage_rejects_corrupt_patch(tmp_path: Path) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "feature.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(tmp_path, "add", "--", "scripts/feature.py")
+    _git(tmp_path, "commit", "-m", "chore: seed feature fixture")
+    (tmp_path / "corrupt.patch").write_text(
+        """diff --git a/scripts/feature.py b/scripts/feature.py
+--- a/scripts/feature.py
++++ b/scripts/feature.py
+@@ -1 +1 @@
+-VALUE = 1
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    with pytest.raises(BridgePublicationError, match="not Git-applyable"):
+        writer._hunk_patch_covered_paths(tmp_path, ["corrupt.patch"])

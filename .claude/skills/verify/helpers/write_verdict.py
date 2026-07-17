@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -59,6 +60,8 @@ MISSING_REQUIRED_SPECS_RE = re.compile(
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w`])(?P<path>[A-Za-z]:[\\/][^\s`|<>'\"]+)")
 FENCED_CODE_BLOCK_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)(?:\n```|$)", re.DOTALL)
 TARGET_PATHS_DECL_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?`?target_paths`?\s*[:=]\s*(?P<value>\[[^\n]+\])")
+PATCH_SHA256_DECL_RE = re.compile(r"(?i)\b(?:patch\s+)?sha-?256\b[^0-9a-f]*(?P<value>[0-9a-f]{64})")
+PATCH_SIZE_DECL_RE = re.compile(r"(?i)\b(?:patch\s+)?size\b[^0-9]*(?P<value>\d+)\s*(?:bytes?)?")
 REPORT_PATH_TOKEN_RE = re.compile(
     r"`(?P<code>[^`\n]+)`|(?P<plain>(?<![\w./-])(?:\.?/?(?:scripts|groundtruth-kb|platform_tests|tests|config|"
     r"\.claude|\.codex|\.cursor|\.github|\.githooks|bridge|applications)/[^\s`|<>'\"]+|"
@@ -108,6 +111,8 @@ class HunkPatch:
 
     path: Path
     touched_paths: tuple[str, ...]
+    sha256: str
+    size_bytes: int
 
 
 @dataclass(frozen=True)
@@ -598,17 +603,27 @@ def _patch_path_token(path_text: str) -> str | None:
     return path_text
 
 
-def _patch_paths_from_text(patch_text: str, project_root: Path) -> tuple[str, ...]:
+def _patch_header_text(raw_line: bytes, patch_arg: str) -> str:
+    try:
+        return raw_line.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise VerifiedFinalizationError(f"Hunk patch has a non-UTF-8 path header: {patch_arg}") from exc
+
+
+def _patch_paths_from_bytes(patch_bytes: bytes, project_root: Path, patch_arg: str) -> tuple[str, ...]:
     raw_paths: list[str] = []
-    for line in patch_text.splitlines():
-        diff_match = re.match(r"^diff --git a/(?P<old>.*?) b/(?P<new>.*)$", line)
-        if diff_match:
-            for group_name in ("old", "new"):
-                path_text = _patch_path_token(diff_match.group(group_name))
-                if path_text is not None:
-                    raw_paths.append(path_text)
+    for raw_line in patch_bytes.splitlines():
+        is_diff_header = raw_line.startswith(b"diff --git ")
+        if not is_diff_header and not raw_line.startswith((b"--- ", b"+++ ")):
             continue
-        if not (line.startswith("--- ") or line.startswith("+++ ")):
+        line = _patch_header_text(raw_line, patch_arg)
+        diff_match = re.match(r"^diff --git a/(?P<old>.*?) b/(?P<new>.*)$", line)
+        if is_diff_header:
+            if diff_match:
+                for group_name in ("old", "new"):
+                    path_text = _patch_path_token(diff_match.group(group_name))
+                    if path_text is not None:
+                        raw_paths.append(path_text)
             continue
         path_text = _patch_path_token(line[4:])
         if path_text is not None:
@@ -616,13 +631,87 @@ def _patch_paths_from_text(patch_text: str, project_root: Path) -> tuple[str, ..
     return _unique_paths(project_root, raw_paths)
 
 
+def _declared_hunk_path(line: str) -> str | None:
+    if not re.match(r"(?i)^\s*[-*]?\s*hunk patch\s*:", line):
+        return None
+    value = line.split(":", 1)[1].strip()
+    code_match = re.search(r"`([^`]+)`", value)
+    if code_match:
+        return code_match.group(1)
+    return value.split()[0] if value.split() else None
+
+
+def _hunk_patch_metadata_from_report(report_text: str, project_root: Path) -> dict[str, dict[str, object]]:
+    section = _section_body(report_text, "Hunk Patch Evidence")
+    if not section:
+        return {}
+    metadata: dict[str, dict[str, object]] = {}
+    current_path: str | None = None
+    for line in section.splitlines():
+        declared_path = _declared_hunk_path(line)
+        if declared_path:
+            current_path = _normalize_repo_path(project_root, declared_path)
+            metadata.setdefault(current_path, {})
+            continue
+        if current_path is None:
+            continue
+        sha_match = PATCH_SHA256_DECL_RE.search(line)
+        if sha_match:
+            metadata[current_path]["sha256"] = sha_match.group("value").lower()
+            continue
+        size_match = PATCH_SIZE_DECL_RE.search(line)
+        if size_match:
+            metadata[current_path]["size_bytes"] = int(size_match.group("value"))
+    return metadata
+
+
+def _load_hunk_patch_metadata(
+    project_root: Path,
+    latest_report_rel_path: str | None,
+) -> dict[str, dict[str, object]]:
+    if not latest_report_rel_path:
+        return {}
+    try:
+        report_text = (project_root / latest_report_rel_path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VerifiedFinalizationError(
+            f"Could not read latest implementation report for hunk metadata: {latest_report_rel_path}"
+        ) from exc
+    return _hunk_patch_metadata_from_report(report_text, project_root)
+
+
+def _validate_hunk_patch_metadata(
+    *,
+    patch_arg: str,
+    patch_rel_path: str,
+    patch_bytes: bytes,
+    report_metadata: dict[str, dict[str, object]],
+) -> tuple[str, int]:
+    actual_sha = hashlib.sha256(patch_bytes).hexdigest()
+    actual_size = len(patch_bytes)
+    declared = report_metadata.get(patch_rel_path, {})
+    declared_sha = declared.get("sha256")
+    if declared_sha is not None and str(declared_sha).lower() != actual_sha:
+        raise VerifiedFinalizationError(
+            f"Hunk patch SHA-256 mismatch for {patch_arg}: declared {declared_sha}, actual {actual_sha}"
+        )
+    declared_size = declared.get("size_bytes")
+    if declared_size is not None and int(declared_size) != actual_size:
+        raise VerifiedFinalizationError(
+            f"Hunk patch size mismatch for {patch_arg}: declared {declared_size}, actual {actual_size}"
+        )
+    return actual_sha, actual_size
+
+
 def _resolve_hunk_patches(
     project_root: Path,
     *,
     hunk_patch_paths: list[str],
     include_paths: tuple[str, ...],
+    latest_report_rel_path: str | None = None,
 ) -> tuple[HunkPatch, ...]:
     include_set = set(include_paths)
+    report_metadata = _load_hunk_patch_metadata(project_root, latest_report_rel_path)
     patches: list[HunkPatch] = []
     for patch_arg in hunk_patch_paths:
         patch_path = Path(patch_arg)
@@ -630,14 +719,20 @@ def _resolve_hunk_patches(
             patch_path = project_root / patch_path
         patch_path = patch_path.resolve()
         try:
-            patch_path.relative_to(project_root.resolve())
+            patch_rel_path = patch_path.relative_to(project_root.resolve()).as_posix()
         except ValueError as exc:
             raise VerifiedFinalizationError(f"Hunk patch path escapes project root: {patch_arg}") from exc
         try:
-            patch_text = patch_path.read_bytes().decode("utf-8", errors="replace")
+            patch_bytes = patch_path.read_bytes()
         except OSError as exc:
             raise VerifiedFinalizationError(f"Hunk patch is unreadable: {patch_arg}") from exc
-        touched = _patch_paths_from_text(patch_text, project_root)
+        patch_sha, patch_size = _validate_hunk_patch_metadata(
+            patch_arg=patch_arg,
+            patch_rel_path=patch_rel_path,
+            patch_bytes=patch_bytes,
+            report_metadata=report_metadata,
+        )
+        touched = _patch_paths_from_bytes(patch_bytes, project_root, patch_arg)
         if not touched:
             raise VerifiedFinalizationError(f"Hunk patch does not identify any repository path: {patch_arg}")
         outside = sorted(set(touched) - include_set)
@@ -645,7 +740,7 @@ def _resolve_hunk_patches(
             raise VerifiedFinalizationError(
                 "Hunk patch touches path(s) outside the VERIFIED include set: " + ", ".join(outside)
             )
-        patches.append(HunkPatch(path=patch_path, touched_paths=touched))
+        patches.append(HunkPatch(path=patch_path, touched_paths=touched, sha256=patch_sha, size_bytes=patch_size))
     return tuple(patches)
 
 
@@ -862,8 +957,41 @@ def _apply_hunk_patch_to_index(project_root: Path, patch: HunkPatch, *, env: dic
         )
         return
 
-    failure = (check.stderr or check.stdout or whitespace_check.stderr or whitespace_check.stdout).strip()
-    raise VerifiedFinalizationError(f"hunk patch failed to apply to the disposable index: {patch.path}: {failure}")
+    reverse_check = _run_git(
+        ["apply", "--binary", "--cached", "--reverse", "--check", str(patch.path)],
+        cwd=project_root,
+        check=False,
+        env=env,
+    )
+    if reverse_check.returncode == 0:
+        raise VerifiedFinalizationError(
+            f"hunk patch is reverse-applyable but not forward-applyable to the disposable index: {patch.path}"
+        )
+
+    whitespace_reverse_check = _run_git(
+        ["apply", "--binary", "--cached", "--reverse", "--check", "--ignore-space-change", str(patch.path)],
+        cwd=project_root,
+        check=False,
+        env=env,
+    )
+    if whitespace_reverse_check.returncode == 0:
+        raise VerifiedFinalizationError(
+            f"hunk patch is reverse-applyable but not forward-applyable to the disposable index: {patch.path}"
+        )
+
+    failure = (
+        check.stderr
+        or check.stdout
+        or whitespace_check.stderr
+        or whitespace_check.stdout
+        or reverse_check.stderr
+        or reverse_check.stdout
+        or whitespace_reverse_check.stderr
+        or whitespace_reverse_check.stdout
+    ).strip()
+    raise VerifiedFinalizationError(
+        f"hunk patch is not Git-applyable against the disposable index: {patch.path}: {failure}"
+    )
 
 
 def _cleanup_failed_verdict(project_root: Path, verdict_rel_path: str, staged_paths: tuple[str, ...]) -> None:
@@ -1024,6 +1152,7 @@ def finalize_verified_commit(
         root,
         hunk_patch_paths=hunk_patch_paths,
         include_paths=tuple(_unique_paths(root, include_paths)),
+        latest_report_rel_path=latest_report,
     )
     hunk_patch_touched_paths = {path for patch in hunk_patches for path in patch.touched_paths}
 

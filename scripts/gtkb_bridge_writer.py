@@ -7,6 +7,7 @@ after caller-side validation has passed; it never mutates aggregate queue state.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -74,6 +75,8 @@ _BRIDGE_KIND_RE = re.compile(r"(?im)^\s*bridge_kind:\s*`?(?P<value>[A-Za-z0-9_.-
 _SAFE_SLUG_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _PATCH_PATH_RE = re.compile(r"(?m)^(?:---|\+\+\+) (?P<path>[^\r\n]+)$")
 _DIFF_GIT_PATH_RE = re.compile(r"(?m)^diff --git a/(?P<old>.*?) b/(?P<new>[^\r\n]*)$")
+_PATCH_SHA256_DECL_RE = re.compile(r"(?i)\b(?:patch\s+)?sha-?256\b[^0-9a-f]*(?P<value>[0-9a-f]{64})")
+_PATCH_SIZE_DECL_RE = re.compile(r"(?i)\b(?:patch\s+)?size\b[^0-9]*(?P<value>\d+)\s*(?:bytes?)?")
 
 
 class BridgeError(Exception):
@@ -489,34 +492,162 @@ def _patch_path_token(path_text: str) -> str | None:
     return path_text.replace("\\", "/")
 
 
-def _patch_paths_from_text(patch_text: str) -> set[str]:
+def _patch_header_text(raw_line: bytes, raw_path: str) -> str:
+    try:
+        return raw_line.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise BridgePublicationError(f"VERIFIED hunk patch has a non-UTF-8 path header: {raw_path}") from exc
+
+
+def _patch_paths_from_bytes(patch_bytes: bytes, raw_path: str) -> set[str]:
     paths: set[str] = set()
-    for match in _DIFF_GIT_PATH_RE.finditer(patch_text):
-        for group_name in ("old", "new"):
-            path_text = _patch_path_token(match.group(group_name))
+    for raw_line in patch_bytes.splitlines():
+        if raw_line.startswith(b"diff --git "):
+            line = _patch_header_text(raw_line, raw_path)
+            match = _DIFF_GIT_PATH_RE.match(line)
+            if match is None:
+                continue
+            for group_name in ("old", "new"):
+                path_text = _patch_path_token(match.group(group_name))
+                if path_text is not None:
+                    paths.add(path_text)
+            continue
+        if not raw_line.startswith((b"--- ", b"+++ ")):
+            continue
+        line = _patch_header_text(raw_line, raw_path)
+        match = _PATCH_PATH_RE.match(line)
+        if match is not None:
+            path_text = _patch_path_token(match.group("path"))
             if path_text is not None:
                 paths.add(path_text)
-    for match in _PATCH_PATH_RE.finditer(patch_text):
-        path_text = _patch_path_token(match.group("path"))
-        if path_text is not None:
-            paths.add(path_text)
     return paths
 
 
-def _hunk_patch_covered_paths(project_root: Path, hunk_patch_paths: Sequence[str]) -> set[str]:
+def _section_body(text: str, heading: str) -> str:
+    pattern = re.compile(rf"^##\s+{re.escape(heading)}\s*$", re.IGNORECASE | re.MULTILINE)
+    match = pattern.search(text)
+    if match is None:
+        return ""
+    start = match.end()
+    next_heading = re.search(r"^##\s+", text[start:], re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(text)
+    return text[start:end].strip()
+
+
+def _declared_hunk_path(line: str) -> str | None:
+    if not re.match(r"(?i)^\s*[-*]?\s*hunk patch\s*:", line):
+        return None
+    value = line.split(":", 1)[1].strip()
+    code_match = re.search(r"`([^`]+)`", value)
+    if code_match:
+        return code_match.group(1).replace("\\", "/")
+    return value.split()[0].replace("\\", "/") if value.split() else None
+
+
+def _hunk_patch_metadata_from_report(report_text: str) -> dict[str, dict[str, object]]:
+    section = _section_body(report_text, "Hunk Patch Evidence")
+    if not section:
+        return {}
+    metadata: dict[str, dict[str, object]] = {}
+    current_path: str | None = None
+    for line in section.splitlines():
+        declared_path = _declared_hunk_path(line)
+        if declared_path:
+            current_path = declared_path.lstrip("./")
+            metadata.setdefault(current_path, {})
+            continue
+        if current_path is None:
+            continue
+        sha_match = _PATCH_SHA256_DECL_RE.search(line)
+        if sha_match:
+            metadata[current_path]["sha256"] = sha_match.group("value").lower()
+            continue
+        size_match = _PATCH_SIZE_DECL_RE.search(line)
+        if size_match:
+            metadata[current_path]["size_bytes"] = int(size_match.group("value"))
+    return metadata
+
+
+def _validate_hunk_patch_metadata(
+    *,
+    raw_path: str,
+    patch_rel_path: str,
+    patch_bytes: bytes,
+    report_metadata: Mapping[str, Mapping[str, object]],
+) -> None:
+    declared = report_metadata.get(patch_rel_path, {})
+    actual_sha = hashlib.sha256(patch_bytes).hexdigest()
+    declared_sha = declared.get("sha256")
+    if declared_sha is not None and str(declared_sha).lower() != actual_sha:
+        raise BridgePublicationError(
+            f"VERIFIED hunk patch SHA-256 mismatch for {raw_path}: declared {declared_sha}, actual {actual_sha}"
+        )
+    actual_size = len(patch_bytes)
+    declared_size = declared.get("size_bytes")
+    if declared_size is not None and int(declared_size) != actual_size:
+        raise BridgePublicationError(
+            f"VERIFIED hunk patch size mismatch for {raw_path}: declared {declared_size}, actual {actual_size}"
+        )
+
+
+def _hunk_patch_apply_check(
+    project_root: Path, patch: Path, *, reverse: bool = False
+) -> subprocess.CompletedProcess[str]:
+    args = ["git", "apply", "--binary", "--check"]
+    if reverse:
+        args.append("--reverse")
+    args.append(str(patch))
+    return subprocess.run(
+        args,
+        cwd=project_root,
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+        **no_window_subprocess_kwargs(),
+    )
+
+
+def _assert_hunk_patch_git_applyable(project_root: Path, patch: Path, raw_path: str) -> None:
+    forward = _hunk_patch_apply_check(project_root, patch)
+    if forward.returncode == 0:
+        return
+    reverse = _hunk_patch_apply_check(project_root, patch, reverse=True)
+    if reverse.returncode == 0:
+        return
+    failure = (forward.stderr or forward.stdout or reverse.stderr or reverse.stdout).strip()
+    raise BridgePublicationError(f"VERIFIED hunk patch is not Git-applyable: {raw_path}: {failure}")
+
+
+def _hunk_patch_covered_paths(
+    project_root: Path,
+    hunk_patch_paths: Sequence[str],
+    *,
+    latest_content: str = "",
+) -> set[str]:
     covered: set[str] = set()
     root = project_root.resolve()
+    report_metadata = _hunk_patch_metadata_from_report(latest_content)
     for raw_path in hunk_patch_paths:
         patch = (root / raw_path).resolve()
         try:
-            patch.relative_to(root)
+            patch_rel_path = patch.relative_to(root).as_posix()
         except ValueError as exc:
             raise BridgePublicationError(f"VERIFIED hunk patch escapes project root: {raw_path}") from exc
         try:
-            content = patch.read_bytes().decode("utf-8", errors="replace")
+            patch_bytes = patch.read_bytes()
         except OSError as exc:
             raise BridgePublicationError(f"VERIFIED hunk patch is unreadable: {raw_path}") from exc
-        covered.update(_patch_paths_from_text(content))
+        _validate_hunk_patch_metadata(
+            raw_path=raw_path,
+            patch_rel_path=patch_rel_path,
+            patch_bytes=patch_bytes,
+            report_metadata=report_metadata,
+        )
+        covered.update(_patch_paths_from_bytes(patch_bytes, raw_path))
+        _assert_hunk_patch_git_applyable(root, patch, raw_path)
     return covered
 
 
@@ -662,7 +793,7 @@ def publish_lo_verdict(
         if not include_paths or not commit_message.strip():
             raise BridgePublicationError("VERIFIED publication requires include_paths and commit_message")
         modified_tracked = _modified_tracked_include_paths(root, include_paths)
-        covered_by_hunks = _hunk_patch_covered_paths(root, hunk_patch_paths)
+        covered_by_hunks = _hunk_patch_covered_paths(root, hunk_patch_paths, latest_content=latest_content)
         uncovered = sorted(modified_tracked - covered_by_hunks)
         if uncovered:
             raise BridgePublicationError(

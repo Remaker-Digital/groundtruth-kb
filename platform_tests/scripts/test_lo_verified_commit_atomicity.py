@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import subprocess
 import sys
@@ -777,7 +778,7 @@ def test_hunk_patch_apply_failure_removes_verdict_and_preserves_real_index(verif
     _git(repo, "add", "--", "scripts/unrelated.py")
     staged_before = _git(repo, "diff", "--cached", "--", "scripts/unrelated.py").stdout
 
-    with pytest.raises(verify_helper.VerifiedFinalizationError, match="failed to apply"):
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="not Git-applyable"):
         verify_helper.finalize_verified_commit(
             "sample",
             _verified_body(),
@@ -790,6 +791,88 @@ def test_hunk_patch_apply_failure_removes_verdict_and_preserves_real_index(verif
 
     assert not (repo / "bridge" / "sample-004.md").exists()
     assert _git(repo, "diff", "--cached", "--", "scripts/unrelated.py").stdout == staged_before
+
+
+def test_hunk_patch_declared_size_mismatch_fails_before_verdict(verify_helper, tmp_path: Path) -> None:
+    repo = _init_verified_repo(tmp_path)
+    patch_text = _git(repo, "diff", "--", "scripts/feature.py").stdout
+    patch_path = repo / "feature.patch"
+    _write(patch_path, patch_text)
+    patch_bytes = patch_path.read_bytes()
+    _write(
+        repo / "bridge" / "sample-003.md",
+        _implementation_report_body() + "\n## Hunk Patch Evidence\n\n"
+        "- Hunk patch: `feature.patch`\n"
+        f"- Patch SHA-256: `{hashlib.sha256(patch_bytes).hexdigest()}`\n"
+        f"- Patch size: `{len(patch_bytes) + 1}` bytes\n",
+    )
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="size mismatch"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            hunk_patch_paths=["feature.patch"],
+            commit_message="fix(gtkb): reject byte-mismatched hunk artifact",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-004.md").exists()
+
+
+def test_hunk_patch_declared_sha_mismatch_fails_before_verdict(verify_helper, tmp_path: Path) -> None:
+    repo = _init_verified_repo(tmp_path)
+    patch_text = _git(repo, "diff", "--", "scripts/feature.py").stdout
+    patch_path = repo / "feature.patch"
+    _write(patch_path, patch_text)
+    patch_size = len(patch_path.read_bytes())
+    _write(
+        repo / "bridge" / "sample-003.md",
+        _implementation_report_body() + "\n## Hunk Patch Evidence\n\n"
+        "- Hunk patch: `feature.patch`\n"
+        "- Patch SHA-256: `0000000000000000000000000000000000000000000000000000000000000000`\n"
+        f"- Patch size: `{patch_size}` bytes\n",
+    )
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="SHA-256 mismatch"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            hunk_patch_paths=["feature.patch"],
+            commit_message="fix(gtkb): reject hash-mismatched hunk artifact",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-004.md").exists()
+
+
+def test_corrupt_hunk_patch_fails_without_committing_verdict(verify_helper, tmp_path: Path) -> None:
+    repo = _init_verified_repo(tmp_path)
+    _write(
+        repo / "corrupt.patch",
+        """diff --git a/scripts/feature.py b/scripts/feature.py
+--- a/scripts/feature.py
++++ b/scripts/feature.py
+@@ -1 +1 @@
+-VALUE = 1
+""",
+    )
+
+    with pytest.raises(verify_helper.VerifiedFinalizationError, match="not Git-applyable"):
+        verify_helper.finalize_verified_commit(
+            "sample",
+            _verified_body(),
+            include_paths=["bridge/sample-003.md", "scripts/feature.py"],
+            hunk_patch_paths=["corrupt.patch"],
+            commit_message="fix(gtkb): reject corrupt hunk artifact",
+            project_root=repo,
+            pre_populate=False,
+        )
+
+    assert not (repo / "bridge" / "sample-004.md").exists()
 
 
 def test_hunk_patch_with_crlf_context_applies_to_disposable_index(verify_helper, tmp_path: Path) -> None:
