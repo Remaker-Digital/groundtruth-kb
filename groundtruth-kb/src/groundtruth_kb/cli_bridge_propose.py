@@ -24,7 +24,9 @@ from groundtruth_kb.bridge.proposal_autoload import (
 from groundtruth_kb.bridge.proposal_filing import (
     FilingRequest,
     ProposalFilingError,
+    draft_nonimpairment_disposition,
     file_implementation_proposal,
+    render_nonimpairment_disposition,
 )
 from groundtruth_kb.bridge.taxonomy import BridgeKind
 from groundtruth_kb.config import GTConfig
@@ -103,6 +105,7 @@ ${auto_owner_decisions}
 
 ${proposed_scope_ip_blocks}
 
+${nonimpairment_section}
 ## Specification-Derived Verification Plan
 
 ${verification_plan_table}
@@ -258,6 +261,11 @@ def build_propose_context(
         ),
         "kind_specific_intro": KIND_INTROS[kind],
         "recommended_commit_type": RECOMMENDED_COMMIT_TYPES[kind],
+        "nonimpairment_section": (
+            render_nonimpairment_disposition(draft_nonimpairment_disposition()) + "\n"
+            if kind == "implementation"
+            else ""
+        ),
     }
 
 
