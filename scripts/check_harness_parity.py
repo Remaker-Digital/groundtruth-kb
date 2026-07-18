@@ -5,32 +5,45 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
+import sys
 import tomllib
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_DIR = Path(__file__).resolve().parent
 REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
 PROJECT_SKILLS_RELATIVE_PATH = Path(".claude") / "skills"
 
-# Guarded import — direct script execution may not have repo root on sys.path.
-# Pattern mirrored from scripts/harness_identity.py:14-16 + scripts/harness_roles.py:47-49.
-try:
-    from scripts.harness_projection_reader import load_harness_projection
-except ModuleNotFoundError:
-    from harness_projection_reader import load_harness_projection  # type: ignore[no-redef]
 
-try:
-    from scripts import generate_antigravity_skill_adapters as antigravity_adapter_generator
-    from scripts import generate_api_skill_adapters as api_adapter_generator
-    from scripts import generate_codex_skill_adapters as codex_adapter_generator
-except ModuleNotFoundError:
-    import generate_antigravity_skill_adapters as antigravity_adapter_generator  # type: ignore[no-redef]
-    import generate_api_skill_adapters as api_adapter_generator  # type: ignore[no-redef]
-    import generate_codex_skill_adapters as codex_adapter_generator  # type: ignore[no-redef]
+def _load_sibling_script_module(module_name: str) -> Any:
+    module_path = SCRIPT_DIR / f"{module_name}.py"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError(f"cannot load local script module {module_name!r} from {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    previous = sys.modules.get(module_name)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        if previous is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous
+        raise
+    return module
+
+
+load_harness_projection = _load_sibling_script_module("harness_projection_reader").load_harness_projection
+codex_adapter_generator = _load_sibling_script_module("generate_codex_skill_adapters")
+antigravity_adapter_generator = _load_sibling_script_module("generate_antigravity_skill_adapters")
+api_adapter_generator = _load_sibling_script_module("generate_api_skill_adapters")
 
 _FALLBACK_KNOWN_HARNESSES = ("claude", "codex")
 
