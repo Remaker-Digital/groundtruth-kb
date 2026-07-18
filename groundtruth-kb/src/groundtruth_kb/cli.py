@@ -3898,7 +3898,14 @@ def validate_spec_coherence(
     help="Read back and validate the written packet.",
 )
 @click.option("--artifact-type", default=None, help="Formal artifact type, required for --kind formal.")
-@click.option("--content-file", type=click.Path(), default=None, help="Formal artifact content file.")
+@click.option(
+    "--content-file",
+    type=click.Path(),
+    default=None,
+    help="Content file. Required for --kind formal. Optional for --kind narrative: "
+    "when given, supplies the packet's full_content in place of reading --target, "
+    "while --target still supplies the packet's real path identity.",
+)
 @click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
 @click.pass_context
 def generate_approval_packet(
@@ -4521,6 +4528,53 @@ def backlog_add_work_item(
         click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
         return
     action = "Would create" if result["dry_run"] else "Created"
+    click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
+
+
+@backlog.command("repair-work-item-test-link")
+@click.option("--work-item", "work_item_id", required=True, help="Exact existing work item id.")
+@click.option("--test", "test_id", required=True, help="Exact existing add-work-item test id.")
+@click.option("--test-plan-phase", "phase_id", required=True, help="Exact phase that must contain the test.")
+@click.option("--change-reason", required=True, help="History reason for the append-only repair.")
+@click.option("--dry-run", is_flag=True, help="Validate and report exact versions without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_repair_work_item_test_link(
+    ctx: click.Context,
+    work_item_id: str,
+    test_id: str,
+    phase_id: str,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Repair one exact historical add-work-item linkage atomically."""
+    from groundtruth_kb.cli_backlog_add_work_item import (
+        AddWorkItemError,
+        RepairWorkItemTestLinkRequest,
+        repair_work_item_test_link,
+    )
+
+    config = _resolve_config(ctx)
+    request = RepairWorkItemTestLinkRequest(
+        work_item_id=work_item_id,
+        test_id=test_id,
+        phase_id=phase_id,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = repair_work_item_test_link(config, request)
+    except (AddWorkItemError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    if result["dry_run"]:
+        action = "Already repaired" if result["already_repaired"] else "Would repair"
+    else:
+        action = "Already repaired" if result["already_repaired"] else "Repaired"
     click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
 
 

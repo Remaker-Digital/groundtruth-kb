@@ -4005,6 +4005,7 @@ class KnowledgeDB:
         last_result: str | None = None,
         last_executed_at: str | None = None,
         application_scope: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new version of a test artifact.
 
@@ -4062,7 +4063,8 @@ class KnowledgeDB:
                     "last_executed_at": last_executed_at,
                 },
             )
-            conn.commit()
+            if commit:
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -4358,6 +4360,7 @@ class KnowledgeDB:
         test_ids: list[str] | None = None,
         last_result: str | None = None,
         last_executed_at: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new version of a test plan phase.
 
@@ -4392,7 +4395,8 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_test_plan_phase(id)
 
     def update_test_plan_phase(
@@ -4581,6 +4585,7 @@ class KnowledgeDB:
         completion_evidence: str | None = None,
         supersedes: str | None = None,
         superseded_by: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Insert a new version of a work item.
 
@@ -4677,7 +4682,8 @@ class KnowledgeDB:
                     "source_test_id": source_test_id,
                 },
             )
-            conn.commit()
+            if commit:
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -4690,6 +4696,7 @@ class KnowledgeDB:
         change_reason: str,
         *,
         owner_approved: bool = False,
+        commit: bool = True,
         **fields: Any,
     ) -> dict[str, Any] | None:
         """Create a new version of a work item, carrying forward unchanged fields.
@@ -4793,7 +4800,8 @@ class KnowledgeDB:
                         "source_test_id": source_test_id,
                     },
                 )
-            conn.commit()
+            if commit:
+                conn.commit()
         except Exception:
             conn.rollback()
             raise

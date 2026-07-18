@@ -184,6 +184,10 @@ def _add_backlog_item(
     request: BacklogAddRequest,
     *,
     changed_by: str,
+    db: KnowledgeDB | None = None,
+    allocated_id: str | None = None,
+    source_test_id: str | None = None,
+    commit: bool = True,
 ) -> dict[str, Any]:
     """Persist one validated backlog item with a pre-resolved document actor.
 
@@ -193,9 +197,9 @@ def _add_backlog_item(
     """
     priority = _validate_request(request)
 
-    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    db = db or KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
 
-    allocated_id = _allocate_next_work_item_id(db)
+    allocated_id = allocated_id or _allocate_next_work_item_id(db)
     if db.get_work_item(allocated_id) is not None:
         raise BacklogAddError(
             f"allocated id {allocated_id} already exists; refusing to overwrite (allocation race — retry the command)"
@@ -211,6 +215,7 @@ def _add_backlog_item(
         "change_reason": request.change_reason,
         "description": request.description,
         "source_spec_id": request.source_spec_id,
+        "source_test_id": source_test_id,
         "priority": priority,
         "stage": "backlogged",
         "project_name": request.project_name,
@@ -233,7 +238,7 @@ def _add_backlog_item(
             "kwargs": insert_kwargs,
         }
 
-    row = db.insert_work_item(**insert_kwargs)
+    row = db.insert_work_item(**insert_kwargs, commit=commit)
     if row is None:
         raise BacklogAddError(f"Unexpected error: inserted work item {allocated_id} not found on readback.")
 
