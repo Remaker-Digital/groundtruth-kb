@@ -84,7 +84,18 @@ def _proposal(
     target_paths: str | None = _HARNESS_SURFACE_TARGET,
     disposition: str | None = _CONCRETE_DISPOSITION,
 ) -> str:
-    parts = [status, "", "# Test Proposal", "", _AUTHOR_METADATA, f"bridge_kind: {bridge_kind}", "", _PROJECT_METADATA]
+    parts = [
+        status,
+        "::init gtkb lo",
+        "::open build",
+        "",
+        "# Test Proposal",
+        "",
+        _AUTHOR_METADATA,
+        f"bridge_kind: {bridge_kind}",
+        "",
+        _PROJECT_METADATA,
+    ]
     if target_paths is not None:
         parts.append(target_paths)
     parts.append(_SPEC_LINKS)
@@ -97,12 +108,17 @@ def _proposal(
 
 
 def _deny(gate: ModuleType, content: str, cwd: Path) -> str | None:
-    return gate._deny_reason_for_content(
-        cwd_path=cwd,
-        file_path="bridge/test-disposition-001.md",
-        content=content,
-        run_pending_preflight=False,
-    )
+    original_membership_gap = gate._wi_project_membership_gap
+    gate._wi_project_membership_gap = lambda _content, _cwd: None
+    try:
+        return gate._deny_reason_for_content(
+            cwd_path=cwd,
+            file_path="bridge/test-disposition-001.md",
+            content=content,
+            run_pending_preflight=False,
+        )
+    finally:
+        gate._wi_project_membership_gap = original_membership_gap
 
 
 # --- Acceptance: deny cases ----------------------------------------------------
@@ -141,6 +157,24 @@ def test_harness_surface_with_concrete_disposition_passes(gate: ModuleType, tmp_
 def test_off_surface_without_disposition_not_triggered(gate: ModuleType, tmp_path: Path) -> None:
     reason = _deny(gate, _proposal(target_paths=_OFF_SURFACE_TARGET, disposition=None), tmp_path)
     assert reason is None
+
+
+def test_membership_gap_substitution_is_restored_when_gate_raises(
+    gate: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_membership_gap = gate._wi_project_membership_gap
+
+    def _raise(_content: str) -> str | None:
+        raise RuntimeError("fixture failure after membership check")
+
+    monkeypatch.setattr(gate, "_requirement_sufficiency_section_gap", _raise)
+
+    with pytest.raises(RuntimeError, match="fixture failure after membership check"):
+        _deny(gate, _proposal(), tmp_path)
+
+    assert gate._wi_project_membership_gap is original_membership_gap
 
 
 def test_verdict_file_touching_surface_excluded(gate: ModuleType, tmp_path: Path) -> None:

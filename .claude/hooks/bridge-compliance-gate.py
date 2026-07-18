@@ -1500,8 +1500,15 @@ def _run_pending_applicability_preflight(
         )
         return True, ""
     missing_required = packet.get("missing_required_specs") or []
-    if missing_required:
-        return False, json.dumps(missing_required)
+    blocking_errors = packet.get("blocking_errors") or []
+    if packet.get("preflight_passed") is False or missing_required or blocking_errors:
+        return False, json.dumps(
+            {
+                "missing_required_specs": missing_required,
+                "blocking_errors": blocking_errors,
+            },
+            sort_keys=True,
+        )
     return True, ""
 
 
@@ -2109,7 +2116,7 @@ def _deny_reason_for_content(
                     return (
                         "[Governance] Pre-filing applicability preflight failed: "
                         f"file_path={file_path}; "
-                        f"missing_required_specs={error_msg}. Run "
+                        f"preflight={error_msg}. Run "
                         f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
                         "for full output. (Hard-block per "
                         "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
