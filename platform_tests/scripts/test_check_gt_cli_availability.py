@@ -11,6 +11,7 @@ fail, dynamic registry discovery, and fallback-path consistency with
 
 from __future__ import annotations
 
+import importlib
 import shutil
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
+import groundtruth_kb.project.checks as checks_registry  # noqa: E402
 import install_gt_path_shim  # noqa: E402
 from groundtruth_kb.project.checks import get_registered_checks  # noqa: E402
 from groundtruth_kb.project.checks import gt_cli_availability as helper  # noqa: E402
@@ -127,6 +129,31 @@ def test_unavailable_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 def test_check_is_registered() -> None:
     """The check is auto-discovered by the doctor registry (ADR-REGISTRY-DISCOVERY-001)."""
     assert "gt_cli_availability" in get_registered_checks()
+
+
+def test_future_check_module_is_discovered(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A future module is discovered without editing the registry loader."""
+    module_name = "wi5415_future_check"
+    check_name = "wi5415_future"
+    qualified_name = f"{checks_registry.__name__}.{module_name}"
+    (tmp_path / f"{module_name}.py").write_text(
+        "from groundtruth_kb.project.checks import register_check\n"
+        f"@register_check({check_name!r})\n"
+        "def check_future(root):\n"
+        "    return root\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checks_registry, "__path__", [str(tmp_path), *checks_registry.__path__])
+    importlib.invalidate_caches()
+
+    try:
+        assert check_name in get_registered_checks()
+    finally:
+        checks_registry._REGISTRY.pop(check_name, None)
+        sys.modules.pop(qualified_name, None)
 
 
 def test_fallback_path_matches_shim_generator(tmp_path: Path) -> None:
