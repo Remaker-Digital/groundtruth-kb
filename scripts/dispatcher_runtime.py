@@ -6094,6 +6094,19 @@ def _process_pending_exit_codes_for_last_launch(
         ):
             failure_reason = "worker_timeout"
             failure_error_type = "worker_timeout"
+        if (
+            failure_reason is None
+            and exit_code == 4294967295
+            and not post_verdict_exit_reconciled
+            and not selected_documents_incomplete
+        ):
+            failure_reason = "process_terminated_abruptly"
+            failure_error_type = "process_terminated_abruptly"
+            failure_extra.update(inspected_paths)
+            failure_extra["diagnostic"] = (
+                "Worker process terminated abruptly before producing a governed verdict; "
+                "no more specific worker-output marker was available."
+            )
 
         if last_launch.get("document_lease_handles") and not last_launch.get("document_leases_released_on_exit"):
             last_launch["document_leases_released_on_exit"] = _release_document_lease_records(

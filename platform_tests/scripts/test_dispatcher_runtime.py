@@ -6724,6 +6724,77 @@ def test_wi5207_single_document_no_verdict_keeps_legacy_failure(tmp_path: Path) 
     assert state["last_launch"]["incomplete_documents"] == ["single-thread"]
 
 
+def test_wi5227_ollama_abrupt_exit_is_specific_and_idempotent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import datetime, timedelta
+
+    trigger = _load_trigger()
+    root = tmp_path / "proj"
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True)
+    state_dir = tmp_path / "state"
+    runs_dir = state_dir / trigger.DISPATCH_RUNS_SUBDIR
+    runs_dir.mkdir(parents=True)
+    dispatch_id = "2026-07-14T01-35-27Z-loyal-opposition-D-f2292b"
+    stdout_path = runs_dir / f"{dispatch_id}.stdout.log"
+    stderr_path = runs_dir / f"{dispatch_id}.stderr.log"
+    stdout_path.write_text("", encoding="utf-8")
+    stderr_path.write_text("", encoding="utf-8")
+    (runs_dir / f"{dispatch_id}.exit_code").write_text("4294967295", encoding="utf-8")
+    (bridge_dir / "abrupt-thread-001.md").write_text("NEW\nWork Item: WI-5227\n", encoding="utf-8")
+
+    release_calls: list[list[str]] = []
+
+    def _release(records):
+        slugs = [record["doc_slug"] for record in records]
+        release_calls.append(slugs)
+        return slugs
+
+    monkeypatch.setattr(trigger, "_release_document_lease_records", _release)
+    launch = _wi5207_batch_launch(
+        dispatch_id=dispatch_id,
+        launched_at=(datetime.now(UTC) - timedelta(seconds=31)).isoformat(),
+        documents=["abrupt-thread"],
+        top_versions=[1],
+    )
+    launch["recipient"] = "loyal-opposition:D"
+    launch["stdout_path"] = str(stdout_path)
+    launch["stderr_path"] = str(stderr_path)
+    recipients_state = {"loyal-opposition:D": {"last_launch": launch, "failure_count": 0}}
+
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+    trigger._process_pending_exit_codes(recipients_state, state_dir, root)
+
+    state = recipients_state["loyal-opposition:D"]
+    last_launch = state["last_launch"]
+    assert state["last_result"] == "process_terminated_abruptly"
+    assert state["last_failure_reason"] == "process_terminated_abruptly"
+    assert state["failure_class"] == "process_terminated_abruptly"
+    assert state["failure_count"] == 1
+    assert last_launch["exit_code"] == 4294967295
+    assert last_launch["exit_code_processed"] is True
+    assert last_launch["exit_failure_reason"] == "process_terminated_abruptly"
+    assert last_launch["completed_documents"] == []
+    assert last_launch["incomplete_documents"] == ["abrupt-thread"]
+    assert "verdict_path" not in last_launch
+    assert "verdict_status" not in last_launch
+    assert last_launch["document_leases_released_on_exit"] == ["abrupt-thread"]
+    assert release_calls == [["abrupt-thread"]]
+
+    failures = _failure_records(state_dir)
+    assert len(failures) == 1
+    failure = failures[0]
+    assert failure["reason"] == "process_terminated_abruptly"
+    assert failure["error_type"] == "process_terminated_abruptly"
+    assert failure["exit_code"] == 4294967295
+    assert failure["stdout_path"] == str(stdout_path)
+    assert failure["stderr_path"] == str(stderr_path)
+    assert "before producing a governed verdict" in failure["diagnostic"]
+    assert "no more specific worker-output marker" in failure["diagnostic"]
+
+
 def test_wi5400_peer_claim_stand_down_exit_zero_is_neutral_not_missing_verdict(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
