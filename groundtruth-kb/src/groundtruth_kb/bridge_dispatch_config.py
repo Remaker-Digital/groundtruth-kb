@@ -102,6 +102,8 @@ DOCUMENT_LEASE_HELD_NONLAUNCH_REASON = "document_lease_held"
 IMPL_AUTH_QUARANTINED_NONLAUNCH_REASON = "all_impl_auth_quarantined"
 SELECTED_DOCUMENTS_INCOMPLETE_RESULT = "selected_documents_incomplete"
 HEALTH_STATUS_RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
+GIT_LOCK_WARN_AGE_SECONDS = 15 * 60
+GIT_LOCK_FAIL_AGE_SECONDS = 60 * 60
 RECENT_RUN_FAILURE_MARKERS = (
     ("provider_rate_limited", "provider_rate_limited"),
     ("HTTP 429", "provider_rate_limited"),
@@ -788,17 +790,20 @@ def collect_bridge_dispatch_health(
     *,
     routing_status: BridgeDispatchStatus | None = None,
 ) -> dict[str, Any]:
-    """Return the owner-facing two-dimension dispatch health rollup."""
+    """Return the owner-facing dispatch health rollup."""
     root = project_root.resolve()
     status = routing_status or collect_bridge_dispatch_status(root)
     routing_dimension = _routing_config_health_dimension(status)
     complex_dimension = _complex_lifecycle_health_dimension(root)
+    git_lock_dimension = _git_lock_health_dimension(root)
     aggregate = _max_health_status(
         str(routing_dimension["health_status"]),
         str(complex_dimension["health_status"]),
+        str(git_lock_dimension["health_status"]),
     )
     dimensions = {
         "complex_lifecycle": complex_dimension,
+        "git_lock_health": git_lock_dimension,
         "routing_config": routing_dimension,
     }
     findings: list[str] = []
@@ -810,6 +815,7 @@ def collect_bridge_dispatch_health(
         "health_status": aggregate,
         "dimensions": dimensions,
         "complex_lifecycle": complex_dimension,
+        "git_lock_health": git_lock_dimension,
         "routing_config": routing_dimension,
         "findings": findings,
         "selected_by_role": status.selected_by_role,
@@ -862,6 +868,47 @@ def _complex_lifecycle_health_dimension(project_root: Path) -> dict[str, Any]:
         "components": payload.get("components", {}),
         "findings": list(payload.get("findings") or []),
     }
+
+
+def _git_lock_health_dimension(project_root: Path) -> dict[str, Any]:
+    lock_path = project_root.resolve() / ".git" / "index.lock"
+    payload: dict[str, Any] = {
+        "name": "git_lock_health",
+        "health_status": "PASS",
+        "findings": [],
+        "lock_path": str(lock_path),
+        "present": False,
+        "age_seconds": None,
+        "warn_age_seconds": GIT_LOCK_WARN_AGE_SECONDS,
+        "fail_age_seconds": GIT_LOCK_FAIL_AGE_SECONDS,
+    }
+    try:
+        modified_at = lock_path.stat().st_mtime
+    except FileNotFoundError:
+        return payload
+    except OSError as exc:
+        payload["health_status"] = "FAIL"
+        payload["findings"] = [f"FAIL git lock probe: cannot inspect {lock_path}: {exc}"]
+        return payload
+
+    age_seconds = max(0.0, _now_utc().timestamp() - modified_at)
+    payload["present"] = True
+    payload["age_seconds"] = age_seconds
+    if age_seconds >= GIT_LOCK_FAIL_AGE_SECONDS:
+        status = "FAIL"
+    elif age_seconds >= GIT_LOCK_WARN_AGE_SECONDS:
+        status = "WARN"
+    else:
+        return payload
+
+    payload["health_status"] = status
+    payload["findings"] = [
+        (
+            f"{status} git lock: {lock_path} has existed for {age_seconds:.1f}s. "
+            "Confirm no live git process holds it, then remove the stale lock."
+        )
+    ]
+    return payload
 
 
 def _max_health_status(*statuses: str) -> str:

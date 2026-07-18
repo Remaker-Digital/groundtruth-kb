@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sqlite3
 import sys
 import tomllib
@@ -160,11 +161,60 @@ def test_collect_bridge_dispatch_health_reports_complex_and_routing_dimensions(
     payload = collect_bridge_dispatch_health(tmp_path)
 
     assert payload["health_status"] == "WARN"
-    assert set(payload["dimensions"]) == {"complex_lifecycle", "routing_config"}
+    assert set(payload["dimensions"]) == {"complex_lifecycle", "git_lock_health", "routing_config"}
     assert payload["complex_lifecycle"]["health_status"] == "WARN"
+    assert payload["git_lock_health"]["health_status"] == "PASS"
+    assert payload["git_lock_health"]["present"] is False
     assert payload["routing_config"]["health_status"] == "PASS"
     assert payload["selected_by_role"]["prime-builder"][0]["id"] == "A"
     assert "complex_lifecycle: WARN daemon: dispatcher daemon is not running" in payload["findings"]
+
+
+def test_git_lock_health_fresh_index_lock_passes(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    lock_path = tmp_path / ".git" / "index.lock"
+    lock_path.parent.mkdir()
+    lock_path.write_text("", encoding="utf-8")
+
+    payload = collect_bridge_dispatch_health(tmp_path)
+
+    assert payload["health_status"] == "PASS"
+    assert payload["git_lock_health"]["health_status"] == "PASS"
+    assert payload["git_lock_health"]["present"] is True
+    assert payload["git_lock_health"]["age_seconds"] < 5
+    assert payload["git_lock_health"]["findings"] == []
+    assert lock_path.is_file()
+
+
+@pytest.mark.parametrize(
+    ("age_seconds", "expected_status"),
+    [
+        (bridge_dispatch_config.GIT_LOCK_WARN_AGE_SECONDS + 1, "WARN"),
+        (bridge_dispatch_config.GIT_LOCK_FAIL_AGE_SECONDS + 1, "FAIL"),
+    ],
+)
+def test_git_lock_health_stale_index_lock_escalates_aggregate(
+    tmp_path: Path,
+    age_seconds: int,
+    expected_status: str,
+) -> None:
+    _write_project(tmp_path)
+    lock_path = tmp_path / ".git" / "index.lock"
+    lock_path.parent.mkdir()
+    lock_path.write_text("", encoding="utf-8")
+    modified_at = bridge_dispatch_config._now_utc().timestamp() - age_seconds
+    os.utime(lock_path, (modified_at, modified_at))
+
+    payload = collect_bridge_dispatch_health(tmp_path)
+
+    assert payload["health_status"] == expected_status
+    dimension = payload["git_lock_health"]
+    assert dimension["health_status"] == expected_status
+    assert dimension["present"] is True
+    assert dimension["age_seconds"] >= age_seconds
+    assert any(expected_status in finding and "index.lock" in finding for finding in dimension["findings"])
+    assert any(finding.startswith(f"git_lock_health: {expected_status} git lock:") for finding in payload["findings"])
+    assert lock_path.is_file()
 
 
 def test_collect_status_preserves_harness_registry_projection_bytes(tmp_path: Path) -> None:
