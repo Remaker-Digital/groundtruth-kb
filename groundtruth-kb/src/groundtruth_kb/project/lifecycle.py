@@ -15,10 +15,27 @@ from groundtruth_kb.governance.approval_packet import parse_packet_path_from_cha
 from groundtruth_kb.project.authorization import ACTIVE_PROJECT_AUTHORIZATION_STATUS
 
 PROJECT_TERMINAL_STATUS = "retired"
+PROJECT_TERMINAL_STATUSES = frozenset({"completed", "retired", "cancelled"})
 COMPLETED_PROJECT_AUTHORIZATION_STATUS = "completed"
 PROJECTS_CHANGED_BY = "gt-projects"
 WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = frozenset({"verified", "resolved", "retired", "wont_fix", "not_a_defect"})
 LOGGER = logging.getLogger(__name__)
+
+PROJECT_DEPENDENCY_KIND_REGISTRY_VERSION = 1
+PROJECT_DEPENDENCY_KIND_REGISTRY: dict[str, dict[str, Any]] = {
+    "requires_project_state": {
+        "supported_required_states": ("active", "completed", "retired", "cancelled"),
+        "satisfying_states": {
+            "active": ("active",),
+            "completed": ("completed", "retired"),
+            "retired": ("retired",),
+            "cancelled": ("cancelled",),
+        },
+        "supported_affected_gates": ("readiness", "authorization", "promotion", "closure"),
+        "hard_dependency": True,
+        "recovery_command": "gt projects dependencies recover <dependency-id>",
+    }
+}
 
 # Bridge proposal/report metadata line: ``Work Item: WI-1234`` (including
 # spec-intake ``WI-AUTO-*`` ids, or a GTKB-/WORKLIST- descriptive id),
@@ -194,7 +211,7 @@ class ProjectLifecycleService:
         return {
             "project": project,
             "work_items": self.db.list_project_work_items(project["id"]),
-            "dependencies": self.db.list_project_dependencies(project["id"]),
+            "dependencies": self.list_project_dependencies(project["id"]),
             "artifact_links": self.db.list_project_artifact_links(project["id"]),
             "authorizations": self.db.list_project_authorizations(project["id"]),
         }
@@ -231,6 +248,30 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError(f"Unsupported project fields: {', '.join(unknown)}")
 
         values = {field: fields.get(field, current.get(field)) for field in allowed_fields}
+        current_status = str(current.get("status") or "").strip().lower()
+        requested_status = str(values.get("status") or "").strip().lower()
+        if current_status not in PROJECT_TERMINAL_STATUSES and requested_status in PROJECT_TERMINAL_STATUSES:
+            self._require_project_dependency_gate_ready(current["id"], "closure")
+            active_dependencies = self.db.list_project_dependencies(current["id"])
+            blocking_dependencies: list[str] = []
+            for dependency in active_dependencies:
+                if dependency.get("dependent_project_id") == current["id"]:
+                    blocking_dependencies.append(str(dependency["id"]))
+                    continue
+                definition = PROJECT_DEPENDENCY_KIND_REGISTRY.get(str(dependency.get("dependency_kind") or ""))
+                required_state = str(dependency.get("required_prerequisite_state") or "")
+                satisfying_states = (
+                    tuple(definition["satisfying_states"].get(required_state, ())) if definition is not None else ()
+                )
+                if requested_status not in satisfying_states:
+                    blocking_dependencies.append(str(dependency["id"]))
+            if blocking_dependencies:
+                dependency_ids = ", ".join(sorted(blocking_dependencies))
+                raise ProjectLifecycleError(
+                    "Project cannot enter the requested terminal state while active dependency edges would "
+                    "become invalid; "
+                    f"retire these dependencies first: {dependency_ids}"
+                )
         project = self.db.insert_project(
             str(values["name"]),
             _require_nonempty(changed_by, "changed_by"),
@@ -279,6 +320,418 @@ class ProjectLifecycleService:
         if membership is None:
             raise ProjectLifecycleError("Project membership insert did not return a current membership")
         return membership
+
+    @staticmethod
+    def dependency_kind_registry() -> dict[str, Any]:
+        """Return the versioned governed dependency-kind registry."""
+        return {
+            "version": PROJECT_DEPENDENCY_KIND_REGISTRY_VERSION,
+            "kinds": PROJECT_DEPENDENCY_KIND_REGISTRY,
+        }
+
+    @staticmethod
+    def _canonical_dependency_record(record: dict[str, Any]) -> dict[str, Any]:
+        hidden_compatibility_fields = {
+            "from_project_id",
+            "to_project_id",
+            "dependency_type",
+            "blocking_status",
+        }
+        return {key: value for key, value in record.items() if key not in hidden_compatibility_fields}
+
+    @staticmethod
+    def _dependency_semantic_key(record: dict[str, Any]) -> tuple[str, ...]:
+        return (
+            str(record.get("dependent_project_id") or ""),
+            str(record.get("prerequisite_project_id") or ""),
+            str(record.get("dependency_kind") or ""),
+            str(record.get("required_prerequisite_state") or ""),
+            str(record.get("affected_gate") or ""),
+        )
+
+    def _dependency_validation_errors(self, records: list[dict[str, Any]]) -> list[str]:
+        errors: list[str] = []
+        active_records = [record for record in records if record.get("status") == "active"]
+        semantic_keys: dict[tuple[str, ...], str] = {}
+        adjacency: dict[str, set[str]] = {}
+
+        for record in active_records:
+            dependency_id = str(record.get("id") or "<missing-id>")
+            dependent = str(record.get("dependent_project_id") or "")
+            prerequisite = str(record.get("prerequisite_project_id") or "")
+            kind = str(record.get("dependency_kind") or "")
+            required_state = str(record.get("required_prerequisite_state") or "")
+            affected_gate = str(record.get("affected_gate") or "")
+            provenance = str(record.get("provenance") or "").strip()
+            rationale = str(record.get("rationale") or "").strip()
+
+            if not dependent or not prerequisite:
+                errors.append(f"{dependency_id}: dependency endpoint is missing")
+                continue
+            if dependent == prerequisite:
+                errors.append(f"{dependency_id}: self-dependency is prohibited")
+
+            dependent_project = self.db.get_project(dependent)
+            prerequisite_project = self.db.get_project(prerequisite)
+            if dependent_project is None or prerequisite_project is None:
+                missing = dependent if dependent_project is None else prerequisite
+                errors.append(f"{dependency_id}: unknown-endpoint {missing}")
+
+            definition = PROJECT_DEPENDENCY_KIND_REGISTRY.get(kind)
+            if definition is None:
+                errors.append(f"{dependency_id}: unknown dependency kind {kind!r}")
+            else:
+                if required_state not in definition["supported_required_states"]:
+                    errors.append(f"{dependency_id}: unknown required state {required_state!r}")
+                if affected_gate not in definition["supported_affected_gates"]:
+                    errors.append(f"{dependency_id}: unsupported affected gate {affected_gate!r}")
+                dependent_status = str((dependent_project or {}).get("status") or "").lower()
+                if dependent_status in PROJECT_TERMINAL_STATUSES:
+                    errors.append(f"{dependency_id}: retired-endpoint {dependent}")
+                prerequisite_status = str((prerequisite_project or {}).get("status") or "").lower()
+                satisfying_states = tuple(definition["satisfying_states"].get(required_state, ()))
+                if prerequisite_status in PROJECT_TERMINAL_STATUSES and prerequisite_status not in satisfying_states:
+                    errors.append(f"{dependency_id}: retired-endpoint {prerequisite}")
+            if not rationale:
+                errors.append(f"{dependency_id}: rationale is required")
+            if not provenance:
+                errors.append(f"{dependency_id}: provenance is required")
+
+            semantic_key = self._dependency_semantic_key(record)
+            prior_id = semantic_keys.get(semantic_key)
+            if prior_id is not None:
+                errors.append(f"{dependency_id}: duplicate-active-edge of {prior_id}")
+            else:
+                semantic_keys[semantic_key] = dependency_id
+            adjacency.setdefault(dependent, set()).add(prerequisite)
+            adjacency.setdefault(prerequisite, set())
+
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(project_id: str) -> bool:
+            if project_id in visiting:
+                return True
+            if project_id in visited:
+                return False
+            visiting.add(project_id)
+            if any(visit(prerequisite) for prerequisite in adjacency.get(project_id, ())):
+                return True
+            visiting.remove(project_id)
+            visited.add(project_id)
+            return False
+
+        if any(visit(project_id) for project_id in tuple(adjacency) if project_id not in visited):
+            errors.append("cycle detected across active project dependencies")
+        return sorted(set(errors))
+
+    def _require_valid_dependency_graph(self, records: list[dict[str, Any]]) -> None:
+        errors = self._dependency_validation_errors(records)
+        if errors:
+            raise ProjectLifecycleError("Project dependency validation failed: " + "; ".join(errors))
+
+    def _dependency_readiness(self, record: dict[str, Any]) -> dict[str, Any]:
+        prerequisite_id = str(record["prerequisite_project_id"])
+        prerequisite = self.db.get_project(prerequisite_id)
+        current_state = str((prerequisite or {}).get("status") or "missing")
+        required_state = str(record["required_prerequisite_state"])
+        definition = PROJECT_DEPENDENCY_KIND_REGISTRY.get(str(record["dependency_kind"]))
+        satisfying_states = (
+            tuple(definition["satisfying_states"].get(required_state, ())) if definition is not None else ()
+        )
+        satisfied = current_state in satisfying_states
+        affected_gate = str(record["affected_gate"])
+        dependency_id = str(record["id"])
+        return {
+            "dependency_id": dependency_id,
+            "dependent_project_id": record["dependent_project_id"],
+            "prerequisite_project_id": prerequisite_id,
+            "current_prerequisite_state": current_state,
+            "required_prerequisite_state": required_state,
+            "satisfying_states": list(satisfying_states),
+            "satisfied": satisfied,
+            "affected_gate": affected_gate,
+            "blocked_gate": None if satisfied else affected_gate,
+            "provenance": record["provenance"],
+            "recovery_route": (
+                f"Advance {prerequisite_id} to {required_state}, or retire {dependency_id} with "
+                f"`gt projects dependencies retire {dependency_id} --change-reason <reason>`."
+            ),
+            "grants_implementation_authority": False,
+        }
+
+    def project_dependency_gate_readiness(self, project_id: str, gate: str) -> dict[str, Any]:
+        """Explain whether one project's declared dependency gate is ready."""
+        normalized_project_id = _require_nonempty(project_id, "project_id")
+        normalized_gate = _require_nonempty(gate, "gate")
+        if self.db.get_project(normalized_project_id) is None:
+            raise ProjectLifecycleError(f"Project not found: {normalized_project_id}")
+        supported_gates = {
+            supported_gate
+            for definition in PROJECT_DEPENDENCY_KIND_REGISTRY.values()
+            for supported_gate in definition["supported_affected_gates"]
+        }
+        if normalized_gate not in supported_gates:
+            raise ProjectLifecycleError(f"Unsupported project dependency gate: {normalized_gate}")
+
+        dependencies = self.list_project_dependencies(
+            normalized_project_id,
+            dependent_project_id=normalized_project_id,
+        )
+        readiness = [
+            dependency["readiness"]
+            for dependency in dependencies
+            if dependency["affected_gate"] == normalized_gate and dependency.get("readiness") is not None
+        ]
+        blockers = [row for row in readiness if not row["satisfied"]]
+        return {
+            "project_id": normalized_project_id,
+            "gate": normalized_gate,
+            "ready": not blockers,
+            "dependency_count": len(readiness),
+            "blocking_dependency_ids": [row["dependency_id"] for row in blockers],
+            "readiness": readiness,
+        }
+
+    def _require_project_dependency_gate_ready(self, project_id: str, gate: str) -> None:
+        result = self.project_dependency_gate_readiness(project_id, gate)
+        if result["ready"]:
+            return
+        dependency_ids = ", ".join(result["blocking_dependency_ids"])
+        raise ProjectLifecycleError(
+            f"Project {result['project_id']} {result['gate']} gate is blocked by unsatisfied "
+            f"project dependency edge(s): {dependency_ids}"
+        )
+
+    def show_project_dependency(self, dependency_id: str) -> dict[str, Any]:
+        record = self.db.get_project_dependency(_require_nonempty(dependency_id, "dependency_id"))
+        if record is None:
+            raise ProjectLifecycleError(f"Project dependency not found: {dependency_id}")
+        canonical = self._canonical_dependency_record(record)
+        canonical["readiness"] = self._dependency_readiness(canonical) if canonical.get("status") == "active" else None
+        return canonical
+
+    def list_project_dependencies(
+        self,
+        project_id: str | None = None,
+        *,
+        dependent_project_id: str | None = None,
+        prerequisite_project_id: str | None = None,
+        include_inactive: bool = False,
+    ) -> list[dict[str, Any]]:
+        records = self.db.list_project_dependencies(project_id, include_inactive=include_inactive)
+        canonical_records: list[dict[str, Any]] = []
+        for raw_record in records:
+            record = self._canonical_dependency_record(raw_record)
+            if dependent_project_id and record.get("dependent_project_id") != dependent_project_id:
+                continue
+            if prerequisite_project_id and record.get("prerequisite_project_id") != prerequisite_project_id:
+                continue
+            record["readiness"] = self._dependency_readiness(record) if record.get("status") == "active" else None
+            canonical_records.append(record)
+        return canonical_records
+
+    def validate_project_dependencies(self, project_id: str | None = None) -> dict[str, Any]:
+        records = self.db.list_project_dependencies(None, include_inactive=True)
+        errors = self._dependency_validation_errors(records)
+        active = [record for record in records if record.get("status") == "active"]
+        if project_id is not None:
+            active = [
+                record
+                for record in active
+                if project_id in {record.get("dependent_project_id"), record.get("prerequisite_project_id")}
+            ]
+        readiness = [self._dependency_readiness(self._canonical_dependency_record(record)) for record in active]
+        return {
+            "valid": not errors,
+            "errors": errors,
+            "active_dependency_count": len(active),
+            "registry": self.dependency_kind_registry(),
+            "readiness": readiness,
+        }
+
+    def add_project_dependency(
+        self,
+        dependent_project_id: str,
+        prerequisite_project_id: str,
+        *,
+        dependency_kind: str = "requires_project_state",
+        required_prerequisite_state: str,
+        affected_gate: str,
+        rationale: str,
+        provenance: str,
+        related_work_item_id: str | None = None,
+        dependency_id: str | None = None,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+    ) -> dict[str, Any]:
+        dependent = _require_nonempty(dependent_project_id, "dependent_project_id")
+        prerequisite = _require_nonempty(prerequisite_project_id, "prerequisite_project_id")
+        candidate = {
+            "id": dependency_id or "<pending>",
+            "dependent_project_id": dependent,
+            "prerequisite_project_id": prerequisite,
+            "dependency_kind": _require_nonempty(dependency_kind, "dependency_kind"),
+            "required_prerequisite_state": _require_nonempty(
+                required_prerequisite_state, "required_prerequisite_state"
+            ),
+            "affected_gate": _require_nonempty(affected_gate, "affected_gate"),
+            "rationale": _require_nonempty(rationale, "rationale"),
+            "provenance": _require_nonempty(provenance, "provenance"),
+            "status": "active",
+        }
+        current_records = self.db.list_project_dependencies(None, include_inactive=True)
+        candidate_key = self._dependency_semantic_key(candidate)
+        for current in current_records:
+            if self._dependency_semantic_key(current) != candidate_key:
+                continue
+            if current.get("status") == "active":
+                raise ProjectLifecycleError(f"duplicate-active-edge: {current['id']}")
+            raise ProjectLifecycleError(
+                f"Dependency {current['id']} is inactive; use `gt projects dependencies recover`"
+            )
+        self._require_valid_dependency_graph([*current_records, candidate])
+
+        conn = self.db._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            transaction_records = self.db.list_project_dependencies(None, include_inactive=True)
+            for current in transaction_records:
+                if self._dependency_semantic_key(current) != candidate_key:
+                    continue
+                if current.get("status") == "active":
+                    raise ProjectLifecycleError(f"duplicate-active-edge: {current['id']}")
+                raise ProjectLifecycleError(
+                    f"Dependency {current['id']} is inactive; use `gt projects dependencies recover`"
+                )
+            self._require_valid_dependency_graph([*transaction_records, candidate])
+            dependency = self.db.add_project_dependency(
+                dependent,
+                prerequisite,
+                _require_nonempty(changed_by, "changed_by"),
+                _require_nonempty(change_reason, "change_reason"),
+                dependency_type="depends_on",
+                rationale=candidate["rationale"],
+                blocking_status=candidate["required_prerequisite_state"],
+                related_work_item_id=related_work_item_id,
+                status="active",
+                id=dependency_id,
+                dependent_project_id=dependent,
+                prerequisite_project_id=prerequisite,
+                dependency_kind=candidate["dependency_kind"],
+                required_prerequisite_state=candidate["required_prerequisite_state"],
+                affected_gate=candidate["affected_gate"],
+                provenance=candidate["provenance"],
+                registry_version=PROJECT_DEPENDENCY_KIND_REGISTRY_VERSION,
+                commit=False,
+            )
+            if dependency is None:
+                raise ProjectLifecycleError("Project dependency insert did not return a current record")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.show_project_dependency(str(dependency["id"]))
+
+    def retire_project_dependency(
+        self,
+        dependency_id: str,
+        *,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+    ) -> dict[str, Any]:
+        current = self.db.get_project_dependency(_require_nonempty(dependency_id, "dependency_id"))
+        if current is None:
+            raise ProjectLifecycleError(f"Project dependency not found: {dependency_id}")
+        if current.get("status") != "active":
+            raise ProjectLifecycleError(f"invalid-transition: dependency {dependency_id} is not active")
+        return self._append_dependency_lifecycle_version(
+            current,
+            status="retired",
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+
+    def recover_project_dependency(
+        self,
+        dependency_id: str,
+        *,
+        changed_by: str = PROJECTS_CHANGED_BY,
+        change_reason: str,
+    ) -> dict[str, Any]:
+        current = self.db.get_project_dependency(_require_nonempty(dependency_id, "dependency_id"))
+        if current is None:
+            raise ProjectLifecycleError(f"Project dependency not found: {dependency_id}")
+        if current.get("status") != "retired":
+            raise ProjectLifecycleError(f"invalid-transition: dependency {dependency_id} is not retired")
+        candidate = {**current, "status": "active"}
+        other_records = [
+            record
+            for record in self.db.list_project_dependencies(None, include_inactive=True)
+            if record["id"] != dependency_id
+        ]
+        self._require_valid_dependency_graph([*other_records, candidate])
+        return self._append_dependency_lifecycle_version(
+            current,
+            status="active",
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+
+    def _append_dependency_lifecycle_version(
+        self,
+        current: dict[str, Any],
+        *,
+        status: str,
+        changed_by: str,
+        change_reason: str,
+    ) -> dict[str, Any]:
+        conn = self.db._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            transaction_current = self.db.get_project_dependency(str(current["id"]))
+            if transaction_current is None:
+                raise ProjectLifecycleError(f"Project dependency not found: {current['id']}")
+            if transaction_current.get("version") != current.get("version") or transaction_current.get(
+                "status"
+            ) != current.get("status"):
+                raise ProjectLifecycleError(
+                    f"Project dependency {current['id']} changed during lifecycle validation; retry"
+                )
+            if status == "active":
+                other_records = [
+                    record
+                    for record in self.db.list_project_dependencies(None, include_inactive=True)
+                    if record["id"] != current["id"]
+                ]
+                self._require_valid_dependency_graph([*other_records, {**transaction_current, "status": "active"}])
+            dependency = self.db.add_project_dependency(
+                str(transaction_current["dependent_project_id"]),
+                str(transaction_current["prerequisite_project_id"]),
+                _require_nonempty(changed_by, "changed_by"),
+                _require_nonempty(change_reason, "change_reason"),
+                dependency_type="depends_on",
+                rationale=transaction_current.get("rationale"),
+                blocking_status=str(transaction_current["required_prerequisite_state"]),
+                related_work_item_id=transaction_current.get("related_work_item_id"),
+                status=status,
+                id=str(transaction_current["id"]),
+                dependent_project_id=str(transaction_current["dependent_project_id"]),
+                prerequisite_project_id=str(transaction_current["prerequisite_project_id"]),
+                dependency_kind=str(transaction_current["dependency_kind"]),
+                required_prerequisite_state=str(transaction_current["required_prerequisite_state"]),
+                affected_gate=str(transaction_current["affected_gate"]),
+                provenance=str(transaction_current["provenance"]),
+                registry_version=PROJECT_DEPENDENCY_KIND_REGISTRY_VERSION,
+                commit=False,
+            )
+            if dependency is None:
+                raise ProjectLifecycleError("Dependency lifecycle append did not return a current record")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.show_project_dependency(str(current["id"]))
 
     def remove_project_item(
         self,
@@ -495,9 +948,27 @@ class ProjectLifecycleService:
             raise ProjectLifecycleError("reorder must name the active membership set exactly; " + "; ".join(parts))
 
         reordered: list[dict[str, Any]] = []
-        for offset, work_item_id in enumerate(ordered_ids):
-            current = current_by_work_item[work_item_id]
-            try:
+        conn = self.db._get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            transaction_memberships = self.db.list_project_work_items(normalized_project_id)
+            transaction_by_work_item = {item["work_item_id"]: item for item in transaction_memberships}
+            if set(transaction_by_work_item) != current_ids:
+                raise ProjectLifecycleError(
+                    "Project membership changed during reorder validation; retry with the exact active set"
+                )
+            for work_item_id, current in current_by_work_item.items():
+                transaction_current = transaction_by_work_item[work_item_id]
+                if (
+                    transaction_current.get("membership_id") != current.get("membership_id")
+                    or transaction_current.get("membership_version") != current.get("membership_version")
+                    or transaction_current.get("membership_status") != current.get("membership_status")
+                ):
+                    raise ProjectLifecycleError(
+                        "Project membership changed during reorder validation; retry with the exact active set"
+                    )
+            for offset, work_item_id in enumerate(ordered_ids):
+                current = transaction_by_work_item[work_item_id]
                 membership = self.db.link_project_work_item(
                     normalized_project_id,
                     work_item_id,
@@ -507,12 +978,15 @@ class ProjectLifecycleService:
                     membership_order=start_at + offset,
                     status=current.get("membership_status") or "active",
                     source=current.get("membership_source"),
+                    commit=False,
                 )
-            except ValueError as exc:
-                raise ProjectLifecycleError(str(exc)) from exc
-            if membership is None:
-                raise ProjectLifecycleError(f"Reorder did not return membership for {work_item_id}")
-            reordered.append(membership)
+                if membership is None:
+                    raise ProjectLifecycleError(f"Reorder did not return membership for {work_item_id}")
+                reordered.append(membership)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         return reordered
 
     def retire_project(
@@ -576,6 +1050,7 @@ class ProjectLifecycleService:
         expires_at: str | None = None,
         plan_incomplete: bool = False,
     ) -> dict[str, Any]:
+        self._require_project_dependency_gate_ready(project_id, "authorization")
         try:
             authorization = self.db.insert_project_authorization(
                 _require_nonempty(project_id, "project_id"),
@@ -747,12 +1222,14 @@ class ProjectLifecycleService:
         verified_bridge_ready = project_root is None or (
             not non_verified_implements and not open_project_authorization_threads and not unverified_bridge_member_ids
         )
+        closure_dependency_gate = self.project_dependency_gate_readiness(normalized_project_id, "closure")
         completion_ready = (
             bool(member_ids)
             and not nonterminal_ids
             and not guard_refs
             and not keep_open_elected
             and verified_bridge_ready
+            and closure_dependency_gate["ready"]
         )
         exclusion_reasons: list[str] = []
         if not member_ids:
@@ -769,6 +1246,8 @@ class ProjectLifecycleService:
             exclusion_reasons.append("open_project_authorization_bridge_threads")
         if unverified_bridge_member_ids:
             exclusion_reasons.append("missing_verified_bridge_evidence")
+        if not closure_dependency_gate["ready"]:
+            exclusion_reasons.append("unsatisfied_project_dependencies")
 
         return {
             "project_id": normalized_project_id,
@@ -784,6 +1263,7 @@ class ProjectLifecycleService:
             "non_verified_implements_bridge_threads": non_verified_implements,
             "open_project_authorization_bridge_threads": open_project_authorization_threads,
             "unverified_bridge_work_item_ids": unverified_bridge_member_ids,
+            "closure_dependency_gate": closure_dependency_gate,
             "completion_ready": completion_ready,
             "exclusion_reasons": exclusion_reasons,
         }
@@ -828,6 +1308,8 @@ class ProjectLifecycleService:
         if open_project_authorization_threads_by_project and open_project_authorization_threads_by_project.get(
             project_id
         ):
+            return False
+        if not self.project_dependency_gate_readiness(project_id, "closure")["ready"]:
             return False
         included = self._project_membership_work_item_ids(project_id)
         return bool(included) and all(work_item in verified_for_project for work_item in included)
@@ -1232,6 +1714,7 @@ class ProjectLifecycleService:
         # Step 2: readiness check - every gating work item must be VERIFIED.
         # The gating set is the project's active membership-linked work items
         # (GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001 v2 "explicitly linked").
+        self._require_project_dependency_gate_ready(project_id, "closure")
         blocker_refs = self._project_completion_blocker_refs(project_id)
         if blocker_refs:
             refs = ", ".join(

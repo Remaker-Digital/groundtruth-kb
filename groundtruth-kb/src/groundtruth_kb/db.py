@@ -511,6 +511,13 @@ CREATE TABLE IF NOT EXISTS project_dependencies (
     from_project_id TEXT NOT NULL,
     to_project_id TEXT NOT NULL,
     dependency_type TEXT NOT NULL DEFAULT 'depends_on',
+    dependent_project_id TEXT NOT NULL,
+    prerequisite_project_id TEXT NOT NULL,
+    dependency_kind TEXT NOT NULL DEFAULT 'requires_project_state',
+    required_prerequisite_state TEXT NOT NULL DEFAULT 'retired',
+    affected_gate TEXT NOT NULL DEFAULT 'readiness',
+    provenance TEXT NOT NULL,
+    registry_version INTEGER NOT NULL DEFAULT 1,
     rationale TEXT,
     blocking_status TEXT NOT NULL DEFAULT 'open',
     related_work_item_id TEXT,
@@ -5026,6 +5033,7 @@ class KnowledgeDB:
         status: str = "active",
         source: str | None = None,
         id: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
         """Link a project to a canonical work item without duplicating the work item."""
         if self.get_project(project_id) is None:
@@ -5054,7 +5062,8 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_project_work_item_membership(membership_id)
 
     def get_project_work_item_membership(self, membership_id: str) -> dict[str, Any] | None:
@@ -5090,6 +5099,7 @@ class KnowledgeDB:
         """
         query = """SELECT
                       m.id AS membership_id,
+                      m.version AS membership_version,
                       m.project_id AS project_id,
                       m.membership_role AS membership_role,
                       m.membership_order AS membership_order,
@@ -5130,46 +5140,69 @@ class KnowledgeDB:
         related_work_item_id: str | None = None,
         status: str = "active",
         id: str | None = None,
+        dependent_project_id: str | None = None,
+        prerequisite_project_id: str | None = None,
+        dependency_kind: str | None = None,
+        required_prerequisite_state: str | None = None,
+        affected_gate: str | None = None,
+        provenance: str | None = None,
+        registry_version: int = 1,
+        commit: bool = True,
     ) -> dict[str, Any] | None:
-        """Record a dependency between two projects.
+        """Record one append-only project dependency version.
 
-        Args:
-            from_project_id: Project that has the dependency.
-            to_project_id: Project that is depended upon.
-            changed_by: Person or agent performing the change.
-            change_reason: Explanatory rationale for the change.
-            dependency_type: Type classification of the dependency.
-            rationale: Optional text rationale for the dependency.
-            blocking_status: The current block status.
-            related_work_item_id: Optional linked work item ID.
-            status: Dependency record lifecycle status.
-            id: Optional stable record identifier.
-
-        Returns:
-            The newly created project dependency record.
+        ``from_project_id``/``to_project_id`` and ``dependency_type`` remain
+        physical compatibility fields. Governed callers provide the canonical
+        directional fields; legacy callers are normalized conservatively.
+        Business validation and transaction ownership live in
+        ``ProjectLifecycleService``.
         """
-        if self.get_project(from_project_id) is None:
-            raise ValueError(f"Project {from_project_id} not found")
-        if self.get_project(to_project_id) is None:
-            raise ValueError(f"Project {to_project_id} not found")
+        dependent = dependent_project_id or from_project_id
+        prerequisite = prerequisite_project_id or to_project_id
+        kind = dependency_kind or ("requires_project_state" if dependency_type == "depends_on" else dependency_type)
+        required_state = required_prerequisite_state or self._legacy_required_project_state(blocking_status)
+        gate = affected_gate or "readiness"
+        source_provenance = provenance or f"legacy-project-dependency:{changed_by}"
+        if self.get_project(dependent) is None:
+            raise ValueError(f"Project {dependent} not found")
+        if self.get_project(prerequisite) is None:
+            raise ValueError(f"Project {prerequisite} not found")
         if related_work_item_id and self.get_work_item(related_work_item_id) is None:
             raise ValueError(f"Work item {related_work_item_id} not found")
-        dependency_id = id or _stable_project_link_id("PDEP", from_project_id, to_project_id, dependency_type)
+        dependency_id = id or _stable_project_link_id(
+            "PDEP",
+            dependent,
+            prerequisite,
+            kind,
+            required_state,
+            gate,
+        )
+        self._ensure_project_dependency_write_schema()
         version = self._next_project_dependency_version(dependency_id)
         conn = self._get_conn()
         conn.execute(
             """INSERT INTO project_dependencies
-               (id, version, from_project_id, to_project_id, dependency_type, rationale,
-                blocking_status, related_work_item_id, status, changed_by, changed_at, change_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, version, from_project_id, to_project_id, dependency_type,
+                dependent_project_id, prerequisite_project_id, dependency_kind,
+                required_prerequisite_state, affected_gate, provenance, registry_version,
+                rationale, blocking_status, related_work_item_id, status,
+                changed_by, changed_at, change_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 dependency_id,
                 version,
-                from_project_id,
-                to_project_id,
+                dependent,
+                prerequisite,
                 dependency_type,
+                dependent,
+                prerequisite,
+                kind,
+                required_state,
+                gate,
+                source_provenance,
+                registry_version,
                 rationale,
-                blocking_status,
+                required_state,
                 related_work_item_id,
                 status,
                 changed_by,
@@ -5177,8 +5210,85 @@ class KnowledgeDB:
                 change_reason,
             ),
         )
-        conn.commit()
+        if commit:
+            conn.commit()
         return self.get_project_dependency(dependency_id)
+
+    @staticmethod
+    def _legacy_required_project_state(blocking_status: str | None) -> str:
+        """Map primitive dependency state to a conservative required state."""
+        normalized = str(blocking_status or "").strip().lower()
+        if normalized in {"active", "completed", "retired", "cancelled"}:
+            return normalized
+        if normalized in {"closed", "resolved", "verified"}:
+            return "completed"
+        return "retired"
+
+    def _ensure_project_dependency_write_schema(self) -> None:
+        """Lazily add canonical columns for an existing database on mutation.
+
+        Read-only project commands never migrate a live store. The governed
+        dependency mutation transaction owns this compatibility migration.
+        """
+        conn = self._get_conn()
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(project_dependencies)").fetchall()}
+        additions = {
+            "dependent_project_id": "TEXT",
+            "prerequisite_project_id": "TEXT",
+            "dependency_kind": "TEXT",
+            "required_prerequisite_state": "TEXT",
+            "affected_gate": "TEXT",
+            "provenance": "TEXT",
+            "registry_version": "INTEGER",
+        }
+        for column, column_type in additions.items():
+            if column not in columns:
+                conn.execute(f"ALTER TABLE project_dependencies ADD COLUMN {column} {column_type}")
+        conn.execute(
+            """
+            UPDATE project_dependencies
+            SET dependent_project_id = COALESCE(dependent_project_id, from_project_id),
+                prerequisite_project_id = COALESCE(prerequisite_project_id, to_project_id),
+                dependency_kind = COALESCE(
+                    dependency_kind,
+                    CASE WHEN dependency_type = 'depends_on'
+                         THEN 'requires_project_state'
+                         ELSE dependency_type END
+                ),
+                required_prerequisite_state = COALESCE(
+                    required_prerequisite_state,
+                    CASE
+                        WHEN blocking_status IN ('active', 'completed', 'retired', 'cancelled')
+                            THEN blocking_status
+                        WHEN blocking_status IN ('closed', 'resolved', 'verified')
+                            THEN 'completed'
+                        ELSE 'retired'
+                    END
+                ),
+                affected_gate = COALESCE(affected_gate, 'readiness'),
+                provenance = COALESCE(provenance, 'legacy-project-dependency:' || changed_by),
+                registry_version = COALESCE(registry_version, 1)
+            """
+        )
+
+    def _canonical_project_dependency(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        record = _row_to_dict(row)
+        record["dependent_project_id"] = record.get("dependent_project_id") or record["from_project_id"]
+        record["prerequisite_project_id"] = record.get("prerequisite_project_id") or record["to_project_id"]
+        record["dependency_kind"] = record.get("dependency_kind") or (
+            "requires_project_state" if record.get("dependency_type") == "depends_on" else record.get("dependency_type")
+        )
+        record["required_prerequisite_state"] = record.get(
+            "required_prerequisite_state"
+        ) or self._legacy_required_project_state(record.get("blocking_status"))
+        record["affected_gate"] = record.get("affected_gate") or "readiness"
+        record["provenance"] = record.get("provenance") or (
+            f"legacy-project-dependency:{record.get('changed_by') or 'unknown'}"
+        )
+        record["registry_version"] = record.get("registry_version") or 1
+        return record
 
     def get_project_dependency(self, dependency_id: str) -> dict[str, Any] | None:
         """Retrieve a project dependency record by ID.
@@ -5194,31 +5304,33 @@ class KnowledgeDB:
             .execute("SELECT * FROM current_project_dependencies WHERE id = ?", (dependency_id,))
             .fetchone()
         )
-        return _row_to_dict(row) if row else None
+        return self._canonical_project_dependency(row)
 
     def list_project_dependencies(
         self,
-        project_id: str,
+        project_id: str | None = None,
         *,
         include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
-        """List dependencies where the given project is the source or target.
+        """List current dependencies, optionally scoped to one endpoint.
 
         Args:
-            project_id: The project identifier.
+            project_id: Optional project identifier.
             include_inactive: If True, inactive records are included.
 
         Returns:
             A list of project dependency dictionaries.
         """
-        query = """SELECT * FROM current_project_dependencies
-                   WHERE (from_project_id = ? OR to_project_id = ?)"""
-        params: list[Any] = [project_id, project_id]
+        query = "SELECT * FROM current_project_dependencies WHERE 1 = 1"
+        params: list[Any] = []
+        if project_id is not None:
+            query += " AND (from_project_id = ? OR to_project_id = ?)"
+            params.extend([project_id, project_id])
         if not include_inactive:
             query += " AND status = 'active'"
         query += " ORDER BY blocking_status, dependency_type, id"
         rows = self._get_conn().execute(query, params).fetchall()
-        return [_row_to_dict(r) for r in rows]
+        return [record for row in rows if (record := self._canonical_project_dependency(row)) is not None]
 
     def add_project_artifact_link(
         self,

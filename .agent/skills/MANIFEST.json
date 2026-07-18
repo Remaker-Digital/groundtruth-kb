@@ -201,7 +201,7 @@
       "canonical_name": "projects",
       "capability_id": "skill.projects",
       "source_relative_path": ".claude/skills/projects/SKILL.md",
-      "source_sha256": "b35a7e3cd6c2b4bd3976c15a2b0f78ec37b4663fbe2d5063047c77daf0c778c8"
+      "source_sha256": "70d646b9b957ad00d39078328bd9aa8b069d503c85b0d40361352c82966f8dde"
     },
     {
       "adapter_relative_path": ".agent/skills/proposal-review/SKILL.md",

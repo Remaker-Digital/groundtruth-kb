@@ -90,6 +90,7 @@ from groundtruth_kb.hygiene import (
 )
 from groundtruth_kb.project.core_spec_intake import next_missing_slot, next_question, slot_statuses
 from groundtruth_kb.project.lifecycle import (
+    PROJECT_DEPENDENCY_KIND_REGISTRY,
     PROJECTS_CHANGED_BY,
     ProjectAuthorizationSpecLinkageError,
     ProjectLifecycleError,
@@ -5437,8 +5438,9 @@ def projects_show(ctx: click.Context, project_id: str, json_output: bool) -> Non
         click.echo("Dependencies:")
         for dep in dependencies:
             click.echo(
-                f"  - {dep['from_project_id']} {dep['dependency_type']} {dep['to_project_id']}"
-                f" [{dep['blocking_status']}]"
+                f"  - {dep['dependent_project_id']} {dep['dependency_kind']} "
+                f"{dep['prerequisite_project_id']} "
+                f"[requires {dep['required_prerequisite_state']}; {dep['status']}]"
             )
     if artifact_links:
         click.echo("Artifact links:")
@@ -5761,6 +5763,269 @@ def projects_reorder(
         click.echo(json.dumps(memberships, indent=2, sort_keys=True))
         return
     click.echo(f"Reordered {len(memberships)} work item(s) in {project_id}.")
+
+
+@projects_cmd.group("dependencies")
+def projects_dependencies_group() -> None:
+    """Governed project dependency lifecycle commands."""
+
+
+_PROJECT_DEPENDENCY_KINDS = tuple(sorted(PROJECT_DEPENDENCY_KIND_REGISTRY))
+_PROJECT_DEPENDENCY_STATES = tuple(
+    sorted(
+        {
+            state
+            for definition in PROJECT_DEPENDENCY_KIND_REGISTRY.values()
+            for state in definition["supported_required_states"]
+        }
+    )
+)
+_PROJECT_DEPENDENCY_GATES = tuple(
+    sorted(
+        {
+            gate
+            for definition in PROJECT_DEPENDENCY_KIND_REGISTRY.values()
+            for gate in definition["supported_affected_gates"]
+        }
+    )
+)
+
+
+@projects_dependencies_group.command("add")
+@click.option("--dependent-project", required=True, help="Project whose gate depends on the prerequisite.")
+@click.option("--prerequisite-project", required=True, help="Project that must reach the required state.")
+@click.option(
+    "--kind",
+    "dependency_kind",
+    type=click.Choice(_PROJECT_DEPENDENCY_KINDS),
+    default="requires_project_state",
+    show_default=True,
+)
+@click.option(
+    "--required-state",
+    "required_prerequisite_state",
+    type=click.Choice(_PROJECT_DEPENDENCY_STATES),
+    required=True,
+)
+@click.option("--affected-gate", type=click.Choice(_PROJECT_DEPENDENCY_GATES), required=True)
+@click.option("--rationale", required=True, help="Why this dependency is required.")
+@click.option("--provenance", required=True, help="Governed decision, proposal, or work-item provenance.")
+@click.option("--related-work-item", default=None, help="Optional related work-item id.")
+@click.option("--id", "dependency_id", default=None, help="Optional explicit stable dependency id.")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the dependency version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_add(
+    ctx: click.Context,
+    dependent_project: str,
+    prerequisite_project: str,
+    dependency_kind: str,
+    required_prerequisite_state: str,
+    affected_gate: str,
+    rationale: str,
+    provenance: str,
+    related_work_item: str | None,
+    dependency_id: str | None,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Add one validated, append-only project dependency."""
+    db, service = _project_service(ctx)
+    try:
+        dependency = service.add_project_dependency(
+            dependent_project,
+            prerequisite_project,
+            dependency_kind=dependency_kind,
+            required_prerequisite_state=required_prerequisite_state,
+            affected_gate=affected_gate,
+            rationale=rationale,
+            provenance=provenance,
+            related_work_item_id=related_work_item,
+            dependency_id=dependency_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+        )
+    except (ProjectLifecycleError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependency, indent=2, sort_keys=True))
+        return
+    click.echo(f"Added project dependency {dependency['id']} (version {dependency['version']}).")
+
+
+@projects_dependencies_group.command("show")
+@click.argument("dependency_id")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_show(ctx: click.Context, dependency_id: str, json_output: bool) -> None:
+    """Show one current project dependency and readiness explanation."""
+    db, service = _project_service(ctx)
+    try:
+        dependency = service.show_project_dependency(dependency_id)
+    except ProjectLifecycleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependency, indent=2, sort_keys=True))
+        return
+    readiness = dependency.get("readiness") or {}
+    click.echo(
+        f"{dependency['id']}: {dependency['dependent_project_id']} depends on "
+        f"{dependency['prerequisite_project_id']} reaching {dependency['required_prerequisite_state']} "
+        f"[{dependency['status']}; satisfied={readiness.get('satisfied')}]"
+    )
+
+
+@projects_dependencies_group.command("list")
+@click.option("--project", "project_id", default=None, help="Limit to either endpoint.")
+@click.option("--dependent-project", default=None, help="Limit to one dependent project.")
+@click.option("--prerequisite-project", default=None, help="Limit to one prerequisite project.")
+@click.option("--all", "include_inactive", is_flag=True, help="Include retired dependency records.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_list(
+    ctx: click.Context,
+    project_id: str | None,
+    dependent_project: str | None,
+    prerequisite_project: str | None,
+    include_inactive: bool,
+    json_output: bool,
+) -> None:
+    """List current project dependencies with deterministic readiness."""
+    db, service = _project_service(ctx)
+    try:
+        dependencies = service.list_project_dependencies(
+            project_id,
+            dependent_project_id=dependent_project,
+            prerequisite_project_id=prerequisite_project,
+            include_inactive=include_inactive,
+        )
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependencies, indent=2, sort_keys=True))
+        return
+    if not dependencies:
+        click.echo("No project dependencies found.")
+        return
+    for dependency in dependencies:
+        readiness = dependency.get("readiness") or {}
+        click.echo(
+            f"{dependency['id']}\t{dependency['dependent_project_id']}\t"
+            f"{dependency['prerequisite_project_id']}\t{dependency['status']}\t"
+            f"satisfied={readiness.get('satisfied')}"
+        )
+
+
+@projects_dependencies_group.command("validate")
+@click.option("--project", "project_id", default=None, help="Limit readiness output to one endpoint.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_validate(ctx: click.Context, project_id: str | None, json_output: bool) -> None:
+    """Validate the complete active graph and explain dependency readiness."""
+    db, service = _project_service(ctx)
+    try:
+        result = service.validate_project_dependencies(project_id)
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(
+            f"Project dependency graph valid={result['valid']} "
+            f"active_dependencies={result['active_dependency_count']} "
+            f"registry_version={result['registry']['version']}"
+        )
+        for error in result["errors"]:
+            click.echo(f"- ERROR: {error}")
+    if not result["valid"]:
+        ctx.exit(1)
+
+
+def _projects_dependency_lifecycle_command(
+    ctx: click.Context,
+    dependency_id: str,
+    *,
+    action: Literal["retire", "recover"],
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    db, service = _project_service(ctx)
+    try:
+        if action == "retire":
+            dependency = service.retire_project_dependency(
+                dependency_id,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+        else:
+            dependency = service.recover_project_dependency(
+                dependency_id,
+                changed_by=changed_by,
+                change_reason=change_reason,
+            )
+    except (ProjectLifecycleError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        db.close()
+    if json_output:
+        click.echo(json.dumps(dependency, indent=2, sort_keys=True))
+        return
+    click.echo(f"{action.title()}d project dependency {dependency['id']} (version {dependency['version']}).")
+
+
+@projects_dependencies_group.command("retire")
+@click.argument("dependency_id")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the retired version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_retire(
+    ctx: click.Context,
+    dependency_id: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Retire one active dependency while preserving history."""
+    _projects_dependency_lifecycle_command(
+        ctx,
+        dependency_id,
+        action="retire",
+        changed_by=changed_by,
+        change_reason=change_reason,
+        json_output=json_output,
+    )
+
+
+@projects_dependencies_group.command("recover")
+@click.argument("dependency_id")
+@click.option("--changed-by", default=PROJECTS_CHANGED_BY, show_default=True, help="History author.")
+@click.option("--change-reason", required=True, help="History reason for the recovered version.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def projects_dependencies_recover(
+    ctx: click.Context,
+    dependency_id: str,
+    changed_by: str,
+    change_reason: str,
+    json_output: bool,
+) -> None:
+    """Recover one retired dependency after full-graph revalidation."""
+    _projects_dependency_lifecycle_command(
+        ctx,
+        dependency_id,
+        action="recover",
+        changed_by=changed_by,
+        change_reason=change_reason,
+        json_output=json_output,
+    )
 
 
 @projects_cmd.command("retire")
