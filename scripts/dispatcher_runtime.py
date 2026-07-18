@@ -4151,6 +4151,18 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, p
         f"and `{venv_python} scripts/adr_dcl_clause_preflight.py --bridge-id <document-name>`, "
         "then include the clean Applicability Preflight section in the verdict artifact."
     )
+    loyal_opposition_review_authority_line = (
+        "Loyal Opposition review authority: determine target ownership from the complete numbered bridge chain "
+        f"for the exact assigned thread. Read it with `{venv_gt} bridge show <slug>` or an equivalent complete "
+        "numbered-chain packet; derive owned targets from proposal/report `target_paths` across that chain, using "
+        "the current numbered status and independent terminal/finalized evidence as controlling. Check live claim "
+        f"ownership with `{venv_python} scripts/bridge_claim_cli.py status <slug>`, backed by the canonical claim "
+        "service. Backlog/MemBase summaries, startup summaries, copied excerpts, cached aggregate views, and "
+        "retired runtime claim directories are not target-ownership or live-claim authority. MemBase remains "
+        "canonical backlog/project authority, but a backlog summary does not replace the exact numbered bridge "
+        "target chain or live claim record. These rules are provider-neutral; no provider identity, cache, or "
+        "runtime directory grants or weakens ownership."
+    )
     canonical_keyword = f"::init gtkb {target.canonical_mode}"
 
     prompt = "\n".join(
@@ -4167,6 +4179,7 @@ def _dispatch_prompt(target: DispatchTarget, items: list[Any], max_items: int, p
             role_line,
             worker_context_line,
             loyal_opposition_preflight_line,
+            *([loyal_opposition_review_authority_line] if target.needed_role_label == "loyal-opposition" else []),
             "Read current TAFE/dispatcher bridge state and status-bearing versioned bridge files before acting; do not require or recreate retired aggregate queue state.",
             "If any listed entry is no longer actionable for your role, do not act on that stale entry.",
             "Keep work scoped to the selected bridge entries and preserve the bridge protocol audit trail.",

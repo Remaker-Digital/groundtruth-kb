@@ -4444,6 +4444,93 @@ def test_lo_dispatch_prompt_requires_preflights_before_verdicts() -> None:
     assert "NEW gtkb-ollama-dispatch-stall-retry-cap" in prompt
 
 
+def test_lo_review_authority_uses_numbered_chain_and_live_claim_service() -> None:
+    """WI-5343: LO workers receive the canonical target and claim authority packet."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-lo-review-authority",
+            "top_status": "REVISED",
+            "top_file": "bridge/gtkb-lo-review-authority-003.md",
+        },
+    )()
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+    venv_gt = trigger._repo_venv_command("gt")
+    venv_python = trigger._repo_venv_command("python")
+
+    assert "Loyal Opposition review authority:" in prompt
+    assert f"`{venv_gt} bridge show <slug>`" in prompt
+    assert "complete numbered bridge chain" in prompt
+    assert "proposal/report `target_paths` across that chain" in prompt
+    assert "current numbered status and independent terminal/finalized evidence" in prompt
+    assert f"`{venv_python} scripts/bridge_claim_cli.py status <slug>`" in prompt
+    assert "backed by the canonical claim service" in prompt
+    assert "Backlog/MemBase summaries, startup summaries, copied excerpts, cached aggregate views" in prompt
+    assert "retired runtime claim directories are not target-ownership or live-claim authority" in prompt
+    assert "MemBase remains canonical backlog/project authority" in prompt
+    assert "a backlog summary does not replace the exact numbered bridge target chain or live claim record" in prompt
+
+
+def test_lo_review_authority_is_provider_neutral_and_excluded_from_prime_prompt() -> None:
+    """WI-5343: provider descriptors do not alter authority, and PB receives no block."""
+    trigger = _load_trigger()
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-lo-review-authority",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-lo-review-authority-001.md",
+        },
+    )()
+    descriptors = [
+        ("A", "codex", _CODEX_INVOCATION_SURFACES),
+        ("B", "claude", _CLAUDE_INVOCATION_SURFACES),
+        ("E", "cursor", {"headless": {"argv": ["cursor-agent", "{{PROMPT}}"]}}),
+        ("D", "ollama", {"headless": {"argv": ["ollama-harness", "{{PROMPT}}"]}}),
+    ]
+    authority_lines = []
+    for harness_id, command_handle, invocation_surfaces in descriptors:
+        target = trigger.DispatchTarget(
+            needed_role_label="loyal-opposition",
+            harness_id=harness_id,
+            command_handle=command_handle,
+            canonical_mode="lo",
+            invocation_surfaces=invocation_surfaces,
+        )
+        prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+        authority_lines.append(
+            next(line for line in prompt.splitlines() if line.startswith("Loyal Opposition review authority:"))
+        )
+
+    assert len(set(authority_lines)) == 1
+    assert "provider-neutral" in authority_lines[0]
+    assert "no provider identity, cache, or runtime directory grants or weakens ownership" in authority_lines[0]
+
+    prime_target = trigger.DispatchTarget(
+        needed_role_label="prime-builder",
+        harness_id="B",
+        command_handle="claude",
+        canonical_mode="pb",
+        invocation_surfaces=_CLAUDE_INVOCATION_SURFACES,
+    )
+    prime_prompt = trigger._dispatch_prompt(prime_target, [item], max_items=1)
+
+    assert "Loyal Opposition review authority:" not in prime_prompt
+    assert "bridge show <slug>" not in prime_prompt
+    assert "bridge_claim_cli.py status <slug>" not in prime_prompt
+
+
 def test_dispatch_prompt_pins_role_and_preflight_commands_to_repo_venv() -> None:
     trigger = _load_trigger()
     target = trigger.DispatchTarget(
