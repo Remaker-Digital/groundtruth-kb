@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -88,6 +90,15 @@ def _write_manifest(tmp_path: Path, env: str, ts: int, body: dict[str, Any]) -> 
     path = logs / f"deploy-result-{env}-{ts}.json"
     path.write_text(json.dumps(body), encoding="utf-8")
     return path
+
+
+@pytest.fixture
+def _azure_reconciliation_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP",
+        json.dumps({"production": "agent-red-api-gateway"}),
+    )
+    monkeypatch.setenv("GTKB_DASHBOARD_AZURE_RESOURCE_GROUP", "rg-agent-red-staging")
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +238,9 @@ def test_t7_ingest_is_idempotent_via_source_dedup(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_t8_reconcile_az_returncode_nonzero_degrades_to_unknown() -> None:
+def test_t8_reconcile_az_returncode_nonzero_degrades_to_unknown(
+    _azure_reconciliation_env: None,
+) -> None:
     """T8: az returns nonzero -> affected rows _consistency='unknown',
     refresh_runs.status NOT touched (function returns counts; never raises)."""
     conn = _make_conn()
@@ -258,7 +271,9 @@ def test_t8_reconcile_az_returncode_nonzero_degrades_to_unknown() -> None:
     assert consistency == "unknown"
 
 
-def test_t9_reconcile_az_not_installed_degrades_to_unknown() -> None:
+def test_t9_reconcile_az_not_installed_degrades_to_unknown(
+    _azure_reconciliation_env: None,
+) -> None:
     """T9: az CLI missing (FileNotFoundError) -> graceful degradation."""
     conn = _make_conn()
     conn.execute(
@@ -284,7 +299,9 @@ def test_t9_reconcile_az_not_installed_degrades_to_unknown() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_t10_reconcile_match_sets_both_match() -> None:
+def test_t10_reconcile_match_sets_both_match(
+    _azure_reconciliation_env: None,
+) -> None:
     """T10: matching Azure revision -> _consistency='both_match';
     _revision_name populated."""
     conn = _make_conn()
@@ -334,7 +351,9 @@ def test_t10_reconcile_match_sets_both_match() -> None:
     assert row[2] == "high"
 
 
-def test_t11_reconcile_drift_sets_manifest_only() -> None:
+def test_t11_reconcile_drift_sets_manifest_only(
+    _azure_reconciliation_env: None,
+) -> None:
     """T11: no matching Azure revision -> _consistency='manifest_only';
     _confidence stays at medium (or downgrades)."""
     conn = _make_conn()
@@ -402,7 +421,10 @@ def test_t12_only_canonical_deploy_counts_as_deployment_event() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_t13_ingest_emits_medium_then_reconcile_upgrades_to_high(tmp_path: Path) -> None:
+def test_t13_ingest_emits_medium_then_reconcile_upgrades_to_high(
+    tmp_path: Path,
+    _azure_reconciliation_env: None,
+) -> None:
     """T13: with full deploy_evidence(target_update_succeeded=true), ingest
     emits _confidence='medium' (per Codex condition 3 cap). Subsequent
     reconciliation with matching Azure revision upgrades to 'high'."""
@@ -494,6 +516,7 @@ def test_migration_columns_include_track2_seven() -> None:
 
 def test_t14_real_schema_supports_canonical_manifest_ingest_and_reconcile(
     tmp_path: Path,
+    _azure_reconciliation_env: None,
 ) -> None:
     """T14: production `initialize_database` + `_migrate_schema` produces a
     `delivery_timeline_events` table that accepts canonical-manifest ingestion
