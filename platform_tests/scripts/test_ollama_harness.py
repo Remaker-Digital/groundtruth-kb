@@ -1233,14 +1233,29 @@ def test_tool_loop_caps_bash_timeout_to_remaining_session_budget(tmp_path: Path,
     assert observed_timeouts == [3.0]
 
 
-def test_tool_loop_rejects_malformed_tool_arguments(tmp_path: Path):
+def test_tool_loop_recovers_from_malformed_tool_arguments(tmp_path: Path):
     root = make_root(tmp_path)
+    calls: list[dict] = []
 
     def chat(url: str, payload: dict, timeout: float) -> dict:
-        return {"message": {"content": "", "tool_calls": [{"function": {"name": "Read", "arguments": "{"}}]}}
+        calls.append(payload)
+        if len(calls) == 1:
+            return {
+                "message": {
+                    "content": "",
+                    "tool_calls": [{"id": "bad_1", "function": {"name": "Read", "arguments": "{"}}],
+                }
+            }
+        tool_result = payload["messages"][-1]
+        assert tool_result["role"] == "tool"
+        assert tool_result["name"] == "Read"
+        assert tool_result["tool_call_id"] == "bad_1"
+        assert tool_result["content"].startswith("ERROR:")
+        assert "arguments string must be JSON" in tool_result["content"]
+        return {"message": {"content": "recovered"}}
 
-    with pytest.raises(oh.OllamaHarnessError, match="arguments string must be JSON"):
-        oh.run_tool_loop("bad", route(root), oh.DEFAULT_ENDPOINT, 2, root, chat_func=chat)
+    assert oh.run_tool_loop("bad", route(root), oh.DEFAULT_ENDPOINT, 2, root, chat_func=chat) == "recovered"
+    assert len(calls) == 2
 
 
 def test_write_edit_and_bash_enter_guards_before_side_effects(tmp_path: Path):
