@@ -2564,7 +2564,22 @@ def run_tool_loop(
             messages.append(assistant_message)
 
             for index, call in enumerate(tool_calls):
-                tool_name, arguments, call_id = _tool_call_parts(call, index)
+                try:
+                    tool_name, arguments, call_id = _tool_call_parts(call, index)
+                except CloudHarnessError as parse_err:
+                    call_id = str(call.get("id")) if isinstance(call, dict) else f"tool_call_{index}"
+                    function = call.get("function") if isinstance(call, dict) else None
+                    parsed_name = function.get("name") if isinstance(function, dict) else None
+                    tool_name = parsed_name if isinstance(parsed_name, str) and parsed_name else "<malformed_tool_call>"
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "name": tool_name,
+                            "tool_call_id": call_id,
+                            "content": f"ERROR: {parse_err}",
+                        }
+                    )
+                    continue
                 publisher_recovery_reason = None
                 if tool_name == "Bash":
                     arguments = dict(arguments)
