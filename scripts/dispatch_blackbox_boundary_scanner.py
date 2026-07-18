@@ -10,8 +10,10 @@ gaps. It never mutates dispatcher, TAFE, harness, bridge, Git, or MemBase state.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
+import sys
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -109,18 +111,55 @@ def scan_paths(paths: Iterable[Path]) -> list[BoundaryFinding]:
     return findings
 
 
-def _member_completion_status(project_root: Path, project_id: str) -> dict[str, Any]:
-    import project_verified_completion_scanner as completion_scanner  # noqa: PLC0415
+def _load_project_completion_scanner() -> Any:
+    completion_scanner_path = (PROJECT_ROOT / "scripts" / "project_verified_completion_scanner.py").resolve()
+    try:
+        completion_scanner_path.relative_to(PROJECT_ROOT.resolve())
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Project completion scanner must resolve inside the project root: {completion_scanner_path}"
+        ) from exc
+    if not completion_scanner_path.is_file():
+        raise RuntimeError(f"Project completion scanner not found: {completion_scanner_path}")
 
-    for status in completion_scanner.member_completion_scan(project_root):
-        if status.project_id == project_id:
-            return status.as_dict()
-    return {
-        "project_id": project_id,
-        "completion_ready": False,
-        "nonterminal_work_item_ids": [],
-        "exclusion_reasons": ["project_not_found"],
-    }
+    spec = importlib.util.spec_from_file_location(
+        "_gtkb_project_verified_completion_scanner",
+        completion_scanner_path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load project completion scanner: {completion_scanner_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    if not callable(getattr(module, "member_completion_scan", None)):
+        raise RuntimeError(f"Project completion scanner lacks member_completion_scan: {completion_scanner_path}")
+    if not callable(getattr(module, "_ensure_groundtruth_importable", None)):
+        raise RuntimeError(f"Project completion scanner lacks import bootstrap: {completion_scanner_path}")
+    readiness_type = getattr(module, "MemberCompletionReadiness", None)
+    if not callable(getattr(readiness_type, "from_service_status", None)):
+        raise RuntimeError(f"Project completion scanner lacks readiness adapter: {completion_scanner_path}")
+    return module
+
+
+def _member_completion_status(project_root: Path, project_id: str) -> dict[str, Any]:
+    completion_scanner = _load_project_completion_scanner()
+    completion_scanner._ensure_groundtruth_importable(project_root)
+    from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
+    from groundtruth_kb.project.lifecycle import ProjectLifecycleService  # noqa: PLC0415
+
+    db = KnowledgeDB(project_root / "groundtruth.db")
+    try:
+        if db.get_project(project_id) is None:
+            return {
+                "project_id": project_id,
+                "completion_ready": False,
+                "nonterminal_work_item_ids": [],
+                "exclusion_reasons": ["project_not_found"],
+            }
+        status = ProjectLifecycleService(db).member_completion_status(project_id, project_root=project_root)
+        return completion_scanner.MemberCompletionReadiness.from_service_status(status).as_dict()
+    finally:
+        db.close()
 
 
 def closure_status(

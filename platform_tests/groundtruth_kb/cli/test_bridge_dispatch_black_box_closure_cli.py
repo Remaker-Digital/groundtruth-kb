@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from click.testing import CliRunner
 from groundtruth_kb import cli as gtcli
 from groundtruth_kb.cli import main
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+GT_EXE = PROJECT_ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "gt.exe"
 
 
 class _FakeScanner:
@@ -136,6 +140,35 @@ def test_black_box_closure_cli_rejects_evidence_outside_project_root(tmp_path: P
 
     assert result.exit_code != 0
     assert "black-box closure evidence must be inside the project root" in result.output
+
+
+def test_black_box_closure_cli_loads_repository_completion_scanner() -> None:
+    result = subprocess.run(
+        [
+            str(GT_EXE),
+            "bridge",
+            "dispatch",
+            "black-box",
+            "closure",
+            "--project-id",
+            "PROJECT-GTKB-WI5467-NOT-FOUND",
+            "--json",
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "ModuleNotFoundError" not in result.stdout
+    assert "ModuleNotFoundError" not in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["project_id"] == "PROJECT-GTKB-WI5467-NOT-FOUND"
+    assert payload["ready"] is False
+    assert payload["member_completion"]["exclusion_reasons"] == ["project_not_found"]
 
 
 def _write_project(root: Path) -> Path:
