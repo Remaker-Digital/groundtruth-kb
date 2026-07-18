@@ -93,6 +93,9 @@ from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
 from groundtruth_kb.bridge_dispatch_reset import (  # noqa: E402
     terminate_pid_tree as _terminate_pid_tree,
 )
+from groundtruth_kb.codex_no_window_verification import (  # noqa: E402
+    schema_failure_reason as _codex_no_window_schema_failure,
+)
 
 
 def _repo_venv_command(executable_name: str) -> str:
@@ -255,9 +258,6 @@ CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH: tuple[str, ...] = (
 )
 CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
 CODEX_WINDOWS_SANDBOX_SETUP_STATUS = "0xc0000142"
-CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION = 2
-CODEX_NO_WINDOW_MIN_RUNS = 2
-CODEX_NO_WINDOW_MIN_COMMAND_STEPS = 3
 DISPATCHER_DISABLE_GUARD_RELATIVE_PATH: tuple[str, ...] = (
     ".gtkb-state",
     "watchdog",
@@ -4578,45 +4578,6 @@ def _codex_no_window_failure_class(payload: dict[str, Any] | None, reason: str) 
     if reason == "codex_no_window_probe_detected_visible_window":
         return "codex_no_window_visible_window_detected"
     return reason
-
-
-def _codex_no_window_run_steps(run: object) -> list[dict[str, Any]]:
-    if not isinstance(run, dict):
-        return []
-    raw_steps = run.get("command_steps")
-    if raw_steps is None:
-        raw_steps = run.get("commands")
-    if not isinstance(raw_steps, list):
-        return []
-    return [step for step in raw_steps if isinstance(step, dict)]
-
-
-def _codex_no_window_step_has_marker_proof(step: dict[str, Any]) -> bool:
-    marker = str(step.get("marker") or step.get("expected_marker") or "").strip()
-    if not marker:
-        return False
-    returncode = step.get("returncode")
-    if returncode not in {0, "0"}:
-        return False
-    if step.get("stdout_contains_marker") is True:
-        return True
-    transcript = str(step.get("transcript_preview") or step.get("stdout_preview") or step.get("stdout") or "")
-    return marker in transcript
-
-
-def _codex_no_window_schema_failure(payload: dict[str, Any]) -> str | None:
-    if payload.get("schema_version") != CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION:
-        return "codex_no_window_verification_legacy_schema"
-    runs = payload.get("runs")
-    if not isinstance(runs, list) or len(runs) < CODEX_NO_WINDOW_MIN_RUNS:
-        return "codex_no_window_verification_insufficient_run_count"
-    for run in runs:
-        steps = _codex_no_window_run_steps(run)
-        if len(steps) < CODEX_NO_WINDOW_MIN_COMMAND_STEPS:
-            return "codex_no_window_verification_insufficient_command_count"
-        if not all(_codex_no_window_step_has_marker_proof(step) for step in steps):
-            return "codex_no_window_verification_missing_marker_chain"
-    return None
 
 
 def _valid_codex_no_window_verification(project_root: Path) -> tuple[bool, dict[str, Any] | None, str]:

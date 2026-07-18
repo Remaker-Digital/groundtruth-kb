@@ -203,34 +203,48 @@ def _load_trigger() -> ModuleType:
     return module
 
 
+def _codex_no_window_verification_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema_version": 3,
+        "result": "pass",
+        "visible_window_detected": False,
+        "verified_at": "2999-01-01T00:00:00Z",
+        "probe": "pytest_synthetic_codex_no_window",
+        "dispatcher_wrapper_path": True,
+        "wrapper_ok": True,
+        "containment_mechanism": "windows_private_desktop",
+        "requested_permissions_profile": ":workspace",
+        "effective_profile_ok": True,
+        "sentinel_lifecycle_ok": True,
+        "runs": [
+            {
+                "requested_permissions_profile": ":workspace",
+                "observed_effective_profile": "workspace-write",
+                "effective_profile_ok": True,
+                "sentinel_lifecycle_ok": True,
+                "sentinel_residual_before_cleanup": False,
+                "sentinel_residual_after_cleanup": False,
+                "wrapper_returncode": 0,
+                "command_steps": [
+                    {
+                        "marker": f"marker-{run}-{step}",
+                        "returncode": 0,
+                        "stdout_contains_marker": True,
+                    }
+                    for step in range(3)
+                ],
+            }
+            for run in range(2)
+        ],
+    }
+    payload.update(overrides)
+    return payload
+
+
 def _write_codex_no_window_verification(root: Path) -> Path:
     verification_path = root / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
     verification_path.parent.mkdir(parents=True, exist_ok=True)
-    verification_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "result": "pass",
-                "visible_window_detected": False,
-                "verified_at": "2999-01-01T00:00:00Z",
-                "probe": "pytest_synthetic_codex_no_window",
-                "runs": [
-                    {
-                        "command_steps": [
-                            {
-                                "marker": f"marker-{run}-{step}",
-                                "returncode": 0,
-                                "stdout_contains_marker": True,
-                            }
-                            for step in range(3)
-                        ]
-                    }
-                    for run in range(2)
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+    verification_path.write_text(json.dumps(_codex_no_window_verification_payload()), encoding="utf-8")
     return verification_path
 
 
@@ -4883,28 +4897,7 @@ def test_codex_windows_dispatch_accepts_fresh_clean_no_window_verification(
     verification_path = tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
     verification_path.parent.mkdir(parents=True, exist_ok=True)
     verification_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "result": "pass",
-                "visible_window_detected": False,
-                "verified_at": "2999-01-01T00:00:00Z",
-                "probe": "dispatcher_codex_no_window_smoke",
-                "runs": [
-                    {
-                        "command_steps": [
-                            {
-                                "marker": f"marker-{run}-{step}",
-                                "returncode": 0,
-                                "stdout_contains_marker": True,
-                            }
-                            for step in range(3)
-                        ]
-                    }
-                    for run in range(2)
-                ],
-            }
-        ),
+        json.dumps(_codex_no_window_verification_payload(probe="dispatcher_codex_no_window_smoke")),
         encoding="utf-8",
     )
 
@@ -4913,6 +4906,24 @@ def test_codex_windows_dispatch_accepts_fresh_clean_no_window_verification(
     assert result["ready"] is True
     assert result["reason"] == "codex_no_window_verification_current"
     assert result["verification"]["visible_window_detected"] is False
+
+
+def test_codex_windows_dispatch_rejects_incomplete_schema_v3_sentinel_proof(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trigger = _load_trigger()
+    monkeypatch.setattr(trigger.os, "name", "nt")
+    verification_path = tmp_path / ".gtkb-state" / "bridge-poller" / "codex-no-window-verification.json"
+    verification_path.parent.mkdir(parents=True, exist_ok=True)
+    verification_path.write_text(
+        json.dumps(_codex_no_window_verification_payload(sentinel_lifecycle_ok=False)),
+        encoding="utf-8",
+    )
+
+    result = trigger._evaluate_harness_dispatch_readiness("codex", tmp_path)
+
+    assert result["ready"] is False
+    assert result["reason"] == "codex_no_window_verification_incomplete_sentinel_lifecycle"
 
 
 def test_codex_windows_dispatch_rejects_legacy_clean_false_green_verification(

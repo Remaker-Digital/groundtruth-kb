@@ -17,6 +17,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
+if str(PACKAGE_SRC) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_SRC))
+
+from groundtruth_kb.codex_no_window_verification import (  # noqa: E402
+    REQUIRED_EFFECTIVE_PROFILE,
+    REQUIRED_PERMISSIONS_PROFILE,
+)
+from groundtruth_kb.codex_no_window_verification import (  # noqa: E402
+    schema_failure_reason as _codex_no_window_schema_failure,
+)
+
 from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
@@ -27,8 +39,6 @@ REQUIRED_MODEL = "gpt-5.5"
 REQUIRED_APPROVAL_CONFIG = 'approval_policy="never"'
 REQUIRED_REASONING_CONFIG = 'model_reasoning_effort="xhigh"'
 REQUIRED_PERMISSIONS_CONFIG = 'default_permissions=":workspace"'
-REQUIRED_PERMISSIONS_PROFILE = ":workspace"
-REQUIRED_EFFECTIVE_PROFILE = "workspace-write"
 FORBIDDEN_FLAGS = {"--dangerously-bypass-approvals-and-sandbox"}
 CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH = (
     ".gtkb-state",
@@ -37,9 +47,6 @@ CODEX_NO_WINDOW_VERIFICATION_RELATIVE_PATH = (
 )
 CODEX_NO_WINDOW_VERIFICATION_MAX_AGE_SECONDS = 4 * 60 * 60
 CODEX_WINDOWS_SANDBOX_SETUP_STATUS = "0xc0000142"
-CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION = 3
-CODEX_NO_WINDOW_MIN_RUNS = 2
-CODEX_NO_WINDOW_MIN_COMMAND_STEPS = 3
 
 
 class VerificationError(RuntimeError):
@@ -233,68 +240,6 @@ def _codex_live_failure_class(payload: dict[str, Any] | None, reason: str) -> st
     }:
         return reason
     return "codex_no_window_probe_not_passing" if reason == "codex_no_window_probe_not_passing" else reason
-
-
-def _codex_no_window_run_steps(run: object) -> list[dict[str, Any]]:
-    if not isinstance(run, dict):
-        return []
-    raw_steps = run.get("command_steps")
-    if raw_steps is None:
-        raw_steps = run.get("commands")
-    if not isinstance(raw_steps, list):
-        return []
-    return [step for step in raw_steps if isinstance(step, dict)]
-
-
-def _codex_no_window_step_has_marker_proof(step: dict[str, Any]) -> bool:
-    marker = str(step.get("marker") or step.get("expected_marker") or "").strip()
-    if not marker:
-        return False
-    if step.get("returncode") not in {0, "0"}:
-        return False
-    if step.get("stdout_contains_marker") is True:
-        return True
-    transcript = str(step.get("transcript_preview") or step.get("stdout_preview") or step.get("stdout") or "")
-    return marker in transcript
-
-
-def _codex_no_window_schema_failure(payload: dict[str, Any]) -> str | None:
-    if payload.get("schema_version") != CODEX_NO_WINDOW_VERIFICATION_SCHEMA_VERSION:
-        return "codex_no_window_verification_legacy_schema"
-    runs = payload.get("runs")
-    if not isinstance(runs, list) or len(runs) < CODEX_NO_WINDOW_MIN_RUNS:
-        return "codex_no_window_verification_insufficient_run_count"
-    if payload.get("dispatcher_wrapper_path") is not True or payload.get("wrapper_ok") is not True:
-        return "codex_no_window_verification_missing_dispatch_wrapper"
-    if payload.get("containment_mechanism") != "windows_private_desktop":
-        return "codex_no_window_verification_missing_private_desktop"
-    if payload.get("requested_permissions_profile") != REQUIRED_PERMISSIONS_PROFILE:
-        return "codex_no_window_verification_requested_profile_mismatch"
-    if payload.get("effective_profile_ok") is not True:
-        return "codex_no_window_verification_effective_profile_mismatch"
-    if payload.get("sentinel_lifecycle_ok") is not True:
-        return "codex_no_window_verification_incomplete_sentinel_lifecycle"
-    for run in runs:
-        steps = _codex_no_window_run_steps(run)
-        if len(steps) < CODEX_NO_WINDOW_MIN_COMMAND_STEPS:
-            return "codex_no_window_verification_insufficient_command_count"
-        if not all(_codex_no_window_step_has_marker_proof(step) for step in steps):
-            return "codex_no_window_verification_missing_marker_chain"
-        if run.get("requested_permissions_profile") != REQUIRED_PERMISSIONS_PROFILE:
-            return "codex_no_window_verification_requested_profile_mismatch"
-        if run.get("observed_effective_profile") != REQUIRED_EFFECTIVE_PROFILE:
-            return "codex_no_window_verification_effective_profile_mismatch"
-        if run.get("effective_profile_ok") is not True:
-            return "codex_no_window_verification_effective_profile_mismatch"
-        if run.get("sentinel_lifecycle_ok") is not True:
-            return "codex_no_window_verification_incomplete_sentinel_lifecycle"
-        if run.get("sentinel_residual_before_cleanup") is not False:
-            return "codex_no_window_verification_sentinel_residue"
-        if run.get("sentinel_residual_after_cleanup") is not False:
-            return "codex_no_window_verification_sentinel_residue"
-        if run.get("wrapper_returncode") not in {0, "0"}:
-            return "codex_no_window_verification_dispatch_wrapper_failed"
-    return None
 
 
 def evaluate_live_headless_readiness(project_root: Path) -> dict[str, Any]:
