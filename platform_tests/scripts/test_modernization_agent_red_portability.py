@@ -105,15 +105,23 @@ _RUNTIME_PROBE = textwrap.dedent(
     from pathlib import Path
 
     source_root = os.path.normcase(os.path.abspath(os.environ["GTKB_SOURCE_ROOT"]))
-    source_prefix = source_root + os.sep
+    allowed_fixture_roots = tuple(
+        os.path.normcase(os.path.abspath(value))
+        for value in (os.environ["GTKB_RELOCATED_HOST"], sys.prefix)
+    )
 
-    def under_source(value):
+    def under_root(value, root):
         if not isinstance(value, (str, bytes, os.PathLike)):
             return False
         normalized = os.path.normcase(os.path.abspath(os.fsdecode(os.fspath(value))))
-        return normalized == source_root or normalized.startswith(source_prefix)
+        return normalized == root or normalized.startswith(root + os.sep)
 
-    sys.path[:] = [entry for entry in sys.path if not entry or not under_source(entry)]
+    def denied_source(value):
+        return under_root(value, source_root) and not any(
+            under_root(value, allowed_root) for allowed_root in allowed_fixture_roots
+        )
+
+    sys.path[:] = [entry for entry in sys.path if not entry or not denied_source(entry)]
 
     def deny_source_host_reads(event, args):
         path = None
@@ -121,9 +129,13 @@ _RUNTIME_PROBE = textwrap.dedent(
             path = args[0]
         elif event in {"os.listdir", "os.scandir", "os.chdir"} and args:
             path = args[0]
-        if path is not None and under_source(path):
+        if path is not None and denied_source(path):
             raise RuntimeError(f"source-host dependency denied: {path}")
 
+    assert not denied_source(os.environ["GTKB_RELOCATED_HOST"])
+    assert not denied_source(sys.prefix)
+    assert denied_source(source_root)
+    assert denied_source(os.path.join(source_root, "groundtruth-kb", "src"))
     sys.addaudithook(deny_source_host_reads)
 
     host_root = Path(os.environ["GTKB_RELOCATED_HOST"]).resolve()
@@ -148,7 +160,7 @@ _RUNTIME_PROBE = textwrap.dedent(
     package_origin = Path(groundtruth_kb.__file__).resolve()
     assert package_origin.is_relative_to(expected_install), (package_origin, expected_install)
     assert groundtruth_kb.__version__ == expected_version
-    assert not any(entry and under_source(entry) for entry in sys.path)
+    assert not any(entry and denied_source(entry) for entry in sys.path)
     candidate_module_present = importlib.util.find_spec("groundtruth_kb.modernization") is not None
     assert candidate_module_present is expected_candidate_module
 
@@ -189,7 +201,22 @@ _RUNTIME_PROBE = textwrap.dedent(
 
     import pytest
 
-    raise SystemExit(pytest.main(["-q", "-p", "no:cacheprovider", *os.environ["GTKB_TEST_NODES"].split("|")]))
+    raise SystemExit(
+        pytest.main(
+            [
+                "-q",
+                "-p",
+                "no:cacheprovider",
+                "-c",
+                os.devnull,
+                "--rootdir",
+                str(app_root),
+                "--confcutdir",
+                str(app_root),
+                *os.environ["GTKB_TEST_NODES"].split("|"),
+            ]
+        )
+    )
     """
 ).strip()
 
@@ -203,15 +230,23 @@ _MIGRATION_DRIVER = textwrap.dedent(
     from pathlib import Path
 
     source_root = os.path.normcase(os.path.abspath(os.environ["GTKB_SOURCE_ROOT"]))
-    source_prefix = source_root + os.sep
+    allowed_fixture_roots = tuple(
+        os.path.normcase(os.path.abspath(value))
+        for value in (os.environ["GTKB_RELOCATED_HOST"], sys.prefix)
+    )
 
-    def under_source(value):
+    def under_root(value, root):
         if not isinstance(value, (str, bytes, os.PathLike)):
             return False
         normalized = os.path.normcase(os.path.abspath(os.fsdecode(os.fspath(value))))
-        return normalized == source_root or normalized.startswith(source_prefix)
+        return normalized == root or normalized.startswith(root + os.sep)
 
-    sys.path[:] = [entry for entry in sys.path if not entry or not under_source(entry)]
+    def denied_source(value):
+        return under_root(value, source_root) and not any(
+            under_root(value, allowed_root) for allowed_root in allowed_fixture_roots
+        )
+
+    sys.path[:] = [entry for entry in sys.path if not entry or not denied_source(entry)]
 
     def deny_source_host_reads(event, args):
         path = None
@@ -219,9 +254,13 @@ _MIGRATION_DRIVER = textwrap.dedent(
             path = args[0]
         elif event in {"os.listdir", "os.scandir", "os.chdir"} and args:
             path = args[0]
-        if path is not None and under_source(path):
+        if path is not None and denied_source(path):
             raise RuntimeError(f"source-host dependency denied: {path}")
 
+    assert not denied_source(os.environ["GTKB_RELOCATED_HOST"])
+    assert not denied_source(sys.prefix)
+    assert denied_source(source_root)
+    assert denied_source(os.path.join(source_root, "groundtruth-kb", "src"))
     sys.addaudithook(deny_source_host_reads)
 
     import groundtruth_kb
@@ -236,7 +275,8 @@ _MIGRATION_DRIVER = textwrap.dedent(
     evidence_path = Path(os.environ["GTKB_EVIDENCE_PATH"])
     operation = os.environ["GTKB_MIGRATION_OPERATION"]
     package_origin = Path(groundtruth_kb.__file__).resolve()
-    assert not package_origin.is_relative_to(Path(source_root))
+    assert package_origin.is_relative_to(Path(sys.prefix).resolve())
+    assert not denied_source(package_origin)
 
     if operation == "upgrade":
         results = execute_upgrade(
@@ -556,6 +596,7 @@ def _run_migration_operation(
     env.update(
         {
             "GTKB_SOURCE_ROOT": str(REPO_ROOT),
+            "GTKB_RELOCATED_HOST": str(relocated_host),
             "GTKB_AGENT_RED_ROOT": str(relocated_host / "applications" / "Agent_Red"),
             "GTKB_EVIDENCE_PATH": str(evidence_path),
             "GTKB_MIGRATION_OPERATION": operation,
