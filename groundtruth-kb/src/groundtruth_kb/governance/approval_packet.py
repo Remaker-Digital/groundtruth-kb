@@ -33,7 +33,6 @@ VALID_ARTIFACT_TYPES = {
 }
 
 VALID_APPROVAL_MODES = {"approve", "acknowledge", "edit-and-approve", "auto"}
-VALID_CAPTURE_CONTEXTS = {"gap_state"}
 
 
 @dataclass(frozen=True)
@@ -168,22 +167,6 @@ def validate_packet(packet: Mapping[str, object]) -> ValidationResult:
             errors.append("approval packet expires_at must be ISO-8601 when present")
             return ValidationResult(is_valid=False, errors=tuple(errors))
 
-    capture_context = packet.get("capture_context")
-    if capture_context is not None:
-        if capture_context not in VALID_CAPTURE_CONTEXTS:
-            errors.append(f"capture_context must be one of {sorted(VALID_CAPTURE_CONTEXTS)}, got {capture_context!r}")
-            return ValidationResult(is_valid=False, errors=tuple(errors))
-        if capture_context == "gap_state":
-            for field_name in ("gap_state_bridge_id", "gap_state_reason"):
-                value = packet.get(field_name)
-                if not isinstance(value, str) or not value.strip():
-                    errors.append(f"gap_state capture requires non-empty {field_name}")
-                    return ValidationResult(is_valid=False, errors=tuple(errors))
-            operation = packet.get("intended_db_operation")
-            if not isinstance(operation, Mapping) or not operation.get("method"):
-                errors.append("gap_state capture requires intended_db_operation with method")
-                return ValidationResult(is_valid=False, errors=tuple(errors))
-
     return ValidationResult(is_valid=True, errors=())
 
 
@@ -204,10 +187,6 @@ def construct_approval_packet(
     acknowledged_by: str | None = None,
     auto_approval_scope: str | None = None,
     auto_approval_activated_by: str | None = None,
-    capture_context: str | None = None,
-    gap_state_bridge_id: str | None = None,
-    gap_state_reason: str | None = None,
-    intended_db_operation: Mapping[str, object] | None = None,
     expires_at: str | None = None,
 ) -> dict[str, object]:
     """Construct a formal approval packet dictionary with a bound content hash."""
@@ -234,14 +213,6 @@ def construct_approval_packet(
         packet["auto_approval_scope"] = auto_approval_scope
     if auto_approval_activated_by:
         packet["auto_approval_activated_by"] = auto_approval_activated_by
-    if capture_context:
-        packet["capture_context"] = capture_context
-    if gap_state_bridge_id:
-        packet["gap_state_bridge_id"] = gap_state_bridge_id
-    if gap_state_reason:
-        packet["gap_state_reason"] = gap_state_reason
-    if intended_db_operation:
-        packet["intended_db_operation"] = dict(intended_db_operation)
     if expires_at:
         packet["expires_at"] = expires_at
     return packet

@@ -75,6 +75,11 @@ LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_oppos
 PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
 PROVIDER_VERDICT_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED"})
+PROVIDER_RUNTIME_MODEL_FIELDS: tuple[str, ...] = (
+    "author_model",
+    "author_model_version",
+    "author_model_configuration",
+)
 PROVIDER_VERDICT_GUARDS: tuple[Path, ...] = (
     Path(".claude/hooks/scanner-safe-writer.py"),
     Path(".claude/hooks/bridge-compliance-gate.py"),
@@ -376,12 +381,15 @@ def normalize_bridge_envelope_head(content: str, *, activity: str | None = None)
         return content
 
     selected_activity = _validate_activity(activity or default_bridge_envelope_activity(content, status))
-    remove_indices = _validated_existing_envelope(
-        lines=lines,
-        status=status,
-        expected_role=expected_role,
-        expected_activity=selected_activity,
-    )
+    if len(init_indices) != 1 or len(open_indices) != 1:
+        remove_indices = set(init_indices) | set(open_indices)
+    else:
+        remove_indices = _validated_existing_envelope(
+            lines=lines,
+            status=status,
+            expected_role=expected_role,
+            expected_activity=selected_activity,
+        )
     body_lines = [line.rstrip("\r") for idx, line in enumerate(lines) if idx not in remove_indices]
     envelope_lines = [f"::init gtkb {expected_role}", f"::open {selected_activity}"]
     normalized_lines = [body_lines[0], *envelope_lines, *body_lines[1:]]
@@ -396,14 +404,49 @@ def _provider_relative_path(path: Path, project_root: Path) -> str:
         raise BridgePublicationError(f"provider verdict path escapes project root: {path}") from exc
 
 
+def _normalize_provider_runtime_model_metadata(
+    content: str,
+    *,
+    author_metadata: Mapping[str, object],
+) -> str:
+    trusted_values: dict[str, str] = {}
+    for key in PROVIDER_RUNTIME_MODEL_FIELDS:
+        value = str(author_metadata.get(key) or "").strip().strip("`")
+        if not value:
+            raise BridgePublicationError(f"provider verdict is missing trusted author metadata: {key}")
+        trusted_values[key] = value
+
+    lines = content.split("\n")
+    seen: set[str] = set()
+    for idx, line in enumerate(lines):
+        match = re.match(r"^(author_[a-z0-9_]+):", line.strip("\n"), re.IGNORECASE)
+        if match:
+            key = match.group(1).lower()
+            if key in trusted_values:
+                lines[idx] = f"{key}: {trusted_values[key]}"
+                seen.add(key)
+    missing_keys = [key for key in PROVIDER_RUNTIME_MODEL_FIELDS if key not in seen]
+    if missing_keys:
+        insertion_at = 0
+        for idx, line in enumerate(lines):
+            if re.match(r"^author_[a-z0-9_]+:", line.strip("\n"), re.IGNORECASE):
+                insertion_at = idx + 1
+        for offset, key in enumerate(missing_keys):
+            lines.insert(insertion_at + offset, f"{key}: {trusted_values[key]}")
+    return "\n".join(lines)
+
+
 def _trusted_author_content(
     content: str,
     *,
     project_root: Path,
     author_metadata: Mapping[str, object],
 ) -> str:
+    content = _normalize_provider_runtime_model_metadata(content, author_metadata=author_metadata)
     existing = extract_author_metadata(content)
     for key, expected in author_metadata.items():
+        if key in PROVIDER_RUNTIME_MODEL_FIELDS:
+            continue
         actual = str(existing.get(key) or "").strip().strip("`")
         expected_text = str(expected or "").strip().strip("`")
         if actual and actual != expected_text:

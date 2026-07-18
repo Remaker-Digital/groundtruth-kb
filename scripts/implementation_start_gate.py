@@ -127,6 +127,7 @@ BRIDGE_FUNCTION_EXACT = {
     ".codex/hooks.json",
     "scripts/bridge_claim_cli.py",
     "scripts/dispatcher_runtime.py",
+    "scripts/gtkb_bridge_writer.py",
     "scripts/implementation_authorization.py",
     "scripts/implementation_start_gate.py",
 }

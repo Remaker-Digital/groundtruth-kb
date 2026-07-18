@@ -506,21 +506,111 @@ def test_publish_lo_verdict_denies_missing_or_other_session_claim(
         )
 
 
-def test_publish_lo_verdict_denies_metadata_conflict_and_post_impl_go(
+def test_publish_lo_verdict_normalizes_trusted_runtime_model_metadata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _provider_thread(tmp_path)
     _prepare_provider_mocks(monkeypatch, tmp_path)
+    if hasattr(writer, "run_bridge_compliance_audit"):
+        monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
 
-    with pytest.raises(BridgePublicationError, match="metadata conflict"):
+    stale_values = {
+        "author_model": "model-authored-name",
+        "author_model_version": "model-authored-version",
+        "author_model_configuration": "model-authored configuration",
+    }
+    result = publish_lo_verdict(
+        "provider-thread",
+        "GO",
+        _provider_go_content(**stale_values),
+        tmp_path,
+        session_id="dispatch-H-1",
+        harness_name="alibaba-cloud-studio",
+        author_metadata=PROVIDER_METADATA,
+    )
+
+    written = (tmp_path / result.verdict_path).read_text(encoding="utf-8")
+    for key in writer.PROVIDER_RUNTIME_MODEL_FIELDS:
+        assert f"{key}: {PROVIDER_METADATA[key]}" in written
+        assert stale_values[key] not in written
+
+
+def test_publish_lo_verdict_fills_missing_runtime_model_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _provider_thread(tmp_path)
+    _prepare_provider_mocks(monkeypatch, tmp_path)
+    if hasattr(writer, "run_bridge_compliance_audit"):
+        monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
+
+    content = _provider_go_content()
+    for key in writer.PROVIDER_RUNTIME_MODEL_FIELDS:
+        content = content.replace(f"{key}: {PROVIDER_METADATA[key]}\n", "")
+
+    result = publish_lo_verdict(
+        "provider-thread",
+        "GO",
+        content,
+        tmp_path,
+        session_id="dispatch-H-1",
+        harness_name="alibaba-cloud-studio",
+        author_metadata=PROVIDER_METADATA,
+    )
+
+    written = (tmp_path / result.verdict_path).read_text(encoding="utf-8")
+    for key in writer.PROVIDER_RUNTIME_MODEL_FIELDS:
+        assert f"{key}: {PROVIDER_METADATA[key]}" in written
+
+
+@pytest.mark.parametrize(
+    ("field", "untrusted_value"),
+    [
+        ("author_identity", "loyal-opposition/other"),
+        ("author_harness_id", "other-harness"),
+        ("author_session_context_id", "other-session"),
+    ],
+)
+def test_publish_lo_verdict_denies_non_model_metadata_conflict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    untrusted_value: str,
+) -> None:
+    _provider_thread(tmp_path)
+    _prepare_provider_mocks(monkeypatch, tmp_path)
+
+    with pytest.raises(BridgePublicationError, match=rf"metadata conflict for {field}"):
         publish_lo_verdict(
             "provider-thread",
             "GO",
-            _provider_go_content(author_model="untrusted-model"),
+            _provider_go_content(**{field: untrusted_value}),
             tmp_path,
             session_id="dispatch-H-1",
             harness_name="alibaba-cloud-studio",
             author_metadata=PROVIDER_METADATA,
+        )
+
+
+@pytest.mark.parametrize("field", writer.PROVIDER_RUNTIME_MODEL_FIELDS)
+def test_publish_lo_verdict_denies_missing_trusted_runtime_model_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+) -> None:
+    _provider_thread(tmp_path)
+    _prepare_provider_mocks(monkeypatch, tmp_path)
+    incomplete_metadata = dict(PROVIDER_METADATA)
+    incomplete_metadata[field] = ""
+
+    with pytest.raises(BridgePublicationError, match=rf"missing trusted author metadata: {field}"):
+        publish_lo_verdict(
+            "provider-thread",
+            "GO",
+            _provider_go_content(),
+            tmp_path,
+            session_id="dispatch-H-1",
+            harness_name="alibaba-cloud-studio",
+            author_metadata=incomplete_metadata,
         )
 
 
