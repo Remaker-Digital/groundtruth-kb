@@ -79,7 +79,7 @@ roles:
     review_surfaces:
       - bridge GO and NO-GO verdict files
       - bridge VERIFIED and NO-GO verification files
-      - independent-progress-assessments/CODEX-INSIGHT-DROPBOX
+      - Advisory Proposal bridge entries / Deliberation Archive records
       - bridge dispatcher reports
     harness_applicability:
       - antigravity

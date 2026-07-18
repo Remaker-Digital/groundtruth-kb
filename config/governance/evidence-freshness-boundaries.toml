@@ -73,11 +73,6 @@ id = "deliberation-id"
 pattern = "DELIB-*"
 rule = "Deliberation IDs are stable design-reasoning citations; cite IDs without loading unrelated archive history."
 
-[[citation_only_patterns]]
-id = "insight-dropbox-report"
-pattern = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/*.md"
-rule = "Governed reports may be cited by path as historical evidence; current-state claims still require canonical readers."
-
 [[full_read_justifications]]
 id = "verify-current-claim"
 description = "A current-state claim depends on the archived reference and cannot be resolved from a compact canonical reader."
@@ -93,48 +88,48 @@ description = "The archive record is being repaired or migrated under a governed
 [[blocker_families]]
 id = "B1"
 summary = "Bridge scan raw JSON included terminal VERIFIED and archived/nonterminal payloads during routine checks."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Use compact current bridge queue reads for routine state; treat terminal/archive payloads as citation-only unless a full-read justification is stated."
 evidence_class = "current"
 
 [[blocker_families]]
 id = "B2"
 summary = "Implementation authorization list output dumped hundreds of expired named packets."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Use compact current packet summaries for routine state; expired packet bodies are archival citation-only unless disputed or repaired."
 evidence_class = "current"
 
 [[blocker_families]]
 id = "B3"
 summary = "Implementation-report planning output included broad dirty-worktree and version-chain payloads when only current GO/report metadata was needed."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Use compact plan metadata for current implementation planning; load full version chains only when filing or verifying the bridge artifact."
 evidence_class = "current"
 
 [[blocker_families]]
 id = "B4"
 summary = "Handoff/session marker drift and archived-envelope mis-resolution could cause agents to use the wrong archived session state."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Explicit session IDs and stable citations justify archive selection; ambiguous archived state fails closed."
 evidence_class = "full-read-justified"
 
 [[blocker_families]]
 id = "B5"
 summary = "Broad generated/cache searches can hit runtime artifacts, wasting tokens and producing access-denied noise."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Generated/cache surfaces are not current-state authority; use deterministic inventory/hygiene readers instead of unbounded full-tree searches."
 evidence_class = "stale"
 
 [[blocker_families]]
 id = "B6"
 summary = "Startup glossary/terminology loading risked loading the full glossary into the base session envelope."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Base sessions use compact core terminology; activity-specific terms are loaded on demand by the relevant activity envelope."
 evidence_class = "current"
 
 [[blocker_families]]
 id = "B7"
 summary = "Provider harnesses lack full transcript/session archives, creating temptation to rely on synthetic state."
-evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md"
+evidence_path = "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/session-activity-envelope-sharding-blockers-2026-07-01.md (source retired 2026-07-17)"
 boundary_rule = "Provider lanes use compact-provider projections and typed waivers; missing full transcripts are not replaced by synthetic current-state claims."
 evidence_class = "missing"

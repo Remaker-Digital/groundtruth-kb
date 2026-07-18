@@ -109,7 +109,6 @@ exclusion_globs = [
     "archive/**",
     "applications/**",
     "bridge/**",
-    "independent-progress-assessments/**",
 ]
 classification = "runtime_residue"
 remediation_hint = "Runtime/sandbox residue committed in-tree; scrub the PASS/ subtree. Sandbox output belongs outside E:/GT-KB or under .gtkb-state per .claude/rules/project-root-boundary.md. Scanner-owned-artifact severity handling is tracked by WI-4259."
@@ -389,7 +388,6 @@ exclusion_globs = [
     "archive/**",
     "applications/**",
     "bridge/**",
-    "independent-progress-assessments/**",
     ".claude/**",
     ".codex/**",
 ]

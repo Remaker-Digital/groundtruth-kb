@@ -5,16 +5,16 @@ Purpose: tracked map of the major control surfaces that shape agent behavior in 
 ## Startup Directives
 
 - `AGENTS.md`
-- `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`
-- `independent-progress-assessments/CODEX-REVIEW-OPERATING-CONTRACT.md`
-- `independent-progress-assessments/CODEX-LOYAL-OPPOSITION-RUNBOOK.md`
-- `independent-progress-assessments/CODEX-KNOWLEDGE-BASE-INDEX.md`
+- `.claude/rules/codex-way-of-working.md`
+- `.claude/rules/codex-review-operating-contract.md`
+- `.claude/rules/codex-loyal-opposition-runbook.md`
+- `.claude/rules/codex-knowledge-base-index.md`
 
 ## Review Memory
 
-- `independent-progress-assessments/CODEX-DECISION-LEDGER.md`
-- `independent-progress-assessments/CODEX-DEAD-ENDS-AND-FALSE-POSITIVES.md`
-- `independent-progress-assessments/CODEX-REVIEW-CHECKLISTS.md`
+- `.claude/rules/codex-decision-ledger.md`
+- `.claude/rules/codex-dead-ends-and-false-positives.md`
+- `.claude/rules/codex-review-checklists.md`
 
 ## Local Runtime Controls
 
@@ -31,9 +31,10 @@ Review skill intent currently lives in local `.claude/skills/` as:
 
 ## Output Contracts
 
-- `independent-progress-assessments/TEMPLATE-CODE-REVIEW.md`
-- `independent-progress-assessments/TEMPLATE-DECISION-MEMO.md`
-- `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
+- `.claude/rules/template-code-review.md`
+- `.claude/rules/template-decision-memo.md`
+- Advisory Proposal bridge entries / Deliberation Archive records
+  (`independent-progress-assessments/` is retired; do not write there)
 
 ---
 

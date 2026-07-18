@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Advisory-to-backlog router service.
 
-Scans Loyal Opposition advisories under
-``independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md`` and
-bridge threads whose latest numbered file is ``ADVISORY``, and STAGES one
+Scans bridge threads whose latest numbered file is ``ADVISORY``, and STAGES one
 candidate per unhandled advisory on an append-only candidate surface
 (``.gtkb-state/advisory-candidates/candidates.jsonl``) under
 ``GOV-STANDING-BACKLOG-001`` authority.
+
+``independent-progress-assessments/`` was retired by owner directive
+(2026-07-17; contents deleted). The ``--source dropbox`` / ``both`` scan path
+below is permanently a no-op (``collect_dropbox_advisories`` fails safe when
+the directory is absent); it is retained, not removed, so this docstring
+does not silently misdescribe a live surface while the fuller removal (the
+function, the CLI choice, and their dependent tests) is tracked separately
+as WI-5509's sibling follow-on.
 
 Stage 3 (WI-4469, ``DELIB-20261667`` D5, owner AUQ 2026-06-11 = approval-staged
 intake) stops the backlog leak at the source: the router no longer auto-promotes
@@ -51,6 +57,11 @@ ORIGIN = "hygiene"
 RESOLUTION_STATUS = "open"
 
 DROPBOX_RELATIVE = Path("independent-progress-assessments/CODEX-INSIGHT-DROPBOX")
+# Retired 2026-07-17 (contents deleted by owner directive); this path never
+# resolves to an existing directory again. collect_dropbox_advisories() below
+# fails safe (returns []) rather than erroring. Left in place -- not removed --
+# because the CLI's --source dropbox|both choice and 8 dependent tests still
+# reference it; full removal is a separate, larger follow-on (WI-5509 sibling).
 INSIGHTS_GLOB = "INSIGHTS-*.md"
 LAST_SCAN_RELATIVE = Path(".gtkb-state/advisory-router/last-scan.json")
 RETENTION_CONFIG_RELATIVE = Path("config/governance/advisory-routing-retention.toml")
@@ -282,7 +293,11 @@ def _parse_insights_date(filename: str) -> date | None:
 
 
 def collect_dropbox_advisories(project_root: Path, *, since: date | None) -> list[Advisory]:
-    """Scan INSIGHTS-*.md files in the dropbox; return one Advisory per file."""
+    """Scan INSIGHTS-*.md files in the dropbox; return one Advisory per file.
+
+    The dropbox is retired (see DROPBOX_RELATIVE); this permanently returns []
+    via the missing-directory fail-safe below.
+    """
     advisories: list[Advisory] = []
     dropbox = project_root / DROPBOX_RELATIVE
     if not dropbox.is_dir():

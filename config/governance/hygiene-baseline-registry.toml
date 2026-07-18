@@ -10,7 +10,7 @@
 #
 # Bridge: bridge/gtkb-fab-20-hygiene-investigation-skill-004.md (GO)
 # Project Authorization: PAUTH-FAB20-20260610 (WI-4432)
-# Source: HYG-001..060 = independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md
+# Source: HYG-001..060 = independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md (source retired 2026-07-17)
 #         HYG-061..068 = bridge/gtkb-fable-investigation-advisory-001.md (v2 verified-merge)
 #
 # Per-finding schema (see HygieneFinding): id, title, finding_class, impact, effort,
@@ -23,7 +23,7 @@ schema_version = 1
 baseline_id = "HYG-BASELINE-2026-06-10"
 generated_at = "2026-06-10T00:00:00Z"
 source_reports = [
-    "independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md",
+    "independent-progress-assessments/GT-KB-ARCHITECTURE-HYGIENE-INVESTIGATION-2026-06-10.md (source retired 2026-07-17)",
     "bridge/gtkb-fable-investigation-advisory-001.md",
 ]
 

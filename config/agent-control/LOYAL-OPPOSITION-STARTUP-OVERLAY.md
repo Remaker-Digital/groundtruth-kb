@@ -36,9 +36,8 @@ Behavior contract: `.claude/rules/loyal-opposition.md` and `AGENTS.md` (authorit
   work items, or lifecycle changes. Workers access these artifacts through
   governed bridge/TAFE/dispatcher status surfaces and status-bearing files under
   `bridge/`; interactive Prime Builder sessions progress them through governed
-  advisory intake/disposition. CODEX-INSIGHT-DROPBOX and
-  `independent-progress-assessments` dropbox files are non-canonical session
-  evidence only.
+  advisory intake/disposition. `independent-progress-assessments/` is retired
+  (contents deleted by owner directive) and must not be read from or recreated.
 - Respond by writing the next numbered bridge file with `GO`, `NO-GO`, or
   `VERIFIED`. Skip latest `VERIFIED` as terminal.
 - **Session-context review independence:** formal GO/NO-GO/VERIFIED must come from a

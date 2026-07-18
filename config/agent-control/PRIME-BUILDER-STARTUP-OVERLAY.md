@@ -40,8 +40,8 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
   Loyal Opposition mechanism for future-work initiation. Retrieve them through
   governed bridge/TAFE/dispatcher status surfaces and status-bearing files under
   `bridge/`, then progress them through governed advisory intake/disposition.
-  CODEX-INSIGHT-DROPBOX and `independent-progress-assessments` dropbox files are
-  non-canonical session evidence only.
+  `independent-progress-assessments/` is retired (contents deleted by owner
+  directive) and must not be read from or recreated.
 - No implementation without a Loyal Opposition `GO` + an implementation-start
   authorization packet (`.claude/rules/codex-review-gate.md`).
 - **Session-context review independence:** the blocker is same author/reviewer

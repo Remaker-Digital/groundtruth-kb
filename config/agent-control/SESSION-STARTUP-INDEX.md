@@ -49,9 +49,9 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
    They are the primary Loyal Opposition mechanism for future-work initiation
    and are accessed through governed bridge/TAFE/dispatcher status surfaces and
    status-bearing versioned files under `bridge/`. Interactive workers progress
-   them through governed advisory intake/disposition; CODEX-INSIGHT-DROPBOX and
-   `independent-progress-assessments` dropbox files are non-canonical session
-   evidence only, not source-of-truth or durable future-work storage.
+   them through governed advisory intake/disposition; `independent-progress-assessments/`
+   is retired (contents deleted by owner directive) and must not be read from
+   or recreated.
 5. **Dashboard / backlog summary** — the generated startup service
    (`scripts/session_self_initialization.py`) emits the current-state summary;
    it is not authoritative after generation.

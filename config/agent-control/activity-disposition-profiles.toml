@@ -84,7 +84,6 @@ terminology = [
     "Advisory Proposal",
     "ADVISORY bridge entry",
     "governed advisory intake/disposition",
-    "CODEX-INSIGHT-DROPBOX",
 ]
 
 [activities.deliberation.history_state]
@@ -95,7 +94,6 @@ sources = [
     "open AUQ items",
     "ADVISORY bridge artifacts from bridge/TAFE/dispatcher status surfaces",
     "status-bearing versioned files under bridge/",
-    "non-canonical session evidence from CODEX-INSIGHT-DROPBOX and independent-progress-assessments",
 ]
 
 [activities.deliberation.classification]
@@ -114,7 +112,7 @@ guardrails = [
     "ADVISORY entries are non-dispatchable and not implementation approval",
     "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
     "interactive workers progress advisories through governed advisory intake/disposition",
-    "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are non-canonical session evidence only",
+    "independent-progress-assessments/ is retired; do not read from or recreate it",
 ]
 manipulates = [
     "Deliberation Archive records",
@@ -150,7 +148,6 @@ terminology = [
     "ADVISORY bridge entry",
     "advisory intake/disposition",
     "bridge/TAFE/dispatcher status surfaces",
-    "CODEX-INSIGHT-DROPBOX",
 ]
 
 [activities.build.history_state]
@@ -162,7 +159,6 @@ sources = [
     "open NO-GO items",
     "ADVISORY bridge artifacts from bridge/TAFE/dispatcher status surfaces",
     "status-bearing versioned files under bridge/",
-    "non-canonical session evidence from CODEX-INSIGHT-DROPBOX and independent-progress-assessments",
 ]
 
 [activities.build.classification]
@@ -185,7 +181,7 @@ guardrails = [
     "ADVISORY entries are non-dispatchable and not implementation approval",
     "Advisory Proposal is the primary Loyal Opposition mechanism for future-work initiation",
     "interactive workers retrieve and progress advisories through governed advisory intake/disposition",
-    "CODEX-INSIGHT-DROPBOX and independent-progress-assessments dropbox files are non-canonical session evidence only",
+    "independent-progress-assessments/ is retired; do not read from or recreate it",
 ]
 manipulates = [
     "source files",
