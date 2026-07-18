@@ -18,6 +18,9 @@ from __future__ import annotations
 import importlib.util
 import sqlite3
 from pathlib import Path
+from unittest.mock import patch
+
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -127,12 +130,13 @@ def _deny(tmp_path: Path, content: str) -> str | None:
     original_resolver = _gate._canonical_project_root
     _gate._canonical_project_root = lambda cwd_path: cwd_path
     try:
-        return _gate._deny_reason_for_content(
-            cwd_path=tmp_path,
-            file_path="bridge/test-wi-membership-001.md",
-            content=content,
-            run_pending_preflight=False,
-        )
+        with patch.object(_gate, "_verdict_self_review_deny", return_value=None):
+            return _gate._deny_reason_for_content(
+                cwd_path=tmp_path,
+                file_path="bridge/test-wi-membership-001.md",
+                content=normalize_bridge_envelope_head(content),
+                run_pending_preflight=False,
+            )
     finally:
         _gate._canonical_project_root = original_resolver
 

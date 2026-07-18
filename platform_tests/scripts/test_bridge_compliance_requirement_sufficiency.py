@@ -14,7 +14,8 @@ Constraints carried forward from the GO at
 ``bridge/gtkb-wi3439-requirement-sufficiency-presence-check-002.md``:
 
 1. The gate is scoped to implementation-proposal bridge_kind tokens
-   (``prime_proposal`` / ``implementation_proposal``), NOT a broad
+   (``prime_proposal`` / ``implementation_proposal`` /
+   ``prime_implementation_proposal``), NOT a broad
    "NEW|REVISED + non-exempt bridge_kind + target_paths" trigger. A
    ``implementation_report`` with target_paths and no subsection must NOT be
    denied (constraint 2).
@@ -36,9 +37,11 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 import pytest
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 from scripts.implementation_authorization import requirement_sufficiency_state
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -123,12 +126,13 @@ def _proposal(
 
 
 def _deny(gate: ModuleType, content: str, cwd: Path) -> str | None:
-    return gate._deny_reason_for_content(
-        cwd_path=cwd,
-        file_path="bridge/test-requirement-sufficiency-001.md",
-        content=content,
-        run_pending_preflight=False,
-    )
+    with patch.object(gate, "_wi_project_membership_gap", return_value=None):
+        return gate._deny_reason_for_content(
+            cwd_path=cwd,
+            file_path="bridge/test-requirement-sufficiency-001.md",
+            content=normalize_bridge_envelope_head(content),
+            run_pending_preflight=False,
+        )
 
 
 # --- Acceptance criteria: deny cases --------------------------------------------
@@ -253,6 +257,7 @@ def test_bridge_kind_predicate_covers_both_proposal_tokens(gate: ModuleType) -> 
     # token, while excluding reports/verdicts/advisories.
     assert gate._bridge_kind_is_implementation_proposal("bridge_kind: prime_proposal\n") is True
     assert gate._bridge_kind_is_implementation_proposal("bridge_kind: implementation_proposal\n") is True
+    assert gate._bridge_kind_is_implementation_proposal("bridge_kind: prime_implementation_proposal\n") is True
     assert gate._bridge_kind_is_implementation_proposal("bridge_kind: implementation_report\n") is False
     assert gate._bridge_kind_is_implementation_proposal("bridge_kind: lo_verdict\n") is False
     assert gate._bridge_kind_is_implementation_proposal("bridge_kind: governance_advisory\n") is False
@@ -286,7 +291,7 @@ def test_shared_status_trigger_constant(gate: ModuleType) -> None:
     # GO constraint 5: the check reuses the project-linkage gate's status set
     # rather than a divergent parser.
     expected_statuses = frozenset({"NEW", "REVISED"})
-    expected_kinds = frozenset({"prime_proposal", "implementation_proposal"})
+    expected_kinds = frozenset({"prime_proposal", "implementation_proposal", "prime_implementation_proposal"})
     assert expected_statuses == gate.PROJECT_METADATA_STATUSES
     assert expected_kinds == gate.BRIDGE_KIND_IMPLEMENTATION_PROPOSAL
 

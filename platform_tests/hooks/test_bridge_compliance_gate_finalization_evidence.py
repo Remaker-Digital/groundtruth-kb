@@ -6,6 +6,8 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 
@@ -54,11 +56,8 @@ missing_required_specs: []
 
 - python -m pytest platform_tests/hooks/test_bridge_compliance_gate_finalization_evidence.py -q
 """
-    if not finalization_evidence:
-        return body
-    return (
-        body
-        + """
+    if finalization_evidence:
+        body += """
 ## Commit Finalization Evidence
 
 - Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
@@ -67,15 +66,14 @@ missing_required_specs: []
 - `bridge/test-finalization-003.md`
 - `bridge/test-finalization-004.md`
 """
-    )
+    return normalize_bridge_envelope_head(body)
 
 
 def _write_reviewed_report(tmp_path: Path) -> Path:
     fixture_root = tmp_path / ".gtkb-state" / "finalization-fixture"
     bridge_dir = fixture_root / "bridge"
     bridge_dir.mkdir(parents=True)
-    (bridge_dir / "test-finalization-003.md").write_text(
-        """NEW
+    report = """NEW
 author_identity: prime-builder/test
 author_harness_id: P
 author_session_context_id: prime-session
@@ -84,7 +82,9 @@ author_model_version: test-version
 author_model_configuration: test-config
 
 # Implementation Report
-""",
+"""
+    (bridge_dir / "test-finalization-003.md").write_text(
+        normalize_bridge_envelope_head(report),
         encoding="utf-8",
     )
     return fixture_root

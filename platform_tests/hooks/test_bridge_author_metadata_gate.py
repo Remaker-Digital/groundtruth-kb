@@ -5,8 +5,11 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 import pytest
+
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -37,12 +40,13 @@ def gate(request: pytest.FixtureRequest) -> ModuleType:
 
 
 def _deny(gate: ModuleType, content: str) -> str | None:
-    return gate._deny_reason_for_content(
-        cwd_path=REPO_ROOT,
-        file_path="bridge/test-author-metadata-001.md",
-        content=content,
-        run_pending_preflight=False,
-    )
+    with patch.object(gate, "_verdict_self_review_deny", return_value=None):
+        return gate._deny_reason_for_content(
+            cwd_path=REPO_ROOT,
+            file_path="bridge/test-author-metadata-001.md",
+            content=normalize_bridge_envelope_head(content),
+            run_pending_preflight=False,
+        )
 
 
 def test_bridge_verdict_missing_author_metadata_blocked(gate: ModuleType) -> None:

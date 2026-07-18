@@ -5,8 +5,11 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 import pytest
+
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
@@ -81,12 +84,13 @@ def _implementation_report(*, prior_section: str) -> str:
 def _deny(gate: ModuleType, tmp_path: Path, content: str, file_name: str = "test-prior-delibs-001.md") -> str | None:
     scratch_cwd = tmp_path / ".gtkb-state" / "prior-deliberations-fixture"
     scratch_cwd.mkdir(parents=True, exist_ok=True)
-    return gate._deny_reason_for_content(
-        cwd_path=scratch_cwd,
-        file_path=f"bridge/{file_name}",
-        content=content,
-        run_pending_preflight=False,
-    )
+    with patch.object(gate, "_verdict_self_review_deny", return_value=None):
+        return gate._deny_reason_for_content(
+            cwd_path=scratch_cwd,
+            file_path=f"bridge/{file_name}",
+            content=normalize_bridge_envelope_head(content),
+            run_pending_preflight=False,
+        )
 
 
 def test_new_proposal_with_unedited_prior_deliberations_placeholder_denied(gate: ModuleType, tmp_path: Path) -> None:

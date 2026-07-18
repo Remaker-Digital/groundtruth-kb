@@ -28,6 +28,8 @@ from types import ModuleType
 
 import pytest
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
@@ -82,7 +84,7 @@ def test_compliance_gate_absent_section_still_denies(gate: ModuleType, tmp_path:
     reason = gate._deny_reason_for_content(
         cwd_path=tmp_path,
         file_path="bridge/test-w4-absent-section-001.md",
-        content=content,
+        content=normalize_bridge_envelope_head(content),
         run_pending_preflight=False,
     )
     assert reason is not None
@@ -117,7 +119,7 @@ def test_compliance_gate_placeholder_only_section_still_rejected(gate: ModuleTyp
     reason = gate._deny_reason_for_content(
         cwd_path=tmp_path,
         file_path="bridge/test-w4-placeholder-only-001.md",
-        content=content,
+        content=normalize_bridge_envelope_head(content),
         run_pending_preflight=False,
     )
     assert reason is not None

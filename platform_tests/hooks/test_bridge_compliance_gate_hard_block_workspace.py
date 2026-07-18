@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 TEMPLATE_HOOK = REPO_ROOT / "groundtruth-kb" / "templates" / "hooks" / "bridge-compliance-gate.py"
@@ -76,6 +78,11 @@ def _run_hook(payload: str) -> subprocess.CompletedProcess:
     payload_data = json.loads(payload)
     session_id = str(payload_data.get("session_id") or "test")
     bridge_id = _bridge_id_from_payload(payload_data)
+    tool_input = payload_data.get("tool_input") or {}
+    content = tool_input.get("content")
+    if bridge_id is not None and isinstance(content, str):
+        tool_input["content"] = normalize_bridge_envelope_head(content)
+        payload = json.dumps(payload_data)
     if bridge_id is not None:
         _claim_bridge_thread(bridge_id, session_id)
     run_env = os.environ.copy()
@@ -340,7 +347,10 @@ def test_verified_lacking_spec_to_test_mapping_blocked_with_deny() -> None:
     bridge/gov-process-spec-precondition-2026-04-29-005.md §3 test 5.
     """
     prior_file = REPO_ROOT / "bridge" / "test-fake-verified-no-tests-001.md"
-    prior_file.write_text("NEW\n" + AUTHOR_METADATA + "\n", encoding="utf-8")
+    prior_file.write_text(
+        normalize_bridge_envelope_head("NEW\n" + AUTHOR_METADATA + "\n"),
+        encoding="utf-8",
+    )
     try:
         payload = json.dumps(
             {
@@ -378,7 +388,10 @@ def test_go_lacking_applicability_preflight_blocked_with_deny() -> None:
     cross-cutting spec applicability is not only memory/judgment based.
     """
     prior_file = REPO_ROOT / "bridge" / "test-fake-go-no-preflight-001.md"
-    prior_file.write_text("NEW\n" + AUTHOR_METADATA + "\n", encoding="utf-8")
+    prior_file.write_text(
+        normalize_bridge_envelope_head("NEW\n" + AUTHOR_METADATA + "\n"),
+        encoding="utf-8",
+    )
     try:
         payload = json.dumps(
             {
@@ -408,7 +421,10 @@ def test_go_with_clean_applicability_preflight_passes() -> None:
     the applicability gate.
     """
     prior_file = REPO_ROOT / "bridge" / "test-fake-go-with-preflight-001.md"
-    prior_file.write_text("NEW\n" + AUTHOR_METADATA + "\n", encoding="utf-8")
+    prior_file.write_text(
+        normalize_bridge_envelope_head("NEW\n" + AUTHOR_METADATA + "\n"),
+        encoding="utf-8",
+    )
     try:
         payload = json.dumps(
             {

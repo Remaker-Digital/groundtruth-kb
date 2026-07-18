@@ -12,6 +12,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+from scripts.gtkb_bridge_writer import normalize_bridge_envelope_head
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_HOOK = REPO_ROOT / ".claude" / "hooks" / "bridge-compliance-gate.py"
 
@@ -28,12 +30,14 @@ _gate = _load_gate()
 
 _SLUG = "gtkb-demo-advisory"
 
-_NO_ACTION_BODY = """NO-ACTION
+_NO_ACTION_BODY = normalize_bridge_envelope_head(
+    """NO-ACTION
 
 # Prime disposition
 
 Disposition: NO-ACTION on this advisory thread.
 """
+)
 
 
 def _bridge_dir(tmp_path: Path) -> Path:
@@ -48,7 +52,10 @@ def _write_version(tmp_path: Path, version: int, status: str) -> None:
 
 # {status} body
 """
-    (d / f"{_SLUG}-{version:03d}.md").write_text(body, encoding="utf-8")
+    (d / f"{_SLUG}-{version:03d}.md").write_text(
+        normalize_bridge_envelope_head(body),
+        encoding="utf-8",
+    )
 
 
 def _target(tmp_path: Path, version: int) -> str:
@@ -85,17 +92,22 @@ def test_allowed_when_prior_nogo_exists(tmp_path):
 
 def test_non_no_action_first_line_ignored(tmp_path):
     _write_version(tmp_path, 1, "ADVISORY")
-    go_body = """GO
+    go_body = normalize_bridge_envelope_head(
+        """GO
 
 # verdict
 """
+    )
     assert _gate._no_action_prior_verdict_deny(_target(tmp_path, 2), go_body) is None
 
 
 def test_prefix_slug_sibling_not_cross_matched(tmp_path):
     # A different slug that shares this slug as a prefix must not satisfy the guard.
     d = _bridge_dir(tmp_path)
-    (d / f"{_SLUG}-extra-002.md").write_text("GO\n\n# unrelated\n", encoding="utf-8")
+    (d / f"{_SLUG}-extra-002.md").write_text(
+        normalize_bridge_envelope_head("GO\n\n# unrelated\n"),
+        encoding="utf-8",
+    )
     reason = _gate._no_action_prior_verdict_deny(_target(tmp_path, 2), _NO_ACTION_BODY)
     assert reason is not None, "GO on a prefix-sharing DIFFERENT slug must not allow this NO-ACTION"
 
@@ -117,7 +129,7 @@ Disposition: NO-ACTION on this advisory thread.
     reason = _gate._deny_reason_for_content(
         cwd_path=tmp_path,
         file_path=_target(tmp_path, 2),
-        content=content,
+        content=normalize_bridge_envelope_head(content),
         run_pending_preflight=False,
     )
     assert reason is not None
