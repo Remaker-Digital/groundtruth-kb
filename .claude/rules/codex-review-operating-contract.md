@@ -151,14 +151,14 @@ At session start, load:
 6. `.claude/rules/codex-review-operating-contract.md`
 7. `.claude/rules/codex-loyal-opposition-runbook.md`
 8. `.claude/rules/codex-knowledge-base-index.md`
-9. latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-10. open items in `independent-progress-assessments/loyal-opposition-log.md`
+9. latest Advisory Proposal bridge entries and relevant Deliberation Archive records produced by Loyal Opposition
+10. MemBase `current_work_items` for unresolved Loyal Opposition-raised work
 
 ## Session Wrap
 
 - Record new standing decisions in `.claude/rules/codex-decision-ledger.md` when they affect future review behavior.
 - Record failed approaches or false positives in `.claude/rules/codex-dead-ends-and-false-positives.md`.
-- Put deliverable reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+- File deliverable reports as Advisory Proposal bridge entries when they may create Prime Builder work, or as Deliberation Archive records when they are process/review findings with no derived-work implication.
 
 ---
 

@@ -60,10 +60,12 @@ made deterministic.
 
 ### 5. Routing pass
 
-If a finding is material, record it as a Loyal Opposition advisory in
-`independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`. The existing
-advisory-router (`scripts/advisory_backlog_router.py`, registered as a Stop
-hook) converts written advisories into MemBase work items idempotently. Do not
+If a finding is material, record it as a Loyal Opposition advisory via an
+**Advisory Proposal** bridge entry (ADVISORY status; see
+`gtkb-bridge-advisory-status-001`, VERIFIED). `independent-progress-assessments/`
+is retired; do not write there. The existing advisory-router
+(`scripts/advisory_backlog_router.py`, registered as a Stop hook) converts
+bridge ADVISORY entries into staged backlog candidates idempotently. Do not
 mutate the backlog directly from this skill — detection is read-only; backlog
 promotion happens downstream through the advisory and the router.
 

@@ -49,7 +49,7 @@ Also inspect:
 - TAFE-backed bridge state and dispatcher status/health for latest bridge statuses and any GO/NO-GO/NEW/VERIFIED changes created this session. Do not consult or recreate aggregate queue artifacts as live queue sources.
 - `groundtruth.db` through the current `groundtruth_kb` CLI or `KnowledgeDB` helpers for current work item, spec, assertion, and `session_prompts` state.
 - `memory/MEMORY.md` for current status, recent sessions, and quick references.
-- `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` for reports produced this session.
+- Deliberation Archive records and Advisory Proposal bridge entries produced this session (independent-progress-assessments/ is retired; do not read from or recreate it).
 - ignored local evidence under `.groundtruth/session/`, `.gtkb-state/`, and generated reports that should be referenced but not committed.
 
 ## Knowledge Collection Matrix

@@ -168,7 +168,7 @@ The following workspace locations are strictly protected and require a bridge GO
   `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and
   `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`.
 - Apply the durable owner-action visibility protocol in
-  `independent-progress-assessments/CODEX-WAY-OF-WORKING.md`: owner decisions,
+  `.claude/rules/codex-way-of-working.md`: owner decisions,
   approvals, credentials, or manual external actions must be surfaced in a
   standalone `OWNER ACTION REQUIRED` block, not buried in normal chat flow.
 - Owner input must be requested one question or decision at a time. The
@@ -190,7 +190,7 @@ The following workspace locations are strictly protected and require a bridge GO
 
 ## Standing Priorities
 
-- Load `independent-progress-assessments/CODEX-STANDING-PRIORITIES.md` during session initialization.
+- Load `.claude/rules/codex-standing-priorities.md` during session initialization.
 - Priority 1: execute role-appropriate top-priority work from the active role
   assignment and standing backlog.
 - This priority persists across sessions unless Mike explicitly suspends it during a session. A suspension is temporary and does not persist across session boundaries.
@@ -294,8 +294,8 @@ item, and release blockers or release-target constraints when present.
 13. Read `.claude/rules/codex-review-operating-contract.md`.
 14. Read `.claude/rules/codex-loyal-opposition-runbook.md`.
 15. Read `.claude/rules/codex-knowledge-base-index.md`.
-16. Review the latest file in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
-17. Check open items in `independent-progress-assessments/loyal-opposition-log.md`.
+16. Review the latest Advisory Proposal bridge entries and relevant Deliberation Archive records produced by Loyal Opposition.
+17. Check MemBase `current_work_items` for unresolved Loyal Opposition-raised work.
 18. Use `.claude/rules/codex-review-checklists.md` and the report templates for substantial reviews/investigations.
 18a. Read `.claude/rules/deliberation-protocol.md` for deliberation archive search/cite obligations.
 19. When verification is needed, prefer repo-native commands already reflected in CI/config:
@@ -306,7 +306,7 @@ item, and release blockers or release-target constraints when present.
 
 ## Report Output Contract
 
-- Place new reports in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`.
+- File new reports as Advisory Proposal bridge entries when they may create Prime Builder work, or as Deliberation Archive records when they are process/review findings with no derived-work implication.
 - Include:
   - claim
   - evidence (file paths, line references, command or doc source)
@@ -332,6 +332,6 @@ item, and release blockers or release-target constraints when present.
   fully utilized.
 - **Antigravity harness (ID C)**: As of 2026-05-31, the former Antigravity Standing Exception Retraction & Scoped Authority restrictions are obsolete per owner directive. Antigravity follows the same role-based file authority as any other harness: when assigned Prime Builder, Prime Builder file authority applies; when assigned Loyal Opposition, Loyal Opposition file-safety applies. **Startup Optimization Directive**: To minimize startup resource consumption and token cost, Antigravity uses a local, low-overhead startup path. It is explicitly exempt from Phase B steps 9 through 18a (reading non-essential bootstrap, rule, priority, vision, checklist, and log files). However, to enforce role boundaries correctly, Antigravity's optimized startup path must still load the active role overlay file (`config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`) appropriate to its resolved role. Antigravity must load the essential baseline files (`CLAUDE.md`, `AGENTS.md`, `.claude/rules/canonical-terminology.md`, `.claude/rules/file-bridge-protocol.md`, and `memory/MEMORY.md`). Furthermore, any startup services or hooks must skip non-local reachability checks (such as Grafana queries) and compile/compaction tasks (such as PDF generation) by running with `--fast-hook` and `--skip-bridge-maintenance`.
 - New files should be created under:
-  - `independent-progress-assessments/`
+  - `bridge/` for governed bridge artifacts.
   - `.claude/rules/`
   - project root only when startup/loading requires it (for example, this file).

@@ -76,8 +76,9 @@ Read the smallest relevant set:
    - Phase 4-5: orchestrate `structural-hygiene-review` and `check-deliberations` outputs.
    - Phase 9: `python scripts/check_harness_parity.py --all --markdown` for adapter / parity residuals.
 4. Synthesize findings into the standard report format (next section).
-5. Write the report to `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-<UTC-timestamp>-LO-HYGIENE-ASSESSMENT.md`.
-6. **Do not mutate any project file outside the report destination.** No bridge edits, no MemBase mutation, no script deletion, no role / role-map mutation, no branch operation, no formal-artifact creation by this skill.
+5. File the report as an Advisory Proposal bridge entry (ADVISORY status) or a
+   Deliberation Archive record, per the Report Destination section below.
+6. **Do not mutate any project file outside the report destination.** No bridge edits beyond filing the Advisory Proposal itself, no MemBase mutation beyond the Deliberation Archive record, no script deletion, no role / role-map mutation, no branch operation, no formal-artifact creation by this skill.
 
 ## Required Report Format
 
@@ -136,13 +137,11 @@ If the assessment finds a defect that requires mutation, the report MUST list it
 
 ## Report Destination
 
-Reports go ONLY to `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/` per `.claude/rules/loyal-opposition.md` storage convention. Naming convention:
-
-```
-INSIGHTS-<UTC-timestamp>-LO-HYGIENE-ASSESSMENT-<overview|phase-N>.md
-```
-
-Example: `INSIGHTS-2026-05-29-13-45-LO-HYGIENE-ASSESSMENT-overview.md`.
+`independent-progress-assessments/` is retired (contents deleted by owner
+directive); reports do NOT go there. Per `.claude/rules/loyal-opposition.md`
+storage convention, file the report as an Advisory Proposal bridge entry
+(ADVISORY status; see `gtkb-bridge-advisory-status-001`, VERIFIED) or a
+Deliberation Archive record (`gt deliberations record`), per content.
 
 ## Relationship to Existing Skills
 

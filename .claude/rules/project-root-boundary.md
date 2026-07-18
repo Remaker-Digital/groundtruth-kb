@@ -74,16 +74,16 @@ positive authority to harness-local scratchpads.
 
 ## Sandbox Output Exception
 
-GT-KB rehearsal-class operations may emit runtime output to a path outside `E:\GT-KB` when ALL of the following hold:
+GT-KB rehearsal-class operations may emit runtime output to a path outside `E:\GT-KB` only when ALL of the following hold:
 
-1. The path is declared in an owner-approved manifest field (currently `output_dir` in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/rehearsal/manifest.toml`).
+1. The path is declared in a current owner-approved, in-root manifest field. The former out-of-root report-directory manifest is retired and no longer grants active authority.
 2. The path matches a sandbox-allowlist pattern enforced by Rule M2 in `scripts/rehearse/_common.py`. Current allowlist (per `_OUTPUT_DIR_ALLOWLIST_DESC` source constant): "C:/temp/agent-red-rehearsal* or /tmp/agent-red-rehearsal* (extend _OUTPUT_DIR_ALLOWLIST_PATTERNS for additional sandbox paths)".
 3. The output is regenerable evidence (preview artifacts, classification manifests, dry-run DBs), not canonical project state.
 4. The output is documented in the bridge proposal that authorizes the operation, and the bridge passes Codex review with the path explicit.
 
 Authority: `DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001`.
 
-Provenance: `DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` and the manifest §3.3 owner decision recorded at S311 (commit `12538b97` context). Rationale: rehearsal output must avoid cloud-sync corruption (Google Drive currently syncs `E:`); the in-root `.driveignore` mechanism per commit `12538b97` adds a per-path enumeration burden that does not scale with rehearsal cardinality.
+Provenance: `DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` and the manifest §3.3 owner decision recorded at S311 (commit `12538b97` context). The manifest surface named there is retired; a new owner-approved in-root manifest is required before this exception can be used for new operations. Rationale: rehearsal output must avoid cloud-sync corruption (Google Drive currently syncs `E:`); the in-root `.driveignore` mechanism per commit `12538b97` adds a per-path enumeration burden that does not scale with rehearsal cardinality.
 
 Outputs covered by this exception remain outside the scope of GT-KB canonical state, audit history, release evidence, regression tests (except as preview-evidence inputs), and dependency closure.
 

@@ -1,6 +1,6 @@
 ---
 name: loyal-opposition-report
-description: "Generate a Loyal Opposition report with required evidence structure. Writes timestamped INSIGHTS file to CODEX-INSIGHT-DROPBOX."
+description: "Generate a Loyal Opposition report with required evidence structure. Files as an Advisory Proposal bridge entry or Deliberation Archive record."
 argument-hint: "<report-slug>"
 allowed-tools: Bash, Read, Write
 license: "Proprietary - Remaker Digital"
@@ -57,12 +57,14 @@ the durable artifact outcome expected from the decision.
 
 ## Output
 
-Generate timestamped file:
-```
-independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-{YYYY}-{MM}-{DD}-{HH}-{mm}-{SLUG}.md
-```
+`independent-progress-assessments/` is retired (contents deleted by owner
+directive); do not write there. File the report as one of:
 
-Update `independent-progress-assessments/loyal-opposition-log.md` if any Open items are affected.
+- An **Advisory Proposal** bridge entry (ADVISORY status; see
+  `gtkb-bridge-advisory-status-001`, VERIFIED) when the report may create
+  future Prime Builder work.
+- A **Deliberation Archive** record (`gt deliberations record`) for
+  process/review findings with no derived-work implication.
 
 ## Severity Levels
 

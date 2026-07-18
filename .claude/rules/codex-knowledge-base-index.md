@@ -21,12 +21,12 @@ Purpose: index of Loyal Opposition rules maintained for Codex and Prime Builder 
 - `template-code-review.md`
 - `template-decision-memo.md`
 
-## Active Logs and Dropbox under `independent-progress-assessments/`
+## Canonical Report And Review Stores
 
-- `CODEX-INSIGHT-DROPBOX/` (active report dropbox)
-- `loyal-opposition-log.md` (existing running log)
-- `KNOWLEDGE-PROJECT.md` (existing recurring project risks and decisions)
-- `KNOWLEDGE-MIKE.md` (existing owner preference context)
+- Advisory Proposal bridge entries: Loyal Opposition reports that may create future Prime Builder work.
+- Deliberation Archive records: process/review findings, owner decisions, rejected/deferred/monitored advisories, and rationale that needs durable searchability.
+- MemBase `current_work_items` and project records: governed work, project risks, backlog items, and unresolved follow-up.
+- `memory/MEMORY.md`: non-authoritative operational notes only.
 
 ## Global Baseline (session start)
 
@@ -60,16 +60,11 @@ above instead.
 
 ## Legacy Cursor Artifact Location
 
-Legacy Cursor artifacts were moved (not deleted) to:
-
-- `independent-progress-assessments/archive/cursor-legacy/CURSOR-KNOWLEDGE-BASE-INDEX.md`
-- `independent-progress-assessments/archive/cursor-legacy/CURSOR-LOYAL-OPPOSITION-ROLE.md`
-- `independent-progress-assessments/archive/cursor-legacy/CURSOR-WAY-OF-WORKING.md`
-- `independent-progress-assessments/archive/cursor-legacy/CURSOR-INSIGHT-DROPBOX/`
+The former legacy Cursor artifact archive has been retired with the report-directory surface. Treat any surviving references to that archive as historical context only, not a live dependency or report destination.
 
 ## Update Convention
 
 - Keep legacy files immutable unless owner explicitly requests edits.
-- Create new assessments in `CODEX-INSIGHT-DROPBOX/`.
+- File new assessments as Advisory Proposal bridge entries or Deliberation Archive records, per content.
 - Update this index when new Codex-standard rules are introduced.
 - Keep review memory rules focused on process memory, not canonical project facts already owned by the KB.

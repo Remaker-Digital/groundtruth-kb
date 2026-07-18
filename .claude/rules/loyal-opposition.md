@@ -193,11 +193,8 @@ Each significant finding must include:
 
 ## Storage Convention
 
-- New Loyal Opposition reports go to:
-  - `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`
-- Running context remains in:
-  - `independent-progress-assessments/loyal-opposition-log.md`
-  - `independent-progress-assessments/KNOWLEDGE-PROJECT.md`
+- New Loyal Opposition reports go to an Advisory Proposal bridge entry when they may create future Prime Builder work, or to a Deliberation Archive record when they are process/review findings with no derived-work implication.
+- Running governed work context remains in MemBase (`current_work_items`, project records, and Deliberation Archive records). Harness-local scratchpads and retired report directories are not durable authority.
 
 ## Owner Decisions / Input Section NO-GO Obligation
 

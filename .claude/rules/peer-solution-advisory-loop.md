@@ -8,7 +8,7 @@ This rule is auto-loaded via `.claude/rules/` convention.
 
 The Peer Solution Advisory Loop is a durable input pattern that converts LO investigations of external peer systems (e.g., Archon, BMAD, Symphony, GSD, Google Opal) into governed, owner-visible decision artifacts rather than chat-only context that fades between sessions.
 
-Without this loop, LO peer-system findings live in `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md` reports that may or may not be revisited. With this loop, every peer-solution advisory either lands as a concrete bridge proposal (adoption / adaptation), is documented as rejected with rationale, is explicitly deferred with a trigger condition, or is recorded as a monitored peer whose evolution is watched. The loop is bidirectional: LO surfaces a peer solution; Prime responds with one of the classification states below; the owner approves or modifies Prime's response when material; the decision is preserved in the Deliberation Archive and (when applicable) in MemBase.
+Without this loop, LO peer-system findings can remain scattered in non-authoritative session context and may not be revisited. With this loop, every peer-solution advisory either lands as a concrete bridge proposal (adoption / adaptation), is documented as rejected with rationale, is explicitly deferred with a trigger condition, or is recorded as a monitored peer whose evolution is watched. The loop is bidirectional: LO surfaces a peer solution; Prime responds with one of the classification states below; the owner approves or modifies Prime's response when material; the decision is preserved in the Deliberation Archive and (when applicable) in MemBase.
 
 The procedure is required when an LO advisory's `Recommended action` cites a specific external system or framework as a candidate solution to a GT-KB problem.
 
@@ -50,7 +50,7 @@ Required follow-on: a Deliberation Archive record citing the peer-system URL or 
 
 The loop runs as follows:
 
-1. **LO files peer-solution advisory.** LO investigates a peer system on owner request (or proactively when LO encounters one in the course of normal review work). LO files the advisory either as a Deliberation Archive entry plus an `INSIGHTS-*.md` report under `independent-progress-assessments/CODEX-INSIGHT-DROPBOX/`, OR as an LO advisory bridge entry (the latter once `gtkb-bridge-advisory-status-001` reaches VERIFIED; until then the `NO-GO@001` transport convention applies per the parent Slice-0 thread).
+1. **LO files peer-solution advisory.** LO investigates a peer system on owner request (or proactively when LO encounters one in the course of normal review work). LO files the advisory as an LO Advisory Proposal bridge entry when it may create future Prime Builder work, or as a Deliberation Archive record when it is a process/review finding with no derived-work implication.
 2. **Prime reads the advisory** as part of the standard Loyal-Opposition-insight review path defined in `.claude/rules/codex-way-of-working.md`.
 3. **Prime classifies the advisory** using the five-state vocabulary above. The classification IS a Prime decision recorded in the response.
 4. **Prime drafts the response artifact** appropriate to the classification:

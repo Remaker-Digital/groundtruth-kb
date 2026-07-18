@@ -1166,10 +1166,9 @@ DCL).
 ### advisory-router
 
 **Definition:** A source-read-only, MemBase-mutating Python service that scans
-`independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md` and bridge
-`ADVISORY` entries, and creates one `work_items` row per unhandled advisory under
+bridge `ADVISORY` entries and creates one `work_items` row per unhandled advisory under
 `GOV-STANDING-BACKLOG-001` authority. Service contract: idempotent on rerun, never
-modifies source advisory files, uses `origin='hygiene'` and
+modifies source advisory entries, uses `origin='hygiene'` and
 `source_spec_id='GOV-STANDING-BACKLOG-001'`.
 
 **Canonical alias:** advisory backlog router.
@@ -1194,7 +1193,7 @@ modifies source advisory files, uses `origin='hygiene'` and
 
 ### advisory latency
 
-**Definition:** A benchmark output that measures the elapsed time between Loyal Opposition advisory creation (INSIGHTS-*.md file ctime in `CODEX-INSIGHT-DROPBOX/` or bridge `ADVISORY` entry filing) and Prime Builder action on the advisory (conversion proposal filing, rejection deliberation, or owner-decision capture). Expressed as a per-advisory duration plus aggregate dimensions (median, p90, count by classification state). Used to detect advisory backlog accumulation and slow-path advisory handling.
+**Definition:** A benchmark output that measures the elapsed time between Loyal Opposition advisory creation (bridge `ADVISORY` entry filing) and Prime Builder action on the advisory (conversion proposal filing, rejection deliberation, or owner-decision capture). Expressed as a per-advisory duration plus aggregate dimensions (median, p90, count by classification state). Used to detect advisory backlog accumulation and slow-path advisory handling.
 
 **Canonical alias:** advisory-to-action latency; advisory turnaround time.
 
