@@ -14,6 +14,13 @@ if TYPE_CHECKING:
 
 CheckFunc = Callable[[Path], "ToolCheck"]
 
+__gtkb_dynamic_import_contract__ = {
+    "get_registered_checks": (
+        "Doctor modules are discovered from the package path and imported dynamically "
+        "so decorator registration remains extensible."
+    ),
+}
+
 _REGISTRY: dict[str, CheckFunc] = {}
 
 
