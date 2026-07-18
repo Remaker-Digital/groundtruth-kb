@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import importlib
 import json
 import os
 import re
@@ -17,14 +18,12 @@ import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-
-from scripts.dispatcher_runtime import DispatchTarget, _harness_command  # noqa: E402
-from scripts.harness_projection_reader import load_harness_projection  # noqa: E402
 
 DEFAULT_EVIDENCE_ROOT = PROJECT_ROOT / ".gtkb-state" / "antigravity-onboarding" / "dispatch-verification"
 DEFAULT_LIVE_PROMPT = "Reply READY only."
@@ -49,6 +48,79 @@ VERDICT_ANCHOR_GUARD_TOKENS = ("validate_verdict_evidence_anchors", "_assert_ver
 
 class VerificationError(RuntimeError):
     """Raised when the dispatch substrate cannot be verified."""
+
+
+def _module_source_path(module: ModuleType) -> Path | None:
+    raw_path = getattr(module, "__file__", None)
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+    try:
+        return Path(raw_path).resolve()
+    except OSError:
+        return None
+
+
+def resolve_loaded_project_module(
+    *,
+    project_root: Path,
+    expected_source_path: Path,
+    import_name: str,
+    required_attributes: tuple[str, ...],
+) -> ModuleType:
+    """Reuse one exact loaded project module or import its canonical package name."""
+
+    try:
+        canonical_root = project_root.resolve(strict=True)
+        expected_source = expected_source_path.resolve(strict=True)
+        expected_source.relative_to(canonical_root)
+    except (OSError, ValueError) as exc:
+        raise VerificationError(
+            f"expected project module source is missing or outside the project root: {expected_source_path}"
+        ) from exc
+
+    matches: dict[int, tuple[ModuleType, list[str]]] = {}
+    for module_name, candidate in tuple(sys.modules.items()):
+        if not isinstance(candidate, ModuleType) or _module_source_path(candidate) != expected_source:
+            continue
+        entry = matches.setdefault(id(candidate), (candidate, []))
+        entry[1].append(module_name)
+
+    if len(matches) > 1:
+        names = sorted(name for _, module_names in matches.values() for name in module_names)
+        raise VerificationError(f"multiple loaded module objects resolve to {expected_source}: {', '.join(names)}")
+
+    if matches:
+        module = next(iter(matches.values()))[0]
+    else:
+        module = importlib.import_module(import_name)
+        resolved_source = _module_source_path(module)
+        if resolved_source != expected_source:
+            raise VerificationError(f"import {import_name!r} resolved to {resolved_source}, expected {expected_source}")
+
+    missing = [name for name in required_attributes if not hasattr(module, name)]
+    if missing:
+        raise VerificationError(
+            f"project module {expected_source} is missing required attributes: {', '.join(missing)}"
+        )
+    return module
+
+
+_dispatcher_runtime = resolve_loaded_project_module(
+    project_root=PROJECT_ROOT,
+    expected_source_path=PROJECT_ROOT / "scripts" / "dispatcher_runtime.py",
+    import_name="scripts.dispatcher_runtime",
+    required_attributes=("DispatchTarget", "_harness_command"),
+)
+DispatchTarget = _dispatcher_runtime.DispatchTarget
+_harness_command = _dispatcher_runtime._harness_command
+
+_harness_projection_reader = resolve_loaded_project_module(
+    project_root=PROJECT_ROOT,
+    expected_source_path=PROJECT_ROOT / "scripts" / "harness_projection_reader.py",
+    import_name="scripts.harness_projection_reader",
+    required_attributes=("load_harness_projection",),
+)
+load_harness_projection = _harness_projection_reader.load_harness_projection
 
 
 def sanitize_capture(text: str) -> str:

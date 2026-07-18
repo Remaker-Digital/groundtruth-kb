@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import sqlite3
 import subprocess
+import sys
+import textwrap
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -14,6 +18,7 @@ from scripts.verify_antigravity_dispatch import (
     build_dispatch_command,
     evaluate_readiness,
     inspect_verdict_anchor_guard,
+    resolve_loaded_project_module,
     run_verification,
     sanitize_capture,
 )
@@ -91,6 +96,187 @@ def _write_conversation_db(conversations_dir: Path, *, step_type: int, payload: 
             """,
             (step_type, payload),
         )
+
+
+def _fake_module(name: str, source_path: Path, **attributes: object) -> ModuleType:
+    module = ModuleType(name)
+    module.__file__ = str(source_path)
+    for key, value in attributes.items():
+        setattr(module, key, value)
+    return module
+
+
+def test_project_module_resolver_reuses_exact_loaded_object(tmp_path, monkeypatch):
+    source_path = tmp_path / "runtime.py"
+    source_path.write_text("# fixture\n", encoding="utf-8")
+    sentinel = object()
+    module = _fake_module("_private_runtime", source_path, sentinel=sentinel)
+    monkeypatch.setitem(sys.modules, "_private_runtime", module)
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda _name: pytest.fail("package import must not run for an exact loaded module"),
+    )
+
+    resolved = resolve_loaded_project_module(
+        project_root=tmp_path,
+        expected_source_path=source_path,
+        import_name="scripts.runtime",
+        required_attributes=("sentinel",),
+    )
+
+    assert resolved is module
+    assert resolved.sentinel is sentinel
+
+
+def test_project_module_resolver_validates_package_fallback_source(tmp_path, monkeypatch):
+    source_path = tmp_path / "runtime.py"
+    source_path.write_text("# fixture\n", encoding="utf-8")
+    module = _fake_module("scripts.runtime", source_path, sentinel=object())
+    monkeypatch.setattr(importlib, "import_module", lambda name: module if name == "scripts.runtime" else None)
+
+    resolved = resolve_loaded_project_module(
+        project_root=tmp_path,
+        expected_source_path=source_path,
+        import_name="scripts.runtime",
+        required_attributes=("sentinel",),
+    )
+
+    assert resolved is module
+
+
+def test_project_module_resolver_rejects_duplicate_exact_source_objects(tmp_path, monkeypatch):
+    source_path = tmp_path / "runtime.py"
+    source_path.write_text("# fixture\n", encoding="utf-8")
+    monkeypatch.setitem(sys.modules, "_runtime_one", _fake_module("_runtime_one", source_path, sentinel=1))
+    monkeypatch.setitem(sys.modules, "_runtime_two", _fake_module("_runtime_two", source_path, sentinel=2))
+
+    with pytest.raises(VerificationError, match="multiple loaded module objects"):
+        resolve_loaded_project_module(
+            project_root=tmp_path,
+            expected_source_path=source_path,
+            import_name="scripts.runtime",
+            required_attributes=("sentinel",),
+        )
+
+
+def test_project_module_resolver_rejects_wrong_source_fallback(tmp_path, monkeypatch):
+    source_path = tmp_path / "runtime.py"
+    wrong_source = tmp_path / "shadow" / "runtime.py"
+    source_path.write_text("# canonical\n", encoding="utf-8")
+    wrong_source.parent.mkdir()
+    wrong_source.write_text("# shadow\n", encoding="utf-8")
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda _name: _fake_module("scripts.runtime", wrong_source, sentinel=object()),
+    )
+
+    with pytest.raises(VerificationError, match="resolved to .* expected"):
+        resolve_loaded_project_module(
+            project_root=tmp_path,
+            expected_source_path=source_path,
+            import_name="scripts.runtime",
+            required_attributes=("sentinel",),
+        )
+
+
+def test_project_module_resolver_rejects_missing_required_attributes(tmp_path, monkeypatch):
+    source_path = tmp_path / "runtime.py"
+    source_path.write_text("# fixture\n", encoding="utf-8")
+    monkeypatch.setitem(
+        sys.modules, "_runtime_without_contract", _fake_module("_runtime_without_contract", source_path)
+    )
+
+    with pytest.raises(VerificationError, match="missing required attributes: sentinel"):
+        resolve_loaded_project_module(
+            project_root=tmp_path,
+            expected_source_path=source_path,
+            import_name="scripts.runtime",
+            required_attributes=("sentinel",),
+        )
+
+
+def test_project_module_resolver_rejects_source_outside_project_root(tmp_path):
+    project_root = tmp_path / "project"
+    source_path = tmp_path / "outside.py"
+    project_root.mkdir()
+    source_path.write_text("# outside\n", encoding="utf-8")
+
+    with pytest.raises(VerificationError, match="outside the project root"):
+        resolve_loaded_project_module(
+            project_root=project_root,
+            expected_source_path=source_path,
+            import_name="scripts.runtime",
+            required_attributes=(),
+        )
+
+
+def test_daemon_style_top_level_import_reuses_private_runtime_with_foreign_namespace(tmp_path):
+    project_root = Path(__file__).resolve().parents[2]
+    script = textwrap.dedent(
+        """
+        import importlib.util
+        import json
+        import sys
+        import types
+        from pathlib import Path
+
+        project_root = Path(sys.argv[1]).resolve()
+        scripts_dir = project_root / "scripts"
+        source_dir = project_root / "groundtruth-kb" / "src"
+        sys.path[:0] = [str(scripts_dir), str(source_dir)]
+
+        runtime_spec = importlib.util.spec_from_file_location(
+            "_dispatcher_runtime_for_daemon",
+            scripts_dir / "dispatcher_runtime.py",
+        )
+        runtime = importlib.util.module_from_spec(runtime_spec)
+        sys.modules[runtime_spec.name] = runtime
+        runtime_spec.loader.exec_module(runtime)
+
+        projection = sys.modules["harness_projection_reader"]
+
+        foreign_scripts = types.ModuleType("scripts")
+        foreign_scripts.__path__ = [str(project_root / "foreign-scripts")]
+        sys.modules["scripts"] = foreign_scripts
+
+        verifier_spec = importlib.util.spec_from_file_location(
+            "verify_antigravity_dispatch",
+            scripts_dir / "verify_antigravity_dispatch.py",
+        )
+        verifier = importlib.util.module_from_spec(verifier_spec)
+        sys.modules[verifier_spec.name] = verifier
+        verifier_spec.loader.exec_module(verifier)
+
+        payload = {
+            "dispatch_target_reused": verifier.DispatchTarget is runtime.DispatchTarget,
+            "harness_command_reused": verifier._harness_command is runtime._harness_command,
+            "projection_reader_reused": (
+                verifier.load_harness_projection is projection.load_harness_projection
+            ),
+            "package_runtime_loaded": "scripts.dispatcher_runtime" in sys.modules,
+        }
+        print(json.dumps(payload, sort_keys=True))
+        """
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-I", "-c", script, str(project_root)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "dispatch_target_reused": True,
+        "harness_command_reused": True,
+        "package_runtime_loaded": False,
+        "projection_reader_reused": True,
+    }
 
 
 def test_build_dispatch_command_uses_registry_template(tmp_path, monkeypatch):
