@@ -82,14 +82,14 @@
       "canonical_name": "lo-opportunity-radar",
       "capability_id": "skill.lo-opportunity-radar",
       "source_relative_path": ".claude/skills/lo-opportunity-radar/SKILL.md",
-      "source_sha256": "f6541de2552662da17e914786ac9fbd24a2de3e4b0be2ea801e2bb50f7a95429"
+      "source_sha256": "d5f68022ad36dae91f5d27d42c4c0da149b0dda29d01ea30a1838fe3e8f4b829"
     },
     {
       "adapter_relative_path": ".agent/skills/codex-report/SKILL.md",
       "canonical_name": "loyal-opposition-report",
       "capability_id": "skill.codex-report",
       "source_relative_path": ".claude/skills/codex-report/SKILL.md",
-      "source_sha256": "3c46cefd9bb72f6e25c5285db6e5de06d19a1e0f6869b5c281ad758dbbae4502"
+      "source_sha256": "527ddc8472ca4089eebffaa040cf2e897d946faf011dd9ab43375c8621ad3a5b"
     },
     {
       "adapter_relative_path": ".agent/skills/decision-capture/SKILL.md",
@@ -173,7 +173,7 @@
       "canonical_name": "kb-session-wrap",
       "capability_id": "skill.kb-session-wrap",
       "source_relative_path": ".claude/skills/kb-session-wrap/SKILL.md",
-      "source_sha256": "eb2b6752e238357a449081afe47f77a486d92126dde72f7bc64377784a803c63"
+      "source_sha256": "78880c713c3e945c1b093f9d82583ef2aa18d791997626f35a556c7404d0d662"
     },
     {
       "adapter_relative_path": ".agent/skills/kb-session-wrap-scan/SKILL.md",
@@ -278,7 +278,7 @@
       "canonical_name": "loyal-opposition-hygiene-assessment",
       "capability_id": "skill.loyal-opposition-hygiene-assessment",
       "source_relative_path": ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md",
-      "source_sha256": "a77cd8c11da39a0f6f0287883600cd5602a3dc66cd264844d756d254d8a6cb98"
+      "source_sha256": "a8386eb662fb26c21ca7f7dd917e40188ca72113f059b5122ba85fb1f7a5d0c9"
     },
     {
       "adapter_relative_path": ".agent/skills/verify/SKILL.md",
