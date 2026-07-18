@@ -1705,14 +1705,14 @@ def test_detect_counterpart_state_uses_project_root_paths_when_provided(tmp_path
     module.detect_counterpart_state(sandbox)
 
     assert recorded_paths, "expected detect_counterpart_state to load role assignments"
-    canonical_root = module.PROJECT_ROOT
+    expected_role_assignment_path = sandbox / "harness-state" / "harness-registry.json"
     for path in recorded_paths:
         assert sandbox in path.parents, (
             f"role assignment path {path!r} should be under sandbox {sandbox!r} but is not — class-level fix regressed"
         )
-        assert canonical_root not in path.parents, (
-            f"role assignment path {path!r} should NOT be under canonical "
-            f"PROJECT_ROOT {canonical_root!r} — class-level fix regressed"
+        assert path == expected_role_assignment_path, (
+            f"role assignment path {path!r} should equal sandbox registry "
+            f"{expected_role_assignment_path!r} — class-level fix regressed"
         )
 
 
