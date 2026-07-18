@@ -44,6 +44,7 @@ class FilingRequest:
     scope_lines: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     verification: tuple[str, ...] = ()
+    cross_harness_dispositions: tuple[str, ...] = ()
     summary: str | None = None
     create_missing_state: bool = False
     dry_run: bool = False
@@ -222,6 +223,27 @@ def _validate_target_paths(project_root: Path, target_paths: tuple[str, ...]) ->
     return tuple(_dedupe(tuple(normalized)))
 
 
+def _validate_cross_harness_dispositions(entries: tuple[str, ...]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen_keys: set[str] = set()
+    for entry in entries:
+        if "=" not in entry:
+            raise ProposalFilingError("--cross-harness-disposition entries must use HARNESS_OR_SURFACE=DISPOSITION")
+        key, disposition = (part.strip() for part in entry.split("=", 1))
+        if not key or not disposition:
+            raise ProposalFilingError(
+                "--cross-harness-disposition requires a non-empty harness/surface and disposition"
+            )
+        if any(character in key or character in disposition for character in "\r\n"):
+            raise ProposalFilingError("--cross-harness-disposition entries must be single-line values")
+        normalized_key = key.casefold()
+        if normalized_key in seen_keys:
+            raise ProposalFilingError(f"Duplicate --cross-harness-disposition key: {key}")
+        seen_keys.add(normalized_key)
+        normalized.append(f"{key}={disposition}")
+    return tuple(normalized)
+
+
 def _format_bullets(values: list[str] | tuple[str, ...], *, empty: str) -> str:
     if not values:
         return f"- {empty}"
@@ -262,6 +284,10 @@ def _format_verification_plan(spec_ids: list[str], explicit: tuple[str, ...]) ->
     return "\n".join(rows)
 
 
+def _format_cross_harness_dispositions(entries: tuple[str, ...]) -> str:
+    return "\n".join(f"- **{key}**: {disposition}" for key, disposition in (entry.split("=", 1) for entry in entries))
+
+
 def _build_content(
     db: KnowledgeDB,
     project_root: Path,
@@ -294,6 +320,11 @@ def _build_content(
     summary = request.summary or (
         f"File a governed implementation proposal for `{request.wi_id}` using deterministic project, "
         "authorization, target-path, and preflight wiring."
+    )
+    cross_harness_section = (
+        f"## Cross-Harness Disposition\n\n{_format_cross_harness_dispositions(request.cross_harness_dispositions)}\n\n"
+        if request.cross_harness_dispositions
+        else ""
     )
     date = f"{datetime.now(UTC).date().isoformat()} UTC"
     return f"""NEW
@@ -350,7 +381,7 @@ Existing requirements are sufficient for filing this proposal. The work item and
 
 {_format_bullets(scope_lines, empty="_No proposed scope supplied._")}
 
-## Specification-Derived Verification Plan
+{cross_harness_section}## Specification-Derived Verification Plan
 
 {_format_verification_plan(spec_links, request.verification)}
 
@@ -450,12 +481,14 @@ def file_implementation_proposal(
 ) -> FilingResult:
     """File a dispatchable ``NEW`` implementation proposal through the bridge writer."""
     normalized_targets = _validate_target_paths(project_root, request.target_paths)
+    normalized_dispositions = _validate_cross_harness_dispositions(request.cross_harness_dispositions)
     request = FilingRequest(
         **{
             **request.__dict__,
             "wi_id": _require(request.wi_id, "wi"),
             "slug": _require(request.slug, "slug"),
             "target_paths": normalized_targets,
+            "cross_harness_dispositions": normalized_dispositions,
         }
     )
     spec_links = auto_spec_links(

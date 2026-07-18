@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from click.testing import CliRunner
 import groundtruth_kb.db
+import pytest
+from click.testing import CliRunner
 from groundtruth_kb.bridge import proposal_filing
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
@@ -125,6 +126,18 @@ def _invoke(root: Path, *args: str):
     return CliRunner().invoke(main, ["--config", str(_config_path(root)), *args])
 
 
+def _with_test_author_metadata(content: str) -> str:
+    metadata = (
+        "author_identity: prime-builder/codex/A\n"
+        "author_harness_id: A\n"
+        "author_session_context_id: wi5420-test-session\n"
+        "author_model: OpenAI Codex\n"
+        "author_model_version: test\n"
+        "author_model_configuration: platform test\n\n"
+    )
+    return content.replace("NEW\n\n", f"NEW\n\n{metadata}", 1)
+
+
 def test_file_implementation_proposal_reuses_active_state_and_writes_new(tmp_path: Path, monkeypatch) -> None:
     _write_config(tmp_path)
     _seed_db(tmp_path)
@@ -155,6 +168,7 @@ def test_file_implementation_proposal_reuses_active_state_and_writes_new(tmp_pat
     assert f"Work Item: {WI_ID}" in content
     assert 'target_paths: ["groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py"]' in content
     assert "## Specification-Derived Verification Plan" in content
+    assert "## Cross-Harness Disposition" not in content
     assert writer.calls[0]["topic_slug"] == "gtkb-wi4567-test"
     assert [item["name"] for item in preflights] == ["applicability", "adr_dcl", "applicability", "adr_dcl"]
     assert preflights[0]["content_file"] is not None
@@ -251,7 +265,150 @@ def test_file_implementation_proposal_rejects_agent_red_target(tmp_path: Path, m
     assert "Agent Red targets are out of scope" in result.output
 
 
+def test_file_implementation_proposal_renders_parity_dispositions_and_passes_real_audit(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    try:
+        result = proposal_filing.file_implementation_proposal(
+            db,
+            tmp_path,
+            proposal_filing.FilingRequest(
+                wi_id=WI_ID,
+                slug="gtkb-wi4567-parity-test",
+                target_paths=(".claude/skills/example/SKILL.md",),
+                add_specs=(SPEC_ID,),
+                cross_harness_dispositions=(
+                    "Claude=Canonical managed-skill source.",
+                    "Codex=Generated adapter with equivalent behavior.",
+                ),
+                dry_run=True,
+            ),
+            run_candidate_preflights=False,
+            run_live_preflights=False,
+        )
+    finally:
+        db.close()
+
+    assert (
+        "## Cross-Harness Disposition\n\n"
+        "- **Claude**: Canonical managed-skill source.\n"
+        "- **Codex**: Generated adapter with equivalent behavior.\n"
+    ) in result.content
+
+    writer = proposal_filing._load_bridge_writer(tmp_path)
+    content = writer.normalize_bridge_envelope_head(_with_test_author_metadata(result.content))
+    audit = writer._run_bridge_compliance_audit(
+        file_path=tmp_path / "bridge" / "gtkb-wi4567-parity-test-001.md",
+        content=content,
+        project_root=tmp_path,
+    )
+    assert audit["decision"] == "pass"
+
+
+def test_file_implementation_proposal_without_parity_disposition_remains_denied(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    db = KnowledgeDB(db_path=tmp_path / "groundtruth.db")
+    try:
+        result = proposal_filing.file_implementation_proposal(
+            db,
+            tmp_path,
+            proposal_filing.FilingRequest(
+                wi_id=WI_ID,
+                slug="gtkb-wi4567-parity-test",
+                target_paths=(".claude/skills/example/SKILL.md",),
+                add_specs=(SPEC_ID,),
+                dry_run=True,
+            ),
+            run_candidate_preflights=False,
+            run_live_preflights=False,
+        )
+    finally:
+        db.close()
+
+    writer = proposal_filing._load_bridge_writer(tmp_path)
+    content = writer.normalize_bridge_envelope_head(_with_test_author_metadata(result.content))
+    with pytest.raises(writer.BridgeComplianceError, match="Cross-Harness Disposition"):
+        writer._run_bridge_compliance_audit(
+            file_path=tmp_path / "bridge" / "gtkb-wi4567-parity-test-001.md",
+            content=content,
+            project_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "missing-equals",
+        "=disposition",
+        "Claude=",
+        "Claude=first\nCodex=second",
+    ],
+)
+def test_file_implementation_proposal_rejects_malformed_parity_disposition(
+    tmp_path: Path,
+    monkeypatch,
+    entry: str,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--target-path",
+        ".claude/skills/example/SKILL.md",
+        "--add-spec",
+        SPEC_ID,
+        "--cross-harness-disposition",
+        entry,
+    )
+
+    assert result.exit_code == 1
+    assert "--cross-harness-disposition" in result.output
+    assert not (tmp_path / "bridge").exists()
+
+
+def test_file_implementation_proposal_rejects_duplicate_parity_disposition_key(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--target-path",
+        ".claude/skills/example/SKILL.md",
+        "--add-spec",
+        SPEC_ID,
+        "--cross-harness-disposition",
+        "Claude=first",
+        "--cross-harness-disposition",
+        "claude=second",
+    )
+
+    assert result.exit_code == 1
+    assert "Duplicate --cross-harness-disposition key: claude" in result.output
+    assert not (tmp_path / "bridge").exists()
+
+
 def test_file_implementation_proposal_help_resolves() -> None:
     result = CliRunner().invoke(main, ["bridge", "file-implementation-proposal", "--help"])
     assert result.exit_code == 0, result.output
     assert "File a dispatchable NEW implementation proposal" in result.output
+    assert "--cross-harness-disposition" in result.output

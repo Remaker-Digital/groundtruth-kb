@@ -347,6 +347,13 @@ def bridge_propose(
 @click.option("--scope", "scope_lines", multiple=True, help="Repeatable proposed-scope bullet.")
 @click.option("--acceptance", "acceptance_criteria", multiple=True, help="Repeatable acceptance-criteria bullet.")
 @click.option("--verification", multiple=True, help="Repeatable SPEC_ID=verification text row.")
+@click.option(
+    "--cross-harness-disposition",
+    "cross_harness_dispositions",
+    multiple=True,
+    metavar="HARNESS_OR_SURFACE=DISPOSITION",
+    help="Repeatable explicit parity disposition for a harness or managed surface.",
+)
 @click.option("--summary", help="Override generated proposal summary.")
 @click.option(
     "--create-missing-state",
@@ -367,6 +374,7 @@ def bridge_file_implementation_proposal(
     scope_lines: tuple[str, ...],
     acceptance_criteria: tuple[str, ...],
     verification: tuple[str, ...],
+    cross_harness_dispositions: tuple[str, ...],
     summary: str | None,
     create_missing_state: bool,
     dry_run: bool,
@@ -385,6 +393,7 @@ def bridge_file_implementation_proposal(
         scope_lines=scope_lines,
         acceptance_criteria=acceptance_criteria,
         verification=verification,
+        cross_harness_dispositions=cross_harness_dispositions,
         summary=summary,
         create_missing_state=create_missing_state,
         dry_run=dry_run,
