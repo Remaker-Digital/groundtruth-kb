@@ -39,7 +39,10 @@ class DeliberationRecordRequest:
     participants: list[str] | None
     outcome: str | None
     session_id: str | None
-    dry_run: bool
+    gap_state_capture: bool = False
+    gap_state_bridge_id: str | None = None
+    gap_state_reason: str | None = None
+    dry_run: bool = False
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:
@@ -95,6 +98,7 @@ def _build_packet(
     artifact_id: str,
     full_content: str,
     changed_by: str,
+    db_operation: dict[str, object],
 ) -> dict[str, object]:
     return construct_approval_packet(
         artifact_type="deliberation",
@@ -109,6 +113,10 @@ def _build_packet(
         approved_by=request.approved_by or "owner",
         changed_by=changed_by,
         change_reason=request.change_reason,
+        capture_context="gap_state" if request.gap_state_capture else None,
+        gap_state_bridge_id=request.gap_state_bridge_id if request.gap_state_capture else None,
+        gap_state_reason=request.gap_state_reason if request.gap_state_capture else None,
+        intended_db_operation=db_operation if request.gap_state_capture else None,
     )
 
 
@@ -121,6 +129,11 @@ def _validate_request_evidence(request: DeliberationRecordRequest) -> None:
         raise DeliberationRecordError("--auq-answer must be non-empty")
     if not request.change_reason.strip():
         raise DeliberationRecordError("--change-reason must be non-empty")
+    if request.gap_state_capture:
+        if not (request.gap_state_bridge_id and request.gap_state_bridge_id.strip()):
+            raise DeliberationRecordError("--gap-state-bridge-id is required with --gap-state-capture")
+        if not (request.gap_state_reason and request.gap_state_reason.strip()):
+            raise DeliberationRecordError("--gap-state-reason is required with --gap-state-capture")
 
 
 def record_deliberation(config: GTConfig, request: DeliberationRecordRequest) -> dict[str, Any]:
@@ -154,11 +167,18 @@ def record_deliberation(config: GTConfig, request: DeliberationRecordRequest) ->
         if db.get_deliberation(planned_id):
             raise DeliberationRecordError(f"could not allocate unused deliberation id after collision: {planned_id}")
 
+    db_operation: dict[str, object] = {
+        "method": "insert_deliberation",
+        "source_type": request.source_type,
+        "source_ref": request.source_ref,
+        "content_hash": digest,
+    }
     packet = _build_packet(
         request=request,
         artifact_id=planned_id,
         full_content=full_content,
         changed_by=changed_by,
+        db_operation=db_operation,
     )
     validation = validate_packet(packet)
     if not validation.is_valid:
@@ -169,16 +189,12 @@ def record_deliberation(config: GTConfig, request: DeliberationRecordRequest) ->
         return {
             "created": False,
             "dry_run": True,
+            "gap_state_capture": request.gap_state_capture,
             "id": planned_id,
             "row": None,
             "approval_packet_path": str(packet_path),
             "approval_packet": packet,
-            "db_operation": {
-                "method": "insert_deliberation",
-                "source_type": request.source_type,
-                "source_ref": request.source_ref,
-                "content_hash": digest,
-            },
+            "db_operation": db_operation,
         }
 
     if db.get_deliberation(planned_id):
@@ -188,6 +204,7 @@ def record_deliberation(config: GTConfig, request: DeliberationRecordRequest) ->
             artifact_id=planned_id,
             full_content=full_content,
             changed_by=changed_by,
+            db_operation=db_operation,
         )
         validation = validate_packet(packet)
         if not validation.is_valid:
@@ -220,6 +237,7 @@ def record_deliberation(config: GTConfig, request: DeliberationRecordRequest) ->
     return {
         "created": True,
         "dry_run": False,
+        "gap_state_capture": request.gap_state_capture,
         "id": row["id"],
         "row": row,
         "approval_packet_path": str(packet_path),
