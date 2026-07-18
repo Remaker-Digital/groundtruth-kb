@@ -1117,3 +1117,132 @@ def test_cli_exits_nonzero_when_capability_floor_missing(monkeypatch, tmp_path: 
         r for r in report.results if r.state == "MISSING" and r.parity_class == "required" and r.harness == "ollama"
     ]
     assert len(missing_required) == 6
+
+
+@pytest.mark.parametrize(
+    ("status", "role", "expected"),
+    [
+        ("active", ["prime-builder"], "active"),
+        ("registered", [], "registered_no_role"),
+        ("suspended", ["loyal-opposition"], "suspended"),
+        ("retired", ["loyal-opposition"], "retired"),
+        ("registered", ["prime-builder"], "other"),
+    ],
+)
+def test_harness_lifecycle_classifies_operative_and_historical_rows(
+    tmp_path: Path,
+    status: str,
+    role: list[str],
+    expected: str,
+) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "X",
+                "harness_name": "fixture",
+                "harness_type": "fixture",
+                "status": status,
+                "role": role,
+                "version": 1,
+            }
+        ],
+    )
+
+    assert module._harness_lifecycle_class("fixture", tmp_path) == expected
+
+
+def test_implicit_all_excludes_suspended_and_retired_but_explicit_retired_remains_queryable(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    _write_projection(
+        tmp_path,
+        [
+            {
+                "id": "A",
+                "harness_name": "codex",
+                "harness_type": "codex",
+                "status": "active",
+                "role": ["prime-builder"],
+                "version": 1,
+            },
+            {
+                "id": "D",
+                "harness_name": "ollama",
+                "harness_type": "ollama",
+                "status": "registered",
+                "role": [],
+                "version": 1,
+            },
+            {
+                "id": "E",
+                "harness_name": "cursor",
+                "harness_type": "cursor",
+                "status": "suspended",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            },
+            {
+                "id": "G",
+                "harness_name": "goose",
+                "harness_type": "goose-desktop",
+                "status": "retired",
+                "role": ["loyal-opposition"],
+                "version": 1,
+            },
+        ],
+    )
+    _write_registry(
+        tmp_path,
+        """
+[harnesses.ollama]
+bridge_compliance_gate_respect = true
+root_boundary_respect = true
+author_metadata_env_var_setting = true
+destructive_gate_delegation = true
+advertised_tool_subset = ["Read"]
+tool_guard_adapter_fail_closed = true
+
+[[capabilities]]
+id = "test.lifecycle"
+kind = "hook"
+canonical_name = "lifecycle"
+canonical_source = ".claude/hooks/lifecycle.py"
+required_for_roles = []
+parity_class = "required"
+
+[capabilities.codex]
+status = "unsupported"
+reason = "fixture"
+
+[capabilities.cursor]
+status = "unsupported"
+reason = "fixture"
+
+[capabilities.goose]
+status = "unsupported"
+reason = "fixture"
+""",
+    )
+    monkeypatch.setattr(module, "KNOWN_HARNESSES", module._load_known_harnesses_from_projection(tmp_path))
+
+    implicit = module.check_harness_parity(tmp_path, harness="all", include_all=True)
+    implicit_harnesses = {result.harness for result in implicit.results}
+
+    assert implicit.selected_harnesses == ["codex", "ollama"]
+    assert "codex" in implicit_harnesses
+    assert "ollama" in implicit_harnesses
+    assert "cursor" not in implicit_harnesses
+    assert "goose" not in implicit_harnesses
+    assert any(
+        result.harness == "ollama" and result.capability_id.startswith("capability_floor.")
+        for result in implicit.results
+    )
+
+    historical = module.check_harness_parity(tmp_path, harness="goose", include_all=True)
+
+    assert historical.selected_harnesses == ["goose"]
+    assert any(result.harness == "goose" and result.capability_id == "test.lifecycle" for result in historical.results)

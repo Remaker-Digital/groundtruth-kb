@@ -435,7 +435,7 @@ def _active_harnesses_from_selection(selected_harnesses: list[str], project_root
     active: list[str] = []
     for selected_harness in selected_harnesses:
         lifecycle = _harness_lifecycle_class(selected_harness, project_root)
-        if lifecycle in {"suspended", "registered_no_role"}:
+        if lifecycle in {"suspended", "registered_no_role", "retired", "other"}:
             continue
         active.append(selected_harness)
     return active
@@ -702,7 +702,7 @@ def _overall_status(results: list[CapabilityResult], extras: list[ExtraResult], 
 
 
 def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROOT) -> str | None:
-    """Return 'active' | 'registered_no_role' | 'suspended' | 'other' | None from the registry projection.
+    """Return the harness lifecycle class from the registry projection.
 
     Used by check_harness_parity() to route registered/no-active-role harnesses (status=registered
     AND role=[]) through the capability-floor evaluation path instead of per-capability checks.
@@ -715,6 +715,8 @@ def _harness_lifecycle_class(harness_name: str, project_root: Path = PROJECT_ROO
         role = record.get("role") or []
         if status == "suspended":
             return "suspended"
+        if status == "retired":
+            return "retired"
         if status == "registered" and role == []:
             return "registered_no_role"
         if status == "active":
@@ -1102,8 +1104,14 @@ def check_harness_parity(
             continue
         if lifecycle == "registered_no_role":
             registered_floor_harnesses.append(selected_harness)
+        elif lifecycle in {"retired", "other"} and not explicit_harness:
+            continue
         else:
             active_harnesses.append(selected_harness)
+    operative_harnesses = set(active_harnesses) | set(registered_floor_harnesses)
+    report_selected_harnesses = [
+        selected_harness for selected_harness in selected_harnesses if selected_harness in operative_harnesses
+    ]
     universal_active_harnesses = _active_harnesses_from_selection(base_selected_harnesses, project_root)
 
     harness_manifest_adapters: dict[str, dict[str, dict[str, Any]]] = {}
@@ -1168,7 +1176,7 @@ def check_harness_parity(
         overall_status=_overall_status(results, extras, errors),
         project_root=str(project_root),
         registry_path=_relative_path(project_root, registry_path),
-        selected_harnesses=selected_harnesses,
+        selected_harnesses=report_selected_harnesses,
         selected_role=selected_role,
         counts=counts,
         results=results,
