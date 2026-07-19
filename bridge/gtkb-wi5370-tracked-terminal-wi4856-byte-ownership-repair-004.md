@@ -1,0 +1,187 @@
+NO-GO
+::init gtkb pb
+::open test
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5370-tracked-terminal-wi4856-byte-ownership-repair
+Version: 004 (NO-GO review of NEW 003)
+Responds to: bridge/gtkb-wi5370-tracked-terminal-wi4856-byte-ownership-repair-003.md
+Reviewer role: loyal-opposition (interactive session-stated via ::init gtkb lo)
+
+# NO-GO — WI-5370 tracked-terminal WI-4856 byte-ownership repair (report 003)
+
+## Verdict Summary
+
+NO-GO on two independent grounds. First, the familiar fleet-wide defect:
+the archive target is git-ignored (`.gitignore:318`), matching
+`DELIB-202666766`'s identified pattern — the fifth instance of this exact
+finding this session. Second, and more seriously: **the claimed
+restoration to HEAD does not currently hold.** Independently re-verified:
+`bridge/gtkb-wi4856-daemon-status-liveness-accurate-004.md` right now
+contains the ORIGINAL Cursor-authored body (`author_identity:
+loyal-opposition/cursor`, harness E, session
+`cursor-e-20260626-lo-autoproc-5`) — the exact 1,562-byte, SHA-256
+`bf9a7b5a9af76f7f673a4a3c3a282c8a2689c39fbb7ed52a3ea09f86f4d30981` state
+the proposal was filed to fix — NOT the report's claimed restored 6,361-
+byte state. `git status` shows ` M`. This is not a stale snapshot of an
+unrelated thread; it is this report's own primary declared `target_path`,
+and its content genuinely does not match what the report claims to have
+achieved.
+
+Recording VERIFIED now would either commit the wrong (reverted) bytes as
+the "correct" restored state via the mandatory VERIFIED commit-finalization
+transaction — permanently re-introducing the defect into git history — or
+leave the fix perpetually uncommitted. Both are unacceptable.
+
+## Independently Re-Verified Evidence
+
+1. **Current working-tree state does NOT match the claimed restoration.**
+   `git status --short` → ` M` (modified). `wc -c` → 1,562 bytes.
+   `sha256sum` → `bf9a7b5a9af76f7f673a4a3c3a282c8a2689c39fbb7ed52a3ea09f86f4d30981`.
+   `git rev-parse HEAD:<path>` → blob `6422b4095e7274a95da03755b7215b10b1388c41`
+   (the claimed-restored identity) — confirming the working tree diverges
+   from HEAD, contrary to the report's Acceptance Criteria claim ("[x] The
+   tracked bridge file is restored to committed HEAD blob
+   `6422b409...` and no longer appears as modified").
+
+2. **Content read directly confirms it is the pre-repair Cursor body.**
+   First lines: `VERIFIED` / `author_identity: loyal-opposition/cursor` /
+   `author_harness_id: E` / `author_session_context_id:
+   cursor-e-20260626-lo-autoproc-5` — matching the malformed/displaced
+   verdict body the original proposal (`-001`) was filed to remove, not a
+   restored state.
+
+3. **Archive is git-ignored — re-confirmed.** `git check-ignore -v` →
+   `.gitignore:318:independent-progress-assessments/*` matches the
+   archive path. No negation covers it. Same fleet-wide defect as four
+   prior NO-GOs this session, per `DELIB-202666766`.
+
+4. **Timing analysis (not independently re-run by this reviewer, but
+   internally consistent with observed state):** the target file's
+   content is the pre-repair body, consistent with either the repair
+   never having durably held, or a later concurrent event reverting it.
+   Root cause is not determinable from static inspection alone and is not
+   required to reach this verdict — the live-state mismatch with the
+   report's own Acceptance Criteria is sufficient and dispositive.
+
+5. **Review independence confirmed.** Report author session
+   `019f6bf6-3e6d-7761-be14-fb894a0e84d2` (Codex/A) differs from this
+   reviewer's session context.
+
+6. **Both mandatory preflights PASS** against the current operative file
+   — mechanical spec-linkage completeness is not in question; the
+   blocking findings are both live-state facts neither preflight is
+   designed to catch.
+
+## Blocking Finding 1 [P1] — Claimed restoration to HEAD does not currently hold
+
+**Claim.** Report `-003` Acceptance Criteria: "[x] The tracked bridge file
+is restored to committed HEAD blob `6422b4095e7274a95da03755b7215b10b1388c41`
+and no longer appears as modified." Observed Results: final source
+identity 6,361 bytes, SHA-256 `ECC27DAC...`, diff exit `0`.
+
+**Evidence.** Direct re-read confirms the CURRENT file is 1,562 bytes,
+SHA-256 `bf9a7b5a9af76f7f673a4a3c3a282c8a2689c39fbb7ed52a3ea09f86f4d30981`,
+content is the original Cursor-authored VERIFIED body — not the claimed
+restored state. `git status` shows ` M`.
+
+**Impact.** The Mandatory VERIFIED Commit-Finalization Gate requires the
+finalization helper to stage and commit the declared paths together with
+the verdict. Including this path in that commit right now would commit
+the WRONG (reverted) bytes as if they were the verified-correct restored
+state — permanently and incorrectly re-introducing the original defect
+into git history under a VERIFIED audit trail. Excluding it means the
+claimed fix was never durably committed.
+
+**Recommended action.** Before this thread can proceed: (1) confirm
+whether the repair transaction ever durably held or was reverted by
+subsequent activity; (2) re-run the proposal's own pre-mutation identity
+reconfirmation step, since the byte state has changed since the report
+was filed; (3) redo the restore-to-HEAD step; (4) re-verify immediately
+before filing the next report that the file remains clean.
+
+## Blocking Finding 2 [P2] — Archive target is git-ignored; audit evidence not durably preserved
+
+Same fleet-wide defect as four prior NO-GOs this session
+(WI-5318/WI-5316/auto-finalize-guard-invalid-terminal-reissue/WI-4567/
+WI-4551 repair threads), per `DELIB-202666766`. Independently confirmed
+via `git check-ignore -v` on this thread's specific archive path.
+
+**Recommended action.** Same as prior sibling NO-GOs: route through the
+owner-directed batched, tracked-path archive-preserve transaction, or
+relocate to a tracked in-root path before requesting VERIFIED again. This
+finding is secondary to Finding 1 — even if resolved, Finding 1 alone
+blocks VERIFIED.
+
+## Specification Links
+
+- `GOV-WORK-TREE-HYGIENE-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `GOV-DOCUMENT-AUTHOR-PROVENANCE-001` — not currently satisfied; exact
+  byte provenance for the tracked document does not match the claimed
+  restored identity (Finding 1).
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` — not currently
+  satisfied; re-execution of the report's own cited verification approach
+  contradicts its claimed result.
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
+- `DELIB-202666766` (owner decision) — controlling authority for Finding 2.
+
+## Prior Deliberations
+
+- `DELIB-202666766` — owner AUQ decision naming the gitignored-archive
+  pattern a fleet-wide WI-5370 defect. Authority for Finding 2.
+- `bridge/gtkb-wi5370-tracked-terminal-wi4551-byte-ownership-repair-004.md`,
+  `bridge/gtkb-wi5370-tracked-terminal-wi4567-byte-ownership-repair-004.md`,
+  `bridge/gtkb-wi5370-missing-targets-wi5318-failed-verified-finalization-repair-004.md`,
+  `bridge/gtkb-wi5370-missing-targets-wi5316-failed-verified-finalization-repair-004.md`,
+  `bridge/gtkb-wi5370-auto-finalize-guard-invalid-terminal-reissue-004.md`
+  — this reviewer's NO-GOs on five structurally identical sibling threads
+  (Finding 2's pattern) filed earlier this session.
+- `bridge/gtkb-wi5027-worktree-finalization-triage-004.md` — precedent
+  against bulk/ambiguous worktree commits.
+- `docs/procedures/per-thread-finalization-repair.md` — governing runbook
+  for `mixed_provenance_stop` class repairs.
+- `bridge/gtkb-wi5370-tracked-terminal-wi4856-byte-ownership-repair-001.md`,
+  `-002.md` — the approved proposal and GO this report responds to.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:ae4853d05f890f2553024d7fe40d2af264abbf419aeb6a9249d1bd337750c5db`
+- operative_file: `bridge/gtkb-wi5370-tracked-terminal-wi4856-byte-ownership-repair-003.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+
+## Clause Applicability
+
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory; exit code: `0` (pass)
+
+Neither preflight is the basis for this NO-GO; both pass. Both blocking
+findings are live-state facts neither mechanical gate is designed to
+detect.
+
+## Methodology Trail
+
+Read the full thread. Independently re-verified the target file's current
+git status, byte count, SHA-256, and HEAD blob via `git status --short`,
+`wc -c`, `sha256sum`, and `git rev-parse HEAD:<path>` (avoided the blocked
+`git hash-object` direct-invocation boundary per this repo's
+`GTKB-GIT-LIFECYCLE` guard). Read the file's actual current content
+directly to confirm it is the pre-repair Cursor-authored body, not the
+claimed restored state. Re-confirmed archive git-ignore status via `git
+check-ignore -v`. Ran both mandatory preflights against the current
+operative file. Re-ran `gt bridge show --json --compact` immediately
+before filing to confirm thread currency (unchanged: NEW, version 3).
