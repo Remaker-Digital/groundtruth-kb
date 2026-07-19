@@ -35,6 +35,47 @@ def helper():
     return _load_helper()
 
 
+def _write_version(
+    bridge_dir: Path,
+    slug: str,
+    version: int,
+    status: str,
+    *,
+    bridge_kind: str | None = None,
+) -> None:
+    kind_line = f"\nbridge_kind: {bridge_kind}" if bridge_kind else ""
+    (bridge_dir / f"{slug}-{version:03d}.md").write_text(
+        f"{status}{kind_line}\nDocument: {slug}\nVersion: {version:03d}\n",
+        encoding="utf-8",
+    )
+
+
+def _normalized_scan_result(result: dict) -> dict:
+    return {
+        "role": result["role"],
+        "summary": result["summary"],
+        "actionable": sorted(
+            (thread["document"], thread["latest_status"], thread["latest_path"]) for thread in result["actionable"]
+        ),
+        "blocked": sorted(
+            (
+                thread["document"],
+                thread["latest_status"],
+                tuple(thread.get("reasons", [])),
+            )
+            for thread in result["blocked_non_activatable"]
+        ),
+        "terminal_verified_count": result.get(
+            "terminal_verified_count",
+            len(result.get("terminal_verified", [])),
+        ),
+        "excluded_archived_count": result.get(
+            "excluded_archived_count",
+            len(result.get("excluded_archived", [])),
+        ),
+    }
+
+
 def test_t1_empty_index_yields_empty_actionable(helper) -> None:
     result = helper.scan(role="prime-builder", index_text="")
     assert result["actionable"] == []
@@ -144,6 +185,113 @@ NEW: bridge/gtkb-verified-001.md
     assert "excluded_archived" not in result
     assert result["actionable"][0]["document"] == "gtkb-go"
     assert "version_chain" not in result["actionable"][0]
+
+
+@pytest.mark.parametrize("role", ["prime-builder", "loyal-opposition"])
+def test_compact_live_scan_bounds_reads_and_matches_full_classification(
+    helper,
+    monkeypatch,
+    tmp_path,
+    role,
+) -> None:
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    config_dir = tmp_path / "config" / "governance"
+    config_dir.mkdir(parents=True)
+    (config_dir / "tafe-acknowledged-archived-bridges.toml").write_text(
+        'schema_version = 1\n\n[[acknowledged]]\nslug = "gtkb-archived"\nreason = "test fixture"\n',
+        encoding="utf-8",
+    )
+
+    _write_version(bridge_dir, "gtkb-go", 1, "NEW", bridge_kind="implementation_proposal")
+    _write_version(bridge_dir, "gtkb-go", 2, "NO-GO")
+    _write_version(bridge_dir, "gtkb-go", 3, "REVISED", bridge_kind="implementation_proposal")
+    _write_version(bridge_dir, "gtkb-go", 4, "GO")
+    _write_version(bridge_dir, "gtkb-new", 1, "NEW", bridge_kind="implementation_proposal")
+    _write_version(bridge_dir, "gtkb-archived", 1, "NEW", bridge_kind="implementation_proposal")
+    for version in range(1, 13):
+        status = "VERIFIED" if version == 12 else ("GO" if version % 2 == 0 else "NEW")
+        _write_version(
+            bridge_dir,
+            "gtkb-terminal-history",
+            version,
+            status,
+            bridge_kind="implementation_proposal" if status == "NEW" else None,
+        )
+
+    status_reads: list[str] = []
+    original_status_reader = helper._status_from_bridge_file
+
+    def counted_status_reader(path):
+        status_reads.append(Path(path).name)
+        return original_status_reader(path)
+
+    monkeypatch.setattr(helper, "_status_from_bridge_file", counted_status_reader)
+    monkeypatch.setattr(helper, "_go_activatable", lambda _root, _bridge_id: (True, []))
+    index_path = bridge_dir / "state.md"
+
+    full = helper.scan(role=role, index_path=index_path)
+    full_read_count = len(status_reads)
+    status_reads.clear()
+    compact = helper.scan(role=role, index_path=index_path, compact=True)
+    compact_read_count = len(status_reads)
+
+    assert _normalized_scan_result(compact) == _normalized_scan_result(full)
+    assert compact_read_count <= 5
+    assert compact_read_count < full_read_count
+    assert compact["excluded_archived_count"] == 1
+    assert compact["terminal_verified_count"] == 1
+    assert "terminal_verified" not in compact
+    assert "excluded_archived" not in compact
+    assert all("version_chain" not in thread for thread in compact["actionable"])
+
+
+@pytest.mark.parametrize("role", ["prime-builder", "loyal-opposition"])
+def test_template_compact_scan_bounds_reads_and_matches_full_classification(
+    monkeypatch,
+    tmp_path,
+    role,
+) -> None:
+    template_helper = _load_module(TEMPLATE_HELPER_PATH, f"scan_bridge_template_compact_{role}")
+    bridge_dir = tmp_path / "bridge"
+    bridge_dir.mkdir()
+    statuses = {
+        "gtkb-template-new": "NEW",
+        "gtkb-template-revised": "REVISED",
+        "gtkb-template-advisory": "ADVISORY",
+        "gtkb-template-verified": "VERIFIED",
+    }
+    for slug, latest_status in statuses.items():
+        for version in range(1, 9):
+            _write_version(
+                bridge_dir,
+                slug,
+                version,
+                latest_status,
+                bridge_kind="implementation_proposal" if latest_status in {"NEW", "REVISED"} else None,
+            )
+
+    status_reads: list[str] = []
+    original_status_reader = template_helper._status_from_bridge_file
+
+    def counted_status_reader(path):
+        status_reads.append(Path(path).name)
+        return original_status_reader(path)
+
+    monkeypatch.setattr(template_helper, "_status_from_bridge_file", counted_status_reader)
+    index_path = bridge_dir / "state.md"
+
+    full = template_helper.scan(role=role, index_path=index_path)
+    full_read_count = len(status_reads)
+    status_reads.clear()
+    compact = template_helper.scan(role=role, index_path=index_path, compact=True)
+
+    assert _normalized_scan_result(compact) == _normalized_scan_result(full)
+    assert len(status_reads) == len(statuses)
+    assert len(status_reads) < full_read_count
+    assert compact["terminal_verified_count"] == 1
+    assert "terminal_verified" not in compact
+    assert all("version_chain" not in thread for thread in compact["actionable"])
 
 
 def test_t7_mixed_index_partitions_correctly(helper) -> None:
@@ -345,6 +493,12 @@ def test_terminal_tokens_parity_with_canonical_notify(helper) -> None:
     from groundtruth_kb.bridge import notify
 
     assert set(helper._KIND_TERMINAL_TOKENS) == set(notify._KIND_TERMINAL_TOKENS)
+
+
+def test_archive_terminal_tokens_parity_with_versioned_file_classifier(helper) -> None:
+    from groundtruth_kb.bridge import versioned_files
+
+    assert helper._ARCHIVE_TERMINAL_STATUSES == versioned_files._TERMINAL_STATUS_TOKENS
 
 
 def test_actionable_status_sets_parity_with_shared_disposition(helper) -> None:

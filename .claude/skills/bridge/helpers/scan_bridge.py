@@ -82,6 +82,8 @@ TERMINAL_STATUSES = MATRIX_VERIFIED_CONTEXT_STATUSES
 # operative Prime proposal (latest NEW/REVISED), NOT on the Codex GO verdict.
 _PRIME_VERSION_STATUSES = frozenset({"NEW", "REVISED"})
 _NONTERMINAL_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "NO-ACTION"})
+_ARCHIVE_TERMINAL_STATUSES = frozenset({"VERIFIED", "WITHDRAWN", "DEFERRED", "ADVISORY", "ACCEPTED"})
+_IMPLEMENTATION_SIBLING_SUFFIX = "-implementation"
 
 # Terminal-kind ``bridge_kind`` substring tokens. MIRROR of
 # ``groundtruth_kb.bridge.notify._KIND_TERMINAL_TOKENS``. A latest-``GO`` whose
@@ -212,15 +214,13 @@ def _thread_from_rows(slug: str, rows: list[tuple[int, str, str]]) -> ThreadEntr
     )
 
 
-def _scan_rows_from_version_files(project_root: Path) -> dict[str, list[tuple[int, str, str]]]:
+def _inventory_version_files(project_root: Path) -> dict[str, list[tuple[int, Path, str]]]:
+    """Group numbered files by slug without reading bridge content."""
     bridge_dir = project_root / "bridge"
-    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    grouped: dict[str, list[tuple[int, Path, str]]] = {}
     for path in bridge_dir.glob("*.md"):
         match = _VERSION_FILE_RE.match(path.name)
         if not match:
-            continue
-        status = _status_from_bridge_file(path)
-        if status is None:
             continue
         slug = match.group(1)
         version = int(match.group(2))
@@ -228,8 +228,97 @@ def _scan_rows_from_version_files(project_root: Path) -> dict[str, list[tuple[in
             rel_path = path.resolve().relative_to(project_root.resolve()).as_posix()
         except ValueError:
             rel_path = path.as_posix()
-        grouped.setdefault(slug, []).append((version, status, rel_path))
+        grouped.setdefault(slug, []).append((version, path, rel_path))
+    for rows in grouped.values():
+        rows.sort(key=lambda row: row[0], reverse=True)
     return grouped
+
+
+def _scan_rows_from_version_files(project_root: Path) -> dict[str, list[tuple[int, str, str]]]:
+    grouped: dict[str, list[tuple[int, str, str]]] = {}
+    for slug, version_files in _inventory_version_files(project_root).items():
+        for version, path, rel_path in version_files:
+            status = _status_from_bridge_file(path)
+            if status is not None:
+                grouped.setdefault(slug, []).append((version, status, rel_path))
+    return grouped
+
+
+def _compact_thread_from_version_files(
+    slug: str,
+    version_files: list[tuple[int, Path, str]],
+    role: Role,
+) -> tuple[ThreadEntry | None, str | None]:
+    """Load current status and only ancestry needed for compact classification."""
+    versions: list[VersionEntry] = []
+    physical_latest_status: str | None = None
+    need_prime_ancestry = False
+
+    for index, (_version, path, rel_path) in enumerate(version_files):
+        status = _status_from_bridge_file(path)
+        if index == 0:
+            physical_latest_status = status
+        if status is None:
+            continue
+        versions.append(VersionEntry(status=status, path=rel_path))
+        if len(versions) == 1:
+            need_prime_ancestry = role == "prime-builder" and status == "GO"
+            if not need_prime_ancestry:
+                break
+        elif status in _PRIME_VERSION_STATUSES:
+            break
+
+    if not versions:
+        return None, physical_latest_status
+    return (
+        ThreadEntry(
+            document=slug,
+            latest_status=versions[0].status,
+            latest_path=versions[0].path,
+            version_chain=tuple(versions),
+        ),
+        physical_latest_status,
+    )
+
+
+def _compact_threads_from_version_files(
+    project_root: Path,
+    role: Role,
+) -> tuple[list[ThreadEntry], list[ThreadEntry]]:
+    """Read one current file per thread plus classification-required ancestry."""
+    inventory = _inventory_version_files(project_root)
+    threads_by_slug: dict[str, ThreadEntry] = {}
+    physical_latest_statuses: dict[str, str | None] = {}
+    for slug, version_files in inventory.items():
+        thread, physical_latest_status = _compact_thread_from_version_files(slug, version_files, role)
+        physical_latest_statuses[slug] = physical_latest_status
+        if thread is not None:
+            threads_by_slug[slug] = thread
+
+    try:
+        from groundtruth_kb.bridge.versioned_files import load_acknowledged_archived_slugs
+
+        acknowledged = load_acknowledged_archived_slugs(project_root)
+    except Exception:
+        acknowledged = frozenset()
+
+    archived_slugs: set[str] = set()
+    for slug, physical_status in physical_latest_statuses.items():
+        if physical_status not in _NONTERMINAL_STATUSES:
+            continue
+        sibling_status = physical_latest_statuses.get(f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}")
+        if slug in acknowledged or sibling_status in _ARCHIVE_TERMINAL_STATUSES:
+            archived_slugs.add(slug)
+
+    threads: list[ThreadEntry] = []
+    excluded_archived: list[ThreadEntry] = []
+    for slug in sorted(threads_by_slug):
+        thread = threads_by_slug[slug]
+        if slug in archived_slugs:
+            excluded_archived.append(thread)
+        else:
+            threads.append(thread)
+    return threads, excluded_archived
 
 
 def _acknowledged_archived_nonterminal_slugs(project_root: Path) -> set[str]:
@@ -429,9 +518,13 @@ def scan(
           - ``summary``: counts by latest-status across all threads.
           - ``generated_at``: ISO-8601 UTC timestamp.
     """
+    threads: list[ThreadEntry] | None = None
     if index_text is None:
         project_root = index_path.resolve().parent.parent if index_path is not None else PROJECT_ROOT
-        index_text, excluded_archived = _render_state_from_version_files_with_archived(project_root)
+        if compact:
+            threads, excluded_archived = _compact_threads_from_version_files(project_root, role)
+        else:
+            index_text, excluded_archived = _render_state_from_version_files_with_archived(project_root)
     elif index_path is not None:
         # Inline text but an explicit index path: resolve operative bridge files
         # relative to that path's project root (used by terminal-kind tests).
@@ -443,7 +536,8 @@ def scan(
         project_root = PROJECT_ROOT
         excluded_archived = []
 
-    threads = _parse_index(index_text)
+    if threads is None:
+        threads = _parse_index(index_text)
     actionable, terminal_verified, blocked_non_activatable = _role_filter(threads, role, project_root)
 
     result = {
