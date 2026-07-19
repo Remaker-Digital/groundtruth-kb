@@ -299,16 +299,44 @@ def scan_range(
         raise GitScanError("--range must use <base>..<head> syntax")
     result = ScanResult(mode="range")
     paths = _git_lines(repo_root, ["diff", "--name-only", "--diff-filter=ACM", range_spec])
-    for relative_posix in paths:
-        if _should_skip_relative_path(relative_posix):
+    eligible_paths = [path for path in paths if not _should_skip_relative_path(path)]
+    eligible_path_set = set(eligible_paths)
+    path_to_blob: dict[str, str] = {}
+    for blob_id, relative_posix in _git_tree_blobs(repo_root, head_ref):
+        if relative_posix in eligible_path_set:
+            path_to_blob[relative_posix] = blob_id
+
+    blob_paths: dict[str, list[str]] = {}
+    for relative_posix in eligible_paths:
+        blob_id = path_to_blob.get(relative_posix)
+        if blob_id is not None:
+            blob_paths.setdefault(blob_id, []).append(relative_posix)
+
+    findings_by_path: dict[str, list[Finding]] = {}
+    seen_blob_ids: set[str] = set()
+    for blob_id, blob_content in _iter_blob_contents(repo_root, blob_paths):
+        if blob_id not in blob_paths or blob_id in seen_blob_ids:
+            raise GitScanError(f"unexpected git cat-file result for {blob_id}")
+        seen_blob_ids.add(blob_id)
+        if not _is_probably_text_bytes(blob_content):
             continue
-        blob = _run_git(repo_root, ["show", f"{head_ref}:{relative_posix}"])
-        if blob.returncode != 0:
-            continue
-        result.paths_scanned += 1
-        result.findings.extend(
-            _scan_text(blob.stdout, relative_posix=relative_posix, patterns=patterns, allowlist=allowlist)
-        )
+        text = blob_content.decode("utf-8", errors="replace")
+        for relative_posix in blob_paths[blob_id]:
+            result.paths_scanned += 1
+            findings_by_path[relative_posix] = _scan_text(
+                text,
+                relative_posix=relative_posix,
+                patterns=patterns,
+                allowlist=allowlist,
+            )
+
+    missing_blob_ids = set(blob_paths) - seen_blob_ids
+    if missing_blob_ids:
+        missing = ", ".join(sorted(missing_blob_ids))
+        raise GitScanError(f"git cat-file --batch returned no content for: {missing}")
+
+    for relative_posix in eligible_paths:
+        result.findings.extend(findings_by_path.get(relative_posix, ()))
     return result
 
 
