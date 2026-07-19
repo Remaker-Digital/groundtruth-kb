@@ -811,6 +811,7 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
     def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
         payloads.append(payload)
         if len(payloads) == 1:
+            assert "tool_choice" not in payload
             return {"choices": [{"message": {"content": "GO is ready"}}]}
         if len(payloads) == 2:
             assert (
@@ -818,7 +819,10 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
                 in payload["messages"][-1]["content"]
             )
             assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
-            assert "tool_choice" not in payload
+            assert payload["tool_choice"] == {
+                "type": "function",
+                "function": {"name": base.PUBLISH_BRIDGE_VERDICT_TOOL},
+            }
             return {
                 "choices": [
                     {
@@ -841,6 +845,7 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
                     }
                 ]
             }
+        assert "tool_choice" not in payload
         assert "bridge/example-002.md" in payload["messages"][-1]["content"]
         return {"choices": [{"message": {"content": "published"}}]}
 

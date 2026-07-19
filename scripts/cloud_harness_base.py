@@ -2389,15 +2389,17 @@ def run_tool_loop(
             active_tools = (PUBLISH_BRIDGE_VERDICT_TOOL,) if publisher_only_recovery else allowed_tools
             schemas = strategy.build_tool_schemas(active_tools)
             payload = strategy.build_payload(messages, model_route, schemas)
-            if (
-                publisher_only_recovery
-                and profile.dialect == DIALECT_ANTHROPIC_MESSAGES
-                and active_tools == (PUBLISH_BRIDGE_VERDICT_TOOL,)
-            ):
-                if profile.disable_anthropic_publisher_recovery_thinking:
-                    payload["thinking"] = {"type": "disabled"}
-                if profile.force_anthropic_publisher_tool_choice:
-                    payload["tool_choice"] = {"type": "any"}
+            if publisher_only_recovery and active_tools == (PUBLISH_BRIDGE_VERDICT_TOOL,):
+                if profile.dialect == DIALECT_ANTHROPIC_MESSAGES:
+                    if profile.disable_anthropic_publisher_recovery_thinking:
+                        payload["thinking"] = {"type": "disabled"}
+                    if profile.force_anthropic_publisher_tool_choice:
+                        payload["tool_choice"] = {"type": "any"}
+                elif profile.dialect == DIALECT_OPENAI_CHAT:
+                    payload["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": PUBLISH_BRIDGE_VERDICT_TOOL},
+                    }
 
             operation_timeout = min(
                 timeout,
