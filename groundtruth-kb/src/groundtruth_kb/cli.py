@@ -4531,6 +4531,67 @@ def backlog_add_work_item(
     click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
 
 
+@backlog.command("add-linked-test")
+@click.option("--work-item", "work_item_id", required=True, help="Exact existing work item id.")
+@click.option("--test-title", required=True, help="GOV-12 linked test title.")
+@click.option(
+    "--test-type",
+    required=True,
+    type=click.Choice(["assertion", "e2e", "integration", "unit", "manual"]),
+    help="GOV-12 linked test type.",
+)
+@click.option("--test-expected-outcome", required=True, help="GOV-03 unambiguous expected outcome.")
+@click.option("--test-spec-id", default=None, help="Test spec id (defaults to the work item's source_spec_id).")
+@click.option("--test-plan-phase", "phase_id", required=True, help="Exact current phase for the new test.")
+@click.option("--change-reason", required=True, help="History reason for the atomic linkage.")
+@click.option("--dry-run", is_flag=True, help="Run the complete preflight without writing.")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_add_linked_test(
+    ctx: click.Context,
+    work_item_id: str,
+    test_title: str,
+    test_type: str,
+    test_expected_outcome: str,
+    test_spec_id: str | None,
+    phase_id: str,
+    change_reason: str,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Create and link one test for one already-existing work item atomically."""
+    from groundtruth_kb.cli_backlog_add_work_item import (
+        AddWorkItemError,
+        ExistingWorkItemLinkedTestRequest,
+        add_linked_test,
+    )
+
+    config = _resolve_config(ctx)
+    request = ExistingWorkItemLinkedTestRequest(
+        work_item_id=work_item_id,
+        test_title=test_title,
+        test_type=test_type,
+        test_expected_outcome=test_expected_outcome,
+        test_spec_id=test_spec_id,
+        phase_id=phase_id,
+        change_reason=change_reason,
+        dry_run=dry_run,
+    )
+    try:
+        result = add_linked_test(config, request)
+    except (AddWorkItemError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True, default=str))
+        return
+    if result["dry_run"]:
+        action = "Already linked" if result["already_linked"] else "Would create and link"
+    else:
+        action = "Already linked" if result["already_linked"] else "Created and linked"
+    click.echo(f"{action} {result['work_item_id']} + {result['test_id']} -> phase {result['phase_id']}")
+
+
 @backlog.command("repair-work-item-test-link")
 @click.option("--work-item", "work_item_id", required=True, help="Exact existing work item id.")
 @click.option("--test", "test_id", required=True, help="Exact existing add-work-item test id.")

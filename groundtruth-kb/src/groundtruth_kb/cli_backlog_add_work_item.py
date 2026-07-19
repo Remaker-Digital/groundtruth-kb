@@ -101,6 +101,20 @@ class RepairWorkItemTestLinkRequest:
     dry_run: bool
 
 
+@dataclass(frozen=True)
+class ExistingWorkItemLinkedTestRequest:
+    """Create and link one test for one already-existing work item."""
+
+    work_item_id: str
+    test_title: str
+    test_type: str
+    test_expected_outcome: str
+    test_spec_id: str | None
+    phase_id: str
+    change_reason: str
+    dry_run: bool
+
+
 def _resolve_changed_by(project_root: Path) -> str:
     """Resolve ``changed_by`` via the MUTATING fail-closed resolver.
 
@@ -344,6 +358,224 @@ def add_work_item_with_test(config: GTConfig, request: AddWorkItemRequest) -> di
         raise AddWorkItemError(str(exc)) from exc
     except Exception as exc:
         raise AddWorkItemError(f"atomic add-work-item transaction rolled back: {exc}") from exc
+    finally:
+        db.close()
+
+
+def _linked_test_provenance(work_item_id: str) -> str:
+    return f"Auto-created for {work_item_id} via gt backlog add-linked-test."
+
+
+def _phase_ids_containing_test(db: KnowledgeDB, test_id: str) -> list[str]:
+    rows = (
+        db._get_conn()
+        .execute(
+            "SELECT id, test_ids FROM current_test_plan_phases WHERE test_ids LIKE ? ORDER BY id",
+            (f"%{test_id}%",),
+        )
+        .fetchall()
+    )
+    return [str(row["id"]) for row in rows if test_id in _coerce_test_ids(row["test_ids"])]
+
+
+def _preflight_add_linked_test(
+    db: KnowledgeDB,
+    request: ExistingWorkItemLinkedTestRequest,
+) -> dict[str, Any]:
+    """Validate one existing-WI linked-test transaction before any write."""
+    if _CANONICAL_WORK_ITEM_ID.fullmatch(request.work_item_id) is None:
+        raise AddWorkItemError(f"noncanonical work item id {request.work_item_id!r}")
+    if not request.test_title.strip():
+        raise AddWorkItemError("--test-title must be a non-empty string (GOV-12)")
+    if request.test_type not in TEST_TYPES:
+        raise AddWorkItemError(f"--test-type must be one of: {', '.join(TEST_TYPES)}")
+    if not request.test_expected_outcome.strip():
+        raise AddWorkItemError("--test-expected-outcome must be a non-empty string (GOV-03)")
+    if not request.phase_id.strip():
+        raise AddWorkItemError("--test-plan-phase must be non-empty (GOV-13)")
+    if not request.change_reason.strip():
+        raise AddWorkItemError("--change-reason must be non-empty")
+    if request.test_spec_id is not None and (
+        not request.test_spec_id.strip() or request.test_spec_id != request.test_spec_id.strip()
+    ):
+        raise AddWorkItemError("--test-spec-id must be a non-empty canonical specification id")
+
+    work_item = db.get_work_item(request.work_item_id)
+    if work_item is None:
+        raise AddWorkItemError(f"work item {request.work_item_id} not found")
+    phase = db.get_test_plan_phase(request.phase_id)
+    if phase is None:
+        raise AddWorkItemError(f"test-plan phase {request.phase_id} not found")
+    phase_test_ids = _coerce_test_ids(phase.get("test_ids"))
+
+    test_spec_id = request.test_spec_id or work_item.get("source_spec_id")
+    if not isinstance(test_spec_id, str) or not test_spec_id.strip():
+        raise AddWorkItemError(f"work item {request.work_item_id} has no usable source_spec_id; pass --test-spec-id")
+    if db.get_spec(test_spec_id) is None:
+        raise AddWorkItemError(f"test spec {test_spec_id!r} does not resolve")
+
+    provenance = _linked_test_provenance(request.work_item_id)
+    provenance_rows = (
+        db._get_conn()
+        .execute("SELECT * FROM current_tests WHERE description = ? ORDER BY id", (provenance,))
+        .fetchall()
+    )
+    current_link = work_item.get("source_test_id")
+    if current_link not in (None, ""):
+        if not isinstance(current_link, str) or _CANONICAL_TEST_ID.fullmatch(current_link) is None:
+            raise AddWorkItemError(f"work item {request.work_item_id} has noncanonical source_test_id {current_link!r}")
+        linked_test = db.get_test(current_link)
+        if linked_test is None:
+            raise AddWorkItemError(f"work item {request.work_item_id} is linked to missing test {current_link}")
+        exact_fields = {
+            "title": request.test_title,
+            "test_type": request.test_type,
+            "expected_outcome": request.test_expected_outcome,
+            "spec_id": test_spec_id,
+            "description": provenance,
+        }
+        mismatches = [field for field, expected in exact_fields.items() if linked_test.get(field) != expected]
+        if mismatches:
+            raise AddWorkItemError(
+                f"work item {request.work_item_id} is already linked to conflicting test "
+                f"{current_link}: {', '.join(mismatches)}"
+            )
+        provenance_ids = [str(row["id"]) for row in provenance_rows]
+        if provenance_ids != [current_link]:
+            raise AddWorkItemError(f"duplicate or ambiguous add-linked-test provenance for {request.work_item_id}")
+        containing_phases = _phase_ids_containing_test(db, current_link)
+        if containing_phases != [request.phase_id] or current_link not in phase_test_ids:
+            raise AddWorkItemError(
+                f"linked test {current_link} does not belong exclusively to phase {request.phase_id}"
+            )
+        return {
+            "already_linked": True,
+            "work_item": work_item,
+            "phase": phase,
+            "phase_test_ids": phase_test_ids,
+            "test_id": current_link,
+            "test_spec_id": test_spec_id,
+            "provenance": provenance,
+        }
+
+    if provenance_rows:
+        raise AddWorkItemError(
+            f"partial or duplicate add-linked-test provenance already exists for {request.work_item_id}"
+        )
+    test_id = _allocate_next_test_id(db)
+    if db.get_test(test_id) is not None:
+        raise AddWorkItemError(f"allocated test id {test_id} already exists; retry")
+    return {
+        "already_linked": False,
+        "work_item": work_item,
+        "phase": phase,
+        "phase_test_ids": phase_test_ids,
+        "test_id": test_id,
+        "test_spec_id": test_spec_id,
+        "provenance": provenance,
+    }
+
+
+def add_linked_test(
+    config: GTConfig,
+    request: ExistingWorkItemLinkedTestRequest,
+) -> dict[str, Any]:
+    """Create a test, phase membership, and existing-WI link atomically."""
+    changed_by = _resolve_changed_by(Path(config.project_root))
+    db = KnowledgeDB(db_path=config.db_path, chroma_path=config.chroma_path)
+    try:
+        if request.dry_run:
+            plan = _preflight_add_linked_test(db, request)
+            return {
+                "created": False,
+                "dry_run": True,
+                "already_linked": plan["already_linked"],
+                "work_item_id": request.work_item_id,
+                "test_id": plan["test_id"],
+                "phase_id": request.phase_id,
+                "test_spec_id": plan["test_spec_id"],
+            }
+
+        conn = db._get_conn()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            plan = _preflight_add_linked_test(db, request)
+            if plan["already_linked"]:
+                conn.rollback()
+                return {
+                    "created": False,
+                    "dry_run": False,
+                    "already_linked": True,
+                    "work_item_id": request.work_item_id,
+                    "test_id": plan["test_id"],
+                    "phase_id": request.phase_id,
+                    "test_spec_id": plan["test_spec_id"],
+                }
+
+            test_id = plan["test_id"]
+            test_row = db.insert_test(
+                id=test_id,
+                title=request.test_title,
+                spec_id=plan["test_spec_id"],
+                test_type=request.test_type,
+                expected_outcome=request.test_expected_outcome,
+                changed_by=changed_by,
+                change_reason=f"GOV-12: add linked test for {request.work_item_id} ({request.change_reason})",
+                description=plan["provenance"],
+                commit=False,
+            )
+            if test_row is None:
+                raise AddWorkItemError(f"insert_test for {test_id} returned None on readback")
+
+            phase = plan["phase"]
+            phase_row = db.insert_test_plan_phase(
+                id=phase["id"],
+                plan_id=phase["plan_id"],
+                phase_order=phase["phase_order"],
+                title=phase["title"],
+                gate_criteria=phase["gate_criteria"],
+                changed_by=changed_by,
+                change_reason=f"GOV-13: assign {test_id} to phase {phase['id']} ({request.change_reason})",
+                description=phase.get("description"),
+                test_ids=[*plan["phase_test_ids"], test_id],
+                last_result=phase.get("last_result"),
+                last_executed_at=phase.get("last_executed_at"),
+                commit=False,
+            )
+            if phase_row is None or test_id not in _coerce_test_ids(phase_row.get("test_ids")):
+                raise AddWorkItemError(f"test-plan phase {request.phase_id} readback failed")
+
+            work_item_row = db.update_work_item(
+                request.work_item_id,
+                changed_by=changed_by,
+                change_reason=request.change_reason,
+                source_test_id=test_id,
+                commit=False,
+            )
+            if work_item_row is None or work_item_row.get("source_test_id") != test_id:
+                raise AddWorkItemError(f"work item {request.work_item_id} linkage readback failed")
+
+            final = _preflight_add_linked_test(db, request)
+            if not final["already_linked"] or final["test_id"] != test_id:
+                raise AddWorkItemError("atomic linked-test readback did not match the requested relationship")
+            _commit_transaction(conn)
+        except Exception:
+            conn.rollback()
+            raise
+
+        return {
+            "created": True,
+            "dry_run": False,
+            "already_linked": False,
+            "work_item_id": request.work_item_id,
+            "test_id": test_id,
+            "phase_id": request.phase_id,
+            "test_spec_id": plan["test_spec_id"],
+        }
+    except AddWorkItemError:
+        raise
+    except Exception as exc:
+        raise AddWorkItemError(f"atomic add-linked-test transaction rolled back: {exc}") from exc
     finally:
         db.close()
 
