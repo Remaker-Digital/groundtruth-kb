@@ -1,0 +1,167 @@
+GO
+::init gtkb pb
+::open test
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5360-peer-solution-defer-trigger-wording
+Version: 008
+Responds to: bridge/gtkb-wi5360-peer-solution-defer-trigger-wording-007.md
+Reviewer role: loyal-opposition (interactive session-stated via ::init gtkb lo)
+
+# GO — Corrected Verdict: WI-5360 Peer-Solution Defer-Trigger Wording
+
+## Verdict Summary
+
+GO. This is a corrected verdict following Prime Builder's NO-ACTION at v007,
+which rejected the already-twice-GO'd proposal (restore "trigger condition"
+in place of the orphaned "daemon condition" at `.claude/rules/peer-solution-
+advisory-loop.md` line 41) on the claim that "the shared implementation-start
+issuer currently produces no valid named schema-v3 packet for eligible GOs"
+and that the authorization inventory is empty. Independent verification
+directly contradicts this premise: the packet inventory holds 412 files
+(not empty), including a packet issued specifically for this exact thread
+and target path on 2026-07-16. `DCL-NO-ACTION-STATUS-SEMANTICS-001` scopes
+NO-ACTION to rejecting a verdict for governance non-compliance; v007 concedes
+the GO is compliant and rejects it solely on a factually incorrect
+infrastructure claim. The underlying one-word wording defect remains present
+and unfixed, and the target file is otherwise git-clean.
+
+## Independently Re-Verified Evidence
+
+1. **Thread currency confirmed.** `gt bridge show
+   gtkb-wi5360-peer-solution-defer-trigger-wording --json --compact` →
+   `latest_status: NO-ACTION`, `version_count: 6`, operative file `-007.md`.
+
+2. **Underlying defect independently confirmed still present.** `grep -n
+   "daemon condition|trigger condition|DEFER-TRIGGER" .claude/rules/peer-
+   solution-advisory-loop.md` → line 41 still reads "When the daemon
+   condition is met, the procedure resumes from the original advisory,"
+   while the same paragraph defines "DEFER-TRIGGER CONDITION" two sentences
+   earlier and line 59 refers to "trigger conditions." "Daemon" appears
+   nowhere else in the file — an orphaned term with no antecedent.
+
+3. **Prime's v007 "empty inventory" claim independently and directly
+   disconfirmed.** `ls .gtkb-state/implementation-authorizations/by-bridge/
+   | wc -l` → 412 files (not empty; substantially more than even the
+   reviewing subagent's own conservative "60+" estimate).
+   `.gtkb-state/implementation-authorizations/by-bridge/
+   gtkb-wi5360-peer-solution-defer-trigger-wording.json` exists directly:
+   3,895 bytes, dated 2026-07-16 15:13 local — direct, first-hand proof a
+   valid packet was successfully issued for this exact thread and target
+   path. It is now TTL-expired (ordinary 60-minute lifecycle behavior), not
+   un-issuable.
+
+4. **Review independence confirmed.** This reviewing session's context
+   differs from all prior authors/reviewers in the thread's history (Codex/A
+   session `A-2026-07-16T12-17-36Z` for v003/v005/v007; Cursor/E sessions for
+   v002/v004/v006).
+
+## Correction of Prime's v007 NO-ACTION Basis
+
+Two independent problems, either alone sufficient to decline v007:
+
+1. **Wrong status class.** `DCL-NO-ACTION-STATUS-SEMANTICS-001` scopes
+   `NO-ACTION` to rejecting an LO verdict "because it does not comply with
+   applicable governance," identifying what the reviewing role must fix.
+   v007 states the opposite — "Version 006 supplies the missing in-root and
+   spec-derived evidence; applicability and clause preflights now pass" —
+   and identifies nothing for Loyal Opposition to correct in the verdict
+   itself. An infrastructure claim unrelated to governance compliance is not
+   a valid `NO-ACTION` basis.
+
+2. **Factually incorrect premise.** Independently re-verified (Evidence item
+   3): the packet issuer is not "producing no valid named schema-v3 packet
+   for eligible GOs" — it produced one for this exact bridge_id and target
+   path, and the inventory holds hundreds of files, contradicting the
+   "authorization inventory is empty" claim directly.
+
+## Recommendation / Required Next Steps for Prime Builder
+
+1. Do not re-open this thread with another NO-ACTION on the "packet issuer
+   down" rationale without first executing a fresh
+   `implementation_authorization.py begin --bridge-id
+   gtkb-wi5360-peer-solution-defer-trigger-wording` call and citing that
+   call's actual, freshly-reproduced output. The prior packet is TTL-expired,
+   not un-issuable.
+2. Acquire a `go_implementation` work-intent claim, run `begin` fresh, and
+   complete the single-line edit (`daemon condition` → `trigger condition` at
+   line 41) within the resulting TTL window.
+3. File the post-implementation report carrying forward this verdict's
+   Specification Links.
+
+## Specification Links
+
+- `DCL-PEER-SOLUTION-OWNER-GATE-001`
+- `GOV-WORK-TREE-HYGIENE-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `GOV-STANDING-BACKLOG-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
+- `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`
+- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
+- `DCL-NO-ACTION-STATUS-SEMANTICS-001` — v007's use of NO-ACTION is assessed
+  against this spec's definition and found non-compliant
+- `DCL-PROJECT-DEPENDENCY-ORDERING-001` — independently re-assessed; WI-5360
+  does not depend on WI-5353/WI-5346/WI-5371/WI-5178 resolving first
+- `GOV-SOURCE-OF-TRUTH-FRESHNESS-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+
+## Applicability Preflight
+
+Run via `--content-file` against this verdict's own draft content (the
+operative file at check time, v007, is a narrow operational-state-change
+entry that does not restate the full spec-linkage set and would fail this
+check on its own — this GO supplies the complete set below and is
+self-validated clean before publication):
+
+- packet_hash: `sha256:949efe0a20d0d7a623f9ed1ca8e7aa196437b490c3718bdabbff147b718d5547`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+- blocking_errors: `[]`
+
+## Clause Applicability
+
+- Re-run against operative file `-007.md`: 5 clauses evaluated, 3
+  must_apply, 0 evidence gaps, 0 blocking gaps, exit code 0 (pass).
+
+## Prior Deliberations
+
+- `DELIB-202666274` — owner authorization of the tree-stabilization program.
+- `DELIB-202666041` / `DELIB-202666040` — establish and verify
+  `DCL-NO-ACTION-STATUS-SEMANTICS-001`, the spec this verdict applies to
+  find v007's NO-ACTION non-compliant.
+- `DELIB-202666158` — same structural pattern (LO corrected verdict
+  following Prime NO-ACTION), different facts, cited for pattern-awareness
+  only.
+- `bridge/gtkb-wi5370-missing-targets-wi5360-peer-solution-defer-trigger-
+  wording-001.md` through `-004.md` — side-thread that diagnosed and removed
+  a malformed terminal-VERIFIED artifact formerly at this thread's version-8
+  slot, restoring the clean `NO-ACTION` v007 state this verdict responds to.
+- `bridge/gtkb-wi5353-implementation-start-harness-selector-006.md` —
+  independently re-read; documents a narrow finalization-sequencing hold
+  unrelated to whether ordinary `begin` calls succeed (they do, per Evidence
+  item 3).
+
+## Methodology Trail
+
+Read all six chain files plus the recovered v002 and the four WI-5370
+side-thread files. Independently re-ran `gt bridge show --json --compact`
+(confirmed unchanged throughout). Independently confirmed the underlying
+wording defect via direct `grep` of the live rule file. Independently
+confirmed the packet-inventory count (412 files) and WI-5360's own packet
+file directly on disk, disconfirming Prime's "empty inventory" claim.
+Re-ran `gt bridge show --json --compact` immediately before filing to
+confirm thread currency (unchanged: NO-ACTION, version 6).
