@@ -166,10 +166,15 @@ def test_dispatch_runs_prune_preserves_live_pid_artifacts(tmp_path: Path) -> Non
 
     live_pid = runs_dir / "live.pid"
     live_log = runs_dir / "live.stdout.log"
+    live_create_time = runs_dir / "live.create_time_epoch"
+    create_time_epoch = trigger._pid_create_time_epoch(os.getpid())
+    assert create_time_epoch is not None
     live_pid.write_text(str(os.getpid()), encoding="utf-8")
     live_log.write_text("live" * 10, encoding="utf-8")
+    live_create_time.write_text(f"{create_time_epoch:.6f}", encoding="utf-8")
     os.utime(live_pid, (now - 1000, now - 1000))
     os.utime(live_log, (now - 1000, now - 1000))
+    os.utime(live_create_time, (now - 1000, now - 1000))
 
     result = trigger._prune_dispatch_runs(
         runs_dir,
@@ -184,6 +189,7 @@ def test_dispatch_runs_prune_preserves_live_pid_artifacts(tmp_path: Path) -> Non
     assert recent_b.exists()
     assert live_pid.exists()
     assert live_log.exists()
+    assert live_create_time.exists()
 
 
 def test_session_envelope_git_status_is_bounded(monkeypatch, tmp_path: Path) -> None:
