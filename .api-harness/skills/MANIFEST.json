@@ -306,6 +306,14 @@
       "source_sha256": "4beb52830648c314210930434ff8ffa33ac3fe9adab98acf70cc5a16dd4d6cf7"
     },
     {
+      "adapter_relative_path": ".api-harness/skills/gtkb-hygiene-reclaim/SKILL.md",
+      "canonical_name": "gtkb-hygiene-reclaim",
+      "capability_id": "skill.gtkb-hygiene-reclaim",
+      "description": "Use only from an active GT-KB ops activity envelope (`::open ops`) when planning, deep-cleaning, reviewing, trashing, purging, restoring, or auditing GT-KB hygiene-reclaim candidates through the production gt hygiene reclaim plan/history/deep-clean/trash/purge/restore CLI with registry, Git-root, ops-evidence, and quiescence gates.",
+      "source_relative_path": ".claude/skills/gtkb-hygiene-reclaim/SKILL.md",
+      "source_sha256": "c1c5fadde360a4f0e03a265ef9cd38b6a0f2f366095ee1b77e180f453a1894a1"
+    },
+    {
       "adapter_relative_path": ".api-harness/skills/gtkb-sweep-commit/SKILL.md",
       "canonical_name": "gtkb-sweep-commit",
       "capability_id": "skill.gtkb-sweep-commit",
@@ -336,6 +344,14 @@
       "description": "Generate and validate formal-artifact approval packets with stable LF normalization and the canonical required fields, referencing the live gate as sole authority.",
       "source_relative_path": ".claude/skills/formal-artifact-packet-helper/SKILL.md",
       "source_sha256": "824af14f6ace58e6a3b3423b55ad1119d6874cb2ac2ff83e5c37734903ac3855"
+    },
+    {
+      "adapter_relative_path": ".api-harness/skills/managed-skill-adoption-review/SKILL.md",
+      "canonical_name": "managed-skill-adoption-review",
+      "capability_id": "skill.managed-skill-adoption-review",
+      "description": "Structural review of managed-artifact proposals (skill, template, or adopter). Use when a bridge thread proposes a new or revised managed-artifact so a Prime Builder structural review is required before proposal filing or as part of the bridge review checklist.",
+      "source_relative_path": ".claude/skills/managed-skill-adoption-review/SKILL.md",
+      "source_sha256": "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
     }
   ],
   "generated_by": "scripts/generate_api_skill_adapters.py",

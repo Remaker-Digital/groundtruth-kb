@@ -193,6 +193,15 @@ PREFLIGHT_MISSING_REQUIRED_RE = re.compile(
     r"\bmissing_required_specs\s*:\s*(?:\[\s*\]|`?\[\s*\]`?|none|None|NONE)",
     re.IGNORECASE,
 )
+VERDICT_PREFLIGHT_FRESHNESS_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+RESPONDS_TO_BRIDGE_PATH_RE = re.compile(r"(?im)^\s*Responds\s+to\s*:\s*`?(?P<path>[^`\r\n]+?\.md)`?\s*$")
+PREFLIGHT_FIELD_LINE_RE = re.compile(r"(?im)^\s*[-*]?\s*(?P<name>[a-z_]+)\s*:\s*`?(?P<value>[^`\r\n]+?)`?\s*$")
+CANDIDATE_EVIDENCE_HASH_SENTINEL = "<CANDIDATE_EVIDENCE_HASH>"
+CANDIDATE_EVIDENCE_HASH_LINE_RE = re.compile(
+    r"(?im)^(?P<prefix>\s*[-*]?\s*candidate_evidence_hash\s*:\s*`?)"
+    r"(?P<value>sha256:[0-9a-f]{64}|<CANDIDATE_EVIDENCE_HASH>)"
+    r"(?P<suffix>`?\s*)$"
+)
 
 # Owner Decisions / Input section gate (Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK).
 # Per bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md
@@ -1435,6 +1444,148 @@ def _has_clean_applicability_preflight(content: str) -> bool:
     return bool(PREFLIGHT_PACKET_HASH_RE.search(section_text) and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text))
 
 
+def _applicability_preflight_section(content: str) -> str | None:
+    lines = content.splitlines()
+    for idx, line in enumerate(lines):
+        if APPLICABILITY_PREFLIGHT_HEADING_RE.match(line.strip()):
+            return "\n".join(_collect_section_lines(lines, idx + 1))
+    return None
+
+
+def _preflight_field(section: str, field_name: str) -> str | None:
+    wanted = field_name.lower()
+    for match in PREFLIGHT_FIELD_LINE_RE.finditer(section):
+        if match.group("name").lower() == wanted:
+            return match.group("value").strip()
+    return None
+
+
+def _root_relative_path(raw_path: str, project_root: Path) -> tuple[str, Path] | None:
+    cleaned = raw_path.strip().strip("`").replace("\\", "/")
+    if not cleaned:
+        return None
+    candidate = Path(cleaned)
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    try:
+        resolved = candidate.resolve(strict=False)
+        relative = resolved.relative_to(project_root.resolve())
+    except (OSError, ValueError):
+        return None
+    return relative.as_posix(), resolved
+
+
+def _candidate_evidence_hash(file_path: str, content: str, project_root: Path) -> str | None:
+    candidate_path = _root_relative_path(file_path, project_root)
+    if candidate_path is None:
+        return None
+    normalized_content = content.replace("\r\n", "\n").replace("\r", "\n")
+    normalized_content, replacements = CANDIDATE_EVIDENCE_HASH_LINE_RE.subn(
+        lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
+        normalized_content,
+    )
+    if replacements != 1:
+        return None
+    payload = candidate_path[0] + "\n" + normalized_content
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _verdict_preflight_freshness_deny_reason(
+    *,
+    cwd_path: Path,
+    file_path: str,
+    content: str,
+) -> str | None:
+    status = _first_nonblank_line(content)
+    if status not in VERDICT_PREFLIGHT_FRESHNESS_STATUSES:
+        return None
+    section = _applicability_preflight_section(content)
+    if section is None:
+        return None
+
+    project_root = _canonical_project_root(cwd_path)
+    bridge_id = _extract_bridge_id_from_path(file_path)
+    if bridge_id is None:
+        return "[Governance] Verdict applicability freshness check could not resolve the candidate bridge thread."
+
+    responds_match = RESPONDS_TO_BRIDGE_PATH_RE.search(content)
+    if responds_match is None:
+        return (
+            "[Governance] Verdict applicability freshness check requires an exact root-contained "
+            "`Responds to:` bridge artifact."
+        )
+    responds_to = _root_relative_path(responds_match.group("path"), project_root)
+    if responds_to is None:
+        return (
+            "[Governance] Verdict applicability freshness check rejected an out-of-root or invalid `Responds to:` path."
+        )
+    responds_relative, responds_path = responds_to
+    responds_version = BRIDGE_VERSIONED_FILE_RE.match(responds_path.name)
+    if (
+        not responds_path.is_file()
+        or responds_path.parent != (project_root / "bridge").resolve()
+        or responds_version is None
+        or responds_version.group(1) != bridge_id
+    ):
+        return (
+            "[Governance] Verdict applicability freshness check requires `Responds to:` to name an "
+            "existing canonical version of the same bridge thread."
+        )
+
+    packet_hash = _preflight_field(section, "packet_hash")
+    packet_bridge_id = _preflight_field(section, "bridge_document_name")
+    source_anchor = _preflight_field(section, "content_file")
+    if source_anchor in {None, "", "(none)"}:
+        source_anchor = _preflight_field(section, "operative_file")
+    anchored_source = _root_relative_path(source_anchor or "", project_root)
+    if anchored_source is None or anchored_source[0] != responds_relative:
+        return (
+            "[Governance] Verdict applicability freshness check rejected a source mismatch: "
+            "`content_file`/`operative_file` must equal the exact `Responds to:` artifact."
+        )
+    if packet_bridge_id != bridge_id:
+        return (
+            "[Governance] Verdict applicability freshness check rejected a bridge-document mismatch: "
+            "`bridge_document_name` must match the candidate thread."
+        )
+    if packet_hash is None or re.fullmatch(r"sha256:[0-9a-f]{64}", packet_hash, re.IGNORECASE) is None:
+        return "[Governance] Verdict applicability freshness check requires a valid `packet_hash` anchor."
+
+    try:
+        from scripts.bridge_applicability_preflight import build_packet
+
+        expected_packet = build_packet(
+            bridge_id=bridge_id,
+            bridge_dir=project_root / "bridge",
+            config_path=project_root / "config" / "governance" / "spec-applicability.toml",
+            db_path=project_root / "groundtruth.db",
+            content_file=responds_path,
+        )
+    except (Exception, SystemExit) as exc:
+        return f"[Governance] Verdict applicability freshness check could not rebuild the source packet: {exc}"
+    expected_packet_hash = str(expected_packet.get("packet_hash") or "")
+    if packet_hash.lower() != expected_packet_hash.lower():
+        return (
+            "[Governance] Verdict applicability freshness check rejected a stale packet_hash; "
+            f"expected `{expected_packet_hash}` for `{responds_relative}`."
+        )
+
+    embedded_candidate_hash = _preflight_field(section, "candidate_evidence_hash")
+    expected_candidate_hash = _candidate_evidence_hash(file_path, content, project_root)
+    if (
+        embedded_candidate_hash is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", embedded_candidate_hash, re.IGNORECASE) is None
+        or expected_candidate_hash is None
+        or embedded_candidate_hash.lower() != expected_candidate_hash.lower()
+    ):
+        expected = expected_candidate_hash or "<unavailable>"
+        return (
+            "[Governance] Verdict applicability freshness check rejected a stale or missing "
+            f"`candidate_evidence_hash`; expected `{expected}` for the final normalized candidate bytes."
+        )
+    return None
+
+
 def _root_contained_scratch_path(cwd: Path, bridge_id: str) -> Path:
     root = cwd.resolve()
     scratch_dir = root / ".tmp" / "bridge-preflight-hook"
@@ -1969,6 +2120,14 @@ def _deny_reason_for_content(
                 "python scripts/bridge_applicability_preflight.py --bridge-id <document-name>. "
                 "(Hard-block per mechanical cross-cutting specification applicability gate.)"
             )
+        if first_line in VERDICT_PREFLIGHT_FRESHNESS_STATUSES:
+            freshness_deny = _verdict_preflight_freshness_deny_reason(
+                cwd_path=cwd_path,
+                file_path=file_path,
+                content=content,
+            )
+            if freshness_deny:
+                return freshness_deny
         if first_line == "VERIFIED" and not _has_spec_derived_verification(content):
             return (
                 "[Governance] VERIFIED bridge reports must carry Specification Links, "

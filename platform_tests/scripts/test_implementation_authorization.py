@@ -74,15 +74,20 @@ def _write_proposal(
     """Write a minimal-compliant bridge proposal file."""
     if target_paths is None:
         target_paths = ["scripts/dummy.py"]
-    suffix = "" if version == 1 else f"-{version:03d}"
+    suffix = f"-{version:03d}"
     proposal_path = project_root / "bridge" / f"{slug}{suffix}.md"
     proposal_path.parent.mkdir(parents=True, exist_ok=True)
     target_paths_json = json.dumps(target_paths)
     bridge_kind_line = f"bridge_kind: {bridge_kind}\n\n" if bridge_kind else ""
+    responds_to = f"Responds to: bridge/{slug}-{version - 1:03d}.md\n" if version > 1 else ""
     body = (
         f"{status}\n\n"
+        f"author_identity: prime-builder/fixture\n"
         f"author_session_context_id: fixture-proposal-session-{slug}-{version:03d}\n\n"
         f"{bridge_kind_line}"
+        f"Document: {slug}\n"
+        f"Version: {version:03d}\n"
+        f"{responds_to}\n"
         f"# Fixture proposal {slug} v{version}\n\n"
         f"target_paths: {target_paths_json}\n\n"
         f"## Specification Links\n\n"
@@ -99,11 +104,16 @@ def _write_proposal(
 
 def _write_verdict(project_root: Path, slug: str, version: int, verdict: str = "GO") -> Path:
     """Write a verdict (GO/NO-GO/VERIFIED) file."""
-    suffix = "" if version == 1 else f"-{version:03d}"
+    suffix = f"-{version:03d}"
     path = project_root / "bridge" / f"{slug}{suffix}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
+    role = "loyal-opposition" if verdict in {"GO", "NO-GO", "VERIFIED"} else "prime-builder"
     path.write_text(
-        f"{verdict}\n\nauthor_session_context_id: fixture-verdict-session-{slug}-{version:03d}\n\n"
+        f"{verdict}\n\nauthor_identity: {role}/fixture\n"
+        f"author_session_context_id: fixture-verdict-session-{slug}-{version:03d}\n"
+        f"Document: {slug}\n"
+        f"Version: {version:03d}\n"
+        f"Responds to: bridge/{slug}-{version - 1:03d}.md\n\n"
         f"Fixture {verdict} verdict for {slug} v{version}.\n",
         encoding="utf-8",
     )
@@ -120,8 +130,12 @@ def _write_implementation_report(project_root: Path, slug: str, version: int, pa
             [
                 "NEW",
                 "",
+                "author_identity: prime-builder/fixture",
+                f"author_session_context_id: fixture-report-session-{slug}-{version:03d}",
                 "bridge_kind: implementation_report",
                 f"Document: {slug}",
+                f"Version: {version:03d}",
+                f"Responds to: bridge/{slug}-{version - 1:03d}.md",
                 "",
                 "## Files Changed",
                 "",
@@ -134,11 +148,16 @@ def _write_implementation_report(project_root: Path, slug: str, version: int, pa
     return path
 
 
+def _write_post_go_report_verdict(project_root: Path, slug: str, verdict: str) -> None:
+    _write_implementation_report(project_root, slug, version=3, paths=["scripts/dummy.py"])
+    _write_verdict(project_root, slug, version=4, verdict=verdict)
+
+
 def _setup_simple_go_bridge(project_root: Path, slug: str = "fixture-bridge") -> tuple[str, Path, Path]:
     """Build a project root with a single GO'd bridge: NEW at -001, GO at -002."""
     proposal = _write_proposal(project_root, slug, version=1, target_paths=["scripts/dummy.py", ".gtkb-state/**"])
     verdict = _write_verdict(project_root, slug, version=2, verdict="GO")
-    block = f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"
+    block = f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}-001.md\n"
     _ignore_retired_index_fixture(project_root, [block])
     return slug, proposal, verdict
 
@@ -157,27 +176,32 @@ def test_bridge_entry_uses_versioned_files_when_index_is_absent(auth_module, tmp
     assert entry.bridge_id == slug
     assert entry.versions == [
         ("GO", "bridge/real-bridge-002.md"),
-        ("NEW", "bridge/real-bridge.md"),
+        ("NEW", "bridge/real-bridge-001.md"),
     ]
 
 
-def test_bridge_entry_raises_for_duplicate_version_files(auth_module, tmp_path):
-    """bridge_entry fails closed when both v1 naming forms exist for one thread."""
+def test_bridge_entry_ignores_legacy_no_suffix_file(auth_module, tmp_path):
+    """Legacy no-suffix content is outside exact numbered lifecycle authority."""
     _write_proposal(tmp_path, "doc-a", version=1, target_paths=["scripts/foo.py"])
-    duplicate = tmp_path / "bridge" / "doc-a-001.md"
-    duplicate.write_text("NEW\n\nDuplicate v1 fixture.\n", encoding="utf-8")
+    legacy = tmp_path / "bridge" / "doc-a.md"
+    legacy.write_text("BROKEN LEGACY STATE\n", encoding="utf-8")
 
-    with pytest.raises(auth_module.AuthorizationError, match="Duplicate bridge version 001"):
-        auth_module.bridge_entry(tmp_path, "doc-a")
+    entry = auth_module.bridge_entry(tmp_path, "doc-a")
+
+    assert entry.versions == [("NEW", "bridge/doc-a-001.md")]
 
 
-def test_bridge_version_from_rel_path_accepts_v1_no_suffix_and_v2_plus_suffix(auth_module):
-    """The resolver accepts both v1 (no suffix) and v2+ (-NNN.md) forms."""
+def test_bridge_version_from_rel_path_requires_suffix_after_exact_bridge_id(auth_module):
+    """A version suffix is parsed only after the complete bridge ID."""
     version = auth_module._bridge_version_from_rel_path
-    assert version("bridge/foo.md", "foo") == 1
+    assert version("bridge/foo.md", "foo") is None
     assert version("bridge/foo-022.md", "foo") == 22
     assert (
-        version("bridge/gtkb-single-harness-bridge-dispatcher-001.md", "gtkb-single-harness-bridge-dispatcher-001") == 1
+        version(
+            "bridge/gtkb-single-harness-bridge-dispatcher-001.md",
+            "gtkb-single-harness-bridge-dispatcher-001",
+        )
+        is None
     )
     assert (
         version(
@@ -236,8 +260,65 @@ def test_bridge_entry_raises_for_malformed_deferred_file(auth_module, tmp_path):
     bad = tmp_path / "bridge" / f"{slug}-003.md"
     bad.write_text("# Missing status token\n", encoding="utf-8")
 
-    with pytest.raises(auth_module.AuthorizationError, match="unrecognized status line"):
+    with pytest.raises(auth_module.AuthorizationError, match="(?i)malformed|status|strict"):
         auth_module.bridge_entry(tmp_path, slug)
+
+
+def _write_malformed_lo_verdict(project_root: Path, slug: str, version: int = 2) -> Path:
+    path = project_root / "bridge" / f"{slug}-{version:03d}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "GO - decorated provider verdict\n\n"
+        "author_identity: provider/fixture\n"
+        f"Document: {slug}\n"
+        f"Version: {version:03d}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_bridge_entry_exposes_completed_corrected_go_pair(auth_module, tmp_path):
+    slug = "corrected-go"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    malformed = _write_malformed_lo_verdict(tmp_path, slug)
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+    _write_verdict(tmp_path, slug, version=4, verdict="GO")
+
+    entry = auth_module.bridge_entry(tmp_path, slug)
+
+    assert entry.implementation_artifact == f"bridge/{slug}-001.md"
+    assert entry.implementation_verdict == f"bridge/{slug}-004.md"
+    assert entry.quarantined_paths == (malformed.relative_to(tmp_path).as_posix(),)
+    assert auth_module.approved_files_for_go(entry) == (
+        f"bridge/{slug}-001.md",
+        f"bridge/{slug}-004.md",
+    )
+
+
+def test_create_packet_denies_pending_corrected_chain(auth_module, tmp_path):
+    slug = "pending-correction"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_malformed_lo_verdict(tmp_path, slug)
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+
+    with pytest.raises(auth_module.AuthorizationError, match="NO-ACTION"):
+        auth_module.create_authorization_packet(tmp_path, slug)
+
+    assert not auth_module.packet_path(tmp_path).exists()
+    assert not auth_module.packet_path_for_bridge(tmp_path, slug).exists()
+
+
+def test_create_packet_uses_completed_corrected_go(auth_module, tmp_path):
+    slug = "corrected-packet"
+    _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/foo.py"])
+    _write_malformed_lo_verdict(tmp_path, slug)
+    _write_verdict(tmp_path, slug, version=3, verdict="NO-ACTION")
+    _write_verdict(tmp_path, slug, version=4, verdict="GO")
+
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+
+    assert packet["proposal_file"] == f"bridge/{slug}-001.md"
+    assert packet["go_file"] == f"bridge/{slug}-004.md"
 
 
 def test_create_packet_fails_when_latest_status_is_deferred(auth_module, tmp_path):
@@ -875,6 +956,7 @@ def test_begin_cli_refuses_without_work_intent_claim(auth_module, tmp_path, caps
     assert output["authorized"] is False
     assert "No active work-intent claim" in output["error"]
     assert not auth_module.packet_path(tmp_path).exists()
+    assert not auth_module.packet_path_for_bridge(tmp_path, slug).exists()
 
 
 def test_begin_cli_refuses_claim_held_by_other_session(auth_module, tmp_path, capsys):
@@ -899,6 +981,62 @@ def test_begin_cli_refuses_claim_held_by_other_session(auth_module, tmp_path, ca
     output = json.loads(capsys.readouterr().out)
     assert "claimed by session 'other-session'" in output["error"]
     assert not auth_module.packet_path(tmp_path).exists()
+    assert not auth_module.packet_path_for_bridge(tmp_path, slug).exists()
+
+
+def test_begin_cli_writes_schema_v3_current_and_named_packet(auth_module, tmp_path, capsys, monkeypatch):
+    _make_groundtruth_toml(tmp_path)
+    slug, proposal, _ = _setup_simple_go_bridge(tmp_path)
+    _add_project_authorization_metadata(proposal)
+    _seed_project_authorization(
+        tmp_path,
+        allowed_mutation_classes=["source", "runtime_state"],
+    )
+    _claim_bridge(auth_module, tmp_path, slug, session_id="session-1")
+    calls = []
+    real_write_named_packet = auth_module.write_named_packet
+    real_write_packet = auth_module.write_packet
+
+    def record_named_packet(project_root, packet, bridge_id):
+        calls.append(("named", bridge_id, packet.get("schema_version"), packet.get("packet_hash")))
+        return real_write_named_packet(project_root, packet, bridge_id)
+
+    def record_current_packet(project_root, packet):
+        calls.append(("current", packet.get("bridge_id"), packet.get("schema_version"), packet.get("packet_hash")))
+        return real_write_packet(project_root, packet)
+
+    monkeypatch.setattr(auth_module, "write_named_packet", record_named_packet)
+    monkeypatch.setattr(auth_module, "write_packet", record_current_packet)
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--session-id",
+            "session-1",
+        ]
+    )
+
+    assert rc == 0
+    packet = json.loads(capsys.readouterr().out)
+    assert packet["bridge_id"] == slug
+    assert packet["schema_version"] == 3
+    assert packet["packet_hash"] == auth_module.packet_hash(packet)
+    assert packet["implementation_start"]["schema_version"] == 1
+    assert packet["implementation_start"]["bridge_id"] == slug
+    assert packet["implementation_start"]["session_id"] == "session-1"
+
+    current_path = auth_module.packet_path(tmp_path)
+    named_path = auth_module.packet_path_for_bridge(tmp_path, slug)
+    assert json.loads(current_path.read_text(encoding="utf-8")) == packet
+    assert json.loads(named_path.read_text(encoding="utf-8")) == packet
+    assert calls == [
+        ("named", slug, 3, packet["packet_hash"]),
+        ("current", slug, 3, packet["packet_hash"]),
+    ]
 
 
 def test_begin_cli_succeeds_when_work_intent_claim_held(auth_module, tmp_path, capsys):
@@ -923,6 +1061,7 @@ def test_begin_cli_succeeds_when_work_intent_claim_held(auth_module, tmp_path, c
     packet = json.loads(capsys.readouterr().out)
     assert packet["bridge_id"] == slug
     assert not auth_module.packet_path(tmp_path).exists()
+    assert not auth_module.packet_path_for_bridge(tmp_path, slug).exists()
 
 
 @pytest.mark.parametrize(
@@ -1063,6 +1202,46 @@ def test_packet_load_rejects_taxonomy_byte_drift(auth_module, tmp_path):
 
     with pytest.raises(auth_module.AuthorizationError, match="taxonomy_sha256"):
         auth_module.load_packet(tmp_path)
+
+
+def test_packet_load_rejects_evaluator_byte_drift(auth_module, tmp_path, monkeypatch):
+    """WI-5629: packet reuse cannot outlive the exact evaluator bytes."""
+    slug = "project-auth-evaluator-drift"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+    packet = auth_module.create_authorization_packet(tmp_path, slug)
+    auth_module.write_packet(tmp_path, packet)
+
+    from groundtruth_kb.governance import project_authorization_operation_time
+
+    monkeypatch.setattr(project_authorization_operation_time, "evaluator_sha256", lambda: "0" * 64)
+
+    with pytest.raises(auth_module.AuthorizationError, match="evaluator_sha256"):
+        auth_module.load_packet(tmp_path)
+
+
+def test_project_authorization_rejects_malformed_json_list_envelope(auth_module, tmp_path):
+    """WI-5629: malformed PAUTH carrier bytes are not normalized to empty authority."""
+    slug = "project-auth-malformed-envelope"
+    proposal = _write_proposal(tmp_path, slug, version=1, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "UPDATE current_project_authorizations SET forbidden_operations = ? WHERE id = ?",
+            ("not-json", "PAUTH-FIXTURE"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(auth_module.AuthorizationError, match=r"forbidden_operations.*valid JSON list"):
+        auth_module.create_authorization_packet(tmp_path, slug)
 
 
 def test_packet_load_rejects_legacy_pauth_packet_schema(auth_module, tmp_path):
@@ -1457,7 +1636,7 @@ def test_clear_active_packet_if_terminal_deletes_current_only(auth_module, tmp_p
                 root, slug, version=3, status="REVISED", target_paths=["scripts/dummy.py"]
             ),
         ),
-        ("NO-GO", lambda root, slug: _write_verdict(root, slug, version=3, verdict="NO-GO")),
+        ("NO-GO", lambda root, slug: _write_post_go_report_verdict(root, slug, "NO-GO")),
     ],
 )
 def test_clear_active_packet_if_terminal_preserves_in_flight_packets(auth_module, tmp_path, latest_status, writer):
@@ -2365,7 +2544,7 @@ def _write_verified_thread(
     *,
     target_paths: list[str] | None = None,
 ) -> None:
-    """Build a terminal-VERIFIED chain: NEW at v1, GO at v2, VERIFIED at v3."""
+    """Build a terminal-VERIFIED chain with a post-GO implementation report."""
     _write_proposal(
         project_root,
         slug,
@@ -2373,7 +2552,13 @@ def _write_verified_thread(
         target_paths=target_paths or ["scripts/sample.py", "platform_tests/scripts/test_sample.py"],
     )
     _write_verdict(project_root, slug, version=2, verdict="GO")
-    _write_verdict(project_root, slug, version=3, verdict="VERIFIED")
+    _write_implementation_report(
+        project_root,
+        slug,
+        version=3,
+        paths=target_paths or ["scripts/sample.py", "platform_tests/scripts/test_sample.py"],
+    )
+    _write_verdict(project_root, slug, version=4, verdict="VERIFIED")
 
 
 def test_finalization_target_paths_for_verified_returns_approved_paths(auth_module, tmp_path):
@@ -2407,7 +2592,8 @@ def test_finalization_target_paths_for_verified_fails_closed_post_go_no_go(auth_
     """A post-GO NO-GO (resumable, not terminal) fails closed for finalization."""
     _write_proposal(tmp_path, "resumable", version=1, target_paths=["scripts/sample.py"])
     _write_verdict(tmp_path, "resumable", version=2, verdict="GO")
-    _write_verdict(tmp_path, "resumable", version=3, verdict="NO-GO")
+    _write_implementation_report(tmp_path, "resumable", version=3, paths=["scripts/sample.py"])
+    _write_verdict(tmp_path, "resumable", version=4, verdict="NO-GO")
 
     with pytest.raises(auth_module.AuthorizationError, match="terminal VERIFIED"):
         auth_module.finalization_target_paths_for_verified(tmp_path, "resumable")
@@ -2427,14 +2613,17 @@ def test_finalization_target_paths_for_verified_fails_closed_missing_target_path
     proposal declares no target_paths fails closed (no approved path set)."""
     bridge = tmp_path / "bridge"
     bridge.mkdir(parents=True, exist_ok=True)
-    (bridge / "no-targets.md").write_text(
-        "NEW\n\nauthor_session_context_id: fixture-proposal-no-targets\n\n"
+    (bridge / "no-targets-001.md").write_text(
+        "NEW\n\nauthor_identity: prime-builder/fixture\n"
+        "author_session_context_id: fixture-proposal-no-targets\n"
+        "Document: no-targets\nVersion: 001\n\n"
         "# Fixture proposal without target_paths\n\n"
         "## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001 - bridge protocol.\n",
         encoding="utf-8",
     )
     _write_verdict(tmp_path, "no-targets", version=2, verdict="GO")
-    _write_verdict(tmp_path, "no-targets", version=3, verdict="VERIFIED")
+    _write_implementation_report(tmp_path, "no-targets", version=3, paths=["scripts/sample.py"])
+    _write_verdict(tmp_path, "no-targets", version=4, verdict="VERIFIED")
 
     with pytest.raises(auth_module.AuthorizationError):
         auth_module.finalization_target_paths_for_verified(tmp_path, "no-targets")
@@ -2452,11 +2641,12 @@ def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_
     """T12 -- end-to-end: a GO'd proposal using the `## target_paths` heading
     form (not the inline JSON) yields a valid authorization packet."""
     slug = "fixture-bridge"
-    proposal = tmp_path / "bridge" / f"{slug}.md"
+    proposal = tmp_path / "bridge" / f"{slug}-001.md"
     proposal.parent.mkdir(parents=True, exist_ok=True)
     proposal.write_text(
-        "NEW\n\n"
-        "author_session_context_id: fixture-proposal-session-fixture-bridge-001\n\n"
+        "NEW\n\nauthor_identity: prime-builder/fixture\n"
+        "author_session_context_id: fixture-proposal-session-fixture-bridge-001\n"
+        f"Document: {slug}\nVersion: 001\n\n"
         f"# Fixture proposal {slug}\n\n"
         "## target_paths\n\n"
         "- `scripts/dummy.py`\n"
@@ -2470,7 +2660,10 @@ def test_create_authorization_packet_accepts_target_paths_heading_proposal(auth_
         encoding="utf-8",
     )
     _write_verdict(tmp_path, slug, version=2, verdict="GO")
-    _ignore_retired_index_fixture(tmp_path, [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}.md\n"])
+    _ignore_retired_index_fixture(
+        tmp_path,
+        [f"Document: {slug}\nGO: bridge/{slug}-002.md\nNEW: bridge/{slug}-001.md\n"],
+    )
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["bridge_id"] == slug
     assert packet["target_path_globs"] == ["scripts/dummy.py", ".gtkb-state/**"]
@@ -2702,7 +2895,7 @@ def test_begin_creates_packet_for_post_go_no_go_thread(auth_module, tmp_path):
     packet = auth_module.create_authorization_packet(tmp_path, slug)
     assert packet["bridge_id"] == slug
     assert packet["go_file"] == f"bridge/{slug}-002.md"
-    assert packet["proposal_file"] == f"bridge/{slug}.md"
+    assert packet["proposal_file"] == f"bridge/{slug}-001.md"
 
 
 # ---------------------------------------------------------------------------

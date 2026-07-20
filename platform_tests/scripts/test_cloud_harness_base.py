@@ -444,9 +444,9 @@ def test_http_error_diagnostic_is_allowlisted_bounded_and_credential_redacted(
     body = json.dumps(
         {
             "code": "InvalidToolChoice",
-            "message": "named selector rejected; api_key=abcdefghijklmnop" + " x" * 400,
+            "message": "named selector rejected; api_key=abcdefghijklmnop" + " x" * 400,  # placeholder
             "request_id": " request-\n 123 ",
-            "authorization": "Bearer ignored-authorization-sentinel",
+            "authorization": "Bearer ignored-authorization-sentinel",  # placeholder
             "prompt": "ignored-prompt-sentinel",
             "details": {"secret": "ignored-nested-sentinel"},
         }
@@ -866,6 +866,94 @@ def test_bridge_review_requires_publish_before_final_text(tmp_path: Path, monkey
     assert len(published) == 1
     assert published[0]["session_id"] == "dispatch-H-completion"
     assert claim_calls == [{"project_root": root, "slug": "example", "session_id": "dispatch-H-completion"}]
+
+
+def test_bridge_review_recovers_from_denied_raw_bridge_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WI-5216: a denied raw Bash bridge-mutation attempt narrows the next turn
+    to PublishBridgeVerdict instead of letting the model keep probing raw
+    mutation paths for the full turn budget (the observed 611-tool-call,
+    63M-token denial loop)."""
+    root = _root(tmp_path)
+    route = base.resolve_model(base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH), None)
+    payloads: list[dict] = []
+
+    class Published:
+        def to_dict(self) -> dict[str, object]:
+            return {"verdict_path": "bridge/example-002.md"}
+
+    def fake_publish(slug, verdict, content, project_root, **kwargs):
+        return Published()
+
+    monkeypatch.setattr(base, "_load_provider_verdict_publisher", lambda _root: fake_publish)
+    _allow_provider_verdict_claim(monkeypatch)
+    for key in base.BRIDGE_WORK_INTENT_ORDER:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-denial-loop")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        payloads.append(payload)
+        if len(payloads) == 1:
+            assert "tool_choice" not in payload
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "raw_rm_1",
+                                    "function": {
+                                        "name": "Bash",
+                                        "arguments": {"command": "rm bridge/gtkb-example-001.md"},
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        if len(payloads) == 2:
+            # The denied raw mutation must remain visible, and the very next
+            # turn must be narrowed to the governed publisher only.
+            tool_result = payload["messages"][-1]
+            assert tool_result["role"] == "tool"
+            assert tool_result["content"].startswith("ERROR:")
+            assert [tool["function"]["name"] for tool in payload["tools"]] == [base.PUBLISH_BRIDGE_VERDICT_TOOL]
+            assert payload["tool_choice"] == {
+                "type": "function",
+                "function": {"name": base.PUBLISH_BRIDGE_VERDICT_TOOL},
+            }
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "publish_1",
+                                    "function": {
+                                        "name": base.PUBLISH_BRIDGE_VERDICT_TOOL,
+                                        "arguments": {
+                                            "slug": "example",
+                                            "verdict": "GO",
+                                            "content": "GO\n\nResponds to: bridge/example-001.md\n",
+                                        },
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "published"}}]}
+
+    result = base.run_tool_loop(
+        "review", route, "https://test.cloud/api/v1", "key", 4, root, _profile(), skill="bridge-review", chat_func=chat
+    )
+    assert result == "published"
+    assert len(payloads) == 3
 
 
 def test_bridge_review_recovers_publisher_result_without_verdict_path(

@@ -20,6 +20,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true", help="validate CLI shape and emit the planned operation only")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    restore = commands.add_parser(
+        "restore-deleted-path",
+        help="restore one unstaged tracked-file deletion from an explicit commit",
+    )
+    restore.add_argument("--path", action="append", required=True)
+    restore.add_argument("--source-ref", action="append", required=True)
+
     create = commands.add_parser("create", help="create and select a deterministic work-item branch")
     create.add_argument("--work-item-id", required=True)
     create.add_argument("--title", required=True)
@@ -87,6 +94,23 @@ def _require(value: str | None, option: str) -> str:
     raise OperationDenied("cli_argument_missing", f"{option} is required for this promotion level")
 
 
+def _require_one(values: list[str], option: str) -> str:
+    if len(values) == 1:
+        return values[0]
+    raise OperationDenied(
+        "cli_argument_count_invalid",
+        f"{option} must be supplied exactly once",
+        count=len(values),
+        option=option,
+    )
+
+
+def _validate_cli_arguments(args: argparse.Namespace) -> None:
+    if args.command == "restore-deleted-path":
+        _require_one(args.path, "--path")
+        _require_one(args.source_ref, "--source-ref")
+
+
 def _serializable_arguments(args: argparse.Namespace) -> dict[str, Any]:
     return {
         key: str(value) if isinstance(value, Path) else value
@@ -96,6 +120,11 @@ def _serializable_arguments(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _execute(service: GitLifecycleService, args: argparse.Namespace) -> dict[str, Any] | OperationResult:
+    if args.command == "restore-deleted-path":
+        return service.restore_deleted_path(
+            path=_require_one(args.path, "--path"),
+            source_ref=_require_one(args.source_ref, "--source-ref"),
+        )
     if args.command == "create":
         return service.create_work_item_branch(
             work_item_id=args.work_item_id,
@@ -181,6 +210,14 @@ def _emit(payload: dict[str, Any], *, as_json: bool, stream: Any | None = None) 
         print(f"code: {payload['code']}", file=destination)
     if payload.get("commit_sha"):
         print(f"commit: {payload['commit_sha']}", file=destination)
+    if payload.get("path"):
+        print(f"path: {payload['path']}", file=destination)
+    if payload.get("source_commit"):
+        print(f"source commit: {payload['source_commit']}", file=destination)
+    if payload.get("source_blob"):
+        print(f"source blob: {payload['source_blob']}", file=destination)
+    if payload.get("restored_blob"):
+        print(f"restored blob: {payload['restored_blob']}", file=destination)
 
 
 def main(
@@ -191,6 +228,7 @@ def main(
     parser = _parser()
     args = parser.parse_args(argv)
     try:
+        _validate_cli_arguments(args)
         service = GitLifecycleService.production(
             Path.cwd(),
             command_boundary=command_boundary,

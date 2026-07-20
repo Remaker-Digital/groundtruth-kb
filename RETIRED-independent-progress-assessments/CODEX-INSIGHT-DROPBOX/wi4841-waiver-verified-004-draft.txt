@@ -1,0 +1,119 @@
+VERIFIED
+
+# Loyal Opposition Verdict — WI-4841 Hunk-Scoped Finalization Under Owner Waiver (VERIFIED)
+
+bridge_kind: lo_verdict
+Document: gtkb-wi4841-hunk-scoped-finalization-waiver
+Version: 004
+Responds to: bridge/gtkb-wi4841-hunk-scoped-finalization-waiver-003.md
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 7ebdb34c-d12d-4830-b37b-b783ff37fb78
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive session; resolved role loyal-opposition via ::init gtkb lo
+
+## Verdict
+
+VERIFIED. The implementation report at `-003` is confirmed against canonical git
+state and re-executed evidence — not against the report's own assertions. Every
+binding condition from the `-002` GO is satisfied. Commit
+`9fe6b2e775bf084f8be131c486dc575f3b5e69c8` ("feat(skills): finalize managed
+adoption review") is a clean, pure-addition, hunk-isolated finalization of the
+owner-approved WI-4841 managed-skill artifacts.
+
+Review independence: report author session context
+`019f4ace-e667-7030-b632-1cf002c1a0f7` (prime-builder/codex, harness A) differs
+from this reviewer's session context `7ebdb34c-d12d-4830-b37b-b783ff37fb78`
+(loyal-opposition/claude, harness B). Independent-review boundary satisfied.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `PB-PROJECT-AUTHORIZATION-NO-BRIDGE-BYPASS-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `DCL-NO-ACTION-STATUS-SEMANTICS-001`
+- `GOV-HARNESS-ONBOARDING-CONTRACT-001`
+- `ADR-CROSS-HARNESS-PARITY-001`
+- `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+
+## Applicability Preflight
+
+- packet_hash: `sha256:5cc8991c0107bca0b3adf2c5169361f388aae1482e9d210d67b5dccb8c74ee3e`
+- bridge_document_name: `gtkb-wi4841-hunk-scoped-finalization-waiver`
+- content_source: `bridge_file_operative`
+- content_file: `bridge/gtkb-wi4841-hunk-scoped-finalization-waiver-003.md`
+- operative_file: `bridge/gtkb-wi4841-hunk-scoped-finalization-waiver-003.md`
+- preflight_passed: `true`
+- warnings.missing_parent_dirs: []
+- warnings.spec_links_section: {"status": "harvested", "candidate_heading": null}
+- missing_required_specs: []
+- missing_advisory_specs: []
+
+## Clause Applicability (Slice 2; mandatory gate)
+
+- Bridge id: `gtkb-wi4841-hunk-scoped-finalization-waiver`
+- Operative file: `bridge\gtkb-wi4841-hunk-scoped-finalization-waiver-003.md`
+- Clauses evaluated: 5
+- must_apply: 4, may_apply: 1, not_applicable: 0
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory (default invocation). Exit 5 = blocking gap; exit 0 = pass. Observed exit 0.
+
+## Prior Deliberations
+
+- `DELIB-20260710-WI4841-HUNK-SCOPED-FINALIZATION-WAIVER` — the owner waiver
+  authorizing exactly this finalization route.
+- `gtkb-wi4841-hunk-scoped-finalization-waiver-002` — the GO whose binding
+  verification conditions this verdict confirms as met.
+- `gtkb-wi4841-managed-skill-adoption-review-scaffold-028` — parent route
+  reconciliation; cedes finalization authority to this child.
+- `DELIB-202665926` — Antigravity is a supported managed-skill projection target.
+
+## Verification Evidence (canonical, independently re-executed)
+
+| Binding condition (from -002 GO) | Canonical evidence I ran | Result |
+| --- | --- | --- |
+| Commit contains exactly the 7 target paths | `git show --name-status 9fe6b2e7` lists exactly the 7 declared paths; no db, no generated registry | PASS |
+| `.agent` + `.codex` manifests add only the WI-4841 object | `git show` diff: added `capability_id` count = 2 (one per manifest), both `skill.managed-skill-adoption-review`; none of the 5 named foreign objects present in added lines | PASS |
+| No foreign `source_sha256` refresh | the only two added `source_sha256` lines are the WI-4841 skill's own hash `b9c8a7e0…`; pure additions, 671 insertions / 0 deletions | PASS |
+| `groundtruth.db` + generated `harness-registry.json` absent; foreign worktree preserved | absent from `git show`; worktree still shows unstaged foreign manifest/registry edits (not absorbed) | PASS |
+| Focused tests pass | I re-ran `pytest test_managed_skill_adoption_review_skill.py test_skill_catalog_contract.py`: `13 passed, 1 warning` | PASS |
+| Antigravity adapter current | I re-ran `generate_antigravity_skill_adapters.py --check`: `PASS (43 adapters current)` | PASS |
+| Codex WI-4841 adapter current | I re-ran `generate_codex_skill_adapters.py --check`: drift is ONLY `final-verdict-5171.md` + `write_bridge_5171.py` (scope-external wi5171 scratch files); no WI-4841 file/entry in the drift list | PASS for WI-4841 projection (see scope-external note) |
+| ruff check + ruff format --check | I re-ran both on the changed test file: `All checks passed!` / `1 file already formatted` | PASS |
+
+## Scope-External Note (does NOT block VERIFIED)
+
+The main-worktree `generate_codex_skill_adapters.py --check` reports drift for two
+untracked, non-registered scratch files under `.claude/skills/verify/helpers/`
+(`final-verdict-5171.md`, `write_bridge_5171.py`). Neither is a WI-4841 artifact.
+The owner waiver (`DELIB-20260710-WI4841-HUNK-SCOPED-FINALIZATION-WAIVER`)
+explicitly forbade sweeping or altering foreign worktree content, so the
+finalization correctly left them untouched. WI-4841's own Codex projection is
+current. These scratch files are exactly the sweepable, non-change-controlled
+artifact class that must not survive as authority; they should be cleaned up
+under separate scope, but they are not a WI-4841 finalization defect and do not
+gate this VERIFIED.
+
+## Finalization
+
+This VERIFIED verdict is committed with the untracked bridge chain
+(`-001`/`-002`/`-003`) via the finalization helper. The verified implementation
+is already durably committed at `9fe6b2e7`; this commit carries only the bridge
+audit chain and does not stage source, the foreign-edited shared manifests, or
+`groundtruth.db`.
+
+Recommended commit type: docs
+
+---
+
+*(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

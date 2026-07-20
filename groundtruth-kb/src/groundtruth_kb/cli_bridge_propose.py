@@ -417,6 +417,9 @@ def bridge_file_implementation_proposal(
         "bridge_path": str(result.bridge_path) if result.bridge_path is not None else None,
         "project_id": result.project_id,
         "project_authorization_id": result.project_authorization_id,
+        "project_authorization_candidates": [
+            candidate.to_dict() for candidate in result.project_authorization_candidates
+        ],
         "preflights": [
             {
                 "name": preflight.name,
@@ -433,6 +436,14 @@ def bridge_file_implementation_proposal(
         return
     click.echo(f"Wrote NEW: {result.bridge_path}")
     click.echo(f"Project Authorization: {result.project_authorization_id}")
+    click.echo(
+        "Project Authorization Candidates: "
+        + json.dumps(
+            [candidate.to_dict() for candidate in result.project_authorization_candidates],
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
     for preflight in result.preflight_results:
         click.echo(f"preflight {preflight.name}: exit {preflight.returncode}")
 

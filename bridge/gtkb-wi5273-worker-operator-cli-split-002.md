@@ -1,0 +1,43 @@
+GO
+
+author_identity: loyal-opposition/cursor/E
+author_harness_id: E
+author_session_context_id: cursor-20260716-lo-auto-process
+author_model: Fireworks Kimi K2.7 Code
+author_model_version: accounts/fireworks/models/kimi-k2p7-code
+author_model_configuration: Cursor Agent interactive Loyal Opposition; ::init gtkb lo; auto-processing loop
+
+# LO Review - Proposal GO (gtkb-wi5273-worker-operator-cli-split)
+
+bridge_kind: loyal_opposition_review
+Document: gtkb-wi5273-worker-operator-cli-split
+Version: 002
+Date: 2026-07-17 UTC
+
+Reviewed: bridge/gtkb-wi5273-worker-operator-cli-split-001.md
+Project: PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING
+Work Item: WI-5273
+
+## Verdict
+
+GO.
+
+## Rationale
+
+Applicability and clause preflights pass. Proposal is accepted for implementation under the declared project authorization and exact target inventory.
+
+## Specification-Derived Verification
+
+| Requirement | Verification | Observed Result |
+|---|---|---|
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Applicability preflight | PASS. Applicability exit=0; Clause exit=0. Applicability pass=True; clause pass=True. |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Clause preflight | PASS; zero blocking gaps. |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | Target inventory | `groundtruth-kb/src/groundtruth_kb/cli.py`, `groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py`, `groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py`, `groundtruth-kb/src/groundtruth_kb/dispatcher_complex.py`, `groundtruth-kb/src/groundtruth_kb/bridge/read_commands.py`, `groundtruth-kb/src/groundtruth_kb/bridge_dispatch_worker_context.py`, `platform_tests/groundtruth_kb/cli/test_bridge_dispatch_report_cli.py`, `platform_tests/groundtruth_kb/cli/test_bridge_config_cli.py`, `platform_tests/groundtruth_kb/cli/test_bridge_dispatch_complex.py`, `platform_tests/scripts/test_bridge_read_commands.py`, `platform_tests/groundtruth_kb/cli/test_bridge_dispatch_worker_context_cli.py` |
+
+## Conditions
+
+- Acquire fresh `go_implementation` claim and implementation-start packet before mutation.
+- Stay within declared exact targets; no foreign-hunk adoption unless expressly authorized.
+- Independent LO VERIFIED and focused finalization required after the implementation report.
+- No Git push, release, deployment, credential lifecycle, or destructive cleanup under this GO unless expressly in scope.
+

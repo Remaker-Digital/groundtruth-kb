@@ -1,6 +1,6 @@
 {
   "description": "Generated hot-path projection of the MemBase harnesses registry table (REQ-HARNESS-REGISTRY-001 FR5). SessionStart harness identity and role resolution reads this flat file so it never depends on DB availability. Do not hand-edit; regenerate from the harnesses table via groundtruth_kb.harness_projection.",
-  "generated_at": "2026-07-16T20:11:56Z",
+  "generated_at": "2026-07-20T06:20:35Z",
   "harnesses": [
     {
       "activity_envelope_projection_mode": "native",
@@ -98,7 +98,7 @@
           "argv": [
             "claude",
             "--model",
-            "claude-opus-4-8",
+            "claude-sonnet-5",
             "--effort",
             "max",
             "-p",
@@ -115,7 +115,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 105
+      "version": 110
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -174,12 +174,12 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 75
+      "version": 82
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -199,7 +199,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": false,
+          "can_receive_dispatch": true,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 2,
@@ -217,9 +217,7 @@
             "-p",
             "{{PROMPT}}",
             "--skill",
-            "bridge-review",
-            "--model",
-            "kimi-k2-7-code-cloud"
+            "bridge-review"
           ],
           "max_items": 1
         }
@@ -229,12 +227,12 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 74
+      "version": 82
     },
     {
       "activity_envelope_projection_mode": "native",
       "can_fire_events": false,
-      "can_receive_dispatch": true,
+      "can_receive_dispatch": false,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "native",
       "compact_session_envelope_mode": "native",
@@ -253,7 +251,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": true,
+          "can_receive_dispatch": false,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_max_items": 3,
@@ -283,12 +281,12 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 18
+      "version": 19
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
       "can_fire_events": false,
-      "can_receive_dispatch": false,
+      "can_receive_dispatch": true,
       "capabilities_ref": null,
       "compact_result_envelope_mode": "compact-provider",
       "compact_session_envelope_mode": "compact-provider",
@@ -307,7 +305,7 @@
       "invocation_surfaces": {
         "dispatch": {
           "can_fire_events": false,
-          "can_receive_dispatch": false,
+          "can_receive_dispatch": true,
           "dispatch_availability": 90,
           "dispatch_cost": 60,
           "dispatch_quality": 90,
@@ -341,7 +339,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 49
+      "version": 52
     },
     {
       "activity_envelope_projection_mode": "native",
@@ -395,12 +393,12 @@
           "name": "Goose Desktop"
         }
       },
-      "reviewer_precedence": null,
+      "reviewer_precedence": 20,
       "role": [
-        "loyal-opposition"
+        "prime-builder"
       ],
-      "status": "retired",
-      "version": 9
+      "status": "active",
+      "version": 15
     },
     {
       "activity_envelope_projection_mode": "compact-provider",
@@ -461,7 +459,7 @@
         "loyal-opposition"
       ],
       "status": "active",
-      "version": 53
+      "version": 59
     }
   ],
   "schema_version": 1,

@@ -54,7 +54,7 @@ _STATUS_VERB_HINT: dict[str, str] = {
     harness_lifecycle.STATUS_REGISTERED: ("use 'gt harness activate' to bring a registered harness into service"),
     harness_lifecycle.STATUS_ACTIVE: ("use 'gt harness suspend' to suspend an active harness"),
     harness_lifecycle.STATUS_SUSPENDED: ("use 'gt harness resume' to return a suspended harness to service"),
-    harness_lifecycle.STATUS_RETIRED: ("'retired' is terminal; the harness has no further transitions"),
+    harness_lifecycle.STATUS_RETIRED: ("use 'gt harness unretire' to return a retired harness to registered status"),
 }
 
 # FR1 content fields carried forward verbatim when appending a new harness

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import importlib.util
 import json
 import logging
@@ -30,6 +31,7 @@ if _PACKAGE_SRC.is_dir() and str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
 from groundtruth_kb.bridge_dispatch_config import clear_operator_quiesce, set_operator_quiesce  # noqa: E402
+import dispatcher_generation_admission as admission  # noqa: E402
 
 DAEMON_STATE_SUBDIR = (".gtkb-state", "dispatcher-daemon")
 BRIDGE_POLLER_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
@@ -41,7 +43,14 @@ SHADOW_LOG_FILENAME = "shadow-decisions.jsonl"
 STATUS_FILENAME = "status.json"
 PID_FILENAME = "daemon.pid"
 PID_CREATE_TIME_FILENAME = "daemon.create_time_epoch"
+GENERATION_HANDOFF_REQUEST_FILENAME = "generation-handoff-request.json"
 PID_CREATE_TIME_MATCH_TOLERANCE_SECONDS = 0.01
+RUNTIME_GENERATION_RELATIVE_PATHS = (
+    Path("scripts/gtkb_dispatcher_daemon.py"),
+    Path("scripts/ensure_dispatcher_daemon.py"),
+    Path("scripts/dispatcher_runtime.py"),
+    Path("groundtruth-kb/src/groundtruth_kb/session/envelope.py"),
+)
 # WI-4882: persistent rotating daemon activity/error log. The daemon previously
 # wrote only status.json + shadow-decisions.jsonl, so an unsupervised death left
 # no diagnostic trail. This log records loop start/exit, per-tick completion, and
@@ -67,6 +76,139 @@ HEARTBEAT_STALE_DEFAULT_SECONDS = 180
 
 def _now_iso() -> str:
     return dt.datetime.now(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _compute_runtime_generation(
+    project_root: Path,
+    *,
+    relative_paths: tuple[Path, ...] = RUNTIME_GENERATION_RELATIVE_PATHS,
+) -> dict[str, Any]:
+    """Hash the exact source set that defines one dispatcher runtime generation."""
+    root = project_root.resolve()
+    digest = hashlib.sha256()
+    manifest: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for relative_path in relative_paths:
+        path = root / relative_path
+        try:
+            body = path.read_bytes()
+        except OSError as exc:
+            errors.append(f"{relative_path.as_posix()}: {exc}")
+            continue
+        file_hash = hashlib.sha256(body).hexdigest()
+        manifest.append(
+            {
+                "path": relative_path.as_posix(),
+                "sha256": file_hash,
+                "size": len(body),
+            }
+        )
+        digest.update(relative_path.as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(body)
+        digest.update(b"\0")
+    generation = None if errors else f"sha256:{digest.hexdigest()}"
+    return {
+        "generation": generation,
+        "manifest": manifest,
+        "errors": errors,
+    }
+
+
+_LOADED_RUNTIME_GENERATION_INFO = _compute_runtime_generation(_SCRIPTS_DIR.parent)
+LOADED_RUNTIME_GENERATION = _LOADED_RUNTIME_GENERATION_INFO["generation"]
+
+
+def current_runtime_generation(project_root: Path) -> dict[str, Any]:
+    """Return the generation represented by the current on-disk runtime source."""
+    return _compute_runtime_generation(project_root)
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        temp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        os.replace(temp_path, path)
+    finally:
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _read_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def generation_handoff_request_path(project_root: Path) -> Path:
+    return daemon_state_dir(project_root) / GENERATION_HANDOFF_REQUEST_FILENAME
+
+
+def read_generation_handoff_request(project_root: Path) -> dict[str, Any] | None:
+    return _read_json_object(generation_handoff_request_path(project_root))
+
+
+def write_generation_handoff_request(project_root: Path, payload: dict[str, Any]) -> None:
+    _write_json_atomic(generation_handoff_request_path(project_root), payload)
+
+
+def clear_generation_handoff_request(project_root: Path) -> None:
+    try:
+        generation_handoff_request_path(project_root).unlink()
+    except FileNotFoundError:
+        pass
+
+
+def dispatch_quiescence(project_root: Path) -> dict[str, Any]:
+    """Read current worker and document-lease liveness without mutating either."""
+    try:
+        from groundtruth_kb.bridge_dispatch_reset import (  # noqa: PLC0415
+            DispatchStateDirs,
+            read_live_dispatch_runs,
+            read_live_leases,
+        )
+
+        state_dirs = DispatchStateDirs.resolve(project_root)
+        workers = read_live_dispatch_runs(state_dirs)
+        leases = read_live_leases(state_dirs)
+    except Exception as exc:  # noqa: BLE001 - unknown quiescence must fail closed
+        return {
+            "known": False,
+            "live_worker_count": None,
+            "live_document_lease_count": None,
+            "error": str(exc),
+        }
+    return {
+        "known": True,
+        "live_worker_count": len(workers),
+        "live_document_lease_count": len(leases),
+        "live_workers": [{"dispatch_id": item.doc_slug, "pid": item.pid, "path": str(item.path)} for item in workers],
+        "live_document_leases": [
+            {"document": item.doc_slug, "pid": item.pid, "path": str(item.path)} for item in leases
+        ],
+    }
+
+
+def _generation_fields(project_root: Path, loaded_generation: str | None) -> dict[str, Any]:
+    current = current_runtime_generation(project_root)
+    current_generation = current.get("generation")
+    diagnostics: list[str] = []
+    if not loaded_generation:
+        diagnostics.append("loaded_generation_unavailable")
+    if not current_generation:
+        diagnostics.append("current_generation_unavailable")
+    diagnostics.extend(str(item) for item in current.get("errors", []))
+    return {
+        "loaded_generation": loaded_generation,
+        "current_generation": current_generation,
+        "generation_match": bool(loaded_generation and current_generation and loaded_generation == current_generation),
+        "generation_diagnostics": diagnostics,
+    }
 
 
 def get_daemon_logger(state_dir: Path) -> logging.Logger:
@@ -576,6 +718,7 @@ def acquire_daemon_lock(state_dir: Path) -> bool:
         "pid_create_time_epoch": _pid_create_time_epoch(os.getpid()),
         "acquired_at": _now_iso(),
         "mode": "shadow",
+        "loaded_generation": LOADED_RUNTIME_GENERATION,
     }
     for attempt in range(2):
         try:
@@ -629,6 +772,123 @@ release_lock = release_daemon_lock
 def write_heartbeat(state_dir: Path) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / HEARTBEAT_FILENAME).write_text(_now_iso() + "\n", encoding="utf-8")
+
+
+def _record_generation_handoff_status(
+    project_root: Path,
+    *,
+    state: str,
+    request: dict[str, Any] | None,
+    quiescence: dict[str, Any] | None = None,
+    reason: str | None = None,
+) -> None:
+    state_dir = _daemon_state_dir(project_root)
+    status_path = state_dir / STATUS_FILENAME
+    status = _read_json_object(status_path) or {}
+    status.update(
+        {
+            "updated_at": _now_iso(),
+            "mode": "live" if _active_substrate(project_root) == DAEMON_SUBSTRATE else "shadow",
+            "active_substrate": _active_substrate(project_root),
+            "pid": os.getpid(),
+            **_generation_fields(project_root, LOADED_RUNTIME_GENERATION),
+        }
+    )
+    handoff = {
+        "state": state,
+        "daemon_pid": os.getpid(),
+        "target_generation": request.get("target_generation") if isinstance(request, dict) else None,
+        "updated_at": _now_iso(),
+    }
+    if quiescence is not None:
+        handoff["quiescence"] = quiescence
+    if reason:
+        handoff["reason"] = reason
+    status["generation_handoff"] = handoff
+    _write_json_atomic(status_path, status)
+    write_heartbeat(state_dir)
+
+
+def _generation_handoff_request_error(
+    project_root: Path,
+    request: dict[str, Any],
+) -> str | None:
+    target_generation = request.get("target_generation")
+    if not isinstance(target_generation, str) or not target_generation.startswith("sha256:"):
+        return "target_generation_invalid"
+    if request.get("observed_loaded_generation") != LOADED_RUNTIME_GENERATION:
+        return "observed_loaded_generation_mismatch"
+    if request.get("daemon_pid") != os.getpid():
+        return "daemon_pid_mismatch"
+    expected_create_time = request.get("daemon_pid_create_time_epoch")
+    if expected_create_time is None or not _pid_create_time_matches(os.getpid(), expected_create_time):
+        return "daemon_pid_provenance_mismatch"
+    current = current_runtime_generation(project_root)
+    if current.get("generation") != target_generation:
+        return "target_generation_no_longer_current"
+    phase = request.get("phase", "requested")
+    if phase not in {"requested", "commit"}:
+        return "handoff_phase_invalid"
+    return None
+
+
+def _process_generation_handoff_request(project_root: Path) -> str:
+    """Return ``none``, ``wait``, or ``exit`` for the daemon loop."""
+    request_path = generation_handoff_request_path(project_root)
+    if not request_path.exists():
+        return "none"
+    request = read_generation_handoff_request(project_root)
+    if request is None:
+        _record_generation_handoff_status(
+            project_root,
+            state="generation_handoff_failed",
+            request=None,
+            reason="handoff_request_unreadable",
+        )
+        return "wait"
+    request_error = _generation_handoff_request_error(project_root, request)
+    if request_error:
+        _record_generation_handoff_status(
+            project_root,
+            state="generation_handoff_failed",
+            request=request,
+            reason=request_error,
+        )
+        return "wait"
+    quiescence = dispatch_quiescence(project_root)
+    if not quiescence.get("known"):
+        _record_generation_handoff_status(
+            project_root,
+            state="generation_handoff_failed",
+            request=request,
+            quiescence=quiescence,
+            reason="dispatch_quiescence_unknown",
+        )
+        return "wait"
+    if quiescence.get("live_worker_count") or quiescence.get("live_document_lease_count"):
+        _record_generation_handoff_status(
+            project_root,
+            state="generation_handoff_deferred",
+            request=request,
+            quiescence=quiescence,
+            reason="dispatch_work_active",
+        )
+        return "wait"
+    if request.get("phase", "requested") == "commit":
+        _record_generation_handoff_status(
+            project_root,
+            state="generation_handoff_committed",
+            request=request,
+            quiescence=quiescence,
+        )
+        return "exit"
+    _record_generation_handoff_status(
+        project_root,
+        state="generation_handoff_ready",
+        request=request,
+        quiescence=quiescence,
+    )
+    return "wait"
 
 
 def _append_shadow_decision(state_dir: Path, record: dict[str, Any]) -> None:
@@ -868,6 +1128,9 @@ def _execute_live_spawns(
         dispatch_id: str | None = None
         work_intent_session_id: str | None = None
         acquired_work_intent_slugs: list[str] = []
+        trusted_worker_context: dict[str, Any] | None = None
+        lo_verdict_claim_session_id: str | None = None
+        acquired_lo_verdict_claim_slugs: list[str] = []
 
         if getattr(target, "needed_role_label", None) == "prime-builder":
             prime_original_selected = list(selected)
@@ -1055,6 +1318,80 @@ def _execute_live_spawns(
                     spawn_results.append(result)
                     continue
 
+        if getattr(target, "needed_role_label", None) == "loyal-opposition" and not dry_run:
+            assert dispatch_id is not None
+            worker_session_result = runtime._ensure_dispatch_worker_session(
+                project_root=project_root,
+                state_dir=state_dir,
+                target=target,
+                recipient=recipient or target.dispatch_state_key,
+                dispatch_id=dispatch_id,
+                session_id=dispatch_id,
+            )
+            if not worker_session_result["ok"]:
+                reason = worker_session_result["reason"]
+                result = {
+                    **worker_session_result,
+                    "document_leases_released_on_authority_failure": runtime._release_document_lease_records(
+                        acquired_document_leases
+                    ),
+                }
+                if recipient_state is not None:
+                    recipient_state["last_result"] = reason
+                    runtime._record_recipient_attempt(recipient_state, result)
+                    recipient_state["pending_count"] = len(selected)
+                    recipient_state["selected_count"] = 0
+                record["spawned"] = False
+                record["spawn_reason"] = reason
+                spawn_results.append(result)
+                continue
+            trusted_worker_context = dict(worker_session_result["trusted_worker_context"])
+            lo_verdict_claim_session_id = dispatch_id
+            lo_claim_ttl_seconds = runtime._lo_verdict_claim_ttl_seconds(
+                runtime.worker_lifetime_profile(target, project_root=project_root).get("seconds")
+            )
+            lo_claim_result = runtime._acquire_lo_verdict_work_intent_batch(
+                selected,
+                project_root=project_root,
+                state_dir=state_dir,
+                recipient=recipient or target.dispatch_state_key,
+                dispatch_id=dispatch_id,
+                session_id=lo_verdict_claim_session_id,
+                ttl_seconds=lo_claim_ttl_seconds,
+            )
+            if recipient_state is not None:
+                recipient_state["lo_verdict_claim_ttl_seconds"] = lo_claim_ttl_seconds
+            if not lo_claim_result["ok"]:
+                reason = lo_claim_result["reason"]
+                released_leases = runtime._release_document_lease_records(acquired_document_leases)
+                result = {
+                    "dispatch_id": dispatch_id,
+                    "recipient": recipient,
+                    "launched": False,
+                    "reason": reason,
+                    "verdict_claim_session_id": lo_verdict_claim_session_id,
+                    "failed_slug": lo_claim_result.get("failed_slug"),
+                    "released_slugs": lo_claim_result.get("acquired_slugs", []),
+                    "document_leases_released_on_claim_failure": released_leases,
+                    "ttl_seconds": lo_claim_ttl_seconds,
+                }
+                holder = lo_claim_result.get("holder")
+                if isinstance(holder, dict):
+                    result["holder_session_id"] = holder.get("session_id")
+                    result["holder_ttl_expires_at"] = holder.get("ttl_expires_at")
+                if lo_claim_result.get("error_message"):
+                    result["error_message"] = lo_claim_result["error_message"]
+                if recipient_state is not None:
+                    recipient_state["last_result"] = reason
+                    runtime._record_recipient_attempt(recipient_state, result)
+                    recipient_state["pending_count"] = len(selected)
+                    recipient_state["selected_count"] = 0
+                record["spawned"] = False
+                record["spawn_reason"] = reason
+                spawn_results.append(result)
+                continue
+            acquired_lo_verdict_claim_slugs = list(lo_claim_result["acquired_slugs"])
+
         if getattr(target, "needed_role_label", None) == "prime-builder" and not dry_run:
             assert dispatch_id is not None
             assert work_intent_session_id is not None
@@ -1141,6 +1478,11 @@ def _execute_live_spawns(
             result["work_intent_session_id"] = work_intent_session_id
         if acquired_work_intent_slugs:
             result["work_intent_slugs"] = acquired_work_intent_slugs
+        if trusted_worker_context is not None:
+            result["trusted_worker_context"] = trusted_worker_context
+        if acquired_lo_verdict_claim_slugs:
+            result["verdict_claim_session_id"] = lo_verdict_claim_session_id
+            result["verdict_claim_slugs"] = acquired_lo_verdict_claim_slugs
         if acquired_document_leases:
             result["document_lease_handles"] = acquired_document_leases
             result["document_lease_slugs"] = [str(record.get("doc_slug")) for record in acquired_document_leases]
@@ -1158,6 +1500,13 @@ def _execute_live_spawns(
             result["document_leases_released_on_launch_failure"] = runtime._release_document_lease_records(
                 acquired_document_leases
             )
+        if acquired_lo_verdict_claim_slugs and not result.get("launched"):
+            runtime._release_prime_work_intents(
+                acquired_lo_verdict_claim_slugs,
+                project_root=project_root,
+                session_id=lo_verdict_claim_session_id or "",
+            )
+            result["verdict_claims_released_on_launch_failure"] = True
         if recipient_state is not None:
             runtime._record_recipient_attempt(recipient_state, result)
             if result.get("launched"):
@@ -1354,6 +1703,7 @@ def run_tick(
             "active_substrate": active_substrate,
             "decision_count": len(decisions),
             "pid": os.getpid(),
+            **_generation_fields(project_root, LOADED_RUNTIME_GENERATION),
         }
         if operator_quiesce.get("exists") or operator_quiesce.get("active"):
             status["operator_quiesce"] = operator_quiesce
@@ -1392,6 +1742,12 @@ def run_loop(
     _write_daemon_pid_record(state_dir, os.getpid())
     try:
         while True:
+            handoff_action = _process_generation_handoff_request(project_root)
+            if handoff_action == "exit":
+                break
+            if handoff_action == "wait":
+                time.sleep(max(1, tick_seconds))
+                continue
             try:
                 run_tick(project_root, max_items=max_items)
             except Exception:  # noqa: BLE001 - WI-4882: log the fatal exception before the loop dies
@@ -1427,11 +1783,11 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
         "lock_path": str(lock_path),
     }
     lock_present = lock_path.is_file()
+    lock_payload: dict[str, Any] | None = None
     if lock_present:
-        try:
-            status["lock"] = json.loads(lock_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            pass
+        lock_payload = _read_daemon_lock_payload(lock_path)
+        if lock_payload is not None:
+            status["lock"] = lock_payload
     heartbeat_age: float | None = None
     if heartbeat_path.is_file():
         try:
@@ -1451,6 +1807,19 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
     heartbeat_fresh = heartbeat_age is not None and heartbeat_age <= _heartbeat_stale_seconds()
     status["pid_provenance_verified"] = pid_provenance_verified
     status["running"] = bool(pid_alive or (lock_present and heartbeat_fresh))
+    runtime_status = _read_json_object(state_dir / STATUS_FILENAME)
+    loaded_generation = lock_payload.get("loaded_generation") if lock_payload is not None else None
+    if (
+        not loaded_generation
+        and status["running"]
+        and isinstance(runtime_status, dict)
+        and runtime_status.get("pid") == (lock_payload or {}).get("pid")
+    ):
+        loaded_generation = runtime_status.get("loaded_generation")
+    status.update(_generation_fields(project_root, loaded_generation))
+    status["generation_match"] = bool(status["running"] and status["generation_match"])
+    if isinstance(runtime_status, dict) and isinstance(runtime_status.get("generation_handoff"), dict):
+        status["generation_handoff"] = runtime_status["generation_handoff"]
     log_path = state_dir / SHADOW_LOG_FILENAME
     if log_path.is_file():
         try:
@@ -1461,6 +1830,18 @@ def collect_daemon_status(project_root: Path) -> dict[str, Any]:
                 status["last_shadow_decision"] = last
         except (OSError, json.JSONDecodeError):
             pass
+    # WI-5429: surface admitted-generation state
+    try:
+        ad_status = admission.candidate_admission_status(project_root)
+        status["admitted_generation"] = {
+            "last_admitted": ad_status.get("last_admitted_generation"),
+            "last_admitted_commit": ad_status.get("last_admitted_commit"),
+            "materialization_ok": ad_status.get("last_admitted_materialization_ok"),
+            "current_already_admitted": ad_status.get("current_already_admitted"),
+            "unfinalized_generation_rejected": ad_status.get("current_unfinalized"),
+        }
+    except Exception:  # noqa: BLE001 - admission is diagnostic, not critical
+        status["admitted_generation"] = {"error": "admission_status_unavailable"}
     return status
 
 

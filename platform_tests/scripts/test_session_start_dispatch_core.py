@@ -63,6 +63,38 @@ def test_timeout_reads_env_when_set(monkeypatch) -> None:
     assert module._startup_service_timeout_seconds() == pytest.approx(200.0)
 
 
+def test_harness_timeout_keeps_codex_default(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.delenv(module.STARTUP_SERVICE_TIMEOUT_ENV, raising=False)
+    monkeypatch.setattr(module, "HARNESS_NAME", "codex")
+
+    assert module._startup_service_timeout_seconds_for_harness() == pytest.approx(150.0)
+
+
+def test_harness_timeout_caps_claude_default(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.delenv(module.STARTUP_SERVICE_TIMEOUT_ENV, raising=False)
+    monkeypatch.setattr(module, "HARNESS_NAME", "claude")
+
+    assert module._startup_service_timeout_seconds_for_harness() == pytest.approx(55.0)
+
+
+def test_harness_timeout_caps_claude_env_above_hook_budget(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv(module.STARTUP_SERVICE_TIMEOUT_ENV, "200")
+    monkeypatch.setattr(module, "HARNESS_NAME", "claude")
+
+    assert module._startup_service_timeout_seconds_for_harness() == pytest.approx(55.0)
+
+
+def test_harness_timeout_honors_claude_env_below_hook_budget(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.setenv(module.STARTUP_SERVICE_TIMEOUT_ENV, "45")
+    monkeypatch.setattr(module, "HARNESS_NAME", "claude")
+
+    assert module._startup_service_timeout_seconds_for_harness() == pytest.approx(45.0)
+
+
 def test_timeout_reads_fractional_env(monkeypatch) -> None:
     module = _load_module()
     monkeypatch.setenv(module.STARTUP_SERVICE_TIMEOUT_ENV, "75.5")
@@ -126,6 +158,100 @@ def test_read_session_start_source_none_on_bad_json(monkeypatch) -> None:
     assert module._read_session_start_source() is None
 
 
+def _fake_packet(kind: str, *, cap: int = 900, estimated: int = 80, status: str = "ready") -> dict[str, object]:
+    packet: dict[str, object] = {
+        "packet_kind": kind,
+        "status": status,
+        "budget": {
+            "estimated_tokens": estimated,
+            "cap_estimated_tokens": cap,
+        },
+        "cache": {
+            "status": "miss",
+            "cache_path": f".gtkb-state/session-envelope/packet-cache/{kind}.json",
+        },
+        "source_pointers": [],
+    }
+    if status == "over_budget_pointer_only":
+        packet["diagnostic"] = {"pointer_only": True}
+    return packet
+
+
+def test_packet_receipt_precedes_activity_context_for_full_hook(monkeypatch) -> None:
+    module = _load_module()
+    calls: list[tuple[str, str, str | None]] = []
+
+    def _fake_compose(*, packet_kind: str, role: str, activity: str | None = None) -> dict[str, object]:
+        calls.append((packet_kind, role, activity))
+        cap = 500 if packet_kind == "activity-packet" else 900
+        return _fake_packet(packet_kind, cap=cap)
+
+    monkeypatch.setattr(module, "HARNESS_NAME", "claude")
+    monkeypatch.setattr(module, "_compose_session_envelope_packet", _fake_compose)
+
+    rendered = module._with_envelope_packet_receipt("activity specialization body", role_mode="pb", activity="build")
+
+    assert rendered.startswith("# GroundTruth-KB Envelope Packet Receipt")
+    assert rendered.index("Envelope Packet Receipt") < rendered.index("activity specialization body")
+    assert "- packet_injection_order: before_activity_specialization" in rendered
+    assert "- hook_disposition: full_sessionstart_packet_injection" in rendered
+    assert "- role_bootstrap: prime-builder" in rendered
+    assert "- activity: build" in rendered
+    assert "session_packet: status=ready; estimated_tokens=80; cap=900" in rendered
+    assert "activity_packet: status=ready; estimated_tokens=80; cap=500" in rendered
+    assert calls == [
+        ("session-envelope", "prime-builder", None),
+        ("activity-packet", "prime-builder", "build"),
+    ]
+
+
+def test_packet_receipt_marks_weak_hook_fallback_as_non_parity(monkeypatch) -> None:
+    module = _load_module()
+    monkeypatch.delenv(module._SESSION_ENVELOPE_ROLE_ENV, raising=False)
+    monkeypatch.delenv(module._SESSION_ENVELOPE_ACTIVITY_ENV, raising=False)
+    monkeypatch.delenv(module._DISPATCH_ACTIVITY_ENV, raising=False)
+
+    def _fake_compose(*, packet_kind: str, role: str, activity: str | None = None) -> dict[str, object]:
+        cap = 500 if packet_kind == "activity-packet" else 900
+        return _fake_packet(packet_kind, cap=cap, status="over_budget_pointer_only")
+
+    monkeypatch.setattr(module, "HARNESS_NAME", "cursor")
+    monkeypatch.setattr(module, "_compose_session_envelope_packet", _fake_compose)
+
+    rendered = module._with_envelope_packet_receipt("activity specialization body", role_mode="lo", activity="test")
+
+    assert "- hook_disposition: fallback_receipt_pointer" in rendered
+    assert "- fallback_is_parity: false" in rendered
+    assert "- role_bootstrap: loyal-opposition" in rendered
+    assert "- activity: test" in rendered
+    assert "pointer_only=true" in rendered
+
+
+def test_role_scoped_relay_cache_deadline_preserves_primary_and_skips_alternate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Deadline guard.
+    module = _load_module()
+    disclosure = (
+        "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\n- Role being assumed: Prime Builder\n"
+    )
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(module, "_persistent_harness_id", lambda: "TEST-ID")
+    monkeypatch.setattr(module, "_resolve_own_role_set", lambda *args, **kwargs: frozenset({"pb"}))
+    monkeypatch.setattr(module, "_monotonic_seconds", lambda: 20.0)
+    monkeypatch.setattr(
+        module,
+        "_render_role_startup_report",
+        lambda _role_profile: pytest.fail("alternate role cache render should be skipped after deadline"),
+    )
+
+    module._write_role_scoped_startup_relay_caches(disclosure, deadline_monotonic=20.0)
+
+    assert (tmp_path / "last-user-visible-startup-pb.md").is_file()
+    assert not (tmp_path / "last-user-visible-startup-lo.md").exists()
+
+
 def test_session_start_context_id_accepts_only_canonical_uuid() -> None:
     module = _load_module()
     session_id = "12a16794-f84d-457f-81b4-8e803034e4d5"
@@ -156,7 +282,12 @@ def _run_normal_startup(module, monkeypatch, tmp_path, payload: dict[str, object
     )
     monkeypatch.setattr(module, "_valid_session_start_payload", lambda *_args: True)
     monkeypatch.setattr(module, "_write_startup_relay_cache", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(module, "_write_role_scoped_startup_relay_caches", lambda *_args, **_kwargs: None)
+
+    def _fake_role_scoped_relay_cache(*args, **kwargs):
+        captured["role_cache_args"] = args
+        captured["role_cache_kwargs"] = kwargs
+
+    monkeypatch.setattr(module, "_write_role_scoped_startup_relay_caches", _fake_role_scoped_relay_cache)
 
     def _fake_run(command, **kwargs):
         captured["command"] = command
@@ -187,6 +318,18 @@ def test_main_passes_valid_session_context_as_startup_guard_id(monkeypatch, tmp_
 
     assert captured["env"]["GTKB_STARTUP_GUARD_ID"] == session_id
     assert captured["command"][-2:] == ["--session-start-source", "startup"]
+
+
+def test_main_bounds_role_scoped_relay_cache_sync_work(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module, "_monotonic_seconds", lambda: 10.0)
+
+    captured = _run_normal_startup(module, monkeypatch, tmp_path, {"source": "startup"})
+
+    assert captured["role_cache_args"] == ("startup",)
+    assert captured["role_cache_kwargs"] == {
+        "deadline_monotonic": 10.0 + module.ROLE_SCOPED_STARTUP_RELAY_CACHE_SYNC_BUDGET_SECONDS
+    }
 
 
 @pytest.mark.parametrize("session_id", [None, "not-a-session", 42])

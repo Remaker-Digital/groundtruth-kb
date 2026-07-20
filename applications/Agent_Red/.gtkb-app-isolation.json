@@ -25,7 +25,7 @@
       "type": "FILE",
       "bucket": "B",
       "tool": "Docker",
-      "justification": "Build-context ignore at Dockerfile location; placeholder pending Phase 3 infra cluster move that brings Dockerfile* into this directory"
+      "justification": "Application-owned Docker build-context ignore for Agent Red production and test-host containers; keeps secrets, caches, and generated local artifacts out of the application build context while retaining src, config, tests, pyproject.toml, and test_host inputs required by the application-local Dockerfiles"
     },
     {
       "name": ".gtkb-app-isolation.json",
@@ -157,6 +157,69 @@
       "purpose": "Agent Red configuration (initially: Stripe pricing at config/stripe_product_ids.json deferred from 18.D); other Agent Red config arrives in subsequent slices. GT-KB platform configs in config/agent-control/ and config/governance/ STAY at GT-KB root per umbrella -008. Migrated in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
     },
     {
+      "name": ".github",
+      "type": "DIR",
+      "bucket": "B",
+      "tool": "GitHub Actions",
+      "justification": "Application-local workflow discovery for Agent Red test-host container builds; workflow defaults set working-directory to applications/Agent_Red and do not make GT-KB platform workflows application-owned"
+    },
+    {
+      "name": "Dockerfile",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Docker",
+      "justification": "Agent Red production API image contract owned by the application lifecycle and built from applications/Agent_Red as Docker context"
+    },
+    {
+      "name": "Dockerfile.test",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Docker",
+      "justification": "Agent Red test-host image contract for SPEC-1825 verification; copies application-local src, config, tests, project metadata, and test_host package from applications/Agent_Red"
+    },
+    {
+      "name": "Dockerfile.ui",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Docker",
+      "justification": "Agent Red static UI image contract for application-local admin and widget build outputs"
+    },
+    {
+      "name": "docker-compose.yml",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Docker Compose",
+      "justification": "Application-local development stack for Agent Red API, test-host, NATS, and Redis using applications/Agent_Red as the compose root"
+    },
+    {
+      "name": "pyproject.toml",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "Python packaging and test tooling",
+      "justification": "Application-owned Python project, pytest, coverage, Ruff, and build metadata for src and test_host packages"
+    },
+    {
+      "name": "requirements.txt",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "pip",
+      "justification": "Application-owned production Python dependency manifest consumed by the Agent Red production and test-host Dockerfiles"
+    },
+    {
+      "name": "requirements-test.txt",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "pip",
+      "justification": "Application-owned test dependency manifest for the Agent Red test-host container and local focused verification"
+    },
+    {
+      "name": "requirements-local.txt",
+      "type": "FILE",
+      "bucket": "B",
+      "tool": "pip",
+      "justification": "Application-owned local development dependency overlay chaining test dependencies plus local GT-KB governance tooling"
+    },
+    {
       "name": "package-lock.json",
       "type": "FILE",
       "bucket": "A",
@@ -173,6 +236,12 @@
       "type": "DIR",
       "bucket": "A",
       "purpose": "Agent Red application-local operational and development scripts."
+    },
+    {
+      "name": "test_host",
+      "type": "DIR",
+      "bucket": "A",
+      "purpose": "Agent Red application-owned self-service verification host package required by SPEC-1825; exposes FastAPI endpoints, suite registry, runner orchestration, and Cosmos result writing without depending on GT-KB root paths."
     },
     {
       "name": "SECURITY.md",

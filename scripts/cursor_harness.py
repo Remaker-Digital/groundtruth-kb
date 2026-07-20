@@ -11,13 +11,24 @@ import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 try:
     from scripts._env import load_env_local
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from _env import load_env_local
+
+try:
+    from scripts.bridge_author_metadata import load_author_metadata
+    from scripts.bridge_work_intent_registry import acquire as acquire_work_intent
+    from scripts.bridge_work_intent_registry import release as release_work_intent
+    from scripts.gtkb_bridge_writer import publish_lo_verdict
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from bridge_author_metadata import load_author_metadata
+    from bridge_work_intent_registry import acquire as acquire_work_intent
+    from bridge_work_intent_registry import release as release_work_intent
+    from gtkb_bridge_writer import publish_lo_verdict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TIMEOUT_SECONDS = 600.0
@@ -46,10 +57,26 @@ _CURSOR_AGENT_PROCESS_NAMES = {"agent", "agent.exe", "cursor-agent", "cursor-age
 _WINDOWS_SHELL_WRAPPER_SUFFIXES = {".bat", ".cmd", ".ps1"}
 _CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
 _CURSOR_AUTH_ENV_KEYS = ("CURSOR_API_KEY",)
-_CURSOR_ADAPTATION_VERSION = "cursor-skill-route-v1"
+_CURSOR_ADAPTATION_VERSION = "cursor-governed-lo-publication-v1"
 _PROVENANCE_DIR = Path(".gtkb-state") / "ops" / "dispatch-provenance"
 _PROVENANCE_LEDGER_FILENAME = "dispatch-provenance.json"
 _TIMEOUT_CAPTURE_LIMIT_BYTES = 4000
+_VERDICT_ENVELOPE_BEGIN = "GTKB_BRIDGE_VERDICT_ENVELOPE_BEGIN"
+_VERDICT_ENVELOPE_END = "GTKB_BRIDGE_VERDICT_ENVELOPE_END"
+_VERDICT_ENVELOPE_SCHEMA_VERSION = 1
+_VERDICT_ENVELOPE_KEYS = frozenset(
+    {
+        "schema_version",
+        "document_name",
+        "verdict",
+        "content",
+        "include_paths",
+        "hunk_patch_paths",
+        "commit_message",
+    }
+)
+_VERDICT_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+_SAFE_BRIDGE_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _TIMEOUT_CAPTURE_SECRET_PATTERNS = (
     re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*([A-Za-z0-9._~+/=-]{8,})"),
 )
@@ -187,11 +214,39 @@ def _skill_system_prompt(skill: str | None) -> str | None:
 
 def _build_prompt(user_prompt: str, skill: str | None) -> str:
     system_prompt = _skill_system_prompt(skill)
-    if not system_prompt:
-        return user_prompt
-    return (
-        f"Follow the GT-KB skill contract below, then execute the user task.\n\n{system_prompt}\n\n---\n\n{user_prompt}"
-    )
+    prompt = user_prompt
+    if system_prompt:
+        prompt = (
+            "Follow the GT-KB skill contract below, then execute the user task.\n\n"
+            f"{system_prompt}\n\n---\n\n{user_prompt}"
+        )
+    if _requires_bridge_output(skill):
+        prompt += _governed_verdict_output_contract()
+    return prompt
+
+
+def _governed_verdict_output_contract() -> str:
+    return f"""
+
+---
+
+You are a read-only Loyal Opposition reviewer. Do not create, edit, delete, stage,
+commit, or execute a helper that writes workspace files. The harness shim owns the
+only authorized bridge write. Your final response must contain exactly one verdict
+envelope and no text outside it:
+
+{_VERDICT_ENVELOPE_BEGIN}
+{{"schema_version":1,"document_name":"canonical-thread-slug","verdict":"GO|NO-GO|VERIFIED","content":"full status-bearing verdict body","include_paths":[],"hunk_patch_paths":[],"commit_message":""}}
+{_VERDICT_ENVELOPE_END}
+
+The content field must begin with the selected verdict token and must cite the
+current latest numbered bridge file. GO and NO-GO require empty path arrays and
+an empty commit message. VERIFIED requires the exact reviewed include paths and
+a non-empty focused commit message; include hunk patch paths for every modified
+tracked include path. Do not supply author, session, harness, claim, routing, or
+eligibility metadata; the trusted shim derives those values from the worker
+session and publishes through the governed bridge service.
+"""
 
 
 def _sha256_file(path: Path) -> str:
@@ -207,8 +262,9 @@ def cursor_adaptation_metadata(project_root: Path = PROJECT_ROOT) -> dict[str, A
     shim_path = project_root / Path("scripts") / "cursor_harness.py"
     return {
         "harness_id": "E",
-        "adaptation_label": "cursor-skill-route-readiness",
+        "adaptation_label": "cursor-governed-lo-publication",
         "adaptation_version": _CURSOR_ADAPTATION_VERSION,
+        "governed_lo_publication": governed_lo_publication_contract(),
         "skill_route_aliases": dict(sorted(_SKILL_ROUTE_ALIASES.items())),
         "input_fingerprints": {
             "scripts/cursor_harness.py": _sha256_file(shim_path),
@@ -218,6 +274,20 @@ def cursor_adaptation_metadata(project_root: Path = PROJECT_ROOT) -> dict[str, A
             .hexdigest(),
         },
         "raw_prompt_included": False,
+    }
+
+
+def governed_lo_publication_contract() -> dict[str, object]:
+    """Return deterministic readiness evidence for Cursor LO publication."""
+
+    return {
+        "schema_version": _VERDICT_ENVELOPE_SCHEMA_VERSION,
+        "execution_mode": "ask",
+        "output_format": "text",
+        "publisher": "publish_lo_verdict",
+        "envelope_begin": _VERDICT_ENVELOPE_BEGIN,
+        "envelope_end": _VERDICT_ENVELOPE_END,
+        "supported_verdicts": sorted(_VERDICT_STATUSES),
     }
 
 
@@ -247,6 +317,120 @@ def _build_command(
 
 def _requires_bridge_output(skill: str | None) -> bool:
     return skill in LOYAL_OPPOSITION_BRIDGE_SKILLS
+
+
+def _effective_execution_options(*, skill: str | None, output_format: str, mode: str | None) -> tuple[str, str | None]:
+    if _requires_bridge_output(skill):
+        return "text", "ask"
+    return output_format, mode
+
+
+def _normalized_envelope_paths(value: object, *, field: str) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise CursorHarnessError(f"verdict envelope {field} must be a JSON array of strings")
+    normalized: list[str] = []
+    for raw in value:
+        candidate = raw.strip().replace("\\", "/")
+        path = PurePosixPath(candidate)
+        if (
+            not candidate
+            or candidate.startswith("/")
+            or re.match(r"^[A-Za-z]:", candidate)
+            or any(part in {"", ".", ".."} for part in path.parts)
+            or any(ord(char) < 32 for char in candidate)
+        ):
+            raise CursorHarnessError(f"verdict envelope {field} contains an unsafe project-relative path")
+        normalized.append(path.as_posix())
+    if len(set(normalized)) != len(normalized):
+        raise CursorHarnessError(f"verdict envelope {field} contains duplicate paths")
+    return normalized
+
+
+def _parse_bridge_verdict_envelope(stdout: str) -> dict[str, object]:
+    pattern = re.compile(
+        rf"\A\s*{re.escape(_VERDICT_ENVELOPE_BEGIN)}\s*\n(?P<payload>.*?)\n"
+        rf"{re.escape(_VERDICT_ENVELOPE_END)}\s*\Z",
+        re.DOTALL,
+    )
+    match = pattern.fullmatch(stdout)
+    if match is None:
+        raise CursorHarnessError("Cursor LO output must contain exactly one complete verdict envelope")
+    try:
+        payload = json.loads(match.group("payload"))
+    except json.JSONDecodeError as exc:
+        raise CursorHarnessError(f"Cursor LO verdict envelope is not valid JSON: {exc.msg}") from exc
+    if not isinstance(payload, dict) or set(payload) != _VERDICT_ENVELOPE_KEYS:
+        raise CursorHarnessError("Cursor LO verdict envelope fields do not match schema version 1")
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 1:
+        raise CursorHarnessError("Cursor LO verdict envelope schema_version must be integer 1")
+    document_name = payload["document_name"]
+    if not isinstance(document_name, str) or _SAFE_BRIDGE_SLUG_RE.fullmatch(document_name) is None:
+        raise CursorHarnessError("Cursor LO verdict envelope document_name is not a canonical bridge slug")
+    verdict = payload["verdict"]
+    if not isinstance(verdict, str) or verdict not in _VERDICT_STATUSES:
+        raise CursorHarnessError("Cursor LO verdict envelope verdict must be GO, NO-GO, or VERIFIED")
+    content = payload["content"]
+    if not isinstance(content, str) or not content.strip():
+        raise CursorHarnessError("Cursor LO verdict envelope content must be non-empty text")
+    if content.lstrip().splitlines()[0].strip() != verdict:
+        raise CursorHarnessError("Cursor LO verdict envelope content status does not match verdict")
+    include_paths = _normalized_envelope_paths(payload["include_paths"], field="include_paths")
+    hunk_patch_paths = _normalized_envelope_paths(payload["hunk_patch_paths"], field="hunk_patch_paths")
+    commit_message = payload["commit_message"]
+    if not isinstance(commit_message, str) or any(ord(char) < 32 and char not in "\t" for char in commit_message):
+        raise CursorHarnessError("Cursor LO verdict envelope commit_message must be plain text")
+    if verdict == "VERIFIED":
+        if not include_paths or not commit_message.strip():
+            raise CursorHarnessError("VERIFIED verdict envelope requires include_paths and commit_message")
+    elif include_paths or hunk_patch_paths or commit_message.strip():
+        raise CursorHarnessError("GO and NO-GO verdict envelopes cannot request Git finalization")
+    return {
+        "document_name": document_name,
+        "verdict": verdict,
+        "content": content,
+        "include_paths": include_paths,
+        "hunk_patch_paths": hunk_patch_paths,
+        "commit_message": commit_message.strip(),
+    }
+
+
+def _publish_bridge_verdict_envelope(
+    envelope: dict[str, object],
+    *,
+    project_root: Path,
+    session_id: str,
+    env: dict[str, str],
+) -> dict[str, object]:
+    if not session_id.strip():
+        raise CursorHarnessError("Cursor LO governed publication requires a dispatcher worker session id")
+    document_name = str(envelope["document_name"])
+    try:
+        author_metadata = load_author_metadata(project_root, env=env)
+        acquired = acquire_work_intent(document_name, session_id, project_root=project_root)
+    except Exception as exc:  # noqa: BLE001 - normalize governed boundary failures
+        raise CursorHarnessError(f"could not acquire governed verdict claim: {type(exc).__name__}: {exc}") from exc
+    if not acquired:
+        raise CursorHarnessError(f"governed verdict claim for {document_name!r} is held by another session")
+    try:
+        published = publish_lo_verdict(
+            document_name,
+            str(envelope["verdict"]),
+            str(envelope["content"]),
+            project_root,
+            session_id=session_id,
+            harness_name="cursor",
+            author_metadata=author_metadata,
+            include_paths=list(envelope["include_paths"]),
+            hunk_patch_paths=list(envelope["hunk_patch_paths"]),
+            commit_message=str(envelope["commit_message"]),
+        )
+    except Exception as exc:  # noqa: BLE001 - release and fail closed on any publisher denial
+        try:
+            release_work_intent(document_name, session_id, project_root=project_root)
+        except Exception:
+            pass
+        raise CursorHarnessError(f"governed verdict publication failed: {type(exc).__name__}: {exc}") from exc
+    return published.to_dict()
 
 
 def _dispatcher_run_id(env: dict[str, str] | None = None) -> str:
@@ -506,9 +690,19 @@ def main(argv: list[str] | None = None) -> int:
         _load_project_env_local()
     except Exception:  # noqa: BLE001 - missing/unreadable .env.local must not block harness startup
         pass
+    effective_output_format, effective_mode = _effective_execution_options(
+        skill=args.skill,
+        output_format=args.output_format,
+        mode=args.mode,
+    )
     try:
         prompt = _build_prompt(args.prompt, args.skill)
-        command = _build_command(prompt, project_root, output_format=args.output_format, mode=args.mode)
+        command = _build_command(
+            prompt,
+            project_root,
+            output_format=effective_output_format,
+            mode=effective_mode,
+        )
         env = _cursor_agent_env()
         should_record_cursor_agents = bool(dispatch_run_id)
         if should_record_cursor_agents:
@@ -551,8 +745,8 @@ def main(argv: list[str] | None = None) -> int:
             _timeout_diagnostic(
                 timeout_seconds=float(args.timeout),
                 skill=args.skill,
-                output_format=args.output_format,
-                mode=args.mode,
+                output_format=effective_output_format,
+                mode=effective_mode,
                 command=command,
                 stdout_text=stdout_text,
                 stderr_text=stderr_text,
@@ -579,6 +773,20 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+    if _requires_bridge_output(args.skill):
+        try:
+            envelope = _parse_bridge_verdict_envelope(completed.stdout or "")
+            publication = _publish_bridge_verdict_envelope(
+                envelope,
+                project_root=project_root,
+                session_id=dispatch_run_id,
+                env=env,
+            )
+        except CursorHarnessError as exc:
+            print(f"cursor_harness: {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps(publication, sort_keys=True))
+        return 0
     sys.stdout.write(completed.stdout)
     return 0
 

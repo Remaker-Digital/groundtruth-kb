@@ -30,6 +30,7 @@ ENVELOPE_SCHEMA_VERSION = 1
 WORKER_ROLE_PROVENANCE_SCHEMA_VERSION = 1
 TOPIC_TYPES = ("ops", "deliberation", "build", "test", "spec", "project")
 GIT_STATUS_SHORT_LINE_LIMIT = 80
+GIT_PROBE_TIMEOUT_SECONDS = 5
 WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
 _SAFE_SESSION_DOCUMENT_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _CANONICAL_INIT_KEYWORD = re.compile(r"::init (gtkb|application)(?: (pb|lo))?")
@@ -265,23 +266,96 @@ def _role_resolution(
     }
 
 
-def _git_status(project_root: Path) -> dict[str, Any]:
+def _normalized_path(value: Path) -> str:
     try:
-        result = subprocess.run(
+        resolved = value.resolve()
+    except OSError:
+        resolved = value.absolute()
+    return os.path.normcase(str(resolved))
+
+
+def _git_unavailable(
+    reason: str,
+    *,
+    error: str | None = None,
+    returncode: int | None = None,
+    top_level: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "available": False,
+        "reason": reason,
+        "dirty": None,
+        "short": "",
+    }
+    if error is not None:
+        result["error"] = error
+    if returncode is not None:
+        result["returncode"] = returncode
+    if top_level is not None:
+        result["top_level"] = top_level
+    return result
+
+
+def _git_status(project_root: Path) -> dict[str, Any]:
+    expected_root = _normalized_path(project_root)
+    try:
+        top_level_result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=GIT_PROBE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return _git_unavailable("git_top_level_timeout")
+    except OSError as exc:
+        return _git_unavailable("git_top_level_unavailable", error=str(exc))
+
+    if top_level_result.returncode != 0:
+        return _git_unavailable(
+            "git_top_level_failed",
+            error=(top_level_result.stderr or top_level_result.stdout).strip(),
+            returncode=top_level_result.returncode,
+        )
+
+    top_level = top_level_result.stdout.strip()
+    if not top_level:
+        return _git_unavailable("git_top_level_empty")
+    actual_root = _normalized_path(Path(top_level))
+    if actual_root != expected_root:
+        return _git_unavailable("git_top_level_mismatch", top_level=top_level)
+
+    try:
+        status_result = subprocess.run(
             ["git", "status", "--short"],
             cwd=project_root,
             capture_output=True,
             text=True,
             check=False,
+            timeout=GIT_PROBE_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired:
+        return _git_unavailable("git_status_timeout", top_level=top_level)
     except OSError as exc:
-        return {"available": False, "error": str(exc), "dirty": None, "short": ""}
-    lines = [line for line in result.stdout.splitlines() if line.strip()]
+        return _git_unavailable("git_status_unavailable", error=str(exc), top_level=top_level)
+
+    if status_result.returncode != 0:
+        return _git_unavailable(
+            "git_status_failed",
+            error=(status_result.stderr or status_result.stdout).strip(),
+            returncode=status_result.returncode,
+            top_level=top_level,
+        )
+
+    lines = [line for line in status_result.stdout.splitlines() if line.strip()]
     shown = lines[:GIT_STATUS_SHORT_LINE_LIMIT]
     short = "\n".join(shown)
     return {
-        "available": result.returncode == 0,
-        "returncode": result.returncode,
+        "available": True,
+        "returncode": status_result.returncode,
+        "top_level": top_level,
+        "exact_root": True,
         "dirty": bool(lines),
         "short": short,
         "short_line_count": len(lines),

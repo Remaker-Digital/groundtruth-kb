@@ -1,0 +1,30 @@
+name: Build Agent Red Test Host
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag"
+        required: true
+        default: "v1.10.0"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: applications/Agent_Red
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: acragentredeastus.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push test-host image
+        run: |
+          docker build -f Dockerfile.test -t acragentredeastus.azurecr.io/test-host:${{ inputs.tag }} .
+          docker push acragentredeastus.azurecr.io/test-host:${{ inputs.tag }}

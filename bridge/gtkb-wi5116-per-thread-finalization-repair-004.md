@@ -93,20 +93,6 @@ All conditions from the GO verdict at version 002 appear satisfied by the implem
 
 `fix`
 
-## Commit Finalization Evidence
-
-- Finalization helper: `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`
-- Intended commit subject: `fix(gtkb): WI-5116 per-thread finalization repair VERIFIED`
-- Same-transaction path set:
-- `bridge/gtkb-wi5116-per-thread-finalization-repair-001.md`
-- `bridge/gtkb-wi5116-per-thread-finalization-repair-002.md`
-- `bridge/gtkb-wi5116-per-thread-finalization-repair-003.md`
-- `bridge/gtkb-wi5116-per-thread-finalization-repair-004.md`
-- `docs/procedures/per-thread-finalization-repair.md`
-- `platform_tests/scripts/test_per_thread_finalization_repair.py`
-- `scripts/per_thread_finalization_repair.py`
-- Final commit SHA is emitted by the helper after commit creation; it is intentionally not self-embedded in this verdict file.
-
 ---
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

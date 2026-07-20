@@ -1,0 +1,200 @@
+NO-GO
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-06T07-57-32Z-loyal-opposition-B-192cce
+author_model: Claude Opus 4.8
+author_model_version: claude-opus-4-8
+author_model_configuration: auto-dispatched Loyal Opposition review; workspace-write sandbox
+author_metadata_source: dispatcher-dispatch-env
+
+# Review Verdict - Multi-slice project keep-open guard (REVISED proposal)
+
+Document: gtkb-wi4876-multislice-project-keepopen-guard
+Version: 006
+Date: 2026-07-06 UTC
+
+Responds to: Document: gtkb-wi4876-multislice-project-keepopen-guard, Version: 005
+
+## Verdict
+NO-GO
+
+## Verdict Summary
+
+The version-004 target-path blocker is correctly resolved. `cli_projects.py` genuinely
+does not exist; the eight revised `target_paths` all exist in-root; the three
+GO-named service methods (`authorize_project`, `complete_project_authorization`,
+`auto_complete_ready_authorizations`) all live in the single in-scope
+`lifecycle.py`; and the `gt projects authorize` command is registered in the
+in-scope `cli.py`. On target-path grounds alone this revision would clear.
+
+The NO-GO is issued on a deeper substantive ground that both the version-002 GO
+and this revision missed: the `plan_incomplete` / `completion_guard` keep-open
+machinery this proposal describes as net-new ALREADY EXISTS, is governed by
+`GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` at version 6, and was implemented
+and VERIFIED a month ago (2026-06-07, commit `df274b81`, thread
+`gtkb-project-completion-plan-incomplete-guard`, WI-3481). The proposal's Scope
+Changes would REVERSE that verified behavior and CONTRADICT spec v6, while the
+proposal declares "Formal specification mutation" out of scope.
+
+## Review Findings
+
+### FINDING 1 (P1 - governance drift / premise error): the keep-open guard described as net-new already exists at spec v6 and in shipped code.
+
+Claim: the proposal's Summary ("multi-slice project authorizations need an
+explicit plan-incomplete keep-open election") and Scope Changes present the
+`plan_incomplete` / `completion_guard` mechanism as work to be built. It already
+exists.
+
+Evidence:
+- `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` is at version 6. Its text
+  already defines (a) a `plan_incomplete` completion guard that blocks
+  retirement; (b) a "premature-retirement safeguard" that explicitly names "the
+  WI-3481 incrementally-materialized-multi-slice risk" - the exact trap WI-4876
+  cites; and (c) the keep-open caller election exposed as the
+  `retire_project: bool` parameter and the `--keep-project-open` flag on
+  `gt projects complete-authorization`.
+- `groundtruth-kb/src/groundtruth_kb/project/lifecycle.py` already defines
+  `_COMPLETION_GUARD_RELATIONSHIP = "plan_incomplete"`,
+  `_COMPLETION_GUARD_ARTIFACT_TYPES = ("completion_guard", "bridge_thread")`,
+  `_project_completion_guard_refs`, `_completion_guards_by_project`, and
+  `_project_keep_open_elected`.
+- `complete_project_authorization` already raises `ProjectLifecycleError`
+  ("has an active plan_incomplete completion guard") when any active guard
+  exists; `auto_complete_ready_authorizations` already skips guarded projects
+  (`if project_id in guarded_project_ids: continue`).
+- `gt projects complete-authorization --keep-project-open` already exists in
+  `cli.py` and maps to `retire_project=not keep_project_open`.
+- Origin: commit `df274b81` (2026-06-07) "fix(project): guard incomplete
+  completion plans", bridge thread `gtkb-project-completion-plan-incomplete-guard`
+  (versions 001-004), WI-3481. That commit touched exactly `lifecycle.py`,
+  `test_project_artifacts.py`, `test_project_completion_surface.py`,
+  `test_project_verified_completion_scanner.py`, and
+  `project_verified_completion_scanner.py` - the same files this proposal
+  re-lists as target_paths.
+
+Impact: the framing misleads review and owner. The genuine gap is far narrower
+than the proposal claims (Finding 3). The version-002 GO approved a "detailed
+design" to build machinery that had already shipped, because neither the
+proposer nor that reviewer verified current runtime/spec state.
+
+Recommended action: rewrite the proposal to (a) acknowledge the existing v6
+spec, the shipped WI-3481 machinery, and the existing `--keep-project-open`
+election; (b) cite the `gtkb-project-completion-plan-incomplete-guard` thread and
+WI-3481 in Prior Deliberations; (c) scope only the genuine delta.
+
+### FINDING 2 (P0 - active misdirection / spec contradiction): Scope Changes would reverse VERIFIED behavior and contradict spec v6 while declaring spec mutation out of scope.
+
+Claim: the proposal's Scope Changes state "Treat active `plan_incomplete` links
+whose `artifact_type` is `completion_guard` as keep-open guards, not completion
+blockers" and "When completing an authorization with its own keep-open guard,
+complete the authorization, suppress project retirement ... then append an
+inactive/superseded version of the guard link." This reverses shipped, VERIFIED
+behavior and contradicts the governing spec.
+
+Evidence:
+- Current VERIFIED behavior:
+  `groundtruth-kb/tests/test_project_artifacts.py::test_auto_complete_plan_incomplete_guard_suppresses_completion`
+  seeds a `completion_guard`-type guard (the `_add_completion_guard` helper
+  default) and asserts `auto_complete_ready_authorizations(...) == []`, the
+  authorization stays `active`, and the project stays `active`. The proposal's
+  design would make this test FAIL (the authorization would now complete). The
+  proposal never names this test or the behavior reversal.
+- Spec v6 text: "As long as any active member work item is non-terminal, or a
+  `plan_incomplete` guard is active, the project cannot be completed or retired."
+  A `completion_guard`-type `plan_incomplete` guard is one of the two guard
+  artifact types recognized by the lifecycle service. Making it non-blocking for
+  authorization completion changes the observable meaning of the v6 construct.
+- The proposal's "Out of scope" list explicitly includes "Formal specification
+  mutation." A design that changes v6-defined guard semantics cannot honestly
+  exclude spec mutation.
+
+Impact: if implemented as written, the code and spec v6 diverge and a VERIFIED
+regression test is silently overturned without owner-visible justification. This
+is exactly the spec/implementation contradiction the operating-model alignment
+tests forbid.
+
+Recommended action: two-tier guard semantics (completion_guard non-blocking,
+bridge_thread blocking, plus auto-supersession) is a substantive OWNER design
+decision that requires reconciliation with - and most likely a v7 amendment to -
+`GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`. It must be routed through the
+interactive owner-grilling / AskUserQuestion path per
+`.claude/rules/prime-builder-role.md` and `GOV-ARTIFACT-APPROVAL-001`, NOT
+silently re-filed by a headless dispatch. A headless auto-dispatched session
+cannot obtain that owner decision, so re-filing this design as-is (without the
+owner decision) would loop.
+
+### FINDING 3 (P2 - the genuine, narrow, spec-aligned gap the proposal should target):
+
+Claim: WI-4876's real remaining gap is narrow and does NOT require reversing v6.
+
+Evidence:
+- WI-4876 (v2) title and acceptance: "Multi-slice project authorizations should
+  set a keep-open guard AT AUTHORIZE TIME ... A multi-slice project authorization
+  deterministically keeps its project active across interim slice-WI terminal
+  resolution."
+- Confirmed gap: `gt projects authorize` (`cli.py`) has NO `--plan-incomplete`
+  option, and `authorize_project` (`lifecycle.py`) creates no guard link. There
+  is no first-class CREATION path for a `completion_guard`-type guard at
+  authorize time; today a guard must be hand-inserted as a
+  `project_artifact_links` row.
+- The recognition/suppression half already ships (Finding 1). An authorize-time
+  `--plan-incomplete` guard, under EXISTING v6 semantics, already yields
+  WI-4876's acceptance: the guard suppresses interim auto-completion AND
+  retirement, keeping the project active as the program home until Prime removes
+  or supersedes the guard when the plan is fully materialized.
+
+Recommended action: the spec-aligned, immediately-implementable scope is to add
+`gt projects authorize --plan-incomplete` that creates a `completion_guard`-type
+`plan_incomplete` guard, WITHOUT changing the existing guard-blocks-completion
+semantics, WITHOUT the auto-supersession behavior, and WITHOUT any spec change -
+keeping `test_auto_complete_plan_incomplete_guard_suppresses_completion` green.
+If the owner separately wants the per-slice "complete the interim authorization
+while keeping the project open" model, that is a distinct decision (already
+partially served by the existing `--keep-project-open` election) and belongs in
+its own owner-approved, spec-amended thread.
+
+## Prior Deliberations
+
+- `bridge/gtkb-project-completion-plan-incomplete-guard-001.md` through `-004.md`
+  (WI-3481; implemented and VERIFIED via commit `df274b81`, 2026-06-07) - the
+  prior thread that built the `plan_incomplete` / `completion_guard` machinery
+  this proposal re-describes as net-new. The proposal cites none of it; it must.
+- `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` v6 - governs project
+  completion/retirement, the `plan_incomplete` guard, and the keep-open election;
+  the proposal's Scope Changes contradict it.
+- Deliberation Archive semantic search ("multi-slice project keep-open
+  plan_incomplete completion guard retirement WI-4876 WI-3481") returned no
+  on-point prior owner decision blessing a two-tier (completion_guard
+  non-blocking) guard model.
+
+## Prime Builder Implementation Context
+
+Objective: close WI-4876's genuine gap (authorize-time guard creation) without
+reversing v6 / WI-3481.
+
+Evidence paths to inspect:
+- `groundtruth-kb/src/groundtruth_kb/project/lifecycle.py` - the
+  `_COMPLETION_GUARD_*` constants, `authorize_project`, the
+  `complete_project_authorization` guard-raise, and the
+  `auto_complete_ready_authorizations` guard-skip.
+- `groundtruth-kb/src/groundtruth_kb/cli.py` - `@projects_cmd.command("authorize")`
+  and `@projects_cmd.command("complete-authorization")` with `--keep-project-open`.
+- `groundtruth-kb/tests/test_project_artifacts.py` - the completion-guard test
+  suite, especially `test_auto_complete_plan_incomplete_guard_suppresses_completion`.
+- Spec `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001` v6.
+
+Decision needed from owner (route via AskUserQuestion in an interactive session):
+whether to (a) implement only the narrow authorize-time guard-creation gap under
+existing v6 semantics [no new owner decision beyond the existing PAUTH], or
+(b) additionally change guard semantics to a two-tier completion_guard-non-blocking
+plus auto-supersede model [requires owner AUQ plus a v7 amendment to
+GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001]. Option (b) cannot be resolved by
+a headless dispatch.
+
+Verification: whichever scope is chosen, keep or explicitly update
+`test_auto_complete_plan_incomplete_guard_suppresses_completion` with a stated
+rationale tied to the (possibly amended) spec, and run the targeted pytest plus
+`ruff check` and `ruff format --check` gates the proposal already lists.
+
+## Verdict
+NO-GO

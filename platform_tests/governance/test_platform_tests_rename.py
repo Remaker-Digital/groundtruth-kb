@@ -149,6 +149,19 @@ def test_t_rename_4_pyproject_testpaths(pyproject_pytest_config: dict) -> None:
     )
 
 
+def test_pyproject_norecursedirs_preserves_platform_collection(pyproject_pytest_config: dict) -> None:
+    """Runtime recursion exclusions must not hide the platform test suite."""
+    testpaths = pyproject_pytest_config.get("testpaths", [])
+    norecursedirs = pyproject_pytest_config.get("norecursedirs", [])
+
+    assert "platform_tests" in testpaths, f"platform_tests must remain collected by default; got {testpaths}"
+    assert norecursedirs == [".*", "pytest-tmp-*"], f"expected exact runtime recursion exclusions; got {norecursedirs}"
+    assert "platform_tests" not in norecursedirs, f"norecursedirs must not hide platform_tests; got {norecursedirs}"
+    assert "applications/Agent_Red/tests" not in norecursedirs, (
+        f"norecursedirs must not target Agent Red tests; got {norecursedirs}"
+    )
+
+
 def test_t_rename_5_no_remaining_workflow_refs() -> None:
     """T-rename-5: No remaining .github/workflows/*.yml refs to old tests/<staying-subdir> paths."""
     workflows_dir = PROJECT_ROOT / ".github" / "workflows"

@@ -1,0 +1,154 @@
+VERIFIED
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5406-artifact-lifecycle-timeout-reliability
+Version: 004
+Responds to: bridge/gtkb-wi5406-artifact-lifecycle-timeout-reliability-003.md
+Recommended commit type: test
+
+# VERIFIED — WI-5406 Artifact Lifecycle Timeout Reliability
+
+## Verdict Summary
+
+VERIFIED. The implementation report's claim — a single, test-local
+`@pytest.mark.timeout(600)` decorator added to
+`test_effective_loading_graph_is_repeatable` in `platform_tests/scripts/
+test_modernization_artifact_decontamination.py`, with no other change — is
+independently confirmed byte-for-byte, and reliability is independently
+confirmed by re-running the actual test suite from a fresh session rather
+than trusting the report's own timing narrative. The one failure present in
+the current module run is the pre-existing, separately-tracked, out-of-scope
+WI-5457 dynamic-import issue, exactly as the report discloses — not a
+regression and not the repeatability test this work item targets.
+
+## Independently Re-Verified Evidence
+
+1. **Thread currency confirmed.** `gt bridge show
+   gtkb-wi5406-artifact-lifecycle-timeout-reliability --json --compact` →
+   `latest_status: NEW`, `version_count: 3`.
+
+2. **Hash verification, independently recomputed.** `Get-FileHash
+   -Algorithm SHA256` on the live target file →
+   `67BF2E8C3D00CD7FC81792524510F168E9150DABD1C2A9A6E9C4F5A88213849B` —
+   exact match to the report's claimed hash.
+
+3. **Test suite independently re-run.** `pytest platform_tests/scripts/
+   test_modernization_artifact_decontamination.py -q --tb=line` →
+   **1 failed, 23 passed, 1 warning in 29.94s**, sole failure
+   `test_mod_ad_12_live_repository_contract_passes` — the exact,
+   already-tracked WI-5457 dynamic-import condition, not the repeatability
+   test and not a timeout. Matches the reviewing subagent's two independent
+   runs (33.01s and untimed) exactly in composition.
+
+4. **Diff isolation confirmed.** `git diff` on the target file shows
+   exactly one inserted line
+   (`+@pytest.mark.timeout(600)`), no other hunk.
+
+5. **Lineage independently traced through primary sources.** The "falsely
+   closed WI-5335" framing is corroborated: WI-5347's own GO verdict
+   explicitly excludes the WI-5335/5406 timeout hunk from baseline
+   adoption, and `git show 42a252ab:<target file>` (the only commit that
+   ever added this file to history) confirms the committed baseline never
+   had the timeout decorator — the defect this work item fixes is real, not
+   a rationalization.
+
+6. **No predecessor bridge chain deletions; all three chain files
+   untracked and required in the finalization `--include` set.**
+
+7. **Both mandatory preflights re-confirmed.** Applicability:
+   `preflight_passed: true`, 0 missing specs. Clause: 5 clauses, 4
+   must_apply, 0 blocking gaps, exit 0.
+
+8. **All 10 cited specifications and the cited PAUTH independently
+   confirmed to exist/be active.**
+
+9. **Review independence confirmed.** Report author session
+   `019f5f6d-60cd-7040-b73f-c7d23757c4bc` (Codex/A) differs from this
+   reviewer's session context.
+
+## Non-Blocking Finding
+
+**Stale MemBase backlog narrative on WI-5406/WI-5234** claims the report
+"failed closed before bridge creation," contradicted by the live, filed,
+status-NEW bridge document. Per this project's own governance (TAFE-backed
+bridge state is authoritative; backlog status text is derived/context-only),
+the live bridge state governs and has been reviewed as such. Recommend a
+post-VERIFIED backlog refresh; not a gate on this verdict.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `GOV-STANDING-BACKLOG-001`
+- `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001`
+- `DCL-CHANGE-CONTROLLED-ARTIFACT-EVALUABILITY-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+
+## Spec-to-Test Mapping
+
+| Specification | Test | Executed | Result |
+| --- | --- | --- | --- |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | Full module re-run | yes | 23 passed, 1 pre-existing unrelated failure (WI-5457) |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | Applicability preflight | yes | preflight_passed=true |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | `gt bridge show` thread-currency check | yes | unchanged throughout review |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | SHA-256 hash verification | yes | exact match |
+| `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001` | Diff scope check | yes | exactly one line changed |
+
+## Commands Executed
+
+- `gt bridge show gtkb-wi5406-artifact-lifecycle-timeout-reliability --json --compact` (start and immediately before filing)
+- `Get-FileHash -Algorithm SHA256 platform_tests\scripts\test_modernization_artifact_decontamination.py`
+- `groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/scripts/test_modernization_artifact_decontamination.py -q --tb=line` → 1 failed, 23 passed
+- `groundtruth-kb\.venv\Scripts\python.exe scripts\bridge_applicability_preflight.py --bridge-id gtkb-wi5406-artifact-lifecycle-timeout-reliability`
+- `groundtruth-kb\.venv\Scripts\python.exe scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-wi5406-artifact-lifecycle-timeout-reliability`
+- `git diff -- platform_tests/scripts/test_modernization_artifact_decontamination.py`
+- `git show 42a252ab:platform_tests/scripts/test_modernization_artifact_decontamination.py`
+
+## Prior Deliberations
+
+- `bridge/gtkb-wi5406-artifact-lifecycle-timeout-reliability-001.md`,
+  `-002.md` — approved proposal and GO.
+- `bridge/gtkb-wi5335-loading-graph-repeatability-timeout-001.md`,
+  `-002.md` — terminal predecessor confirming the gating condition and
+  narrow scope this thread fulfills.
+- `bridge/gtkb-wi5347-wi5142-artifact-decontamination-baseline-002.md`,
+  `-003.md` — the baseline-adoption thread confirming the WI-5335/5406
+  hunk was deliberately excluded from baseline landing.
+- `bridge/gtkb-wi5457-doctor-registry-dynamic-import-contract-001.md` —
+  the separately governed thread owning the one remaining module failure;
+  confirmed non-overlapping target_paths.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:1e8ed0074b5143385f8fa62e058c3164a6759535d2275af4cd1bdc55976f8585`
+- operative_file: `bridge/gtkb-wi5406-artifact-lifecycle-timeout-reliability-003.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+
+## Clause Applicability
+
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory; exit code: `0` (pass)
+
+## Methodology Trail
+
+Read all three version files. Independently recomputed the SHA-256 hash
+(exact match). Independently re-ran the full test module, reproducing the
+23-passed/1-unrelated-failure composition. Independently confirmed the
+WI-5335→WI-5347→WI-5406 lineage via `git show` at the baseline commit.
+Re-ran both mandatory preflights. Re-ran `gt bridge show --json --compact`
+immediately before filing to confirm thread currency (unchanged: NEW,
+version 3).

@@ -60,7 +60,15 @@ def _reset_daemon_logger():
 def test_ensure_is_idempotent_noop_when_alive(tmp_path, monkeypatch):
     """When the daemon is alive, ensure no-ops and spawns nothing (D3)."""
     spawn_calls = []
-    monkeypatch.setattr(ensure.daemon, "read_daemon_status", lambda root: {"running": True})
+    monkeypatch.setattr(
+        ensure.daemon,
+        "read_daemon_status",
+        lambda root: {
+            "running": True,
+            "generation_match": True,
+            "loaded_generation": "sha256:current",
+        },
+    )
     monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
     monkeypatch.setattr(
         ensure, "_spawn_detached_daemon", lambda root, interval: spawn_calls.append((root, interval)) or 0
@@ -76,6 +84,27 @@ def test_ensure_restarts_dead_daemon(tmp_path, monkeypatch):
     spawn_calls = []
     monkeypatch.setattr(ensure.daemon, "read_daemon_status", lambda root: {"running": False})
     monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: False)
+    monkeypatch.setattr(
+        ensure.daemon,
+        "dispatch_quiescence",
+        lambda root: {"known": True, "live_worker_count": 0, "live_document_lease_count": 0},
+    )
+    monkeypatch.setattr(
+        ensure.daemon,
+        "current_runtime_generation",
+        lambda root: {"generation": "sha256:current", "errors": []},
+    )
+    monkeypatch.setattr(
+        ensure,
+        "_wait_for_successor_generation",
+        lambda root, expected: {
+            "running": True,
+            "generation_match": True,
+            "loaded_generation": expected,
+            "current_generation": expected,
+            "lock": {"pid": 12345},
+        },
+    )
 
     def _fake_spawn(root, interval):
         spawn_calls.append((root, interval))
@@ -87,6 +116,184 @@ def test_ensure_restarts_dead_daemon(tmp_path, monkeypatch):
     assert result["pid"] == 12345
     assert len(spawn_calls) == 1
     assert spawn_calls[0][1] == 45
+
+
+def _stale_daemon_status(*, handoff_state: str | None = None, provenance: bool = True):
+    status = {
+        "running": True,
+        "generation_match": False,
+        "loaded_generation": "sha256:loaded",
+        "current_generation": "sha256:current",
+        "pid_provenance_verified": provenance,
+        "lock": {
+            "pid": 4242,
+            "pid_create_time_epoch": 1234.5,
+            "loaded_generation": "sha256:loaded",
+        },
+    }
+    if handoff_state:
+        status["generation_handoff"] = {"state": handoff_state}
+    return status
+
+
+def _handoff_request(*, phase: str = "requested"):
+    return {
+        "schema_version": 1,
+        "phase": phase,
+        "requested_at": "2026-07-17T00:00:00Z",
+        "daemon_pid": 4242,
+        "daemon_pid_create_time_epoch": 1234.5,
+        "observed_loaded_generation": "sha256:loaded",
+        "target_generation": "sha256:current",
+    }
+
+
+def test_ensure_fails_closed_when_live_generation_is_unknown(tmp_path, monkeypatch):
+    spawn_calls = []
+    monkeypatch.setattr(
+        ensure.daemon,
+        "read_daemon_status",
+        lambda root: {
+            "running": True,
+            "generation_match": False,
+            "loaded_generation": None,
+            "current_generation": "sha256:current",
+        },
+    )
+    monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
+    monkeypatch.setattr(
+        ensure, "_spawn_detached_daemon", lambda root, interval: spawn_calls.append((root, interval)) or 99
+    )
+
+    result = ensure.ensure_daemon_running(tmp_path, 30)
+
+    assert result["action"] == "generation_handoff_failed"
+    assert result["reason"] == "runtime_generation_unknown"
+    assert spawn_calls == []
+    assert ensure.daemon.read_generation_handoff_request(tmp_path) is None
+
+
+def test_ensure_requests_stale_generation_handoff_without_terminating(tmp_path, monkeypatch):
+    spawn_calls = []
+    monkeypatch.setattr(ensure.daemon, "read_daemon_status", lambda root: _stale_daemon_status())
+    monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
+    monkeypatch.setattr(
+        ensure, "_spawn_detached_daemon", lambda root, interval: spawn_calls.append((root, interval)) or 99
+    )
+
+    result = ensure.ensure_daemon_running(tmp_path, 30)
+
+    assert result["action"] == "generation_handoff_deferred"
+    assert result["reason"] == "handoff_requested"
+    assert spawn_calls == []
+    request = ensure.daemon.read_generation_handoff_request(tmp_path)
+    assert request is not None
+    assert request["phase"] == "requested"
+    assert request["daemon_pid"] == 4242
+    assert request["target_generation"] == "sha256:current"
+
+
+def test_ensure_retargets_same_daemon_handoff_when_current_generation_changes(tmp_path, monkeypatch):
+    request = _handoff_request()
+    ensure.daemon.write_generation_handoff_request(tmp_path, request)
+    changed_status = _stale_daemon_status()
+    changed_status["current_generation"] = "sha256:new-current"
+    monkeypatch.setattr(ensure.daemon, "read_daemon_status", lambda root: changed_status)
+    monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
+    monkeypatch.setattr(
+        ensure, "_spawn_detached_daemon", lambda root, interval: pytest.fail("retargeting must not spawn")
+    )
+
+    result = ensure.ensure_daemon_running(tmp_path, 30)
+
+    assert result["action"] == "generation_handoff_deferred"
+    assert result["reason"] == "handoff_retargeted"
+    updated = ensure.daemon.read_generation_handoff_request(tmp_path)
+    assert updated["phase"] == "requested"
+    assert updated["target_generation"] == "sha256:new-current"
+    assert updated["supersedes_target_generation"] == "sha256:current"
+
+
+def test_ensure_ready_handoff_defers_when_dispatch_work_reappears(tmp_path, monkeypatch):
+    ensure.daemon.write_generation_handoff_request(tmp_path, _handoff_request())
+    monkeypatch.setattr(
+        ensure.daemon,
+        "read_daemon_status",
+        lambda root: _stale_daemon_status(handoff_state="generation_handoff_ready"),
+    )
+    monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
+    monkeypatch.setattr(
+        ensure.daemon,
+        "dispatch_quiescence",
+        lambda root: {"known": True, "live_worker_count": 1, "live_document_lease_count": 1},
+    )
+    monkeypatch.setattr(
+        ensure, "_spawn_detached_daemon", lambda root, interval: pytest.fail("active work must block spawn")
+    )
+
+    result = ensure.ensure_daemon_running(tmp_path, 30)
+
+    assert result["action"] == "generation_handoff_deferred"
+    assert result["reason"] == "dispatch_work_active"
+    assert ensure.daemon.read_generation_handoff_request(tmp_path)["phase"] == "requested"
+
+
+def test_ensure_completes_ready_handoff_once_and_attests_successor(tmp_path, monkeypatch):
+    ensure.daemon.write_generation_handoff_request(tmp_path, _handoff_request())
+    spawn_calls = []
+    monkeypatch.setattr(
+        ensure.daemon,
+        "read_daemon_status",
+        lambda root: _stale_daemon_status(handoff_state="generation_handoff_ready"),
+    )
+    monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
+    monkeypatch.setattr(
+        ensure.daemon,
+        "dispatch_quiescence",
+        lambda root: {"known": True, "live_worker_count": 0, "live_document_lease_count": 0},
+    )
+    monkeypatch.setattr(ensure, "_wait_for_daemon_exit", lambda root, state_dir: True)
+    monkeypatch.setattr(
+        ensure, "_spawn_detached_daemon", lambda root, interval: spawn_calls.append((root, interval)) or 8181
+    )
+    monkeypatch.setattr(
+        ensure,
+        "_wait_for_successor_generation",
+        lambda root, expected: {
+            "running": True,
+            "generation_match": True,
+            "loaded_generation": expected,
+            "current_generation": expected,
+            "lock": {"pid": 8181},
+        },
+    )
+
+    result = ensure.ensure_daemon_running(tmp_path, 30)
+
+    assert result == {
+        "action": "generation_handoff_completed",
+        "running": True,
+        "old_pid": 4242,
+        "pid": 8181,
+        "loaded_generation": "sha256:current",
+    }
+    assert spawn_calls == [(tmp_path, 30)]
+    assert ensure.daemon.read_generation_handoff_request(tmp_path) is None
+
+
+def test_ensure_refuses_stale_daemon_without_pid_provenance(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        ensure.daemon,
+        "read_daemon_status",
+        lambda root: _stale_daemon_status(provenance=False),
+    )
+    monkeypatch.setattr(ensure.daemon, "daemon_process_alive", lambda state_dir: True)
+
+    result = ensure.ensure_daemon_running(tmp_path, 30)
+
+    assert result["action"] == "generation_handoff_failed"
+    assert result["reason"] == "daemon_pid_provenance_unverified"
+    assert ensure.daemon.read_generation_handoff_request(tmp_path) is None
 
 
 def test_spawn_detached_daemon_runs_headless_on_windows(tmp_path, monkeypatch):
@@ -366,3 +573,249 @@ def test_collect_supervisor_status_non_windows(tmp_path, monkeypatch):
     status = collect_supervisor_status(tmp_path)
     assert status["supported"] is False
     assert status["healthy"] is False
+
+
+# ---------------------------------------------------------------------------
+# WI-5429: generation-admission-aware recovery
+# ---------------------------------------------------------------------------
+
+
+class TestAdmissionAwareSpawnSource:
+    """_resolve_daemon_spawn_source prefers admitted generations."""
+
+    def test_falls_back_to_working_tree_when_no_admission(self, tmp_path, monkeypatch):
+        """When no admitted generation exists, spawn from working-tree scripts."""
+        monkeypatch.setattr(
+            ensure.admission,
+            "candidate_admission_status",
+            lambda root: {
+                "last_admitted_generation": None,
+                "last_admitted_materialization_ok": False,
+                "no_admitted_generation_exists": True,
+                "current_working_tree_generation": "sha256:abc",
+                "current_already_admitted": False,
+                "current_unfinalized": False,
+                "working_tree_errors": [],
+            },
+        )
+        script_path, gen_id, meta = ensure._resolve_daemon_spawn_source(tmp_path)
+        assert meta["source"] == "working_tree"
+        assert gen_id is None
+
+    def test_prefers_admitted_generation_when_materialization_intact(self, tmp_path, monkeypatch):
+        """When a valid admitted generation exists, prefer it."""
+        mat_dir = tmp_path / ".gtkb-state" / "dispatcher-generations" / "sha256-test"
+        (mat_dir / "scripts").mkdir(parents=True)
+        (mat_dir / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# test")
+        mat_dir_str = str(mat_dir)
+
+        monkeypatch.setattr(
+            ensure.admission,
+            "candidate_admission_status",
+            lambda root: {
+                "last_admitted_generation": "sha256:test",
+                "last_admitted_materialization_ok": True,
+                "no_admitted_generation_exists": False,
+                "current_working_tree_generation": "sha256:other",
+                "current_already_admitted": False,
+                "current_unfinalized": True,
+                "working_tree_errors": [],
+            },
+        )
+        monkeypatch.setattr(
+            ensure.admission,
+            "read_last_admitted",
+            lambda root: {
+                "generation": "sha256:test",
+                "materialization_dir": mat_dir_str,
+            },
+        )
+
+        script_path, gen_id, meta = ensure._resolve_daemon_spawn_source(tmp_path)
+        assert meta["source"] == "admitted_generation"
+        assert gen_id == "sha256:test"
+        assert meta["unfinalized_rejected"] is True
+
+    def test_falls_back_when_materialization_missing_file(self, tmp_path, monkeypatch):
+        """When admitted generation materialization directory has no daemon
+        script, fall back to working tree."""
+        mat_dir = tmp_path / ".gtkb-state" / "dispatcher-generations" / "sha256-broken"
+        mat_dir.mkdir(parents=True)
+        # No scripts/ subdir created
+
+        monkeypatch.setattr(
+            ensure.admission,
+            "candidate_admission_status",
+            lambda root: {
+                "last_admitted_generation": "sha256:broken",
+                "last_admitted_materialization_ok": True,
+                "no_admitted_generation_exists": False,
+                "current_working_tree_generation": "sha256:abc",
+                "current_already_admitted": False,
+                "current_unfinalized": False,
+                "working_tree_errors": [],
+            },
+        )
+        monkeypatch.setattr(
+            ensure.admission,
+            "read_last_admitted",
+            lambda root: {
+                "generation": "sha256:broken",
+                "materialization_dir": str(mat_dir),
+            },
+        )
+
+        script_path, gen_id, meta = ensure._resolve_daemon_spawn_source(tmp_path)
+        assert meta["source"] == "working_tree"
+
+
+class TestUnfinalizedRejection:
+    """Supervisor reports unfinalized_generation_rejected."""
+
+    def test_unfinalized_flag_in_recovery_result(self, tmp_path, monkeypatch):
+        """When daemon is dead and working tree has unfinalized changes,
+        the recovery result includes the rejection flag."""
+        monkeypatch.setattr(
+            ensure.daemon,
+            "read_daemon_status",
+            lambda root: {"running": False},
+        )
+        monkeypatch.setattr(
+            ensure.daemon, "daemon_process_alive", lambda state_dir: False
+        )
+        monkeypatch.setattr(
+            ensure.admission,
+            "candidate_admission_status",
+            lambda root: {
+                "last_admitted_generation": "sha256:prev",
+                "last_admitted_materialization_ok": True,
+                "no_admitted_generation_exists": False,
+                "current_working_tree_generation": "sha256:new",
+                "current_already_admitted": False,
+                "current_unfinalized": True,
+                "working_tree_errors": [],
+            },
+        )
+        # Simulate an admitted generation materialization
+        mat_dir = tmp_path / ".gtkb-state" / "dispatcher-generations" / "sha256-prev"
+        (mat_dir / "scripts").mkdir(parents=True)
+        (mat_dir / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# test")
+        monkeypatch.setattr(
+            ensure.admission,
+            "read_last_admitted",
+            lambda root: {
+                "generation": "sha256:prev",
+                "materialization_dir": str(mat_dir),
+            },
+        )
+        monkeypatch.setattr(
+            ensure.daemon,
+            "dispatch_quiescence",
+            lambda root: {"known": True, "live_worker_count": 0, "live_document_lease_count": 0},
+        )
+        monkeypatch.setattr(
+            ensure.daemon, "read_generation_handoff_request", lambda root: None
+        )
+        monkeypatch.setattr(
+            ensure.daemon, "clear_generation_handoff_request", lambda root: None
+        )
+        monkeypatch.setattr(
+            ensure.daemon,
+            "current_runtime_generation",
+            lambda root: {"generation": "sha256:prev"},
+        )
+
+        spawn_pid = [0]
+
+        def fake_spawn(root, interval):
+            spawn_pid[0] = 99999
+            return 99999
+
+        monkeypatch.setattr(ensure, "_spawn_detached_daemon", fake_spawn)
+        monkeypatch.setattr(
+            ensure,
+            "_wait_for_successor_generation",
+            lambda root, expected: {
+                "running": True,
+                "pid_provenance_verified": True,
+                "loaded_generation": expected,
+                "current_generation": expected,
+                "generation_match": True,
+                "lock": {"pid": 99999},
+            },
+        )
+
+        result = ensure.ensure_daemon_running(tmp_path, 30)
+        assert "admission" in result
+        assert result["admission"] == "unfinalized_generation_rejected"
+
+    def test_empty_admission_no_flag_when_already_admitted(self, tmp_path, monkeypatch):
+        """When working tree matches admitted generation, no rejection flag."""
+        monkeypatch.setattr(
+            ensure.daemon,
+            "read_daemon_status",
+            lambda root: {"running": False},
+        )
+        monkeypatch.setattr(
+            ensure.daemon, "daemon_process_alive", lambda state_dir: False
+        )
+        monkeypatch.setattr(
+            ensure.admission,
+            "candidate_admission_status",
+            lambda root: {
+                "last_admitted_generation": "sha256:same",
+                "last_admitted_materialization_ok": True,
+                "no_admitted_generation_exists": False,
+                "current_working_tree_generation": "sha256:same",
+                "current_already_admitted": True,
+                "current_unfinalized": False,
+                "working_tree_errors": [],
+            },
+        )
+        mat_dir = tmp_path / ".gtkb-state" / "dispatcher-generations" / "sha256-same"
+        (mat_dir / "scripts").mkdir(parents=True)
+        (mat_dir / "scripts" / "gtkb_dispatcher_daemon.py").write_text("# test")
+        monkeypatch.setattr(
+            ensure.admission,
+            "read_last_admitted",
+            lambda root: {
+                "generation": "sha256:same",
+                "materialization_dir": str(mat_dir),
+            },
+        )
+        monkeypatch.setattr(
+            ensure.daemon,
+            "dispatch_quiescence",
+            lambda root: {"known": True, "live_worker_count": 0, "live_document_lease_count": 0},
+        )
+        monkeypatch.setattr(
+            ensure.daemon, "read_generation_handoff_request", lambda root: None
+        )
+        monkeypatch.setattr(
+            ensure.daemon, "clear_generation_handoff_request", lambda root: None
+        )
+        monkeypatch.setattr(
+            ensure.daemon,
+            "current_runtime_generation",
+            lambda root: {"generation": "sha256:same"},
+        )
+
+        def fake_spawn(root, interval):
+            return 99999
+
+        monkeypatch.setattr(ensure, "_spawn_detached_daemon", fake_spawn)
+        monkeypatch.setattr(
+            ensure,
+            "_wait_for_successor_generation",
+            lambda root, expected: {
+                "running": True,
+                "pid_provenance_verified": True,
+                "loaded_generation": expected,
+                "current_generation": expected,
+                "generation_match": True,
+                "lock": {"pid": 99999},
+            },
+        )
+
+        result = ensure.ensure_daemon_running(tmp_path, 30)
+        assert result.get("admission") == "current_already_admitted"

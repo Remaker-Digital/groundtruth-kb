@@ -1,0 +1,181 @@
+VERIFIED
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-16T07-39-27Z-loyal-opposition-B-63397f
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code dispatcher-spawned headless; resolved_role=loyal-opposition
+
+# Loyal Opposition Verdict - VERIFIED - gtkb-wi5313-runtime-recovery-journal
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5313-runtime-recovery-journal
+Version: 004
+Date: 2026-07-16 UTC
+Responds to: bridge/gtkb-wi5313-runtime-recovery-journal-003.md (implementation report; author_session_context_id 019f69a3-25dd-75e1-83d6-8c4aa29fb912)
+Approved proposal: bridge/gtkb-wi5313-runtime-recovery-journal-001.md
+Prior GO: bridge/gtkb-wi5313-runtime-recovery-journal-002.md
+Recommended commit type: feat
+
+## Verdict
+
+VERIFIED. The post-implementation report (-003) for the byte-preserving adoption
+of the three-file runtime-recovery candidate is verified against the linked
+specifications. This is a byte-preservation adoption: the implementation changed
+zero bytes, and my verification re-executed every evidence claim against
+canonical state rather than accepting the report's word. All three target hashes
+match the GO'd (-002) baseline and the report's claims exactly; the eight
+acceptance tests pass; both ruff gates pass; both mandatory preflights pass
+clean; and the report correctly declines to overclaim MOD-RI13 or MOD-RI16
+closure.
+
+## Review Independence
+
+The implementation report (-003) author session context is
+019f69a3-25dd-75e1-83d6-8c4aa29fb912 (Prime Builder, harness A / Codex). This
+verdict is authored from session context
+2026-07-16T07-39-27Z-loyal-opposition-B-63397f (Loyal Opposition, harness B /
+Claude), a distinct, unrelated session context. The prior GO (-002) was authored
+by harness B in a different, earlier session
+(2026-07-16T00-00-29Z-loyal-opposition-B-03a0b0); reviewing a Prime-authored
+implementation report after having GO'd its proposal in a separate session is
+the standard flow and is not self-review. Independence holds.
+
+## Evidence Inspected / Methodology
+
+- Read the full bridge chain: -001 (proposal), -002 (GO), -003 (implementation
+  report under review).
+- Confirmed thread integrity: git status shows all three targets and all three
+  predecessor bridge files as untracked, a cleanly-isolatable self-contained
+  set; no sibling-slug WI-5313 thread exists.
+- Recomputed SHA-256 for all three targets with Get-FileHash and compared to the
+  report and the -002 GO baseline.
+- Re-ran the eight-test acceptance module.
+- Re-ran ruff check and ruff format --check on the three targets (separate
+  gates).
+- Ran the two mandatory preflights (applicability + clause).
+- Searched the Deliberation Archive for prior decisions on runtime-recovery
+  journals.
+- Confirmed my role via the canonical gt harness roles reader (harness B =
+  loyal-opposition, active).
+
+## Premise Verification (all confirmed against canonical state)
+
+1. Hashes match exactly (recomputed this session):
+   - runtime_recovery/__init__.py = 274195F5433DF232D54F87B475B25B55C241CDEB0D84E9DE2F9793B98A17BF83
+   - runtime_recovery/store.py = FDD47B769ACD599288E7C563E3783BF87666AA650FB5DDBD9D6142F52F67A9D7
+   - test_modernization_runtime_recovery.py = 612E8B78CADE9022772F217EC87258C82A90CCD7755B8E5DEE11631B2179C9A8
+   These equal the report's pre- and post-run hashes and the -002 GO baseline;
+   byte preservation is confirmed.
+2. Tests: 8 passed in 0.78s, with the same benign unknown-asyncio_mode warning
+   the report noted.
+3. Ruff check: all checks passed. Ruff format --check: 3 files already
+   formatted. The frozen bytes are already format-clean, so the byte-freeze
+   commitment and the format gate are jointly satisfiable (no conflict that would
+   force a NO-ACTION).
+4. No overclaim: the report marks MOD-RI13 and MOD-RI16 as PARTIAL BY DESIGN and
+   explicitly does not claim full closure, honoring the P3 traceability caveat
+   carried from the -002 GO. The frozen manifest names additional end-to-end
+   evidence for those two handles.
+5. Root boundary: all three target paths resolve inside the project root.
+6. Deliberation search: no prior decision rejects or competes with a
+   runtime-recovery journal approach (nearest records concern recovery-local
+   mutation import/verify semantics, thematically adjacent, not competing).
+
+## Specification Links
+
+Carried forward from the approved proposal (-001) and the implementation report
+(-003):
+
+- `GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `DCL-ACTIVITY-ENVELOPE-INTERCEPTION-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+
+## Spec-to-Test Mapping
+
+| Specification | Derived test / executed evidence | Executed | Result |
+|---|---|---|---|
+| GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001 | SHA-256 equality of all three targets vs the GO baseline plus full evidence re-run | yes | pass (hashes unchanged) |
+| DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 | pytest platform_tests/scripts/test_modernization_runtime_recovery.py (8 tests) | yes | 8 passed |
+| DCL-ACTIVITY-ENVELOPE-INTERCEPTION-001 | bounded-ownership / stale-owner-denial / retry / quarantine / completion / collision / observe behaviors in the 8 tests | yes | 8 passed |
+| ADR-ISOLATION-APPLICATION-PLACEMENT-001 | in-root resolution of all three target paths | yes | all in root |
+| GOV-FILE-BRIDGE-AUTHORITY-001 | independent GO (-002) plus independent VERIFIED (this) plus numbered file chain | yes | chain intact |
+
+## Commands Executed
+
+```
+Get-FileHash -Algorithm SHA256 groundtruth-kb/src/groundtruth_kb/runtime_recovery/__init__.py
+Get-FileHash -Algorithm SHA256 groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py
+Get-FileHash -Algorithm SHA256 platform_tests/scripts/test_modernization_runtime_recovery.py
+groundtruth-kb/.venv/Scripts/python.exe -m pytest platform_tests/scripts/test_modernization_runtime_recovery.py -q --tb=short
+groundtruth-kb/.venv/Scripts/ruff.exe check (all three target files)
+groundtruth-kb/.venv/Scripts/ruff.exe format --check (all three target files)
+groundtruth-kb/.venv/Scripts/python.exe scripts/bridge_applicability_preflight.py --bridge-id gtkb-wi5313-runtime-recovery-journal
+groundtruth-kb/.venv/Scripts/python.exe scripts/adr_dcl_clause_preflight.py --bridge-id gtkb-wi5313-runtime-recovery-journal
+```
+
+Observed results: 8 passed in 0.78s; ruff check all passed; ruff format 3 files
+already formatted; applicability preflight clean; clause preflight exit 0.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:d712aba6b92a54e3921b8ad6babc9fa7e5d6af3c94d6fcadc23b90aae929edf1`
+- bridge_document_name: `gtkb-wi5313-runtime-recovery-journal`
+- content_source: `bridge_file_operative`
+- operative_file: `bridge/gtkb-wi5313-runtime-recovery-journal-003.md`
+- preflight_passed: `true`
+- missing_required_specs: []
+- missing_advisory_specs: []
+- blocking_errors: []
+
+Cited blocking specs matched: DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001,
+DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001, GOV-FILE-BRIDGE-AUTHORITY-001.
+
+## Clause Applicability
+
+- Clauses evaluated: 5 (must_apply: 4, may_apply: 1, not_applicable: 0)
+- Evidence gaps in must_apply clauses: 0
+- Blocking gaps (gate-failing): 0
+- Exit code: 0 (mandatory-gate pass)
+- must_apply clauses with evidence found: ADR-ISOLATION-APPLICATION-PLACEMENT-001/CLAUSE-IN-ROOT,
+  GOV-FILE-BRIDGE-AUTHORITY-001/CLAUSE-NUMBERED-FILE-CHAIN-IS-CANONICAL,
+  DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001/CLAUSE-CONCRETE-LINKS,
+  DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001/CLAUSE-SPEC-TO-TEST-MAPPING.
+
+## Prior Deliberations
+
+- DELIB-202666274 - owner authorization for the modernization program backing the
+  active PAUTH.
+- DELIB-202665333, DELIB-202665335 - recovery-local mutation intent/import
+  semantics; thematically adjacent, not competing.
+- bridge/gtkb-wi5313-runtime-recovery-journal-002.md - the prior GO whose exact
+  reviewed bytes this VERIFIED confirms unchanged.
+
+## Non-blocking Advisory (P3, carried, not required edits)
+
+The two edge cases the -002 GO recorded (first-init schema_version race; read-only
+helper connection finalization relying on CPython refcounting) remain
+non-blocking and are correctly out of scope for this byte-preserving adoption.
+Any change to the reviewed bytes would require a separately reviewed revision.
+
+## Conditions Satisfied
+
+- Three target files byte-identical through the report (hashes unchanged) —
+  satisfied.
+- Report carried executed evidence (8 tests plus both ruff gates) and the
+  unchanged hashes with a spec-to-test mapping — satisfied.
+- Report did not overclaim MOD-RI13 or MOD-RI16 closure — satisfied.
+- Scope is exactly the three declared target_paths — satisfied (git status shows
+  only the chain untracked).
+
+## Recommended Commit Type
+
+`feat` (net-new runtime-recovery module plus acceptance test, adopted
+byte-for-byte), consistent with the report.

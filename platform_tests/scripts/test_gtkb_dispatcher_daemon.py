@@ -356,6 +356,158 @@ def test_status_mode_shadow_when_substrate_none(tmp_path: Path) -> None:
     assert status["active_substrate"] == "none"
 
 
+def test_runtime_generation_is_deterministic_and_source_sensitive(tmp_path: Path) -> None:
+    daemon = _load_daemon()
+    paths = (Path("a.py"), Path("nested/b.py"))
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "a.py").write_text("a = 1\n", encoding="utf-8")
+    (tmp_path / "nested" / "b.py").write_text("b = 2\n", encoding="utf-8")
+
+    first = daemon._compute_runtime_generation(tmp_path, relative_paths=paths)
+    second = daemon._compute_runtime_generation(tmp_path, relative_paths=paths)
+    assert first == second
+    assert first["generation"].startswith("sha256:")
+    assert first["errors"] == []
+
+    (tmp_path / "nested" / "b.py").write_text("b = 3\n", encoding="utf-8")
+    changed = daemon._compute_runtime_generation(tmp_path, relative_paths=paths)
+    assert changed["generation"] != first["generation"]
+
+
+def test_status_reports_loaded_and_current_generation_match(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    state_dir = daemon.daemon_state_dir(root)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    generation = "sha256:current"
+    pid = os.getpid()
+    create_time = float(psutil.Process(pid).create_time())
+    (state_dir / daemon.PID_FILENAME).write_text(f"{pid}\n", encoding="utf-8")
+    _write_daemon_pid_provenance(daemon, state_dir, pid)
+    (state_dir / daemon.LOCK_FILENAME).write_text(
+        json.dumps(
+            {
+                "pid": pid,
+                "pid_create_time_epoch": create_time,
+                "loaded_generation": generation,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        daemon,
+        "current_runtime_generation",
+        lambda project_root: {"generation": generation, "errors": [], "manifest": []},
+    )
+
+    status = daemon.collect_daemon_status(root)
+
+    assert status["loaded_generation"] == generation
+    assert status["current_generation"] == generation
+    assert status["generation_match"] is True
+    assert status["generation_diagnostics"] == []
+
+
+def _write_generation_handoff_request(
+    daemon,
+    root: Path,
+    *,
+    phase: str,
+    loaded_generation: str,
+    target_generation: str,
+) -> None:
+    daemon.write_generation_handoff_request(
+        root,
+        {
+            "schema_version": 1,
+            "phase": phase,
+            "requested_at": daemon._now_iso(),
+            "daemon_pid": os.getpid(),
+            "daemon_pid_create_time_epoch": float(psutil.Process(os.getpid()).create_time()),
+            "observed_loaded_generation": loaded_generation,
+            "target_generation": target_generation,
+        },
+    )
+
+
+def test_daemon_handoff_defers_without_spawning_while_work_is_live(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    loaded = "sha256:loaded"
+    target = "sha256:current"
+    monkeypatch.setattr(daemon, "LOADED_RUNTIME_GENERATION", loaded)
+    monkeypatch.setattr(
+        daemon,
+        "current_runtime_generation",
+        lambda project_root: {"generation": target, "errors": [], "manifest": []},
+    )
+    monkeypatch.setattr(
+        daemon,
+        "dispatch_quiescence",
+        lambda project_root: {"known": True, "live_worker_count": 1, "live_document_lease_count": 1},
+    )
+    _write_generation_handoff_request(
+        daemon,
+        root,
+        phase="requested",
+        loaded_generation=loaded,
+        target_generation=target,
+    )
+
+    assert daemon._process_generation_handoff_request(root) == "wait"
+    status = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
+    assert status["generation_handoff"]["state"] == "generation_handoff_deferred"
+    assert status["generation_handoff"]["reason"] == "dispatch_work_active"
+
+
+def test_daemon_handoff_requires_supervisor_commit_before_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    loaded = "sha256:loaded"
+    target = "sha256:current"
+    monkeypatch.setattr(daemon, "LOADED_RUNTIME_GENERATION", loaded)
+    monkeypatch.setattr(
+        daemon,
+        "current_runtime_generation",
+        lambda project_root: {"generation": target, "errors": [], "manifest": []},
+    )
+    monkeypatch.setattr(
+        daemon,
+        "dispatch_quiescence",
+        lambda project_root: {"known": True, "live_worker_count": 0, "live_document_lease_count": 0},
+    )
+    _write_generation_handoff_request(
+        daemon,
+        root,
+        phase="requested",
+        loaded_generation=loaded,
+        target_generation=target,
+    )
+    assert daemon._process_generation_handoff_request(root) == "wait"
+    ready = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
+    assert ready["generation_handoff"]["state"] == "generation_handoff_ready"
+
+    _write_generation_handoff_request(
+        daemon,
+        root,
+        phase="commit",
+        loaded_generation=loaded,
+        target_generation=target,
+    )
+    assert daemon._process_generation_handoff_request(root) == "exit"
+    committed = json.loads((daemon.daemon_state_dir(root) / daemon.STATUS_FILENAME).read_text(encoding="utf-8"))
+    assert committed["generation_handoff"]["state"] == "generation_handoff_committed"
+
+
 def test_run_tick_includes_health_monitoring(tmp_path: Path) -> None:
     daemon = _load_daemon()
     root = _make_project(tmp_path)
@@ -629,6 +781,443 @@ def test_daemon_live_spawns_do_not_duplicate_lo_documents_across_targets(
     assert state["recipients"]["loyal-opposition:D"]["last_result"] == runtime.DOCUMENT_LEASE_HELD_RESULT
 
 
+def test_wi5427_daemon_creates_cursor_worker_session_before_lo_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    identities_path = root / "harness-state" / "harness-identities.json"
+    identities = json.loads(identities_path.read_text(encoding="utf-8"))
+    identities["harnesses"]["cursor"] = {"id": "E"}
+    identities_path.write_text(json.dumps(identities), encoding="utf-8")
+    registry_path = root / "harness-state" / "harness-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["harnesses"].append(
+        {
+            "id": "E",
+            "harness_name": "cursor",
+            "harness_type": "cursor",
+            "status": "active",
+            "event_driven_hooks": False,
+            "can_receive_dispatch": True,
+            "role": ["loyal-opposition"],
+            "invocation_surfaces": {"headless": {"argv": ["cursor-agent", "{{PROMPT}}"]}},
+        }
+    )
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    runtime = daemon._load_dispatch_runtime()
+    target = runtime.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="E",
+        command_handle="cursor",
+        canonical_mode="lo",
+        invocation_surfaces={"headless": {"argv": ["cursor-agent", "{{PROMPT}}"]}},
+    )
+    selected = [
+        types.SimpleNamespace(
+            document_name="cursor-proof-thread",
+            top_status="NEW",
+            top_file="bridge/cursor-proof-thread-001.md",
+        )
+    ]
+    decision = {
+        "role": "loyal-opposition",
+        "recipient": target.dispatch_state_key,
+        "signature": runtime._signature(selected),
+        "_spawn_target": target,
+        "_spawn_selected": selected,
+    }
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **kwargs: (items, [], []),
+    )
+
+    def _spawn_after_authority(**kwargs):
+        dispatch_id = kwargs["dispatch_id"]
+        envelope_path = root / "harness-state" / "cursor" / "session-envelopes" / f"{dispatch_id}.json"
+        assert envelope_path.is_file()
+        envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+        assert envelope["session_id"] == dispatch_id
+        assert envelope["role_resolved"] == "loyal-opposition"
+        assert envelope["worker_role_provenance"]["dispatch_run_id"] == dispatch_id
+        observed["envelope_path"] = envelope_path
+        return {
+            "dispatch_id": dispatch_id,
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+        }
+
+    monkeypatch.setattr(runtime, "_spawn_harness", _spawn_after_authority)
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=1, dry_run=False)
+
+    assert result[0]["launched"] is True
+    assert observed["envelope_path"]
+
+
+def _wi5627_lo_decision(runtime, *slugs: str):
+    target = runtime.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION,
+    )
+    selected = [
+        types.SimpleNamespace(
+            document_name=slug,
+            top_status="NEW",
+            top_file=f"bridge/{slug}-001.md",
+        )
+        for slug in slugs
+    ]
+    return (
+        target,
+        selected,
+        {
+            "role": "loyal-opposition",
+            "recipient": target.dispatch_state_key,
+            "signature": runtime._signature(selected),
+            "_spawn_target": target,
+            "_spawn_selected": selected,
+        },
+    )
+
+
+def test_wi5627_daemon_claims_exact_lo_batch_after_authority_before_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    target, selected, decision = _wi5627_lo_decision(runtime, "first-review", "second-review")
+    events: list[str] = []
+    claim_call: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: (items, [], []),
+    )
+
+    def _ensure_authority(**kwargs):
+        events.append("authority")
+        return {
+            "ok": True,
+            "reason": None,
+            "trusted_worker_context": {
+                "schema_version": 1,
+                "session_id": kwargs["session_id"],
+                "harness_id": target.harness_id,
+                "harness_name": target.command_handle,
+                "role": "loyal-opposition",
+            },
+        }
+
+    def _acquire_claims(items, **kwargs):
+        events.append("claim")
+        claim_call.update(kwargs)
+        claim_call["slugs"] = [item.document_name for item in items]
+        return {
+            "ok": True,
+            "reason": None,
+            "acquired_slugs": list(claim_call["slugs"]),
+            "ttl_seconds": kwargs["ttl_seconds"],
+        }
+
+    def _spawn(**kwargs):
+        events.append("spawn")
+        return {
+            "dispatch_id": kwargs["dispatch_id"],
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": True,
+            "reason": "launched",
+        }
+
+    monkeypatch.setattr(runtime, "_ensure_dispatch_worker_session", _ensure_authority)
+    monkeypatch.setattr(runtime, "_acquire_lo_verdict_work_intent_batch", _acquire_claims)
+    monkeypatch.setattr(runtime, "_spawn_harness", _spawn)
+    monkeypatch.setattr(runtime, "worker_lifetime_profile", lambda *_args, **_kwargs: {"seconds": 4200})
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=2, dry_run=False)[0]
+
+    assert events == ["authority", "claim", "spawn"]
+    assert claim_call["slugs"] == [item.document_name for item in selected]
+    assert claim_call["session_id"] == result["dispatch_id"]
+    assert claim_call["dispatch_id"] == result["dispatch_id"]
+    assert claim_call["ttl_seconds"] >= runtime.WORK_INTENT_TRIGGER_TTL_SECONDS
+    assert result["verdict_claim_session_id"] == result["dispatch_id"]
+    assert result["verdict_claim_slugs"] == ["first-review", "second-review"]
+    assert result["trusted_worker_context"]["session_id"] == result["dispatch_id"]
+
+
+def test_wi5627_daemon_peer_held_claim_suppresses_spawn_and_releases_leases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    target, selected, decision = _wi5627_lo_decision(runtime, "peer-held-review")
+    lease_records = [{"doc_slug": "peer-held-review"}]
+    released_leases: list[list[str]] = []
+
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: (items, lease_records, []),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_release_document_lease_records",
+        lambda records: (
+            released_leases.append([record["doc_slug"] for record in records])
+            or [record["doc_slug"] for record in records]
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_dispatch_worker_session",
+        lambda **kwargs: {
+            "ok": True,
+            "reason": None,
+            "trusted_worker_context": {
+                "session_id": kwargs["session_id"],
+                "harness_id": target.harness_id,
+                "role": "loyal-opposition",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_lo_verdict_work_intent_batch",
+        lambda *_args, **_kwargs: {
+            "ok": False,
+            "reason": runtime.LO_VERDICT_CLAIM_HELD_RESULT,
+            "acquired_slugs": [],
+            "failed_slug": selected[0].document_name,
+            "holder": {
+                "session_id": "peer-session",
+                "ttl_expires_at": "2999-01-01T00:00:00Z",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_harness",
+        lambda **_kwargs: pytest.fail("peer-held verdict claim must suppress provider spawn"),
+    )
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=1, dry_run=False)[0]
+
+    assert result["launched"] is False
+    assert result["reason"] == runtime.LO_VERDICT_CLAIM_HELD_RESULT
+    assert result["holder_session_id"] == "peer-session"
+    assert result["document_leases_released_on_claim_failure"] == ["peer-held-review"]
+    assert released_leases == [["peer-held-review"]]
+    state = runtime._load_dispatch_state(daemon._bridge_poller_state_dir(root), root)
+    recipient = state["recipients"][target.dispatch_state_key]
+    assert recipient.get("failure_count", 0) == 0
+    assert recipient["last_result"] == runtime.LO_VERDICT_CLAIM_HELD_RESULT
+
+
+def test_wi5627_daemon_partial_claim_failure_releases_only_owned_claims(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    _target, selected, decision = _wi5627_lo_decision(runtime, "owned-review", "failed-review")
+    acquired: list[str] = []
+    released_claims: list[tuple[list[str], str]] = []
+    released_leases: list[list[str]] = []
+    lease_records = [{"doc_slug": item.document_name} for item in selected]
+
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: (items, lease_records, []),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_release_document_lease_records",
+        lambda records: (
+            released_leases.append([record["doc_slug"] for record in records])
+            or [record["doc_slug"] for record in records]
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_dispatch_worker_session",
+        lambda **kwargs: {
+            "ok": True,
+            "reason": None,
+            "trusted_worker_context": {
+                "session_id": kwargs["session_id"],
+                "harness_id": "A",
+                "role": "loyal-opposition",
+            },
+        },
+    )
+
+    def _acquire(slug, _session_id, **_kwargs):
+        if slug == "failed-review":
+            raise runtime.WorkIntentRegistryError("synthetic claim-store failure")
+        acquired.append(slug)
+        return True
+
+    monkeypatch.setattr(runtime, "acquire_work_intent", _acquire)
+    monkeypatch.setattr(
+        runtime,
+        "_release_prime_work_intents",
+        lambda slugs, *, project_root, session_id: released_claims.append((list(slugs), session_id)),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_harness",
+        lambda **_kwargs: pytest.fail("partial claim failure must suppress provider spawn"),
+    )
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=2, dry_run=False)[0]
+
+    assert acquired == ["owned-review"]
+    assert result["reason"] == runtime.LO_VERDICT_CLAIM_ACQUIRE_FAILED_RESULT
+    assert result["failed_slug"] == "failed-review"
+    assert result["released_slugs"] == ["owned-review"]
+    assert released_claims == [(["owned-review"], result["verdict_claim_session_id"])]
+    assert released_leases == [["owned-review", "failed-review"]]
+
+
+def test_wi5627_daemon_authority_failure_precedes_claim_and_releases_leases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    _target, selected, decision = _wi5627_lo_decision(runtime, "authority-failure-review")
+    lease_records = [{"doc_slug": selected[0].document_name}]
+    released_leases: list[list[str]] = []
+
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: (items, lease_records, []),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_release_document_lease_records",
+        lambda records: (
+            released_leases.append([record["doc_slug"] for record in records])
+            or [record["doc_slug"] for record in records]
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_dispatch_worker_session",
+        lambda **kwargs: {
+            "ok": False,
+            "launched": False,
+            "reason": "worker_session_authority_failed",
+            "dispatch_id": kwargs["dispatch_id"],
+            "recipient": kwargs["recipient"],
+        },
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_lo_verdict_work_intent_batch",
+        lambda *_args, **_kwargs: pytest.fail("authority failure must precede claim acquisition"),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_harness",
+        lambda **_kwargs: pytest.fail("authority failure must suppress provider spawn"),
+    )
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=1, dry_run=False)[0]
+
+    assert result["reason"] == "worker_session_authority_failed"
+    assert result["document_leases_released_on_authority_failure"] == ["authority-failure-review"]
+    assert released_leases == [["authority-failure-review"]]
+
+
+def test_wi5627_daemon_launch_failure_releases_exact_owned_claims(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon = _load_daemon()
+    root = _make_project(tmp_path)
+    runtime = daemon._load_dispatch_runtime()
+    _target, _selected, decision = _wi5627_lo_decision(runtime, "launch-failure-review")
+    released_claims: list[tuple[list[str], str]] = []
+
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_dispatch_document_leases",
+        lambda items, **_kwargs: (items, [], []),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_dispatch_worker_session",
+        lambda **kwargs: {
+            "ok": True,
+            "reason": None,
+            "trusted_worker_context": {
+                "session_id": kwargs["session_id"],
+                "harness_id": "A",
+                "role": "loyal-opposition",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_acquire_lo_verdict_work_intent_batch",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "reason": None,
+            "acquired_slugs": ["launch-failure-review"],
+        },
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_release_prime_work_intents",
+        lambda slugs, *, project_root, session_id: released_claims.append((list(slugs), session_id)),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_spawn_harness",
+        lambda **kwargs: {
+            "dispatch_id": kwargs["dispatch_id"],
+            "recipient": kwargs["target"].dispatch_state_key,
+            "launched": False,
+            "reason": "synthetic_launch_failure",
+        },
+    )
+
+    result = daemon._execute_live_spawns(root, [decision], max_items=1, dry_run=False)[0]
+
+    assert result["reason"] == "synthetic_launch_failure"
+    assert result["verdict_claims_released_on_launch_failure"] is True
+    assert released_claims == [(["launch-failure-review"], result["verdict_claim_session_id"])]
+
+
+def test_wi5627_daemon_persists_claim_context_before_exit_reconciliation() -> None:
+    source = _DAEMON_PATH.read_text(encoding="utf-8")
+    start = source.index("acquired_lo_verdict_claim_slugs: list[str] = []")
+    authority = source.index("worker_session_result = runtime._ensure_dispatch_worker_session(", start)
+    claim = source.index("lo_claim_result = runtime._acquire_lo_verdict_work_intent_batch(", authority)
+    spawn = source.index("result = runtime._spawn_harness(", claim)
+    claim_context = source.index('result["verdict_claim_slugs"] = acquired_lo_verdict_claim_slugs', spawn)
+    persist = source.index("runtime._record_recipient_attempt(recipient_state, result)", claim_context)
+
+    assert authority < claim < spawn < claim_context < persist
+
+
 def test_daemon_live_dedupe_survives_newer_unsuffixed_substrate_mismatch_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -801,12 +1390,16 @@ def test_daemon_reconciles_nonzero_exit_and_falls_back_to_next_lo(
     target_a = types.SimpleNamespace(
         dispatch_state_key="loyal-opposition:A",
         harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
         needed_role_label="loyal-opposition",
         invocation_surfaces={},
     )
     target_c = types.SimpleNamespace(
         dispatch_state_key="loyal-opposition:C",
         harness_id="C",
+        command_handle="antigravity",
+        canonical_mode="lo",
         needed_role_label="loyal-opposition",
         invocation_surfaces={},
     )

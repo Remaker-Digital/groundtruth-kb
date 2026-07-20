@@ -768,6 +768,44 @@ def test_activity_envelope_projection_accepts_compact_provider_without_transcrip
     assert openrouter_modes["activity_envelope.full_transcript_archive_independence"] == "false"
 
 
+def test_activity_envelope_projection_distinguishes_native_and_fallback_packet_postures() -> None:
+    module = _load_module()
+    registry = {
+        "harnesses": {
+            "claude": {
+                "activity_envelope_projection_mode": "native",
+                "compact_result_envelope_mode": "native",
+                "compact_session_envelope_mode": "native",
+                "full_transcript_archive_required": False,
+            },
+            "antigravity": {
+                "activity_envelope_projection_mode": "optimized-startup",
+                "compact_result_envelope_mode": "native",
+                "compact_session_envelope_mode": "optimized-startup",
+                "full_transcript_archive_required": False,
+            },
+            "cursor": {
+                "activity_envelope_projection_mode": "fallback",
+                "compact_result_envelope_mode": "fallback",
+                "compact_session_envelope_mode": "fallback",
+                "full_transcript_archive_required": False,
+            },
+        }
+    }
+
+    results = module._activity_envelope_projection_results(["claude", "antigravity", "cursor"], registry)
+
+    assert all(result.state == "PASS" for result in results)
+    modes = {
+        (result.harness, result.capability_id): result.configured_status
+        for result in results
+        if result.capability_id == "activity_envelope.activity_envelope_projection_mode"
+    }
+    assert modes[("claude", "activity_envelope.activity_envelope_projection_mode")] == "native"
+    assert modes[("antigravity", "activity_envelope.activity_envelope_projection_mode")] == "optimized-startup"
+    assert modes[("cursor", "activity_envelope.activity_envelope_projection_mode")] == "fallback"
+
+
 def test_activity_envelope_projection_missing_field_fails_required_row() -> None:
     module = _load_module()
     registry = {

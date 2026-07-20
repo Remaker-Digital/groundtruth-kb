@@ -206,17 +206,19 @@ def test_diagnostic_files_land_in_claude_hooks_dir() -> None:
     assert "hookSpecificOutput" in content
 
 
-def test_session_start_timeout_budget_contract() -> None:
+def test_session_start_timeout_budget_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     """SessionStart timeouts satisfy the current per-harness budget contract.
 
     WI-4564 raised the shared inner startup-service timeout to 150 s under the
     180 s Codex async timeout. Claude still uses the shorter 60 s hook timeout,
-    so the live contract is no longer equality; both hooks must expose positive
-    startup timeouts, and Codex must leave headroom over the shared inner bound.
+    so the live contract is no longer equality; Claude must cap the inner wait
+    below its outer hook budget, and Codex must leave headroom over the shared
+    inner bound.
     """
     claude = json.loads(CLAUDE_SETTINGS.read_text(encoding="utf-8"))
     codex = json.loads(CODEX_HOOKS.read_text(encoding="utf-8"))
     hook = _load_claude_hook_isolated("timeout_budget")
+    monkeypatch.delenv(hook.STARTUP_SERVICE_TIMEOUT_ENV, raising=False)
 
     def _session_start_timeout(settings: dict) -> int:
         for entry in settings.get("hooks", {}).get("SessionStart", []):
@@ -230,6 +232,7 @@ def test_session_start_timeout_budget_contract() -> None:
     assert claude_timeout > 0, "Claude settings has no SessionStart timeout"
     assert codex_timeout > 0, "Codex hooks has no SessionStart timeout"
     assert claude_timeout >= 60
+    assert hook._startup_service_timeout_seconds_for_harness() <= claude_timeout - 5
     assert codex_timeout > hook.STARTUP_SERVICE_TIMEOUT_SECONDS
 
 
@@ -566,7 +569,8 @@ def test_legacy_env_without_keyword_falls_through_to_normal_startup(
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
     emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
-    assert emitted_context == context
+    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
+    assert context in emitted_context
     assert "Bridge Auto-Dispatch Session" not in emitted_context
     assert "test-run-claude-env-only" not in emitted_context
 
@@ -715,8 +719,10 @@ def test_normal_startup_relay_cache_uses_startup_disclosure_field(
 
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
-    assert emitted["hookSpecificOutput"]["additionalContext"] == context
-    assert "full owner-visible disclosure" not in emitted["hookSpecificOutput"]["additionalContext"]
+    emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
+    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
+    assert context in emitted_context
+    assert "full owner-visible disclosure" not in emitted_context
     assert (tmp_path / "last-user-visible-startup.md").read_text(encoding="utf-8") == disclosure
 
 

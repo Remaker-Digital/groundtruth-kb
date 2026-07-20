@@ -1,0 +1,161 @@
+diff --git a/groundtruth-kb/tests/test_cli_bridge_propose.py b/groundtruth-kb/tests/test_cli_bridge_propose.py
+index 455a5716..05b788c3 100644
+--- a/groundtruth-kb/tests/test_cli_bridge_propose.py
++++ b/groundtruth-kb/tests/test_cli_bridge_propose.py
+@@ -1,435 +1,446 @@
+-"""Tests for the deterministic ``gt bridge propose`` draft CLI."""
+-
+-from __future__ import annotations
+-
+-import subprocess
+-import sys
+-from pathlib import Path
+-
+-import pytest
+-from click.testing import CliRunner
+-from scripts.bridge_author_metadata import FIELD_ENV_NAMES, REQUIRED_AUTHOR_METADATA_FIELDS
+-
+-from groundtruth_kb.bridge.proposal_autoload import (
+-    auto_prior_delibs,
+-    auto_project_metadata,
+-    auto_spec_links,
+-)
+-from groundtruth_kb.bridge.taxonomy import BridgeKind
+-from groundtruth_kb.cli import main
+-from groundtruth_kb.cli_bridge_propose import build_propose_context, render_proposal_draft
+-from groundtruth_kb.db import KnowledgeDB
+-
+-WI_ID = "WI-3318"
+-PROJECT_ID = "PROJECT-GTKB-DETERMINISTIC-SERVICES-TEST"
+-AUTH_ID = "PAUTH-GT-BRIDGE-PROPOSE-CLI"
+-DELIB_ID = "DELIB-GT-BRIDGE-PROPOSE-CLI"
+-
+-
+-def _config_path(project_dir: Path) -> Path:
+-    return project_dir / "groundtruth.toml"
+-
+-
+-def _seed_project(project_dir: Path) -> None:
+-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+-    try:
+-        db.insert_spec(
+-            id="SPEC-CLI-001",
+-            title="CLI source spec",
+-            status="specified",
+-            changed_by="test",
+-            change_reason="seed spec",
+-        )
+-        db.insert_deliberation(
+-            id=DELIB_ID,
+-            source_type="owner_conversation",
+-            title="Owner approved gt bridge propose CLI",
+-            summary=f"Owner approved deterministic bridge proposal scaffolding for {WI_ID}.",
+-            content=f"{WI_ID} approved for deterministic bridge proposal scaffolding.",
+-            changed_by="test",
+-            change_reason="seed owner decision",
+-        )
+-        db.insert_project("Deterministic Services", "test", "seed project", id=PROJECT_ID)
+-        db.insert_work_item(
+-            id=WI_ID,
+-            title="gt bridge propose CLI",
+-            description="Build deterministic bridge proposal scaffolding.",
+-            origin="new",
+-            component="developer_tooling",
+-            source_spec_id="SPEC-CLI-001",
+-            resolution_status="open",
+-            priority="P1",
+-            changed_by="test",
+-            change_reason="seed work item",
+-            related_spec_ids_at_creation='["SPEC-RELATED-001"]',
+-        )
+-        db.link_project_work_item(PROJECT_ID, WI_ID, "test", "link work item")
+-        db.insert_project_authorization(
+-            PROJECT_ID,
+-            "gt bridge propose CLI",
+-            DELIB_ID,
+-            "Implement deterministic bridge proposal scaffolding.",
+-            "test",
+-            "seed authorization",
+-            id=AUTH_ID,
+-            included_work_item_ids=[WI_ID],
+-            included_spec_ids=["SPEC-CLI-001"],
+-        )
+-    finally:
+-        db.close()
+-
+-
+-def _runner_result(project_dir: Path, *args: str):
+-    return CliRunner().invoke(main, ["--config", str(_config_path(project_dir)), *args])
+-
+-
+-def _context(project_dir: Path, kind: str = "implementation") -> dict:
+-    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+-    try:
+-        return build_propose_context(
+-            db,
+-            project_dir,
+-            kind=kind,
+-            wi_id=WI_ID,
+-            slug="gtkb-test-bridge-propose",
+-            target_paths=("groundtruth-kb/src/groundtruth_kb/cli.py",),
+-            add_specs=("SPEC-EXTRA-001",),
+-        )
+-    finally:
+-        db.close()
+-
+-
+-def _clear_author_env(monkeypatch: pytest.MonkeyPatch) -> None:
+-    for names in FIELD_ENV_NAMES.values():
+-        for name in names:
+-            monkeypatch.delenv(name, raising=False)
+-
+-
+-def test_scaffold_emits_six_author_metadata_field_labels(project_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+-    _clear_author_env(monkeypatch)
+-    _seed_project(project_dir)
+-    rendered = render_proposal_draft("implementation", _context(project_dir))
+-
+-    for field in REQUIRED_AUTHOR_METADATA_FIELDS:
+-        assert f"{field}:" in rendered
+-
+-
+-def test_scaffold_author_block_after_date_before_project_auth(
+-    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+-) -> None:
+-    _clear_author_env(monkeypatch)
+-    _seed_project(project_dir)
+-    rendered = render_proposal_draft("implementation", _context(project_dir))
+-
+-    assert rendered.index("Date: ") < rendered.index("author_identity:")
+-    assert rendered.index("author_model_configuration:") < rendered.index("Project Authorization:")
+-
+-
+-def test_scaffold_author_block_populates_resolvable_fields_from_env(
+-    project_dir: Path, monkeypatch: pytest.MonkeyPatch
+-) -> None:
+-    _clear_author_env(monkeypatch)
+-    values = {
+-        "GTKB_AUTHOR_IDENTITY": "prime-builder/test-harness",
+-        "GTKB_AUTHOR_HARNESS_ID": "T",
+-        "GTKB_AUTHOR_SESSION_CONTEXT_ID": "test-session-123",
+-        "GTKB_AUTHOR_MODEL": "test-model",
+-        "GTKB_AUTHOR_MODEL_VERSION": "test-model-version",
+-        "GTKB_AUTHOR_MODEL_CONFIGURATION": "test-config",
+-    }
+-    for name, value in values.items():
+-        monkeypatch.setenv(name, value)
+-
+-    _seed_project(project_dir)
+-    rendered = render_proposal_draft("implementation", _context(project_dir))
+-
+-    assert "author_identity: prime-builder/test-harness" in rendered
+-    assert "author_harness_id: T" in rendered
+-    assert "author_session_context_id: test-session-123" in rendered
+-    assert "author_model: test-model" in rendered
+-    assert "author_model_version: test-model-version" in rendered
+-    assert "author_model_configuration: test-config" in rendered
+-    assert "TODO: <fill" not in rendered
+-
+-
+-def test_scaffold_author_block_degrades_to_placeholder_when_unresolvable(
+-    project_dir: Path, monkeypatch: pytest.MonkeyPatch

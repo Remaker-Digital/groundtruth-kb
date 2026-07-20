@@ -31,11 +31,13 @@ _VALID_EDGES = [
     (STATUS_ACTIVE, STATUS_SUSPENDED),
     (STATUS_SUSPENDED, STATUS_ACTIVE),
     (STATUS_SUSPENDED, STATUS_RETIRED),
+    (STATUS_RETIRED, STATUS_REGISTERED),
 ]
 
 # Representative non-edges: skipped states, backward moves, the deliberately
-# absent direct active->retired edge, transitions out of the terminal state,
-# and same-state pairs.
+# absent direct active->retired edge, and same-state pairs. (retired has one
+# outgoing edge to registered per the FSM amendment; retired->active and
+# retired->suspended remain invalid.)
 _INVALID_PAIRS = [
     (STATUS_REGISTERED, STATUS_RETIRED),
     (STATUS_REGISTERED, STATUS_SUSPENDED),
@@ -73,9 +75,10 @@ def test_invalid_transitions_rejected(src: str, dst: str) -> None:
         validate_transition(src, dst)
 
 
-def test_retired_is_terminal() -> None:
-    assert is_terminal(STATUS_RETIRED) is True
-    assert next_states(STATUS_RETIRED) == frozenset()
+def test_retired_is_not_terminal() -> None:
+    """retired is no longer terminal per the FSM amendment; it has one outgoing edge."""
+    assert is_terminal(STATUS_RETIRED) is False
+    assert next_states(STATUS_RETIRED) == frozenset({STATUS_REGISTERED})
     for status in (STATUS_REGISTERED, STATUS_ACTIVE, STATUS_SUSPENDED):
         assert is_terminal(status) is False
 
@@ -110,4 +113,4 @@ def test_next_states_per_state() -> None:
     assert next_states(STATUS_REGISTERED) == frozenset({STATUS_ACTIVE})
     assert next_states(STATUS_ACTIVE) == frozenset({STATUS_SUSPENDED})
     assert next_states(STATUS_SUSPENDED) == frozenset({STATUS_ACTIVE, STATUS_RETIRED})
-    assert next_states(STATUS_RETIRED) == frozenset()
+    assert next_states(STATUS_RETIRED) == frozenset({STATUS_REGISTERED})

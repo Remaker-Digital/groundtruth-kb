@@ -3,11 +3,10 @@
 
 RETIRED (2026-05-09): The smart-poller runtime that was the primary consumer of
 ``state_dir`` has been archived to ``archive/smart-poller-2026-05-09/``. The
-cross-harness event-driven trigger
-(``scripts/cross_harness_bridge_trigger.py``) reuses the same directory layout
-under ``.gtkb-state/bridge-poller/`` for its dispatch-state file. This
-module's project-root and state-dir resolution helpers remain valid for both
-the retired smart-poller substrate and the current trigger.
+dispatcher daemon reuses the same directory layout under
+``.gtkb-state/bridge-poller/`` for its dispatch-state file. This module's
+project-root and state-dir resolution helpers remain valid for both the retired
+smart-poller substrate and the current daemon.
 
 Per ``.claude/rules/project-root-boundary.md`` and DELIB-S319 owner directives,
 all live GT-KB bridge state must remain under the GT-KB host root.

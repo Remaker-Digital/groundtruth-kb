@@ -10,6 +10,7 @@ import pytest
 from scripts import ollama_harness as oh
 from scripts import openrouter_harness as orh
 from scripts.bridge_author_metadata import (
+    CODEX_TURN_METADATA_SOURCE,
     ENV_VAR_HARNESS_NAME,
     FIELD_ENV_NAMES,
     BridgeAuthorMetadataError,
@@ -91,6 +92,56 @@ def _write_stale_current_json(project_root: Path, metadata: dict) -> None:
     stale = project_root / ".gtkb-state" / "bridge-author-metadata" / "current.json"
     stale.parent.mkdir(parents=True, exist_ok=True)
     stale.write_text(json.dumps(metadata), encoding="utf-8")
+
+
+def _write_attested_codex_session(
+    project_root: Path,
+    session_id: str,
+    *,
+    status: str = "open",
+    model_id: str = "gpt-5.6-sol",
+    model_version: str = "gpt-5.6-sol",
+    model_configuration: str = "reasoning_effort=xhigh; thread_source=user",
+    metadata_source: str = CODEX_TURN_METADATA_SOURCE,
+    harness_id: str = "A",
+) -> None:
+    path = project_root / "harness-state" / "codex" / "session-envelopes" / f"{session_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "session_id": session_id,
+                "harness_id": harness_id,
+                "harness_name": "codex",
+                "status": status,
+                "role": "prime-builder",
+                "role_asserted": "prime-builder",
+                "role_resolved": "prime-builder",
+                "role_resolution": {
+                    "interactive_resolved_role": "prime-builder",
+                    "interactive_role_source": "transcript_init_keyword",
+                    "authority_mode": "interactive_transcript",
+                },
+                "worker_role_provenance": {
+                    "schema_version": 1,
+                    "session_id": session_id,
+                    "harness_id": "A",
+                    "harness_name": "codex",
+                    "role": "prime-builder",
+                    "role_resolution_source": "transcript_init_keyword",
+                    "dispatch_run_id": None,
+                    "issued_at": "2026-07-18T00:00:00Z",
+                },
+                "model_id": model_id,
+                "model_version": model_version,
+                "model_configuration": model_configuration,
+                "model_metadata_source": metadata_source,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_author_metadata_gaps_for_bridge_artifact() -> None:
@@ -293,6 +344,101 @@ def test_runtime_envelope_supplies_session_model_fields(tmp_path: Path, monkeypa
         "author_model_version": "4.8",
         "author_model_configuration": "headless bridge auto-dispatch worker",
     }
+
+
+def test_exact_session_envelope_supplies_attested_codex_model_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+    _write_attested_codex_session(tmp_path, "codex-thread-123")
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+
+    result = load_author_metadata(tmp_path)
+
+    assert result == {
+        "author_identity": "codex",
+        "author_harness_id": "A",
+        "author_session_context_id": "codex-thread-123",
+        "author_model": "gpt-5.6-sol",
+        "author_model_version": "gpt-5.6-sol",
+        "author_model_configuration": "reasoning_effort=xhigh; thread_source=user",
+        "author_metadata_source": CODEX_TURN_METADATA_SOURCE,
+    }
+
+
+def test_exact_session_loader_never_uses_shared_current_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+    _write_attested_codex_session(tmp_path, "other-session")
+    shared = tmp_path / "harness-state" / "codex" / "session-envelope.json"
+    shared.parent.mkdir(parents=True, exist_ok=True)
+    shared.write_text(
+        json.dumps(
+            {
+                "session_id": "requested-session",
+                "harness_id": "A",
+                "harness_name": "codex",
+                "status": "open",
+                "model_id": "shared-wrong-model",
+                "model_version": "shared-wrong-model",
+                "model_configuration": "shared-wrong-config",
+                "model_metadata_source": CODEX_TURN_METADATA_SOURCE,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("CODEX_THREAD_ID", "requested-session")
+
+    with pytest.raises(BridgeAuthorMetadataError, match="missing or invalid"):
+        load_author_metadata(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error"),
+    [
+        ({"status": "closed"}, "requires an open session envelope"),
+        ({"model_id": "unknown"}, "missing or invalid"),
+        ({"metadata_source": "untrusted-source"}, "not attested"),
+        ({"harness_id": "B"}, "mismatched harness identity"),
+    ],
+)
+def test_exact_session_loader_rejects_closed_placeholder_or_untrusted_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    overrides: dict[str, str],
+    error: str,
+) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+    _write_attested_codex_session(tmp_path, "codex-thread-123", **overrides)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+
+    with pytest.raises(BridgeAuthorMetadataError, match=error):
+        load_author_metadata(tmp_path)
+
+
+def test_environment_model_metadata_precedes_exact_session_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_registry_projection(tmp_path, _PB_AND_LO_REGISTRY)
+    _write_attested_codex_session(tmp_path, "codex-thread-123")
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "environment-model")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "environment-version")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "environment-config")
+
+    result = load_author_metadata(tmp_path)
+
+    assert result["author_model"] == "environment-model"
+    assert result["author_model_version"] == "environment-version"
+    assert result["author_model_configuration"] == "environment-config"
 
 
 def test_dispatch_run_id_wins_for_runtime_session_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -114,6 +114,28 @@ def _seed_db(root: Path, *, membership: bool = True, authorization: bool = True)
         db.close()
 
 
+def _insert_authorization(
+    root: Path,
+    authorization_id: str,
+    included_work_item_ids: list[str] | None,
+) -> None:
+    db = KnowledgeDB(db_path=root / "groundtruth.db")
+    try:
+        db.insert_project_authorization(
+            PROJECT_ID,
+            f"{authorization_id} test authorization",
+            DELIB_ID,
+            "Bounded authorization for proposal selection tests.",
+            "test",
+            "seed authorization candidate",
+            id=authorization_id,
+            included_work_item_ids=included_work_item_ids,
+            included_spec_ids=[SPEC_ID],
+        )
+    finally:
+        db.close()
+
+
 def _install_fakes(monkeypatch) -> tuple[_FakeWriter, list[dict[str, Any]]]:
     writer = _FakeWriter()
     preflights: list[dict[str, Any]] = []
@@ -179,6 +201,10 @@ def test_file_implementation_proposal_reuses_active_state_and_writes_new(tmp_pat
     assert "Version: 001\n" in content
     assert "DRAFT" not in content
     assert f"Project Authorization: {AUTH_ID}" in content
+    assert "Project Authorization Candidates:" in content
+    assert f'"project_authorization_id":"{AUTH_ID}"' in content
+    assert '"coverage":"exact_singleton"' in content
+    assert "Project Authorization Candidates:" in result.output
     assert f"Project: {PROJECT_ID}" in content
     assert f"Work Item: {WI_ID}" in content
     assert 'target_paths: ["groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py"]' in content
@@ -223,6 +249,167 @@ def test_file_implementation_proposal_fails_closed_without_active_authorization(
     assert result.exit_code == 1
     assert "No active project authorization covers" in result.output
     assert not (tmp_path / "bridge").exists()
+
+
+@pytest.mark.parametrize(
+    "authorization_rows",
+    [
+        [
+            ("PAUTH-FALLBACK-TEST", None),
+            ("PAUTH-EXPLICIT-TEST", [WI_ID, "WI-4568"]),
+            ("PAUTH-EXACT-TEST", [WI_ID]),
+        ],
+        [
+            ("PAUTH-EXACT-TEST", [WI_ID]),
+            ("PAUTH-EXPLICIT-TEST", [WI_ID, "WI-4568"]),
+            ("PAUTH-FALLBACK-TEST", None),
+        ],
+    ],
+)
+def test_file_implementation_proposal_selects_exact_authorization_independent_of_insertion_order(
+    tmp_path: Path,
+    monkeypatch,
+    authorization_rows: list[tuple[str, list[str] | None]],
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    for authorization_id, included_work_item_ids in authorization_rows:
+        _insert_authorization(tmp_path, authorization_id, included_work_item_ids)
+    _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--target-path",
+        "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["project_authorization_id"] == "PAUTH-EXACT-TEST"
+    assert [
+        (candidate["project_authorization_id"], candidate["coverage"], candidate["specificity_rank"])
+        for candidate in payload["project_authorization_candidates"]
+    ] == [
+        ("PAUTH-EXACT-TEST", "exact_singleton", [0, 1]),
+        ("PAUTH-EXPLICIT-TEST", "explicit_list", [1, 2]),
+        ("PAUTH-FALLBACK-TEST", "project_membership_fallback", [2, 0]),
+    ]
+    assert [candidate["selected"] for candidate in payload["project_authorization_candidates"]] == [
+        True,
+        False,
+        False,
+    ]
+
+
+def test_file_implementation_proposal_prefers_smaller_explicit_authorization(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(tmp_path, "PAUTH-EXPLICIT-THREE-TEST", [WI_ID, "WI-4568", "WI-4569"])
+    _insert_authorization(tmp_path, "PAUTH-EXPLICIT-TWO-TEST", [WI_ID, "WI-4568"])
+    _insert_authorization(tmp_path, "PAUTH-FALLBACK-TEST", None)
+    _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--target-path",
+        "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+        "--json",
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["project_authorization_id"] == "PAUTH-EXPLICIT-TWO-TEST"
+    assert payload["project_authorization_candidates"][0] == {
+        "coverage": "explicit_list",
+        "included_work_item_count": 2,
+        "project_authorization_id": "PAUTH-EXPLICIT-TWO-TEST",
+        "selected": True,
+        "specificity_rank": [1, 2],
+    }
+
+
+def test_file_implementation_proposal_fails_before_publication_on_equal_rank_ambiguity(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path, authorization=False)
+    _insert_authorization(tmp_path, "PAUTH-EXACT-A-TEST", [WI_ID])
+    _insert_authorization(tmp_path, "PAUTH-EXACT-B-TEST", [WI_ID])
+    writer, preflights = _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--target-path",
+        "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py",
+        "--add-spec",
+        SPEC_ID,
+    )
+
+    assert result.exit_code == 1
+    assert "Ambiguous active project authorizations cover WI-4567 at specificity rank [0, 1]" in result.output
+    assert "PAUTH-EXACT-A-TEST, PAUTH-EXACT-B-TEST" in result.output
+    assert writer.calls == []
+    assert preflights == []
+    assert not (tmp_path / "bridge").exists()
+
+
+def test_file_implementation_proposal_dry_run_text_discloses_candidate_ranks(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_config(tmp_path)
+    _seed_db(tmp_path)
+    _install_fakes(monkeypatch)
+
+    result = _invoke(
+        tmp_path,
+        "bridge",
+        "file-implementation-proposal",
+        "--wi",
+        WI_ID,
+        "--slug",
+        "gtkb-wi4567-test",
+        "--target-path",
+        "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py",
+        "--add-spec",
+        SPEC_ID,
+        "--dry-run",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert f"Project Authorization: {AUTH_ID}" in result.output
+    assert "Project Authorization Candidates:" in result.output
+    assert '"specificity_rank":[0,1]' in result.output
+    assert '"selected":true' in result.output
 
 
 def test_file_implementation_proposal_can_create_missing_state_with_owner_decision(

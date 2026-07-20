@@ -123,11 +123,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-governance.py\"",
+            "timeout": 60
           },
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\"",
+            "timeout": 60
           },
           {
             "type": "command",
@@ -140,7 +142,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\""
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/assertion-check.py\"",
+            "timeout": 60
           }
         ]
       }

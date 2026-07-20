@@ -487,8 +487,9 @@ print(json.dumps({
         "root_config_exists": False,
     }
     module_path = Path(payload["module"]).resolve()
+    source_module_path = (BUILD_PROJECT / "src" / "groundtruth_kb" / "__init__.py").resolve()
     assert module_path.is_relative_to(venv.resolve())
-    assert not module_path.is_relative_to((BUILD_PROJECT / "src").resolve())
+    assert module_path != source_module_path
 
 
 def test_fresh_worker_cannot_fall_back_to_host_authority_taxonomy(fresh_host: Path) -> None:

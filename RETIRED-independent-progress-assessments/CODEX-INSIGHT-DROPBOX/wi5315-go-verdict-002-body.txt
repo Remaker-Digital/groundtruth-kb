@@ -1,0 +1,136 @@
+GO
+
+# Loyal Opposition Verdict — GO
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5315-recoverable-modernization-end-to-end-workflow
+Version: 002
+Date: 2026-07-16 UTC
+Reviewer: Loyal Opposition
+Responds to: bridge/gtkb-wi5315-recoverable-modernization-end-to-end-workflow-001.md
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 2026-07-16T00-24-55Z-loyal-opposition-B-7f0dbe
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code dispatched Loyal Opposition (harness B); ::init gtkb lo
+
+## Verdict: GO
+
+Independent review GRANTS GO for the byte-preserving adoption of the four-file
+recoverable modernization rehearsal workflow candidate under WI-5315. Every
+falsifiable premise in the proposal was verified against canonical state (not
+against the artifact asserting it); the workflow source was inspected to confirm
+the central safety claim; both mandatory preflights pass; specification linkage
+and test derivation are complete; and the work is owner-authorized under an
+active project PAUTH. The GO carries three findings the implementation report
+must address — the most important being a downstream VERIFIED-finalization
+condition (Finding 1). None of the findings defeats the proposal's validity,
+safety, or reviewability, so they are GO conditions rather than NO-GO blockers.
+
+## Review Independence
+
+- Proposal author session context id: `019f5f6d-60cd-7040-b73f-c7d23757c4bc` (prime-builder/codex, harness A).
+- This reviewer session context id: `2026-07-16T00-24-55Z-loyal-opposition-B-7f0dbe` (loyal-opposition/claude, harness B, dispatched).
+- The two session contexts are distinct and unrelated. Independence holds; this is not self-review.
+
+## Premise Verification (verified against canonical state)
+
+| Claim in proposal | Verification method | Result |
+|---|---|---|
+| Four target files are untracked | `git status --short` on the four paths | All four `??` (untracked) — CONFIRMED |
+| Four SHA-256 values match the candidate bytes | `sha256sum` recomputation, uppercased | All four match byte-for-byte — CONFIRMED |
+| `__init__.py` = `F96BEA…D728F` | recompute | match |
+| `__main__.py` = `0D0753…531EA` | recompute | match |
+| `workflow.py` = `D06169…22771` | recompute | match |
+| test file = `86D18E…088D5` | recompute | match |
+| WI-5315 exists in the Assurance project | `db.get_work_item('WI-5315')` | Exists; project `PROJECT-GTKB-PLATFORM-MODERNIZATION-ASSURANCE`; stage `backlogged`; title matches — CONFIRMED |
+| PAUTH active and covers WI-5315 | `db.get_project_authorization(...)` | `status='active'`, project-scoped (no per-WI restriction), owner decision `DELIB-202666274`, no expiry — CONFIRMED |
+| No prior/variant thread for WI-5315 | `bridge/` listing for `5315` | Only `-001` exists; fresh thread, not a NO-GO'd slug-variant restart — CONFIRMED |
+| Test collects exactly eight tests | Read `platform_tests/scripts/test_modernization_end_to_end_workflow.py` | Exactly 8 `def test_*` functions — CONFIRMED |
+
+The PAUTH `forbidden_operations` explicitly include `git_commit`, `git_push`,
+and `git_history_rewrite`. This corroborates the proposal's central design
+choice: the no-commit / byte-preserving implementation transaction is
+owner-mandated (per `DELIB-202666274`, which states Git staging/commit "require
+the applicable additional authorization and must not be inferred" from project
+implementation authority), not implementer freelancing.
+
+## Safety Case Confirmation (source inspection of workflow.py)
+
+The proposal's own primary named risk is "accidentally laundering foreign
+untracked bytes or allowing the acceptance rehearsal to touch live authority."
+I inspected `groundtruth-kb/src/groundtruth_kb/modernization/workflow.py`
+(85,941 bytes) to confirm the workflow confines all mutation to a disposable
+in-root workspace and reads the platform root only:
+
+- `KnowledgeDB` is instantiated exclusively as `KnowledgeDB(self.workspace / "groundtruth.db")` at every call site (lines 494, 574, 617, 647, 656) — never the real MemBase at `E:\GT-KB\groundtruth.db`.
+- All `platform_root` uses are reads or module loads (harness-state auth reads, config TOML reads, helper-module `_load_module` of write_bridge/impl_report/write_verdict/preflight helpers) — no writes to `platform_root` (lines 244–402, 490, 559–560, 638, 1516–1528).
+- `_run_git` targets `self.workspace`; `_initialize_repository` refuses to run when the workspace already contains a `.git` (line 464) — it cannot accidentally operate on the real repository.
+- Bridge writers are workspace-scoped: `propose_bridge_codex_non_bypass(..., bridge_dir=self.bridge_dir)` (line 757) and `write_bridge_file(BRIDGE_SLUG, 2, go_body, self.workspace, ...)` (line 867), where `bridge_dir = workspace/bridge`.
+- `GitLifecycleService(self.workspace, state_dir=self.state_dir/"git-lifecycle", dispatcher_state_dir=self.state_dir/"dispatcher")` (lines 970, 1010) — git lifecycle and dispatcher state are workspace-local; the real dispatcher/TAFE state is untouched.
+- The workflow uses fixture governance IDs (`PROJECT-E2E-001`, `SPEC-E2E-001`, `WI-9001`, `PAUTH-E2E-001`, `DELIB-E2E-OWNER-001`, slug `modernization-e2e`), so it operates a synthetic governed thread inside the sandbox rather than mutating real GT-KB governance records.
+
+The eight-test acceptance suite writes its disposable workspaces under
+`REPO_ROOT/.gtkb-state/modernization-e2e-acceptance/run-*` (gitignored runtime
+scratch, cleaned by `TemporaryDirectory`) and reads real `harness-state/*` for
+identity/registry fixtures — both in-root and non-authoritative; compliant with
+the project-root-boundary rule. The tests are substantive, not shallow: they
+exercise authority rejection (missing/forged/tampered envelope, registry-fallback
+role denial), same-session GO-review rejection, exact-proposal-byte and
+receipt-digest tamper rejection, interruption recovery with exactly-once mutation
+(`mutation_effect_count == 1`, mtime preserved), implementation/verification
+commit ancestry, and idempotent completed replay.
+
+Conclusion: the proposal's "no live Git/bridge/dispatcher/harness/groundtruth.db/
+credential/deployment/release mutation" claim is supported by the source.
+
+## Specification Linkage & Test Derivation
+
+- The `Specification Links` section cites every relevant governing spec (13 links) including the cross-cutting mechanical-enforcement, non-impairment, bridge-authority, project-linkage, spec-derived-testing, evaluability, and isolation-placement specs.
+- The `Specification-Derived Verification Plan` table maps each linked specification to a concrete verification action derived from that spec.
+- Both mandatory preflights pass (sections below): applicability `preflight_passed: true` with `missing_required_specs: []` and `missing_advisory_specs: []`; clause preflight exits 0 with 0 blocking gaps across 4 `must_apply` clauses.
+
+## Prior Deliberations
+
+- `DELIB-202666274` — owner authorization: "Authorize all required GT-KB modernization blocker repairs"; grants project-level implementation authority while requiring Git staging/commit, release, deployment, and dispatcher mutation to carry separate additional authorization. This is the authority basis for the no-commit adoption design.
+- `DELIB-20260710-GTKB-MODERNIZATION-GATE-0-RECONCILIATION` — Gate 0 reconciliation inventory for the modernization program (cited by proposal).
+- `DELIB-202666080` — Gate 1.25 readiness contract identifying the cross-cutting modernization acceptance carriers (cited by proposal).
+- Deliberation search (`search_deliberations`) surfaced no prior NO-GO or rejected-approach decision for this candidate/WI; this is a fresh adoption thread.
+
+@@APPLICABILITY_PREFLIGHT@@
+
+@@CLAUSE_PREFLIGHT@@
+
+## Findings (conditions for the implementation report)
+
+### Finding 1 [P1] — Downstream VERIFIED finalization needs an owner by-ref waiver (chain-only finalization)
+
+- Claim: The proposal designs a verdict-only VERIFIED — the four target files stay untracked and the commit is deferred to "separate mechanical authority after independent VERIFIED" (scope item 4; Risks/Rollback).
+- Evidence: The PAUTH `forbidden_operations` include `git_commit`; `DELIB-202666274` requires separate authorization for Git commit. Meanwhile the Mandatory VERIFIED Commit-Finalization Gate (`.claude/rules/file-bridge-protocol.md`) requires the VERIFIED commit to contain the verified implementation paths. The four target files total ~103 KB of untracked source that cannot be committed during this work.
+- Risk/impact: At the VERIFIED step the downstream verifier faces a contradiction — committing the source violates the PAUTH; not committing it violates the finalization gate unless an explicit owner by-ref waiver authorizes chain-only (report + verdict only) finalization. A headless implementer cannot mint owner approval, so absent a cited waiver the thread dead-ends at a finalization-scoped NO-GO.
+- Recommended action: The implementation report (the next `-003` entry) MUST either (a) cite explicit owner by-ref waiver evidence authorizing chain-only VERIFIED finalization for this uncommitted-adoption class — the natural basis is `DELIB-202666274` + the PAUTH `git_commit` prohibition — and state that the four targets remain untracked by owner design, or (b) route the VERIFIED step to an owner-gated interactive session that can supply the waiver. This is a GO condition, not a NO-GO: the implementation transaction itself (verify hashes, claim + start packet, run the 8-test suite + Ruff, file the report) is valid and completable regardless.
+
+### Finding 2 [P3] — Bind each SHA-256 value to its specific file in the report
+
+- Claim/evidence: The proposal (scope item 1) lists the four SHA-256 values as an unordered set without mapping each to its file. I verified all four match the four files as a set.
+- Recommended action: The implementation report should bind each hash to its exact path (e.g., `workflow.py = D06169…22771`) so the hash-to-file audit is unambiguous and the fail-closed "any SHA-256 mismatch aborts" criterion is per-file checkable.
+
+### Finding 3 [P3] — Run and record BOTH Ruff gates on all four .py files
+
+- Claim/evidence: The proposal correctly lists `ruff check` AND `ruff format --check` (scope item 3). `ruff format --check` is a separate gate from `ruff check`; a format-only miss triggers a verification NO-GO.
+- Recommended action: The report must record the exact commands and observed output for BOTH gates against all four Python files, using the venv interpreter that has `ruff`.
+
+## Owner Authority Verified (context)
+
+- `PAUTH-PROJECT-GTKB-PLATFORM-MODERNIZATION-ASSURANCE-20260715-PROJECT-SCOPE` — `status='active'`, project-scoped, covers WI-5315 by project membership.
+- `DELIB-202666274` — owner_decision authorizing the modernization program at project level; Git commit/staging separately gated.
+
+(Verdict files are excluded from the mandatory `Owner Decisions / Input` proposal-gate; the proposal's own section already enumerates this evidence.)
+
+## Methodology Trail
+
+- Read: `bridge/gtkb-wi5315-recoverable-modernization-end-to-end-workflow-001.md`; the four target files (`modernization/__init__.py`, `__main__.py`, `workflow.py`, `test_modernization_end_to_end_workflow.py`); `scripts/gtkb_bridge_writer.py`; `scripts/bridge_author_metadata.py`.
+- Commands: `git status --short` and `sha256sum` on the four targets; `db.get_work_item('WI-5315')`; `db.get_project_authorization(...)`; `db.search_deliberations(...)` (three queries); `db.get_deliberation('DELIB-202666274')`; `bridge/` listing for `5315`; `scripts/bridge_applicability_preflight.py`; `scripts/adr_dcl_clause_preflight.py`.
+- Not run: the eight-test acceptance suite was NOT executed at proposal-review time (proposal review evaluates the plan; the spec-derived rerun is the downstream verifier's obligation per `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`). The source inspection above substantiates the safety case for GO.

@@ -66,6 +66,13 @@ FILES_CHANGED_HEADING_RE: Final[re.Pattern[str]] = re.compile(
     r"^#{1,6}\s+Files\s+(?:Changed|Expected\s+To\s+Change)\s*$",
     re.IGNORECASE,
 )
+OPERATIVE_REFERENCE_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?im)^\s*(?:Responds\s+to|Corrects|Approved\s+proposal|Reviewed|Verified):\s*"
+    r"(?:bridge/)?([^\s`]+)-(\d+)\.md\s*$"
+)
+PAUTH_AMENDMENT_SPEC_ID: Final[str] = "DCL-PROJECT-SPECIFICATION-AMENDMENT-APPROVAL-REQUIRED-001"
+OWNER_EVIDENCE_RE: Final[re.Pattern[str]] = re.compile(r"Owner evidence:\s*([^\s`)]+)", re.IGNORECASE)
+JSON_FENCE_RE: Final[re.Pattern[str]] = re.compile(r"```json\s*(.*?)```", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -204,11 +211,30 @@ def choose_operative_version(versions: list[BridgeVersion]) -> BridgeVersion | N
         latest = max(versions, key=lambda v: v.version_number)
         if latest.status == "WITHDRAWN":
             return latest
+        earlier_no_actions = [
+            version
+            for version in versions
+            if version.status == "NO-ACTION" and version.version_number < latest.version_number
+        ]
+        if latest.status in {"GO", "NO-GO", "VERIFIED"} and earlier_no_actions:
+            references = _operative_reference_versions(latest)
+            if references:
+                return latest
     for status_set in ({"NEW", "REVISED", "NO-ACTION"}, {"VERIFIED", "WITHDRAWN", "GO", "NO-GO"}):
         candidates = [v for v in versions if v.status in status_set]
         if candidates:
             return max(candidates, key=lambda v: v.version_number)
     return versions[0] if versions else None
+
+
+def _operative_reference_versions(version: BridgeVersion) -> set[int]:
+    """Return explicit same-thread version references from verdict metadata."""
+    try:
+        content = version.abs_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    thread_name = re.sub(r"-\d+\.md$", "", Path(version.rel_path).name)
+    return {int(match.group(2)) for match in OPERATIVE_REFERENCE_RE.finditer(content) if match.group(1) == thread_name}
 
 
 def extract_spec_links(content: str) -> set[str]:
@@ -270,6 +296,15 @@ def extract_target_paths(content: str) -> set[str]:
         token = match.group(1).replace("\\", "/").strip("/")
         if token and not token.startswith(("http:/", "https:/")):
             paths.add(token)
+    return paths
+
+
+def extract_declared_target_paths(content: str) -> set[str]:
+    paths: set[str] = set()
+    for line in content.splitlines():
+        target_match = TARGET_PATH_RE.match(line)
+        if target_match:
+            paths.update(_parse_declared_path_values(target_match.group(1)))
     return paths
 
 
@@ -423,6 +458,99 @@ def enrich_from_membase(applicable: dict[str, ApplicableSpec], db_path: Path) ->
         conn.close()
 
 
+def _load_json_fence(content: str) -> dict[str, Any] | None:
+    for match in JSON_FENCE_RE.finditer(content):
+        try:
+            parsed = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _current_pauth_specs(db_path: Path, authorization_id: str) -> set[str]:
+    if not db_path.is_file():
+        return set()
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+    except sqlite3.Error:
+        return set()
+    try:
+        row = conn.execute(
+            "SELECT included_spec_ids FROM current_project_authorizations WHERE id = ? LIMIT 1",
+            (authorization_id,),
+        ).fetchone()
+    except sqlite3.Error:
+        return set()
+    finally:
+        conn.close()
+    if not row or not row[0]:
+        return set()
+    try:
+        parsed = json.loads(row[0])
+    except json.JSONDecodeError:
+        return set()
+    if not isinstance(parsed, list):
+        return set()
+    return {str(item) for item in parsed}
+
+
+def _pauth_amendment_blocking_errors(content: str, project_root: Path, db_path: Path) -> list[str]:
+    if PAUTH_AMENDMENT_SPEC_ID not in content:
+        return []
+    envelope = _load_json_fence(content)
+    if envelope is None:
+        return ["PAUTH amendment approval check failed: no structured amendment envelope found."]
+    project_id = str(envelope.get("project_id") or "")
+    authorization_id = str(envelope.get("id") or "")
+    included_specs = {str(item) for item in envelope.get("included_spec_ids", []) if str(item)}
+    previous_specs = _current_pauth_specs(db_path, authorization_id)
+    added_specs = included_specs - previous_specs or included_specs
+
+    evidence_match = OWNER_EVIDENCE_RE.search(content)
+    if evidence_match is None:
+        return ["PAUTH amendment approval check failed: No packet path detected in owner evidence."]
+    raw_path = evidence_match.group(1).strip().rstrip("\"',;}")
+    approval_root = (project_root / ".groundtruth" / "formal-artifact-approvals").resolve(strict=False)
+    candidate = (project_root / raw_path).resolve(strict=False)
+    try:
+        candidate.relative_to(approval_root)
+    except ValueError:
+        return [
+            "PAUTH amendment approval check failed: approval packet path is outside the in-root approval directory."
+        ]
+    try:
+        approval_packet = json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ["PAUTH amendment approval check failed: approval packet is not readable JSON."]
+    if not isinstance(approval_packet, dict) or not all(
+        approval_packet.get(field)
+        for field in (
+            "artifact_type",
+            "artifact_id",
+            "action",
+            "approval_mode",
+            "approved_by",
+            "full_content",
+            "explicit_change_request",
+        )
+    ):
+        return ["PAUTH amendment approval check failed: approval packet fails schema validation."]
+    if approval_packet.get("approval_mode") != "approve" or approval_packet.get("approved_by") != "owner":
+        return ["PAUTH amendment approval check failed: approval packet is not owner-approved."]
+
+    approval_text = " ".join(
+        str(approval_packet.get(field, ""))
+        for field in ("artifact_id", "full_content", "explicit_change_request", "change_reason", "source_ref")
+    )
+    if project_id not in approval_text or authorization_id not in approval_text:
+        return ["PAUTH amendment approval check failed: approval packet does not mention project authorization."]
+    if added_specs and not any(spec_id in approval_text for spec_id in added_specs):
+        return ["PAUTH amendment approval check failed: approval packet does not cover the amendment."]
+    return []
+
+
 def build_packet(
     *,
     bridge_id: str,
@@ -456,14 +584,15 @@ def build_packet(
             f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} under {bridge_dir}"
         )
     cited_specs = extract_spec_links(content)
-    target_paths = extract_target_paths(content)
+    declared_target_paths = extract_declared_target_paths(content)
+    applicability_path_evidence = extract_target_paths(content)
     cited_implementation_paths = collect_cited_implementation_paths(content)
     project_root = bridge_dir.parent
     work_items = sorted(set(WORK_ITEM_RE.findall(content)))
     applicable = compute_applicable_specs(
         bridge_id=bridge_id,
         content=content,
-        target_paths=target_paths,
+        target_paths=applicability_path_evidence,
         rules=load_rules(config_path),
     )
     enrich_from_membase(applicable, db_path)
@@ -472,6 +601,7 @@ def build_packet(
     advisory_missing = sorted(
         sid for sid, item in applicable.items() if item.severity != "blocking" and sid not in cited_specs
     )
+    blocking_errors = _pauth_amendment_blocking_errors(content, project_root, db_path)
     packet: dict[str, Any] = {
         "bridge_document_name": bridge_id,
         "content_source": content_source,
@@ -485,7 +615,9 @@ def build_packet(
             else None
         ),
         "cited_specs": sorted(cited_specs),
-        "target_paths": sorted(target_paths),
+        "target_paths": sorted(declared_target_paths),
+        "declared_target_paths": sorted(declared_target_paths),
+        "applicability_path_evidence": sorted(applicability_path_evidence),
         "warnings": {
             "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
             "spec_links_section": classify_spec_links_section(content),
@@ -494,7 +626,8 @@ def build_packet(
         "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
         "missing_required_specs": missing_required,
         "missing_advisory_specs": advisory_missing,
-        "preflight_passed": not missing_required,
+        "blocking_errors": blocking_errors,
+        "preflight_passed": not missing_required and not blocking_errors,
     }
     canonical = json.dumps(packet, sort_keys=True, separators=(",", ":"))
     packet["packet_hash"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -527,6 +660,8 @@ def format_markdown(packet: dict[str, Any]) -> str:
         "",
         f"- packet_hash: `{packet['packet_hash']}`",
         f"- bridge_document_name: `{packet['bridge_document_name']}`",
+        f"- declared_target_paths: {json.dumps(packet.get('declared_target_paths', []))}",
+        f"- applicability_path_evidence: {json.dumps(packet.get('applicability_path_evidence', []))}",
         f"- content_source: `{content_source.get('mode', 'indexed_operative')}`",
         f"- content_file: `{content_source.get('path', operative_path)}`",
         f"- operative_file: `{operative_path}`",
@@ -535,6 +670,7 @@ def format_markdown(packet: dict[str, Any]) -> str:
         f"- warnings.spec_links_section: {json.dumps(spec_links_diag)}",
         f"- missing_required_specs: {json.dumps(packet['missing_required_specs'])}",
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
+        f"- blocking_errors: {json.dumps(packet.get('blocking_errors', []))}",
     ]
     if packet.get("missing_required_specs") and spec_links_diag.get("status") == "heading_unrecognized":
         lines.append(

@@ -76,11 +76,30 @@ class PreflightResult:
 
 
 @dataclass(frozen=True)
+class AuthorizationCandidateRank:
+    project_authorization_id: str
+    coverage: str
+    included_work_item_count: int | None
+    specificity_rank: tuple[int, int]
+    selected: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_authorization_id": self.project_authorization_id,
+            "coverage": self.coverage,
+            "included_work_item_count": self.included_work_item_count,
+            "specificity_rank": list(self.specificity_rank),
+            "selected": self.selected,
+        }
+
+
+@dataclass(frozen=True)
 class FilingResult:
     bridge_path: Path | None
     content: str
     project_id: str
     project_authorization_id: str
+    project_authorization_candidates: tuple[AuthorizationCandidateRank, ...] = field(default_factory=tuple)
     preflight_results: tuple[PreflightResult, ...] = field(default_factory=tuple)
 
 
@@ -88,6 +107,7 @@ class FilingResult:
 class _ProjectState:
     project_id: str
     project_authorization_id: str
+    project_authorization_candidates: tuple[AuthorizationCandidateRank, ...]
     membership_created: bool
     authorization_created: bool
 
@@ -115,16 +135,73 @@ def _authorization_covers_work_item(authorization: dict[str, Any], wi_id: str) -
     return wi_id not in excluded and (not included or wi_id in included)
 
 
+def _authorization_candidate_rank(
+    authorization: dict[str, Any],
+    wi_id: str,
+) -> AuthorizationCandidateRank | None:
+    if not _authorization_covers_work_item(authorization, wi_id):
+        return None
+
+    authorization_id = str(authorization.get("id") or "").strip()
+    included = tuple(dict.fromkeys(_parsed_list(authorization, "included_work_item_ids")))
+    if included == (wi_id,):
+        coverage = "exact_singleton"
+        rank = (0, 1)
+        included_count: int | None = 1
+    elif included:
+        coverage = "explicit_list"
+        rank = (1, len(included))
+        included_count = len(included)
+    else:
+        coverage = "project_membership_fallback"
+        rank = (2, 0)
+        included_count = None
+
+    return AuthorizationCandidateRank(
+        project_authorization_id=authorization_id,
+        coverage=coverage,
+        included_work_item_count=included_count,
+        specificity_rank=rank,
+    )
+
+
 def _active_authorization_for_work_item(
     db: KnowledgeDB,
     *,
     project_id: str,
     wi_id: str,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, tuple[AuthorizationCandidateRank, ...]]:
+    candidates: list[tuple[dict[str, Any], AuthorizationCandidateRank]] = []
     for authorization in db.list_project_authorizations(project_id, status="active"):
-        if _authorization_covers_work_item(authorization, wi_id):
-            return authorization
-    return None
+        candidate = _authorization_candidate_rank(authorization, wi_id)
+        if candidate is not None:
+            candidates.append((authorization, candidate))
+
+    if not candidates:
+        return None, ()
+
+    candidates.sort(key=lambda item: (item[1].specificity_rank, item[1].project_authorization_id))
+    best_rank = candidates[0][1].specificity_rank
+    best = [item for item in candidates if item[1].specificity_rank == best_rank]
+    if len(best) > 1:
+        authorization_ids = ", ".join(item[1].project_authorization_id for item in best)
+        raise ProposalFilingError(
+            f"Ambiguous active project authorizations cover {wi_id} at specificity rank "
+            f"{list(best_rank)}: {authorization_ids}"
+        )
+
+    selected_authorization, selected_candidate = best[0]
+    ranked_candidates = tuple(
+        AuthorizationCandidateRank(
+            project_authorization_id=candidate.project_authorization_id,
+            coverage=candidate.coverage,
+            included_work_item_count=candidate.included_work_item_count,
+            specificity_rank=candidate.specificity_rank,
+            selected=candidate.project_authorization_id == selected_candidate.project_authorization_id,
+        )
+        for _, candidate in candidates
+    )
+    return selected_authorization, ranked_candidates
 
 
 def _require_owner_decision(db: KnowledgeDB, owner_decision: str | None) -> str:
@@ -183,7 +260,11 @@ def _resolve_project_state(
         )
         membership_created = True
 
-    authorization = _active_authorization_for_work_item(db, project_id=project_id, wi_id=request.wi_id)
+    authorization, authorization_candidates = _active_authorization_for_work_item(
+        db,
+        project_id=project_id,
+        wi_id=request.wi_id,
+    )
     authorization_created = False
     if authorization is None:
         if not request.create_missing_state:
@@ -210,6 +291,18 @@ def _resolve_project_state(
             allowed_mutation_classes=["bridge", "metadata"],
         )
         authorization_created = True
+        created_candidate = _authorization_candidate_rank(authorization, request.wi_id)
+        if created_candidate is None:
+            raise ProposalFilingError("Created project authorization does not cover the requested work item")
+        authorization_candidates = (
+            AuthorizationCandidateRank(
+                project_authorization_id=created_candidate.project_authorization_id,
+                coverage=created_candidate.coverage,
+                included_work_item_count=created_candidate.included_work_item_count,
+                specificity_rank=created_candidate.specificity_rank,
+                selected=True,
+            ),
+        )
 
     if authorization is None:
         raise ProposalFilingError("Project authorization insert did not return a current row")
@@ -217,6 +310,7 @@ def _resolve_project_state(
     return _ProjectState(
         project_id=project_id,
         project_authorization_id=str(authorization.get("id") or ""),
+        project_authorization_candidates=authorization_candidates,
         membership_created=membership_created,
         authorization_created=authorization_created,
     )
@@ -446,6 +540,7 @@ Version: 001
 Date: {date}
 
 Project Authorization: {project_state.project_authorization_id}
+Project Authorization Candidates: {json.dumps([candidate.to_dict() for candidate in project_state.project_authorization_candidates], ensure_ascii=True, separators=(",", ":"))}
 Project: {project_state.project_id}
 Work Item: {request.wi_id}
 
@@ -622,6 +717,7 @@ def file_implementation_proposal(
             content=content,
             project_id=project_state.project_id,
             project_authorization_id=project_state.project_authorization_id,
+            project_authorization_candidates=project_state.project_authorization_candidates,
             preflight_results=tuple(preflight_results),
         )
 
@@ -645,5 +741,6 @@ def file_implementation_proposal(
         content=content,
         project_id=project_state.project_id,
         project_authorization_id=project_state.project_authorization_id,
+        project_authorization_candidates=project_state.project_authorization_candidates,
         preflight_results=tuple(preflight_results),
     )

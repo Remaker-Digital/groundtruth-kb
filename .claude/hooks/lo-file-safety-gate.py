@@ -65,13 +65,25 @@ NULL_SINKS = {"nul", "null", "$null", "/dev/null", "2>nul", "2>$null", "2>/dev/n
 WRITEISH_COMMAND_RE = re.compile(
     r"\b("
     r"Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item|"
-    r"New-Item|rm|mv|cp|copy|del|erase|tee|git\s+restore|git\s+checkout"
+    r"New-Item|rm|mv|cp|copy|del|erase|tee|git\s+restore|git\s+checkout|git\s+reset"
     r")\b|(?<![:<>=!-])(?:\d?>|>>)",
     re.IGNORECASE,
 )
+
+_PYTHON_WHOLE_FILE_RE = re.compile(
+    r"\b("
+    r"shutil\.(copy|copy2|copyfile|move|rmtree)|"
+    r"os\.(remove|unlink|rename|replace)|"
+    r"pathlib\.Path\([^)]*\)\.(write_text|read_text|unlink|rename|replace)|"
+    r'open\([^)]*,\s*[\x27"]w[\x27"]'
+    r")\b",
+    re.IGNORECASE,
+)
+
 _COMMAND_SEPARATORS = frozenset(";&|\n")
 _GIT_RESTORE_OPTS_WITH_ARG = frozenset({"-s", "--source", "-C", "--conflict", "--pathspec-from-file"})
 _GIT_CHECKOUT_OPTS_WITH_ARG = frozenset({"-b", "-B", "--conflict", "--orphan", "--pathspec-from-file"})
+_GIT_RESET_OPTS_WITH_ARG = frozenset({"--pathspec-from-file"})
 
 
 def _split_command_segment(command: str, start: int) -> str:
@@ -267,7 +279,6 @@ def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
     Missing/malformed role state is fail-open by design so startup repairs and
     fresh clones are not hard-blocked by an unavailable projection.
     """
-    # --- Resolve harness_name (same heuristic as the prior durable-only path) ---
     harness_name = os.environ.get("GTKB_HARNESS_NAME") or payload.get("harness_name")
     if not harness_name and os.environ.get("CLAUDE_PROJECT_DIR"):
         harness_name = "claude"
@@ -280,7 +291,6 @@ def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
     if not harness_name and not harness_id:
         harness_name = "codex"
 
-    # --- Preferred path: session role resolver (marker > durable) ---
     if resolve_interactive_session_role is not None and resolve_session_id is not None:
         try:
             payload_session_id = payload.get("session_id") or payload.get("active_session_id")
@@ -299,7 +309,7 @@ def _is_lo_enforced(root: Path, payload: dict[str, Any]) -> bool:
             if str(_outcome).startswith("durable_"):
                 return False
             return resolved_role == "loyal-opposition"
-        except Exception:  # noqa: BLE001 - fail-open on any resolver error
+        except Exception:
             return False
 
     return False
@@ -386,7 +396,7 @@ def _load_packet(packet_ref: str, root: Path) -> tuple[dict[str, Any] | None, st
         if not path.is_absolute():
             path = root / path
         packet = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - convert all packet failures to block text
+    except Exception as exc:
         return None, f"approval packet could not be read or parsed: {exc}"
     if not isinstance(packet, dict):
         return None, "approval packet root must be a JSON object"
@@ -526,7 +536,7 @@ def _extract_command(payload: dict[str, Any]) -> str:
 
 
 def _clean_target_token(value: str) -> str:
-    return value.strip().strip("\"'`").rstrip(";,)")
+    return value.strip().strip("\"'`").rstrip(";,)") if value else ""
 
 
 def _is_null_sink(path: str) -> bool:
@@ -625,6 +635,32 @@ def _bash_targets(payload: dict[str, Any], root: Path) -> list[Change]:
             if not path:
                 continue
             change = _target_change(path, root, operation="Delete")
+            if change:
+                changes.append(change)
+    for match in re.finditer(r"\bgit\s+reset\b", command, re.IGNORECASE):
+        args_text = _split_command_segment(command, match.end())
+        tokens = _tokenize_argv(args_text)
+        # git reset [--soft|--mixed|--hard] [<commit>] [--] [<path>...]
+        hard_opts = {"--soft", "--mixed", "--hard", "--merge", "--keep"}
+        for token in tokens:
+            if token in hard_opts:
+                continue
+            if token == "--":
+                continue
+            if token.startswith("-"):
+                continue
+            if re.match(r"^[0-9a-f]{7,40}$", token) or token in ("HEAD", "HEAD~", "HEAD~1", "HEAD~2", "ORIG_HEAD"):
+                continue
+            change = _target_change(token, root, operation="Delete")
+            if change:
+                changes.append(change)
+    # Python whole-file operations
+    for match in _PYTHON_WHOLE_FILE_RE.finditer(command):
+        # Try to find the target path near the match
+        rest = command[match.end() :]
+        path_match = re.search(r'[\x27"]([^\x27"]+)[\x27"]', rest)
+        if path_match:
+            change = _target_change(path_match.group(1), root)
             if change:
                 changes.append(change)
     changes.extend(_powershell_targets(command, root))

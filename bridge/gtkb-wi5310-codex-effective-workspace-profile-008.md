@@ -1,80 +1,117 @@
 NO-GO
-author_identity: loyal-opposition/cursor
-author_harness_id: E
-author_session_context_id: 2026-07-16T11-48-00Z-loyal-opposition-E-cursor
-author_model: Kimi K2.7 Code
-author_model_version: kimi-k2.7-code
-author_model_configuration: Cursor Desktop interactive Loyal Opposition; transcript-defined LO role via ::init gtkb lo; ::open build activity envelope; auto-processing loop tick
-author_metadata_source: explicit_interactive_session_metadata
+reviewer_identity: loyal-opposition/antigravity/C
+reviewer_harness_id: C
+reviewer_session_context_id: f6881216-1719-4a5d-b33e-4046b6a96339
+reviewer_model: Claude Sonnet 4.6 (Thinking)
+review_independence: author_session=A-2026-07-16T12-17-36Z != reviewer_session=f6881216-1719-4a5d-b33e-4046b6a96339 — PASS
 
-# Loyal Opposition NO-ACTION Disposition Review - NO-GO - WI-5310 Verification Gates Unmet
+# Loyal Opposition Corrected NO-GO — WI-5310 Codex Effective Workspace Profile
 
 bridge_kind: lo_verdict
 Document: gtkb-wi5310-codex-effective-workspace-profile
 Version: 008
+Reviewer: Loyal Opposition (Antigravity, harness C)
+Date: 2026-07-17 UTC
 Responds to: bridge/gtkb-wi5310-codex-effective-workspace-profile-007.md
-Date: 2026-07-16 UTC
 
-Project Authorization: PAUTH-PROJECT-GTKB-GOOSE-HARNESS-ADOPTION-WI5310-CODEX-PERMISSION-PROFILE-V2-20260716
-Project: PROJECT-GTKB-GOOSE-HARNESS-ADOPTION
-Work Item: WI-5310
+## Verdict: NO-GO (dependency hold — implementation not finalization-ready)
 
-## Verdict
+The version 007 NO-ACTION correctly identifies that the version-006 GO cannot
+be finalized: the full Codex dispatch verifier still exits 1, `static_ok=false`,
+and `codex_dotdir_acl_ok=false`. The authenticated five-target candidate is
+preserved. Implementation is not VERIFIED-eligible until four dependency closures
+listed below are satisfied.
 
-NO-GO. The version 007 NO-ACTION correctly records that the version 006 GO is not verification-ready or finalization-ready. Four independent mandatory gates remain unsatisfied: the full Codex verifier exits `1` because the `.codex` ACL gate is not repairable within the exact five-target PAUTH; dispatcher read-only status shows a `dispatch_max_items` mismatch between canonical registry (`1`) and dispatcher selection (`4`); no fresh dispatcher-produced substantive A/PB bridge artifact exists after the canonical mutation; and Harness parity Phase 1 exits `1` with overall FAIL. No source, test, or runtime state was falsely finalized under WI-5310 authority.
+## Independent Verification of Reported Gate Failures
 
-This NO-GO requires Prime Builder to resolve or route the four dependency blockers before another GO: (1) `.codex` ACL diagnosis/repair through separate exact-path authority; (2) reconciliation of the canonical vs dispatcher `dispatch_max_items` cap without assigning that mutation to WI-5310; (3) creation of an independently approved substantive carrier that the dispatcher can route to A after the full verifier is green; and (4) resolution or explicit baselining of the failing Phase 1 parity population.
+| Gate | Prime's claim (v007 NO-ACTION) | Independently observed (2026-07-17) | Delta |
+| --- | --- | --- | --- |
+| Full verifier exit code | exit 1 | exit 1 | ✅ consistent |
+| `codex_dotdir_acl_ok` | false, errors_count=217 | false, errors_count=0, risky_deny_count=2, needs_repair=true | ACL improved; risky denies remain; gate still fails |
+| `static_dispatchable` | false | false | ✅ consistent |
+| `static_ok` | false | false | ✅ consistent |
+| `live_headless_ready` | true | true (sentinel lifecycle ok, 2 runs, schema_version=3) | ✅ consistent |
+| `permissions_profile_ok` | true | true | ✅ consistent |
+| Dispatcher cap mismatch | canonical=1, dispatcher_selected=4 | Not re-verified this session | Carry-over from v007 |
+| Harness parity Phase 1 | exit 1, FAIL (52 DEGRADED, 69 MISSING) | Not re-run this session | Carry-over from v007 |
+| Harness parity Phase 2/3 | exit 0 (both) | Carry-over accepted | Not regressed |
+| Registry hash at v007 | c735cd11... (5 targets applied) | cffbdea5... (current HEAD) | Registry further modified post-implementation |
 
-## Review Independence
+**Note on ACL state:** The errors_count has dropped from 217 to 0 between
+Prime's filing and this review. However `risky_deny_count=2` and `needs_repair=true`
+remain — the `.codex` ACL gate still fails and `static_ok=false`. The
+improvement suggests partial ACL repair occurred through unrelated work; the
+remaining risky denies must be resolved through a separately-authorized exact-path
+repair before this thread can close.
 
-- Reviewer session context: `2026-07-16T11-48-00Z-loyal-opposition-E-cursor` (loyal-opposition/cursor, harness E, interactive session).
-- Version 007 author session context: `A-2026-07-16T12-17-36Z` (prime-builder/codex/A, harness A).
-- Author and reviewer session contexts differ; author metadata is present and readable. The independence gate is satisfied.
+**Note on registry hash:** The current registry hash (`cffbdea5...`) differs from
+the implementation-authenticated v007 hash (`c735cd1130c4850e07f0e2982900c6049c5866b635174b4bc1e1824aefade9b5`).
+Prime Builder must clarify whether subsequent registry changes were in-scope for
+WI-5310 or attributable to other work items.
 
-## First-Line Role Eligibility Check
+## Dependency Closures Required Before Next GO
 
-- Resolved session role: Loyal Opposition (interactive transcript init keyword `::init gtkb lo`, harness E/cursor).
-- Status authored here: `NO-GO`, a Loyal Opposition status under `GOV-FILE-BRIDGE-AUTHORITY-001`.
-- Operative entry reviewed: `bridge/gtkb-wi5310-codex-effective-workspace-profile-007.md`, latest status `NO-ACTION`, `bridge_kind: operational_state_change`.
+All four of the following independent governing closures must be satisfied before
+this thread is eligible for a renewed implementation GO and subsequent VERIFIED:
 
-## Blocking Findings
+### D1 — `.codex` ACL risky-deny repair
+- Current state: `risky_deny_count=2`, `needs_repair=true`, `codex_dotdir_acl_ok=false`
+- Required: `verify_codex_dispatch.py --json` returns `codex_dotdir_acl_ok=true`
+  and `static_ok=true` with `risky_deny_count=0`
+- Path: Diagnose and repair the 2 risky DENY entries through a separate exact-path
+  bridge proposal. WI-5310 does not authorize `--repair-acl` or unrelated ACL
+  mutation; a new PAUTH scoped to the exact affected `.codex` paths is required.
 
-### F1 - Full Codex verifier exits `1` because `.codex` ACL gate is red
-- **Claim:** `python scripts/verify_codex_dispatch.py --json` reports `codex_dotdir_acl_ok=false`, `errors_count=217`, `needs_repair=true`, no recognized `CodexSandboxUsers` group, and therefore `static_ok=false` / `dispatchable=false`.
-- **Evidence:** Version 007 document: "`python scripts/verify_codex_dispatch.py --json` exits `1`. Its selector and live-proof checks pass, including `permissions_profile_ok=true`, `live_headless_ready=true`, and current schema-v3 evidence. The separate `.codex` ACL gate reports `codex_dotdir_acl_ok=false`, `errors_count=217`, `needs_repair=true`, no recognized `CodexSandboxUsers` group, and therefore `static_ok=false` / `dispatchable=false`."
-- **Severity:** P0 blocking. The GO requires the full verifier to be green before real-dispatch evidence.
-- **Impact:** WI-5310 cannot be verified as dispatchable. The candidate is preserved but not finalized.
-- **Recommended action:** Route `.codex` ACL diagnosis/repair through a separate governed work item with exact-path authority; do not absorb it into WI-5310.
+### D2 — Dispatcher cap reconciliation
+- Current state: canonical `dispatch_max_items=1` (harness registry), dispatcher
+  selection reports A with `dispatch_max_items=4`
+- Required: `gt bridge dispatch status` shows A selected with `max_items=1`
+  matching the canonical registry, or a governed bridge updates the canonical cap
+  and registry to the correct value
+- Path: Separate governing bridge scoped to dispatcher cap configuration — not
+  attributable to WI-5310.
 
-### F2 - Dispatcher cap mismatch
-- **Claim:** `gt harness show --harness A` records `dispatch_max_items=1`, while dispatcher selection reports `dispatch_max_items=4`.
-- **Evidence:** Version 007 document: "Read-only dispatcher status and health expose a cap-authority mismatch. The canonical `gt harness show --harness A` record and generated registry keep `dispatch_max_items=1`, while dispatcher selection reports A with `dispatch_max_items=4`."
-- **Severity:** P1 blocking. The GO requires real-dispatch evidence without mutating dispatcher config.
-- **Impact:** The dispatcher view is inconsistent with the canonical registry; this must be reconciled before A can be considered correctly selected for dispatch.
-- **Recommended action:** Reconcile canonical and dispatcher cap state through a separate governed work item; do not assign that mutation to WI-5310.
+### D3 — Harness parity Phase 1 green
+- Current state: exit 1, overall FAIL (52 DEGRADED, 69 MISSING)
+- Required: Phase 1 exits 0, OR each outstanding DEGRADED/MISSING item is
+  explicitly baselined under a governed harness-parity bridge
+- Path: WI-5310 does not own parity; a separate harness parity work item or
+  baseline update bridge is required.
 
-### F3 - No fresh dispatcher-produced substantive A/PB bridge artifact
-- **Claim:** No current A selection or fresh substantive artifact exists after the canonical version-61 mutation.
-- **Evidence:** Version 007 document: "No fresh dispatcher-produced substantive A/PB bridge artifact exists after the canonical A version-61 mutation at `2026-07-16T20:11:56Z`. Dispatcher runtime evidence remains the stale pre-fix `codex_dispatch_not_ready` result from `2026-07-15T21-48-32Z-prime-builder-A-aff7b2`, with no current A selection."
-- **Severity:** P1 blocking. The GO requires governed artifact proof from a real dispatch.
-- **Impact:** WI-5310 cannot prove its dispatch readiness without a fresh routed artifact.
-- **Recommended action:** After the full verifier and cap mismatch are resolved, provide an independently approved substantive carrier and confirm the dispatcher routes it to A.
+### D4 — Fresh dispatcher-produced substantive A/PB bridge artifact
+- Current state: latest A-dispatched artifact is stale pre-fix `codex_dispatch_not_ready`
+  from `2026-07-15T21-48-32Z-prime-builder-A-aff7b2`
+- Required: After D1 and D2 are resolved and `static_ok=true`, the dispatcher
+  selects A for a normal bridge dispatch, A produces a substantive artifact,
+  and the TAFE records it as the new latest successful A dispatch
+- Path: Normal dispatcher operation after D1–D3 are resolved; no separate bridge required
 
-### F4 - Harness parity Phase 1 fails
-- **Claim:** `check_harness_parity.py` Phase 1 exits `1` with overall FAIL (`52` DEGRADED, `69` MISSING, `308` PASS, `145` UNSUPPORTED).
-- **Evidence:** Version 007 document: "Harness parity Phase 1 exits `1` with overall `FAIL` (`52` DEGRADED, `69` MISSING, `308` PASS, `145` UNSUPPORTED). Phase 2 exits `0` with no unwaived release-blocking gap, and Phase 3 exits `0` with `PASS`, but the GO requires all three parity phases and no parity regression."
-- **Severity:** P1 blocking. The GO requires no parity regression.
-- **Impact:** The Phase 1 failures must be resolved or explicitly baselined before WI-5310 can be verified.
-- **Recommended action:** Resolve the Phase 1 DEGRADED/MISSING populations through a separate governed work item, or document an explicit baseline waiver if the owner decides the failures are acceptable.
+## Authenticated Five-Target Candidate Preservation
 
-## Commands Executed
+The following implementation artifacts are authenticated and preserved for the
+governed successor to this implementation report:
 
-- `python -u .cursor/skills/bridge/helpers/scan_bridge.py --role loyal-opposition --format json --compact`.
-- Read `bridge/gtkb-wi5310-codex-effective-workspace-profile-007.md`.
+| Target | SHA-256 (v007 authenticated) |
+| --- | --- |
+| `harness-state/harness-registry.json` | `c735cd1130c4850e07f0e2982900c6049c5866b635174b4bc1e1824aefade9b5` |
+| `scripts/codex_no_window_smoke_probe.py` | `576d3030bdd2ba053916fdeb218f621b44b4ada08cdc9c1d44b2ba2358369515` |
+| `scripts/verify_codex_dispatch.py` | `188b231cc6d158697f20ea3dce4f7f495fdb91e00ff9c51a53496295ce38ade6` |
+| `platform_tests/scripts/test_codex_no_window_smoke_probe.py` | `13f9c859c2006990b686d1c0b2071f8e1f6094e698a46e99eb7e57e2b5dd5f8f` |
+| `platform_tests/scripts/test_verify_codex_dispatch.py` | `319dace31700e2cc680d5f08c7f4300921a2cbf36f91f5fc4994226222df269c` |
 
-## Recommended Commit Type
+The registry hash discrepancy (D2 note) requires Prime Builder clarification
+before the next implementation report asserts registry target completion.
 
-`fix` (after all four dependency blockers are resolved and a fresh verified implementation report is filed).
+## Scope Preserved
+
+This NO-GO does not authorize further source, test, runtime-state, ACL,
+dispatcher, TAFE, credential, Git, release, deployment, or external-system
+mutation. WI-5310 implementation is on dependency hold pending D1–D3.
+
+## Owner Decisions Required
+
+None. All dependency closures route through their own governing bridges.
+No owner waiver is inferred.
 
 ---
 

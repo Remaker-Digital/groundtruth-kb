@@ -1,5 +1,53 @@
-# Agent Red application-scoped Docker build-context ignore.
-# Minimal placeholder created in sub-slice 1 of application-isolation-contract
-# (bridge/application-isolation-contract-006.md GO).
-# Patterns will be populated when Dockerfile* and infrastructure/ move into
-# this directory in the Phase 3 infra cluster move (separate bridge thread).
+# Agent Red application build context.
+
+# Version control and local tooling
+.git
+.github/*.local
+.vscode
+.idea
+.claude
+.codex
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+
+# Secrets and local environment files
+.env
+.env.local
+.env.*.local
+.env.integration
+.env.integration.example
+.env.example
+
+# Frontend dependency caches
+node_modules/
+admin/node_modules/
+admin/*/node_modules/
+widget/node_modules/
+docs-site/node_modules/
+
+# Generated frontend output and local build products
+build/
+dist/
+admin/*/dist/.vite
+docs-site/.cache/
+
+# Local/scratch artifacts
+logs/
+scratch/
+temp/
+tmp/
+*.log
+*.tmp
+*.bak
+
+# OS artifacts
+Thumbs.db
+desktop.ini
+.DS_Store

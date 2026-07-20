@@ -22,8 +22,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts import bridge_work_intent_registry, gtkb_session_id
+    from scripts import bridge_lifecycle_resolver, bridge_work_intent_registry, gtkb_session_id
 except ImportError:  # pragma: no cover - direct script execution from scripts/
+    import bridge_lifecycle_resolver  # type: ignore[no-redef]
     import bridge_work_intent_registry  # type: ignore[no-redef]
     import gtkb_session_id  # type: ignore[no-redef]
 
@@ -91,6 +92,7 @@ PROJECT_KEYS = frozenset({"project", "project id"})
 WORK_ITEM_KEYS = frozenset({"work item", "work item id", "backlog item", "backlog item id"})
 BRIDGE_KIND_KEYS = frozenset({"bridge_kind"})
 PROJECT_RETIREMENT_RECONCILIATION_CLASS = "project_retirement_reconciliation"
+PROJECT_AUTHORIZATION_REQUIRED_MUTATION_CLASSES = frozenset({"configuration", "source", "test"})
 GOVERNANCE_REVIEW_BRIDGE_KIND = "governance_review"
 GOVERNANCE_REVIEW_REQUIREMENT_CAPTURE_SUBMODE = "governance_review_requirement_capture"
 GOVERNANCE_REVIEW_FORBIDDEN_TARGET_PATTERNS = (
@@ -130,6 +132,11 @@ class AuthorizationError(RuntimeError):
 class BridgeEntry:
     bridge_id: str
     versions: list[tuple[str, str]]
+    implementation_artifact: str | None = None
+    implementation_verdict: str | None = None
+    blocking_diagnostics: tuple[str, ...] = ()
+    quarantined_paths: tuple[str, ...] = ()
+    resolver_managed: bool = False
 
     @property
     def latest_status(self) -> str:
@@ -306,54 +313,39 @@ def groundtruth_db_path(project_root: Path) -> Path:
 
 
 def _bridge_version_from_rel_path(rel_path: str, bridge_id: str) -> int | None:
-    if rel_path == f"bridge/{bridge_id}.md":
-        return 1
     match = re.fullmatch(rf"bridge/{re.escape(bridge_id)}-(\d{{3,}})\.md", rel_path)
     return int(match.group(1)) if match else None
-
-
-def _bridge_file_status(project_root: Path, rel_path: str) -> str:
-    path = project_root / rel_path
-    try:
-        lines = path.read_text(encoding="utf-8-sig").splitlines()
-    except (OSError, UnicodeError) as exc:
-        raise AuthorizationError(f"Bridge file is unreadable or has invalid encoding: {rel_path}") from exc
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line:
-            continue
-        if BRIDGE_FILE_STATUS_RE.fullmatch(line):
-            return line
-        raise AuthorizationError(f"Bridge file has unrecognized status line: {rel_path}: {line!r}")
-    raise AuthorizationError(f"Bridge file is empty: {rel_path}")
 
 
 def bridge_entry_from_versioned_files(project_root: Path, bridge_id: str) -> BridgeEntry:
     """Resolve a bridge thread from its append-only version files.
 
     The retired bridge index is historical only. Authorization derives current
-    state from the versioned audit files that remain in bridge/.
+    state from the shared operation-neutral exact-thread lifecycle resolver.
     """
-    bridge_dir = project_root / "bridge"
-    if not bridge_dir.is_dir():
-        raise AuthorizationError("bridge directory not found")
+    try:
+        resolution = bridge_lifecycle_resolver.resolve_bridge_lifecycle(project_root, bridge_id)
+    except bridge_lifecycle_resolver.BridgeLifecycleResolutionError as exc:
+        raise AuthorizationError(str(exc)) from exc
 
-    by_version: dict[int, tuple[str, str]] = {}
-    for path in sorted(bridge_dir.glob(f"{bridge_id}*.md")):
-        rel_path = path.relative_to(project_root).as_posix()
-        version = _bridge_version_from_rel_path(rel_path, bridge_id)
-        if version is None:
-            continue
-        if version in by_version:
-            prior = by_version[version][1]
-            raise AuthorizationError(f"Duplicate bridge version {version:03d} for {bridge_id}: {prior}, {rel_path}")
-        status = _bridge_file_status(project_root, rel_path)
-        by_version[version] = (status, rel_path)
-
-    if not by_version:
-        raise AuthorizationError(f"Bridge document not found as versioned files: {bridge_id}")
-    versions = [entry for _, entry in sorted(by_version.items(), reverse=True)]
-    return BridgeEntry(bridge_id, versions)
+    strict_versions = [
+        (version.status, version.path) for version in reversed(resolution.audit_versions) if version.status is not None
+    ]
+    if not strict_versions:
+        raise AuthorizationError(f"Bridge document has no strict numbered state: {bridge_id}")
+    return BridgeEntry(
+        bridge_id=bridge_id,
+        versions=strict_versions,
+        implementation_artifact=(
+            resolution.implementation_artifact.path if resolution.implementation_artifact is not None else None
+        ),
+        implementation_verdict=(
+            resolution.implementation_verdict.path if resolution.implementation_verdict is not None else None
+        ),
+        blocking_diagnostics=tuple(diagnostic.code for diagnostic in resolution.blocking_diagnostics),
+        quarantined_paths=tuple(resolution.quarantined_paths),
+        resolver_managed=True,
+    )
 
 
 def bridge_entry(project_root: Path, bridge_id: str) -> BridgeEntry:
@@ -412,6 +404,23 @@ def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
     ``approved_files_for_go`` rejected it, an asymmetry that blocked every
     post-impl-report revision once the original packet expired.
     """
+    if entry.resolver_managed:
+        if entry.implementation_artifact is not None and entry.implementation_verdict is not None:
+            return entry.implementation_artifact, entry.implementation_verdict
+        if (
+            "PENDING_CORRECTION_NO_IMPLEMENTATION_AUTHORITY" in entry.blocking_diagnostics
+            or entry.latest_status == "NO-ACTION"
+        ):
+            raise AuthorizationError(
+                "Bridge thread is NO-ACTION; the prior GO is non-dispatchable. "
+                "A later corrected GO is required before implementation authorization."
+            )
+        raise AuthorizationError(
+            "Implementation authorization requires a GO in the bridge chain; "
+            "latest GO or resumable post-GO NO-GO is required; "
+            f"found latest status {entry.latest_status}"
+        )
+
     go_index = next(
         (index for index, (status, _) in enumerate(entry.versions) if status == "GO"),
         None,
@@ -866,6 +875,121 @@ def _json_list(row: sqlite3.Row, field: str) -> list[str]:
     return [str(value) for value in parsed]
 
 
+def _authorization_json_list(row: sqlite3.Row, field: str) -> list[str]:
+    """Decode one PAUTH list field without treating malformed bytes as empty."""
+    if field not in set(row.keys()):
+        return []
+    raw = row[field]
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise AuthorizationError(f"Project authorization {row['id']} field {field} is not a valid JSON list") from exc
+    if not isinstance(parsed, list):
+        raise AuthorizationError(f"Project authorization {row['id']} field {field} is not a valid JSON list")
+    return [str(value) for value in parsed]
+
+
+def _project_authorization_envelope(row: sqlite3.Row) -> dict[str, Any]:
+    """Decode the current PAUTH row into the canonical evaluator envelope."""
+    row_fields = set(row.keys())
+
+    def value(field: str) -> Any:
+        return row[field] if field in row_fields else None
+
+    return {
+        "id": str(value("id") or ""),
+        "version": value("version"),
+        "project_id": str(value("project_id") or ""),
+        "status": value("status"),
+        "authorization_name": value("authorization_name"),
+        "owner_decision_deliberation_id": value("owner_decision_deliberation_id"),
+        "scope_summary": value("scope_summary"),
+        "expires_at": value("expires_at"),
+        "supersedes": _authorization_json_list(row, "supersedes"),
+        "superseded_by": _authorization_json_list(row, "superseded_by"),
+        "allowed_mutation_classes": _authorization_json_list(row, "allowed_mutation_classes"),
+        "forbidden_operations": _authorization_json_list(row, "forbidden_operations"),
+        "included_work_item_ids": _authorization_json_list(row, "included_work_item_ids"),
+        "excluded_work_item_ids": _authorization_json_list(row, "excluded_work_item_ids"),
+        "included_spec_ids": _authorization_json_list(row, "included_spec_ids"),
+        "excluded_spec_ids": _authorization_json_list(row, "excluded_spec_ids"),
+    }
+
+
+def _operation_time_api(project_root: Path) -> tuple[Any, Any, Any]:
+    """Load the root-bound canonical evaluator and taxonomy fail closed."""
+    try:
+        from groundtruth_kb.governance.project_authorization_operation_time import (
+            classify_target,
+            evaluate_envelope,
+            load_operation_taxonomy,
+        )
+
+        taxonomy = load_operation_taxonomy(project_root)
+    except (ImportError, OSError, ValueError) as exc:
+        raise AuthorizationError(f"Canonical project-authorization operation evaluator is unavailable: {exc}") from exc
+    return classify_target, evaluate_envelope, taxonomy
+
+
+def _evaluate_project_authorization_operations(
+    project_root: Path,
+    envelope: dict[str, Any],
+    *,
+    target_paths: list[str],
+    requested_operations: list[str],
+) -> dict[str, Any]:
+    classify_target, evaluate_envelope, taxonomy = _operation_time_api(project_root)
+    decisions = [
+        evaluate_envelope(
+            envelope,
+            requested_operation=operation,
+            target_paths=target_paths,
+            taxonomy=taxonomy,
+        )
+        for operation in requested_operations
+    ]
+    for decision in decisions:
+        if not decision.allowed:
+            raise AuthorizationError(f"{decision.reason_code}: {decision.reason}")
+
+    result = dict(envelope)
+    if not decisions:
+        result["target_classifications"] = [
+            {
+                "path": classified.path,
+                "mutation_class": classified.mutation_class,
+            }
+            for classified in (classify_target(path, taxonomy) for path in target_paths)
+        ]
+        result["requested_operations"] = []
+        result["operation_time_decisions"] = []
+        return result
+
+    first = decisions[0]
+    result.update(
+        {
+            "normalized_envelope_hash": first.normalized_envelope_hash,
+            "target_classifications": [
+                {
+                    "path": classified.path,
+                    "mutation_class": classified.mutation_class,
+                }
+                for classified in first.classified_targets
+            ],
+            "requested_operations": [decision.normalized_operation for decision in decisions],
+            "operation_time_decisions": [decision.as_dict() for decision in decisions],
+            "evaluator_id": first.evaluator_id,
+            "evaluator_version": first.evaluator_version,
+            "evaluator_sha256": first.evaluator_sha256,
+            "taxonomy_version": first.taxonomy_version,
+            "taxonomy_sha256": first.taxonomy_sha256,
+        }
+    )
+    return result
+
+
 def _project_authorization_row(
     project_root: Path,
     authorization_id: str,
@@ -1140,17 +1264,17 @@ def validate_project_authorization_row(
             f"Spec link(s) excluded by project authorization {authorization_id}: {', '.join(blocked_specs)}"
         )
 
-    return {
-        "id": authorization_id,
-        "project_id": project_id,
-        "status": row["status"],
-        "authorization_name": row["authorization_name"],
-        "owner_decision_deliberation_id": row["owner_decision_deliberation_id"],
-        "scope_summary": row["scope_summary"],
-        "expires_at": row["expires_at"],
-        "proposal_project_id": proposal_project_id,
-        "work_item_id": work_item_id,
-    }
+    envelope = _project_authorization_envelope(row)
+    envelope["proposal_project_id"] = proposal_project_id
+    envelope["work_item_id"] = work_item_id
+    if target_paths is not None or requested_operations is not None:
+        return _evaluate_project_authorization_operations(
+            project_root,
+            envelope,
+            target_paths=list(target_paths or []),
+            requested_operations=list(requested_operations or []),
+        )
+    return envelope
 
 
 def extract_and_validate_project_authorization(
@@ -1698,6 +1822,8 @@ def create_authorization_packet(
                 project_root,
                 proposal,
                 spec_links,
+                target_paths=target_paths,
+                requested_operations=["implementation_packet_create"],
             )
         except AuthorizationError as exc:
             errors.append(str(exc))
@@ -2191,6 +2317,20 @@ def validate_packet_project_authorization_operation(
         return bootstrap_decision
     project_authorization = packet.get("project_authorization")
     if not isinstance(project_authorization, dict):
+        normalized_operations = {
+            re.sub(r"[^a-z0-9]+", "_", operation.strip().lower()).strip("_") for operation in requested_operations
+        }
+        if normalized_operations.intersection({"implementation_start", "protected_mutation"}):
+            classify_target, _, taxonomy = _operation_time_api(project_root)
+            classified_targets = [classify_target(path, taxonomy) for path in target_paths]
+            protected_targets = [
+                item
+                for item in classified_targets
+                if item.mutation_class in PROJECT_AUTHORIZATION_REQUIRED_MUTATION_CLASSES
+            ]
+            if protected_targets:
+                detail = ", ".join(f"{item.path} ({item.mutation_class})" for item in protected_targets)
+                raise AuthorizationError(f"Project Authorization is required for protected target(s): {detail}")
         return None
     if packet.get("schema_version") not in {2, 3}:
         raise AuthorizationError(
@@ -2206,9 +2346,23 @@ def validate_packet_project_authorization_operation(
         proposal_project_id=project_authorization.get("proposal_project_id"),
         work_item_id=project_authorization.get("work_item_id"),
         spec_links=packet_spec_links(packet),
+        target_paths=target_paths,
+        requested_operations=requested_operations,
     )
-    if current["project_id"] != project_authorization.get("project_id"):
-        raise AuthorizationError("Project authorization project_id drifted since packet creation")
+    stable_fields = (
+        "project_id",
+        "version",
+        "normalized_envelope_hash",
+        "target_classifications",
+        "evaluator_id",
+        "evaluator_version",
+        "evaluator_sha256",
+        "taxonomy_version",
+        "taxonomy_sha256",
+    )
+    for field in stable_fields:
+        if current.get(field) != project_authorization.get(field):
+            raise AuthorizationError(f"Project authorization {field} drifted since packet creation")
     return current
 
 

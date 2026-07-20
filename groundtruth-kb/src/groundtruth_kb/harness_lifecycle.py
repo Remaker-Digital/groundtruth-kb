@@ -3,8 +3,9 @@
 ``REQ-HARNESS-REGISTRY-001`` FR2: each harness has a lifecycle ``status``
 governed by a four-state finite state machine — ``registered`` -> ``active``
 <-> ``suspended`` -> ``retired`` — with deterministic, validated transitions.
-``retired`` is terminal; records are never deleted (the append-only
-``harnesses`` table guarantees that).
+``retired`` is no longer terminal per DELIB-20260720-GOOSE-ACTIVATION-FSM-AMENDMENT;
+a retired harness may transition back to ``registered``. Records are never
+deleted (the append-only ``harnesses`` table guarantees that).
 
 This module is pure logic: the four status constants, the transition graph,
 and the functions that decide whether a status transition is permitted. It
@@ -19,9 +20,10 @@ Transition graph (the literal reading of the FR2 notation)::
     suspended  --> active
     suspended  --> retired
 
-``retired`` has no outgoing edges. There is no direct ``active -> retired``
-edge; retiring an ``active`` harness is the two-step
-``active -> suspended -> retired``.
+``retired`` has one outgoing edge back to ``registered`` (per the
+DELIB-20260720-GOOSE-ACTIVATION-FSM-AMENDMENT owner decision). There is no
+direct ``active -> retired`` edge; retiring an ``active`` harness is the
+two-step ``active -> suspended -> retired``.
 
 Authority: ``REQ-HARNESS-REGISTRY-001`` (FR2); ``DELIB-2079`` Q3 (four-state
 lifecycle FSM, a single enum).
@@ -46,7 +48,7 @@ _TRANSITIONS: dict[str, frozenset[str]] = {
     STATUS_REGISTERED: frozenset({STATUS_ACTIVE}),
     STATUS_ACTIVE: frozenset({STATUS_SUSPENDED}),
     STATUS_SUSPENDED: frozenset({STATUS_ACTIVE, STATUS_RETIRED}),
-    STATUS_RETIRED: frozenset(),
+    STATUS_RETIRED: frozenset({STATUS_REGISTERED}),
 }
 
 
@@ -65,8 +67,8 @@ def _require_known_status(status: str, *, role: str = "") -> str:
 def next_states(status: str) -> frozenset[str]:
     """Return the permitted successor states for ``status``.
 
-    Raises ``ValueError`` if ``status`` is not one of the four FR2 states. A
-    terminal status (``retired``) returns an empty frozenset.
+    Raises ``ValueError`` if ``status`` is not one of the four FR2 states.
+    ``retired`` returns ``{STATUS_REGISTERED}`` per the FSM amendment.
     """
     _require_known_status(status)
     return _TRANSITIONS[status]

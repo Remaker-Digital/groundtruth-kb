@@ -194,16 +194,106 @@ def test_dispatch_runs_prune_preserves_live_pid_artifacts(tmp_path: Path) -> Non
 
 def test_session_envelope_git_status_is_bounded(monkeypatch, tmp_path: Path) -> None:
     class Result:
-        returncode = 0
-        stdout = "\n".join(f" M file_{index}.py" for index in range(5))
+        def __init__(self, stdout: str, returncode: int = 0, stderr: str = "") -> None:
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append(list(args))
+        assert kwargs["timeout"] == envelope.GIT_PROBE_TIMEOUT_SECONDS
+        if args[1:3] == ["rev-parse", "--show-toplevel"]:
+            return Result(str(tmp_path.resolve()))
+        assert args[1:3] == ["status", "--short"]
+        return Result("\n".join(f" M file_{index}.py" for index in range(5)))
 
     monkeypatch.setattr(envelope, "GIT_STATUS_SHORT_LINE_LIMIT", 3)
-    monkeypatch.setattr(envelope.subprocess, "run", lambda *args, **kwargs: Result())
+    monkeypatch.setattr(envelope.subprocess, "run", fake_run)
 
     status = envelope._git_status(tmp_path)
 
+    assert calls == [["git", "rev-parse", "--show-toplevel"], ["git", "status", "--short"]]
+    assert status["available"] is True
+    assert status["exact_root"] is True
     assert status["dirty"] is True
     assert status["short_line_count"] == 5
     assert status["short_line_limit"] == 3
     assert status["short_truncated"] is True
     assert status["short"].splitlines() == [" M file_0.py", " M file_1.py", " M file_2.py"]
+
+
+def test_session_envelope_git_status_rejects_ancestor_top_level(monkeypatch, tmp_path: Path) -> None:
+    ancestor = tmp_path / "ancestor"
+    nested = ancestor / "nested"
+    nested.mkdir(parents=True)
+
+    class Result:
+        returncode = 0
+        stdout = str(ancestor.resolve())
+        stderr = ""
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append(list(args))
+        assert kwargs["timeout"] == envelope.GIT_PROBE_TIMEOUT_SECONDS
+        if args[1:3] != ["rev-parse", "--show-toplevel"]:
+            raise AssertionError("status must not run for a non-exact root")
+        return Result()
+
+    monkeypatch.setattr(envelope.subprocess, "run", fake_run)
+
+    status = envelope._git_status(nested)
+
+    assert calls == [["git", "rev-parse", "--show-toplevel"]]
+    assert status["available"] is False
+    assert status["dirty"] is None
+    assert status["reason"] == "git_top_level_mismatch"
+    assert status["top_level"] == str(ancestor.resolve())
+    assert status["short"] == ""
+
+
+def test_session_envelope_git_status_top_level_timeout_fails_soft(monkeypatch, tmp_path: Path) -> None:
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        assert args[1:3] == ["rev-parse", "--show-toplevel"]
+        raise envelope.subprocess.TimeoutExpired(args, kwargs["timeout"])
+
+    monkeypatch.setattr(envelope.subprocess, "run", fake_run)
+
+    status = envelope._git_status(tmp_path)
+
+    assert status == {
+        "available": False,
+        "reason": "git_top_level_timeout",
+        "dirty": None,
+        "short": "",
+    }
+
+
+def test_session_envelope_git_status_status_timeout_fails_soft(monkeypatch, tmp_path: Path) -> None:
+    class Result:
+        returncode = 0
+        stdout = str(tmp_path.resolve())
+        stderr = ""
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append(list(args))
+        if args[1:3] == ["rev-parse", "--show-toplevel"]:
+            return Result()
+        assert args[1:3] == ["status", "--short"]
+        raise envelope.subprocess.TimeoutExpired(args, kwargs["timeout"])
+
+    monkeypatch.setattr(envelope.subprocess, "run", fake_run)
+
+    status = envelope._git_status(tmp_path)
+
+    assert calls == [["git", "rev-parse", "--show-toplevel"], ["git", "status", "--short"]]
+    assert status["available"] is False
+    assert status["dirty"] is None
+    assert status["reason"] == "git_status_timeout"
+    assert status["top_level"] == str(tmp_path.resolve())
+    assert status["short"] == ""

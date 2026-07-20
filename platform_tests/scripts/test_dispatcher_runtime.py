@@ -2236,6 +2236,8 @@ def test_dispatched_child_env_does_not_inherit_disable_var(tmp_path: Path, monke
     assert child_env["GTKB_INHERITED_SESSION_ID"] == meta["dispatch_id"], (
         "GTKB_INHERITED_SESSION_ID must mirror dispatch_id for compatibility work-intent surfaces"
     )
+    assert child_env["GTKB_SESSION_ENVELOPE_ROLE"] == "loyal-opposition"
+    assert child_env["GTKB_SESSION_ENVELOPE_ACTIVITY"] == "test"
     assert "GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS" not in child_env
 
 
@@ -2327,6 +2329,8 @@ def test_prime_spawn_creates_dispatch_authorization_packet_and_env(
     assert child_env["GTKB_IMPLEMENTATION_AUTH_BRIDGE_IDS"] == doc
     assert child_env["GTKB_IMPLEMENTATION_AUTH_CURRENT_BRIDGE_ID"] == doc
     assert child_env["GTKB_IMPLEMENTATION_AUTH_PACKET_HASHES"] == current["packet_hash"]
+    assert child_env["GTKB_SESSION_ENVELOPE_ROLE"] == "prime-builder"
+    assert child_env["GTKB_SESSION_ENVELOPE_ACTIVITY"] == "build"
 
 
 def test_prime_spawn_fails_closed_when_dispatch_authorization_fails(
@@ -4442,6 +4446,71 @@ def test_lo_dispatch_prompt_requires_preflights_before_verdicts() -> None:
     assert "latest NEW, REVISED, or NO-ACTION entries" in prompt
     assert "corrected governance-compliant verdict via review_no_action" in prompt
     assert "NEW gtkb-ollama-dispatch-stall-retry-cap" in prompt
+
+
+def test_fallback_dispatch_prompt_exposes_packet_receipt_before_action_instructions() -> None:
+    """Slice D: weak-hook workers need a visible non-parity packet receipt."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="F",
+        command_handle="openrouter",
+        canonical_mode="lo",
+        invocation_surfaces={
+            "envelope_projection": {"activity_envelope_projection_mode": "compact-provider"},
+            "headless": {"argv": ["openrouter-harness", "{{PROMPT}}"]},
+        },
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-envelope-fallback-worker-receipt",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-envelope-fallback-worker-receipt-001.md",
+        },
+    )()
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+
+    assert prompt.splitlines()[0] == "::init gtkb lo"
+    receipt_index = prompt.index("# GroundTruth-KB Envelope Packet Receipt")
+    notification_index = prompt.index("Bridge auto-dispatch notification")
+    action_index = prompt.index("Selected entries, oldest-first")
+    assert receipt_index < notification_index < action_index
+    assert "- hook_disposition: fallback_receipt_pointer" in prompt
+    assert "- fallback_is_parity: false" in prompt
+    assert "session envelope packet --kind session-envelope --role loyal-opposition" in prompt
+    assert "session envelope packet --kind activity-packet --role loyal-opposition --activity test" in prompt
+    assert "pointer_only=true; cap=900" in prompt
+    assert "pointer_only=true; cap=500" in prompt
+
+
+def test_native_dispatch_prompt_keeps_packet_receipt_in_session_start_hook() -> None:
+    """Native hook harnesses receive packet receipts through SessionStart."""
+    trigger = _load_trigger()
+    target = trigger.DispatchTarget(
+        needed_role_label="loyal-opposition",
+        harness_id="A",
+        command_handle="codex",
+        canonical_mode="lo",
+        invocation_surfaces=_CODEX_INVOCATION_SURFACES,
+    )
+    item = type(
+        "FakeItem",
+        (),
+        {
+            "document_name": "gtkb-native-worker-receipt",
+            "top_status": "NEW",
+            "top_file": "bridge/gtkb-native-worker-receipt-001.md",
+        },
+    )()
+
+    prompt = trigger._dispatch_prompt(target, [item], max_items=1)
+
+    assert prompt.splitlines()[0] == "::init gtkb lo"
+    assert "# GroundTruth-KB Envelope Packet Receipt" not in prompt
+    assert "fallback_receipt_pointer" not in prompt
 
 
 def test_lo_review_authority_uses_numbered_chain_and_live_claim_service() -> None:

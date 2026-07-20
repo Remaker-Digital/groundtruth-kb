@@ -34,6 +34,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -60,6 +61,14 @@ STARTUP_SERVICE = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 STARTUP_FRESHNESS_CONTRACT_VERSION = "gtkb-startup-freshness-v1"
 STARTUP_SERVICE_TIMEOUT_ENV = "GTKB_STARTUP_SERVICE_TIMEOUT_SECONDS"
 STARTUP_SERVICE_TIMEOUT_SECONDS = 150.0
+STARTUP_SERVICE_TIMEOUT_BY_HARNESS = {
+    # Claude Code's registered SessionStart hook budget is 60 seconds. Cap the
+    # inner startup-service wait so this dispatcher can still emit a fail-soft
+    # SessionStart envelope instead of being killed by the outer hook runtime.
+    "claude": 55.0,
+}
+ROLE_SCOPED_STARTUP_RELAY_CACHE_SYNC_BUDGET_SECONDS = 25.0
+# Deadline guard for live hook budget
 # Parity marker for tests: Role: Prime Builder
 
 # IP-4: canonical init-keyword recognition (receiver side).
@@ -81,6 +90,16 @@ _MODE_TO_ROLE_PROFILE = {
 # trigger's dispatch-failures path so investigators see all dispatch-related
 # failures in one location.
 DISPATCH_FAILURES_PATH = PROJECT_ROOT / ".gtkb-state" / "bridge-poller" / "dispatch-failures.jsonl"
+_SESSION_ENVELOPE_ACTIVITY_ENV = "GTKB_SESSION_ENVELOPE_ACTIVITY"
+_DISPATCH_ACTIVITY_ENV = "GTKB_DISPATCH_ACTIVITY"
+_SESSION_ENVELOPE_ROLE_ENV = "GTKB_SESSION_ENVELOPE_ROLE"
+_NATIVE_PACKET_HOOK_HARNESSES = frozenset({"claude", "codex"})
+_CANONICAL_PACKET_ACTIVITIES = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
+_WORKER_ROLES = frozenset({"prime-builder", "loyal-opposition"})
+_DISPATCH_ACTIVITY_BY_ROLE_MODE = {
+    "pb": "build",
+    "lo": "test",
+}
 
 
 class StartupDecision(Enum):
@@ -102,6 +121,10 @@ def _now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _monotonic_seconds() -> float:
+    return time.monotonic()
+
+
 def _startup_service_timeout_seconds() -> float:
     raw = os.environ.get(STARTUP_SERVICE_TIMEOUT_ENV)
     if raw is None or not raw.strip():
@@ -111,6 +134,14 @@ def _startup_service_timeout_seconds() -> float:
     except ValueError:
         return STARTUP_SERVICE_TIMEOUT_SECONDS
     return parsed if parsed > 0 else STARTUP_SERVICE_TIMEOUT_SECONDS
+
+
+def _startup_service_timeout_seconds_for_harness() -> float:
+    configured_timeout = _startup_service_timeout_seconds()
+    harness_timeout = STARTUP_SERVICE_TIMEOUT_BY_HARNESS.get(str(HARNESS_NAME or "").strip().lower())
+    if harness_timeout is None:
+        return configured_timeout
+    return min(configured_timeout, harness_timeout)
 
 
 def _parse_iso8601(value: str | None) -> datetime | None:
@@ -276,6 +307,132 @@ def _session_start_payload(context: str) -> dict[str, dict[str, str]]:
             "additionalContext": context,
         }
     }
+
+
+def _dispatch_role_mode_from_keyword() -> str | None:
+    keyword_match = match_canonical_init_keyword(_read_first_prompt_line() or "")
+    return keyword_match.role_mode if keyword_match is not None else None
+
+
+def _session_envelope_role(role_mode: str | None) -> str:
+    raw_role = (os.environ.get(_SESSION_ENVELOPE_ROLE_ENV) or "").strip().lower()
+    if raw_role in _WORKER_ROLES:
+        return raw_role
+    if raw_role in _MODE_TO_ROLE_PROFILE:
+        return _MODE_TO_ROLE_PROFILE[raw_role]
+    if role_mode in _MODE_TO_ROLE_PROFILE:
+        return _MODE_TO_ROLE_PROFILE[role_mode]
+    return "prime-builder"
+
+
+def _session_envelope_activity(role_mode: str | None) -> str | None:
+    raw_activity = (
+        (os.environ.get(_SESSION_ENVELOPE_ACTIVITY_ENV) or os.environ.get(_DISPATCH_ACTIVITY_ENV) or "").strip().lower()
+    )
+    if raw_activity in _CANONICAL_PACKET_ACTIVITIES:
+        return raw_activity
+    if os.environ.get(_BRIDGE_DISPATCH_RUN_ID_ENV):
+        return _DISPATCH_ACTIVITY_BY_ROLE_MODE.get(role_mode or "")
+    return None
+
+
+def _compose_session_envelope_packet(
+    *,
+    packet_kind: str,
+    role: str,
+    activity: str | None = None,
+) -> dict[str, object]:
+    from groundtruth_kb.session.packet import compose_packet
+
+    return compose_packet(
+        project_root=PROJECT_ROOT,
+        packet_kind=packet_kind,
+        role=role,
+        activity=activity,
+    )
+
+
+def _packet_pointer(packet: dict[str, object]) -> str:
+    cache = packet.get("cache")
+    if isinstance(cache, dict) and cache.get("cache_path"):
+        return str(cache["cache_path"])
+    pointers = packet.get("source_pointers")
+    if isinstance(pointers, list) and pointers:
+        first = pointers[0]
+        if isinstance(first, dict) and first.get("path"):
+            return str(first["path"])
+    return "unavailable"
+
+
+def _packet_receipt_line(label: str, packet: dict[str, object]) -> str:
+    budget = packet.get("budget") if isinstance(packet.get("budget"), dict) else {}
+    cache = packet.get("cache") if isinstance(packet.get("cache"), dict) else {}
+    status = str(packet.get("status") or "unknown")
+    parts = [
+        f"- {label}: status={status}",
+        f"estimated_tokens={budget.get('estimated_tokens', 'unknown')}",
+        f"cap={budget.get('cap_estimated_tokens', 'unknown')}",
+        f"pointer={_packet_pointer(packet)}",
+        f"cache={cache.get('status', 'unavailable')}",
+    ]
+    diagnostic = packet.get("diagnostic") if isinstance(packet.get("diagnostic"), dict) else {}
+    if diagnostic.get("pointer_only") is True:
+        parts.append("pointer_only=true")
+    return "; ".join(parts)
+
+
+def _envelope_packet_receipt(role_mode: str | None = None, activity: str | None = None) -> str:
+    role = _session_envelope_role(role_mode)
+    selected_activity = activity or _session_envelope_activity(role_mode)
+    harness_name = str(HARNESS_NAME or "").strip().lower()
+    hook_disposition = (
+        "full_sessionstart_packet_injection"
+        if harness_name in _NATIVE_PACKET_HOOK_HARNESSES
+        else "fallback_receipt_pointer"
+    )
+    lines = [
+        "# GroundTruth-KB Envelope Packet Receipt",
+        "",
+        "- packet_injection_order: before_activity_specialization",
+        f"- hook_disposition: {hook_disposition}",
+        f"- role_bootstrap: {role}",
+        "- live_state_policy: stable bootstrap packet; live bridge, claim, git, and MemBase state still require fresh canonical reads",
+    ]
+    if hook_disposition == "fallback_receipt_pointer":
+        lines.append("- fallback_is_parity: false")
+
+    try:
+        session_packet = _compose_session_envelope_packet(packet_kind="session-envelope", role=role)
+        lines.append(_packet_receipt_line("session_packet", session_packet))
+    except Exception as exc:  # noqa: BLE001 - SessionStart must remain fail-soft.
+        lines.append(f"- session_packet: status=unavailable; reason={type(exc).__name__}")
+
+    if selected_activity:
+        try:
+            activity_packet = _compose_session_envelope_packet(
+                packet_kind="activity-packet",
+                activity=selected_activity,
+                role=role,
+            )
+            lines.append(f"- activity: {selected_activity}")
+            lines.append(_packet_receipt_line("activity_packet", activity_packet))
+        except Exception as exc:  # noqa: BLE001 - SessionStart must remain fail-soft.
+            lines.append(
+                f"- activity_packet: status=unavailable; activity={selected_activity}; reason={type(exc).__name__}"
+            )
+    else:
+        lines.append("- activity_packet: status=not_requested; pointer=none")
+    return "\n".join(lines)
+
+
+def _with_envelope_packet_receipt(
+    context: str,
+    *,
+    role_mode: str | None = None,
+    activity: str | None = None,
+) -> str:
+    receipt = _envelope_packet_receipt(role_mode=role_mode, activity=activity)
+    return f"{receipt}\n\n{context}" if receipt else context
 
 
 def _bridge_auto_dispatch_context() -> str | None:
@@ -690,7 +847,11 @@ def _write_startup_relay_cache(additional_context: str, *, role_mode: str | None
         pass
 
 
-def _write_role_scoped_startup_relay_caches(additional_context: str) -> None:
+def _write_role_scoped_startup_relay_caches(
+    additional_context: str,
+    *,
+    deadline_monotonic: float | None = None,
+) -> None:
     marker = "## User-Visible Startup Message"
     body = (
         additional_context.split(marker, 1)[1].strip() if marker in additional_context else additional_context.strip()
@@ -699,16 +860,19 @@ def _write_role_scoped_startup_relay_caches(additional_context: str) -> None:
     if primary_mode:
         _write_startup_relay_cache(body, role_mode=primary_mode)
     # Per ADR-INTERACTIVE-SESSION-ROLE-OVERRIDE-001 Decision 2 and
-    # DCL-SESSION-ROLE-RESOLUTION-001: both the -pb and -lo startup-disclosure
-    # caches are generated unconditionally, regardless of this harness's
-    # dispatcher/default role set, so the UserPromptSubmit init-keyword matcher's keyword-keyed
-    # cache lookup succeeds for either role when the owner declares a
-    # session-stated role via ``::init gtkb (pb|lo)``. The dispatcher/default
-    # role set is NOT consulted here; registry role remains the authority for headless
-    # dispatch routing only.
+    # DCL-SESSION-ROLE-RESOLUTION-001: role-scoped startup-disclosure cache
+    # generation iterates the full role vocabulary regardless of this harness's
+    # dispatcher/default role set, so the UserPromptSubmit init-keyword matcher
+    # can look up either role when the owner declares a session-stated role via
+    # ``::init gtkb (pb|lo)``. Alternate-role rendering remains fail-soft under
+    # hook budget pressure; the primary role cache is written before that budget
+    # check. The dispatcher/default role set is NOT consulted here; registry
+    # role remains the authority for headless dispatch routing only.
     for mode in sorted(_MODE_TO_ROLE_PROFILE):
         if mode == primary_mode:
             continue
+        if deadline_monotonic is not None and _monotonic_seconds() >= deadline_monotonic:
+            return
         report = _render_role_startup_report(_MODE_TO_ROLE_PROFILE[mode])
         if report:
             _write_startup_relay_cache(report, role_mode=mode)
@@ -719,6 +883,7 @@ def main() -> int:
     stdout_path = OUT_DIR / "last-session-start.json"
     stderr_path = OUT_DIR / "last-session-start.err"
     request_started_at = _now_iso()
+    request_started_monotonic = _monotonic_seconds()
     _purge_previous_diagnostics(stdout_path, stderr_path)
     # Invalidate only the legacy shared session-role marker before the dispatch
     # fork and before role rendering. Per-session markers and the session
@@ -763,7 +928,12 @@ def main() -> int:
         # turn an interactive restart into a bridge worker.
         auto_dispatch_context = _bridge_auto_dispatch_context()
         if auto_dispatch_context is not None:
-            payload = _session_start_payload(auto_dispatch_context)
+            payload = _session_start_payload(
+                _with_envelope_packet_receipt(
+                    auto_dispatch_context,
+                    role_mode=_dispatch_role_mode_from_keyword(),
+                )
+            )
             serialized = _dump_payload(payload)
             stdout_path.write_text(serialized, encoding="utf-8")
             stderr_path.write_text("", encoding="utf-8")
@@ -812,7 +982,7 @@ def main() -> int:
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=_startup_service_timeout_seconds(),
+            timeout=_startup_service_timeout_seconds_for_harness(),
             check=False,
             env=env,
             **no_window_subprocess_kwargs(),
@@ -835,19 +1005,49 @@ def main() -> int:
             else:
                 relay_body = startup_context
             _write_startup_relay_cache(relay_body)
-            _write_role_scoped_startup_relay_caches(relay_body)
-            print(_dump_payload(_session_start_payload(startup_context)))
+            _write_role_scoped_startup_relay_caches(
+                relay_body,
+                deadline_monotonic=(request_started_monotonic + ROLE_SCOPED_STARTUP_RELAY_CACHE_SYNC_BUDGET_SECONDS),
+            )
+            print(
+                _dump_payload(
+                    _session_start_payload(
+                        _with_envelope_packet_receipt(
+                            startup_context,
+                            role_mode=_dispatch_role_mode_from_keyword(),
+                        )
+                    )
+                )
+            )
             return 0
         reason = f"startup service returned exit {process.returncode}"
         if process.stderr.strip():
             reason = f"{reason}: {process.stderr.strip()[:400]}"
         elif process.returncode == 0:
             reason = "startup service freshness contract validation failed"
-        print(_dump_payload(_session_start_payload(_fallback_context(reason))))
+        print(
+            _dump_payload(
+                _session_start_payload(
+                    _with_envelope_packet_receipt(
+                        _fallback_context(reason),
+                        role_mode=_dispatch_role_mode_from_keyword(),
+                    )
+                )
+            )
+        )
     except Exception as exc:  # noqa: BLE001 - lifecycle hook must fail soft.
         try:
             stderr_path.write_text(str(exc), encoding="utf-8")
         except OSError:
             pass
-        print(_dump_payload(_session_start_payload(_fallback_context(str(exc)))))
+        print(
+            _dump_payload(
+                _session_start_payload(
+                    _with_envelope_packet_receipt(
+                        _fallback_context(str(exc)),
+                        role_mode=_dispatch_role_mode_from_keyword(),
+                    )
+                )
+            )
+        )
     return 0

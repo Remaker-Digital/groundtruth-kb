@@ -32,6 +32,12 @@ def _write_bridge(root: Path, bridge_id: str, content: str) -> None:
     (bridge / f"{bridge_id}-001.md").write_text(f"NEW\n\n{content}", encoding="utf-8")
 
 
+def _write_bridge_version(root: Path, bridge_id: str, version: int, status: str, content: str) -> None:
+    bridge = root / "bridge"
+    bridge.mkdir(exist_ok=True)
+    (bridge / f"{bridge_id}-{version:03d}.md").write_text(f"{status}\n\n{content}", encoding="utf-8")
+
+
 def _write_config(path: Path) -> None:
     path.write_text(
         """
@@ -518,6 +524,77 @@ WITHDRAWN
     assert packet["preflight_passed"] is True
 
 
+def test_corrected_go_after_no_action_is_operative_and_packet_hash_is_stable(tmp_path: Path) -> None:
+    bridge_id = "corrected-go"
+    _write_bridge_version(
+        tmp_path,
+        bridge_id,
+        1,
+        "NEW",
+        'target_paths: ["applications/Agent_Red/src/app.py"]\n\n'
+        "## Specification Links\n\n- ADR-ISOLATION-APPLICATION-PLACEMENT-001\n",
+    )
+    _write_bridge_version(tmp_path, bridge_id, 2, "NO-ACTION", "# Dependency hold\n")
+    _write_bridge_version(
+        tmp_path,
+        bridge_id,
+        3,
+        "GO",
+        f"Responds to: bridge/{bridge_id}-002.md\n"
+        f"Approved proposal: bridge/{bridge_id}-001.md\n\n"
+        'target_paths: ["applications/Agent_Red/src/app.py"]\n\n'
+        "## Specification Links\n\n- ADR-ISOLATION-APPLICATION-PLACEMENT-001\n",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+
+    first = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+    second = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+
+    assert first["operative_version"]["path"] == f"bridge/{bridge_id}-003.md"
+    assert first["preflight_passed"] is True
+    assert first["packet_hash"] == second["packet_hash"]
+
+
+def test_latest_verified_after_no_action_is_operative_when_metadata_links_chain(tmp_path: Path) -> None:
+    bridge_id = "verified-correction"
+    _write_bridge_version(tmp_path, bridge_id, 1, "NEW", "# Proposal\n")
+    _write_bridge_version(tmp_path, bridge_id, 2, "NO-ACTION", "# Failed start\n")
+    _write_bridge_version(
+        tmp_path,
+        bridge_id,
+        3,
+        "VERIFIED",
+        f"Verified: bridge/{bridge_id}-001.md\n\n## Specification Links\n",
+    )
+
+    versions = preflight.parse_versioned_files_for_document(tmp_path / "bridge", bridge_id)
+
+    assert preflight.choose_operative_version(versions).version_number == 3
+
+
+def test_latest_standalone_no_action_remains_operative(tmp_path: Path) -> None:
+    bridge_id = "standalone-no-action"
+    _write_bridge_version(tmp_path, bridge_id, 1, "NEW", "# Proposal\n")
+    _write_bridge_version(tmp_path, bridge_id, 2, "NO-ACTION", "# Dependency hold\n")
+
+    versions = preflight.parse_versioned_files_for_document(tmp_path / "bridge", bridge_id)
+
+    operative = preflight.choose_operative_version(versions)
+    assert operative.status == "NO-ACTION"
+    assert operative.version_number == 2
+
+
 def test_markdown_output_contains_hook_readable_clean_fields(tmp_path: Path) -> None:
     bridge_id = "application-move"
     _write_bridge(
@@ -582,6 +659,72 @@ def test_preflight_declared_and_rooted_paths_still_harvested() -> None:
     harvested = preflight.extract_target_paths(content)
     assert "scripts/foo.py" in harvested, f"declared target_paths entry not harvested: {sorted(harvested)}"
     assert "config/governance/sample.toml" in harvested, f"repo-rooted path mention not harvested: {sorted(harvested)}"
+
+
+def test_declared_target_paths_exclude_incidental_applicability_evidence() -> None:
+    content = (
+        "# Proposal\n\n"
+        'target_paths: ["scripts/foo.py"]\n\n'
+        "The review cites config/governance/sample.toml as applicability evidence only.\n"
+    )
+
+    assert preflight.extract_declared_target_paths(content) == {"scripts/foo.py"}
+    assert preflight.extract_target_paths(content) == {
+        "config/governance/sample.toml",
+        "scripts/foo.py",
+    }
+
+
+def test_packet_separates_declared_scope_from_applicability_path_evidence(tmp_path: Path) -> None:
+    bridge_id = "declared-scope"
+    (tmp_path / "scripts").mkdir()
+    _write_bridge(
+        tmp_path,
+        bridge_id,
+        """
+# Proposal
+
+target_paths: ["scripts/foo.py"]
+
+The review cites config/governance/sample.toml as applicability evidence only.
+
+## Specification Links
+
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+""",
+    )
+    config = tmp_path / "spec-applicability.toml"
+    config.write_text(
+        """
+[[rules]]
+spec_id = "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001"
+severity = "blocking"
+rationale = "Config path evidence must still trigger applicability."
+applies_when_paths_match = ["config/**"]
+""",
+        encoding="utf-8",
+    )
+
+    packet = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "missing.db",
+    )
+    markdown = preflight.format_markdown(packet)
+
+    assert packet["preflight_passed"] is True
+    assert packet["target_paths"] == ["scripts/foo.py"]
+    assert packet["declared_target_paths"] == ["scripts/foo.py"]
+    assert packet["applicability_path_evidence"] == [
+        "config/governance/sample.toml",
+        "scripts/foo.py",
+    ]
+    assert "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001" in packet["applicable_specs"]
+    assert packet["warnings"]["missing_parent_dirs"] == []
+    assert 'declared_target_paths: ["scripts/foo.py"]' in markdown
+    assert "applicability_path_evidence:" in markdown
+    assert "config/governance/sample.toml" in markdown
 
 
 # WI-4542: SPEC_LINK_HEADING_RE was `$`-anchored immediately after the optional

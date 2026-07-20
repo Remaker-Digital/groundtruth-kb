@@ -15,6 +15,7 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import click
@@ -22,10 +23,35 @@ import click
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.session.envelope import TOPIC_TYPES
 
+_PLACEHOLDER_TURN_METADATA = {
+    "",
+    "-",
+    "n/a",
+    "na",
+    "none",
+    "null",
+    "tbd",
+    "todo",
+    "unknown",
+    "unspecified",
+}
+
 
 def _resolve_config(ctx: click.Context) -> GTConfig:
     config_path = ctx.obj.get("config") if ctx.obj else None
     return GTConfig.load(config_path=config_path)
+
+
+def _required_turn_metadata(value: str, option_name: str) -> str:
+    normalized = value.strip()
+    if (
+        normalized.lower() in _PLACEHOLDER_TURN_METADATA
+        or "\n" in normalized
+        or "\r" in normalized
+        or len(normalized) > 256
+    ):
+        raise click.ClickException(f"{option_name} must be non-placeholder single-line Codex turn metadata.")
+    return normalized
 
 
 @click.group("session")
@@ -113,6 +139,122 @@ def envelope_show_cmd(ctx: click.Context, harness_name: str) -> None:
     if envelope is None:
         raise click.ClickException(f"No current session envelope for harness {harness_name!r}.")
     click.echo(json.dumps(envelope, indent=2, sort_keys=True))
+
+
+@envelope_group.command("attest-author-metadata")
+@click.option("--harness-name", default="codex", show_default=True)
+@click.option("--harness-id", default=None)
+@click.option("--session-id", required=True)
+@click.option("--model", required=True)
+@click.option("--reasoning-effort", required=True)
+@click.option("--thread-source", required=True)
+@click.option("--json", "json_output", is_flag=True, default=False)
+@click.pass_context
+def envelope_attest_author_metadata_cmd(
+    ctx: click.Context,
+    harness_name: str,
+    harness_id: str | None,
+    session_id: str,
+    model: str,
+    reasoning_effort: str,
+    thread_source: str,
+    json_output: bool,
+) -> None:
+    """Attest host-provided Codex turn metadata for one exact open session."""
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        load_current,
+        load_worker_session,
+        resolve_harness_identity,
+        resolve_worker_role_provenance,
+        utc_now_iso,
+        write_current,
+    )
+
+    normalized_harness = harness_name.strip().lower()
+    if normalized_harness != "codex":
+        raise click.ClickException("Author metadata attestation currently accepts only the Codex harness.")
+    normalized_session_id = _required_turn_metadata(session_id, "--session-id")
+    normalized_model = _required_turn_metadata(model, "--model")
+    normalized_reasoning = _required_turn_metadata(reasoning_effort, "--reasoning-effort")
+    normalized_thread_source = _required_turn_metadata(thread_source, "--thread-source")
+
+    config = _resolve_config(ctx)
+    project_root = Path(config.project_root)
+    try:
+        resolved_name, resolved_id = resolve_harness_identity(
+            project_root,
+            harness_name=normalized_harness,
+            harness_id=harness_id,
+        )
+        envelope = load_worker_session(project_root, resolved_name, normalized_session_id)
+        current = load_current(project_root, resolved_name)
+        provenance_validated = False
+        if current is None:
+            raise EnvelopeError("Current harness session envelope is missing.")
+        current_session_id = current.get("session_id")
+        if current_session_id != normalized_session_id:
+            host_thread_id = str(os.environ.get("CODEX_THREAD_ID") or "").strip()
+            if host_thread_id != normalized_session_id:
+                raise EnvelopeError("Exact session envelope is not the current harness session.")
+            if envelope is None:
+                if current.get("harness_name") != resolved_name or current.get("harness_id") != resolved_id:
+                    raise EnvelopeError("Current session envelope has mismatched harness identity.")
+                if current.get("status") != "open":
+                    raise EnvelopeError("Current session envelope is not open.")
+                resolve_worker_role_provenance(
+                    project_root,
+                    current_session_id=str(current_session_id),
+                    harness_name=resolved_name,
+                )
+                provenance_validated = True
+                envelope = dict(current)
+                envelope["session_id"] = normalized_session_id
+                provenance = dict(envelope["worker_role_provenance"])
+                provenance["session_id"] = normalized_session_id
+                envelope["worker_role_provenance"] = provenance
+        elif envelope is None:
+            raise EnvelopeError("Exact session envelope is missing.")
+        if envelope.get("session_id") != normalized_session_id:
+            raise EnvelopeError("Exact session envelope has a mismatched session id.")
+        if envelope.get("harness_name") != resolved_name or envelope.get("harness_id") != resolved_id:
+            raise EnvelopeError("Exact session envelope has mismatched harness identity.")
+        if envelope.get("status") != "open":
+            raise EnvelopeError("Exact session envelope is not open.")
+        if not provenance_validated:
+            resolve_worker_role_provenance(
+                project_root,
+                current_session_id=normalized_session_id,
+                harness_name=resolved_name,
+            )
+    except EnvelopeError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    envelope["model_id"] = normalized_model
+    # Codex request metadata exposes one opaque model identifier, not a
+    # separately versioned semantic model. Preserve that value without parsing.
+    envelope["model_version"] = normalized_model
+    envelope["model_configuration"] = (
+        f"reasoning_effort={normalized_reasoning}; thread_source={normalized_thread_source}"
+    )
+    envelope["model_metadata_source"] = "x-codex-turn-metadata"
+    envelope["model_metadata_attested_at"] = utc_now_iso()
+    write_current(project_root, resolved_name, envelope)
+
+    result = {
+        "session_id": normalized_session_id,
+        "harness_id": resolved_id,
+        "harness_name": resolved_name,
+        "model_id": envelope["model_id"],
+        "model_version": envelope["model_version"],
+        "model_configuration": envelope["model_configuration"],
+        "model_metadata_source": envelope["model_metadata_source"],
+        "model_metadata_attested_at": envelope["model_metadata_attested_at"],
+    }
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(normalized_session_id)
 
 
 @envelope_group.command("packet")

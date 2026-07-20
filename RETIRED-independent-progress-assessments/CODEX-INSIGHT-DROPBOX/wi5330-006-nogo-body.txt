@@ -1,0 +1,85 @@
+NO-GO
+
+# Loyal Opposition Verdict - NO-GO (finalization-scoped) - WI-5330 Spec-Link Heading Hyphen False Positive
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5330-spec-link-heading-hyphen-false-positive
+Version: 006
+Responds to: bridge/gtkb-wi5330-spec-link-heading-hyphen-false-positive-005.md
+Date: 2026-07-16 UTC
+Reviewer role: loyal-opposition (harness B, Claude Code; headless dispatcher-spawned)
+
+Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-WI-5330-SPEC-LINK-HYPHEN
+Project: PROJECT-GTKB-RELIABILITY-FIXES
+Work Item: WI-5330
+
+## Verdict
+
+NO-GO -- finalization-scoped, NOT a substance defect. The WI-5330 implementation
+substance is independently confirmed correct (see "Substance Verified" below).
+This NO-GO rests entirely on a finalization blocker a headless worker cannot
+clear: the governed VERIFIED finalizer helper is dirty in the live worktree with
+uncommitted, unreviewed changes belonging to other open threads, so the only
+governed VERIFIED path would execute mid-flight finalizer code to produce a
+terminal, append-only governed commit. This is the FIRST finalization
+adjudication of this thread (v005 is the first post-implementation report), so
+this NO-GO routes the thread to Prime Builder for sequencing -- it is not
+loop-fuel and does not ask for re-implementation.
+
+## Review Independence
+
+- Reviewer session context: 2026-07-16T18-23-54Z-loyal-opposition-B-a036ed (loyal-opposition/claude, harness B, headless dispatch).
+- Report author session context: 019f6bf6-3e6d-7761-be14-fb894a0e84d2 (prime-builder/codex, harness A).
+- Author and reviewer session contexts differ; author metadata present and readable. Independence gate satisfied. Harness ID is a routing label, not the review boundary.
+
+## Substance Verified (sound -- do not re-implement)
+
+Verified directly against the live worktree at HEAD 42f6d02dfb4e91598247dce77c6b7506bee34732 (the report's declared base):
+
+1. Regex fix present and correct. `SPEC_LINK_HEADING_RE` in `scripts/bridge_applicability_preflight.py` now uses the qualifier group `(?:\s*[(:–—].*|\s+-.*)?\s*$` (separator class is `(`, `:`, en-dash, em-dash) -- the bare ASCII hyphen is removed from the separator character class and re-admitted only through a whitespace-gated alternative (`\s+-.*`). Prior WI-4542 form was `(?:\s*[(:–—-].*)?\s*$`. Hand-traced: `## Specification-Derived Verification Plan` no longer matches (no whitespace precedes the hyphen, and the hyphen is no longer a member of the separator class), while `## Specification Links`, `## Specification Links (carried forward)`, and the whitespace-hyphen qualifier form all still match. WI-4542's qualifier-tolerance intent is preserved; the accompanying comment was updated to state the WI-5330 exclusion.
+2. Regression tests present. `test_spec_link_heading_rejects_bare_hyphen_compound_headings` (direct regex rejection of `Specification-Derived` / `Specification-Driven`) and `test_extract_spec_links_skips_compound_heading_before_real_section` (end-to-end: a real later Specification Links section is still harvested) both exist in `platform_tests/scripts/test_bridge_applicability_preflight.py`.
+3. Focused slice passes. `python -m pytest platform_tests/scripts/test_bridge_applicability_preflight.py -k "spec_link_heading or extract_spec_links or carried_forward_qualifier"` -> `6 passed, 22 deselected`, reproducing the report's claim.
+4. Both ruff gates green on the two targets. `ruff check` -> All checks passed; `ruff format --check` -> 2 files already formatted.
+5. Source target is a clean exact hunk. `git diff HEAD -- scripts/bridge_applicability_preflight.py` shows only the single comment+regex hunk; no foreign content -- corroborating the report's byte-clean source claim (its whole-file content IS the desired WI-5330 finalized state).
+
+The engineering does not need rework.
+
+## Blocker A (overriding) -- VERIFIED finalizer machinery is dirty with unreviewed foreign changes
+
+- Claim: The only governed VERIFIED path is `.claude/skills/verify/helpers/write_verdict.py --finalize-verified`, and that helper is currently ` M` (unstaged-dirty) with two uncommitted, unreviewed changes belonging to other open threads.
+- Evidence (`git diff HEAD -- .claude/skills/verify/helpers/write_verdict.py`):
+  - WI-5113 git-no-window: a new `from scripts.windows_subprocess import no_window_subprocess_kwargs` import plus `**no_window_subprocess_kwargs()` injected into `_run_git`. Its owning thread (`gtkb-wi5113-verified-finalizer-git-no-window-pauth-v2`) is not yet VERIFIED.
+  - A review-independence hardening in `_assert_verdict_review_independence`: the fail-open `except ImportError: return` becomes a fail-closed `raise VerifiedFinalizationError`, and a new `latest_report_rel_path` / `expected_artifact_path` kwarg is threaded into `verdict_self_review_reason`. This is co-dependent on the also-dirty `scripts/bridge_review_independence.py` (` M`).
+- Why this blocks VERIFIED: VERIFIED is a commit-finalization outcome. Finalizing WI-5330 now would (a) execute mid-flight, unreviewed finalizer code to produce a terminal, append-only governed commit, and (b) depend on another uncommitted file's new function signature. A headless worker cannot stash or revert those foreign threads (LO shell-mutation gate plus the prohibition on touching foreign in-flight work) and holds no owner co-finalization waiver.
+- Severity: blocking for VERIFIED; systemic on branch `research` (the same dirty finalizer has finalization-blocked WI-5257, WI-5290, WI-5313, WI-5302, WI-5144, and WI-5217 on 2026-07-15/16).
+
+## Blocker B (secondary) -- commingled test target
+
+- Claim: `platform_tests/scripts/test_bridge_applicability_preflight.py` (one of the two GO'd target paths) is ` M` dirty with foreign WI-5254 structured-PAUTH-amendment test hunks in addition to the WI-5330 additions.
+- Evidence: `git status --short` shows the file modified; a content scan finds WI-5254 markers. The report's own "Exact-Hunk And Dirty-Tree Boundary" section discloses this and constructs an exact WI-5330-only candidate excluding the foreign hunks.
+- Why this matters at finalization: a whole-file `--include` of the test target would capture the foreign WI-5254 hunks. A clean VERIFIED finalize therefore requires a hunk-scoped `--hunk-patch` isolating only the WI-5330 test additions (the source target, being byte-clean, can be included whole). This is handleable once Blocker A is cleared; it is not independently loop-blocking.
+
+## Related dirty-writer observation (context, not a WI-5330 defect)
+
+`scripts/gtkb_bridge_writer.py` is also ` M` dirty, adding a `run_bridge_compliance_audit` call inside `write_bridge_file` (a new compliance-audit-at-write enforcement). This appears to belong to the sibling `gtkb-wi5116-per-thread-finalization-repair` NEW entry. It does not block filing this NO-GO (a non-terminal, untracked bridge write, which is the ambient path every bridge write on this branch currently uses), but it means the governed bridge-writing machinery as a whole is mid-flight; sequencing the finalizer/writer-owning threads is the clean remediation.
+
+## Remediation (Prime Builder / owner-supervised interactive session)
+
+1. Sequence the finalizer-owning threads to VERIFIED and commit their changes so the finalizer is clean at HEAD: WI-5113 (git-no-window) and the review-independence hardening in `write_verdict.py` + `scripts/bridge_review_independence.py`. Confirm which thread owns the `run_bridge_compliance_audit` hunk now dirty in `scripts/gtkb_bridge_writer.py` (candidate: `gtkb-wi5116-per-thread-finalization-repair`) and land it in the same clean-up.
+2. Re-file WI-5330 for VERIFIED against the clean finalizer, using `write_verdict.py --finalize-verified` with a `--hunk-patch` isolating the WI-5330 test additions from the foreign WI-5254 hunks, `--include` the byte-clean source target whole, and `--include` the untracked bridge chain (`-001` through the new verdict).
+3. WI-5113's own latest verdict records it could not isolate its commit headlessly either -- so breaking this deadlock needs an interactive / owner-supervised finalization, not another headless pass.
+
+## Prior Deliberations
+
+- `bridge/gtkb-wi4542-spec-link-heading-qualifier-tolerance-001.md` through `-004.md` (VERIFIED) -- the originating qualifier-tolerance widening this correction narrows a side effect of; confirmed still governs the live regex.
+- `bridge/gtkb-wi5330-spec-link-heading-hyphen-false-positive-002.md` (NO-GO, project-linkage), `-003.md` (REVISED), `-004.md` (GO) -- the resolved proposal history; the GO's exact-WI-5330-only-patch and dirty-tree-boundary conditions are honored by the report.
+- `DELIB-20260716-WI5330-PAUTH-DECISION` -- owner approval for the bounded per-WI authorization used by this thread.
+- Finalizer-blocker precedent on branch `research`: the same dirty `write_verdict.py` produced finalization-scoped NO-GOs on WI-5257, WI-5290, WI-5313, WI-5302, WI-5144, and WI-5217; remediation in every case is "sequence the finalizer-owning thread to VERIFIED + commit first, then re-file."
+
+## Scope / Non-Authority
+
+This NO-GO authorizes no implementation, target mutation, Git operation, formal-artifact mutation, database change, credential action, release, or deployment. It sets the thread's latest status to NO-GO, routing it to Prime Builder. All inspection was read-only: `git rev-parse HEAD`, `git status --short`, `git diff HEAD` on the finalizer/writer/target files, the focused pytest slice, and both ruff gates. No source, test, or configuration file was modified during this review.
+
+---
+
+(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

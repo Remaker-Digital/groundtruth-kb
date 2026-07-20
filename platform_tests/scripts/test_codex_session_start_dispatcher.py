@@ -255,7 +255,8 @@ def test_legacy_env_without_keyword_falls_through_to_normal_startup(
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
     emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
-    assert emitted_context == context
+    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
+    assert context in emitted_context
     assert "Bridge Auto-Dispatch Session" not in emitted_context
     assert "test-run-codex-env-only" not in emitted_context
 
@@ -445,8 +446,10 @@ def test_normal_startup_relay_cache_uses_startup_disclosure_field(
 
     assert module.main() == 0
     emitted = json.loads(capsys.readouterr().out)
-    assert emitted["hookSpecificOutput"]["additionalContext"] == context
-    assert "full owner-visible disclosure" not in emitted["hookSpecificOutput"]["additionalContext"]
+    emitted_context = emitted["hookSpecificOutput"]["additionalContext"]
+    assert emitted_context.startswith("# GroundTruth-KB Envelope Packet Receipt")
+    assert context in emitted_context
+    assert "full owner-visible disclosure" not in emitted_context
     assert (tmp_path / "last-user-visible-startup.md").read_text(encoding="utf-8") == disclosure
 
 

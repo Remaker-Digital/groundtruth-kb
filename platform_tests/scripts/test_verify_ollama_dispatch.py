@@ -357,10 +357,15 @@ def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
     assert verify_module.OLLAMA_DISPATCH_REQUIRED_TOOLS == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
-def test_default_ollama_bridge_review_route_uses_kimi_k2_7_code_cloud(ollama_harness_module, tmp_path) -> None:
+def test_default_ollama_bridge_review_route_uses_deepseek_v4_flash_cloud(ollama_harness_module, tmp_path) -> None:
     (tmp_path / ".api-harness").mkdir()
     (tmp_path / ".api-harness" / "routing.toml").write_text(
         "schema_version = 1\n"
+        "[models.deepseek-v4-flash-cloud]\n"
+        'model_id = "deepseek-v4-flash:cloud"\n'
+        'provider = "ollama"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[models.kimi-k2-7-code-cloud]\n"
         'model_id = "kimi-k2.7-code:cloud"\n'
         'provider = "ollama"\n'
@@ -377,20 +382,20 @@ def test_default_ollama_bridge_review_route_uses_kimi_k2_7_code_cloud(ollama_har
         "tool_calling_supported = true\n"
         'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[routing.ollama]\n"
-        'default_model = "kimi-k2-7-code-cloud"\n'
+        'default_model = "deepseek-v4-flash-cloud"\n'
         "timeout_seconds = 3600\n"
         "[routing.ollama.skills]\n"
-        'bridge-review = "kimi-k2-7-code-cloud"\n'
-        'verification = "kimi-k2-7-code-cloud"\n'
-        'implementation = "kimi-k2-7-code-cloud"\n',
+        'bridge-review = "deepseek-v4-flash-cloud"\n'
+        'verification = "deepseek-v4-flash-cloud"\n'
+        'implementation = "deepseek-v4-flash-cloud"\n',
         encoding="utf-8",
     )
 
     config = ollama_harness_module.load_routing_config(tmp_path)
     route = ollama_harness_module.resolve_model(config, None, skill="bridge-review")
 
-    assert route.key == "kimi-k2-7-code-cloud"
-    assert route.model_id == "kimi-k2.7-code:cloud"
+    assert route.key == "deepseek-v4-flash-cloud"
+    assert route.model_id == "deepseek-v4-flash:cloud"
     assert config.timeout_seconds == 3600
     assert ollama_harness_module.derive_session_timeout_from_route_timeout(config.timeout_seconds) == 3660
 

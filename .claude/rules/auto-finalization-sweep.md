@@ -58,6 +58,14 @@ On turn-end it:
      `git status`. If any is dirty/untracked, the verdict is skipped and
      audit-logged for manual handling (the sweep never guesses source staging or
      hunk-selection).
+   - **Current finalization/checker floor** — the terminal verdict body must
+     pass `.claude/skills/verify/helpers/write_verdict.py` `validate_verified_body()`
+     and the protected-commit authorization checker for the exact verdict path.
+     A legacy file-only verdict that lacks `Recommended commit type`,
+     `## Spec-to-Test Mapping`, `## Commands Executed`, or helper-generated
+     `## Commit Finalization Evidence` is skipped and audit-logged for
+     per-thread repair. The sweep must not fight the per-thread finalization
+     repair planner in a commingled tree.
 3. **Finalize:** stages the verdict file plus all untracked
    `bridge/<slug>-NNN.md` thread-chain files for that slug and commits them with
    a `chore(bridge): finalize <author>-LO <slug> VERIFIED verdict (-NNN)`
@@ -73,7 +81,8 @@ On turn-end it:
 - **Lock/contention-safe.** A failed commit (pre-commit gate block,
   `.git/index.lock` contention, concurrent ref update) unstages the chain and
   returns without spinning; the verdict is left for the next run or manual
-  handling.
+  handling. Git subprocesses are timeout-bounded so a blocked commit cannot hold
+  `.git/index.lock` indefinitely.
 - **Idempotent.** A second run finds nothing to finalize.
 - **Cheap-gated.** The only unconditional per-turn work is the cheap WI-4871
   enumeration; the bounded commit action runs only when eligible verdicts exist.

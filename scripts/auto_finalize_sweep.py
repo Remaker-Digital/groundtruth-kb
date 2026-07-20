@@ -46,13 +46,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = _SCRIPTS_DIR.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+_VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "verify" / "helpers"
+if str(_VERIFY_HELPERS) not in sys.path:
+    sys.path.insert(0, str(_VERIFY_HELPERS))
 from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 AUDIT_DIR = PROJECT_ROOT / ".gtkb-state" / "auto-finalize-sweep"
 AUDIT_LOG = AUDIT_DIR / "sweep.jsonl"
+GIT_TIMEOUT_SECONDS = int(os.environ.get("GTKB_AUTO_FINALIZE_GIT_TIMEOUT_SECONDS", "60"))
 
 _VERSION_RE = re.compile(r"-(\d{3})\.md$")
 _RESPONDS_RE = re.compile(r"^Responds to:\s*(?:GO\s+)?(bridge/[^\s]+-\d{3}\.md)", re.MULTILINE)
@@ -73,14 +79,22 @@ def _audit(event: dict) -> None:
         pass
 
 
-def _git(args: list[str], *, env: dict | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", "-C", str(PROJECT_ROOT), *args],
-        capture_output=True,
-        text=True,
-        env=env,
-        **no_window_subprocess_kwargs(),
-    )
+def _git(args: list[str], *, env: dict | None = None, timeout: int | None = None) -> subprocess.CompletedProcess:
+    command = ["git", "-C", str(PROJECT_ROOT), *args]
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=timeout if timeout is not None else GIT_TIMEOUT_SECONDS,
+            **no_window_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        detail = f"git subprocess timed out after {exc.timeout} seconds: {' '.join(command)}"
+        return subprocess.CompletedProcess(command, 124, stdout, (stderr + "\n" + detail).strip())
 
 
 def _enumerate_untracked_verified() -> list[str]:
@@ -198,6 +212,34 @@ def _target_paths(report_content: str) -> tuple[list[str] | None, str]:
         return None, f"target_paths parse error: {exc}"
 
 
+def _canonical_verdict_skip_reason(verdict_rel: str, verdict_content: str) -> str | None:
+    try:
+        from write_verdict import VerifiedFinalizationError, validate_verified_body  # type: ignore[import-not-found]
+    except Exception as exc:  # pragma: no cover - import-environment guard
+        return f"canonical finalizer validation unavailable: {exc}"
+    try:
+        validate_verified_body(verdict_content, project_root=PROJECT_ROOT)
+    except VerifiedFinalizationError as exc:
+        return f"canonical_finalizer_rejects_verdict_body: {exc}"
+
+    try:
+        import check_protected_commit_authorization as protected_commit  # type: ignore[import-not-found]
+    except Exception as exc:  # pragma: no cover - import-environment guard
+        return f"protected commit authorization checker unavailable: {exc}"
+    try:
+        result = protected_commit.evaluate(PROJECT_ROOT, paths=[verdict_rel])
+    except Exception as exc:  # noqa: BLE001 - fail closed for stop-hook safety
+        return f"protected_commit_authorization_error: {exc}"
+    if result.get("status") != "pass":
+        findings = result.get("findings") or []
+        reasons = [
+            f"{finding.get('path', verdict_rel)}: {finding.get('reason', 'unknown reason')}" for finding in findings
+        ]
+        reason = "; ".join(reasons) if reasons else "checker returned failure"
+        return f"protected_commit_authorization_rejects_terminal_verdict: {reason}"
+    return None
+
+
 def _commit_chain(slug: str, chain: list[str], message: str) -> tuple[bool, str]:
     """Commit only ``chain`` via a pathspec-limited partial commit.
 
@@ -278,6 +320,12 @@ def sweep(*, dry_run: bool = False) -> dict:
             reason = f"verified impl not committed: {', '.join(sorted(dirty))}"
             summary["skipped"].append({"verdict": verdict_rel, "reason": reason})
             _audit({"action": "skip", "verdict": verdict_rel, "reason": reason})
+            continue
+
+        canonical_skip = _canonical_verdict_skip_reason(verdict_rel, content)
+        if canonical_skip:
+            summary["skipped"].append({"verdict": verdict_rel, "reason": canonical_skip})
+            _audit({"action": "skip", "verdict": verdict_rel, "reason": canonical_skip})
             continue
 
         # Eligible. Stage the verdict + all untracked chain .md files for this slug.

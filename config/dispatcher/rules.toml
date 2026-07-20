@@ -25,7 +25,7 @@ pricing = "priced"
 estimated_usd_per_dispatch = 0.0
 
 [budget.harnesses.D]
-model = "kimi-k2-7-code-cloud"
+model = "deepseek-v4-flash-cloud"
 pricing = "priced"
 estimated_usd_per_dispatch = 0.0
 
@@ -41,17 +41,20 @@ estimated_usd_per_dispatch = 0.0
 
 [harnesses.A]
 description = "Codex"
-max_items = 4
+max_items = 8
+max_items_override = true
 tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.B]
 description = "Claude Code"
-max_items = 4
+max_items = 2
+max_items_override = true
 tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.C]
 description = "Antigravity"
-max_items = 1
+max_items = 2
+max_items_override = true
 tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.D]
@@ -66,7 +69,8 @@ tags = ["loyal-opposition", "prime-builder"]
 
 [harnesses.F]
 description = "OpenRouter"
-max_items = 1
+max_items = 8
+max_items_override = true
 tags = ["low-cost", "prime-builder"]
 
 [harnesses.H]

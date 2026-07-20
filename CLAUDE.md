@@ -4,12 +4,9 @@ This document provides active guidance for AI assistants working on the GroundTr
 
 For application-scope guidance (Application Identity, Copyright, Adding Commercial Features, Branching Strategy, Hotfix Workflow), see [`applications/Agent_Red/CLAUDE.md`](applications/Agent_Red/CLAUDE.md). Application-scope files are consulted only when the active work subject is `application` and the named application is Agent Red.
 
-**Role precedence:** active role is resolved at session start from `harness-state/harness-identities.json` (persistent harness identity) and `harness-state/harness-registry.json` (canonical role registry), read through `groundtruth_kb.harness_projection.read_roles` or the `roles` subcommand under `gt harness`. `.claude/rules/operating-role.md`, `AGENTS.md`, and `.claude/rules/*.md` files are explanatory guidance only - they describe behavior contracts but cannot override dispatcher/default role metadata. If markdown text and the registry differ, the registry is authoritative for dispatcher/default role metadata and headless dispatch routing; surface the divergence as a defect rather than acting on the markdown. Interactive sessions MAY override dispatcher/default role metadata for in-session surfaces (SessionStart disclosure, AXIS 2 Claude-native surface, focus menu, MemBase attribution, AUQ routing) when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. That transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. Runtime marker files such as `.claude/session/active-session-role.json` may cache the resolved role, but they are not dispatcher/default authority. Headless dispatch routing remains keyed to the dispatcher role set per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
+**Role precedence:** Your role is identified in prompts by the "::init" command line, which also indicates the subject of the session envelope (e.g., "gtkb") and the role of the session-context should take when processing the inputs during contiguous session-context turns (e.g., "pb" for Prime Builder and "lo" for Loyal Opposition, or the `roles` subcommand under `gt harness`.  Remember: no session context may ever formally review its own prior work. Interactive sessions MAY override dispatcher/default role metadata for in-session surfaces (SessionStart disclosure, AXIS 2 Claude-native surface, focus menu, MemBase attribution, AUQ routing) when the owner gives explicit role direction in the transcript, including the canonical init keyword `::init gtkb (pb|lo)`. That transcript-defined role persists across compaction, resume, and contiguous SessionStart-like boundaries within the same interactive context until the owner explicitly changes it. Runtime marker files such as `.claude/session/active-session-role.json` may cache the resolved role, but they are not dispatcher/default authority. Headless dispatch routing remains keyed to the dispatcher role set per `GOV-SESSION-ROLE-AUTHORITY-001`, `DCL-SESSION-ROLE-RESOLUTION-001`, `ADR-ROLE-AUTHORITY-INTERACTIVE-PERSISTENCE-001`, and `DCL-INTERACTIVE-SESSION-ROLE-PERSISTENCE-001`.
 
-> **📁 Application-scope reference** (Agent Red legal, pricing, infrastructure, AGNTCY rules): [`applications/Agent_Red/CLAUDE-REFERENCE.md`](applications/Agent_Red/CLAUDE-REFERENCE.md) — read on demand when working on Agent Red.
-> **📁 Application-scope architecture** (Agent Red project structure, module inventory): [`applications/Agent_Red/CLAUDE-ARCHITECTURE.md`](applications/Agent_Red/CLAUDE-ARCHITECTURE.md) — read on demand.
-> **📁 Application-scope historical archive** (Agent Red session logs, technical decisions): [`applications/Agent_Red/CLAUDE_ARCHIVE.md`](applications/Agent_Red/CLAUDE_ARCHIVE.md) — read when investigating Agent Red historical decisions.
-> **📁 Platform session memory** (state and bootstrap): `memory/MEMORY.md` — the in-repo GT-KB notepad preserves session state and artifact access hints; authoritative project knowledge lives in MemBase and governed in-root artifacts. Home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
+**📁 Platform session memory** (state and bootstrap): `memory/MEMORY.md` — the in-repo GT-KB notepad preserves session state and artifact access hints; authoritative project knowledge lives in MemBase and governed in-root artifacts. Home-directory auto-memory is a non-authoritative harness cache and must be reconciled only through an owner-approved in-root export/snapshot.
 
 ### Canonical Terminology
 
@@ -20,7 +17,7 @@ Load `.claude/rules/canonical-terminology.md` at session start; the operating-mo
 All active files for the GT-KB project MUST be within `E:\GT-KB`. No GT-KB
 artifact may be created, read as a live dependency, updated, verified, or
 required from outside that root. GT-KB application files MUST be within
-`E:\GT-KB\applications\`; Agent Red application files MUST be within
+`E:\GT-KB\applications\`; Application files MUST be within
 `E:\GT-KB\applications\Agent_Red\`. There are no exceptions.
 `E:\Claude-Playground` is an archive only and must not be used as a live
 GT-KB, Agent Red, harness-state, bridge, dashboard, memory, source,
@@ -37,7 +34,7 @@ CLAUDE.md = rules & behavior (how to work: procedures, mandates; updated rarely)
 
 ### Session ID Convention
 
-`S{N}` format; N is a monotonically increasing integer derived by reading MEMORY.md's "Recent Sessions" section.
+Recent Sessions entries key off the session's own session_context_id (the session envelope's `session_id` field -- typically the harness's native session UUID, or `{harness_id}-{opened_at-ISO}` when no native session UUID is available, e.g. `A-2026-07-16T12-17-36Z`). This replaces the historical sequential `S{N}` convention; `S{N}` labels in older artifacts (bridge threads, deliberations, archived MEMORY.md history) are historical only.
 
 ---
 

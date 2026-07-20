@@ -203,6 +203,20 @@ def evaluate_readiness(
     shim_ok = shim_path.is_file()
     add_check("cursor harness shim", shim_ok, CURSOR_SHIM_RELATIVE.as_posix())
 
+    publication_contract = cursor_harness.governed_lo_publication_contract()
+    publication_ok = (
+        publication_contract.get("schema_version") == 1
+        and publication_contract.get("execution_mode") == "ask"
+        and publication_contract.get("output_format") == "text"
+        and publication_contract.get("publisher") == "publish_lo_verdict"
+        and publication_contract.get("supported_verdicts") == ["GO", "NO-GO", "VERIFIED"]
+    )
+    add_check(
+        "governed read-only LO publication",
+        publication_ok,
+        json.dumps(publication_contract, sort_keys=True, separators=(",", ":")),
+    )
+
     resolver = agent_resolver or cursor_harness._resolve_agent_command
     try:
         agent_command = resolver()
@@ -255,7 +269,7 @@ def evaluate_readiness(
             detail = live_probe["error"]
         add_check("live bridge-review probe", live_ok, detail)
 
-    ready_for_activation = record_ok and argv_ok and shim_ok and agent_ok and auth_ok and live_ok
+    ready_for_activation = record_ok and argv_ok and shim_ok and publication_ok and agent_ok and auth_ok and live_ok
     role = _role_tokens(record)
     dispatchable_now = (
         ready_for_activation
@@ -273,6 +287,7 @@ def evaluate_readiness(
         "harness_id": recipient,
         "headless_argv": argv,
         "live_probe": live_probe,
+        "publication_contract": publication_contract,
         "ready": ready_for_activation,
         "recipient": recipient,
         "role": sorted(role),

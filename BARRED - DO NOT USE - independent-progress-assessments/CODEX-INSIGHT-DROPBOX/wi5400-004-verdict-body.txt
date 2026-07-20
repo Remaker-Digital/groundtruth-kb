@@ -1,0 +1,207 @@
+VERIFIED
+
+author_identity: loyal-opposition/claude
+author_harness_id: B
+author_session_context_id: 82426707-5f90-4ee3-9784-5300a804159e
+author_model: claude-opus-4-8
+author_model_version: claude-opus-4-8
+author_model_configuration: Claude Code interactive; resolved role loyal-opposition via ::init gtkb lo
+
+bridge_kind: lo_verdict
+Document: gtkb-wi5400-cloud-verdict-claim-lifecycle
+Version: 004
+Responds to: bridge/gtkb-wi5400-cloud-verdict-claim-lifecycle-003.md
+Recommended commit type: feat
+
+# VERIFIED — WI-5400 Cloud Verdict Claim Lifecycle
+
+## Verdict Summary
+
+VERIFIED. WI-5400's implementation report (`-003`) is confirmed against live
+repository state. All four declared `target_paths` are cleanly isolated, the
+code correctly implements the owner-ratified "dispatcher-owns, pre-launch
+claim" design (independently located at `DELIB-202666762`), all
+specification-derived tests re-execute clean, both mandatory preflights pass
+with zero blocking gaps, and both ruff gates plus compile pass. The
+implementation correctly distinguishes the two failure variants the owner's
+ratification required be handled oppositely (peer-held-valid-claim -> neutral
+stand-down; own-claim-absent-or-expired -> silent reacquire-and-publish) —
+verified by tracing the underlying `bridge_work_intent_registry.acquire()` /
+`_claim_operation()` primitives directly, not by trusting the report's
+characterization.
+
+## Independently Re-Verified Evidence
+
+1. **Full diff read for all four target_paths.** Diffstat: `4 files changed,
+   564 insertions(+), 2 deletions(-)`. Content matches the report's "Files
+   Changed" narrative: new `LO_VERDICT_CLAIM_HELD_RESULT` /
+   `LO_VERDICT_CLAIM_ACQUIRE_FAILED_RESULT` /
+   `PROVIDER_VERDICT_CLAIM_PEER_STAND_DOWN_RESULT` suppression reasons; new
+   `_lo_verdict_claim_ttl_seconds`, `_record_lo_verdict_claim_held`,
+   `_acquire_lo_verdict_work_intent_batch` helpers; pre-launch claim
+   acquisition wired into `run_dispatch_cycle` guarded by
+   `target.needed_role_label == "loyal-opposition"`; exit reconciliation
+   recognizing the stand-down marker; owned-claim release on launch
+   failure/incomplete exit/neutral stand-down. `cloud_harness_base.py` adds
+   `BridgeVerdictClaimStandDown` + `_ensure_provider_verdict_claim`, with a
+   dedicated short-circuit in `run_tool_loop` bypassing the 4-attempt
+   publisher-recovery loop.
+
+2. **Source-level trace of the two-variant distinction (the load-bearing
+   correctness property).** `bridge_work_intent_registry._claim_operation()`:
+   an absent/expired claim (any prior holder, including the caller's own
+   expired record) returns success -> `acquire()` returns `True` regardless
+   of who held it before; a non-expired claim held by a different session
+   returns `None` -> `acquire()` returns `False`. `_ensure_provider_verdict_
+   claim` only raises `BridgeVerdictClaimStandDown` when `acquired is False`
+   (peer-held-and-valid); the own-expired/absent case falls through to
+   publish normally — exactly matching `DELIB-202666762`'s explicit
+   requirement.
+
+3. **`worker_session_id`/`dispatch_id` aliasing verified, not assumed.**
+   Traced to `run_dispatch_cycle`: for the `loyal-opposition` branch this
+   feature is scoped to, `worker_session_id = dispatch_id` — the same
+   string, confirmed by
+   `test_wi5400_lo_live_spawn_acquires_verdict_claim_before_provider_launch`.
+
+4. **Root-cause narrative corroborated independently.**
+   `.gtkb-state/bridge-poller/dispatch-runs/2026-07-16T23-58-59Z-loyal-
+   opposition-H-db9529.telemetry.json` confirms `elapsed_ms: 2185000` (~36.4
+   min), `PublishBridgeVerdict` called 4 times, `exit_code: 1`, consistent
+   with `no_progress_loop`.
+
+5. **Owner-ratification anchor located and cross-checked.**
+   `DELIB-202666762` ("Owner Decision: WI-5400 cloud-harness verdict-claim
+   lifecycle") explicitly ratifies the filed `-001` proposal's exact 4-file,
+   dispatcher-owned, pre-launch-claim architecture over two rejected
+   alternatives, and directs that robust owned-claim release on incomplete
+   exit be treated as a first-class acceptance criterion — confirmed
+   satisfied.
+
+6. **Targeted tests re-executed, live (independently re-run this pass).**
+   `pytest platform_tests\scripts\test_cloud_harness_base.py::
+   test_bridge_review_peer_held_publish_claim_stands_down_neutrally
+   platform_tests\scripts\test_cloud_harness_base.py::
+   test_bridge_review_fails_closed_after_repeated_publisher_failures
+   platform_tests\scripts\test_dispatcher_runtime.py::
+   test_wi5400_lo_live_spawn_acquires_verdict_claim_before_provider_launch
+   platform_tests\scripts\test_dispatcher_runtime.py::
+   test_wi5400_lo_peer_held_verdict_claim_suppresses_provider_launch
+   platform_tests\scripts\test_dispatcher_runtime.py::
+   test_wi5400_peer_claim_stand_down_exit_zero_is_neutral_not_missing_verdict
+   -q --tb=short` -> **5 passed**.
+
+7. **Both ruff gates re-run separately, live.** `ruff check` on all four
+   target files -> all checks passed. `ruff format --check` on all four ->
+   already formatted.
+
+8. **Scope isolation confirmed.** `git status --porcelain` on the four
+   target_paths shows exactly those four files as `M`, nothing else.
+
+9. **Both mandatory preflights re-run.** Applicability preflight:
+   `preflight_passed: true`, `missing_required_specs: []`. Clause preflight:
+   4 must_apply clauses evaluated, 0 blocking gaps, exit 0.
+
+10. **Review independence confirmed.** Report author session
+    `019f6668-9974-7d72-a456-826f9a67e627` differs from this reviewer's
+    session context, and from the GO author session (Cursor/E,
+    `cursor-20260716-lo-auto-process`).
+
+## Non-Blocking Findings
+
+**F1 (P3 — traceability hygiene).** The implementation report's Owner
+Decisions/Input and Prior Deliberations sections cite `PAUTH-...` and
+`DELIB-202666274` but do not cite `DELIB-202666762` — the specific owner-AUQ
+ratification of this exact architecture. Not a gate failure; the substantive
+authorization requirement is independently satisfied regardless. Future
+related threads should cite `DELIB-202666762` explicitly.
+
+**F2 (P4 — informational).** Proposal `-001`'s root-cause evidence citation
+references a `.stderr.log` that does not exist on disk; only the sibling
+`.telemetry.json` does. The telemetry file independently corroborates the
+same facts.
+
+## Specification Links
+
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`
+- `SPEC-AUQ-POLICY-ENGINE-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+- `GOV-STANDING-BACKLOG-001`
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `SPEC-CENTRALIZED-DISPATCH-SERVICE-001`
+- `ADR-DISPATCHER-ARCHITECTURE-001`
+- `GOV-HARNESS-ISOLATION-001`
+- `GOV-HARNESS-ONBOARDING-CONTRACT-001`
+
+## Spec-to-Test Mapping
+
+| Specification | Test | Executed | Result |
+| --- | --- | --- | --- |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | Thread chain integrity check (`gt bridge show`, no deleted predecessors) | yes | PASS |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | `bridge_applicability_preflight.py --bridge-id gtkb-wi5400-cloud-verdict-claim-lifecycle` | yes | preflight_passed=true |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | 5 targeted WI-5400 tests, re-run live this pass | yes | 5 passed |
+| `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001` | Project/PAUTH/target_paths metadata check; `DELIB-202666762` located | yes | PASS (see F1) |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | All four target_paths confirmed in-root | yes | PASS |
+| `ADR-CODEX-HOOK-PARITY-FALLBACK-001` | ruff check + ruff format --check, both re-run separately | yes | PASS |
+| `ADR-DISPATCHER-ARCHITECTURE-001` | Source trace of claim-lifecycle registry calls | yes | PASS — no bypass path introduced |
+| `GOV-HARNESS-ONBOARDING-CONTRACT-001` | `test_bridge_review_fails_closed_after_repeated_publisher_failures`, re-run live | yes | PASS |
+
+## Commands Executed
+
+- `gt bridge show gtkb-wi5400-cloud-verdict-claim-lifecycle --json --compact` (start and immediately before filing)
+- `groundtruth-kb\.venv\Scripts\python.exe scripts\bridge_applicability_preflight.py --bridge-id gtkb-wi5400-cloud-verdict-claim-lifecycle`
+- `groundtruth-kb\.venv\Scripts\python.exe scripts\adr_dcl_clause_preflight.py --bridge-id gtkb-wi5400-cloud-verdict-claim-lifecycle`
+- `git diff --stat -- scripts/dispatcher_runtime.py scripts/cloud_harness_base.py platform_tests/scripts/test_dispatcher_runtime.py platform_tests/scripts/test_cloud_harness_base.py`
+- `groundtruth-kb\.venv\Scripts\python.exe -m pytest platform_tests\scripts\test_cloud_harness_base.py::test_bridge_review_peer_held_publish_claim_stands_down_neutrally platform_tests\scripts\test_cloud_harness_base.py::test_bridge_review_fails_closed_after_repeated_publisher_failures platform_tests\scripts\test_dispatcher_runtime.py::test_wi5400_lo_live_spawn_acquires_verdict_claim_before_provider_launch platform_tests\scripts\test_dispatcher_runtime.py::test_wi5400_lo_peer_held_verdict_claim_suppresses_provider_launch platform_tests\scripts\test_dispatcher_runtime.py::test_wi5400_peer_claim_stand_down_exit_zero_is_neutral_not_missing_verdict -q --tb=short` -> 5 passed
+- `groundtruth-kb\.venv\Scripts\python.exe -m ruff check scripts\dispatcher_runtime.py scripts\cloud_harness_base.py platform_tests\scripts\test_dispatcher_runtime.py platform_tests\scripts\test_cloud_harness_base.py` -> all checks passed
+- `groundtruth-kb\.venv\Scripts\python.exe -m ruff format --check scripts\dispatcher_runtime.py scripts\cloud_harness_base.py platform_tests\scripts\test_dispatcher_runtime.py platform_tests\scripts\test_cloud_harness_base.py` -> 4 files already formatted
+- `git status --porcelain -- scripts/dispatcher_runtime.py scripts/cloud_harness_base.py platform_tests/scripts/test_dispatcher_runtime.py platform_tests/scripts/test_cloud_harness_base.py`
+- `gt deliberations search "cloud verdict claim lifecycle publisher"`
+
+## Prior Deliberations
+
+- `bridge/gtkb-wi5400-cloud-verdict-claim-lifecycle-001.md` — approved proposal.
+- `bridge/gtkb-wi5400-cloud-verdict-claim-lifecycle-002.md` — Loyal Opposition GO.
+- `bridge/gtkb-wi5400-cloud-verdict-claim-lifecycle-003.md` — this implementation report, verified.
+- `DELIB-202666762` — owner-AUQ ratification of the exact dispatcher-owned,
+  pre-launch, 4-file architecture implemented here, located via deliberation
+  search (not cited by `-003` itself; see F1).
+- `DELIB-202666173` — prior NO-GO, WI-5210 provider LO governed verdict
+  publication (carried forward from `-001`).
+- `DELIB-202666250` / `DELIB-202666251` — WI-5245 Alibaba H publisher
+  recovery, related prior publisher-recovery work on the same subsystem.
+- `DELIB-202666734` — WI-5399 Cursor Governed Verdict Publication, adjacent
+  same-day sibling thread on a related verdict-publication subsystem, no
+  file overlap.
+
+## Applicability Preflight
+
+- packet_hash: `sha256:e63b0c708696744c0b3c251e40546d86ea94d8a7ee9dba3213f517cbc0bf3b38`
+- operative_file: `bridge/gtkb-wi5400-cloud-verdict-claim-lifecycle-003.md`
+- preflight_passed: `true`
+- missing_required_specs: `[]`
+- missing_advisory_specs: `[]`
+
+## Clause Applicability
+
+- Clauses evaluated: 5; must_apply: 4, may_apply: 1
+- Blocking gaps (gate-failing): 0
+- Mode: mandatory; exit code: `0` (pass)
+
+## Methodology Trail
+
+Read all three bridge version files in full. Read `scripts/
+bridge_work_intent_registry.py` (`acquire`, `release`, `_claim_operation`,
+`_can_preempt_lingering_draft`) directly to independently verify
+claim-lifecycle correctness rather than accept the report's characterization.
+Independently re-ran the 5 targeted WI-5400 tests, both ruff gates, both
+mandatory preflights, and a scope-isolation `git status --porcelain` check
+against current (further-churned) tree state. Re-ran `gt bridge show --json
+--compact` at start and immediately before filing to confirm thread currency
+(unchanged: NEW, version 3).

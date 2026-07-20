@@ -114,6 +114,7 @@ MAX_FILE_SCAN_ENTRIES = 5000
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
 MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
 MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS = 500
+PROVIDER_VERDICT_STATUS_MISMATCH_CODE = "GTKB_PROVIDER_VERDICT_STATUS_MISMATCH"
 MAX_HTTP_ERROR_BODY_BYTES = 8192
 MAX_HTTP_ERROR_DIAGNOSTIC_CHARS = 500
 HTTP_ERROR_FIELD_CHAR_LIMITS = {
@@ -2284,6 +2285,10 @@ def _bounded_bridge_verdict_recovery_reason(reason: str) -> str:
     return normalized[:MAX_BRIDGE_VERDICT_RECOVERY_REASON_CHARS]
 
 
+def _is_provider_verdict_status_mismatch(result: str) -> bool:
+    return f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}:" in result
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -2378,6 +2383,7 @@ def run_tool_loop(
     bridge_verdict_published = False
     bridge_recovery_turns = 0
     publisher_recovery_failures = 0
+    publisher_status_mismatches = 0
     last_publisher_failure: str | None = None
 
     stop_reason = "process_error"
@@ -2618,23 +2624,40 @@ def run_tool_loop(
                         raise
                     except CloudHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"
+                if (
+                    bridge_verdict_required
+                    and tool_name in ("Write", "Edit", "Bash")
+                    and result.startswith("ERROR:")
+                    and "bridge/"
+                    in str(arguments.get("command") or arguments.get("path") or arguments.get("file_path") or "")
+                ):
+                    bridge_recovery_turns = max(bridge_recovery_turns, 1)
                 if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
                     if not _publish_bridge_verdict_succeeded(result):
-                        publisher_recovery_failures += 1
                         last_publisher_failure = _bounded_bridge_verdict_recovery_reason(
                             f"PublishBridgeVerdict did not return a verdict_path: {result}"
                         )
-                        if publisher_recovery_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                            raise CloudHarnessError(
-                                "bridge verdict publisher recovery exhausted after "
-                                f"{publisher_recovery_failures} attempts; last failure: {last_publisher_failure}"
-                            )
+                        if _is_provider_verdict_status_mismatch(result):
+                            publisher_status_mismatches += 1
+                            if publisher_status_mismatches > 1:
+                                raise CloudHarnessError(
+                                    f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}: publication stopped after "
+                                    f"{publisher_status_mismatches} mismatches; last failure: {last_publisher_failure}"
+                                )
+                        else:
+                            publisher_recovery_failures += 1
+                            if publisher_recovery_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                                raise CloudHarnessError(
+                                    "bridge verdict publisher recovery exhausted after "
+                                    f"{publisher_recovery_failures} attempts; last failure: {last_publisher_failure}"
+                                )
                         bridge_recovery_turns = max(bridge_recovery_turns, 1)
                         publisher_recovery_reason = last_publisher_failure
                     else:
                         bridge_verdict_published = True
                         bridge_recovery_turns = 0
                         publisher_recovery_failures = 0
+                        publisher_status_mismatches = 0
                         last_publisher_failure = None
                 invoke_native_hooks(
                     NATIVE_HOOK_POST_TOOL_USE,

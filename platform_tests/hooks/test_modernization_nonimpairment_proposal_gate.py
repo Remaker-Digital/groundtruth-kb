@@ -54,6 +54,8 @@ def _disposition(**overrides) -> str:
 def _proposal(disposition: str | None) -> str:
     sections = [
         "NEW",
+        "::init gtkb lo",
+        "::open build",
         "",
         "# Non-impairment proposal",
         "",
@@ -88,12 +90,35 @@ def _proposal(disposition: str | None) -> str:
 
 
 def _deny(gate, content: str, cwd: Path) -> str | None:
-    return gate._deny_reason_for_content(
-        cwd_path=cwd,
-        file_path="bridge/test-nonimpairment-001.md",
-        content=content,
-        run_pending_preflight=False,
-    )
+    membership_check = gate._wi_project_membership_gap
+    gate._wi_project_membership_gap = lambda _content, _cwd: None
+    try:
+        return gate._deny_reason_for_content(
+            cwd_path=cwd,
+            file_path="bridge/test-nonimpairment-001.md",
+            content=content,
+            run_pending_preflight=False,
+        )
+    finally:
+        gate._wi_project_membership_gap = membership_check
+
+
+def test_deny_restores_membership_check_when_content_gate_raises(
+    gate,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    membership_check = gate._wi_project_membership_gap
+
+    def raise_diagnostic(**_kwargs):
+        raise RuntimeError("synthetic content-gate failure")
+
+    monkeypatch.setattr(gate, "_deny_reason_for_content", raise_diagnostic)
+
+    with pytest.raises(RuntimeError, match="synthetic content-gate failure"):
+        _deny(gate, _proposal(_disposition()), tmp_path)
+
+    assert gate._wi_project_membership_gap is membership_check
 
 
 def test_concrete_structured_disposition_passes(gate):

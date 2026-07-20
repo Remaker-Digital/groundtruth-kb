@@ -1,0 +1,5 @@
+# Agent Red local development dependencies.
+
+-r requirements-test.txt
+
+groundtruth-kb[web,search] @ git+https://github.com/Remaker-Digital/groundtruth-kb.git@v0.6.1

@@ -122,14 +122,30 @@ def test_semantic_only_fails_closed_when_semantic_pass_degrades(tmp_path: Path, 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(dbmod, "HAS_CHROMADB", True)
 
-    def _fake_search(self: dbmod.KnowledgeDB, _query: str, *, limit: int = 5) -> list[dict[str, Any]]:  # noqa: ARG001
-        self._last_deliberation_search_status = {
+    semantic_requirements: list[bool] = []
+
+    def _fake_search(
+        self: dbmod.KnowledgeDB,
+        _query: str,
+        *,
+        limit: int = 5,
+        require_semantic: bool = False,
+    ) -> list[dict[str, Any]]:  # noqa: ARG001
+        semantic_requirements.append(require_semantic)
+        status = {
             "semantic_expected": True,
             "semantic_attempted": True,
             "semantic_succeeded": False,
             "semantic_degraded": True,
             "degradation_reason": "stale_segment",
+            "semantic_required": require_semantic,
         }
+        self._last_deliberation_search_status = status
+        if require_semantic:
+            raise dbmod.DeliberationSearchDegradedError(
+                "Semantic deliberation search degraded (stale_segment).",
+                status=status,
+            )
         return [
             {
                 "id": "DELIB-TEXT-ONLY",
@@ -150,6 +166,7 @@ def test_semantic_only_fails_closed_when_semantic_pass_degrades(tmp_path: Path, 
     )
 
     assert result.exit_code == 1
+    assert semantic_requirements == [True]
     assert "semantic search" in result.output
     assert "stale_segment" in result.output
     assert "DELIB-TEXT-ONLY" not in result.output

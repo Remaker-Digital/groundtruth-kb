@@ -75,6 +75,7 @@ LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_oppos
 PRIME_ROLE_SLOT = "prime-builder"
 LOYAL_OPPOSITION_ROLE_SLOT = "loyal-opposition"
 PROVIDER_VERDICT_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED"})
+PROVIDER_VERDICT_STATUS_MISMATCH_CODE = "GTKB_PROVIDER_VERDICT_STATUS_MISMATCH"
 PROVIDER_RUNTIME_MODEL_FIELDS: tuple[str, ...] = (
     "author_model",
     "author_model_version",
@@ -967,8 +968,18 @@ def publish_lo_verdict(
         latest_content=latest_content,
         verdict=normalized_verdict,
     )
-    if _first_status(content) != normalized_verdict:
-        raise BridgePublicationError("provider verdict content first status does not match the verdict argument")
+    content_first_status = _first_status(content)
+    if content_first_status != normalized_verdict:
+        reported_content_status = (
+            content_first_status
+            if content_first_status in PROVIDER_VERDICT_STATUSES
+            else ("<missing>" if not content_first_status else "<invalid>")
+        )
+        raise BridgePublicationError(
+            f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}: no publication occurred; "
+            f"verdict_argument={normalized_verdict}; content_first_status={reported_content_status}; "
+            "choose the intended substantive verdict and resend matching verdict and content-first-status values"
+        )
     document_match = _DOCUMENT_LINE_RE.search(content)
     if document_match and document_match.group("value") != document_name:
         raise BridgePublicationError("provider verdict content Document field does not match the claimed thread")

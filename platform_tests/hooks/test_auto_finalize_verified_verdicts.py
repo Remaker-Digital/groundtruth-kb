@@ -67,9 +67,64 @@ bridge_kind: implementation_verification
 Document: {slug}
 Version: 002
 Responds to: bridge/{slug}-001.md
+Recommended commit type: chore
 
 ## Verdict
 VERIFIED.
+
+## Spec-to-Test Mapping
+
+| Spec | Verification | Executed | Result |
+| --- | --- | --- | --- |
+| GOV-WORK-TREE-HYGIENE-001 | python -m pytest tests/test_{slug}.py -q | yes | passed |
+
+## Commands Executed
+
+- `python -m pytest tests/test_{slug}.py -q` -> passed
+
+## Commit Finalization Evidence
+
+Same-transaction path set:
+
+- `bridge/{slug}-001.md`
+- `bridge/{slug}-002.md`
+"""
+
+_INVALID_VERDICT = """VERIFIED
+author_identity: loyal-opposition/cursor
+author_session_context_id: {verdict_session}
+
+bridge_kind: implementation_verification
+Document: {slug}
+Version: 002
+Responds to: bridge/{slug}-001.md
+
+## Verdict
+VERIFIED.
+"""
+
+_VALID_BODY_WITHOUT_FINALIZATION_EVIDENCE = """VERIFIED
+author_identity: loyal-opposition/cursor
+author_session_context_id: {verdict_session}
+
+bridge_kind: implementation_verification
+Document: {slug}
+Version: 002
+Responds to: bridge/{slug}-001.md
+Recommended commit type: chore
+
+## Verdict
+VERIFIED.
+
+## Spec-to-Test Mapping
+
+| Spec | Verification | Executed | Result |
+| --- | --- | --- | --- |
+| GOV-WORK-TREE-HYGIENE-001 | python -m pytest tests/test_{slug}.py -q | yes | passed |
+
+## Commands Executed
+
+- `python -m pytest tests/test_{slug}.py -q` -> passed
 """
 
 
@@ -80,13 +135,14 @@ def _write_thread(
     report_session: str = "pb-sess-1",
     verdict_session: str = "lo-sess-2",
     target_paths_json: str | None = None,
+    verdict_template: str = _VERDICT,
 ) -> None:
     report = _REPORT.format(slug=slug, report_session=report_session)
     if target_paths_json is not None:
         report = report.replace('target_paths: ["src/foo.py"]', f"target_paths: {target_paths_json}")
     (repo / "bridge" / f"{slug}-001.md").write_text(report, encoding="utf-8")
     (repo / "bridge" / f"{slug}-002.md").write_text(
-        _VERDICT.format(slug=slug, verdict_session=verdict_session), encoding="utf-8"
+        verdict_template.format(slug=slug, verdict_session=verdict_session), encoding="utf-8"
     )
 
 
@@ -139,6 +195,32 @@ def test_sweep_skips_when_impl_uncommitted(repo):
     assert result["finalized"] == []
     assert len(result["skipped"]) == 1
     assert "not committed" in result["skipped"][0]["reason"]
+
+
+def test_sweep_skips_invalid_verdict_before_commit(repo, monkeypatch):
+    _write_thread(repo, "thread-invalid", verdict_template=_INVALID_VERDICT)
+    monkeypatch.setattr(sweep_mod, "_commit_chain", lambda *args, **kwargs: pytest.fail("commit should not run"))
+
+    result = sweep_mod.sweep()
+
+    assert result["finalized"] == []
+    assert len(result["skipped"]) == 1
+    assert "canonical_finalizer_rejects_verdict_body" in result["skipped"][0]["reason"]
+
+
+def test_sweep_skips_checker_rejected_verdict_before_commit(repo, monkeypatch):
+    _write_thread(
+        repo,
+        "thread-no-finalization-evidence",
+        verdict_template=_VALID_BODY_WITHOUT_FINALIZATION_EVIDENCE,
+    )
+    monkeypatch.setattr(sweep_mod, "_commit_chain", lambda *args, **kwargs: pytest.fail("commit should not run"))
+
+    result = sweep_mod.sweep()
+
+    assert result["finalized"] == []
+    assert len(result["skipped"]) == 1
+    assert "protected_commit_authorization_rejects_terminal_verdict" in result["skipped"][0]["reason"]
 
 
 def test_sweep_noops_when_no_untracked_verdicts(repo):
@@ -203,6 +285,21 @@ def test_sweep_audit_log_written(repo):
     assert log.is_file()
     events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert any(e.get("action") == "finalize" for e in events)
+
+
+def test_git_timeout_returns_failed_completed_process(monkeypatch):
+    monkeypatch.setattr(
+        sweep_mod.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout"))
+        ),
+    )
+
+    result = sweep_mod._git(["status"], timeout=1)
+
+    assert result.returncode == 124
+    assert "timed out after 1 seconds" in result.stderr
 
 
 def test_sweep_registered_in_both_harness_surfaces():

@@ -20,6 +20,6 @@ try:
         pathlib.Path("E:/GT-KB"),
     )
     print("WROTE", path)
-except Exception:
+except Exception as e:
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)

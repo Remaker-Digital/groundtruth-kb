@@ -478,6 +478,11 @@ applications/Agent_Red/harness-state/*/session-lifecycle-guard.json
 # Durable operating-role.md and session-startup-preferences.json ARE tracked;
 # the per-harness session-lifecycle-guard.json is runtime-mutable.
 harness-state/*/session-lifecycle-guard.json
+# WI-5325: live and archived per-harness session-envelope runtime state remains
+# in-root and readable, but is not a git-tracked source or governance artifact.
+harness-state/*/session-envelope.json
+harness-state/*/session-envelopes/
+harness-state/*/session-envelope-archive/
 
 # =============================================================================
 # MEMORY.md trim backups (added 2026-04-28 S319)

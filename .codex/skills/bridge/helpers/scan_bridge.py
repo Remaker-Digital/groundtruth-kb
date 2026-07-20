@@ -425,7 +425,8 @@ def _go_activatable(project_root: Path, bridge_id: str) -> tuple[bool, list[str]
     except AuthorizationError as exc:
         message = str(exc)
         if (
-            "Bridge document not found as versioned files" in message
+            "Bridge document not found as exact numbered files" in message
+            or "Bridge document not found as versioned files" in message
             or "Implementation authorization requires a GO in the bridge chain" in message
             or "No approved proposal file found under GO" in message
         ):

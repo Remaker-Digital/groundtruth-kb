@@ -55,6 +55,7 @@ MAX_GLOB_RESULTS = 100
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
 MAX_BRIDGE_VERDICT_RECOVERY_TURNS = 3
 MAX_PUBLISHER_DIAGNOSTIC_CHARS = 500
+PROVIDER_VERDICT_STATUS_MISMATCH_CODE = "GTKB_PROVIDER_VERDICT_STATUS_MISMATCH"
 LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 PUBLISH_BRIDGE_VERDICT_TOOL = "PublishBridgeVerdict"
 BRIDGE_VERDICT_COMPLETION_RECOVERY_PROMPT = (
@@ -1213,6 +1214,10 @@ def _publisher_recovery_exhausted(attempts: int, last_failure: str | None) -> Ol
     )
 
 
+def _is_provider_verdict_status_mismatch(result: str) -> bool:
+    return f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}:" in result
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -1263,6 +1268,7 @@ def run_tool_loop(
     bridge_verdict_published = False
     bridge_recovery_turns = 0
     publisher_failures = 0
+    publisher_status_mismatches = 0
     last_publisher_failure: str | None = None
 
     stop_reason = "process_error"
@@ -1400,16 +1406,25 @@ def run_tool_loop(
                     result = f"ERROR: {tool_err}"
                 if bridge_verdict_required and tool_name == PUBLISH_BRIDGE_VERDICT_TOOL:
                     if not _publish_bridge_verdict_succeeded(result):
-                        publisher_failures += 1
                         last_publisher_failure = _bounded_publisher_failure_diagnostic(result)
-                        if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
-                            raise _publisher_recovery_exhausted(publisher_failures, last_publisher_failure)
+                        if _is_provider_verdict_status_mismatch(result):
+                            publisher_status_mismatches += 1
+                            if publisher_status_mismatches > 1:
+                                raise OllamaHarnessError(
+                                    f"{PROVIDER_VERDICT_STATUS_MISMATCH_CODE}: publication stopped after "
+                                    f"{publisher_status_mismatches} mismatches; last failure: {last_publisher_failure}"
+                                )
+                        else:
+                            publisher_failures += 1
+                            if publisher_failures > MAX_BRIDGE_VERDICT_RECOVERY_TURNS:
+                                raise _publisher_recovery_exhausted(publisher_failures, last_publisher_failure)
                         bridge_recovery_turns = max(bridge_recovery_turns, 1)
                         publisher_recovery_reason = last_publisher_failure
                     else:
                         bridge_verdict_published = True
                         bridge_recovery_turns = 0
                         publisher_failures = 0
+                        publisher_status_mismatches = 0
                         last_publisher_failure = None
                 messages.append(
                     {

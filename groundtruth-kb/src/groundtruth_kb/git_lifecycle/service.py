@@ -158,6 +158,95 @@ class GitLifecycleService:
                 destination_branch=destination_branch,
             )
 
+    @staticmethod
+    def _byte_hash(payload: bytes) -> str:
+        return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _status_records(payload: bytes) -> list[str]:
+        return [record.decode("utf-8", errors="backslashreplace") for record in payload.split(b"\0") if record]
+
+    def restore_deleted_path(self, *, path: str, source_ref: str) -> dict[str, Any]:
+        """Restore one unstaged deletion from one explicit committed blob."""
+        normalized = normalize_repo_path(self.repo.root, path)
+        source_commit = self.repo.resolve_commit(source_ref)
+        source_mode, source_blob, source_payload = self.repo.blob_at(source_commit, normalized)
+        expected_target_status = b" D " + normalized.encode("ascii") + b"\0"
+
+        target_before = self.repo.target_status_z(normalized)
+        if target_before != expected_target_status:
+            raise OperationDenied(
+                "restore_target_not_unstaged_deletion",
+                "restore target must be exactly one unstaged worktree deletion",
+                path=normalized,
+                target_status=self._status_records(target_before),
+            )
+        unrelated_before = self.repo.unrelated_status_z(normalized)
+        index_before = self.repo.index_snapshot()
+
+        if (
+            self.repo.target_status_z(normalized) != target_before
+            or self.repo.unrelated_status_z(normalized) != unrelated_before
+            or self.repo.index_snapshot() != index_before
+        ):
+            raise OperationDenied(
+                "restore_state_changed",
+                "repository state changed after restore preflight",
+                path=normalized,
+            )
+
+        self.repo.restore_worktree_blob(normalized, source_payload)
+        try:
+            restored_blob, restored_payload = self.repo.worktree_blob(normalized)
+            target_after = self.repo.target_status_z(normalized)
+            unrelated_after = self.repo.unrelated_status_z(normalized)
+            index_after = self.repo.index_snapshot()
+            if restored_payload != source_payload or restored_blob != source_blob:
+                raise OperationDenied(
+                    "restored_blob_mismatch",
+                    "restored worktree bytes do not match the selected source blob",
+                    path=normalized,
+                    restored_blob=restored_blob,
+                    source_blob=source_blob,
+                )
+            if index_after != index_before:
+                raise OperationDenied(
+                    "restore_index_changed",
+                    "Git index changed during exact-path worktree restore",
+                    index_hash_after=self._byte_hash(index_after),
+                    index_hash_before=self._byte_hash(index_before),
+                    path=normalized,
+                )
+            if unrelated_after != unrelated_before:
+                raise OperationDenied(
+                    "restore_unrelated_status_changed",
+                    "unrelated Git status changed during exact-path restore",
+                    path=normalized,
+                    unrelated_status_hash_after=self._byte_hash(unrelated_after),
+                    unrelated_status_hash_before=self._byte_hash(unrelated_before),
+                )
+        except Exception:
+            self.repo.remove_restored_path(normalized)
+            raise
+
+        return {
+            "status": "PASS",
+            "operation": "restore-deleted-path",
+            "code": "tracked_path_restored",
+            "path": normalized,
+            "source_ref": source_ref,
+            "source_commit": source_commit,
+            "source_mode": source_mode,
+            "source_blob": source_blob,
+            "restored_blob": restored_blob,
+            "target_status_before": self._status_records(target_before),
+            "target_status_after": self._status_records(target_after),
+            "unrelated_status_hash_before": self._byte_hash(unrelated_before),
+            "unrelated_status_hash_after": self._byte_hash(unrelated_after),
+            "index_hash_before": self._byte_hash(index_before),
+            "index_hash_after": self._byte_hash(index_after),
+        }
+
     def create_work_item_branch(
         self,
         *,

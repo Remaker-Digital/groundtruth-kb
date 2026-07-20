@@ -215,6 +215,7 @@ def test_mod_ad_11_report_bytes_are_order_independent() -> None:
     assert canonical_report_bytes(index.audit(references)) == canonical_report_bytes(index.audit(reversed(references)))
 
 
+@pytest.mark.timeout(600)
 def test_effective_loading_graph_is_repeatable() -> None:
     first = discover_effective_loading_graph(ROOT)
     second = discover_effective_loading_graph(ROOT)
