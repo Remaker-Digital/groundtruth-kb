@@ -5,7 +5,7 @@
     "script_hash": "sha256:8212ae6b1de0eca07cb3f425165ffb5dcd13b4b1b68981b6a2dfa221eae808e0",
     "version": "gtkb-dev-environment-inventory-v1"
   },
-  "generated_at": "2026-07-16T04:54:30Z",
+  "generated_at": "2026-07-21T06:17:00Z",
   "harnesses": {
     "claude": {
       "session_start_configured": true,
@@ -124,7 +124,7 @@
       "G": {
         "harness_type": "goose-desktop",
         "role": [
-          "loyal-opposition"
+          "prime-builder"
         ],
         "status": "verified"
       },
@@ -167,7 +167,7 @@
     "sensitive_environment_categories": [
       "key_name"
     ],
-    "sensitive_environment_entry_count": 6,
+    "sensitive_environment_entry_count": 3,
     "status": "pass"
   },
   "repo_configured_surfaces": {
@@ -336,50 +336,50 @@
       "classification": "public_safe",
       "count": 44,
       "items": [
-        "advisory-disposition",
-        "advisory-intake",
-        "advisory-proposal",
-        "alternatives-investigation",
-        "arch-audit",
-        "assertion-triage",
-        "bridge",
-        "bridge-config",
-        "bridge-propose",
-        "bridge-reconciliation",
-        "check-deliberations",
-        "code-review-audit",
-        "codex-report",
-        "decision-capture",
-        "dispatcher-control",
-        "formal-artifact-packet-helper",
-        "grill-me-for-clarification",
+        "gtkb-adr",
+        "gtkb-advisory-disposition",
+        "gtkb-advisory-intake",
+        "gtkb-advisory-proposal",
+        "gtkb-alternatives-investigation",
+        "gtkb-arch-audit",
+        "gtkb-assert",
+        "gtkb-assertion-triage",
+        "gtkb-batch",
         "gtkb-benchmarks",
+        "gtkb-bridge",
+        "gtkb-bridge-config",
+        "gtkb-bridge-propose",
+        "gtkb-bridge-reconciliation",
+        "gtkb-check-deliberations",
+        "gtkb-code-review-audit",
+        "gtkb-decision-capture",
+        "gtkb-dispatcher-control",
+        "gtkb-formal-artifact-packet-helper",
+        "gtkb-grill-me-for-clarification",
+        "gtkb-harness-parity-review",
         "gtkb-hygiene-investigation",
         "gtkb-hygiene-reclaim",
         "gtkb-hygiene-sweep",
+        "gtkb-lo-hygiene-assessment",
+        "gtkb-lo-opportunity-radar",
+        "gtkb-loyal-opposition-report",
+        "gtkb-managed-skill-adoption-review",
+        "gtkb-projects",
+        "gtkb-promote",
+        "gtkb-proposal-review",
         "gtkb-propose",
+        "gtkb-query",
+        "gtkb-release-candidate-gate",
+        "gtkb-send-review",
+        "gtkb-session-wrap",
+        "gtkb-session-wrap-scan",
+        "gtkb-skill-governance-lifecycle",
+        "gtkb-spec",
+        "gtkb-spec-intake",
+        "gtkb-structural-hygiene-review",
         "gtkb-sweep-commit",
-        "harness-parity-review",
-        "kb-adr",
-        "kb-assert",
-        "kb-batch",
-        "kb-promote",
-        "kb-query",
-        "kb-session-wrap",
-        "kb-session-wrap-scan",
-        "kb-spec",
-        "kb-work-item",
-        "lo-opportunity-radar",
-        "loyal-opposition-hygiene-assessment",
-        "managed-skill-adoption-review",
-        "projects",
-        "proposal-review",
-        "release-candidate-gate",
-        "send-review",
-        "skill-governance-lifecycle",
-        "spec-intake",
-        "structural-hygiene-review",
-        "verify"
+        "gtkb-verify",
+        "gtkb-work-item"
       ]
     }
   },
@@ -742,7 +742,7 @@
       "command": "python -m pip --version",
       "evidence": "python -m pip --version",
       "status": "verified",
-      "version": "25.2"
+      "version": "26.1.2"
     },
     "playwright": {
       "classification": "unsupported",
@@ -756,7 +756,7 @@
       "command": "python -m pytest --version",
       "evidence": "python -m pytest --version",
       "status": "verified",
-      "version": "9.1.1"
+      "version": "9.0.2"
     },
     "python": {
       "classification": "verified",
@@ -770,7 +770,7 @@
       "command": "python -m ruff --version",
       "evidence": "python -m ruff --version",
       "status": "verified",
-      "version": "0.15.20"
+      "version": "0.15.5"
     }
   },
   "verification": {
