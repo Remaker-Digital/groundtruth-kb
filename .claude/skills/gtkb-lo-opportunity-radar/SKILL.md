@@ -1,7 +1,7 @@
 ---
 name: gtkb-lo-opportunity-radar
 description: Bias Loyal Opposition review toward finding token-savings opportunities and deterministic-service / automation candidates alongside defects. Use during Loyal Opposition review, evaluation, advisory, bridge-verdict, or wrap-up work, or when asked to scan for automation or efficiency opportunities.
-allowed-tools: Read, Grep, Glob, Bash 
+allowed-tools: Read, Grep, Glob, Bash
 license: "Proprietary - (c) 2026 Remaker Digital"
 metadata:
   project: groundtruth-kb

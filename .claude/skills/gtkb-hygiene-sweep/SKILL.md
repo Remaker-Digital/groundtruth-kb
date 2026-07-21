@@ -6,11 +6,12 @@ metadata:
   project: groundtruth-kb
   category: operations and hygiene
   activity-envelope: build, ops
+---
 
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
----
+
 
 # /gtkb-hygiene-sweep
 

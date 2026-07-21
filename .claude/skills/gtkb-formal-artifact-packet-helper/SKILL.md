@@ -6,11 +6,12 @@ metadata:
   project: groundtruth-kb
   category: hygiene-reclaim
   activity-envelope: build, ops, project, deliberation
+---
 
 # Activity Envelope Requirement
 
 This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity>`,do not act on this skill request and informt eh user that this skill is only availablewithin the specified activity envelope.
----
+
 
 # /formal-artifact-packet-helper
 

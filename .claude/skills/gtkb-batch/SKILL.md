@@ -1,5 +1,5 @@
 ---
-name: kb-batch
+name: gtkb-batch
 description: "Batch KB operations with mandatory dry-run, GOV-15 gate, and 50-item maximum. Operations: resolve-wis, promote-specs, retire-specs."
 argument-hint: "<operation> <id1,id2,...> [--execute]"
 allowed-tools: Bash, Read
