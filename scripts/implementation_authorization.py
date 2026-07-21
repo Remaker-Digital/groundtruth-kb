@@ -1764,6 +1764,35 @@ def validate_structured_pauth_spec_amendment(project_root: Path, proposal: str) 
     }
 
 
+def _suggest_pauth_for_work_item(project_root: Path, work_item_id: str | None) -> list[str]:
+    """Find active PAUTHs whose included_work_item_ids contain the work item."""
+    if not work_item_id:
+        return []
+    db_path = project_root / "groundtruth.db"
+    if not db_path.is_file():
+        return []
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, included_work_item_ids FROM current_project_authorizations WHERE status = 'active' LIMIT 10"
+        ).fetchall()
+        conn.close()
+    except Exception:
+        return []
+    matches: list[str] = []
+    for row in rows:
+        pauth_id = str(row["id"])
+        raw_wis = row["included_work_item_ids"] or ""
+        try:
+            wis = json.loads(raw_wis) if raw_wis else []
+        except (json.JSONDecodeError, TypeError):
+            wis = []
+        if work_item_id in wis:
+            matches.append(pauth_id)
+    return matches
+
+
 def create_authorization_packet(
     project_root: Path,
     bridge_id: str,

@@ -27,6 +27,16 @@ try:
 except ImportError:  # pragma: no cover - direct script execution path
     from implementation_authorization import PATH_TOKEN_RE
 
+try:
+    from scripts.bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
+except ImportError:  # pragma: no cover - direct script execution path
+    from bridge_author_metadata import REQUIRED_AUTHOR_METADATA_FIELDS
+
+try:
+    from groundtruth_kb.governance.project_authorization_operation_time import classify_target as _classify_target
+except ImportError:  # pragma: no cover
+    _classify_target = None  # type: ignore[assignment]
+
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
@@ -551,6 +561,31 @@ def _pauth_amendment_blocking_errors(content: str, project_root: Path, db_path: 
     return []
 
 
+def _check_author_metadata_presence(content: str) -> list[str]:
+    """Check for missing required author-metadata fields in bridge content."""
+    warnings: list[str] = []
+    for field_name in REQUIRED_AUTHOR_METADATA_FIELDS:
+        pattern = re.compile(r"^" + re.escape(field_name) + r"\s*:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
+        if not pattern.search(content):
+            warnings.append(field_name)
+    return warnings
+
+
+def _check_unclassified_target_paths(target_paths: set[str]) -> list[str]:
+    """Classify declared target paths and return any that are 'unclassified'."""
+    if _classify_target is None:
+        return []  # fail-soft when classifier unavailable
+    unclassified: list[str] = []
+    for path in sorted(target_paths):
+        try:
+            result = _classify_target(path)
+            if result.mutation_class == "unclassified":
+                unclassified.append(path)
+        except Exception:
+            pass  # fail-soft on classifier error
+    return unclassified
+
+
 def build_packet(
     *,
     bridge_id: str,
@@ -621,6 +656,8 @@ def build_packet(
         "warnings": {
             "missing_parent_dirs": compute_missing_parent_dir_warnings(project_root, cited_implementation_paths),
             "spec_links_section": classify_spec_links_section(content),
+            "author_metadata_warnings": _check_author_metadata_presence(content),
+            "unclassified_target_paths": _check_unclassified_target_paths(declared_target_paths),
         },
         "work_items": work_items,
         "applicable_specs": {sid: asdict(item) for sid, item in sorted(applicable.items())},
@@ -668,6 +705,8 @@ def format_markdown(packet: dict[str, Any]) -> str:
         f"- preflight_passed: `{str(packet['preflight_passed']).lower()}`",
         f"- warnings.missing_parent_dirs: {json.dumps(packet.get('warnings', {}).get('missing_parent_dirs', []))}",
         f"- warnings.spec_links_section: {json.dumps(spec_links_diag)}",
+        f"- warnings.author_metadata_warnings: {json.dumps(packet.get('warnings', {}).get('author_metadata_warnings', []))}",
+        f"- warnings.unclassified_target_paths: {json.dumps(packet.get('warnings', {}).get('unclassified_target_paths', []))}",
         f"- missing_required_specs: {json.dumps(packet['missing_required_specs'])}",
         f"- missing_advisory_specs: {json.dumps(packet['missing_advisory_specs'])}",
         f"- blocking_errors: {json.dumps(packet.get('blocking_errors', []))}",

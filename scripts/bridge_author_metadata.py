@@ -153,6 +153,37 @@ class BridgeAuthorMetadataError(RuntimeError):
     """Raised when required bridge author metadata is absent or not credible."""
 
 
+def resolve_author_metadata() -> dict[str, str]:
+    """Resolve all author-metadata fields from environment variables.
+
+    Iterates over REQUIRED_AUTHOR_METADATA_FIELDS and OPTIONAL_AUTHOR_METADATA_FIELDS,
+    checking FIELD_ENV_NAMES for each. Returns a dict of {field: value} for
+    all fields that resolve from the environment.
+    """
+    result: dict[str, str] = {}
+    all_fields = list(REQUIRED_AUTHOR_METADATA_FIELDS) + list(OPTIONAL_AUTHOR_METADATA_FIELDS)
+    for field_name in all_fields:
+        env_names = FIELD_ENV_NAMES.get(field_name, ())
+        for env_name in env_names:
+            value = os.environ.get(env_name, "").strip()
+            if value:
+                result[field_name] = value
+                break
+    return result
+
+
+def _emit_metadata() -> int:
+    """CLI mode: emit resolved metadata as YAML-like frontmatter lines."""
+    resolved = resolve_author_metadata()
+    missing = [f for f in REQUIRED_AUTHOR_METADATA_FIELDS if f not in resolved]
+    for field_name in sorted(resolved):
+        print(f"{field_name}: {resolved[field_name]}")
+    if missing:
+        print(f"# Missing required fields: {', '.join(missing)}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def first_nonblank_line(content: str) -> str:
     for line in content.splitlines():
         stripped = line.strip()
@@ -572,3 +603,9 @@ def ensure_author_metadata(
         metadata_lines.append("\n")
     lines[insert_idx:insert_idx] = metadata_lines
     return "".join(lines)
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(_emit_metadata())
