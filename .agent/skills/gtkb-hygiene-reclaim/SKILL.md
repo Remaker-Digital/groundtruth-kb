@@ -16,7 +16,7 @@ Generated at: 2026-07-17T21:06:12Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# GT-KB Hygiene Reclaim
+# /gtkb-hygiene-reclaim
 
 Use this skill to orchestrate the production `gt hygiene reclaim` command
 family. Keep repeatable discovery, hashing, revalidation, state transitions,

@@ -1,5 +1,5 @@
 ---
-name: proposal-review
+name: gtkb-proposal-review
 description: Review proposals, plans, and technical approaches for correctness, missing assumptions, risk, and decision quality. Use for design reviews, plan critiques, and proposal stress tests.
 argument-hint: [topic]
 allowed-tools: Bash, Read, Grep, Glob, Agent
@@ -7,7 +7,7 @@ license: "Proprietary - Remaker Digital"
 compatibility:
   - claude-code >= 1.0
 metadata:
-  project: agent-red-customer-experience
+  project: gt-kb
   category: review
 ---
 <!-- GTKB-ANTIGRAVITY-SKILL-ADAPTER
@@ -19,7 +19,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Proposal Review
+# /gtkb-proposal-review
 
 Review the target proposal or plan with an evidence-first, decision-support posture.
 

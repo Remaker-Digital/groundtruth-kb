@@ -1,6 +1,14 @@
 ---
 name: gtkb-sweep-commit
 description: Sweep and locally commit all current non-ignored GroundTruth-KB worktree changes after owner authorization. Use when the owner says to "sweep commit", "commit everything", "commit all changes", consolidate verified bridge work, or perform the regular GT-KB full-worktree cleanup commit. Handles GT-KB governance hooks, inventory drift, narrative-artifact approval evidence, staged credential scans, and verification before committing. Does not push unless the owner explicitly asks.
+metadata:
+  project: groundtruth-kb
+  category: operation and hygiene
+  activity-envelope: ops
+
+# Activity Envelope Requirement
+
+This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
 ---
 
 # GT-KB Sweep Commit

@@ -1,6 +1,9 @@
 ---
 name: gtkb-propose
 description: Scaffold a structurally compliant bridge proposal body (status token, project-linkage metadata, inline-JSON target_paths, seeded Prior Deliberations, spec-derived verification heading, required sections) and run a self-review checklist BEFORE filing, then hand off to gtkb-bridge-propose for the write. Use when starting a NEW bridge implementation proposal and you want it to clear the bridge-compliance gates on the first review instead of in a revise loop.
+metadata:
+  project: groundtruth-kb
+  category: implementation and planning
 ---
 
 This skill is the **composer** front-end to the `gtkb-bridge-propose`

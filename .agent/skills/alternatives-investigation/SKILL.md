@@ -12,7 +12,7 @@ metadata:
 ---
 
 
-# Alternatives Investigation
+# /gtkb-alternatives-investigation
 
 Investigate distinct solution paths and recommend the best option under the real project constraints.
 

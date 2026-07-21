@@ -20,7 +20,7 @@ Generated at: 2026-06-11T18:34:14Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# GT-KB Benchmark Suite
+# /gtkb-benchmarks
 
 Read-only measurement benchmarks for the GT-KB platform. Each benchmark
 computes a structured observation with a headline scalar plus per-dimension

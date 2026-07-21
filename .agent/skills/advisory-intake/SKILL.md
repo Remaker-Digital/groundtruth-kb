@@ -4,7 +4,7 @@ description: Consume live ADVISORY entries through Prime Builder owner-grilling,
 ---
 
 
-# /advisory-intake
+# /gtkb-advisory-intake
 
 Use this skill when Prime Builder needs to triage a live ADVISORY bridge entry
 or advisory report and decide whether it should become no-op evidence, a backlog

@@ -12,7 +12,7 @@ metadata:
   governance: GOV-18
 ---
 
-# Assertion Signal/Noise Triage
+# /gtkb-assertion-triage
 
 Categorize currently-failing GT-KB assertions and route chronic-noise candidates
 through a one-at-a-time owner decision. Read-only inference over the

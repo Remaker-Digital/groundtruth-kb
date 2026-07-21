@@ -1,11 +1,16 @@
 ---
 name: gtkb-hygiene-reclaim
-description: Use only from an active GT-KB ops activity envelope (`::open ops`) when planning, deep-cleaning, reviewing, trashing, purging, restoring, or auditing GT-KB hygiene-reclaim candidates through the production gt hygiene reclaim plan/history/deep-clean/trash/purge/restore CLI with registry, Git-root, ops-evidence, and quiescence gates.
+description: Use when planning, deep-cleaning, reviewing, trashing, purging, restoring, or auditing GT-KB hygiene-reclaim candidates through the production gt hygiene reclaim plan/history/deep-clean/trash/purge/restore CLI with registry, Git-root, ops-evidence, and quiescence gates.
 allowed-tools: Bash, Read
-license: "Proprietary - Remaker Digital"
+license: "Proprietary - (c) 2026 Remaker Digital"
 metadata:
   project: groundtruth-kb
-  category: hygiene-reclaim
+  category: operations and hygiene
+  activity-envelope: ops
+
+# Activity Envelope Requirement
+
+This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope (e.g., 'ops', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity>`,do not act on this skill request and informt eh user that this skill is only availablewithin the specified activity envelope.
 ---
 
 # GT-KB Hygiene Reclaim
@@ -15,10 +20,7 @@ family. Keep repeatable discovery, hashing, revalidation, state transitions,
 and history reconstruction in the deterministic CLI rather than reproducing
 them in model context.
 
-This is an **ops-envelope-only** skill. Use it only after the current worker has
-opened the `ops` activity envelope. If a request for deep cleaning arrives
-outside `::open ops`, open or require the ops envelope before loading or acting
-on this skill.
+
 
 ## When To Use
 

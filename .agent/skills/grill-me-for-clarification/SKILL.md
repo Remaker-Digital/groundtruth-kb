@@ -1,5 +1,5 @@
 ---
-name: grill-me-for-clarification
+name: gtkb-grill-me-for-clarification
 description: Interview the owner relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their requirements specifications and directives, or mentions "grill me for clarification".
 argument-hint: [plan or design or scope to grill]
 allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion, Skill, Agent
@@ -13,7 +13,7 @@ Generated at: 2026-06-11T18:34:14Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# /grill-me-for-clarification
+# /gtkb grill-me-for-clarification
 
 Conduct a structured, dependency-ordered clarification interview of the owner
 about an explicitly-scoped plan or design, until you reach shared

@@ -4,7 +4,7 @@ description: Draft Loyal Opposition ADVISORY bridge entries from reusable extern
 ---
 
 
-# /advisory-proposal
+# /gtkb-advisory-proposal
 
 Use this skill when Loyal Opposition, advisory mode, or a review session finds a
 reusable external solution, peer-harness suggestion, research result, or process

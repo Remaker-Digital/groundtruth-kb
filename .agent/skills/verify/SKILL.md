@@ -12,7 +12,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# /verify
+# /gtkb-verify
 
 This skill helps Loyal Opposition author post-implementation verdict files
 (`VERIFIED` or `NO-GO`) that satisfy the **Mandatory Specification-Derived

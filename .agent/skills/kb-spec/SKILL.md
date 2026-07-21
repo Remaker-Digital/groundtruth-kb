@@ -1,5 +1,5 @@
 ---
-name: kb-spec
+name: gtkb-spec
 description: Create or update a specification in the Knowledge Database. Enforces GOV-01 (spec-first), validates ID format, checks for duplicates, and ensures all required fields are present.
 argument-hint: [new|update] [SPEC-ID]
 allowed-tools: Bash, Read, Grep, Glob
@@ -22,7 +22,7 @@ Generated at: 2026-06-11T18:34:14Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Create or Update Specification
+# /gtkb-spec
 
 Guided specification management enforcing GOV-01 (spec-first workflow).
 

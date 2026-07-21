@@ -1,5 +1,5 @@
 ---
-name: kb-promote
+name: gtkb-promote
 description: Promote a specification's status (specified -> implemented -> verified) with assertion validation. Prevents premature promotion by running assertions before status change.
 argument-hint: <SPEC-ID> [to-status]
 allowed-tools: Bash, Read, Grep, Glob
@@ -22,7 +22,7 @@ Generated at: 2026-06-11T18:34:14Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Promote Specification Status
+# /gtkb-promote
 
 Safely advance a specification through its lifecycle with assertion-gated validation.
 

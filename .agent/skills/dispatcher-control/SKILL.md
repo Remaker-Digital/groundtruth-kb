@@ -9,7 +9,7 @@ metadata:
 ---
 
 
-# Dispatcher Control
+# /gtkb dispatcher-control
 
 Use this skill when you need to inspect or change GT-KB bridge dispatcher behavior.
 Use the governed `gt bridge dispatch` CLI surfaces; do not read or edit

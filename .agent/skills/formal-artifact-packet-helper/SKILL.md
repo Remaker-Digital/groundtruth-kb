@@ -4,7 +4,7 @@ description: Generate and validate formal-artifact approval packets with stable 
 ---
 
 
-# /formal-artifact-packet-helper
+# /gtkb formal-artifact-packet-helper
 
 Use this skill when a bridge proposal, implementation report, or approval gate
 workflow requires generating or validating a formal-artifact approval packet.

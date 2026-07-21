@@ -1,5 +1,5 @@
 ---
-name: kb-session-wrap-scan
+name: gtkb-session-wrap-scan
 description: Run the wrap-up scanner suite (W0 transcript-snapshot precursor + W1 hygiene scan + W2 cross-artifact consistency check). Read-only; non-mutating. Owner reviews findings before invoking the mutating /kb-session-wrap procedure.
 disable-model-invocation: false
 argument-hint: [session-id]
@@ -21,7 +21,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Session Wrap-Up Scan (Slice 1: W0 + W1 + W2)
+# gtkb-session-wrap-scan
 
 Run the three Slice 1 wrap-up scanners and emit reports. **Non-mutating** —
 writes only to `.groundtruth/session/snapshots/<session-id>/` (gitignored).

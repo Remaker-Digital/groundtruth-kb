@@ -1,5 +1,5 @@
 ---
-name: harness-parity-review
+name: gtkb-harness-parity-review
 description: Use when reviewing or correcting parity across GT-KB harnesses (Claude, Codex, Cursor, Antigravity, Ollama, OpenRouter), including skills, hooks, roles, commands, plugins, MCP tools, startup context, permissions, role-specific capabilities, or harness capability drift.
 ---
 <!-- GTKB-ANTIGRAVITY-SKILL-ADAPTER
@@ -11,7 +11,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Harness Parity Review
+# /gtkb-harness-parity-review
 
 ## Goal
 

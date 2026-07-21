@@ -11,7 +11,7 @@ Generated at: 2026-06-11T18:34:14Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# GT-KB Sweep Commit
+# /gtkb-sweep-commit
 
 ## Overview
 

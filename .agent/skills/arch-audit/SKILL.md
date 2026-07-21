@@ -12,7 +12,7 @@ metadata:
   governance: GOV-20
 ---
 
-# Architecture Compliance Audit
+# /gtkb-arch-audit
 
 Run all ADR/DCL assertions and produce a family-grouped compliance matrix.
 

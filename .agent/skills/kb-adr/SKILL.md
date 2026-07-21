@@ -1,5 +1,5 @@
 ---
-name: kb-adr
+name: gtkb-adr
 description: Create an Architecture Decision Record (ADR) in the Knowledge Database as a spec with type='architecture_decision'. Records the decision, rationale, consequences, failed approaches, and rejected alternatives so architectural choices are never revisited without context. Part of GOV-20 governance.
 argument-hint: "<decision title>"
 allowed-tools: Bash, Read, Grep
@@ -19,7 +19,7 @@ Generated at: 2026-06-11T18:34:14Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Architecture Decision Record (ADR) — GOV-20
+# /gtkb-adr
 
 Create a formal ADR in the Knowledge Database. ADRs are stored as **specifications** with `type='architecture_decision'` and `ADR-*` IDs. They document **why** a decision was made, **what was tried and failed**, and **why alternatives were rejected**.
 

@@ -1,5 +1,5 @@
 ---
-name: loyal-opposition-hygiene-assessment
+name: gtkb-loyal-opposition-hygiene-assessment
 description: Use when Loyal Opposition should assess GT-KB project hygiene, classify drift, and prepare a Prime Builder action plan without mutating project files.
 ---
 <!-- GTKB-ANTIGRAVITY-SKILL-ADAPTER
@@ -11,7 +11,7 @@ Generated at: 2026-06-01T04:09:02Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Loyal Opposition Hygiene Assessment
+# /gtkb-loyal-opposition-hygiene-assessment
 
 ## Purpose
 

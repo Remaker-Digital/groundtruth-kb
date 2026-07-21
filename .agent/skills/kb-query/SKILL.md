@@ -1,5 +1,5 @@
 ---
-name: kb-query
+name: gtkb-query
 description: Query the Knowledge Database for specs, tests, work items, procedures, and documents. Use when looking up project knowledge, checking spec status, finding open work items, or reviewing test coverage.
 argument-hint: [query-type] [filter]
 allowed-tools: Bash, Read
@@ -23,7 +23,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Knowledge Database Query
+# /gtkb-query
 
 Query the Agent Red Knowledge Database (`groundtruth.db`) using the Python API.
 

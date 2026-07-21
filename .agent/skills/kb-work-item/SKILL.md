@@ -1,5 +1,5 @@
 ---
-name: kb-work-item
+name: gtkb-work-item
 description: Create a work item with automatic test creation and backlog assignment. Enforces GOV-12 (WI triggers tests) and GOV-13 (phase assignment) in a single invocation.
 argument-hint: [title] [--spec SPEC-ID] [--origin regression|defect|new|hygiene]
 allowed-tools: Bash, Read, Grep
@@ -22,7 +22,9 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# Create Work Item (with Linked Test + Backlog)
+# /gtkb-work-item
+
+Create Work Item (with Linked Test + Backlog)
 
 Single-invocation skill enforcing the full GOV-12 chain: **Work Item -> Test -> Phase Assignment -> Backlog**.
 

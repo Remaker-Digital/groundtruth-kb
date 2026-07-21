@@ -1,5 +1,5 @@
 ---
-name: lo-opportunity-radar
+name: gtkb-lo-opportunity-radar
 description: Bias Loyal Opposition review toward finding token-savings opportunities and deterministic-service / automation candidates alongside defects. Use during Loyal Opposition review, evaluation, advisory, bridge-verdict, or wrap-up work, or when asked to scan for automation or efficiency opportunities.
 allowed-tools: Read, Grep, Glob, Bash
 ---
@@ -12,7 +12,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# /lo-opportunity-radar
+# /gtkb-lo-opportunity-radar
 
 Apply a structured "opportunity radar" pass to Loyal Opposition review work.
 Standard review finds defects in the artifact under inspection; this skill

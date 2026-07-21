@@ -20,7 +20,7 @@ Generated at: 2026-05-19T15:33:26Z
 Do not edit this adapter directly. Edit the canonical source and regenerate.
 GTKB-ANTIGRAVITY-SKILL-ADAPTER -->
 
-# KB Architecture Assertion Runner
+# /kb-assert
 
 Run all ADR/DCL assertions against the codebase and display a compliance dashboard.
 
