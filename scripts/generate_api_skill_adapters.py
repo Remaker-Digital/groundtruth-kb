@@ -22,7 +22,8 @@ if str(_SCRIPT_DIR) not in sys.path:
 from _wrap_io import _atomic_write_bytes  # noqa: E402
 
 REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
-API_SKILLS_RELATIVE_PATH = Path(".api-harness") / "skills"
+DEFAULT_SKILLS_RELATIVE_PATH = Path(".api-harness") / "skills"
+API_SKILLS_RELATIVE_PATH = DEFAULT_SKILLS_RELATIVE_PATH
 MANIFEST_NAME = "MANIFEST.json"
 GENERATED_MARKER = "<!-- GTKB-API-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-API-SKILL-ADAPTER -->"
@@ -271,10 +272,14 @@ def generate(project_root: Path, *, check: bool = False) -> tuple[list[str], lis
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    global API_SKILLS_RELATIVE_PATH
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=str, default=None, help="Override the output skills directory (e.g. .goose/skills).")
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--check", action="store_true", help="Report drift without writing files.")
     args = parser.parse_args(argv)
+    if getattr(args, "output_dir", None):
+        API_SKILLS_RELATIVE_PATH = Path(args.output_dir)
 
     try:
         changed, adapter_paths = generate(args.project_root, check=args.check)

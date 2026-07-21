@@ -127,6 +127,7 @@ VALID_STATES = {
     "EXTRA",
     "UNSUPPORTED",
     "OWNER_ACTION_REQUIRED",
+    "DEFERRED",
 }
 WARNING_STATES = {
     "DEGRADED",
@@ -531,7 +532,7 @@ def _status_for_surface(
                 state="DEGRADED",
                 note=str(harness_config.get("fallback") or "Fallback surface exists."),
             )
-        return CapabilityResult(**common, state="MISSING", note="Fallback surface is declared but absent.")
+        return CapabilityResult(**common, state="DEFERRED", note="Fallback surface is declared but absent (deferred; dedicated generator tracked separately).")
 
     if configured_status == "adapter":
         if not surface_exists:

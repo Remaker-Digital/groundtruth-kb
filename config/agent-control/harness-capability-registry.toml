@@ -1873,6 +1873,9 @@ full_transcript_archive_required = false
 activity_envelope_manifest_source = "config/agent-control/activity-disposition-profiles.toml"
 result_envelope_limitations = "Cursor parity is assessed through generated adapters and fallback startup hooks rather than a native GT-KB hook surface."
 
+[harnesses.goose]
+skill_adapter_manifest = ".goose/skills/MANIFEST.json"
+
 [harnesses.ollama]
 # Harness-level capability floor declaration per GOV-HARNESS-ONBOARDING-CONTRACT-001 Layer 3
 # (spec inserted by Child 4; draft assertions updated from capabilities.ollama.* to
