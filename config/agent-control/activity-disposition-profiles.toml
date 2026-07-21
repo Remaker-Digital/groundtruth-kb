@@ -129,6 +129,7 @@ skills = [
     "bridge-propose",
     "verify",
     "kb-work-item",
+    "gtkb-work-item",
     "kb-spec",
     "advisory-intake",
 ]

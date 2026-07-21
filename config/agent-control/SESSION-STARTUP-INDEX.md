@@ -27,6 +27,12 @@ classification) lives in `config/agent-control/SESSION-STARTUP-CONTROL-MAP.md`
 2. **Role overlay** — load the role-specific overlay:
    `config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md` or
    `config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md`.
+2.5. **Session envelope (pre-flight)** — if the resolved role requires
+   worker-role provenance for KB writes (Prime Builder and Loyal Opposition
+   both do), verify an open session envelope exists. Open one with:
+   `python -m groundtruth_kb session envelope open --harness-name <name> --harness-id <id> --init-keyword "::init gtkb pb" --subject gtkb --role prime-builder`
+   before any `gt backlog`, `gt bridge`, or `implementation_authorization.py`
+   command.
 3. **Canonical terminology** — load the **core GT-KB primer subset** from
    `.claude/rules/canonical-terminology.md` at base startup (bounded by
    `required_primer_terms` in `canonical-terminology.toml`). Activity-specific

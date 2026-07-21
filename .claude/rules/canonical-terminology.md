@@ -1,4 +1,4 @@
-# Canonical Terminology — GroundTruth-KB
+# Canonical Terminology â€” GroundTruth-KB
 
 This file is the scaffolded glossary of canonical vocabulary for projects built
 on GroundTruth KB. Base session startup loads only the **core primer subset**
@@ -6,11 +6,11 @@ on GroundTruth KB. Base session startup loads only the **core primer subset**
 terms load when an agent opens the corresponding activity envelope with
 `::open <activity>` (SPEC-INTAKE-46594e).
 
-**Status:** scaffolded — customize the project-specific rows (marked
+**Status:** scaffolded â€” customize the project-specific rows (marked
 `GroundTruth-KB` or in the per-project section) but DO NOT remove the
 canonical rows above without replacing them. Doctor will flag missing terms.
 
-**Ties to ADR-0001: Three-Tier Memory Architecture** — MemBase (canonical
+**Ties to ADR-0001: Three-Tier Memory Architecture** â€” MemBase (canonical
 truth) / MEMORY.md (operational notepad) / Deliberation Archive (design-
 reasoning record). Canonical knowledge lives in MemBase.
 
@@ -27,7 +27,7 @@ review gate. DO NOT redefine them locally.
 **Definition:** The canonical, authoritative store of specifications and
 governed knowledge for the project. Implemented as a SQLite database
 (`groundtruth.db`) accessed via the `groundtruth_kb` Python API or `gt` CLI.
-Append-only versioning — every mutation creates a new versioned row with
+Append-only versioning â€” every mutation creates a new versioned row with
 `changed_by`, `changed_at`, and `change_reason`. Current state = latest
 version per ID.
 
@@ -62,7 +62,7 @@ and from MEMORY.md (which holds *what was recently done*).
 
 **Definition:** The operational notepad tier of ADR-0001. A repo-tracked
 markdown file at project root that records current status, recent sessions,
-and operational pointers. NOT canonical — MEMORY.md can coordinate work but
+and operational pointers. NOT canonical â€” MEMORY.md can coordinate work but
 it cannot make anything true. If MEMORY.md and MemBase disagree, MemBase
 wins.
 
@@ -83,7 +83,7 @@ store. In GT-KB projects, use "MemBase" for the store itself and
 "GroundTruth KB" for the product. "Knowledge Database" persists as a
 descriptive phrase but is not the canonical noun.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#knowledge-database).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#knowledge-database).*
 
 ### GroundTruth KB
 
@@ -95,7 +95,7 @@ templates, the doctor check, the file-bridge protocol (dual-agent profiles),
 and the published documentation at `docs/`. Shipped as the PyPI package
 `groundtruth-kb`.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#groundtruth-kb).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#groundtruth-kb).*
 
 ### project-resource alias resolution
 
@@ -103,7 +103,7 @@ and the published documentation at `docs/`. Shipped as the PyPI package
 through the configured GroundTruth-KB project resource URL unless the owner
 explicitly scopes the reference otherwise.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-resource-alias-resolution).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-resource-alias-resolution).*
 
 ### GT-KB
 
@@ -132,7 +132,7 @@ owner (provides direction, decisions).
 **Source:** `templates/rules/prime-builder.md`; `templates/project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md`.
 
 **Implementation pointer:** currently embodied by the Claude Code CLI
-(model: Opus 4.x). Provider-agnostic by design — see
+(model: Opus 4.x). Provider-agnostic by design â€” see
 `src/groundtruth_kb/providers/`.
 
 ### Loyal Opposition
@@ -161,7 +161,7 @@ Adopter projects also define their own application-instance term (e.g., the
 project_name itself); GT-KB's own checkout adds the instance term in its
 self-install. Multi-source attribution per Codex
 `gtkb-gov-term-primer-startup-2026-05-02-002.md` F3: each entry cites its
-authoritative source. Sources include `.claude/rules/operating-model.md` §2
+authoritative source. Sources include `.claude/rules/operating-model.md` Â§2
 (canonical for most terms), `AGENTS.md`, role rules, and
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
@@ -201,7 +201,7 @@ Platform (IDP) that supports the application lifecycle.
 **Not to be confused with:** hosted application (the platform manages
 applications, is not one); cloud platform (e.g., AWS) which is unrelated.
 
-**Source:** `.claude/rules/operating-model.md` §2 "platform";
+**Source:** `.claude/rules/operating-model.md` Â§2 "platform";
 `DELIB-GTKB-IDP-TERMINOLOGY`.
 
 ### application
@@ -215,7 +215,7 @@ when GT-KB is the active application.
 application; see "project" below); platform (GT-KB itself; see above);
 hosted application (an application in service).
 
-**Source:** `.claude/rules/operating-model.md` §2 "application".
+**Source:** `.claude/rules/operating-model.md` Â§2 "application".
 
 ### hosted application
 
@@ -226,7 +226,7 @@ of an application (vs. the lifecycle record managed by GT-KB).
 **Not to be confused with:** application (the lifecycle object); platform
 (GT-KB itself).
 
-**Source:** `.claude/rules/operating-model.md` §2 "hosted application".
+**Source:** `.claude/rules/operating-model.md` Â§2 "hosted application".
 
 ### Agent Red
 
@@ -235,14 +235,14 @@ of an application (vs. the lifecycle record managed by GT-KB).
 **Definition:** The reference adopter application for GT-KB. Agent Red exercises
 the platform's application-isolation contract in continuous use through a
 deliberately lifecycle-independent repository and CI cadence. The application
-subtree lives at `applications/Agent_Red/` per `CLAUDE.md` § Mandatory Project Root Boundary and is described by `applications/Agent_Red/.gtkb-app-isolation.json`. The hosted form deploys from a lifecycle-independent repository (see "Configured GitHub repository URLs" below).
+subtree lives at `applications/Agent_Red/` per `CLAUDE.md` Â§ Mandatory Project Root Boundary and is described by `applications/Agent_Red/.gtkb-app-isolation.json`. The hosted form deploys from a lifecycle-independent repository (see "Configured GitHub repository URLs" below).
 
 **Role in GT-KB.** Agent Red is the isolation validator: portability of Agent Red
 between GT-KB installations is the operative test of the platform/application
 isolation contract (`ADR-APPLICATION-ISOLATION-CONTRACT-001` proposed;
 `DCL-APP-ROOT-MINIMIZATION-001` proposed; `applications/Agent_Red/.gtkb-app-isolation.json`). Active adopter-experience work tracks under `PROJECT-GTKB-ADOPTER-EXPERIENCE` (e.g., the Agent Red deployability preservation gate at `bridge/gtkb-agent-red-deployability-preservation-gate-*`).
 
-**Tooling-reference discipline (2026-05-04 narrowing).** Unqualified GT-KB tooling references — CLI invocations, CI workflows, GitHub Actions, release evidence, repository state — must not resolve silently to Agent Red surfaces. Agent Red surfaces are addressed explicitly when in scope (e.g., adopter-experience work, isolation validation, Agent Red CI binding). The narrowing scopes tooling-reference resolution; it does not alter Agent Red's role as the reference adopter application or the isolation validator.
+**Tooling-reference discipline (2026-05-04 narrowing).** Unqualified GT-KB tooling references â€” CLI invocations, CI workflows, GitHub Actions, release evidence, repository state â€” must not resolve silently to Agent Red surfaces. Agent Red surfaces are addressed explicitly when in scope (e.g., adopter-experience work, isolation validation, Agent Red CI binding). The narrowing scopes tooling-reference resolution; it does not alter Agent Red's role as the reference adopter application or the isolation validator.
 
 **Configured GitHub repository URLs (canonical-migration window in effect):**
 
@@ -251,7 +251,7 @@ isolation contract (`ADR-APPLICATION-ISOLATION-CONTRACT-001` proposed;
 
 When the canonical migration completes, the migration-target URL becomes the sole canonical and this entry is updated to remove the dual listing.
 
-**Not to be confused with:** the five adopter fixtures in `groundtruth-kb/examples/` (those are scaffolded examples, not the reference adopter); the GroundTruth-KB platform repository `https://github.com/Remaker-Digital/groundtruth-kb` (the platform that manages Agent Red as its reference adopter); a deployed Agent Red instance running in service (that is a "hosted application" — Agent Red's hosted form). Separate-repository topology is the *mechanism* of lifecycle independence; it should not be misread as severance from GT-KB.
+**Not to be confused with:** the five adopter fixtures in `groundtruth-kb/examples/` (those are scaffolded examples, not the reference adopter); the GroundTruth-KB platform repository `https://github.com/Remaker-Digital/groundtruth-kb` (the platform that manages Agent Red as its reference adopter); a deployed Agent Red instance running in service (that is a "hosted application" â€” Agent Red's hosted form). Separate-repository topology is the *mechanism* of lifecycle independence; it should not be misread as severance from GT-KB.
 
 **Source:** `GOV-AGENT-RED-GTKB-CONFORMANCE-001`; `DELIB-0834`; owner directive 2026-05-04 (tooling-reference narrowing); owner-decision capture S347 (2026-05-24, reference-adopter framing restoration); dual-repo clarification per S333 audit FINDING-P1-002 (downgraded to P3) and `bridge/gtkb-governance-hygiene-bundle-001.md` Change E.
 
@@ -268,7 +268,7 @@ activity envelope triggers injection of that activity's context-load bundle (dis
 profile terminology/skills and routing context) per
 `DCL-ACTIVITY-DISPOSITION-PROFILE-001` and `DCL-ACTIVITY-ENVELOPE-INTERCEPTION-001`.
 
-**Lineage (retired terms):** work envelope → topic envelope → **activity envelope**.
+**Lineage (retired terms):** work envelope â†’ topic envelope â†’ **activity envelope**.
 Retired terms remain historical only; new narrative MUST use **activity envelope**.
 
 **Three-axis disambiguation (do not conflate):**
@@ -312,7 +312,7 @@ workstream/program grouping; not the hosted application.
 applications contain projects); platform (GT-KB itself); work item (the
 atomic known-work unit).
 
-**Source:** `.claude/rules/operating-model.md` §2 "project"; owner
+**Source:** `.claude/rules/operating-model.md` Â§2 "project"; owner
 clarification, 2026-05-06.
 
 ### project authorization
@@ -326,7 +326,7 @@ replace implementation proposals, Loyal Opposition review, bridge `GO`,
 proposal `target_paths`, implementation-start packets, spec-derived tests,
 implementation reports, or verification.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-authorization).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#project-authorization).*
 
 ### sub-project
 
@@ -334,7 +334,7 @@ implementation reports, or verification.
 A sub-project exists to organize work under a larger project; it is not a
 separate application and is not a separate backlog source.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#sub-project).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#sub-project).*
 
 ### work item
 
@@ -348,7 +348,7 @@ grouping, and continuation context.
 **Not to be confused with:** project or sub-project (groupings of work
 items); external issue or ticket records.
 
-**Source:** `.claude/rules/operating-model.md` §2 "work item";
+**Source:** `.claude/rules/operating-model.md` Â§2 "work item";
 `work_items` table in MemBase; owner clarification, 2026-05-06.
 
 ### backlog
@@ -379,15 +379,15 @@ activity defaults, startup order, prior context, notes, and conjecture.
 conclusion of the `GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration the former
 transitional markdown backlog view under `memory/` was deleted (Slice
 7-prime, `bridge/gtkb-gov-backlog-source-of-truth-2026-05-02`). The steady
-state is "MemBase only" — the canonical `work_items` table is the sole
+state is "MemBase only" â€” the canonical `work_items` table is the sole
 backlog authority.
 
 **Not to be confused with:** the bridge queue (current handoff/review state,
 read with `gt bridge state-report`); ignore list or deprecated work (forbidden
-uses per operating-model §2); backlog snapshot (point-in-time export);
+uses per operating-model Â§2); backlog snapshot (point-in-time export);
 a separate `backlog_items` conceptual class distinct from work items.
 
-**Source:** `.claude/rules/operating-model.md` §2 "backlog";
+**Source:** `.claude/rules/operating-model.md` Â§2 "backlog";
 `GOV-STANDING-BACKLOG-001` (governance contract); owner clarification,
 2026-05-06.
 
@@ -400,7 +400,7 @@ recorded in MemBase as one of the spec subtypes (`SPEC-NNNN`, `GOV-NNN`,
 **Not to be confused with:** technical-design document; implementation
 proposal (a different bridge artifact); test (a verification artifact).
 
-**Source:** `.claude/rules/operating-model.md` §2 "specification";
+**Source:** `.claude/rules/operating-model.md` Â§2 "specification";
 `specifications` table in MemBase.
 
 ### requirement
@@ -412,9 +412,9 @@ requires owner-visible confirmation per `GOV-SPEC-CAPTURE-TRANSPARENCY-001`.
 
 **Not to be confused with:** preference or wish (informal); inferred
 behavior (must not be silently promoted to requirement per
-operating-model §1).
+operating-model Â§1).
 
-**Source:** `.claude/rules/operating-model.md` §2 "requirement".
+**Source:** `.claude/rules/operating-model.md` Â§2 "requirement".
 
 ### implementation proposal
 
@@ -428,7 +428,7 @@ criteria, and risk/rollback per
 **Not to be confused with:** specification (a different artifact type);
 implementation report (post-implementation; below).
 
-**Source:** `.claude/rules/operating-model.md` §2 "implementation proposal";
+**Source:** `.claude/rules/operating-model.md` Â§2 "implementation proposal";
 `.claude/rules/file-bridge-protocol.md`.
 
 ### implementation report
@@ -444,7 +444,7 @@ Verification Gate.
 **Not to be confused with:** implementation proposal (pre-implementation);
 test (an independent artifact).
 
-**Source:** `.claude/rules/operating-model.md` §2 "implementation report";
+**Source:** `.claude/rules/operating-model.md` Â§2 "implementation report";
 `.claude/rules/file-bridge-protocol.md`.
 
 ### verification
@@ -459,7 +459,7 @@ that a specification exists or has been claimed.
 verification can require many tests); validation (testing against
 real-world use; verification is internal-spec compliance).
 
-**Source:** `.claude/rules/operating-model.md` §2 "verification".
+**Source:** `.claude/rules/operating-model.md` Â§2 "verification".
 
 ### dashboard
 
@@ -473,14 +473,14 @@ access to MemBase.
 **Not to be confused with:** static documentation (dashboard implies
 live data + interaction); non-interactive README-style views.
 
-**Source:** `.claude/rules/operating-model.md` §2 "dashboard";
+**Source:** `.claude/rules/operating-model.md` Â§2 "dashboard";
 `GTKB-DASHBOARD-002` (slice progression).
 
 ### bridge
 
 **Canonical full term:** file bridge (the protocol surface).
 
-**Definition:** The Prime Builder ↔ Loyal Opposition coordination
+**Definition:** The Prime Builder â†” Loyal Opposition coordination
 protocol implemented through dispatcher-backed bridge state and versioned
 markdown audit files under `bridge/`. Statuses: NEW, REVISED, GO, NO-GO,
 VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. After the 2026-06-15
@@ -534,7 +534,7 @@ isolation, not the definition.
 
 **Canonical alias:** lifecycle independence.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#isolation).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#isolation).*
 
 ### session scope
 
@@ -543,7 +543,7 @@ of `GT-KB`, `Application`, or `GT-KB+Application` (exceptional). Scope is
 declared at session start and mechanically enforced by hook-level write gating
 once the enforcement layer lands.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-scope).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-scope).*
 
 ### bias case
 
@@ -551,7 +551,7 @@ once the enforcement layer lands.
 equivalent options, reliably prefers one over another in a way that produces
 wrong outcomes. The wrong option was actively chosen over the right one.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bias-case).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bias-case).*
 
 ### salience case
 
@@ -559,7 +559,7 @@ wrong outcomes. The wrong option was actively chosen over the right one.
 relevant option because it is not on the natural retrieval path at the moment
 of decision. The correct option was never weighed.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#salience-case).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#salience-case).*
 
 ### placement
 
@@ -572,7 +572,7 @@ reach-patterns rather than fighting agent defaults.
 
 **Canonical alias:** bias-aligned placement.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#placement).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#placement).*
 
 ### glossary as DA read surface
 
@@ -583,7 +583,7 @@ read path for prior-decision consultation; the Deliberation Archive is the
 substrate the glossary cites. Direct DA semantic search is the long-tail /
 audit / rationale-deep-dive path.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#glossary-as-da-read-surface).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#glossary-as-da-read-surface).*
 
 ### harness
 
@@ -595,17 +595,17 @@ vendor.
 
 **Canonical alias:** AI coding harness.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#harness).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#harness).*
 
 ### harness identity
 
 **Definition:** The persistent, installation-stable ID assigned to each
-installed AI coding harness on a workstation. IDs (`A`, `B`, `C`, …) are
+installed AI coding harness on a workstation. IDs (`A`, `B`, `C`, â€¦) are
 unique and do not change after initial assignment except through an explicit
 owner-requested identity change operation. Startup resolves the active
 harness's identity from the persistent record before any role lookup.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#harness-identity).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#harness-identity).*
 
 ### canonical reader entrypoint
 
@@ -615,7 +615,7 @@ fallback, or lifecycle semantics.
 
 **Canonical alias:** reader entrypoint.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-reader-entrypoint).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-reader-entrypoint).*
 
 ### SoT read discipline
 
@@ -650,11 +650,11 @@ structured content that carries forward session context, continuation scope,
 and next-step direction to the next session. It is *generated content*,
 distinct from its *persisted record*.
 
-**Canonical alias:** none. Do NOT use "continuation prompt" — that label is
+**Canonical alias:** none. Do NOT use "continuation prompt" â€” that label is
 explicitly rejected (per ``DELIB-20260883``) as a redundant third term for the
 same concept.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#handoff-prompt).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#handoff-prompt).*
 
 ### role assignment
 
@@ -679,19 +679,19 @@ Dispatch eligibility and final target ranking are controlled by
 
 **Canonical alias:** operating role.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#role-assignment).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#role-assignment).*
 
 ### bridge thread
 
 **Definition:** The multi-version conversational unit between Prime Builder
 and Loyal Opposition on a single topic. A bridge thread is identified by a
 kebab-case slug and consists of an ordered sequence of versioned files
-(`bridge/<slug>-001.md`, `-002.md`, …) plus a single entry in
+(`bridge/<slug>-001.md`, `-002.md`, â€¦) plus a single entry in
 the dispatcher-backed bridge state. The thread terminates at `VERIFIED` or owner-directed
 retirement. `DEFERRED` parks a thread in owner-directed non-actionable state
 until its recorded clear/resume condition is met.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-thread).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-thread).*
 
 ### GO / NO-GO / VERIFIED / DEFERRED
 
@@ -704,7 +704,7 @@ after a NO-GO) are upstream Prime-side states. `DEFERRED` is owner-directed
 bridge parking state; it is indexed and non-actionable, but it is not a Loyal
 Opposition verdict and does not authorize implementation.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#go-no-go-verified-deferred).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#go-no-go-verified-deferred).*
 
 ### NO-ACTION
 
@@ -736,7 +736,7 @@ An LO advisory is filed at `bridge/<slug>-001.md` with status `NO-GO`
 Prime Builder with filing a normal implementation proposal that converts the
 advisory into scoped, testable GT-KB work.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#loyal-opposition-advisory).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#loyal-opposition-advisory).*
 
 ### applicability preflight
 
@@ -747,7 +747,7 @@ by the proposal's path or content. The gate emits a packet hash that LO
 verdicts cite. Returns `preflight_passed: false` when required cross-cutting
 specs are missing.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#applicability-preflight).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#applicability-preflight).*
 
 ### clause preflight
 
@@ -758,7 +758,7 @@ Emits an exit-5 blocking gate when any `must_apply` clause with both
 `severity = "blocking"` and `enforcement_mode = "blocking"` lacks satisfying
 evidence and is not explicitly owner-waived.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#clause-preflight).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#clause-preflight).*
 
 ### bridge compliance gate
 
@@ -768,7 +768,7 @@ proposals/reports lacking required protocol elements. Currently enforces the
 `Owner Decisions / Input` section requirement when the proposal/report
 depends on owner approval.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-compliance-gate).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#bridge-compliance-gate).*
 
 ### scanner-safe-writer
 
@@ -783,7 +783,7 @@ and `.claude/hooks/scanner-safe-writer.py` (bridge-scoped, Write-only for
 `bridge/*.md` files). Both are registered in tracked `.claude/settings.json`
 and `.codex/hooks.json` PreToolUse arrays.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#scanner-safe-writer).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#scanner-safe-writer).*
 
 ### owner-decision tracker
 
@@ -793,7 +793,7 @@ patterns in agent output and refuses turn-end when no `AskUserQuestion` tool
 call occurred in the same turn. Records detected questions in
 `memory/pending-owner-decisions.md`.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#owner-decision-tracker).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#owner-decision-tracker).*
 
 ### prose decision-ask pattern
 
@@ -803,7 +803,7 @@ resembles asking the owner for a decision in prose rather than via
 constant defines the patterns. When detected without an accompanying
 `AskUserQuestion` call in the same turn, the tracker blocks turn-end.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#prose-decision-ask-pattern).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#prose-decision-ask-pattern).*
 
 ### AskUserQuestion
 
@@ -817,7 +817,7 @@ owner decisions).
 
 **Canonical alias:** AUQ.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#askuserquestion).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#askuserquestion).*
 
 ### operating model
 
@@ -828,7 +828,7 @@ operating-model reference; its terminology and framing are the alignment
 baseline for future remediation work. No hook or test mechanically enforces
 compliance with this artifact's text.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-model).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-model).*
 
 ### operating role
 
@@ -843,7 +843,7 @@ per the Acting-Prime Compatibility Contract.
 
 **Canonical alias:** resolved session role; harness role; dispatcher/default role when specifically referring to registry fallback or headless dispatch routing.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-role).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#operating-role).*
 
 ### session lane
 
@@ -854,7 +854,7 @@ or change the dispatcher/default role assignment. Examples: research, architectu
 implementation, quality engineering, operations/release, documentation,
 governance stewardship.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-lane).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-lane).*
 
 ### session focus
 
@@ -864,7 +864,7 @@ binds the session to a specific work item or focus area for the duration
 of the session. Distinct from session lane (classification) and operating
 role (authority).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-focus).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-focus).*
 
 ### work subject
 
@@ -877,16 +877,16 @@ by owner commands at session start.
 
 **Canonical alias:** active work subject.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#work-subject).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#work-subject).*
 
 ### session-stated role
 
 **Definition:** A transcript-defined role declared by the owner via the
 canonical init keyword `::init gtkb (pb|lo)` on an interactive owner prompt. It
-overrides dispatcher/default role metadata for in-session surfaces — SessionStart
+overrides dispatcher/default role metadata for in-session surfaces â€” SessionStart
 disclosure rendering, the AXIS 2 Claude-native surface filter, the
 workstream-focus menu shape, MemBase `changed_by` attribution, and AUQ-keyed
-routing — for the rest of the contiguous interactive context. It persists
+routing â€” for the rest of the contiguous interactive context. It persists
 across compaction, resume, and contiguous SessionStart-like boundaries until
 the owner explicitly changes it. Runtime marker files such as
 `.claude/session/active-session-role.json` and per-session `role-*.json` files
@@ -896,13 +896,13 @@ interactive role persists through the per-session marker/envelope authority.
 
 **Canonical alias:** interactive session role; session-scoped role.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-stated-role).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#session-stated-role).*
 
 ### session envelope
 
 **Definition:** The outer runtime envelope for an interactive or dispatched GT-KB
-session, opened by an init-keyword family explicit hint (typically `::init gtkb …` or
-`::init application …`) and closed by the wrap-keyword family (`::wrap`). It contains
+session, opened by an init-keyword family explicit hint (typically `::init gtkb â€¦` or
+`::init application â€¦`) and closed by the wrap-keyword family (`::wrap`). It contains
 zero or more nested activity envelopes. Conforms to the three-part anatomy
 (invocation, intent_hint, payload) per `ADR-ENVELOPE-META-MODEL-001`.
 
@@ -921,7 +921,7 @@ aggregate queue artifacts were canonical describe pre-cutover behavior. Bridge
 dispatch is now governed by the `dispatcher daemon` and the dispatcher
 configuration/status/health CLI (see entry below).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#smart-poller).*
 
 ### dispatcher daemon
 
@@ -936,7 +936,7 @@ changes.
 Aggregate queue artifacts must not be cited as canonical dispatcher topology,
 dispatch health, target-selection, or bridge-state authority.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#dispatcher-daemon).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#dispatcher-daemon).*
 
 ### role set
 
@@ -950,7 +950,7 @@ multi-element lists represent the single-harness case (one harness ID holds
 both roles). In-process, role sets are represented as Python ``frozenset[str]``
 constructed by ``_normalize_role_field`` in ``scripts/harness_roles.py``.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#role-set).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#role-set).*
 
 ### single-harness operating mode
 
@@ -966,7 +966,7 @@ provided by the retired scheduled bridge worker (per
 event-driven trigger. Single-harness operating mode is first-class architecture,
 not a degradation of the multi-harness topology.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-operating-mode).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-operating-mode).*
 
 ### retired scheduled bridge worker
 
@@ -984,7 +984,7 @@ changed. Workers receive the canonical init keyword ``::init gtkb <mode>``
 as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 ``GTKB_BRIDGE_DISPATCH_KEYWORD`` env vars.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-bridge-dispatcher).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#single-harness-bridge-dispatcher).*
 
 ### OS poller
 
@@ -993,17 +993,17 @@ as the prompt's first line plus the ``GTKB_BRIDGE_POLLER_RUN_ID`` and
 `AgentRedPollerLivenessWatcher`; the foreground watchdog; the
 `.claude/hooks/poller-freshness.py` hook; the in-session `CronCreate`
 poller). All members of this class were halted 2026-04-25 per owner
-directive because each fixed-interval tick spent an expensive resource —
-waking a harness into a full investigation — unconditionally, with no cheap
+directive because each fixed-interval tick spent an expensive resource â€”
+waking a harness into a full investigation â€” unconditionally, with no cheap
 deterministic gate (the fixed interval itself was negligibly cheap; the
-value/cost defect was the unconditional expensive spawn) — and must not be
+value/cost defect was the unconditional expensive spawn) â€” and must not be
 re-enabled as a substitute for the smart poller.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#os-poller).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#os-poller).*
 
 ### canonical init keyword
 
-**Canonical alias:** init-keyword; `::init …` family member of **explicit hint**.
+**Canonical alias:** init-keyword; `::init â€¦` family member of **explicit hint**.
 
 **Definition:** The canonical first-line activator syntax for GroundTruth-KB session
 envelopes. Regex: `^::init (gtkb|application)( (pb|lo))?$`. First-line-only. Subject
@@ -1026,7 +1026,7 @@ scaffold drift, KB integrity, dashboard reachability, and other configured
 checks. The doctor is the canonical predicate for several rule-cited
 conditions.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#doctor).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#doctor).*
 
 ### release manifest
 
@@ -1036,7 +1036,7 @@ The manifest accompanies the release tag and identifies constituent
 component versions so that the release can be reproduced, rolled back, or
 audited.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#release-manifest).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#release-manifest).*
 
 ### deliberation harvest
 
@@ -1045,7 +1045,7 @@ audited.
 into the Deliberation Archive table in MemBase plus the ChromaDB semantic
 index. Runs as part of session wrap.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#deliberation-harvest).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#deliberation-harvest).*
 
 ### explicit hint
 
@@ -1054,17 +1054,17 @@ index. Runs as part of session wrap.
 **Definition:** An inline, first-line-only, `::`-prefixed token that steers the
 current session's stance (role, scope, activity, wrap/lifecycle, or routing) through
 harness hooks and priority directives. Explicit hints are a **context-management /
-progressive-disclosure** mechanism — not skills and not free-form prose commands.
+progressive-disclosure** mechanism â€” not skills and not free-form prose commands.
 Grammar is strict: the token MUST occupy the entire first non-blank line; vocabulary
 is closed per hint family; parse failures are rejected or ignored conservatively per
 family spec.
 
 **Member families (non-exhaustive closed sets per family spec):**
 
-- **Init-keyword family** — `::init (gtkb|application)( (pb|lo))?$` per
+- **Init-keyword family** â€” `::init (gtkb|application)( (pb|lo))?$` per
   `SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001` v3.
-- **Wrap-keyword family** — `::wrap` per `SPEC-CANONICAL-WRAP-KEYWORD-SYNTAX-001`.
-- **Activity open/close family** — `::open <activity>` and `::close` or
+- **Wrap-keyword family** â€” `::wrap` per `SPEC-CANONICAL-WRAP-KEYWORD-SYNTAX-001`.
+- **Activity open/close family** â€” `::open <activity>` and `::close` or
   `::close <activity>` over the closed activity vocabulary
   `{ops, deliberation, build, test, spec, project}` per
   `SPEC-TOPIC-ENVELOPE-ROUTER-001` / `DCL-TOPIC-ENVELOPE-ROUTING-001`.
@@ -1096,7 +1096,7 @@ hash.
 
 **Canonical alias:** approval packet.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#formal-artifact-approval-packet).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#formal-artifact-approval-packet).*
 
 ### canonical artifact
 
@@ -1111,7 +1111,7 @@ protected narrative artifacts at `.claude/rules/*.md`, `AGENTS.md`,
 `applications/<name>/CLAUDE-ARCHITECTURE.md`. Canonical artifacts are subject to append-only
 versioning discipline.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-artifact).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#canonical-artifact).*
 
 ### interrogative default
 
@@ -1125,7 +1125,7 @@ interrogative default does NOT apply to claims the agent cannot verify
 (e.g., owner-stated business facts, customer information, organizational
 decisions).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#interrogative-default).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#interrogative-default).*
 
 ### specify-on-contact
 
@@ -1137,31 +1137,31 @@ specification triggers specification creation; touching a load-bearing
 concept that lacks a glossary entry triggers glossary promotion (per the
 DCL).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#specify-on-contact).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#specify-on-contact).*
 
 ### assertion category
 
 **Definition:** One of four classifications produced by `scripts/assertion_categorize.py` for currently-failing assertions: `genuine_drift`, `chronic_noise`, `flaky`, `healthy`. Categorization is deterministic inference over `assertion_runs` history; outputs are read-only at `.gtkb-state/assertion-triage/categories/<assertion_id>.json`.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#assertion-category).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#assertion-category).*
 
 ### genuine_drift
 
 **Definition:** Assertion category indicating: latest run FAIL, prior PASS streak (default >=2 consecutive PASS runs), transition within configurable window (default 7 days). Drift detection per SPEC-1662 (GOV-18). Highest-priority assertion-triage category.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#genuinedrift).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#genuinedrift).*
 
 ### chronic_noise
 
 **Definition:** Assertion category indicating: all available recent runs FAIL, count meets configurable threshold (default 5; the SPEC-default 50 becomes reachable once the `assertion_runs` retention cap is widened). Candidate for retirement-or-accept owner decision per GOV-15 (test fix gate).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#chronicnoise).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#chronicnoise).*
 
 ### flaky
 
 **Definition:** Assertion category indicating: recent runs window includes both PASS and FAIL with at least one transition. Flag for test-quality repair, NOT for retirement.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#flaky).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#flaky).*
 
 ### advisory-router
 
@@ -1173,7 +1173,7 @@ modifies source advisory entries, uses `origin='hygiene'` and
 
 **Canonical alias:** advisory backlog router.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#advisory-router).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#advisory-router).*
 
 ### benchmark
 
@@ -1181,7 +1181,7 @@ modifies source advisory entries, uses `origin='hygiene'` and
 
 **Canonical alias:** measurement script; metric collector.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#benchmark).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#benchmark).*
 
 ### linkage heat map
 
@@ -1189,7 +1189,7 @@ modifies source advisory entries, uses `origin='hygiene'` and
 
 **Canonical alias:** cross-artifact linkage matrix.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#linkage-heat-map).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#linkage-heat-map).*
 
 ### advisory latency
 
@@ -1197,7 +1197,7 @@ modifies source advisory entries, uses `origin='hygiene'` and
 
 **Canonical alias:** advisory-to-action latency; advisory turnaround time.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#advisory-latency).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#advisory-latency).*
 
 ### metric snapshot
 
@@ -1205,7 +1205,7 @@ modifies source advisory entries, uses `origin='hygiene'` and
 
 **Canonical alias:** benchmark result; measurement snapshot.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#metric-snapshot).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#metric-snapshot).*
 
 ## Alias / Canonical Disposition
 
@@ -1220,7 +1220,7 @@ modifies source advisory entries, uses `origin='hygiene'` and
 | (tenant acronyms) | (tenant name) | Tenant aliases are project-scoped; not GroundTruth KB vocabulary |
 
 Aliases resolve to canonical forms. Two forms with divergent definitions is
-a drift defect — the doctor will eventually flag it.
+a drift defect â€” the doctor will eventually flag it.
 
 ---
 
@@ -1235,7 +1235,7 @@ adopting GT-KB inherit them.
 |------|-------|---------|
 | Specification | `specifications` | Business requirement with decision log structure |
 | Test | `tests` | Testable assertion with PASS/FAIL semantics |
-| Test Plan | `test_plans` | Orchestrating artifact — ordered phases with gate criteria |
+| Test Plan | `test_plans` | Orchestrating artifact â€” ordered phases with gate criteria |
 | Work Item | `work_items` | Classified unit of work (origin + component) with stage lifecycle |
 | Backlog Snapshot | `backlog_snapshots` | Point-in-time snapshot of open WIs |
 | Operational Procedure | `operational_procedures` | Repeatable process (deploy/verify/audit) |
@@ -1247,7 +1247,7 @@ adopting GT-KB inherit them.
 | Term | Table | Summary |
 |------|-------|---------|
 | Assertion Run | `assertion_runs` | Historical assertion execution record |
-| Session Prompt | `session_prompts` | Structured handoff message for next session (the persisted record of a handoff prompt — see "handoff prompt") |
+| Session Prompt | `session_prompts` | Structured handoff message for next session (the persisted record of a handoff prompt â€” see "handoff prompt") |
 
 ### Concepts (not tables)
 
@@ -1258,9 +1258,9 @@ adopting GT-KB inherit them.
 | Orchestrating Artifact | Composes other artifacts by reference only (no content duplication) |
 | Governance Principle | Process rule (GOV-\*) governing human-AI team collaboration |
 | Protected Behavior | Spec with `type = 'protected_behavior'` + must-always-pass assertions |
-| Append-Only Change Control | Versioning discipline — no UPDATE, no DELETE |
+| Append-Only Change Control | Versioning discipline â€” no UPDATE, no DELETE |
 | Session Handoff | Mechanism for storing context for the next session |
-| Specify on Contact | GOV-06 — touching unspecified code brings it under control |
+| Specify on Contact | GOV-06 â€” touching unspecified code brings it under control |
 | Audit Session | Every Nth session auto-flagged for fresh-context integrity review |
 
 ---
@@ -1279,13 +1279,13 @@ Term, definition, not-to-be-confused-with, source, implementation pointer. -->
 Phase 1 of `PROJECT-GTKB-OLLAMA-INTEGRATION`. The upstream Ollama platform
 CLI/server (`http://localhost:11434`) is local-capable, but the GT-KB harness
 currently routes all skills to cloud model ids via `.api-harness/routing.toml`
-(current route: `kimi-k2-7-code-cloud` — cloud-backed, not local inference).
+(current route: `kimi-k2-7-code-cloud` â€” cloud-backed, not local inference).
 Integrated through `scripts/ollama_harness.py` (a framework-free Python
 tool-calling shim) and `.api-harness/routing.toml` (static routing).
 
 **Canonical alias:** ollama harness.
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#ollama).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#ollama).*
 
 ### routing.toml
 
@@ -1297,7 +1297,7 @@ remains local-capable but is not the active inference endpoint for GT-KB
 dispatch. Schema per `DCL-OLLAMA-ROUTING-CONFIG-SCHEMA-001` (`schema_version`,
 at least one `[models.<key>]` table, a `[routing]` table with `default_model`).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#routingtoml).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#routingtoml).*
 
 ### task-to-model routing
 
@@ -1306,7 +1306,7 @@ within a single harness's model pool. In Phase 1 this is expressed via
 `.api-harness/routing.toml` (`[routing].default_model`, with optional
 `[routing.skills]` overrides reserved for Phase 2+).
 
-*Full entry — alias, disambiguation, source, implementation pointer — in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*
+*Full entry â€” alias, disambiguation, source, implementation pointer â€” in [`canonical-terminology-detail.md`](../../groundtruth-kb/docs/reference/canonical-terminology-detail.md#task-to-model-routing).*
 
 ## Doctor Contract
 
@@ -1317,5 +1317,19 @@ ERROR-level; minor drift is WARN-level. See
 `.claude/rules/canonical-terminology.toml` for the required-terms matrix.
 
 ---
+
+### Worker-role provenance
+
+**Source:** scripts/_kb_attribution.py; groundtruth-kb/src/groundtruth_kb/session/envelope.py L424-464; WI-5010; DELIB-202667078.
+
+Worker-role provenance is the validated role attestation that an **open session envelope** provides. It is not an environment variable, a harness registry role, or a marker file. The changed_by field on MemBase writes (e.g., backlog add-work-item) resolves worker-role provenance by reading the open session envelope worker_role_provenance block, which is populated at envelope-open time from the init keyword resolved role.
+
+An env var like GTKB_SESSION_ID tells the CLI *which* session envelope to read, but it does not *provide* provenance — only the open envelope document does. If resolve_changed_by fails with current session id is missing or does not match, the fix is to open a session envelope, not to set more env vars.
+
+### Unclassified mutation class
+
+**Source:** scripts/bridge_applicability_preflight.py L64 (TARGET_PATH_RE); scripts/implementation_authorization.py target-path classification.
+
+When a target_paths entry matches no classifier rule in bridge_applicability_preflight.py, it is classified as unclassified. Paths classified as unclassified may cause implementation_authorization.py begin to fail if they fall into a protected scope that the classifier did not match. To resolve, refine the glob pattern to match a known classified sub-pattern (e.g., .../**/*.md -> governance_evidence rather than .../**).
 
 *{{COPYRIGHT}}*

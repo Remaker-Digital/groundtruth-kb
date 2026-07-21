@@ -59,6 +59,16 @@ Behavior contract: `.claude/rules/prime-builder-role.md` (authoritative).
 - Implementation authority does not waive formal-artifact approval, credential
   safety, or release/deployment gates.
 
+## Pre-flight (before any KB-write or bridge claim)
+
+Worker-role provenance requires an open session envelope. Open one with:
+
+```
+python -m groundtruth_kb session envelope open --harness-name <name> --harness-id <id> --init-keyword "::init gtkb pb" --subject gtkb --role prime-builder
+```
+
+before any `gt backlog`, `gt bridge`, or `implementation_authorization.py begin` command.
+
 ---
 
 *(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
