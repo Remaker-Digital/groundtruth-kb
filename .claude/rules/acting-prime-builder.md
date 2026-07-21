@@ -166,12 +166,10 @@ Owner decision `DELIB-0838` and formal records `GOV-STANDING-BACKLOG-001`,
 `PB-STANDING-BACKLOG-CONTINUITY-001`,
 `ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001`, and
 `DCL-STANDING-BACKLOG-SCHEMA-001` establish the standing backlog
-governance contract for GroundTruth-KB. Following the
-`GTKB-GOV-BACKLOG-SOURCE-OF-TRUTH` migration (Slice 7-prime, per
-`DELIB-S337-WORK-LIST-MD-DELETION-AT-MIGRATION-CONCLUSION`), the canonical
+governance contract for GroundTruth-KB. The canonical
 standing backlog authority is the MemBase `work_items` table, surfaced via
-`gt backlog list`; the former transitional markdown view under `memory/`
-was retired.
+`gt backlog list`; the documents under `memory/` are temporary/ephemeral and 
+may not be referennced in any formal context as a source of truth.
 
 The standing backlog governance contract is treated like other formal
 GroundTruth-KB specifications: it is represented in MemBase, linked to a
@@ -182,44 +180,19 @@ Individual backlog entries remain queue/work items unless separately promoted
 to GOV, SPEC, PB, ADR, DCL, or another formal artifact type.
 
 Future sessions must inspect the standing backlog before selecting
-discretionary work. Owner-prioritized or TOP items must not be silently
-bypassed, reordered, or dropped without explicit owner decision, superseding
-artifact, or completion evidence.
+discretionary work.
 
 ## Session Self-Initialization Principle
 
 Owner decision `DELIB-0840` and formal records
 `GOV-SESSION-SELF-INITIALIZATION-001`,
-`PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001`,
-`SPEC-PROJECT-DASHBOARD-KPI-LINK-001`, and
-`DCL-SESSION-STARTUP-TOKEN-BUDGET-001` establish the required fresh-session
+`PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001` establish the required fresh-session
 self-initialization experience.
 
 At the start of a fresh GroundTruth-KB session, the active AI
 harness must present the role being assumed and the session governance stance,
 including the known active skills, plug-ins, directives, hooks, and role
 mapping that affect the session.
-
-The startup disclosure must display a live project dashboard link when the
-dashboard is available. That dashboard must provide time-series KPI for GT-KB
-artifacts and subsystems, including the standing backlog, MemBase, Deliberation
-Archive, tests, templates, specifications, drift, regression, contention, and
-tokens consumed at session start before user input.
-
-The startup disclosure must propose the three top priority actions for the
-owner to initiate or confirm. Candidate actions include choosing work from the
-standing backlog, governance hygiene, remediation of newly discovered problems,
-project state investigation, and release-blocking issue itemization.
-
-The startup disclosure must also suggest options for reducing token consumption
-during session startup and ongoing work. Preferred options include dashboard
-links, cached startup snapshots, index-first artifact loading, targeted skill
-loading, progressive disclosure, and explicit relaxation proposals for expensive
-governance or artifact workflows.
-
-Until the live dashboard, startup metric collection, and pre-user-input token
-measurement are fully implemented, the implementation gap must remain visible
-in the standing backlog and release-gate regression checks.
 
 ## Session Lifecycle Engagement And Wrap-Up Principle
 
@@ -303,9 +276,10 @@ Operational requirements while this override is active:
 
 ## AskUserQuestion as the Only Valid Owner-Decision Channel
 
-(Active per S331 owner directive; mechanically enforced by `.claude/hooks/owner-decision-tracker.py` per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
+(Active per S331 owner directive; mechanically enforced by `.claude/hooks/owner-decision-tracker.py` 
+per `bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-a-hook-reenable-014.md` VERIFIED.)
 
-Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are invalid:
+Prime Builder collects owner decisions through `AskUserQuestion` exclusively. Prose decision-asks are only acceptable if `AskUserQuestion` is unavailable, and then only as a fallback. The following rules apply:
 
 - The Stop-mode hook detects prose decision-ask patterns (`PROSE_DECISION_PATTERNS`) and emits `{"decision": "block", ...}` to refuse turn-end when no `AskUserQuestion` tool_use occurred in the same turn (per `bridge/gtkb-decision-tracker-block-prose-ask-2026-04-29-006.md` VERIFIED + Sub-slice A tightening).
 - All accepted owner decisions are recorded in `memory/pending-owner-decisions.md` with `detected_via: ask_user_question`.
@@ -324,3 +298,7 @@ In-scope decision classes (use `AskUserQuestion`, never prose):
 Bridge proposals/reports that depend on owner approval should cite this rule and include an `Owner Decisions / Input` section enumerating the AskUserQuestion answers that authorize the work. Bridge compliance gate enforcement of this section requirement lands in Sub-slice C.
 
 When in doubt, ask via `AskUserQuestion`. Verbose status updates that mention pending decisions DO NOT count as owner-decision asks; they are factual reporting (and the tightened regex per Sub-slice A no longer detects them as decision asks).
+
+## Clean-Before-You-Leave Principle
+
+When implementation work is complete, all temp, ephemeral, or session-only artifacts must be cleaned up before the session ends. This includes: python temp files, `.codex` (or other harness) temp files, `memory/` temp files, and any other session-only artifacts. The session must leave the system in a clean state for the next session. All important information must be persisted in the Deliberation Archive, MemBase, bridge Advisory Proposals, or other formal artifact storage before cleanup. If new code or durable artifacts have been created as part of the work product of an implementation, those must be registered as formal artifacts (i.e., change controlled) before cleanup.
