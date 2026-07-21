@@ -532,7 +532,11 @@ def _status_for_surface(
                 state="DEGRADED",
                 note=str(harness_config.get("fallback") or "Fallback surface exists."),
             )
-        return CapabilityResult(**common, state="DEFERRED", note="Fallback surface is declared but absent (deferred; dedicated generator tracked separately).")
+        return CapabilityResult(
+            **common,
+            state="DEFERRED",
+            note="Fallback surface is declared but absent (deferred; dedicated generator tracked separately).",
+        )
 
     if configured_status == "adapter":
         if not surface_exists:
@@ -1051,6 +1055,60 @@ def validate_parity_schema(
     return errors
 
 
+def _check_rename_map_consistency(project_root: Path) -> list[dict[str, str]]:
+    """Compare on-disk skill dirs against skill-rename-map.toml (GFR Slice D Finding 4.5)."""
+    import tomllib
+
+    rename_map_path = project_root / "config" / "agent-control" / "skill-rename-map.toml"
+    if not rename_map_path.is_file():
+        return []
+    with rename_map_path.open("rb") as f:
+        payload = tomllib.load(f)
+    skills_dir = project_root / ".claude" / "skills"
+    findings: list[dict[str, str]] = []
+    for entry in payload.get("skills", []):
+        expected_dir = entry.get("dir", "")
+        canonical_name = entry.get("canonical_name", "")
+        if not expected_dir:
+            continue
+        expected_path = skills_dir / expected_dir
+        if not expected_path.is_dir():
+            # Check if a dir with a different name exists
+            actual_dirs = [d.name for d in skills_dir.iterdir() if d.is_dir()] if skills_dir.is_dir() else []
+            for actual in actual_dirs:
+                skill_md = skills_dir / actual / "SKILL.md"
+                if skill_md.is_file():
+                    content = skill_md.read_text(encoding="utf-8")
+                    name_match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
+                    if name_match and name_match.group(1).strip() == canonical_name:
+                        findings.append(
+                            {
+                                "type": "STALE_NAME",
+                                "expected_dir": expected_dir,
+                                "actual_dir": actual,
+                                "canonical_name": canonical_name,
+                            }
+                        )
+                        break
+        # Check frontmatter name matches canonical_name
+        skill_md = expected_path / "SKILL.md"
+        if skill_md.is_file():
+            content = skill_md.read_text(encoding="utf-8")
+            name_match = re.search(r"^name:\s*(.+)$", content, re.MULTILINE)
+            if name_match:
+                actual_name = name_match.group(1).strip()
+                if actual_name != canonical_name:
+                    findings.append(
+                        {
+                            "type": "NAME_MISMATCH",
+                            "dir": expected_dir,
+                            "canonical_name": canonical_name,
+                            "actual_name": actual_name,
+                        }
+                    )
+    return findings
+
+
 def check_harness_parity(
     project_root: Path = PROJECT_ROOT,
     *,
@@ -1270,6 +1328,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Validate the cross-harness parity schema (applicability + waiver records) and exit.",
     )
+    parser.add_argument(
+        "--strict-on-rename",
+        action="store_true",
+        help="Compare on-disk skill dirs against skill-rename-map.toml and flag stale names.",
+    )
     args = parser.parse_args(argv)
 
     if args.validate_schema:
@@ -1288,6 +1351,16 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {err}")
             return 1
         print("parity schema OK")
+        return 0
+
+    if args.strict_on_rename:
+        findings = _check_rename_map_consistency(args.project_root.resolve())
+        if findings:
+            print("STALE NAME / NAME_MISMATCH findings:")
+            for f in findings:
+                print(f"  - {f['type']}: {f}")
+            return 1
+        print("strict-on-rename: all skill dirs consistent with skill-rename-map.toml")
         return 0
 
     report = check_harness_parity(

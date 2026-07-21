@@ -103,7 +103,7 @@
       "canonical_name": "gtkb-harness-parity-review",
       "capability_id": "skill.harness-parity-review",
       "source_relative_path": ".claude/skills/gtkb-harness-parity-review/SKILL.md",
-      "source_sha256": "8d8962fda56a0e1bb352c5bce6399ae4df9e6c538affec1bd29a2ed48445996e"
+      "source_sha256": "609a37f9545de53b3f65e1566e1e7509a0d0bd55ddab59e4c2bf563de7f295d1"
     },
     {
       "adapter_relative_path": ".codex/skills/gtkb-skill-governance-lifecycle/SKILL.md",

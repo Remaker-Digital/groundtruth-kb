@@ -113,3 +113,16 @@ Include:
 - undeclared extras
 - recommended corrections
 - verification command output (phase 1 and, when relevant, phase 2)
+
+## Generator Inventory
+
+| Harness | Generator Script | Adapter Surface |
+|---|---|---|
+| Claude Code | (canonical source — no generator needed) | `.claude/skills/` |
+| Codex | `scripts/generate_codex_skill_adapters.py` | `.codex/skills/` |
+| Antigravity | **No generator** — inline loading | N/A |
+| Cursor | **No generator** — Claude-compatible loading | N/A |
+| Goose | **No generator** — inline loading | N/A |
+| OpenRouter | **No generator** — inline loading | N/A |
+
+When a harness declares capabilities in `config/agent-control/harness-capability-registry.toml` but has no generator script, flag it as a **generator gap** — adapter regeneration is not possible for that harness, and skill changes must be manually synced.

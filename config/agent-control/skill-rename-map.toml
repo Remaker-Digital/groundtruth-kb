@@ -225,3 +225,8 @@ registry_old_name = ""
 dir = "gtkb-verify"
 canonical_name = "gtkb-verify"
 registry_old_name = ""
+
+[[skills]]
+dir = "gtkb-skill-rollout"
+canonical_name = "gtkb-skill-rollout"
+registry_old_name = ""

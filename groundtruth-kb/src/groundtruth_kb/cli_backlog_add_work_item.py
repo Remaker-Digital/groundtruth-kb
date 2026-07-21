@@ -86,6 +86,7 @@ class AddWorkItemRequest:
     test_expected_outcome: str
     test_spec_id: str | None  # defaults to source_spec_id when None
     # Phase assignment (GOV-13) — REQUIRED for non-dry-run
+    project_id: str | None
     test_plan_phase: str | None
     dry_run: bool
 

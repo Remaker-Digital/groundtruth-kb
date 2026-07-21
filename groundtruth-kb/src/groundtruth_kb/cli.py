@@ -4459,6 +4459,12 @@ def backlog_authorize_implementation(
 @click.option("--test-expected-outcome", required=True, help="GOV-03 unambiguous expected outcome for the test.")
 @click.option("--test-spec-id", default=None, help="Spec the test links to (defaults to --source-spec-id).")
 @click.option(
+    "--project",
+    "project_id",
+    default=None,
+    help="Project id to link the new work item to (atomic).",
+)
+@click.option(
     "--test-plan-phase",
     default=None,
     help="GOV-13 test-plan phase id to assign the test to (REQUIRED for non-dry-run creation).",
@@ -4478,6 +4484,7 @@ def backlog_add_work_item(
     description: str | None,
     source_owner_directive: str | None,
     source_spec_id: str | None,
+    project_id: str | None,
     test_title: str,
     test_type: str,
     test_expected_outcome: str,
@@ -4511,6 +4518,7 @@ def backlog_add_work_item(
         description=description,
         source_owner_directive=source_owner_directive,
         source_spec_id=source_spec_id,
+        project_id=project_id,
         change_reason=change_reason,
         test_title=test_title,
         test_type=test_type,
@@ -4821,6 +4829,26 @@ def core_specs_next_question_cmd(
         return
     click.echo(f"{question['label']} ({question['name']})")
     click.echo(question["prompt"])
+
+
+@backlog.command("list-phases")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def backlog_list_phases(ctx: click.Context, json_output: bool) -> None:
+    """List valid test-plan phases (GOV-13)."""
+    config = _resolve_config(ctx)
+    db = KnowledgeDB(config.db_path)
+    rows = db._get_conn().execute("SELECT id, title, last_result FROM test_plan_phases ORDER BY id").fetchall()
+    if json_output:
+        click.echo(
+            json.dumps(
+                [{"phase_id": r[0], "phase_name": r[1], "status": r[2]} for r in rows],
+                indent=2,
+            )
+        )
+        return
+    for row in rows:
+        click.echo(f"{row[0]}  {row[1]}  ({row[2]})")
 
 
 @backlog.command("list")
@@ -6371,6 +6399,11 @@ def projects_authorize(
 @click.argument("project_id")
 @click.option("--all", "include_terminal", is_flag=True, help="Include revoked/terminal authorizations.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option(
+    "--covers-path",
+    default=None,
+    help="Filter to authorizations covering this target path.",
+)
 @click.pass_context
 def projects_authorizations(ctx: click.Context, project_id: str, include_terminal: bool, json_output: bool) -> None:
     """List project-scoped implementation authorizations."""
