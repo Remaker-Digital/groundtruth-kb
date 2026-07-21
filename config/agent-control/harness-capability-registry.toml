@@ -121,24 +121,24 @@ id = "skill.bridge"
 kind = "skill"
 canonical_name = "gtkb-bridge"
 canonical_purpose = "Operate the full bridge protocol — propose, scan, respond, verify, lifecycle, status — as a single canonical entry point spanning the per-action helper skills."
-canonical_source = ".claude/skills/bridge/SKILL.md"
+canonical_source = ".claude/skills/gtkb-bridge/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "baseline"
 
 [capabilities.claude]
-surface = ".claude/skills/bridge/SKILL.md"
+surface = ".claude/skills/gtkb-bridge/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/bridge/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/bridge/SKILL.md"
+adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
 source_sha256 = "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
 
 [capabilities.antigravity]
 surface = ".agent/skills/bridge/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/bridge/SKILL.md"
+adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
 source_sha256 = "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
 [capabilities.cursor]
 surface = ".cursor/skills/bridge/SKILL.md"
@@ -205,24 +205,24 @@ id = "skill.bridge-propose"
 kind = "skill"
 canonical_name = "gtkb-bridge-propose"
 canonical_purpose = "Create bridge proposal files and bridge INDEX entries through the governed helper path."
-canonical_source = ".claude/skills/bridge-propose/SKILL.md"
+canonical_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "required"
 
 [capabilities.claude]
-surface = ".claude/skills/bridge-propose/SKILL.md"
+surface = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/bridge-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/bridge-propose/SKILL.md"
+adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/bridge-propose/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/bridge-propose/SKILL.md"
+adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 [capabilities.cursor]
 surface = ".cursor/skills/bridge-propose/SKILL.md"
@@ -373,24 +373,24 @@ id = "skill.codex-report"
 kind = "skill"
 canonical_name = "gtkb-loyal-opposition-report"
 canonical_purpose = "Create Codex/Loyal Opposition reports in the expected format."
-canonical_source = ".claude/skills/codex-report/SKILL.md"
+canonical_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
 [capabilities.claude]
-surface = ".claude/skills/codex-report/SKILL.md"
+surface = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/codex-report/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/codex-report/SKILL.md"
+adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
 source_sha256 = "527ddc8472ca4089eebffaa040cf2e897d946faf011dd9ab43375c8621ad3a5b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/codex-report/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/codex-report/SKILL.md"
+adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
 source_sha256 = "527ddc8472ca4089eebffaa040cf2e897d946faf011dd9ab43375c8621ad3a5b"
 [capabilities.cursor]
 surface = ".cursor/skills/codex-report/SKILL.md"
@@ -401,24 +401,24 @@ id = "skill.decision-capture"
 kind = "skill"
 canonical_name = "gtkb-decision-capture"
 canonical_purpose = "Capture owner decisions and durable decision evidence."
-canonical_source = ".claude/skills/decision-capture/SKILL.md"
+canonical_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
 required_for_roles = ["prime-builder", "loyal-opposition"]
 parity_class = "required"
 
 [capabilities.claude]
-surface = ".claude/skills/decision-capture/SKILL.md"
+surface = ".claude/skills/gtkb-decision-capture/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/decision-capture/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/decision-capture/SKILL.md"
+adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
 source_sha256 = "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
 
 [capabilities.antigravity]
 surface = ".agent/skills/decision-capture/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/decision-capture/SKILL.md"
+adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
 source_sha256 = "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
 [capabilities.cursor]
 surface = ".cursor/skills/decision-capture/SKILL.md"
@@ -944,24 +944,24 @@ id = "skill.spec-intake"
 kind = "skill"
 canonical_name = "gtkb-spec-intake"
 canonical_purpose = "Capture owner requirement/specification intake."
-canonical_source = ".claude/skills/spec-intake/SKILL.md"
+canonical_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
 required_for_roles = ["prime-builder"]
 parity_class = "required"
 
 [capabilities.claude]
-surface = ".claude/skills/spec-intake/SKILL.md"
+surface = ".claude/skills/gtkb-spec-intake/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/spec-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/spec-intake/SKILL.md"
+adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
 source_sha256 = "74b89d071fea590bc4ceedde8055c1014902820a1b80c3385fb9c1d76090d7f2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/spec-intake/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/spec-intake/SKILL.md"
+adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
 source_sha256 = "74b89d071fea590bc4ceedde8055c1014902820a1b80c3385fb9c1d76090d7f2"
 [capabilities.cursor]
 surface = ".cursor/skills/spec-intake/SKILL.md"
@@ -1234,26 +1234,26 @@ fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor
 [[capabilities]]
 id = "skill.loyal-opposition-hygiene-assessment"
 kind = "skill"
-canonical_name = "loyal-opposition-hygiene-assessment"
+canonical_name = "gtkb-lo-hygiene-assessment"
 canonical_purpose = "Assess GT-KB project hygiene as Loyal Opposition, classify drift, and prepare a Prime Builder action plan without mutating project files."
-canonical_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+canonical_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
 [capabilities.claude]
-surface = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+surface = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 source_sha256 = "a8386eb662fb26c21ca7f7dd917e40188ca72113f059b5122ba85fb1f7a5d0c9"
 
 [capabilities.antigravity]
 surface = ".agent/skills/loyal-opposition-hygiene-assessment/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 source_sha256 = "a8386eb662fb26c21ca7f7dd917e40188ca72113f059b5122ba85fb1f7a5d0c9"
 [capabilities.cursor]
 surface = ".cursor/skills/loyal-opposition-hygiene-assessment/SKILL.md"
@@ -1264,24 +1264,24 @@ id = "skill.verify"
 kind = "skill"
 canonical_name = "gtkb-verify"
 canonical_purpose = "Author a Loyal Opposition post-implementation VERIFIED/NO-GO verdict file that satisfies the Mandatory Specification-Derived Verification Gate."
-canonical_source = ".claude/skills/verify/SKILL.md"
+canonical_source = ".claude/skills/gtkb-verify/SKILL.md"
 required_for_roles = ["loyal-opposition"]
 parity_class = "baseline"
 
 [capabilities.claude]
-surface = ".claude/skills/verify/SKILL.md"
+surface = ".claude/skills/gtkb-verify/SKILL.md"
 status = "native"
 
 [capabilities.codex]
 surface = ".codex/skills/verify/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/verify/SKILL.md"
+adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
 source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/verify/SKILL.md"
 status = "adapter"
-adapter_source = ".claude/skills/verify/SKILL.md"
+adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
 source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
 [capabilities.cursor]
 surface = ".cursor/skills/verify/SKILL.md"
