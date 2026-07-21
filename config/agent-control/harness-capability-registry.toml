@@ -49,13 +49,13 @@ status = "native"
 surface = ".codex/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
-source_sha256 = "66b0d8f36e70a0ce4a9ea8f4e32326e7a9c9f84519559cca708649ed8635c561"
+source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-alternatives-investigation/SKILL.md"
-source_sha256 = "66b0d8f36e70a0ce4a9ea8f4e32326e7a9c9f84519559cca708649ed8635c561"
+source_sha256 = "44b7fd37bc51973b7f045c492fb71064f64678a9f3fbd487cf76a5fef0d1f706"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-alternatives-investigation/SKILL.md"
 status = "fallback"
@@ -77,13 +77,13 @@ status = "native"
 surface = ".codex/skills/gtkb-arch-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
-source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
+source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-arch-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-arch-audit/SKILL.md"
-source_sha256 = "605747f029cc665c671c9fe9079d2534a09cc190dcc87c65e9a1ca2f55c86aac"
+source_sha256 = "0c933f48c14c2f068a8fadca6a8b2727a489265c916a372338676772c1bd7453"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-arch-audit/SKILL.md"
 status = "fallback"
@@ -105,13 +105,13 @@ status = "native"
 surface = ".codex/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
-source_sha256 = "f3a3201fe3b7f3afc7c265548fb98794557e965f8e461117645295c509f416c0"
+source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-assertion-triage/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-assertion-triage/SKILL.md"
-source_sha256 = "f3a3201fe3b7f3afc7c265548fb98794557e965f8e461117645295c509f416c0"
+source_sha256 = "d43e7a58978173c7b877652ba31b7e5a4be4d7f2c1d5973fddca19e31739b5df"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-assertion-triage/SKILL.md"
 status = "fallback"
@@ -130,18 +130,18 @@ surface = ".claude/skills/gtkb-bridge/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/bridge/SKILL.md"
+surface = ".codex/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
 source_sha256 = "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
 
 [capabilities.antigravity]
-surface = ".agent/skills/bridge/SKILL.md"
+surface = ".agent/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
 source_sha256 = "ffe3ebbd15425d20abdf07e7bae961aad5d9a00247f49dd96164f5bc242614ce"
 [capabilities.cursor]
-surface = ".cursor/skills/bridge/SKILL.md"
+surface = ".cursor/skills/gtkb-bridge/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -161,13 +161,13 @@ status = "native"
 surface = ".codex/skills/gtkb-bridge-config/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
-source_sha256 = "9c674fade46e95b76bf877f059253ddac687aba75d54eb3c054399b6f83d58a3"
+source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge-config/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge-config/SKILL.md"
-source_sha256 = "9c674fade46e95b76bf877f059253ddac687aba75d54eb3c054399b6f83d58a3"
+source_sha256 = "3e87f3b153c970444157317520d93279c195b9566b9e011aa7965e38e54245fb"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge-config/SKILL.md"
 status = "fallback"
@@ -189,13 +189,13 @@ status = "native"
 surface = ".codex/skills/gtkb-dispatcher-control/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
-source_sha256 = "2dc26c0578410bdc1a028dc360503b11d18d96a24c739917906873d0b21b0ed5"
+source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-dispatcher-control/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-dispatcher-control/SKILL.md"
-source_sha256 = "2dc26c0578410bdc1a028dc360503b11d18d96a24c739917906873d0b21b0ed5"
+source_sha256 = "3ba260c4f6698a1d46c0031699984f5d8464549d74252cc675830c2dac30d6c2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-dispatcher-control/SKILL.md"
 status = "fallback"
@@ -214,18 +214,18 @@ surface = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/bridge-propose/SKILL.md"
+surface = ".codex/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 
 [capabilities.antigravity]
-surface = ".agent/skills/bridge-propose/SKILL.md"
+surface = ".agent/skills/gtkb-bridge-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge-propose/SKILL.md"
 source_sha256 = "f6400b72fe5c1209f75254fccfbc0944ca3c996dc19b216b0a6af7a7c15bd4b2"
 [capabilities.cursor]
-surface = ".cursor/skills/bridge-propose/SKILL.md"
+surface = ".cursor/skills/gtkb-bridge-propose/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -245,13 +245,13 @@ status = "native"
 surface = ".codex/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
-source_sha256 = "cb755587a8e2b4ff2ea4b53339da606b12728e944cdbce84283de2ce57eabbcd"
+source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge-reconciliation/SKILL.md"
-source_sha256 = "cb755587a8e2b4ff2ea4b53339da606b12728e944cdbce84283de2ce57eabbcd"
+source_sha256 = "04150ef93b4c545eb5a41310e03593b8fdd564d0bf13bf4db425661cb0b6808b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-bridge-reconciliation/SKILL.md"
 status = "fallback"
@@ -273,13 +273,13 @@ status = "native"
 surface = ".codex/skills/gtkb-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
-source_sha256 = "c0f526b45d59eab1f8ad6b59dd4bb067054b27e53a4d754885e7f353dbc59590"
+source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-propose/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-propose/SKILL.md"
-source_sha256 = "c0f526b45d59eab1f8ad6b59dd4bb067054b27e53a4d754885e7f353dbc59590"
+source_sha256 = "ed037162b4091af7814529100eb84aa3f902e8904038bdf884a2f74eb0f028a2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-propose/SKILL.md"
 status = "fallback"
@@ -301,13 +301,13 @@ status = "native"
 surface = ".codex/skills/gtkb-check-deliberations/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
-source_sha256 = "ea6f9f23c5d36c673e82d120bdab5868203f78ee073530bb72c3e16ac2efb59d"
+source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-check-deliberations/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-check-deliberations/SKILL.md"
-source_sha256 = "ea6f9f23c5d36c673e82d120bdab5868203f78ee073530bb72c3e16ac2efb59d"
+source_sha256 = "c0366f647fb36d34171c336bade6157dcf4c8ba33bb3a8ad82f6e0ef778526e2"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-check-deliberations/SKILL.md"
 status = "fallback"
@@ -329,13 +329,13 @@ status = "native"
 surface = ".codex/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
-source_sha256 = "cc494032f13bd8c34e4024802a3de5510740ff5b734d0527003a63bbad139c0b"
+source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-code-review-audit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-code-review-audit/SKILL.md"
-source_sha256 = "cc494032f13bd8c34e4024802a3de5510740ff5b734d0527003a63bbad139c0b"
+source_sha256 = "5e16702bbb66c6667fcc69505d254b07912288ec5538a9d932f4039a9a87be54"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-code-review-audit/SKILL.md"
 status = "fallback"
@@ -357,13 +357,13 @@ status = "native"
 surface = ".codex/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
-source_sha256 = "d5f68022ad36dae91f5d27d42c4c0da149b0dda29d01ea30a1838fe3e8f4b829"
+source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-lo-opportunity-radar/SKILL.md"
-source_sha256 = "d5f68022ad36dae91f5d27d42c4c0da149b0dda29d01ea30a1838fe3e8f4b829"
+source_sha256 = "a47bfabea763756f69c20d4b4536f98eef0e408a6db115f616272d2099839d1f"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-lo-opportunity-radar/SKILL.md"
 status = "fallback"
@@ -382,18 +382,18 @@ surface = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/codex-report/SKILL.md"
+surface = ".codex/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
-source_sha256 = "527ddc8472ca4089eebffaa040cf2e897d946faf011dd9ab43375c8621ad3a5b"
+source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
 
 [capabilities.antigravity]
-surface = ".agent/skills/codex-report/SKILL.md"
+surface = ".agent/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-loyal-opposition-report/SKILL.md"
-source_sha256 = "527ddc8472ca4089eebffaa040cf2e897d946faf011dd9ab43375c8621ad3a5b"
+source_sha256 = "b30bff47d12c25c1ee2d684d95920562c47d03d2695b96efa0236b77b10054f7"
 [capabilities.cursor]
-surface = ".cursor/skills/codex-report/SKILL.md"
+surface = ".cursor/skills/gtkb-loyal-opposition-report/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -410,18 +410,18 @@ surface = ".claude/skills/gtkb-decision-capture/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/decision-capture/SKILL.md"
+surface = ".codex/skills/gtkb-decision-capture/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
-source_sha256 = "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
+source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
 
 [capabilities.antigravity]
-surface = ".agent/skills/decision-capture/SKILL.md"
+surface = ".agent/skills/gtkb-decision-capture/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-decision-capture/SKILL.md"
-source_sha256 = "e20846616eaa196e6a77cb5a093fdf40b29e2683f6a1f42b2fa55460e27a10ae"
+source_sha256 = "24d8335416edce0e9a7676250a868fed7373f79d7d6eb20fbbdc2c0397f2777b"
 [capabilities.cursor]
-surface = ".cursor/skills/decision-capture/SKILL.md"
+surface = ".cursor/skills/gtkb-decision-capture/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -441,13 +441,13 @@ status = "native"
 surface = ".codex/skills/gtkb-harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
-source_sha256 = "b4b0b96b112aa9952c372f189fb732008eb8b41304b6be1dcf1bf10cf7f0ba94"
+source_sha256 = "8d8962fda56a0e1bb352c5bce6399ae4df9e6c538affec1bd29a2ed48445996e"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-harness-parity-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-harness-parity-review/SKILL.md"
-source_sha256 = "b4b0b96b112aa9952c372f189fb732008eb8b41304b6be1dcf1bf10cf7f0ba94"
+source_sha256 = "8d8962fda56a0e1bb352c5bce6399ae4df9e6c538affec1bd29a2ed48445996e"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-harness-parity-review/SKILL.md"
 status = "fallback"
@@ -469,7 +469,7 @@ status = "native"
 surface = ".codex/skills/gtkb-skill-governance-lifecycle/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-skill-governance-lifecycle/SKILL.md"
-source_sha256 = "03062927d9c99e367f4510ae132f2b77ad779f3d3020716ad68e0efe3df608a4"
+source_sha256 = "e30a2541f4042ca28c8f582743e380ecfda0a71cc7d3ceb58de6fd418bf1e550"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -495,7 +495,7 @@ status = "native"
 surface = ".codex/skills/gtkb-advisory-disposition/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-advisory-disposition/SKILL.md"
-source_sha256 = "e1fdb32d6d071b32a0e0b56ba61c81c1723c8546063f34728d1f414ee7931df4"
+source_sha256 = "43a1e728f208d9ba1e484b9c715924aa47dd0b6670ef57e0814c5ad43b06a22e"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -522,7 +522,7 @@ status = "native"
 surface = ".codex/skills/gtkb-advisory-proposal/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-advisory-proposal/SKILL.md"
-source_sha256 = "7b84d9c531da94e4fbe05755a823607507b758c7e25669f298d60d7077d4ebf3"
+source_sha256 = "a1985ec2b71ab6a2aab6914854ae82194e3fe7930e17a458cbcc02c853931805"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -557,7 +557,7 @@ status = "native"
 surface = ".codex/skills/gtkb-advisory-intake/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-advisory-intake/SKILL.md"
-source_sha256 = "142e31d3c107afcef17a1161e7dd722b3b3ee3b47cd3467c46b8ef91196697f1"
+source_sha256 = "25e4f360c5fb6bef91601c183e8df217b4eebf4008e7555d6527f1f2a8ab870e"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -592,13 +592,13 @@ status = "native"
 surface = ".codex/skills/gtkb-adr/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-adr/SKILL.md"
-source_sha256 = "5313dca3d3c8c42ca3f69ccfd8b61eba716e3267a6ee19ce7454d79c76fc00d4"
+source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-adr/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-adr/SKILL.md"
-source_sha256 = "5313dca3d3c8c42ca3f69ccfd8b61eba716e3267a6ee19ce7454d79c76fc00d4"
+source_sha256 = "4b1ec3c66407daa82cd66a84eefe1e2ed6e8d83cc4a4d7e0f7383bb7dd03b969"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-adr/SKILL.md"
 status = "fallback"
@@ -620,13 +620,13 @@ status = "native"
 surface = ".codex/skills/gtkb-assert/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-assert/SKILL.md"
-source_sha256 = "41e992629bbc599f80464971f0135cea20870803082f4dab720dce8a642db4e2"
+source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-assert/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-assert/SKILL.md"
-source_sha256 = "41e992629bbc599f80464971f0135cea20870803082f4dab720dce8a642db4e2"
+source_sha256 = "21efa5bb54ede144061770a326b29632a6139d935c85e0fa3d6d4aefb85cbcdf"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-assert/SKILL.md"
 status = "fallback"
@@ -648,13 +648,13 @@ status = "native"
 surface = ".codex/skills/gtkb-batch/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-batch/SKILL.md"
-source_sha256 = "235090b9cedeb9b194b94f747b4fc4cbff5156b128493f2ab8aab0bebbd1542c"
+source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-batch/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-batch/SKILL.md"
-source_sha256 = "235090b9cedeb9b194b94f747b4fc4cbff5156b128493f2ab8aab0bebbd1542c"
+source_sha256 = "e3269505c142a81126c6615619d06b9f1156253b1cf88bbb71d272e42fd2df7c"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-batch/SKILL.md"
 status = "fallback"
@@ -676,13 +676,13 @@ status = "native"
 surface = ".codex/skills/gtkb-promote/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-promote/SKILL.md"
-source_sha256 = "d2e768c49b47519160b4042506c34d3c3faf3f90fd06aeb8ff2c59152db11dbd"
+source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-promote/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-promote/SKILL.md"
-source_sha256 = "d2e768c49b47519160b4042506c34d3c3faf3f90fd06aeb8ff2c59152db11dbd"
+source_sha256 = "5dab12bd288a3ce3d126c30d2670322617121432fcd7d0a38b7fdc93bed2e7cb"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-promote/SKILL.md"
 status = "fallback"
@@ -704,13 +704,13 @@ status = "native"
 surface = ".codex/skills/gtkb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-query/SKILL.md"
-source_sha256 = "693cfda872edd966ca5f382b0435df0c8b9c62639b32be22ef56f65c92e84086"
+source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-query/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-query/SKILL.md"
-source_sha256 = "693cfda872edd966ca5f382b0435df0c8b9c62639b32be22ef56f65c92e84086"
+source_sha256 = "f694720b346a85a5c239cb5aa03c01b18f819b33aa10a43aaff76eb46b8d1ca5"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-query/SKILL.md"
 status = "fallback"
@@ -732,13 +732,13 @@ status = "native"
 surface = ".codex/skills/gtkb-session-wrap/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
-source_sha256 = "78880c713c3e945c1b093f9d82583ef2aa18d791997626f35a556c7404d0d662"
+source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-session-wrap/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-session-wrap/SKILL.md"
-source_sha256 = "78880c713c3e945c1b093f9d82583ef2aa18d791997626f35a556c7404d0d662"
+source_sha256 = "6680210122f77b617608d543ebc53e0674a89dc418f552bbe09976d893166575"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-session-wrap/SKILL.md"
 status = "fallback"
@@ -760,13 +760,13 @@ status = "native"
 surface = ".codex/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
-source_sha256 = "01093f939c5e621616ea45c5ca82b3a1d7b8afa986594b4a196b0b4378888df8"
+source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-session-wrap-scan/SKILL.md"
-source_sha256 = "01093f939c5e621616ea45c5ca82b3a1d7b8afa986594b4a196b0b4378888df8"
+source_sha256 = "9468768273e151445af117755950d0467a8bd19d1e0357e61639cf41c2dfd83e"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-session-wrap-scan/SKILL.md"
 status = "fallback"
@@ -788,13 +788,13 @@ status = "native"
 surface = ".codex/skills/gtkb-spec/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-spec/SKILL.md"
-source_sha256 = "77d84c4ee4960b9cfc119347c36080e92edb62613c4e6514148019a717ca5dda"
+source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-spec/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-spec/SKILL.md"
-source_sha256 = "77d84c4ee4960b9cfc119347c36080e92edb62613c4e6514148019a717ca5dda"
+source_sha256 = "7430be6a9e5c424a3f27a71fe2b9f7580085f59858bcb1176252a095b67755ac"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-spec/SKILL.md"
 status = "fallback"
@@ -816,13 +816,13 @@ status = "native"
 surface = ".codex/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-work-item/SKILL.md"
-source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-work-item/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-work-item/SKILL.md"
-source_sha256 = "c6576c7970fe97713f6218fec825a0fed6dd2933d2e7130117f2157bf9e659a5"
+source_sha256 = "b3b4a36c21530da6cc31470583a8baf3a9d1f4da19c579941d6df76085cee015"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-work-item/SKILL.md"
 status = "fallback"
@@ -844,13 +844,13 @@ status = "native"
 surface = ".codex/skills/gtkb-projects/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-projects/SKILL.md"
-source_sha256 = "70d646b9b957ad00d39078328bd9aa8b069d503c85b0d40361352c82966f8dde"
+source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-projects/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-projects/SKILL.md"
-source_sha256 = "70d646b9b957ad00d39078328bd9aa8b069d503c85b0d40361352c82966f8dde"
+source_sha256 = "17a2b01dd84becb7fe48487ef8ddff092f7b4897a16092406fb9b956f1394c2e"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-projects/SKILL.md"
 status = "fallback"
@@ -872,13 +872,13 @@ status = "native"
 surface = ".codex/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "2f199c8dc6d75752fe4b058afdcd938432f9cf68732eefb61768d9fecfc1509c"
+source_sha256 = "af5b84ee08bd1c54707ddba54b57cedcfc39288a95874b01cdf54056c98d7eed"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "2f199c8dc6d75752fe4b058afdcd938432f9cf68732eefb61768d9fecfc1509c"
+source_sha256 = "af5b84ee08bd1c54707ddba54b57cedcfc39288a95874b01cdf54056c98d7eed"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-proposal-review/SKILL.md"
 status = "fallback"
@@ -900,13 +900,13 @@ status = "native"
 surface = ".codex/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
-source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
+source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-release-candidate-gate/SKILL.md"
-source_sha256 = "149f282f610457a732f382dd16d8853e421c6585b5036a99ee2cc3567b770a92"
+source_sha256 = "dc064edf4e9d291b640d0261bbd2293b24f37093f7bbc59127ed90ac997287b9"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-release-candidate-gate/SKILL.md"
 status = "fallback"
@@ -928,13 +928,13 @@ status = "native"
 surface = ".codex/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
-source_sha256 = "ff37ea3c5c0b56a4c9608de0016c1af564764a3b64324833714b7e97d680975e"
+source_sha256 = "0dd7b431ddeb0df8e7379b50ad0593d029b605dc3f96f0001411b92edcb197d9"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
-source_sha256 = "ff37ea3c5c0b56a4c9608de0016c1af564764a3b64324833714b7e97d680975e"
+source_sha256 = "0dd7b431ddeb0df8e7379b50ad0593d029b605dc3f96f0001411b92edcb197d9"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-send-review/SKILL.md"
 status = "fallback"
@@ -953,18 +953,18 @@ surface = ".claude/skills/gtkb-spec-intake/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/spec-intake/SKILL.md"
+surface = ".codex/skills/gtkb-spec-intake/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
-source_sha256 = "74b89d071fea590bc4ceedde8055c1014902820a1b80c3385fb9c1d76090d7f2"
+source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
 
 [capabilities.antigravity]
-surface = ".agent/skills/spec-intake/SKILL.md"
+surface = ".agent/skills/gtkb-spec-intake/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-spec-intake/SKILL.md"
-source_sha256 = "74b89d071fea590bc4ceedde8055c1014902820a1b80c3385fb9c1d76090d7f2"
+source_sha256 = "aa9090907a86ca0c1a05844ce51e509c66bdfe013ffa95b4ba4d5a3cf48ca111"
 [capabilities.cursor]
-surface = ".cursor/skills/spec-intake/SKILL.md"
+surface = ".cursor/skills/gtkb-spec-intake/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -984,13 +984,13 @@ status = "native"
 surface = ".codex/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
-source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
+source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-structural-hygiene-review/SKILL.md"
-source_sha256 = "92c27c8c214205f550e59cbe7f5881fab8d75354f28ecef8faeb8d7af4711476"
+source_sha256 = "13de9e2f85addc7faa602baf9312bf00538d5bb33e4270036146052da0b1309b"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-structural-hygiene-review/SKILL.md"
 status = "fallback"
@@ -1100,13 +1100,13 @@ status = "native"
 surface = ".codex/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
-source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
+source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-grill-me-for-clarification/SKILL.md"
-source_sha256 = "6171f361e9c83b3ead22e4d80ef28ee278244c432087423eee46059ddc810f96"
+source_sha256 = "781e7752a6cdd0332b99971534b64b36cad4d10652926d520b54e83c02678c08"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-grill-me-for-clarification/SKILL.md"
 status = "fallback"
@@ -1128,13 +1128,13 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
-source_sha256 = "58a49132e0384ae2d277ce7e3f88cd27a21a4cb324a84bbf580b1a888aac8a86"
+source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-investigation/SKILL.md"
-source_sha256 = "58a49132e0384ae2d277ce7e3f88cd27a21a4cb324a84bbf580b1a888aac8a86"
+source_sha256 = "4474b3c97a78fd01896fc2c02dec4a36b1d3d158f43e8f1d97a97ea14b832e94"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-hygiene-investigation/SKILL.md"
 status = "fallback"
@@ -1156,13 +1156,13 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
-source_sha256 = "a836a16b551bca526c1b7457433aa704383544abb4b3823b10e9c2222396179f"
+source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-sweep/SKILL.md"
-source_sha256 = "a836a16b551bca526c1b7457433aa704383544abb4b3823b10e9c2222396179f"
+source_sha256 = "97ccc96744186df7ddb9a7548d15b64dc413c42cbde5909d99f87ab9ceb7465c"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-hygiene-sweep/SKILL.md"
 status = "fallback"
@@ -1185,7 +1185,7 @@ status = "native"
 surface = ".codex/skills/gtkb-hygiene-reclaim/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-hygiene-reclaim/SKILL.md"
-source_sha256 = "c1c5fadde360a4f0e03a265ef9cd38b6a0f2f366095ee1b77e180f453a1894a1"
+source_sha256 = "0b928d4c238f7ad893bc194569f0be4c175ff71c32910d26baebb11d4b7cc152"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -1220,13 +1220,13 @@ status = "native"
 surface = ".codex/skills/gtkb-sweep-commit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
-source_sha256 = "25541a0b5ccd0ad04341535cef9d14b9aa32950089800513a0d3e3bf7c562ae2"
+source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-sweep-commit/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-sweep-commit/SKILL.md"
-source_sha256 = "25541a0b5ccd0ad04341535cef9d14b9aa32950089800513a0d3e3bf7c562ae2"
+source_sha256 = "fc4b1626c9eeeb2eee79565165160453668a6236f91f9582828873283ac679ef"
 [capabilities.cursor]
 surface = ".cursor/skills/gtkb-sweep-commit/SKILL.md"
 status = "fallback"
@@ -1245,18 +1245,18 @@ surface = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+surface = ".codex/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
-source_sha256 = "a8386eb662fb26c21ca7f7dd917e40188ca72113f059b5122ba85fb1f7a5d0c9"
+source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
 
 [capabilities.antigravity]
-surface = ".agent/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+surface = ".agent/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-lo-hygiene-assessment/SKILL.md"
-source_sha256 = "a8386eb662fb26c21ca7f7dd917e40188ca72113f059b5122ba85fb1f7a5d0c9"
+source_sha256 = "69d66578cd14cbe3e807cd6a6a93c973e08dc8566a3734cfd773568bc7feaa9c"
 [capabilities.cursor]
-surface = ".cursor/skills/loyal-opposition-hygiene-assessment/SKILL.md"
+surface = ".cursor/skills/gtkb-lo-hygiene-assessment/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -1273,18 +1273,18 @@ surface = ".claude/skills/gtkb-verify/SKILL.md"
 status = "native"
 
 [capabilities.codex]
-surface = ".codex/skills/verify/SKILL.md"
+surface = ".codex/skills/gtkb-verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
-source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
+source_sha256 = "57b1863c131f81676f84fd497695e7f4333f9481473e58abc9f827ea351c0271"
 
 [capabilities.antigravity]
-surface = ".agent/skills/verify/SKILL.md"
+surface = ".agent/skills/gtkb-verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
-source_sha256 = "cb2ee93b3edcb2884d71d0cf42cffa018166f8da1c459a8fcb443ec2fe8b9a1c"
+source_sha256 = "57b1863c131f81676f84fd497695e7f4333f9481473e58abc9f827ea351c0271"
 [capabilities.cursor]
-surface = ".cursor/skills/verify/SKILL.md"
+surface = ".cursor/skills/gtkb-verify/SKILL.md"
 status = "fallback"
 fallback = "Cursor uses a repo-local generated skill adapter; a dedicated Cursor marker-aware generator is tracked separately."
 [[capabilities]]
@@ -2150,7 +2150,7 @@ status = "native"
 surface = ".codex/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md"
-source_sha256 = "824af14f6ace58e6a3b3423b55ad1119d6874cb2ac2ff83e5c37734903ac3855"
+source_sha256 = "8fba2488531fb05a5e07dc07bfcd94eb62fc7fa891072ee8e57ffdb6949fff0f"
 
 [capabilities.antigravity]
 status = "unsupported"
@@ -2185,13 +2185,13 @@ status = "native"
 surface = ".codex/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
-source_sha256 = "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
+source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-managed-skill-adoption-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-managed-skill-adoption-review/SKILL.md"
-source_sha256 = "b9c8a7e0f81a893ef98de6b7e28b9b9057d5bb79a3d8b4025d70b1a8998614e9"
+source_sha256 = "ab7cfdd90ddbeeee51b48dc546b3b092823736802c7bcc87c3cf368f3039e6b3"
 
 [capabilities.cursor]
 status = "unsupported"
