@@ -346,12 +346,31 @@ def add_work_item_with_test(config: GTConfig, request: AddWorkItemRequest) -> di
             conn.rollback()
             raise
 
+        project_membership: dict[str, Any] | None = None
+        if request.project_id:
+            try:
+                project_membership = db.link_project_work_item(
+                    request.project_id,
+                    work_item_id,
+                    changed_by,
+                    f"GOV-12: atomic --project linkage for {work_item_id} ({request.change_reason})",
+                    membership_role="member",
+                    membership_order=None,
+                    source="gt backlog add-work-item --project",
+                )
+            except (ValueError, RuntimeError) as exc:
+                # Fail-loud for linkage, fail-open for WI (WI already committed).
+                raise AddWorkItemError(
+                    f"Work item {work_item_id} created but project linkage to {request.project_id} failed: {exc}"
+                ) from exc
+
         return {
             "created": True,
             "dry_run": False,
             "work_item_id": work_item_id,
             "test_id": test_id,
             "phase_id": phase["id"],
+            "project_membership": project_membership,
         }
     except AddWorkItemError:
         raise

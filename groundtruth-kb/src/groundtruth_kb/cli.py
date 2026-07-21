@@ -6405,7 +6405,13 @@ def projects_authorize(
     help="Filter to authorizations covering this target path.",
 )
 @click.pass_context
-def projects_authorizations(ctx: click.Context, project_id: str, include_terminal: bool, json_output: bool) -> None:
+def projects_authorizations(
+    ctx: click.Context,
+    project_id: str,
+    include_terminal: bool,
+    json_output: bool,
+    covers_path: str | None,
+) -> None:
     """List project-scoped implementation authorizations."""
     db, service = _project_service(ctx)
     try:
@@ -6414,6 +6420,20 @@ def projects_authorizations(ctx: click.Context, project_id: str, include_termina
         raise click.ClickException(str(exc)) from exc
     finally:
         db.close()
+
+    if covers_path is not None:
+        from groundtruth_kb.governance.project_authorization_operation_time import classify_target
+
+        path_class = classify_target(covers_path).mutation_class
+        filtered: list[dict[str, Any]] = []
+        for auth in authorizations:
+            allowed = auth.get("allowed_mutation_classes_parsed") or []
+            if path_class in allowed:
+                filtered.append(auth)
+        authorizations = filtered
+        if not authorizations:
+            click.echo(f"No active project authorization covers path: {covers_path}")
+            return
 
     if json_output:
         click.echo(json.dumps(authorizations, indent=2, sort_keys=True))
