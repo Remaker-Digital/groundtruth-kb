@@ -18,6 +18,7 @@ import os
 import queue
 import re
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -1617,6 +1618,41 @@ def _startup_relay_refresh_timeout_seconds() -> float:
     return max(0.01, min(value, STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS))
 
 
+STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME = "startup-relay-refresh.jsonl"
+
+
+def _record_startup_relay_refresh(
+    root: Path,
+    *,
+    outcome: str,
+    elapsed_seconds: float,
+    budget_seconds: float,
+    role_mode: str | None,
+) -> None:
+    """Append a fail-soft diagnostic record for one bounded relay-refresh attempt.
+
+    Records the outcome (``completed`` / ``timeout_abandoned`` / ``error``), the
+    measured wall-clock duration, the budget in force, and the role mode to the
+    harness-scoped startup diagnostic directory. Any failure to write the record
+    is swallowed: this runs inside a fail-soft UserPromptSubmit hook path and must
+    never raise (WI-5650 Slice A acceptance criterion 4).
+    """
+    try:
+        record = {
+            "recorded_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "outcome": outcome,
+            "elapsed_seconds": round(float(elapsed_seconds), 3),
+            "budget_seconds": round(float(budget_seconds), 3),
+            "role_mode": role_mode,
+        }
+        diag = _startup_diagnostic_dir(root)
+        diag.mkdir(parents=True, exist_ok=True)
+        with (diag / STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+    except Exception:  # noqa: BLE001 - fail-soft: diagnostic write must never break the hook.
+        pass
+
+
 def _refresh_startup_relay_cache_bounded(root: Path, *, role_mode: str | None, meta: dict[str, Any]) -> bool:
     """Best-effort stale relay-cache refresh, bounded for UserPromptSubmit hooks."""
 
@@ -1648,16 +1684,42 @@ def _refresh_startup_relay_cache_bounded(root: Path, *, role_mode: str | None, m
             except queue.Full:
                 pass
 
+    budget_seconds = _startup_relay_refresh_timeout_seconds()
+    effective_role_mode = role_mode if role_mode is not None else meta.get("role_mode")
     worker = threading.Thread(target=_refresh, name="gtkb-startup-relay-refresh", daemon=True)
+    started_at = time.monotonic()
     worker.start()
-    worker.join(_startup_relay_refresh_timeout_seconds())
+    worker.join(budget_seconds)
     if worker.is_alive():
         cancel.set()
+        _record_startup_relay_refresh(
+            root,
+            outcome="timeout_abandoned",
+            elapsed_seconds=time.monotonic() - started_at,
+            budget_seconds=budget_seconds,
+            role_mode=effective_role_mode,
+        )
         return False
+    elapsed_seconds = time.monotonic() - started_at
     try:
-        return result_queue.get_nowait()
+        refreshed = result_queue.get_nowait()
     except queue.Empty:
+        _record_startup_relay_refresh(
+            root,
+            outcome="error",
+            elapsed_seconds=elapsed_seconds,
+            budget_seconds=budget_seconds,
+            role_mode=effective_role_mode,
+        )
         return False
+    _record_startup_relay_refresh(
+        root,
+        outcome="completed" if refreshed else "error",
+        elapsed_seconds=elapsed_seconds,
+        budget_seconds=budget_seconds,
+        role_mode=effective_role_mode,
+    )
+    return refreshed
 
 
 def _allowed_startup_relay_cache_reads(root: Path) -> set[Path]:
@@ -1771,6 +1833,7 @@ def _startup_relay_pointer(project_root: Path | None = None, *, role_mode: str |
         "role_mode": meta.get("role_mode"),
         "generated_at": meta.get("generated_at"),
         "fresh": freshness_ok,
+        "consistent_except_freshness": consistent_except_freshness,
         "consistent": consistent,
     }
 
@@ -1885,11 +1948,20 @@ def _startup_gate_response(
         )
     message = _startup_gate_message(role_mode or pointer.get("role_mode"), init_mode=init_mode)
     if not pointer["consistent"]:
-        diagnostic = _startup_relay_failure_context(
-            f"cache file {pointer['cache_path']} does not match its metadata sidecar "
-            "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
-            "it may be stale, wrong-role, or displaced by a non-disclosure payload"
-        )
+        if pointer.get("consistent_except_freshness"):
+            diagnostic = _startup_relay_failure_context(
+                f"cache file {pointer['cache_path']} is identity-intact and content-consistent with its "
+                f"metadata sidecar but STALE: its generated-at timestamp is older than the "
+                f"{STARTUP_RELAY_CACHE_MAX_AGE_SECONDS}s freshness TTL, and the bounded self-heal refresh was "
+                f"abandoned after its {_startup_relay_refresh_timeout_seconds():g}s budget. The disclosure is "
+                "well-formed but simply too old to relay"
+            )
+        else:
+            diagnostic = _startup_relay_failure_context(
+                f"cache file {pointer['cache_path']} does not match its metadata sidecar "
+                "(sha256, byte-length, harness id, role, freshness, or startup-disclosure shape mismatch); "
+                "it may be stale, wrong-role, or displaced by a non-disclosure payload"
+            )
         return (
             {
                 "systemMessage": diagnostic,

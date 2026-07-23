@@ -1813,6 +1813,156 @@ def test_startup_gate_default_refresh_budget_allows_local_render(tmp_path, monke
     assert module._startup_relay_refresh_timeout_seconds() == 5.0
 
 
+def _mock_dispatch_core_render_and_write(monkeypatch, module, *, render, write) -> None:
+    """Stub both _render_role_startup_report and _write_startup_relay_cache on
+    whichever session_start_dispatch_core import path the refresh thread resolves."""
+    import sys
+
+    if str(module.PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(module.PROJECT_ROOT))
+    try:
+        import scripts.session_start_dispatch_core as _core_pkg
+
+        monkeypatch.setattr(_core_pkg, "_render_role_startup_report", render)
+        monkeypatch.setattr(_core_pkg, "_write_startup_relay_cache", write)
+    except (ImportError, AttributeError):
+        pass
+
+    if str(module.PROJECT_ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(module.PROJECT_ROOT / "scripts"))
+    try:
+        import session_start_dispatch_core as _core_top
+
+        monkeypatch.setattr(_core_top, "_render_role_startup_report", render)
+        monkeypatch.setattr(_core_top, "_write_startup_relay_cache", write)
+    except (ImportError, AttributeError):
+        pass
+
+
+def test_refresh_records_timeout_abandonment(tmp_path, monkeypatch) -> None:
+    """WI-5650 A1 / GOV-SESSION-SELF-INITIALIZATION-001: a budget-exceeding refresh
+    returns False AND records a timeout_abandoned diagnostic with elapsed + budget."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", "0.05")
+
+    def _slow_render(role_profile):
+        time.sleep(0.4)
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nlate"
+
+    _mock_dispatch_core_render_and_write(monkeypatch, module, render=_slow_render, write=lambda *a, **k: None)
+
+    result = module._refresh_startup_relay_cache_bounded(tmp_path, role_mode="pb", meta={"role_mode": "pb"})
+
+    assert result is False
+    diag = tmp_path / ".codex" / "gtkb-hooks" / module.STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME
+    assert diag.is_file(), "an abandoned refresh must leave a diagnostic record"
+    records = [json.loads(line) for line in diag.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert records, "at least one record must be written"
+    last = records[-1]
+    assert last["outcome"] == "timeout_abandoned"
+    assert isinstance(last["elapsed_seconds"], (int, float))
+    assert last["elapsed_seconds"] >= 0.0
+    assert last["budget_seconds"] == pytest.approx(0.05)
+    assert last["role_mode"] == "pb"
+
+
+def test_refresh_records_completion(tmp_path, monkeypatch) -> None:
+    """WI-5650 A1 / DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001: a fast refresh
+    returns True and records outcome=completed with elapsed below budget."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.setenv("GTKB_STARTUP_RELAY_REFRESH_TIMEOUT_SECONDS", "2.0")
+
+    def _fast_render(role_profile):
+        return "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nfresh"
+
+    _mock_dispatch_core_render_and_write(monkeypatch, module, render=_fast_render, write=lambda *a, **k: None)
+
+    result = module._refresh_startup_relay_cache_bounded(tmp_path, role_mode="pb", meta={"role_mode": "pb"})
+
+    assert result is True
+    diag = tmp_path / ".codex" / "gtkb-hooks" / module.STARTUP_RELAY_REFRESH_DIAGNOSTIC_NAME
+    records = [json.loads(line) for line in diag.read_text(encoding="utf-8").splitlines() if line.strip()]
+    last = records[-1]
+    assert last["outcome"] == "completed"
+    assert last["elapsed_seconds"] < last["budget_seconds"]
+    assert last["budget_seconds"] == pytest.approx(2.0)
+    assert last["role_mode"] == "pb"
+
+
+def test_stale_but_intact_cache_reports_staleness_not_corruption(tmp_path, monkeypatch) -> None:
+    """WI-5650 A2 / GOV-SOURCE-OF-TRUTH-FRESHNESS-001: an identity-intact,
+    content-consistent, but stale cache whose refresh was abandoned is diagnosed
+    as staleness + refresh abandonment, not as a corruption/mismatch."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    _write_startup_gate_guard(tmp_path)
+
+    body = "# GroundTruth-KB Fresh Session Startup\n\n## Startup Disclosure\n\nintact body\n"
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    diagnostics.mkdir(parents=True, exist_ok=True)
+    cache_file = diagnostics / "last-user-visible-startup.md"
+    meta_file = diagnostics / "last-user-visible-startup.meta.json"
+    cache_file.write_text(body, encoding="utf-8", newline="\n")
+    encoded = body.encode("utf-8")
+    meta_file.write_text(
+        json.dumps(
+            {
+                "harness_name": "codex",
+                "harness_id": "A",
+                "generated_at": "2020-01-01T00:00:00Z",
+                "byte_length": len(encoded),
+                "sha256": hashlib.sha256(encoded).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+    monkeypatch.setattr(module, "_refresh_startup_relay_cache_bounded", lambda *a, **k: False)
+
+    response, validated = module._startup_gate_response(tmp_path, role_mode=None)
+    diagnostic = response["hookSpecificOutput"]["additionalContext"]
+
+    assert validated is False
+    assert "STARTUP RELAY FAILURE" in diagnostic
+    lowered = diagnostic.lower()
+    assert "stale" in lowered
+    assert "abandoned" in lowered
+    assert "budget" in lowered
+    assert "sha256" not in lowered
+    assert "does not match its metadata sidecar" not in diagnostic
+
+
+def test_genuine_identity_mismatch_message_unchanged(tmp_path, monkeypatch) -> None:
+    """WI-5650 A2 / GOV-SOURCE-OF-TRUTH-FRESHNESS-001: a genuine identity/shape
+    mismatch keeps the existing corruption-shaped diagnostic byte-for-byte."""
+    module = _load_module()
+    _isolate_state(monkeypatch, tmp_path)
+    monkeypatch.setenv("GTKB_HARNESS_NAME", "codex")
+    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
+    _write_startup_gate_guard(tmp_path)
+
+    diagnostics = tmp_path / ".codex" / "gtkb-hooks"
+    _write_relay_cache(diagnostics, "this is not a startup disclosure at all\n")
+    monkeypatch.setattr(module, "_resolved_harness_id", lambda root: "A")
+
+    response, validated = module._startup_gate_response(tmp_path, role_mode=None)
+    diagnostic = response["hookSpecificOutput"]["additionalContext"]
+
+    assert validated is False
+    assert (
+        "does not match its metadata sidecar (sha256, byte-length, harness id, role, "
+        "freshness, or startup-disclosure shape mismatch); it may be stale, wrong-role, "
+        "or displaced by a non-disclosure payload"
+    ) in diagnostic
+
+
 def test_startup_gate_self_heals_rederivable_content_drift(tmp_path, monkeypatch) -> None:
     module = _load_module()
     _isolate_state(monkeypatch, tmp_path)
