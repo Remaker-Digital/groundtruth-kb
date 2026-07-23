@@ -145,6 +145,17 @@ def _load_module(path: Path, name: str) -> ModuleType:
     return module
 
 
+def _resolve_platform_helper(platform_root: Path, *relative_candidates: str) -> Path:
+    """Resolve a governed skill-helper path, preferring the canonical gtkb-
+    prefixed location and falling back to the pre-rename name for backward
+    compatibility (WI-5651 skill-rename path canonicalization)."""
+    for relative in relative_candidates:
+        candidate = platform_root / relative
+        if candidate.is_file():
+            return candidate
+    return platform_root / relative_candidates[0]
+
+
 def _run_git(root: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(root), *args],
@@ -383,15 +394,27 @@ class ModernizationWorkflow:
         self.ensure_author_metadata = ensure_author_metadata
         self.extract_author_metadata = extract_author_metadata
         self.proposal_helper = _load_module(
-            self.platform_root / ".claude/skills/bridge-propose/helpers/write_bridge.py",
+            _resolve_platform_helper(
+                self.platform_root,
+                ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py",
+                ".claude/skills/bridge-propose/helpers/write_bridge.py",
+            ),
             "gtkb_modernization_proposal_helper",
         )
         self.report_helper = _load_module(
-            self.platform_root / ".claude/skills/bridge/helpers/impl_report_bridge.py",
+            _resolve_platform_helper(
+                self.platform_root,
+                ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+                ".claude/skills/bridge/helpers/impl_report_bridge.py",
+            ),
             "gtkb_modernization_report_helper",
         )
         self.verify_helper = _load_module(
-            self.platform_root / ".claude/skills/verify/helpers/write_verdict.py",
+            _resolve_platform_helper(
+                self.platform_root,
+                ".claude/skills/gtkb-verify/helpers/write_verdict.py",
+                ".claude/skills/verify/helpers/write_verdict.py",
+            ),
             "gtkb_modernization_verify_helper",
         )
         self.applicability_helper = _load_module(

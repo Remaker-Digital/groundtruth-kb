@@ -617,6 +617,8 @@ def _project_root_from_module() -> Path:
 
 def _load_bridge_writer(project_root: Path) -> ModuleType:
     candidates = [
+        project_root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py",
+        _project_root_from_module() / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py",
         project_root / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
         _project_root_from_module() / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py",
     ]

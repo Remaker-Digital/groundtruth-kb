@@ -11,7 +11,20 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "impl_report_bridge.py"
+
+
+def _resolve_repo_helper(*relative_candidates: str) -> Path:
+    for relative in relative_candidates:
+        candidate = REPO_ROOT / relative
+        if candidate.is_file():
+            return candidate
+    return REPO_ROOT / relative_candidates[0]
+
+
+HELPER_PATH = _resolve_repo_helper(
+    ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+    ".claude/skills/bridge/helpers/impl_report_bridge.py",
+)
 
 
 def _load_helper_module():
@@ -22,6 +35,27 @@ def _load_helper_module():
     sys.modules["bridge_impl_report_helper_under_test"] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_governed_bridge_helper_paths_prefer_canonical_gtkb_prefix():
+    """WI-5651 regression: tracked bridge helpers resolve the canonical gtkb-
+    prefixed skill path (not only the pre-rename unprefixed path)."""
+    src = str(REPO_ROOT / "groundtruth-kb" / "src")
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    from groundtruth_kb.bridge import proposal_filing
+
+    module = proposal_filing._load_bridge_writer(REPO_ROOT)
+    assert hasattr(module, "propose_bridge"), "proposal filer must load the write helper"
+
+    for tracked in (
+        REPO_ROOT / "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py",
+        REPO_ROOT / "groundtruth-kb/src/groundtruth_kb/modernization/workflow.py",
+        REPO_ROOT / "groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py",
+    ):
+        assert "gtkb-bridge-propose" in tracked.read_text(encoding="utf-8"), (
+            f"{tracked} must reference the canonical gtkb-bridge-propose path"
+        )
 
 
 @pytest.fixture()
