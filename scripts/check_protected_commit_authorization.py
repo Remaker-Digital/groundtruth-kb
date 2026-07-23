@@ -1092,6 +1092,40 @@ def _has_commit_finalization_evidence(text: str) -> bool:
     return "Same-transaction path set" in section and bool(re.search(r"(?m)^\s*-\s+`[^`]+`\s*$", section))
 
 
+def _superseded_versioned_bridge(
+    rel_path: str,
+    snapshot: _IndexSnapshot | None,
+) -> bool:
+    """Return True when ``rel_path`` is a superseded predecessor within its numbered
+    bridge chain in THIS commit transaction: a higher-numbered version of the same
+    slug is staged in the current transaction (``snapshot.selected_paths``).
+
+    Supersession is scoped to the staged transaction, never the ambient worktree,
+    so an untracked or parked higher-numbered draft cannot false-positively mark a
+    genuine latest terminal VERIFIED as superseded (which would both break a
+    legitimate commit and suppress the terminal-VERIFIED finalization-evidence
+    finding). A superseded predecessor is non-authoritative history: excluded from
+    the VERIFIED-candidate count and from the finalization-evidence finding.
+    Excluding it grants no authority: with zero live VERIFIED candidates a protected
+    commit is simply not authorized (fail-closed), so only the single latest
+    VERIFIED candidate ever carries authorization, and that candidate still receives
+    full validation (including the resolver latest-strict-state check).
+    """
+    if snapshot is None:
+        return False
+    match = VERSIONED_BRIDGE_CAPTURE_RE.fullmatch(rel_path)
+    if match is None:
+        return False
+    slug = match.group("bridge_id")
+    version = int(match.group("version"))
+
+    def _is_higher_sibling(candidate: str) -> bool:
+        sibling = VERSIONED_BRIDGE_CAPTURE_RE.fullmatch(candidate)
+        return sibling is not None and sibling.group("bridge_id") == slug and int(sibling.group("version")) > version
+
+    return any(_is_higher_sibling(p) for p in snapshot.selected_paths)
+
+
 def _verified_bridge_finalization_finding(
     root: Path,
     rel_path: str,
@@ -1118,6 +1152,10 @@ def _verified_bridge_finalization_finding(
             "reason": f"versioned bridge file has invalid status token {status!r}",
         }
     if status != "VERIFIED":
+        return None
+    if _superseded_versioned_bridge(rel_path, snapshot):
+        # A superseded predecessor VERIFIED is committed as inert history; it is
+        # not the live terminal state and needs no Commit Finalization Evidence.
         return None
     if _has_commit_finalization_evidence(content):
         return None
@@ -1523,6 +1561,11 @@ def _load_transaction_verified_evidence(
         except GateError as exc:
             return None, [str(exc)], rel_path
         if _first_nonblank_line(content) == "VERIFIED":
+            if _superseded_versioned_bridge(rel_path, snapshot):
+                # Superseded predecessor VERIFIED is non-authoritative history,
+                # not a live terminal candidate; only the latest-per-chain
+                # VERIFIED counts toward the exactly-one-candidate clearance.
+                continue
             candidates.append((rel_path, content))
 
     if not candidates:

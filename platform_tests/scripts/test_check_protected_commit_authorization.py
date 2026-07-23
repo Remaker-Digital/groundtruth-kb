@@ -1700,6 +1700,144 @@ def test_snapshot_hardlink_race_fails_closed_on_link_count_drift(tmp_path: Path)
     hardlink.unlink()
 
 
+# --- WI-5657: superseded predecessor VERIFIED handling ------------------------
+#
+# Governing specs: GOV-FILE-BRIDGE-AUTHORITY-001 (Mandatory VERIFIED
+# Commit-Finalization Gate); DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.
+# A superseded predecessor VERIFIED (a first-line-VERIFIED versioned bridge file
+# with a higher-numbered same-slug version STAGED in the same commit transaction)
+# is non-authoritative history: excluded from the transaction VERIFIED-candidate
+# count and from the terminal-VERIFIED finalization-evidence finding, while the
+# single latest VERIFIED candidate keeps full validation and zero live candidates
+# fail closed. Supersession is scoped to the staged transaction, never the ambient
+# worktree, so an untracked/parked higher-numbered draft cannot false-positively
+# supersede a genuine latest VERIFIED.
+
+
+def _wi5657_write_bridge(root: Path, slug: str, version: int, status: str) -> str:
+    bridge_dir = root / "bridge"
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+    rel = f"bridge/{slug}-{version:03d}.md"
+    (root / rel).write_text(f"{status}\n\n# {slug} v{version:03d}\n", encoding="utf-8")
+    return rel
+
+
+def _wi5657_git_init_stage(root: Path, staged: list[str]) -> None:
+    hooks = root / "empty-hooks"
+    hooks.mkdir(exist_ok=True)
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    (root / ".seed").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--", ".seed"], cwd=root, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            f"core.hooksPath={hooks}",
+            "commit",
+            "-qm",
+            "seed",
+        ],
+        cwd=root,
+        check=True,
+    )
+    subprocess.run(["git", "add", "--", *staged], cwd=root, check=True)
+
+
+def _wi5657_snap(selected_paths: list[str]):
+    return type("_Snap", (), {"selected_paths": list(selected_paths)})()
+
+
+def test_wi5657_staged_higher_sibling_marks_superseded() -> None:
+    module = _load_module()
+    snap = _wi5657_snap(["bridge/slug-a-004.md", "bridge/slug-a-007.md"])
+    assert module._superseded_versioned_bridge("bridge/slug-a-004.md", snap) is True
+    assert module._superseded_versioned_bridge("bridge/slug-a-007.md", snap) is False
+
+
+def test_wi5657_exact_slug_matching_prefix_sharing_not_sibling() -> None:
+    module = _load_module()
+    # `slug-a` and `slug-a-v2` are DIFFERENT numbered chains (distinct bridge_id).
+    snap = _wi5657_snap(["bridge/slug-a-004.md", "bridge/slug-a-v2-001.md"])
+    assert module._superseded_versioned_bridge("bridge/slug-a-004.md", snap) is False
+
+
+def test_wi5657_non_versioned_or_none_snapshot_is_never_superseded() -> None:
+    module = _load_module()
+    snap = _wi5657_snap(["bridge/slug-a-007.md"])
+    assert module._superseded_versioned_bridge("bridge/not-a-versioned-file.md", snap) is False
+    assert module._superseded_versioned_bridge("scripts/foo.py", snap) is False
+    # A None snapshot (non-transaction context) never marks anything superseded.
+    assert module._superseded_versioned_bridge("bridge/slug-a-004.md", None) is False
+
+
+def test_wi5657_untracked_worktree_higher_sibling_does_not_supersede_staged_latest(tmp_path: Path) -> None:
+    # Regression guard (adversarial-review finding): an untracked/parked higher-numbered
+    # same-slug file in the worktree must NOT mark a STAGED genuine latest VERIFIED as
+    # superseded. Supersession is scoped to the staged transaction only.
+    module = _load_module()
+    slug = "gtkb-wi5657-untracked-guard"
+    v6 = _wi5657_write_bridge(tmp_path, slug, 6, "VERIFIED")  # staged genuine latest
+    _wi5657_git_init_stage(tmp_path, [v6])
+    _wi5657_write_bridge(tmp_path, slug, 7, "NEW")  # untracked parked draft, NOT staged
+    with module._index_snapshot(tmp_path) as snap:
+        _evidence, errors, candidate_path = module._load_transaction_verified_evidence(tmp_path, [], snap)
+    assert "found 2" not in " ".join(errors)
+    # -006 is NOT superseded by the untracked -007; it remains the sole live candidate.
+    assert candidate_path == v6
+
+
+def test_wi5657_superseded_verified_yields_no_finalization_finding(tmp_path: Path) -> None:
+    # Superseded predecessor (-004) with a higher STAGED sibling (-007) -> no finding.
+    module = _load_module()
+    v4 = _wi5657_write_bridge(tmp_path, "slug-b", 4, "VERIFIED")
+    v7 = _wi5657_write_bridge(tmp_path, "slug-b", 7, "VERIFIED")
+    _wi5657_git_init_stage(tmp_path, [v4, v7])
+    with module._index_snapshot(tmp_path) as snap:
+        assert module._verified_bridge_finalization_finding(tmp_path, v4, snap) is None
+        # The latest (-007) is not superseded and lacks evidence -> finding still fires.
+        finding = module._verified_bridge_finalization_finding(tmp_path, v7, snap)
+    assert finding is not None
+    assert "Commit Finalization Evidence" in finding["reason"]
+
+
+def test_wi5657_non_superseded_terminal_verified_without_evidence_yields_finding(tmp_path: Path) -> None:
+    module = _load_module()
+    _wi5657_write_bridge(tmp_path, "slug-c", 4, "VERIFIED")  # sole latest, lacks evidence
+    finding = module._verified_bridge_finalization_finding(tmp_path, "bridge/slug-c-004.md", None)
+    assert finding is not None
+    assert "Commit Finalization Evidence" in finding["reason"]
+
+
+def test_wi5657_superseded_plus_latest_yields_single_candidate_not_found_two(tmp_path: Path) -> None:
+    # Case 1: -004 VERIFIED (superseded) + -005 NO-GO + -007 VERIFIED (latest), all staged.
+    module = _load_module()
+    slug = "gtkb-wi5657-fixture-case1"
+    v4 = _wi5657_write_bridge(tmp_path, slug, 4, "VERIFIED")
+    v5 = _wi5657_write_bridge(tmp_path, slug, 5, "NO-GO")
+    v7 = _wi5657_write_bridge(tmp_path, slug, 7, "VERIFIED")
+    _wi5657_git_init_stage(tmp_path, [v4, v5, v7])
+    with module._index_snapshot(tmp_path) as snap:
+        _evidence, errors, candidate_path = module._load_transaction_verified_evidence(tmp_path, [], snap)
+    assert "found 2" not in " ".join(errors), f"superseded -004 must be excluded from candidate count: {errors}"
+    assert candidate_path == v7
+
+
+def test_wi5657_only_superseded_verified_with_latest_nogo_yields_zero_candidates(tmp_path: Path) -> None:
+    # Case 3: -004 VERIFIED superseded by staged -005 NO-GO; no live VERIFIED candidate remains.
+    module = _load_module()
+    slug = "gtkb-wi5657-fixture-case3"
+    v4 = _wi5657_write_bridge(tmp_path, slug, 4, "VERIFIED")
+    v5 = _wi5657_write_bridge(tmp_path, slug, 5, "NO-GO")
+    _wi5657_git_init_stage(tmp_path, [v4, v5])
+    with module._index_snapshot(tmp_path) as snap:
+        result = module._load_transaction_verified_evidence(tmp_path, [], snap)
+    assert result == (None, [], None)
+
+
 # --- WI-5658: protected-commit checker performance (hoist ls-tree; git timeout) -
 #
 # Governing specs: GOV-FILE-BRIDGE-AUTHORITY-001 (the commit-finalization gate must
