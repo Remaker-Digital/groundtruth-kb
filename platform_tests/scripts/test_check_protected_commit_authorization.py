@@ -1698,3 +1698,75 @@ def test_snapshot_hardlink_race_fails_closed_on_link_count_drift(tmp_path: Path)
             os.link(authority, hardlink)
 
     hardlink.unlink()
+
+
+# --- WI-5658: protected-commit checker performance (hoist ls-tree; git timeout) -
+#
+# Governing specs: GOV-FILE-BRIDGE-AUTHORITY-001 (the commit-finalization gate must
+# be fast enough to run as a pre-commit hook); DCL-VERIFIED-SPEC-DERIVED-TESTING-
+# MANDATORY-001. The committed-bridge enumeration is hoisted out of the
+# _load_verified_evidence per-packet loop (O(packets + files) instead of
+# O(packets x files)), and every _run_git call is timeout-bounded and fails closed.
+
+
+def test_wi5658_run_git_times_out_fails_closed(monkeypatch, tmp_path: Path) -> None:
+    module = _load_module()
+    monkeypatch.setattr(module, "_git_command", lambda *a: ["git", *a])
+    monkeypatch.setattr(module, "_sanitized_subprocess_env", lambda **k: {})
+
+    def _raise_timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["git"], timeout=kwargs.get("timeout"))
+
+    monkeypatch.setattr(module.subprocess, "run", _raise_timeout)
+    result = module._run_git(tmp_path, "ls-tree", "-r", "HEAD", text=True)
+    # Fails closed (non-zero) with a timeout message instead of hanging or raising.
+    assert result.returncode == 124
+    assert "timed out" in result.stderr
+
+
+def test_wi5658_committed_bridge_entries_by_id_groups_by_exact_slug(tmp_path: Path) -> None:
+    module = _load_module()
+    _init_committed_paths(
+        tmp_path,
+        [
+            "bridge/slug-a-001.md",
+            "bridge/slug-a-002.md",
+            "bridge/slug-a-v2-001.md",
+            "bridge/slug-b-001.md",
+            "bridge/not-a-versioned-file.md",
+        ],
+    )
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    grouped = module._committed_bridge_entries_by_id(tmp_path, head)
+    assert {e.rel_path for e in grouped.get("slug-a", ())} == {"bridge/slug-a-001.md", "bridge/slug-a-002.md"}
+    # Exact-slug: slug-a-v2 is a DIFFERENT chain, not folded into slug-a.
+    assert {e.rel_path for e in grouped.get("slug-a-v2", ())} == {"bridge/slug-a-v2-001.md"}
+    assert {e.rel_path for e in grouped.get("slug-b", ())} == {"bridge/slug-b-001.md"}
+    # Non-versioned bridge files are excluded.
+    assert all("not-a-versioned-file" not in e.rel_path for entries in grouped.values() for e in entries)
+
+
+def test_wi5658_load_verified_evidence_enumerates_committed_bridge_once(monkeypatch, tmp_path: Path) -> None:
+    # Core perf property: for N packets, the committed bridge tree is enumerated via
+    # ls-tree exactly ONCE (not once per packet, which was the O(packets x files) hang).
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    pkt_dir = tmp_path / ".gtkb-state" / "implementation-authorizations" / "by-bridge"
+    pkt_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(5):
+        (pkt_dir / f"slug-{i}.json").write_text(json.dumps({"bridge_id": f"slug-{i}"}), encoding="utf-8")
+
+    ls_tree_calls = {"n": 0}
+    real_run_git = module._run_git
+
+    def _counting_run_git(root, *args, **kwargs):
+        if args and args[0] == "ls-tree":
+            ls_tree_calls["n"] += 1
+        return real_run_git(root, *args, **kwargs)
+
+    monkeypatch.setattr(module, "_run_git", _counting_run_git)
+    module._load_verified_evidence(tmp_path, head_oid=head)
+    assert ls_tree_calls["n"] == 1, (
+        f"committed bridge tree must be enumerated once, not per-packet; got {ls_tree_calls['n']}"
+    )

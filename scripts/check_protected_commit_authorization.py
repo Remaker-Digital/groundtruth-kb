@@ -268,22 +268,39 @@ def _git_command(*args: str) -> list[str]:
     ]
 
 
+# WI-5658: bound every checker git subprocess so a blocked/slow git call fails
+# closed instead of grinding unbounded (honors the git-subprocess timeout-bound
+# invariant relied on by the finalizer / pre-commit gate).
+_GIT_SUBPROCESS_TIMEOUT_SECONDS = 120
+
+
 def _run_git(
     root: Path,
     *args: str,
     env: dict[str, str] | None = None,
     text: bool = False,
+    timeout: float | None = _GIT_SUBPROCESS_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[Any]:
-    return subprocess.run(
-        _git_command(*args),
-        cwd=root,
-        capture_output=True,
-        text=text,
-        encoding="utf-8" if text else None,
-        errors="replace" if text else None,
-        check=False,
-        env=env or _sanitized_subprocess_env(),
-    )
+    try:
+        return subprocess.run(
+            _git_command(*args),
+            cwd=root,
+            capture_output=True,
+            text=text,
+            encoding="utf-8" if text else None,
+            errors="replace" if text else None,
+            check=False,
+            env=env or _sanitized_subprocess_env(),
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        message = f"git subprocess timed out after {timeout}s: {' '.join(str(a) for a in args)}"
+        return subprocess.CompletedProcess(
+            exc.cmd,
+            returncode=124,
+            stdout=exc.stdout if exc.stdout is not None else ("" if text else b""),
+            stderr=message if text else message.encode("utf-8"),
+        )
 
 
 def _git_object_text(root: Path, object_spec: str, *, env: dict[str, str] | None = None) -> str:
@@ -793,6 +810,7 @@ def _bridge_snapshot(
     bridge_id: str,
     index_snapshot: _IndexSnapshot | None = None,
     head_oid: str | None = None,
+    precomputed_head_entries: tuple[_IndexEntry, ...] | None = None,
 ) -> Iterator[_BridgeSnapshot]:
     pinned_head = index_snapshot.head_oid if index_snapshot is not None else head_oid
     if pinned_head is None:
@@ -805,14 +823,19 @@ def _bridge_snapshot(
             yield _BridgeSnapshot(root=snapshot_root, ledger=ledger)
             return
 
-    head_listing = _run_git(root, "ls-tree", "-r", "-z", pinned_head, "--", "bridge")
-    if head_listing.returncode != 0:
-        raise GateError(f"could not enumerate committed bridge history: {head_listing.stderr!r}")
+    if precomputed_head_entries is not None:
+        # WI-5658: reuse the once-enumerated committed bridge inventory instead of
+        # re-running ls-tree + re-parsing the full ~13k-file tree for every caller.
+        head_entries = precomputed_head_entries
+    else:
+        head_listing = _run_git(root, "ls-tree", "-r", "-z", pinned_head, "--", "bridge")
+        if head_listing.returncode != 0:
+            raise GateError(f"could not enumerate committed bridge history: {head_listing.stderr!r}")
 
-    exact_re = re.compile(rf"^bridge/{re.escape(bridge_id)}-\d{{3}}\.md$")
-    head_entries = tuple(
-        entry for entry in _parse_tree_inventory(head_listing.stdout) if exact_re.fullmatch(entry.rel_path)
-    )
+        exact_re = re.compile(rf"^bridge/{re.escape(bridge_id)}-\d{{3}}\.md$")
+        head_entries = tuple(
+            entry for entry in _parse_tree_inventory(head_listing.stdout) if exact_re.fullmatch(entry.rel_path)
+        )
     with tempfile.TemporaryDirectory(prefix=".gtkb-lifecycle-", dir=scratch_root) as tmp:
         snapshot_root = Path(tmp)
         ledger = _materialize_entries(
@@ -1208,6 +1231,26 @@ def _packet_binding_errors(
     return errors
 
 
+def _committed_bridge_entries_by_id(root: Path, head_oid: str) -> dict[str, tuple[_IndexEntry, ...]]:
+    """Enumerate the committed ``bridge/`` tree ONCE and group versioned entries by
+    bridge slug, so callers can look up a chain's committed entries without
+    re-running ``git ls-tree`` (and re-parsing the full ~13k-file inventory) per
+    packet. This turns ``_load_verified_evidence`` from
+    O(packets x committed-bridge-files) into O(packets + committed-bridge-files).
+    Grouping by ``VERSIONED_BRIDGE_CAPTURE_RE`` bridge_id is equivalent to the
+    prior per-bridge exact-slug filter.
+    """
+    listing = _run_git(root, "ls-tree", "-r", "-z", head_oid, "--", "bridge")
+    if listing.returncode != 0:
+        raise GateError(f"could not enumerate committed bridge history: {listing.stderr!r}")
+    by_id: dict[str, list[_IndexEntry]] = {}
+    for entry in _parse_tree_inventory(listing.stdout):
+        match = VERSIONED_BRIDGE_CAPTURE_RE.fullmatch(entry.rel_path)
+        if match is not None:
+            by_id.setdefault(match.group("bridge_id"), []).append(entry)
+    return {bridge_id: tuple(entries) for bridge_id, entries in by_id.items()}
+
+
 def _load_verified_evidence(
     root: Path,
     head_oid: str | None = None,
@@ -1221,6 +1264,12 @@ def _load_verified_evidence(
     packet_paths = sorted(by_bridge_dir.glob("*.json"))
     if packet_paths and head_oid is None:
         return evidence, ["terminal VERIFIED evidence cannot be read without a pinned HEAD commit"], len(packet_paths)
+    # WI-5658: enumerate committed bridge history ONCE and group by bridge-id, so the
+    # per-packet loop below is O(packets + committed-bridge-files) instead of
+    # re-running ls-tree over all committed bridge files for each packet.
+    head_entries_by_bridge = (
+        _committed_bridge_entries_by_id(root, head_oid) if (packet_paths and head_oid is not None) else {}
+    )
     for packet_path in packet_paths:
         try:
             packet = json.loads(packet_path.read_text(encoding="utf-8"))
@@ -1234,7 +1283,12 @@ def _load_verified_evidence(
         if not isinstance(bridge_id, str) or not bridge_id.strip():
             continue
         try:
-            with _bridge_snapshot(root, bridge_id, head_oid=head_oid) as bridge_snapshot:
+            with _bridge_snapshot(
+                root,
+                bridge_id,
+                head_oid=head_oid,
+                precomputed_head_entries=head_entries_by_bridge.get(bridge_id, ()),
+            ) as bridge_snapshot:
                 snapshot_root = bridge_snapshot.root
                 with _immutable_snapshot(bridge_snapshot):
                     resolution = resolve_bridge_lifecycle(snapshot_root, bridge_id)
