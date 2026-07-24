@@ -118,6 +118,17 @@ class _LedgerEntry:
     device: int
     inode: int
     link_count: int
+    # WI-5659 mechanism 3 (in-ledger; DELIB-202667186 / DELIB-202667188): an index
+    # entry whose blob exceeded MAX_BLOB_BYTES is recorded IN the ledger with
+    # content_exempt=True, carrying its mode, index object id (`oid`), and declared
+    # `size`, but is NOT copied to disk. Keeping every index entry in the one
+    # verifier-recognised structure (per the owner decision) instead of a parallel
+    # map lets _verify_snapshot_ledger prove enumeration completeness and enforce
+    # that no content file exists at an exempt path. For exempt entries
+    # device/inode/link_count are 0 (no on-disk file) and sha256 is the streamed
+    # content hash.
+    content_exempt: bool = False
+    oid: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -681,29 +692,166 @@ def _materialize_entries(
     env: dict[str, str],
     object_format: str,
 ) -> dict[str, _LedgerEntry]:
+    # WI-5659: stream every blob through ONE `git cat-file --batch` process
+    # instead of two subprocess spawns per entry (`cat-file -s` + `cat-file
+    # blob`). Measured on this 19,090-entry index: 159.4 ms/entry (50.7 min)
+    # -> ~1 ms/entry, with 86% of the old cost being process spawn alone. This
+    # changes only HOW blobs are fetched, never WHAT is materialized: the tree
+    # stays index-complete, and per-blob declared-size checks, per-blob
+    # object-hash verification, MAX_BLOB_BYTES / MAX_TREE_BYTES limits,
+    # destination path/link-safety checks, exclusive-create writes, and ledger
+    # contents are all preserved. `_blob_ledger_entry` is retained as the
+    # reference single-entry implementation the ledger-equivalence test
+    # compares against.
+    #
+    # Requests are interleaved one-at-a-time rather than written up front: git
+    # would otherwise block writing a full stdout pipe while this process is
+    # still writing stdin, deadlocking on a large index.
     ledger: dict[str, _LedgerEntry] = {}
-    total_size = 0
+    if not entries:
+        return ledger
+
+    expected_oid_length = GIT_OBJECT_FORMATS[object_format]
     for entry in entries:
-        destination = snapshot_root / entry.rel_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if _path_is_linklike(destination.parent):
-            raise GateError(f"snapshot destination parent is link-like: {destination.parent}")
-        resolved_parent = destination.parent.resolve()
+        if len(entry.oid) != expected_oid_length:
+            raise GateError(
+                f"index object id length does not match repository {object_format} format for {entry.rel_path}"
+            )
+
+    total_size = 0
+    snapshot_root_resolved = snapshot_root.resolve()
+    process = subprocess.Popen(
+        _git_command("cat-file", "--batch"),
+        cwd=root,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    try:
+        assert process.stdin is not None
+        assert process.stdout is not None
+        for entry in entries:
+            destination = snapshot_root / entry.rel_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if _path_is_linklike(destination.parent):
+                raise GateError(f"snapshot destination parent is link-like: {destination.parent}")
+            resolved_parent = destination.parent.resolve()
+            try:
+                resolved_parent.relative_to(snapshot_root_resolved)
+            except ValueError as exc:
+                raise GateError(f"snapshot destination escapes materialization root: {entry.rel_path}") from exc
+
+            process.stdin.write(f"{entry.oid}\n".encode("ascii"))
+            process.stdin.flush()
+
+            header = process.stdout.readline()
+            if not header:
+                raise GateError(f"could not read raw index blob {entry.oid} for {entry.rel_path}: batch stream closed")
+            fields = header.decode("utf-8", "replace").strip().split(" ")
+            if len(fields) != 3:
+                # `<oid> missing` / `<oid> ambiguous` and any malformed header.
+                raise GateError(f"could not read raw index blob {entry.oid} for {entry.rel_path}: {header!r}")
+            batch_oid, object_type, raw_size = fields
+            if object_type != "blob":
+                raise GateError(f"unsupported committed tree object type {object_type!r}")
+            if batch_oid.lower() != entry.oid.lower():
+                raise GateError(f"batch stream returned object id {batch_oid!r} for {entry.rel_path}")
+            try:
+                expected_size = int(raw_size)
+            except ValueError as exc:
+                raise GateError(f"could not read raw blob size for {entry.rel_path}") from exc
+            if expected_size < 0:
+                raise GateError(f"could not read raw blob size for {entry.rel_path}")
+            if expected_size > MAX_BLOB_BYTES:
+                # WI-5659 mechanism 3 (in-ledger; DELIB-202667186 / DELIB-202667188):
+                # exempt oversized blobs from CONTENT COPY only. The bytes are still
+                # streamed from the batch and hash-verified against the index object
+                # id (a substituted blob still fails closed), but are NOT written to
+                # the tree and do NOT consume MAX_TREE_BYTES. The entry is recorded IN
+                # the ledger with content_exempt=True and its mode/oid/declared size.
+                # Required because tracked groundtruth.db (762720256 bytes) otherwise
+                # makes every governed VERIFIED finalization fail closed. Size-triggered
+                # only, never path- or content-targeted.
+                exempt_object_hasher = hashlib.new(object_format)
+                exempt_object_hasher.update(f"blob {expected_size}\0".encode("ascii"))
+                exempt_content_hasher = hashlib.sha256()
+                remaining = expected_size
+                while remaining > 0:
+                    chunk = process.stdout.read(min(remaining, 1024 * 1024))
+                    if not chunk:
+                        raise GateError(
+                            f"raw blob size mismatch for {entry.rel_path}: "
+                            f"expected {expected_size}, got {expected_size - remaining}"
+                        )
+                    remaining -= len(chunk)
+                    exempt_object_hasher.update(chunk)
+                    exempt_content_hasher.update(chunk)
+                if process.stdout.read(1) != b"\n":
+                    raise GateError(f"malformed batch record terminator for {entry.rel_path}")
+                if exempt_object_hasher.hexdigest().lower() != entry.oid.lower():
+                    raise GateError(f"raw blob bytes do not hash to indexed object id for {entry.rel_path}")
+                ledger[entry.rel_path] = _LedgerEntry(
+                    mode=entry.mode,
+                    sha256=exempt_content_hasher.hexdigest(),
+                    size=expected_size,
+                    device=0,
+                    inode=0,
+                    link_count=0,
+                    content_exempt=True,
+                    oid=entry.oid,
+                )
+                continue
+
+            object_hasher = hashlib.new(object_format)
+            object_hasher.update(f"blob {expected_size}\0".encode("ascii"))
+            content_hasher = hashlib.sha256()
+            actual_size = 0
+            with destination.open("xb") as output:
+                remaining = expected_size
+                while remaining > 0:
+                    chunk = process.stdout.read(min(remaining, 1024 * 1024))
+                    if not chunk:
+                        raise GateError(
+                            f"raw blob size mismatch for {entry.rel_path}: expected {expected_size}, got {actual_size}"
+                        )
+                    remaining -= len(chunk)
+                    actual_size += len(chunk)
+                    object_hasher.update(chunk)
+                    content_hasher.update(chunk)
+                    output.write(chunk)
+            if process.stdout.read(1) != b"\n":
+                raise GateError(f"malformed batch record terminator for {entry.rel_path}")
+            if actual_size != expected_size:
+                raise GateError(
+                    f"raw blob size mismatch for {entry.rel_path}: expected {expected_size}, got {actual_size}"
+                )
+            if object_hasher.hexdigest().lower() != entry.oid.lower():
+                raise GateError(f"raw blob bytes do not hash to indexed object id for {entry.rel_path}")
+            if os.name != "nt":
+                destination.chmod(0o755 if entry.mode == "100755" else 0o644)
+            info = destination.stat()
+
+            total_size += actual_size
+            if total_size > MAX_TREE_BYTES:
+                raise GateError(f"prospective tree exceeds {MAX_TREE_BYTES}-byte materialization limit")
+            ledger[entry.rel_path] = _LedgerEntry(
+                mode=entry.mode,
+                sha256=content_hasher.hexdigest(),
+                size=actual_size,
+                device=info.st_dev,
+                inode=info.st_ino,
+                link_count=info.st_nlink,
+            )
+    finally:
         try:
-            resolved_parent.relative_to(snapshot_root.resolve())
-        except ValueError as exc:
-            raise GateError(f"snapshot destination escapes materialization root: {entry.rel_path}") from exc
-        ledger_entry = _blob_ledger_entry(
-            root,
-            destination,
-            entry,
-            env=env,
-            object_format=object_format,
-        )
-        total_size += ledger_entry.size
-        if total_size > MAX_TREE_BYTES:
-            raise GateError(f"prospective tree exceeds {MAX_TREE_BYTES}-byte materialization limit")
-        ledger[entry.rel_path] = ledger_entry
+            if process.stdin is not None and not process.stdin.closed:
+                process.stdin.close()
+        except OSError:
+            pass
+        if process.poll() is None:
+            process.kill()
+        process.communicate()
     return ledger
 
 
@@ -849,23 +997,38 @@ def _bridge_snapshot(
 
 
 def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
+    # WI-5659 mechanism 4 (DELIB-202667187): verify TRACKED `.gtkb-state/*` files
+    # (which are materialized into the ledger) and ignore only runtime audit
+    # scratch (never in the ledger), instead of blanket-skipping the namespace.
+    # Mechanism 3 (in-ledger; DELIB-202667186 / DELIB-202667188): content-exempt
+    # entries are recorded in the ledger but must be ABSENT from disk.
+    exempt_paths = {rel for rel, entry in snapshot.ledger.items() if entry.content_exempt}
+    non_exempt_paths = {rel for rel, entry in snapshot.ledger.items() if not entry.content_exempt}
     actual_paths: set[str] = set()
     for candidate in snapshot.root.rglob("*"):
         rel_path = candidate.relative_to(snapshot.root).as_posix()
-        if rel_path == ".gtkb-state" or rel_path.startswith(".gtkb-state/"):
+        if rel_path == ".gtkb-state":
+            continue
+        if rel_path.startswith(".gtkb-state/") and rel_path not in snapshot.ledger:
             continue
         if _path_is_linklike(candidate):
             raise GateError(f"prospective audit tree contains a link-like path after audit: {rel_path}")
         if candidate.is_file():
             actual_paths.add(rel_path)
-    expected_paths = set(snapshot.ledger)
-    if actual_paths != expected_paths:
+    if actual_paths != non_exempt_paths:
         raise GateError(
             "prospective audit tree file set drifted during audit"
-            f"; missing={sorted(expected_paths - actual_paths)}"
-            f"; extra={sorted(actual_paths - expected_paths)}"
+            f"; missing={sorted(non_exempt_paths - actual_paths)}"
+            f"; extra={sorted(actual_paths - non_exempt_paths)}"
         )
+    exempt_on_disk = sorted(rel for rel in exempt_paths if (snapshot.root / rel).exists())
+    if exempt_on_disk:
+        raise GateError(f"content-exempt ledger paths must not exist on disk: {exempt_on_disk}")
     for rel_path, expected in snapshot.ledger.items():
+        if expected.content_exempt:
+            if not expected.oid or expected.size < 0 or not expected.mode:
+                raise GateError(f"content-exempt ledger entry has incomplete metadata: {rel_path}")
+            continue
         candidate = snapshot.root / rel_path
         if not candidate.is_file() or _path_is_linklike(candidate):
             raise GateError(f"prospective audit authority path is no longer a regular file: {rel_path}")
@@ -1292,6 +1455,7 @@ def _committed_bridge_entries_by_id(root: Path, head_oid: str) -> dict[str, tupl
 def _load_verified_evidence(
     root: Path,
     head_oid: str | None = None,
+    protected_paths: list[str] | None = None,
 ) -> tuple[list[tuple[str, list[str]]], list[str], int]:
     errors: list[str] = []
     evidence: list[tuple[str, list[str]]] = []
@@ -1320,6 +1484,24 @@ def _load_verified_evidence(
         bridge_id = packet.get("bridge_id")
         if not isinstance(bridge_id, str) or not bridge_id.strip():
             continue
+        # WI-5659: pre-filter to packets that could authorize a staged protected
+        # path before the expensive _bridge_snapshot + resolve_bridge_lifecycle.
+        # By the _packet_binding_errors invariant a packet contributes to evidence
+        # only when its stored target_path_globs == the resolver-approved
+        # chain.target_paths, and _verified_authorization matches those exact
+        # globs. So a packet whose stored globs authorize none of the staged
+        # protected paths cannot change any cleared/finding outcome, and
+        # verified_errors are only diagnostic context on already-failing paths;
+        # skip its resolution. The scanned-packet count below stays total, so
+        # evidence_summary's terminal_verified_packets_scanned remains honest.
+        # protected_paths=None preserves legacy full-scan behavior for callers
+        # that do not pass it.
+        if protected_paths is not None:
+            packet_globs = _packet_target_paths(packet)
+            if packet_globs is None or not any(
+                path_authorized({"target_path_globs": packet_globs}, rel_path) for rel_path in protected_paths
+            ):
+                continue
         try:
             with _bridge_snapshot(
                 root,
@@ -1775,7 +1957,9 @@ def _evaluate_selected(
     transaction_candidate_path: str | None = None
     if protected_paths:
         live_go_packets, live_go_errors, live_go_count = _load_live_go_evidence(root)
-        verified_evidence, verified_errors, verified_packet_count = _load_verified_evidence(root, head_oid=head_oid)
+        verified_evidence, verified_errors, verified_packet_count = _load_verified_evidence(
+            root, head_oid=head_oid, protected_paths=protected_paths
+        )
         if snapshot is not None:
             transaction_evidence, transaction_errors, transaction_candidate_path = _load_transaction_verified_evidence(
                 root,

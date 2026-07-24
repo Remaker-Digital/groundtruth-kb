@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -703,7 +704,9 @@ def test_evidence_sources_are_loaded_once_for_343_paths(tmp_path: Path, monkeypa
         return [("gtkb-verified", ["scripts/verified-*.py"])], [], 1
 
     monkeypatch.setattr(module, "list_named_packets", live_packets)
-    monkeypatch.setattr(module, "_load_verified_evidence", lambda root, head_oid=None: verified_entry(root))
+    monkeypatch.setattr(
+        module, "_load_verified_evidence", lambda root, head_oid=None, protected_paths=None: verified_entry(root)
+    )
     paths = [f"scripts/live-{index}.py" for index in range(172)] + [
         f"scripts/verified-{index}.py" for index in range(171)
     ]
@@ -748,7 +751,11 @@ def test_live_go_precedence_and_errors_match_snapshot_decisions(
     monkeypatch.setattr(
         module,
         "_load_verified_evidence",
-        lambda root, head_oid=None: ([("gtkb-verified", ["scripts/shared.py", "scripts/verified.py"])], [], 1),
+        lambda root, head_oid=None, protected_paths=None: (
+            [("gtkb-verified", ["scripts/shared.py", "scripts/verified.py"])],
+            [],
+            1,
+        ),
     )
 
     result = module.evaluate(
@@ -1536,20 +1543,28 @@ def test_raw_index_inventory_rejects_casefold_and_unicode_collisions(first: str,
         module._parse_index_inventory(b"\0".join(records) + b"\0")
 
 
-def test_raw_materialization_fails_closed_on_blob_resource_limit(
+def test_raw_materialization_exempts_oversized_blob_in_ledger(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # WI-5659 mechanism 3 (in-ledger; DELIB-202667186 / DELIB-202667188). This
+    # supersedes the prior fail-closed-on-oversized-blob contract, which made every
+    # governed VERIFIED finalization impossible because tracked groundtruth.db is
+    # 762,720,256 bytes. An oversized blob is now recorded IN the ledger with
+    # content_exempt=True and is NOT written to disk; it is still hash-verified while
+    # streaming.
     module = _load_module()
     _init_committed_paths(tmp_path, ["authority.txt"])
     monkeypatch.setattr(module, "MAX_BLOB_BYTES", 1)
 
     with (
         module._index_snapshot(tmp_path) as index_snapshot,
-        pytest.raises(module.GateError, match="materialization limit"),
-        module._bridge_snapshot(tmp_path, "gtkb-unused", index_snapshot),
+        module._bridge_snapshot(tmp_path, "gtkb-unused", index_snapshot) as bridge_snapshot,
     ):
-        pass
+        entry = bridge_snapshot.ledger["authority.txt"]
+        assert entry.content_exempt is True
+        assert entry.oid and entry.size >= 0 and entry.mode
+        assert not (bridge_snapshot.root / "authority.txt").exists()
 
 
 def test_index_snapshot_parser_fails_closed_on_unsupported_status() -> None:
@@ -1908,3 +1923,522 @@ def test_wi5658_load_verified_evidence_enumerates_committed_bridge_once(monkeypa
     assert ls_tree_calls["n"] == 1, (
         f"committed bridge tree must be enumerated once, not per-packet; got {ls_tree_calls['n']}"
     )
+
+
+# --- WI-5659: pre-filter verified-evidence to staged protected paths ----------
+#
+# Governing specs: GOV-FILE-BRIDGE-AUTHORITY-001 (the commit-finalization gate
+# must be fast enough to run as a pre-commit hook) and
+# DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001. _load_verified_evidence skips
+# the expensive _bridge_snapshot + resolve_bridge_lifecycle for packets whose
+# stored target_path_globs authorize NONE of the staged protected paths. By the
+# _packet_binding_errors invariant (a packet counts as evidence only when its
+# stored target_path_globs == the resolver-approved chain.target_paths, and
+# _verified_authorization matches those exact globs) and because verified_errors
+# are only diagnostic context on already-failing paths, the pre-filter cannot
+# change any cleared/finding authorization outcome; it only avoids resolving
+# irrelevant packets (~471 -> typically 1-3, collapsing the 460.8s hang).
+
+
+class _Wi5659RaisingSnapshot:
+    """Stand-in for _bridge_snapshot that records the bridge_id reaching the
+    expensive resolution path, then fails closed so the packet lands in errors
+    (never evidence). Proves ONLY relevant packets are expensively resolved."""
+
+    def __init__(self, reached: list[str], bridge_id: str, exc: Exception) -> None:
+        self._reached = reached
+        self._bridge_id = bridge_id
+        self._exc = exc
+
+    def __enter__(self):
+        self._reached.append(self._bridge_id)
+        raise self._exc
+
+    def __exit__(self, *exc_info) -> bool:
+        return False
+
+
+def _wi5659_write_packet(root: Path, bridge_id: str, globs: list[str]) -> None:
+    pkt_dir = root / ".gtkb-state" / "implementation-authorizations" / "by-bridge"
+    pkt_dir.mkdir(parents=True, exist_ok=True)
+    (pkt_dir / f"{bridge_id}.json").write_text(
+        json.dumps({"bridge_id": bridge_id, "target_path_globs": list(globs)}), encoding="utf-8"
+    )
+
+
+def _wi5659_head(root: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def _wi5659_spy_snapshot(module, monkeypatch: pytest.MonkeyPatch, reached: list[str]) -> None:
+    monkeypatch.setattr(
+        module,
+        "_bridge_snapshot",
+        lambda root, bridge_id, *a, **k: _Wi5659RaisingSnapshot(reached, bridge_id, module.GateError("wi5659-spy")),
+    )
+
+
+def test_wi5659_prefilter_resolves_only_matching_packets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
+    head = _wi5659_head(tmp_path)
+    # Exact-match globs so relevance does not depend on wildcard semantics; the
+    # pre-filter reuses the same path_authorized predicate as authorization.
+    _wi5659_write_packet(tmp_path, "rel-exact", ["scripts/target.py"])
+    _wi5659_write_packet(tmp_path, "rel-multi", ["scripts/unrelated.py", "scripts/target.py"])
+    _wi5659_write_packet(tmp_path, "irr-exact", ["scripts/other.py"])
+    _wi5659_write_packet(tmp_path, "irr-docs", ["docs/readme.md"])
+    _wi5659_write_packet(tmp_path, "irr-noglobs", [])
+    reached: list[str] = []
+    _wi5659_spy_snapshot(module, monkeypatch, reached)
+
+    evidence, errors, count = module._load_verified_evidence(
+        tmp_path, head_oid=head, protected_paths=["scripts/target.py"]
+    )
+
+    # Only packets whose stored globs authorize the staged path are resolved.
+    assert set(reached) == {"rel-exact", "rel-multi"}
+    # terminal_verified_packets_scanned stays TOTAL (evidence_summary honesty).
+    assert count == 5
+    # Both resolved packets hit the fail-closed spy -> errors, never evidence.
+    assert evidence == []
+    assert len(errors) == 2
+
+
+def test_wi5659_prefilter_none_is_full_scan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
+    head = _wi5659_head(tmp_path)
+    for bid, globs in (("a", ["scripts/a.py"]), ("b", ["docs/b.md"]), ("c", ["x/c.py"])):
+        _wi5659_write_packet(tmp_path, bid, globs)
+    reached: list[str] = []
+    _wi5659_spy_snapshot(module, monkeypatch, reached)
+
+    # protected_paths=None preserves legacy full-scan behavior: every packet is
+    # expensively resolved (backward compatibility for callers that omit it).
+    _evidence, _errors, count = module._load_verified_evidence(tmp_path, head_oid=head, protected_paths=None)
+
+    assert set(reached) == {"a", "b", "c"}
+    assert count == 3
+
+
+def test_wi5659_prefilter_preserves_authorization_outcome() -> None:
+    # Algebraic property backing the safety claim (NOT the end-to-end proof; see
+    # test_wi5659_prefilter_integrated_real_chain_equivalence for real resolution).
+    # Filtering an evidence list down to the entries that authorize a staged
+    # protected path preserves _verified_authorization's per-path cleared decision
+    # AND its source, because every authorizing entry survives the filter in its
+    # original order. This isolates WHY the production pre-filter (which drops
+    # exactly the non-authorizing packets) cannot change any authorization outcome.
+    module = _load_module()
+    full_evidence = [
+        ("t-target", ["scripts/target.py"]),
+        ("t-multi", ["scripts/x.py", "scripts/target.py"]),
+        ("t-other", ["docs/readme.md"]),
+        ("t-unrelated", ["other/thing.py"]),
+    ]
+    staged_protected = ["scripts/target.py", "scripts/nope.py"]
+    pre_evidence = [
+        entry
+        for entry in full_evidence
+        if any(module.path_authorized({"target_path_globs": entry[1]}, rel) for rel in staged_protected)
+    ]
+    # Only the two entries authorizing scripts/target.py survive the pre-filter.
+    assert {entry[0] for entry in pre_evidence} == {"t-target", "t-multi"}
+    for rel in staged_protected:
+        full_res = module._verified_authorization(full_evidence, [], rel)
+        pre_res = module._verified_authorization(pre_evidence, [], rel)
+        assert (full_res[0], full_res[1]) == (pre_res[0], pre_res[1]), f"authorization outcome differs for {rel}"
+    # Non-trivial: one staged path is authorized, the other is not.
+    assert module._verified_authorization(pre_evidence, [], "scripts/target.py")[0] is True
+    assert module._verified_authorization(pre_evidence, [], "scripts/nope.py")[0] is False
+
+
+def test_wi5659_prefilter_scales_past_pre_commit_budget(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import time
+
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["bridge/seed-001.md"])
+    head = _wi5659_head(tmp_path)
+    # ~450 irrelevant packets + 1 relevant, mirroring the ~471-packet prod load
+    # that made the full scan take 460.8s.
+    for index in range(450):
+        _wi5659_write_packet(tmp_path, f"irr-{index:03d}", [f"other/mod-{index}.py"])
+    _wi5659_write_packet(tmp_path, "relevant", ["scripts/target.py"])
+    reached: list[str] = []
+    _wi5659_spy_snapshot(module, monkeypatch, reached)
+
+    start = time.perf_counter()
+    _evidence, _errors, count = module._load_verified_evidence(
+        tmp_path, head_oid=head, protected_paths=["scripts/target.py"]
+    )
+    elapsed = time.perf_counter() - start
+
+    # Deterministic proof of the perf mechanism: only the 1 relevant packet is
+    # expensively resolved; the other 450 are skipped by the cheap pre-filter.
+    assert reached == ["relevant"]
+    assert count == 451
+    # Loose wall-clock guard: skipping 450 packets keeps the scan far under budget.
+    assert elapsed < 20.0, f"pre-filter scan took {elapsed:.2f}s"
+
+
+def test_wi5659_prefilter_integrated_real_chain_equivalence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # End-to-end proof (real resolution, NOT mocked) that the pre-filter is
+    # outcome-preserving. A genuine committed VERIFIED chain resolves to real
+    # evidence via _bridge_snapshot + resolve_bridge_lifecycle + the
+    # _packet_binding_errors invariant (packet.target_path_globs ==
+    # chain.target_paths). The pre-filter must (a) return byte-identical evidence
+    # when a staged protected path matches the chain, and (b) skip the chain
+    # entirely (no evidence) when no staged path matches -- while the scanned count
+    # stays total in both cases. This is the test the adversarial-review lens
+    # flagged as missing; it exercises the binding invariant the safety rests on.
+    module = _load_module()
+    selected_paths, report, verdict = _write_transaction_chain(tmp_path, module, monkeypatch)
+    _stage_transaction(tmp_path, selected_paths, report, verdict)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            f"core.hooksPath={tmp_path / 'empty-hooks'}",
+            "commit",
+            "-qm",
+            "fixture verified chain",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    # Baseline full scan: the committed chain resolves to REAL VERIFIED evidence.
+    ev_full, err_full, count_full = module._load_verified_evidence(tmp_path, head_oid=head)
+    assert count_full == 1
+    assert err_full == []
+    assert ev_full, "committed VERIFIED chain must resolve to evidence in the full scan"
+    a_target = selected_paths[0]  # a path the chain's proposal (and packet globs) authorize
+    assert any(a_target in globs for _bid, globs in ev_full)
+
+    # (a) Staged protected path MATCHES the chain -> byte-identical real evidence.
+    ev_match, err_match, count_match = module._load_verified_evidence(
+        tmp_path, head_oid=head, protected_paths=[a_target]
+    )
+    assert ev_match == ev_full
+    assert err_match == err_full
+    assert count_match == 1  # terminal_verified_packets_scanned stays total
+
+    # (b) No staged protected path matches -> chain skipped, no evidence, count total.
+    ev_none, _err_none, count_none = module._load_verified_evidence(
+        tmp_path, head_oid=head, protected_paths=["totally/unrelated-xyz.py"]
+    )
+    assert ev_none == []
+    assert count_none == 1
+
+
+# --- WI-5659 mechanism 2: batch prospective-tree materialization --------------
+#
+# Governing specs: GOV-FILE-BRIDGE-AUTHORITY-001 (the commit-finalization gate
+# must complete as a pre-commit hook); DCL-VERIFIED-SPEC-DERIVED-TESTING-
+# MANDATORY-001. Authorized by DELIB-202667185 (PAUTH v2). `_materialize_entries`
+# streams every blob through ONE `git cat-file --batch` process instead of two
+# subprocess spawns per entry. This changes only HOW blobs are fetched: the tree
+# stays index-complete and every per-blob verification, size limit, and ledger
+# field is preserved. Fail-closed behavior is asserted explicitly below because a
+# batch stream has failure modes (missing/ambiguous objects, short reads,
+# malformed record terminators) the per-entry path did not.
+
+
+class _FakeBatchProcess:
+    """Minimal stand-in for a `git cat-file --batch` Popen handle."""
+
+    def __init__(self, payload: bytes) -> None:
+        self.stdin = io.BytesIO()
+        self.stdout = io.BytesIO(payload)
+        self.stderr = io.BytesIO(b"")
+        self.returncode = 0
+
+    def poll(self):
+        return 0
+
+    def kill(self) -> None:
+        return None
+
+    def communicate(self, timeout=None):
+        return (b"", b"")
+
+
+def _wi5659_single_entry(module, tmp_path: Path):
+    """Commit one file and return (snapshot-context-manager factory, entry)."""
+    _init_committed_paths(tmp_path, ["only.txt"])
+    return module
+
+
+def test_wi5659_batch_ledger_matches_per_entry_reference(tmp_path: Path) -> None:
+    # Ledger equivalence: the batch path must produce the same content-derived
+    # ledger fields (mode/sha256/size) AND the same materialized bytes as the
+    # retained per-entry reference implementation `_blob_ledger_entry`.
+    # device/inode/link_count are per-file identity of two distinct trees, so
+    # they are intentionally not compared.
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["a.txt", "sub/b.txt", "sub/deep/c.bin"])
+    batch_root = tmp_path / "batch-tree"
+    ref_root = tmp_path / "ref-tree"
+    batch_root.mkdir()
+    ref_root.mkdir()
+
+    with module._index_snapshot(tmp_path) as snap:
+        entries = module._index_entries(tmp_path, snap)
+        batch = module._materialize_entries(
+            tmp_path, batch_root, entries, env=snap.env, object_format=snap.object_format
+        )
+        reference: dict[str, object] = {}
+        for entry in entries:
+            destination = ref_root / entry.rel_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            reference[entry.rel_path] = module._blob_ledger_entry(
+                tmp_path, destination, entry, env=snap.env, object_format=snap.object_format
+            )
+
+    assert set(batch) == set(reference)
+    assert batch, "fixture must materialize at least one entry"
+    for rel_path, ref_entry in reference.items():
+        got = batch[rel_path]
+        assert (got.mode, got.sha256, got.size) == (ref_entry.mode, ref_entry.sha256, ref_entry.size), rel_path
+        # Materialized bytes are byte-identical between the two paths.
+        assert (batch_root / rel_path).read_bytes() == (ref_root / rel_path).read_bytes(), rel_path
+
+
+def test_wi5659_batch_uses_one_process_for_all_entries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Deterministic proof of the perf mechanism: N entries cost ONE cat-file
+    # process, not 2N spawns (the 159.4 ms/entry -> ~1 ms/entry change).
+    module = _load_module()
+    paths = [f"f{index}.txt" for index in range(12)]
+    _init_committed_paths(tmp_path, paths)
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+
+    spawns = {"n": 0}
+    real_popen = subprocess.Popen
+
+    def counting_popen(*args, **kwargs):
+        spawns["n"] += 1
+        return real_popen(*args, **kwargs)
+
+    with module._index_snapshot(tmp_path) as snap:
+        entries = module._index_entries(tmp_path, snap)
+        monkeypatch.setattr(module.subprocess, "Popen", counting_popen)
+        ledger = module._materialize_entries(
+            tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format
+        )
+
+    assert len(ledger) == len(entries) >= 12
+    assert spawns["n"] == 1, f"batch materialization must spawn exactly one cat-file process; got {spawns['n']}"
+
+
+def _wi5659_run_batch_with_payload(module, tmp_path: Path, monkeypatch, payload: bytes):
+    """Materialize a one-entry index against a faked batch stream."""
+    out_root = tmp_path / "tree"
+    out_root.mkdir(exist_ok=True)
+    with module._index_snapshot(tmp_path) as snap:
+        entries = module._index_entries(tmp_path, snap)
+        monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **k: _FakeBatchProcess(payload))
+        return module._materialize_entries(tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format)
+
+
+def test_wi5659_batch_missing_object_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # `<oid> missing` (and `<oid> ambiguous`) are 2-field headers -> GateError.
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["only.txt"])
+    with module._index_snapshot(tmp_path) as snap:
+        oid = module._index_entries(tmp_path, snap)[0].oid
+    with pytest.raises(module.GateError, match="could not read raw index blob"):
+        _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, f"{oid} missing\n".encode("ascii"))
+
+
+def test_wi5659_batch_hash_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Defense in depth: content that does not hash to the indexed object id must
+    # fail closed even though a real content-addressed git could not produce it.
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["only.txt"])
+    with module._index_snapshot(tmp_path) as snap:
+        oid = module._index_entries(tmp_path, snap)[0].oid
+    tampered = b"tampered-bytes"
+    payload = f"{oid} blob {len(tampered)}\n".encode("ascii") + tampered + b"\n"
+    with pytest.raises(module.GateError, match="do not hash to indexed object id"):
+        _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, payload)
+
+
+def test_wi5659_batch_malformed_terminator_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A record whose trailing newline is missing must not be silently accepted.
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["only.txt"])
+    with module._index_snapshot(tmp_path) as snap:
+        entry = module._index_entries(tmp_path, snap)[0]
+    content = (tmp_path / entry.rel_path).read_bytes()
+    payload = f"{entry.oid} blob {len(content)}\n".encode("ascii") + content  # no trailing b"\n"
+    with pytest.raises(module.GateError, match="malformed batch record terminator"):
+        _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, payload)
+
+
+def test_wi5659_batch_exempts_oversized_blob_and_enforces_tree_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # In-ledger mechanism 3: an oversized blob is exempted (in-ledger, absent from
+    # disk), not fatal. MAX_TREE_BYTES is still enforced for MATERIALIZED
+    # (non-exempt) blobs, whose written bytes are what consume the budget.
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["a.txt", "b.txt"])
+
+    monkeypatch.setattr(module, "MAX_BLOB_BYTES", 2)  # every fixture blob is oversized
+    out_root = tmp_path / "tree-blob"
+    out_root.mkdir()
+    with module._index_snapshot(tmp_path) as snap:
+        entries = module._index_entries(tmp_path, snap)
+        ledger = module._materialize_entries(
+            tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format
+        )
+    assert ledger and all(e.content_exempt for e in ledger.values())
+    assert set(ledger) == {e.rel_path for e in entries}
+    assert not any((out_root / rel).exists() for rel in ledger)
+
+    monkeypatch.setattr(module, "MAX_BLOB_BYTES", 64 * 1024 * 1024)
+    monkeypatch.setattr(module, "MAX_TREE_BYTES", 3)
+    out_root2 = tmp_path / "tree-total"
+    out_root2.mkdir()
+    with module._index_snapshot(tmp_path) as snap:
+        entries = module._index_entries(tmp_path, snap)
+        with pytest.raises(module.GateError, match="prospective tree exceeds"):
+            module._materialize_entries(tmp_path, out_root2, entries, env=snap.env, object_format=snap.object_format)
+
+
+# --- WI-5659 mechanism 3 (in-ledger) + mechanism 4: ledger exemption + scope ---
+#
+# Authorized by DELIB-202667186 / DELIB-202667188 (mechanism 3, in-ledger) and
+# DELIB-202667187 (mechanism 4). Oversized blobs are recorded IN the ledger with
+# content_exempt=True and their mode/oid/declared size, are hash-verified while
+# streaming, are NOT written to disk, and do NOT consume MAX_TREE_BYTES.
+# _verify_snapshot_ledger compares the on-disk file set to the NON-exempt ledger
+# keys, asserts exempt entries are absent from disk, and (mechanism 4) verifies
+# tracked .gtkb-state/* files while ignoring only runtime audit scratch (never in
+# the ledger).
+
+
+def _wi5659_grow_and_commit(tmp_path: Path, rel: str, nbytes: int) -> None:
+    (tmp_path / rel).write_bytes(b"x" * nbytes)
+    subprocess.run(["git", "add", "--", rel], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            f"core.hooksPath={tmp_path / 'empty-hooks'}",
+            "commit",
+            "-qm",
+            f"grow {rel}",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+
+
+def _wi5659_materialize_all(module, tmp_path: Path, out_root: Path):
+    with module._index_snapshot(tmp_path) as snap:
+        entries = module._index_entries(tmp_path, snap)
+        return module._materialize_entries(tmp_path, out_root, entries, env=snap.env, object_format=snap.object_format)
+
+
+def test_wi5659_exempt_entry_recorded_in_ledger_absent_from_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["big.txt", "small.txt"])
+    _wi5659_grow_and_commit(tmp_path, "big.txt", 4096)
+    monkeypatch.setattr(module, "MAX_BLOB_BYTES", 1024)  # big.txt exempt, small.txt not
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+    ledger = _wi5659_materialize_all(module, tmp_path, out_root)
+
+    assert ledger["big.txt"].content_exempt is True
+    assert ledger["big.txt"].oid and ledger["big.txt"].size > 1024
+    assert ledger["small.txt"].content_exempt is False
+    assert not (out_root / "big.txt").exists()
+    assert (out_root / "small.txt").is_file()
+    # Enumeration completeness is provable from the ledger alone.
+    assert set(ledger) == {"big.txt", "small.txt"}
+    # The exemption-aware verifier passes with no false drift.
+    module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+
+
+def test_wi5659_exempt_blob_streaming_hash_mismatch_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["only.txt"])
+    monkeypatch.setattr(module, "MAX_BLOB_BYTES", 2)
+    with module._index_snapshot(tmp_path) as snap:
+        oid = module._index_entries(tmp_path, snap)[0].oid
+    tampered = b"tampered-oversized-bytes"
+    payload = f"{oid} blob {len(tampered)}\n".encode("ascii") + tampered + b"\n"
+    with pytest.raises(module.GateError, match="do not hash to indexed object id"):
+        _wi5659_run_batch_with_payload(module, tmp_path, monkeypatch, payload)
+
+
+def test_wi5659_content_file_at_exempt_path_is_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["big.txt"])
+    _wi5659_grow_and_commit(tmp_path, "big.txt", 4096)
+    monkeypatch.setattr(module, "MAX_BLOB_BYTES", 1024)
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+    ledger = _wi5659_materialize_all(module, tmp_path, out_root)
+    assert ledger["big.txt"].content_exempt is True
+    # Planting a content file at the exempt path must fail closed.
+    (out_root / "big.txt").write_bytes(b"smuggled")
+    with pytest.raises(module.GateError, match="must not exist on disk|file set drifted"):
+        module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+
+
+def test_wi5659_tracked_gtkb_state_files_are_verified_not_skipped(tmp_path: Path) -> None:
+    module = _load_module()
+    tracked_state = ".gtkb-state/tracked-evidence.json"
+    _init_committed_paths(tmp_path, [tracked_state, "normal.txt"])
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+    ledger = _wi5659_materialize_all(module, tmp_path, out_root)
+    assert tracked_state in ledger and not ledger[tracked_state].content_exempt
+    assert (out_root / tracked_state).is_file()
+    module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+
+
+def test_wi5659_audit_scratch_subtree_is_still_ignored(tmp_path: Path) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["normal.txt"])
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+    ledger = _wi5659_materialize_all(module, tmp_path, out_root)
+    scratch = out_root / ".gtkb-state" / "compliance-audit" / "audit-xyz"
+    scratch.mkdir(parents=True)
+    (scratch / "audit.json").write_text('{"decision": "pass"}', encoding="utf-8")
+    # Non-ledger .gtkb-state content is ignored, not reported as drift.
+    module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+
+
+def test_wi5659_tampering_with_tracked_gtkb_state_file_is_detected(tmp_path: Path) -> None:
+    module = _load_module()
+    tracked_state = ".gtkb-state/tracked-evidence.json"
+    _init_committed_paths(tmp_path, [tracked_state])
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+    ledger = _wi5659_materialize_all(module, tmp_path, out_root)
+    (out_root / tracked_state).write_text("tampered payload", encoding="utf-8")
+    with pytest.raises(module.GateError):
+        module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
