@@ -2432,6 +2432,22 @@ def test_wi5659_audit_scratch_subtree_is_still_ignored(tmp_path: Path) -> None:
     module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
 
 
+def test_wi5659_unexpected_gtkb_state_file_outside_scratch_is_drift(tmp_path: Path) -> None:
+    # LO verdict -021 P1: mechanism 4 must NOT ignore every non-ledger `.gtkb-state/`
+    # path. An unexpected untracked file outside the authorized compliance-audit
+    # scratch boundary must still be caught as file-set drift.
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["normal.txt"])
+    out_root = tmp_path / "tree"
+    out_root.mkdir()
+    ledger = _wi5659_materialize_all(module, tmp_path, out_root)
+    sneaky = out_root / ".gtkb-state" / "unexpected-subtree" / "sneaky.txt"
+    sneaky.parent.mkdir(parents=True)
+    sneaky.write_text("sneaky", encoding="utf-8")
+    with pytest.raises(module.GateError, match="file set drifted"):
+        module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+
+
 def test_wi5659_tampering_with_tracked_gtkb_state_file_is_detected(tmp_path: Path) -> None:
     module = _load_module()
     tracked_state = ".gtkb-state/tracked-evidence.json"

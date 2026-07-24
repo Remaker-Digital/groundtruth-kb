@@ -997,9 +997,12 @@ def _bridge_snapshot(
 
 
 def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
-    # WI-5659 mechanism 4 (DELIB-202667187): verify TRACKED `.gtkb-state/*` files
-    # (which are materialized into the ledger) and ignore only runtime audit
-    # scratch (never in the ledger), instead of blanket-skipping the namespace.
+    # WI-5659 mechanism 4 (DELIB-202667187): skip ONLY the owner-authorized audit
+    # scratch boundary `.gtkb-state/compliance-audit/` (both _isolated_compliance_audit
+    # and the audit-candidate quarantine live under it), NOT every non-ledger path.
+    # Tracked `.gtkb-state/*` files are in the ledger and verified normally; any
+    # UNEXPECTED untracked file elsewhere under `.gtkb-state/` is caught as file-set
+    # drift, preserving the narrow exclusion the owner selected (LO verdict -021 P1).
     # Mechanism 3 (in-ledger; DELIB-202667186 / DELIB-202667188): content-exempt
     # entries are recorded in the ledger but must be ABSENT from disk.
     exempt_paths = {rel for rel, entry in snapshot.ledger.items() if entry.content_exempt}
@@ -1007,9 +1010,7 @@ def _verify_snapshot_ledger(snapshot: _BridgeSnapshot) -> None:
     actual_paths: set[str] = set()
     for candidate in snapshot.root.rglob("*"):
         rel_path = candidate.relative_to(snapshot.root).as_posix()
-        if rel_path == ".gtkb-state":
-            continue
-        if rel_path.startswith(".gtkb-state/") and rel_path not in snapshot.ledger:
+        if rel_path == ".gtkb-state" or rel_path.startswith(".gtkb-state/compliance-audit/"):
             continue
         if _path_is_linklike(candidate):
             raise GateError(f"prospective audit tree contains a link-like path after audit: {rel_path}")
@@ -1194,7 +1195,7 @@ def _run_snapshot_compliance_audit(
     snapshot_root = snapshot.root
     candidate = snapshot_root / candidate_path
     _verify_snapshot_ledger(snapshot)
-    quarantine_dir = snapshot_root / ".gtkb-state" / "audit-candidate"
+    quarantine_dir = snapshot_root / ".gtkb-state" / "compliance-audit" / "audit-candidate"
     quarantine_dir.mkdir(parents=True, exist_ok=True)
     hidden_candidate = quarantine_dir / candidate.name
     try:
