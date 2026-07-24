@@ -80,6 +80,17 @@ def _parser() -> argparse.ArgumentParser:
     drain.add_argument("--operation-id")
     drain.add_argument("--reason")
     _drain_bounds(drain)
+
+    maintenance = commands.add_parser(
+        "maintenance",
+        help="governed git object-store maintenance (plan/run/recover)",
+    )
+    maintenance.add_argument("action", choices=("plan", "run", "recover"))
+    maintenance.add_argument("--operation-id")
+    maintenance.add_argument("--reason")
+    maintenance.add_argument("--expire", default="now")
+    maintenance.add_argument("--prune", default="now")
+    maintenance.add_argument("--max-garbage-age-seconds", type=float, default=86400.0)
     return parser
 
 
@@ -119,7 +130,11 @@ def _serializable_arguments(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def _execute(service: GitLifecycleService, args: argparse.Namespace) -> dict[str, Any] | OperationResult:
+def _execute(
+    service: GitLifecycleService,
+    args: argparse.Namespace,
+    command_boundary: CommandBoundary | None = None,
+) -> dict[str, Any] | OperationResult:
     if args.command == "restore-deleted-path":
         return service.restore_deleted_path(
             path=_require_one(args.path, "--path"),
@@ -195,6 +210,27 @@ def _execute(service: GitLifecycleService, args: argparse.Namespace) -> dict[str
         if args.action == "verify":
             return service.verify_quiescence(operation_id=operation_id)
         return service.release_quiescence(operation_id=operation_id)
+    if args.command == "maintenance":
+        from groundtruth_kb.git_lifecycle.maintenance import MaintenanceActuator
+
+        actuator = MaintenanceActuator(
+            repo_root=service.repo.root,
+            quiescence=service,
+            command=command_boundary,
+        )
+        if args.action == "plan":
+            return actuator.plan()
+        if args.action == "run":
+            return actuator.run(
+                operation_id=_require(args.operation_id, "--operation-id"),
+                expire_spec=args.expire,
+                prune_spec=args.prune,
+                max_garbage_age_seconds=args.max_garbage_age_seconds,
+            )
+        return actuator.recover(
+            reason=_require(args.reason, "--reason"),
+            operation_id=args.operation_id,
+        )
     raise OperationDenied("cli_command_unknown", "unsupported lifecycle command")
 
 
@@ -244,7 +280,7 @@ def main(
                 as_json=args.json,
             )
             return 0
-        result = _execute(service, args)
+        result = _execute(service, args, command_boundary)
     except OperationDenied as exc:
         _emit(exc.to_dict(), as_json=args.json, stream=sys.stderr)
         return 2
