@@ -2898,6 +2898,87 @@ def test_begin_creates_packet_for_post_go_no_go_thread(auth_module, tmp_path):
     assert packet["proposal_file"] == f"bridge/{slug}-001.md"
 
 
+def test_begin_cli_accepts_draft_claim_only_for_report_no_go_resume(auth_module, tmp_path, capsys):
+    """WI-5677: normal claim can resume an implementation-report NO-GO."""
+    _make_groundtruth_toml(tmp_path)
+    slug = "report-no-go-resume"
+    proposal = _write_proposal(tmp_path, slug, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+    _write_verdict(tmp_path, slug, version=2, verdict="GO")
+    _write_implementation_report(tmp_path, slug, version=3, paths=["scripts/dummy.py"])
+    _write_verdict(tmp_path, slug, version=4, verdict="NO-GO")
+    _claim_bridge(auth_module, tmp_path, slug, session_id="session-resume")
+
+    holder = auth_module.bridge_work_intent_registry.current_holder(slug, project_root=tmp_path)
+    assert holder is not None
+    assert holder["claim_kind"] == auth_module.bridge_work_intent_registry.CLAIM_KIND_DRAFT
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--session-id",
+            "session-resume",
+        ]
+    )
+
+    assert rc == 0
+    packet = json.loads(capsys.readouterr().out)
+    expected = {
+        "state": "resumable_report_no_go",
+        "originating_go_file": f"bridge/{slug}-002.md",
+        "originating_go_version": 2,
+        "implementation_report_file": f"bridge/{slug}-003.md",
+        "implementation_report_version": 3,
+        "remediated_no_go_file": f"bridge/{slug}-004.md",
+        "remediated_no_go_version": 4,
+    }
+    assert packet["resumption_authority"] == expected
+    assert packet["implementation_start"]["resumption_authority"] == expected
+    assert packet["implementation_start"]["work_intent_claim"]["claim_kind"] == "draft"
+
+    with pytest.raises(auth_module.AuthorizationError, match="outside implementation authorization scope"):
+        auth_module.validate_targets(
+            tmp_path,
+            ["scripts/outside.py"],
+            session_id="session-resume",
+        )
+
+
+def test_begin_cli_rejects_draft_claim_for_proposal_no_go(auth_module, tmp_path, capsys):
+    """WI-5677: proposal-level NO-GO has no prior GO to resume under."""
+    _make_groundtruth_toml(tmp_path)
+    slug = "proposal-no-go"
+    proposal = _write_proposal(tmp_path, slug, target_paths=["scripts/dummy.py"])
+    _add_project_authorization_metadata(proposal)
+    _seed_project_authorization(tmp_path, allowed_mutation_classes=["source"])
+    _write_verdict(tmp_path, slug, version=2, verdict="NO-GO")
+    _claim_bridge(auth_module, tmp_path, slug, session_id="session-proposal-no-go")
+
+    rc = auth_module.main(
+        [
+            "--project-root",
+            str(tmp_path),
+            "begin",
+            "--bridge-id",
+            slug,
+            "--session-id",
+            "session-proposal-no-go",
+            "--no-write",
+        ]
+    )
+
+    assert rc == 2
+    output = json.loads(capsys.readouterr().out)
+    assert "requires a GO in the bridge chain" in output["error"]
+    assert not auth_module.packet_path(tmp_path).exists()
+    assert not auth_module.packet_path_for_bridge(tmp_path, slug).exists()
+
+
 # ---------------------------------------------------------------------------
 # WI-3353 IP-4: worktree-safe project_root_from_arg
 # ---------------------------------------------------------------------------

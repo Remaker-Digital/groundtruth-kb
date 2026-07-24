@@ -393,6 +393,66 @@ def _post_go_chain_state(statuses_after_go: list[str]) -> str:
     return "awaiting_review"
 
 
+def _report_no_go_resumption_authority(
+    project_root: Path,
+    packet: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return immutable provenance for a narrowly resumable report NO-GO.
+
+    A normal claim is ``draft`` whenever the latest bridge status is not GO.
+    That claim may authorize implementation start only when fresh numbered-file
+    state proves that the latest NO-GO directly reviews an implementation
+    report filed after the packet's pinned GO.  This deliberately rejects a
+    proposal-level NO-GO and a NO-GO that responds to an intervening
+    NO-ACTION or other non-report artifact.
+    """
+    bridge_id = str(packet.get("bridge_id") or "")
+    go_file = str(packet.get("go_file") or "")
+    if not bridge_id or not go_file:
+        return None
+
+    entry = bridge_entry(project_root, bridge_id)
+    if entry.latest_status != "NO-GO" or len(entry.versions) < 2:
+        return None
+
+    go_index = next(
+        (index for index, (status, path) in enumerate(entry.versions) if status == "GO" and path == go_file),
+        None,
+    )
+    if go_index is None or _post_go_chain_state([status for status, _ in entry.versions[:go_index]]) != "resumable":
+        return None
+
+    no_go_file = entry.latest_path
+    report_status, report_file = entry.versions[1]
+    if report_status not in {"NEW", "REVISED"}:
+        return None
+    try:
+        report_text = (project_root / report_file).read_text(encoding="utf-8-sig")
+        no_go_text = (project_root / no_go_file).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return None
+    if proposal_bridge_kind(report_text) != "implementation_report":
+        return None
+    responds_match = re.search(r"(?im)^Responds\s+to\s*:\s*(\S+)\s*$", no_go_text)
+    if responds_match is None or responds_match.group(1).replace("\\", "/") != report_file.replace("\\", "/"):
+        return None
+
+    go_version = _bridge_version_from_rel_path(go_file, bridge_id)
+    report_version = _bridge_version_from_rel_path(report_file, bridge_id)
+    no_go_version = _bridge_version_from_rel_path(no_go_file, bridge_id)
+    if None in {go_version, report_version, no_go_version}:
+        return None
+    return {
+        "state": "resumable_report_no_go",
+        "originating_go_file": go_file,
+        "originating_go_version": go_version,
+        "implementation_report_file": report_file,
+        "implementation_report_version": report_version,
+        "remediated_no_go_file": no_go_file,
+        "remediated_no_go_version": no_go_version,
+    }
+
+
 def approved_files_for_go(entry: BridgeEntry) -> tuple[str, str]:
     """Return ``(approved_proposal_file, go_file)`` for the thread's latest GO.
 
@@ -2085,12 +2145,22 @@ def finalize_implementation_start_packet(
     if holder is None:
         raise AuthorizationError(f"No active work-intent evidence exists for {bridge_id!r}")
     claim_kind = holder.get("claim_kind")
-    if claim_kind not in {
-        bridge_work_intent_registry.CLAIM_KIND_GO_IMPLEMENTATION,
-        bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
-    }:
+    resumption_authority = (
+        _report_no_go_resumption_authority(project_root, packet)
+        if claim_kind == bridge_work_intent_registry.CLAIM_KIND_DRAFT
+        else None
+    )
+    if (
+        claim_kind
+        not in {
+            bridge_work_intent_registry.CLAIM_KIND_GO_IMPLEMENTATION,
+            bridge_work_intent_registry.CLAIM_KIND_PROJECT_AUTHORIZATION_BOOTSTRAP,
+        }
+        and resumption_authority is None
+    ):
         raise AuthorizationError(
-            f"Bridge {bridge_id!r} does not have a GO-implementation claim or project_authorization_bootstrap claim"
+            f"Bridge {bridge_id!r} does not have a GO-implementation claim, "
+            "project_authorization_bootstrap claim, or draft claim backed by a fresh report-level NO-GO resume state"
         )
 
     try:
@@ -2140,6 +2210,8 @@ def finalize_implementation_start_packet(
     finalized = dict(packet)
     finalized.pop("packet_hash", None)
     finalized["schema_version"] = 3
+    if resumption_authority is not None:
+        finalized["resumption_authority"] = resumption_authority
     bootstrap_authority = finalized.get("bootstrap_authority")
     if isinstance(bootstrap_authority, dict):
         bootstrap_authority = dict(bootstrap_authority)
@@ -2161,6 +2233,8 @@ def finalize_implementation_start_packet(
             else None
         ),
     }
+    if resumption_authority is not None:
+        finalized["implementation_start"]["resumption_authority"] = resumption_authority
     finalized["packet_hash"] = packet_hash(finalized)
     return finalized
 
