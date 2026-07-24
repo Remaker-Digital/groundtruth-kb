@@ -2389,8 +2389,35 @@ def validate_packet_project_authorization_operation(
         "taxonomy_version",
         "taxonomy_sha256",
     )
+    # WI-5652: the drift check must compare like-for-like against the packet's
+    # stored snapshot, which was computed over ALL declared target paths at
+    # packet-creation time. `current` above is computed over the write-time
+    # target paths -- a single file for any Write tool call -- so comparing it
+    # directly false-positives on `target_classifications` and
+    # `normalized_envelope_hash` for every multi-path PAUTH packet. Recompute a
+    # drift reference over the packet's declared target paths. Per-write
+    # authorization is still enforced by the `current` evaluation above, which
+    # raises when a write-time target's mutation class is not PAUTH-allowed.
+    declared_target_paths = [
+        str(entry.get("path"))
+        for entry in project_authorization.get("target_classifications", [])
+        if isinstance(entry, dict) and entry.get("path")
+    ]
+    drift_reference = (
+        validate_project_authorization_row(
+            project_root,
+            row,
+            proposal_project_id=project_authorization.get("proposal_project_id"),
+            work_item_id=project_authorization.get("work_item_id"),
+            spec_links=packet_spec_links(packet),
+            target_paths=declared_target_paths,
+            requested_operations=requested_operations,
+        )
+        if declared_target_paths
+        else current
+    )
     for field in stable_fields:
-        if current.get(field) != project_authorization.get(field):
+        if drift_reference.get(field) != project_authorization.get(field):
             raise AuthorizationError(f"Project authorization {field} drifted since packet creation")
     return current
 
