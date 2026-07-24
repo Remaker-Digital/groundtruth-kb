@@ -14,7 +14,7 @@ status rewriting to drain the sprawl.
 The normal positive finalization actuator remains:
 
 ```powershell
-python .claude/skills/verify/helpers/write_verdict.py --finalize-verified --slug <slug> --body-file <reviewed-verdict-body> --commit-message "<type(scope): subject>" --include <verified-path>
+python .claude/skills/gtkb-verify/helpers/write_verdict.py --finalize-verified --slug <slug> --body-file <reviewed-verdict-body> --commit-message "<type(scope): subject>" --include <verified-path>
 ```
 
 For already-written terminal verdicts, use only the approved project finalizer

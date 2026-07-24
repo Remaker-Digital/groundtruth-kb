@@ -499,7 +499,7 @@ pattern set); `GOV-ARTIFACT-APPROVAL-001` (credential safety as part of the
 formal-artifact-approval discipline).
 
 **Implementation pointer:** `.claude/hooks/scanner-safe-writer.py`;
-`.claude/skills/bridge-propose/SKILL.md` (helper-side scan).
+`.claude/skills/gtkb-bridge-propose/SKILL.md` (helper-side scan).
 
 ### owner-decision tracker
 
@@ -1067,7 +1067,7 @@ staged across Phase 3 (Stage A) and Phase 6 (Stages B and C).
 
 **Source:** S349 self-diagnostic; `bridge/gtkb-self-diagnostic-leak-closure-slice-3-assertion-triage-007.md` (Codex GO at -008); SPEC-1662 (GOV-18).
 
-**Implementation pointer:** `scripts/assertion_categorize.py`; `scripts/assertion_retirement_workflow.py`; `.claude/skills/assertion-triage/SKILL.md`.
+**Implementation pointer:** `scripts/assertion_categorize.py`; `scripts/assertion_retirement_workflow.py`; `.claude/skills/gtkb-assertion-triage/SKILL.md`.
 
 ### genuine_drift
 

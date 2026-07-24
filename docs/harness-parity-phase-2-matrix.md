@@ -36,7 +36,7 @@ readiness, credential-source, or live-probe classification assertions.
 | antigravity | Readiness probe | supported | True | scripts/verify_antigravity_dispatch.py | Supported | Readiness or harness wrapper script exists. |
 | antigravity | Harness registry projection | supported | True | harness-state/harness-registry.json | Supported | status=retired; roles=['loyal-opposition'] |
 | antigravity | Skill projection surface | supported | True | .agent/skills | Supported | Known skill projection surface exists. |
-| claude | Bridge write and verdict path | supported | True | .claude/skills/bridge/helpers<br>.claude/skills/verify/helpers | Supported | Bridge helper or harness bridge route exists. |
+| claude | Bridge write and verdict path | supported | True | .claude/skills/gtkb-bridge/helpers<br>.claude/skills/gtkb-verify/helpers | Supported | Bridge helper or harness bridge route exists. |
 | claude | Dispatcher receive capability | blocked | True | config/dispatcher/rules.toml<br>harness-state/harness-registry.json | Candidate: Close claude dispatcher receive capability gap | can_receive_dispatch=False; dispatcher required roles=['loyal-opposition', 'prime-builder'] |
 | claude | Event-source capability | blocked | False | harness-state/harness-registry.json | Candidate: Close claude event-source capability gap | can_fire_events=False |
 | claude | Headless invocation surface | supported | True | harness-state/harness-registry.json | Supported | Headless argv is declared. |
@@ -46,7 +46,7 @@ readiness, credential-source, or live-probe classification assertions.
 | claude | Readiness probe | needs_adapter | True | scripts/verify_claude_dispatch.py<br>scripts/claude_harness.py<br>scripts/check_claude_harness.py | Candidate: Close claude readiness probe gap | No deterministic readiness probe was found. |
 | claude | Harness registry projection | supported | True | harness-state/harness-registry.json | Supported | status=suspended; roles=['prime-builder'] |
 | claude | Skill projection surface | supported | True | .claude/skills | Supported | Known skill projection surface exists. |
-| codex | Bridge write and verdict path | supported | True | .codex/skills/bridge/helpers<br>.codex/skills/verify/helpers | Supported | Bridge helper or harness bridge route exists. |
+| codex | Bridge write and verdict path | supported | True | .codex/skills/gtkb-bridge/helpers<br>.codex/skills/gtkb-verify/helpers | Supported | Bridge helper or harness bridge route exists. |
 | codex | Dispatcher receive capability | supported | True | config/dispatcher/rules.toml<br>harness-state/harness-registry.json | Supported | can_receive_dispatch=True; dispatcher required roles=['loyal-opposition', 'prime-builder'] |
 | codex | Event-source capability | supported | False | harness-state/harness-registry.json | Supported | can_fire_events=True |
 | codex | Headless invocation surface | supported | True | harness-state/harness-registry.json | Supported | Headless argv is declared. |
