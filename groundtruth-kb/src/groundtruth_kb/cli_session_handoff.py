@@ -89,7 +89,14 @@ def envelope_open_cmd(
     json_output: bool,
 ) -> None:
     """Open a current per-harness session-envelope file."""
-    from groundtruth_kb.session.envelope import open_session, parse_canonical_init_keyword
+    from groundtruth_kb.session.envelope import (
+        EnvelopeError,
+        load_worker_session,
+        open_session,
+        parse_canonical_init_keyword,
+        resolve_harness_identity,
+        resolve_worker_role_provenance,
+    )
 
     parsed_keyword = parse_canonical_init_keyword(init_keyword) if init_keyword is not None else None
     if init_keyword is not None and parsed_keyword is None:
@@ -111,16 +118,52 @@ def envelope_open_cmd(
         subject = parsed_subject
 
     config = _resolve_config(ctx)
-    envelope = open_session(
-        Path(config.project_root),
-        harness_name=harness_name,
-        harness_id=harness_id,
-        init_keyword=init_keyword,
-        subject=subject,
-        role=role,
-        active_work_item_id=active_work_item_id,
-        worker_role_source="transcript_init_keyword" if parsed_role is not None else None,
-    )
+    project_root = Path(config.project_root)
+    envelope = None
+    host_session_id = None
+    normalized_harness = harness_name.strip().lower()
+    codex_thread_id = os.environ.get("CODEX_THREAD_ID") if normalized_harness == "codex" else None
+    try:
+        if codex_thread_id is not None:
+            host_session_id = _required_turn_metadata(codex_thread_id, "CODEX_THREAD_ID")
+            resolved_name, resolved_id = resolve_harness_identity(
+                project_root,
+                harness_name=normalized_harness,
+                harness_id=harness_id,
+            )
+            existing = load_worker_session(project_root, resolved_name, host_session_id)
+            if existing is not None:
+                if existing.get("session_id") != host_session_id:
+                    raise EnvelopeError("Exact session envelope has a mismatched session id.")
+                if existing.get("status") != "open":
+                    raise EnvelopeError("Exact session envelope is not open.")
+                if existing.get("harness_name") != resolved_name or existing.get("harness_id") != resolved_id:
+                    raise EnvelopeError("Exact session envelope has mismatched harness identity.")
+                provenance = resolve_worker_role_provenance(
+                    project_root,
+                    current_session_id=host_session_id,
+                    harness_name=resolved_name,
+                )
+                if role is not None and provenance["role"] != role:
+                    raise EnvelopeError("Requested role conflicts with the exact host-bound session envelope.")
+                if subject is not None and existing.get("subject") != subject:
+                    raise EnvelopeError("Requested subject conflicts with the exact host-bound session envelope.")
+                envelope = existing
+
+        if envelope is None:
+            envelope = open_session(
+                project_root,
+                harness_name=harness_name,
+                harness_id=harness_id,
+                init_keyword=init_keyword,
+                subject=subject,
+                role=role,
+                active_work_item_id=active_work_item_id,
+                session_id=host_session_id if parsed_role is not None else None,
+                worker_role_source="transcript_init_keyword" if parsed_role is not None else None,
+            )
+    except EnvelopeError as exc:
+        raise click.ClickException(str(exc)) from exc
     if json_output:
         click.echo(json.dumps(envelope, indent=2, sort_keys=True))
     else:

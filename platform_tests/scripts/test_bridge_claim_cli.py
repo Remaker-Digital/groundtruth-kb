@@ -10,6 +10,9 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from click.testing import CliRunner
+from groundtruth_kb.cli import main
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "bridge_claim_cli.py"
 
@@ -97,6 +100,45 @@ def _write_prime_marker(root: Path, session_id: str) -> None:
     envelope_path = root / "harness-state" / harness_name / "session-envelopes" / f"{session_id}.json"
     envelope_path.parent.mkdir(parents=True, exist_ok=True)
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+
+
+def _open_host_bound_prime_envelope(root: Path, session_id: str) -> None:
+    state = root / "harness-state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "harness-identities.json").write_text(
+        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}),
+        encoding="utf-8",
+    )
+    (state / "harness-registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "harnesses": [{"id": "A", "harness_name": "codex", "role": ["loyal-opposition"]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = root / "groundtruth.toml"
+    config.write_text(
+        f'[groundtruth]\nproject_root = "{root.as_posix()}"\ndb_path = "{(root / "groundtruth.db").as_posix()}"\n',
+        encoding="utf-8",
+    )
+    opened = CliRunner().invoke(
+        main,
+        [
+            "--config",
+            str(config),
+            "session",
+            "envelope",
+            "open",
+            "--init-keyword",
+            "::init gtkb pb",
+            "--json",
+        ],
+        env={"CODEX_THREAD_ID": session_id},
+    )
+    assert opened.exit_code == 0, opened.output
+    assert json.loads(opened.output)["session_id"] == session_id
 
 
 def test_resolve_session_id_uses_harness_neutral_fallbacks(monkeypatch) -> None:
@@ -234,6 +276,21 @@ def test_claim_go_implementation_uses_versioned_bridge_files_without_index(tmp_p
     assert holder["session_id"] == session_id
     assert holder["claim_kind"] == "go_implementation"
     assert not (tmp_path / "bridge" / "INDEX.md").exists()
+
+
+def test_claim_go_implementation_uses_host_bound_cli_envelope_provenance(tmp_path: Path) -> None:
+    slug = "gtkb-host-bound-go-thread"
+    session_id = "codex-thread-123"
+    _write_go_thread(tmp_path, slug)
+    _open_host_bound_prime_envelope(tmp_path, session_id)
+
+    claim = _run_cli(tmp_path, "claim", slug, env={"CODEX_THREAD_ID": session_id})
+
+    assert claim.returncode == 0, claim.stderr
+    holder = json.loads(claim.stdout)
+    assert holder["session_id"] == session_id
+    assert holder["claim_kind"] == "go_implementation"
+    assert holder["acting_role"] == "prime-builder"
 
 
 def test_claim_refused_when_other_session_holds_slug(tmp_path: Path) -> None:

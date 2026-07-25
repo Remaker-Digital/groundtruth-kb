@@ -131,6 +131,83 @@ def test_cli_role_bearing_keyword_can_supply_the_transcript_role(tmp_path: Path)
     assert envelope["worker_role_provenance"]["role"] == "prime-builder"
 
 
+def test_cli_role_bearing_codex_open_binds_exact_host_thread(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _seed_project(tmp_path)
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+
+    result = _invoke_open(config, "--init-keyword", "::init gtkb pb")
+
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    assert envelope["session_id"] == "codex-thread-123"
+    assert envelope["worker_role_provenance"]["session_id"] == "codex-thread-123"
+    assert envelope["worker_role_provenance"]["role"] == "prime-builder"
+    exact = worker_session_envelope_path(root, "codex", "codex-thread-123")
+    assert json.loads(exact.read_text(encoding="utf-8")) == envelope
+
+
+def test_cli_same_host_refresh_returns_exact_envelope_without_rewrite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _seed_project(tmp_path)
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb pb")
+    assert opened.exit_code == 0, opened.output
+    exact_path = worker_session_envelope_path(root, "codex", "codex-thread-123")
+    current_path = root / "harness-state" / "codex" / "session-envelope.json"
+    projection_path = root / ".claude" / "session" / "envelope.json"
+    before = (exact_path.read_bytes(), current_path.read_bytes(), projection_path.read_bytes())
+
+    refreshed = _invoke_open(config)
+
+    assert refreshed.exit_code == 0, refreshed.output
+    envelope = json.loads(refreshed.output)
+    assert envelope["session_id"] == "codex-thread-123"
+    assert envelope["role"] == "prime-builder"
+    assert envelope["worker_role_provenance"]["role_resolution_source"] == "transcript_init_keyword"
+    assert (exact_path.read_bytes(), current_path.read_bytes(), projection_path.read_bytes()) == before
+
+
+def test_cli_same_host_conflict_fails_before_exact_or_projection_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, config = _seed_project(tmp_path)
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-thread-123")
+    opened = _invoke_open(config, "--init-keyword", "::init gtkb pb")
+    assert opened.exit_code == 0, opened.output
+    exact_path = worker_session_envelope_path(root, "codex", "codex-thread-123")
+    current_path = root / "harness-state" / "codex" / "session-envelope.json"
+    projection_path = root / ".claude" / "session" / "envelope.json"
+    before = (exact_path.read_bytes(), current_path.read_bytes(), projection_path.read_bytes())
+
+    conflicting = _invoke_open(config, "--init-keyword", "::init gtkb lo")
+
+    assert conflicting.exit_code != 0
+    assert "conflicts with the exact host-bound session envelope" in conflicting.output
+    assert (exact_path.read_bytes(), current_path.read_bytes(), projection_path.read_bytes()) == before
+
+
+@pytest.mark.parametrize("host_id", [" ", "unknown", "bad\nthread"])
+def test_cli_rejects_invalid_codex_host_thread_before_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    host_id: str,
+) -> None:
+    root, config = _seed_project(tmp_path)
+    monkeypatch.setenv("CODEX_THREAD_ID", host_id)
+
+    result = _invoke_open(config, "--init-keyword", "::init gtkb pb")
+
+    assert result.exit_code != 0
+    assert not (root / "harness-state" / "codex" / "session-envelope.json").exists()
+    assert not (root / "harness-state" / "codex" / "session-envelopes").exists()
+
+
 @pytest.mark.parametrize("keyword", ["::init gtkb", "::init application"])
 def test_cli_role_free_keyword_preserves_durable_fallback(tmp_path: Path, keyword: str) -> None:
     _, config = _seed_project(tmp_path)
