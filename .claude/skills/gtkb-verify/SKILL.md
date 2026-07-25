@@ -98,7 +98,7 @@ Before writing the verdict file, the reviewer must:
    (`gt deliberations search <topic>`) for prior reviews on the same
    spec/WI/component.
 7. Before writing the verdict, run
-   `python .claude/skills/verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
+   `python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug <slug> --body-file <draft-body-file>`
    to seed the draft's `## Prior Deliberations` section. Review and prune the
    helper-suggested candidates; if you opt out, leave an explicit
    `_No prior deliberations: <reason>._` line in the verdict.
@@ -112,7 +112,7 @@ Before writing the verdict file, the reviewer must:
     atomic finalization helper instead of writing the verdict file directly:
 
     ```text
-    python .claude/skills/verify/helpers/write_verdict.py --slug <slug> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
+    python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug <slug> --body-file <reviewed-verdict-body> --finalize-verified --no-prepopulate --commit-message "<type(scope): message>" --include <verified-path> [--include <verified-path> ...]
     ```
 
     Repeat `--include` for every verified implementation/report path that must
@@ -194,8 +194,8 @@ The verdict must honor these gates before `VERIFIED` is recorded:
 ## Cross-harness implementation notes
 
 The skill body is identical between Claude Code and Codex. The canonical file
-is `.claude/skills/verify/SKILL.md`; the Codex adapter is
-`.codex/skills/verify/SKILL.md` and carries the generated adapter marker. Do
+is `.claude/skills/gtkb-verify/SKILL.md`; the Codex adapter is
+`.codex/skills/gtkb-verify/SKILL.md` and carries the generated adapter marker. Do
 NOT edit the adapter directly — edit the canonical file and regenerate with
 `python scripts/generate_codex_skill_adapters.py --update-registry` per
 `ADR-CODEX-HOOK-PARITY-FALLBACK-001`. The adapter's stored SHA in

@@ -445,13 +445,13 @@ def _hook_projection_status(root: Path, harness: dict[str, Any]) -> tuple[str, l
 def _bridge_write_path_status(root: Path, harness: dict[str, Any]) -> tuple[str, list[str], str]:
     name = str(harness.get("harness_name") or "")
     surfaces = {
-        "claude": [".claude/skills/bridge/helpers", ".claude/skills/verify/helpers"],
-        "codex": [".codex/skills/bridge/helpers", ".codex/skills/verify/helpers"],
-        "cursor": [".cursor/skills/bridge/helpers"],
-        "antigravity": [".agent/skills/bridge"],
-        "ollama": ["scripts/ollama_harness.py", ".api-harness/skills/bridge"],
-        "openrouter": ["scripts/openrouter_harness.py", ".api-harness/skills/bridge"],
-        "alibaba-cloud-studio": ["scripts/alibaba_cloud_studio_harness.py", ".api-harness/skills/bridge"],
+        "claude": [".claude/skills/gtkb-bridge/helpers", ".claude/skills/gtkb-verify/helpers"],
+        "codex": [".codex/skills/gtkb-bridge/helpers", ".codex/skills/gtkb-verify/helpers"],
+        "cursor": [".cursor/skills/gtkb-bridge/helpers"],
+        "antigravity": [".agent/skills/gtkb-bridge"],
+        "ollama": ["scripts/ollama_harness.py", ".api-harness/skills/gtkb-bridge"],
+        "openrouter": ["scripts/openrouter_harness.py", ".api-harness/skills/gtkb-bridge"],
+        "alibaba-cloud-studio": ["scripts/alibaba_cloud_studio_harness.py", ".api-harness/skills/gtkb-bridge"],
     }.get(name, [])
     existing = [path for path in surfaces if _exists(root, path)]
     if existing:

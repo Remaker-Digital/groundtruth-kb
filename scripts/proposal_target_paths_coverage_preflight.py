@@ -38,7 +38,7 @@ GENERATOR_OUTPUT_MAP: dict[str, list[str]] = {
     "scripts/generate_codex_skill_adapters.py": [
         ".codex/skills/**",
         ".codex/skills/MANIFEST.json",
-        "config/agent-control/harness-capability-registry.toml",
+        "config/agent-control/gtkb-harness-capability-registry.toml",
     ],
 }
 
@@ -84,7 +84,7 @@ _PROSE_INTENT_CUES = (
 # common scope miss. Classified out of the union of implied paths.
 _INTEGRATION_SURFACE_RE = re.compile(
     r"(?:^|/)(?:settings(?:\.local)?\.json|hooks\.json|"
-    r"harness-capability-registry\.toml|rules\.toml)$"
+    r"(?:gtkb-)?harness-capability-registry\.toml|rules\.toml)$"
 )
 
 

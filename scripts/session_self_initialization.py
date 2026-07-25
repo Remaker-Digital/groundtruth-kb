@@ -41,7 +41,7 @@ if hasattr(sys.stderr, "reconfigure"):
 # Ensure E:\GT-KB project root is on sys.path so `from scripts.<sibling>` imports
 # resolve when this script is invoked as `python scripts/session_self_initialization.py`
 # (where sys.path[0] is the scripts/ directory, not the project root).
-# Per gtkb-claude-session-start-parity-001 GO Change 3 — repairs the
+# Per gtkb-claude-session-start-parity-001 GO Change 3 â€” repairs the
 # `No module named 'scripts.check_harness_parity'` error that surfaced in the
 # `Harness parity` field of every startup payload.
 _PROJECT_ROOT_FOR_IMPORTS = Path(__file__).resolve().parent.parent
@@ -141,7 +141,7 @@ HARNESS_REGISTRY_RELATIVE_PATH = Path("harness-state") / "harness-registry.json"
 # state unless Mike explicitly switches the session to Agent Red work.
 GTKB_HARNESS_STATE_ROOT = PROJECT_ROOT / "harness-state"
 # DEFAULT_DASHBOARD_DIR / DEFAULT_HISTORY_PATH removed per
-# bridge/generator-hardening-001-003.md Â§4.6: argparse defaults to None;
+# bridge/generator-hardening-001-003.md Ã‚Â§4.6: argparse defaults to None;
 # main() derives both from resolved --project-root post-parse.
 # Codex GO -004 implementation constraint (i): PROJECT_ROOT only as CLI
 # fallback for --project-root, never as internal output/read-path fallback.
@@ -178,12 +178,12 @@ BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Bridge automation has two complementary axes. "
     "AXIS 1 (DISPATCHABLE WORK): the dispatcher daemon "
     "(`scripts/dispatcher_runtime.py`) is the canonical mechanism for "
-    "self-contained work — reviews, verdicts, tests, work that a freshly-spawned "
+    "self-contained work â€” reviews, verdicts, tests, work that a freshly-spawned "
     "counterpart harness can complete without further owner input. Registered as "
     "PostToolUse and Stop hooks. "
     "AXIS 2 (NON-DISPATCHABLE WORK): an owner-approved thread automation pattern "
     "may wake the interactive chat session to inspect TAFE/dispatcher bridge "
-    "state and surface work that requires interactive owner input mid-stream — owner-AUQ-required "
+    "state and surface work that requires interactive owner input mid-stream â€” owner-AUQ-required "
     "decisions, multi-turn review with accumulating context, cross-thread "
     "coordination, AUQ-heavy implementation. "
     "Both axes are required; their roles do not overlap. "
@@ -194,17 +194,17 @@ BRIDGE_OPERATION_INSTRUCTIONS_TEXT = (
     "Do NOT create new bridge automations (Codex-app-side, Claude-side, or otherwise) "
     "without owner approval; any new automation must be classified by axis "
     "(dispatchable vs non-dispatchable) and inventoried in "
-    "`config/agent-control/system-interface-map.toml`."
+    "`config/agent-control/gtkb-system-interface-map.toml`."
 )
 SESSION_CONTEXT_REVIEW_INDEPENDENCE_INDEX_REF = (
-    "config/agent-control/SESSION-STARTUP-INDEX.md § Session-context review independence (normative)"
+    "config/agent-control/gtkb-session-startup-index.md Â§ Session-context review independence (normative)"
 )
 SESSION_CONTEXT_REVIEW_INDEPENDENCE_CANONICAL = """## Session-context review independence (normative)
 
 Formal bridge review (GO / NO-GO / VERIFIED) must come from a **different model
 session context** than the one that authored or implemented the artifact under
 review. Shared session context means the verifier likely inherits the same
-assumptions and errors as the author — same-session formal review is prohibited
+assumptions and errors as the author â€” same-session formal review is prohibited
 and must fail closed.
 
 - **Blocker:** reviewer session context equals artifact `author_session_context_id`
@@ -893,7 +893,7 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-# Per bridge/generator-hardening-001-003.md Â§4.7 + Codex -004 GO:
+# Per bridge/generator-hardening-001-003.md Ã‚Â§4.7 + Codex -004 GO:
 # _LOCAL_ENV_CACHE dropped. With project_root threaded, the cache would
 # need a per-root key; the .env.local parse is trivial work and
 # eliminates the multi-root cache-correctness question.
@@ -902,7 +902,7 @@ def _read_text(path: Path) -> str:
 def _local_env_values(project_root: Path) -> dict[str, str]:
     """Read non-secret routing values from local env files without logging them.
 
-    Per bridge/generator-hardening-001-003.md Â§4.7: project_root is now
+    Per bridge/generator-hardening-001-003.md Ã‚Â§4.7: project_root is now
     a required parameter (was: bound to module-level PROJECT_ROOT).
     """
 
@@ -922,7 +922,7 @@ def _local_env_values(project_root: Path) -> dict[str, str]:
 def _local_env_value(project_root: Path, name: str, default: str = "") -> str:
     """Read one local-env value with environment-variable override.
 
-    Per bridge/generator-hardening-001-003.md Â§4.7 + Codex -002 Finding 2:
+    Per bridge/generator-hardening-001-003.md Ã‚Â§4.7 + Codex -002 Finding 2:
     project_root is now a required parameter (was: parameterless wrapper).
     """
     return os.environ.get(name) or _local_env_values(project_root).get(name, default)
@@ -4611,7 +4611,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
     harness_parity = model.get("infrastructure", {}).get("harness_parity", {})
     subject_label = _active_subject_label(model)
 
-    # Â§A hard-rejection: a combined application + GT-KB green claim may not be
+    # Ã‚Â§A hard-rejection: a combined application + GT-KB green claim may not be
     # emitted without an explicit dual-scope declaration at the readiness/report
     # layer. This is defense-in-depth against future code paths that might
     # assemble dual-subject readiness outputs without the guard.
@@ -4642,7 +4642,7 @@ def _render_current_project_state(model: dict[str, Any]) -> str:
 
         # WI-3342 IP-4: role map resolves from the harness registry projection
         # via the IP-3 foundational loader (load_role_assignments now reads the
-        # projection). load_role_assignments is fail-soft — a missing or
+        # projection). load_role_assignments is fail-soft â€” a missing or
         # malformed projection yields an empty document, preserving the
         # canonical-helper fail-closed path below.
         assignment_path = role_assignments_path(_PROJECT_ROOT_FOR_IMPORTS)
@@ -4807,7 +4807,7 @@ def _markdown_url_link(url: str) -> str:
 
 
 # _atomic_write_text relocated to scripts/_wrap_io.py per
-# bridge/gtkb-wrapup-enhancements-slice1-005.md Â§2.4 (REVISED-2 binding,
+# bridge/gtkb-wrapup-enhancements-slice1-005.md Ã‚Â§2.4 (REVISED-2 binding,
 # GO at -006). Re-imported here as a module-level alias so the four
 # existing call sites at lines ~2744, ~4886, ~4891, ~4892 continue to
 # resolve to the same function object without behavior change.
@@ -4825,11 +4825,11 @@ from _wrap_io import _atomic_write_text  # noqa: E402,F401,I001
 
 # Pending owner-decisions surfacing
 # ---------------------------------
-# The .claude/hooks/owner-decision-tracker.py hook is the canonical
+# The config/hooks/gtkb-owner-decision-tracker.py hook is the canonical
 # writer of memory/pending-owner-decisions.md. This renderer reads the
 # same file and surfaces any `## Pending` entries in the startup
 # disclosure so owner decisions don't drown in inline message flow.
-# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Â§2.6;
+# Authority: bridge/gtkb-gov-owner-decision-surfacing-slice1-003.md Ã‚Â§2.6;
 # Codex GO at -004 with condition "keep visibility through this script,
 # do not reintroduce a separate SessionStart hook as primary surface."
 
@@ -4866,7 +4866,7 @@ def _parse_pending_block(text: str) -> list[dict[str, str]]:
     """Parse the `## Pending` section into a list of decision dicts.
 
     Format matches the YAML-frontmatter list shape that
-    .claude/hooks/owner-decision-tracker.py writes:
+    config/hooks/gtkb-owner-decision-tracker.py writes:
 
       - id: DECISION-NNNN
         asked_at: 2026-04-25T07:30:00Z
@@ -4941,13 +4941,13 @@ def _unquote_pending_value(value: str) -> str:
 
 
 def _render_smart_poller_section(project_root: Path, role: dict[str, Any]) -> list[str]:
-    """Retired stub — smart-poller startup-orient surface removed in Slice 4.
+    """Retired stub â€” smart-poller startup-orient surface removed in Slice 4.
 
     The smart-poller mechanism was retired on 2026-05-09 in favor of the
     dispatcher daemon (see Slice 4 of
     ``bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*``).
     The dispatcher runtime does not surface a startup-orient section
-    — actionable bridge work is dispatched via PostToolUse + Stop hooks
+    â€” actionable bridge work is dispatched via PostToolUse + Stop hooks
     rather than read from notification artifacts at session start.
 
     The function is preserved as a stub returning ``[]`` so that the
@@ -4962,15 +4962,15 @@ def _render_diagnostic_section(health: Any) -> list[str]:
     """Render a single-section diagnostic for an unhealthy smart poller.
 
     Per ``bridge/smart-poller-orient-verification-2026-04-29-005.md`` (carry
-    forward of ``-003 §3-§4``) + GO at ``-006``: when the doctor reports
+    forward of ``-003 Â§3-Â§4``) + GO at ``-006``: when the doctor reports
     ``warning`` or ``fail``, the diagnostic supersedes notification rendering
     because notifications cannot be trusted when the poller itself is
-    unhealthy. The doctor message is reused verbatim — it already contains
+    unhealthy. The doctor message is reused verbatim â€” it already contains
     specific remediation hints (file paths, command strings).
     """
-    icon = "⚠️" if health.status == "warning" else "❌"
+    icon = "âš ï¸" if health.status == "warning" else "âŒ"
     return [
-        f"### Smart-poller diagnostic — {health.status.upper()}",
+        f"### Smart-poller diagnostic â€” {health.status.upper()}",
         "",
         f"{icon} {health.message}",
         "",
@@ -5112,7 +5112,7 @@ def render_session_context_review_independence_disclosure(role_profile: str | No
 def render_report(model: dict[str, Any], dashboard_link: str, project_root: Path) -> str:
     """Render the startup report markdown.
 
-    Per bridge/generator-hardening-001-003.md Â§4.5 + Codex -004 GO:
+    Per bridge/generator-hardening-001-003.md Ã‚Â§4.5 + Codex -004 GO:
     project_root is now a required parameter (was: model lacked
     project_root, so the function read PROJECT_ROOT global directly).
     """
@@ -7085,7 +7085,7 @@ def _suggested_skills_lines(model: dict[str, Any]) -> list[str]:
             f"- Suggested skills ({suggestion.scenario}): required {required}; "
             f"recommended {recommended} (report-only).",
         ]
-    except Exception:  # noqa: BLE001 — report-only fail-safe: never break startup (R7)
+    except Exception:  # noqa: BLE001 â€” report-only fail-safe: never break startup (R7)
         return []
 
 
@@ -7294,7 +7294,7 @@ def _write_session_start_json(
     """Write ``.claude/session/session-start.json`` for the spec-event-surfacer.
 
     Per bridge ``gtkb-membase-effective-use-recovery-slice-a-event-surfacer-
-    2026-04-29-005`` REVISED-2 §1.3 + Codex GO at -006: the surfacer hook
+    2026-04-29-005`` REVISED-2 Â§1.3 + Codex GO at -006: the surfacer hook
     reads ``session_started_at`` from this file as the lower bound for
     "in-session" spec rows. Atomic-rename pattern; graceful degradation on
     filesystem errors (the surfacer's fallback to ``now() - 1 hour`` is the
@@ -7408,7 +7408,7 @@ def _arm_startup_interaction_guard(
     }
     # Persist the active harness's current work subject so the counterpart
     # harness's detect_counterpart_state() can detect divergence against a
-    # live-populated durable source (Phase 7 Â§E live-wiring, per bridge -012).
+    # live-populated durable source (Phase 7 Ã‚Â§E live-wiring, per bridge -012).
     if current_subject is not None:
         update["current_subject"] = current_subject
     state.update(update)
@@ -7460,7 +7460,7 @@ def _consume_startup_wrapup_guard(path: Path) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    # Per bridge/generator-hardening-001-003.md Â§4.6: dashboard-dir and
+    # Per bridge/generator-hardening-001-003.md Ã‚Â§4.6: dashboard-dir and
     # history-path default to None; main() derives them from the resolved
     # --project-root post-parse. This means a caller passing only
     # --project-root <child-root> gets all output under <child-root>, not
@@ -7732,7 +7732,7 @@ def main(argv: list[str] | None = None) -> int:
         _emit_no_hook_context()
         return 0
 
-    # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths
+    # Per bridge/generator-hardening-001-003.md Ã‚Â§4.6: derive output paths
     # from resolved project_root when CLI args are omitted, so a caller
     # passing only --project-root <child> gets all output under <child>.
     dashboard_dir = (
@@ -7746,7 +7746,7 @@ def main(argv: list[str] | None = None) -> int:
     bridge_maintenance = None
     startup_pruning = _startup_pruning_scan(project_root, bridge_maintenance) if startup_emit_requested else None
 
-    # Per bridge/generator-hardening-001-003.md Â§4.6: derive output paths
+    # Per bridge/generator-hardening-001-003.md Ã‚Â§4.6: derive output paths
     # from resolved project_root when CLI args are omitted, so a caller
     # passing only --project-root <child> gets all output under <child>.
     dashboard_dir = (

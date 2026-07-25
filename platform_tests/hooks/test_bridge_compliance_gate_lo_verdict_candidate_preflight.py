@@ -42,7 +42,7 @@ def _project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Pat
     source = bridge_dir / "topic-001.md"
     source.write_text(
         "NEW\n"
-        "::init gtkb lo\n"
+        "::init gtkb pb\n"
         "::open build\n\n"
         "bridge_kind: prime_proposal\n"
         "Document: topic\n"
@@ -72,7 +72,7 @@ def _candidate(
     )
     content = (
         f"{status}\n"
-        "::init gtkb pb\n"
+        "::init gtkb lo\n"
         "::open test\n\n"
         "author_identity: loyal-opposition/test/Z\n"
         "author_harness_id: Z\n"

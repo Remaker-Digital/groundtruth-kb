@@ -38,7 +38,7 @@ BRIDGE_ID = "gtkb-wi4965-skill-effectiveness-by-activity"
 WORK_ITEM_ID = "WI-4965"
 PROJECT_ID = "PROJECT-HARNESS-EQUIVALENCE-PHASE-3"
 PAUTH_ID = "PAUTH-PROJECT-HARNESS-EQUIVALENCE-PHASE-3-WI4965-BATCH-C-20260705"
-CAPABILITY_REGISTRY = Path("config") / "agent-control" / "harness-capability-registry.toml"
+CAPABILITY_REGISTRY = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 HARNESS_REGISTRY = Path("harness-state") / "harness-registry.json"
 ACTIVITY_PROFILES = Path("config") / "agent-control" / "activity-disposition-profiles.toml"
 REPORT_DIR = PROJECT_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
@@ -282,7 +282,7 @@ def _activity_projection_evidence(registry: dict[str, Any], harness_name: str) -
         return None
     manifest = str(floor.get("activity_envelope_manifest_source") or ACTIVITY_PROFILES.as_posix())
     limitations = str(floor.get("result_envelope_limitations") or "").strip()
-    evidence = f"config/agent-control/harness-capability-registry.toml::[harnesses.{harness_name}]"
+    evidence = f"config/agent-control/gtkb-harness-capability-registry.toml::[harnesses.{harness_name}]"
     if mode in STRONG_ENVELOPE_MODES:
         status = STATUS_COVERED
         disposition = f"Activity-envelope mode `{mode}` references `{manifest}`."

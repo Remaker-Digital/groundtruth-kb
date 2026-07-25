@@ -261,7 +261,7 @@ def _lane_record(
         "dimensions": dimensions,
         "evidence_sources": {
             "registry_projection": "harness-state/harness-registry.json",
-            "capability_registry": "config/agent-control/harness-capability-registry.toml"
+            "capability_registry": "config/agent-control/gtkb-harness-capability-registry.toml"
             if capability_floor
             else None,
             "waiver_registry": "config/harness-parity/phase2-waivers.toml" if waivers else None,
@@ -285,7 +285,7 @@ def build_report(
     capability_file = (
         Path(capability_registry_path)
         if capability_registry_path is not None
-        else root / "config" / "agent-control" / "harness-capability-registry.toml"
+        else root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     )
     waivers_file = (
         Path(waivers_path) if waivers_path is not None else root / "config" / "harness-parity" / "phase2-waivers.toml"

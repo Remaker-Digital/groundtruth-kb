@@ -4,6 +4,7 @@ Goose resolves skill capability parity via .goose/skills/MANIFEST.json rather th
 per-capability registry surface entries. This generator scans the on-disk
 .goose/skills/gtkb-*/SKILL.md adapters and writes a deterministic manifest index.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -46,7 +47,8 @@ def _read_skill_name(skill_md: Path) -> str:
 
 def _load_registry_ids(project_root: Path) -> dict[str, str]:
     import tomllib
-    reg = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+
+    reg = project_root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     ids: dict[str, str] = {}
     if reg.is_file():
         data = tomllib.loads(reg.read_text(encoding="utf-8"))

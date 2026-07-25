@@ -124,7 +124,7 @@ def _adapter_status(project_root: Path, module, family: str):
 
 
 def _write_registry(project_root: Path, body: str) -> None:
-    registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path = project_root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text(
         "\n".join(
@@ -1046,7 +1046,7 @@ def test_known_harnesses_data_driven_from_projection(monkeypatch, tmp_path: Path
 
 
 def test_known_harnesses_fallback_on_empty_projection(monkeypatch, tmp_path: Path) -> None:
-    """Empty harnesses array → falls back to baseline tuple."""
+    """Empty harnesses array â†’ falls back to baseline tuple."""
     module = _load_module()
     _write_projection(tmp_path, [])
     monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
@@ -1055,7 +1055,7 @@ def test_known_harnesses_fallback_on_empty_projection(monkeypatch, tmp_path: Pat
 
 
 def test_known_harnesses_fallback_on_missing_projection(monkeypatch, tmp_path: Path) -> None:
-    """Missing projection file → fail-safe loader returns empty doc → fallback to baseline."""
+    """Missing projection file â†’ fail-safe loader returns empty doc â†’ fallback to baseline."""
     module = _load_module()
     (tmp_path / "harness-state").mkdir()  # parent exists, file absent
     monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
@@ -1064,7 +1064,7 @@ def test_known_harnesses_fallback_on_missing_projection(monkeypatch, tmp_path: P
 
 
 def test_capability_floor_for_registered_no_role_harness(monkeypatch, tmp_path: Path) -> None:
-    """Registered/no-active-role harness with full floor → 6 PASS CapabilityResults."""
+    """Registered/no-active-role harness with full floor â†’ 6 PASS CapabilityResults."""
     module = _load_module()
     _write_projection(
         tmp_path,
@@ -1108,7 +1108,7 @@ def test_capability_floor_for_registered_no_role_harness(monkeypatch, tmp_path: 
 
 
 def test_capability_floor_missing_floor_returns_MISSING(tmp_path: Path) -> None:
-    """Registered harness without [harnesses.<name>] block → 6 MISSING CapabilityResults."""
+    """Registered harness without [harnesses.<name>] block â†’ 6 MISSING CapabilityResults."""
     module = _load_module()
     registry = {"harnesses": {}}  # No ollama floor
     results = module._evaluate_capability_floor("ollama", registry)
@@ -1120,7 +1120,7 @@ def test_capability_floor_missing_floor_returns_MISSING(tmp_path: Path) -> None:
 
 
 def test_cli_exits_nonzero_when_capability_floor_missing(monkeypatch, tmp_path: Path) -> None:
-    """F8 spec-derivation: registered/no-role harness without floor → CLI exit code 1.
+    """F8 spec-derivation: registered/no-role harness without floor â†’ CLI exit code 1.
 
     Per Codex NO-GO at gtkb-ollama-integration-phase-1-foundation-008.md, the capability-floor
     enforcement must reach the CLI exit path. CapabilityResult(parity_class='required', state='MISSING')
@@ -1144,7 +1144,7 @@ def test_cli_exits_nonzero_when_capability_floor_missing(monkeypatch, tmp_path: 
     # Write a capability registry WITHOUT [harnesses.ollama] block
     reg_dir = tmp_path / "config" / "agent-control"
     reg_dir.mkdir(parents=True, exist_ok=True)
-    (reg_dir / "harness-capability-registry.toml").write_text(
+    (reg_dir / "gtkb-harness-capability-registry.toml").write_text(
         'schema_version = 1\nregistry_id = "test"\npurpose = "test"\nlast_updated = "2026-06-05"\n',
         encoding="utf-8",
     )

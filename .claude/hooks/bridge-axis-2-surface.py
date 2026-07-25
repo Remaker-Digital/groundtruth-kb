@@ -116,7 +116,12 @@ def _log_error(payload: dict[str, Any]) -> None:
 
 
 def _load_scan_bridge_helper() -> Any:
-    helper_path = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+    helper_path = PROJECT_ROOT / ".claude" / "skills" / "gtkb-bridge" / "helpers" / "scan_bridge.py"
+    if not helper_path.is_file():
+        # WI-5661: fall back to the pre-rename skill dir (WI-5651 renamed bridge -> gtkb-bridge).
+        _legacy = PROJECT_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "scan_bridge.py"
+        if _legacy.is_file():
+            helper_path = _legacy
     spec = importlib.util.spec_from_file_location("_gtkb_axis2_scan_bridge", helper_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"scan helper could not be loaded from {helper_path}")

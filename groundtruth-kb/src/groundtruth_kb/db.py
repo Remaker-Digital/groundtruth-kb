@@ -1318,6 +1318,7 @@ CREATE TABLE IF NOT EXISTS sot_artifacts (
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
+    coverage_mode TEXT,
     UNIQUE(id, version)
 );
 
@@ -1330,6 +1331,87 @@ SELECT s.* FROM sot_artifacts s
 INNER JOIN (
     SELECT id, MAX(version) AS max_version FROM sot_artifacts GROUP BY id
 ) latest ON s.id = latest.id AND s.version = latest.max_version;
+
+-- WI-5441 Phase 1B: artifact-registry observed-revision ledger (append-only).
+-- Observed revisions record digest/state history for concrete registry members;
+-- they never grant membership (DCL-SOT-REGISTRY-PROJECTION-PARITY-001 v2).
+CREATE TABLE IF NOT EXISTS sot_artifact_revisions (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    revision_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    canonical_relative_path TEXT NOT NULL,
+    object_kind TEXT NOT NULL,
+    content_digest TEXT NOT NULL,
+    size_bytes INTEGER,
+    observed_at TEXT NOT NULL,
+    actor_session TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    predecessor_revision_id TEXT,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(revision_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_entry ON sot_artifact_revisions(entry_id);
+CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_observed ON sot_artifact_revisions(observed_at);
+
+-- WI-5441 Phase 1B: registry transaction journal (intent + completion) enabling
+-- deterministic recovery after partial failure
+-- (DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001 v1).
+CREATE TABLE IF NOT EXISTS sot_registry_transaction_journal (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    journal_id TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    entry_id TEXT,
+    intent_recorded_at TEXT NOT NULL,
+    declaration_digest TEXT,
+    prior_revision_id TEXT,
+    current_revision_id TEXT,
+    filesystem_result TEXT,
+    projection_transaction TEXT,
+    receipt_digest TEXT,
+    journal_state TEXT NOT NULL,
+    completed_at TEXT,
+    actor_session TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(journal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_state ON sot_registry_transaction_journal(journal_state);
+
+-- WI-5441 Phase 1B: quarantine receipts. Each receipt binds identity, source stat,
+-- digests, and immutable quarantined_at/expires_at plus restore_pending
+-- (DCL-QUARANTINE-RETENTION-EXPIRY-001 v1). Retention/expiry ENFORCEMENT is not in
+-- this schema-only slice; it lands in a later phase.
+CREATE TABLE IF NOT EXISTS sot_quarantine_receipts (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    receipt_id TEXT NOT NULL,
+    original_relative_path TEXT NOT NULL,
+    object_kind TEXT NOT NULL,
+    source_stat_evidence TEXT NOT NULL,
+    payload_path TEXT NOT NULL,
+    content_digest TEXT NOT NULL,
+    logical_size INTEGER,
+    registry_declaration_digest TEXT NOT NULL,
+    observed_revision_cutoff TEXT,
+    inventory_digest TEXT NOT NULL,
+    sweep_plan_digest TEXT NOT NULL,
+    actor_session TEXT NOT NULL,
+    quarantined_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    restore_pending INTEGER NOT NULL DEFAULT 0,
+    receipt_state TEXT NOT NULL,
+    changed_by TEXT NOT NULL,
+    changed_at TEXT NOT NULL,
+    change_reason TEXT NOT NULL,
+    UNIQUE(receipt_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_quarantine_receipts_expiry ON sot_quarantine_receipts(expires_at);
+CREATE INDEX IF NOT EXISTS idx_sot_quarantine_receipts_restore ON sot_quarantine_receipts(restore_pending);
 
 -- Work intent claims registry for bridge thread coordination
 CREATE TABLE IF NOT EXISTS work_intent_claims (
@@ -1734,6 +1816,18 @@ class KnowledgeDB:
         conn.commit()
         if added_work_item_cols:
             _log.debug("Applied migration: unified backlog work item columns %s", added_work_item_cols)
+
+        # Migration 6b: WI-5441 Phase 1B — additive nullable coverage_mode column on
+        # sot_artifacts (no default) per DCL-SOT-REGISTRY-RECORD-SCHEMA-001 v3, which
+        # forbids a silent default that would classify existing declarations. The new
+        # registry tables (sot_artifact_revisions, sot_registry_transaction_journal,
+        # sot_quarantine_receipts) are created via SCHEMA_SQL CREATE TABLE IF NOT EXISTS
+        # and need no migration here.
+        sot_cols = {row[1] for row in conn.execute("PRAGMA table_info(sot_artifacts)").fetchall()}
+        if "coverage_mode" not in sot_cols:
+            conn.execute("ALTER TABLE sot_artifacts ADD COLUMN coverage_mode TEXT")
+            conn.commit()
+            _log.debug("Applied migration: add coverage_mode column to sot_artifacts")
 
         # Migration 7: first-class project layer over canonical work_items.
         self._backfill_project_artifacts_from_work_items()

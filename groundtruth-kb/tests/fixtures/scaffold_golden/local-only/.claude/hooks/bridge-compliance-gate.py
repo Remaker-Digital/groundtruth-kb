@@ -27,6 +27,14 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
+
+def _no_window_subprocess_kwargs() -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return kwargs
+
+
 for _parent in Path(__file__).resolve().parents:
     if (_parent / "scripts" / "bridge_author_metadata.py").is_file():
         if str(_parent) not in sys.path:
@@ -41,6 +49,8 @@ try:
         BRIDGE_AUTHOR_METADATA_STATUSES,
         REQUIRED_AUTHOR_METADATA_FIELDS,
         author_metadata_gaps_for_content,
+        extract_author_metadata,
+        is_synthetic_session_context_id,
     )
 except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
     BRIDGE_AUTHOR_METADATA_STATUSES = frozenset({"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "DEFERRED"})
@@ -57,26 +67,54 @@ except Exception:  # pragma: no cover - hook fail-soft fallback for partial inst
         values = dict(re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE))
         return [field for field in REQUIRED_AUTHOR_METADATA_FIELDS if not values.get(field)]
 
+    def extract_author_metadata(content: str) -> dict[str, str]:
+        return {
+            key.lower(): value.strip()
+            for key, value in re.findall(r"^(author_[a-z0-9_]+):\s*(.*?)\s*$", content, re.IGNORECASE | re.MULTILINE)
+        }
 
-RETIRED_BRIDGE_INDEX_REL = "bridge/" + "INDEX" + ".md"
+    def is_synthetic_session_context_id(value: object) -> bool:
+        text = str(value or "").strip().strip("`")
+        return bool(re.fullmatch(r"(?:openrouter|ollama)-harness-[a-z]", text, re.IGNORECASE))
+
+
+try:
+    from scripts.gtkb_bridge_writer import BridgeEnvelopeError, validate_bridge_envelope_head
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+
+    class BridgeEnvelopeError(RuntimeError):
+        pass
+
+    def validate_bridge_envelope_head(
+        _content: str,
+        *,
+        require_dispatchable: bool = False,
+        activity: str | None = None,
+    ) -> None:
+        return None
+
+
 WRITE_TOOLS = {"Write", "Edit"}
 PENDING_PREFLIGHT_STATUSES = {"NEW", "REVISED"}
-BRIDGE_INDEX_STATUS_TOKENS = (
+BRIDGE_STATUS_TOKENS = (
     "NEW",
     "REVISED",
     "GO",
     "NO-GO",
     "VERIFIED",
+    "NO-ACTION",
     "WITHDRAWN",
     "ADVISORY",
     "DEFERRED",
     "ACCEPTED",
     "BLOCKED",
 )
-BRIDGE_INDEX_STATUS_RE = re.compile(
-    r"^(?:" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r"):\s+bridge/[^\s]+\.md$"
+BRIDGE_VERSIONED_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
+LO_VERDICT_BRIDGE_FILE_RE = re.compile(r"^.+\.lo-verdict\.md$", re.IGNORECASE)
+BRIDGE_FILE_STATUS_RE = re.compile(
+    r"^[#>*\-\s`]*(?:" + "|".join(re.escape(status) for status in BRIDGE_STATUS_TOKENS) + r")\b",
+    re.IGNORECASE,
 )
-BRIDGE_INDEX_STATUS_LIKE_RE = re.compile(r"^[A-Z][A-Z-]*:")
 # Session-id env-var membership is owned by scripts/gtkb_session_id.py
 # (WI-4270 shared resolver unification; bridge/gtkb-session-id-shared-resolver-
 # unification-003 GO at -004). Import the canonical bridge work-intent order;
@@ -124,6 +162,11 @@ OWNER_DECISIONS_PLACEHOLDER_LINE_RE = re.compile(
     r"[\s.`_\-:]*$",
     re.IGNORECASE,
 )
+PRIOR_DELIBERATIONS_HEADING_RE = re.compile(
+    r"^#{1,6}\s*prior\s+deliberations\s*$",
+    re.IGNORECASE,
+)
+NO_PRIOR_DELIBS_PLACEHOLDER = "_No prior deliberations: <fill in reason before filing>._"
 SPEC_TEST_HEADING_RE = re.compile(
     r"^#{1,6}\s*(?:spec(?:ification)?[-\s]+to[-\s]+test|specification[-\s]+derived\s+verification)",
     re.IGNORECASE | re.MULTILINE,
@@ -136,6 +179,12 @@ APPLICABILITY_PREFLIGHT_HEADING_RE = re.compile(
     r"^#{1,6}\s*applicability\s+preflight\s*$",
     re.IGNORECASE,
 )
+COMMIT_FINALIZATION_HEADING_RE = re.compile(
+    r"^#{1,6}\s*commit\s+finalization\s+evidence\s*$",
+    re.IGNORECASE,
+)
+SAME_TRANSACTION_PATH_SET_RE = re.compile(r"\bsame-transaction\s+path\s+set\b", re.IGNORECASE)
+FINALIZATION_PATH_BULLET_RE = re.compile(r"(?m)^\s*[-*]\s+`[^`]+`\s*$")
 PREFLIGHT_PACKET_HASH_RE = re.compile(
     r"\bpacket_hash\s*:\s*`?sha256:[0-9a-f]{64}`?",
     re.IGNORECASE,
@@ -143,6 +192,15 @@ PREFLIGHT_PACKET_HASH_RE = re.compile(
 PREFLIGHT_MISSING_REQUIRED_RE = re.compile(
     r"\bmissing_required_specs\s*:\s*(?:\[\s*\]|`?\[\s*\]`?|none|None|NONE)",
     re.IGNORECASE,
+)
+VERDICT_PREFLIGHT_FRESHNESS_STATUSES = frozenset({"GO", "NO-GO", "VERIFIED"})
+RESPONDS_TO_BRIDGE_PATH_RE = re.compile(r"(?im)^\s*Responds\s+to\s*:\s*`?(?P<path>[^`\r\n]+?\.md)`?\s*$")
+PREFLIGHT_FIELD_LINE_RE = re.compile(r"(?im)^\s*[-*]?\s*(?P<name>[a-z_]+)\s*:\s*`?(?P<value>[^`\r\n]+?)`?\s*$")
+CANDIDATE_EVIDENCE_HASH_SENTINEL = "<CANDIDATE_EVIDENCE_HASH>"
+CANDIDATE_EVIDENCE_HASH_LINE_RE = re.compile(
+    r"(?im)^(?P<prefix>\s*[-*]?\s*candidate_evidence_hash\s*:\s*`?)"
+    r"(?P<value>sha256:[0-9a-f]{64}|<CANDIDATE_EVIDENCE_HASH>)"
+    r"(?P<suffix>`?\s*)$"
 )
 
 # Owner Decisions / Input section gate (Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK).
@@ -176,6 +234,59 @@ OWNER_APPROVAL_MARKER_RES = (
     ),
 )
 
+# Cross-Harness Disposition gate (Slice 4 of PROJECT-GTKB-CROSS-HARNESS-PARITY;
+# DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion PARITY-DISPOSITION-GATE;
+# ADR-CROSS-HARNESS-PARITY-001 Q8). An implementation proposal whose target_paths
+# touch a harness-surface file must declare, per applicable harness, behavioral
+# parity or an owner-approved typed waiver in a ## Cross-Harness Disposition
+# section. The harness-surface marker set is scoped to the demonstrated
+# behavioral-surface set; .cursor/ surfaces and registry-driven expansion are a
+# Slice-6 follow-on.
+CROSS_HARNESS_DISPOSITION_HEADING_RE = re.compile(
+    r"^#{1,6}\s*cross[-\s]?harness\s+disposition\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+HARNESS_SURFACE_PATH_MARKERS = (
+    ".claude/settings.json",
+    ".codex/hooks.json",
+    ".claude/hooks/",
+    ".codex/gtkb-hooks/",
+    ".claude/skills/",
+    ".codex/skills/",
+)
+# Leading bullet / punctuation markers stripped before testing a disposition
+# line for real (alphanumeric) content, so a bare "-", blank bullet, or
+# placeholder line is not mistaken for substantive content.
+DISPOSITION_NONCONTENT_PREFIX_RE = re.compile(r"^[\s>*`_:\-]+")
+
+# Modernization intuitiveness/non-impairment proposal gate. The exact heading
+# is part of GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001's executable contract.
+NONIMPAIRMENT_DISPOSITION_HEADING_RE = re.compile(
+    r"^#{1,6}\s*intuitiveness\s*/\s*non[-\s]?impairment\s+disposition\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+NONIMPAIRMENT_REQUIRED_FIELDS = frozenset(
+    {
+        "applicability",
+        "provenance",
+        "canonical_authority",
+        "primary_route",
+        "before_behavior",
+        "after_behavior",
+        "self_descriptive_naming",
+        "obsolete_guidance_disposition",
+        "history_preservation",
+        "baseline",
+        "expected_result",
+        "rollback",
+        "hard_invariants",
+        "fail_closed_conditions",
+        "essential_context_preservation",
+    }
+)
+NONIMPAIRMENT_PLACEHOLDERS = frozenset({"", "n/a", "none", "tbd", "todo", "unknown"})
+NONIMPAIRMENT_GOV_ID = "GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001"
+
 # Project-linkage metadata gate (DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001).
 # WI-3314: metadata-presence enabling slice. Implementation bridge proposals
 # (NEW/REVISED status, not bridge_kind-exempt) must carry three machine-readable
@@ -188,6 +299,14 @@ PROJECT_AUTHORIZATION_LINE_RE = re.compile(r"^Project Authorization:\s*PAUTH-[A-
 PROJECT_LINE_RE = re.compile(r"^Project:\s*[A-Z0-9-]+\s*$", re.MULTILINE)
 WORK_ITEM_LINE_RE = re.compile(
     r"^Work Item:\s*(?:WI-\d+|WI-AUTO-[A-Z0-9-]+|GTKB-[A-Z0-9-]+|WORKLIST-[A-Z0-9-]+)\s*$", re.MULTILINE
+)
+PROJECT_METADATA_FORMAT_HINT = (
+    "Expected plain metadata lines such as "
+    "`Project Authorization: PAUTH-PROJECT-GTKB-RELIABILITY-FIXES-STANDING`, "
+    "`Project: PROJECT-GTKB-RELIABILITY-FIXES`, and `Work Item: WI-3496`. "
+    "Markdown-bold forms such as `**Project Authorization:** ...`, "
+    "`**Project:** ...`, and `**Work Item:** ...` are not recognized as "
+    "project-linkage metadata lines by this gate. "
 )
 BRIDGE_KIND_LINE_RE = re.compile(r"^bridge_kind:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
 BRIDGE_KIND_METADATA_EXEMPT = frozenset(
@@ -219,29 +338,73 @@ REQUIREMENT_SUFFICIENCY_HEADING_RE = re.compile(
     r"^#{1,6}\s*requirement\s+sufficiency\s*$",
     re.IGNORECASE,
 )
-REQUIREMENT_SUFFICIENCY_OPERATIVE_RE = re.compile(
-    r"existing\s+requirements?\s+(?:are\s+)?sufficient"
-    r"|new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
-    re.IGNORECASE,
-)
+# The implementation-start authorization parser owns the bounded Requirement
+# Sufficiency vocabulary. The Write-time hook imports that classifier when the
+# full project checkout is available, and falls back to the same bounded regexes
+# when installed in a partial hook/template context.
+try:
+    from scripts.implementation_authorization import (
+        REQUIREMENT_GAP_RE as REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
+    )
+    from scripts.implementation_authorization import (
+        REQUIREMENT_SUFFICIENCY_RE as REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
+    )
+    from scripts.implementation_authorization import (
+        requirement_sufficiency_state as _implementation_requirement_sufficiency_state,
+    )
+except Exception:  # pragma: no cover - hook fail-soft fallback for partial installs
+    REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE = re.compile(
+        r"(?i)(?<!\bno\s)\bnew\s+or\s+revised\s+requirements?\b[^.]{0,60}?\b(?:required|needed)\b"
+    )
+    REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE = re.compile(
+        r"(?i)\b(?:existing\s+)?(?:requirements?|owner\s+direction)\b(?:(?!\bnot\b)[^.]){0,80}?\bsufficient\b"
+    )
+    _FALLBACK_FUTURE_SCOPED_GAP_CONTEXT_RE = re.compile(
+        r"(?i)\b(?:would|could|might|may)\b[^.]{0,80}?\b(?:only|later|future|follow-?on|separate|child)\b"
+    )
+
+    def _implementation_requirement_sufficiency_state(markdown: str) -> str:
+        lines = markdown.splitlines()
+        start: int | None = None
+        for idx, line in enumerate(lines):
+            if REQUIREMENT_SUFFICIENCY_HEADING_RE.match(line.strip()):
+                start = idx + 1
+                break
+        if start is None:
+            return "missing"
+        body_lines = _collect_section_lines(lines, start)
+        body = "\n".join(body_lines).strip()
+        if not body:
+            return "missing"
+        gap_match = REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE.search(body)
+        sufficiency_match = REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE.search(body)
+        if gap_match and sufficiency_match:
+            if gap_match.start() < sufficiency_match.start():
+                return "gap"
+            gap_sentence_end = body.find(".", gap_match.start())
+            if gap_sentence_end == -1:
+                gap_sentence_end = len(body)
+            gap_sentence = body[gap_match.start() : gap_sentence_end + 1]
+            if _FALLBACK_FUTURE_SCOPED_GAP_CONTEXT_RE.search(gap_sentence):
+                return "sufficient"
+            return "gap"
+        if gap_match:
+            return "gap"
+        if sufficiency_match:
+            return "sufficient"
+        return "unrecognized"
+
+
 # The two mutually exclusive operative states. The file-bridge-protocol requires
-# EXACTLY ONE; the gap helper counts distinct states present and rejects zero or
-# more than one (per WI-3439 verification NO-GO -008: the combined RE above only
-# proved presence-of-either, so a section asserting BOTH states was wrongly
-# accepted).
-REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE = re.compile(
-    r"existing\s+requirements?\s+(?:are\s+)?sufficient",
-    re.IGNORECASE,
-)
-REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE = re.compile(
-    r"new\s+or\s+revised\s+requirements?\s+required\s+before\s+implementation",
-    re.IGNORECASE,
-)
+# EXACTLY ONE; the gap helper counts distinct canonical states present and
+# rejects zero or more than one (per WI-3439 verification NO-GO -008).
 REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES = (
     REQUIREMENT_SUFFICIENCY_STATE_SUFFICIENT_RE,
     REQUIREMENT_SUFFICIENCY_STATE_NEW_REQUIRED_RE,
 )
-BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset({"prime_proposal", "implementation_proposal"})
+BRIDGE_KIND_IMPLEMENTATION_PROPOSAL = frozenset(
+    {"prime_proposal", "implementation_proposal", "prime_implementation_proposal"}
+)
 
 # WI-project membership gate (DCL-WORK-ITEM-MUST-BELONG-TO-APPROVED-PROJECT-001/
 # CLAUSE-BRIDGE-WI-PROJECT-MEMBERSHIP + DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-
@@ -277,6 +440,26 @@ KB_MUTATION_NEGATION_RE = re.compile(
     r"[^.\n]{0,100}\b(?:MemBase|KB|groundtruth\.db)\b[^.\n]{0,80}\b(?:mutation|write|insert|change|edit)s?\b",
     re.IGNORECASE,
 )
+APPROVAL_EVIDENCE_DECLARATION_RE = re.compile(
+    r"\b(?:"
+    r"formal[-\s]+artifact[-\s]+approval(?:[-\s]+evidence|[-\s]+packet)?|"
+    r"formal[-\s]+approval[-\s]+packet|"
+    r"narrative[-\s]+artifact[-\s]+approval(?:[-\s]+evidence|[-\s]+packet)?|"
+    r"narrative[-\s]+approval[-\s]+packet|"
+    r"artifact[-\s]+approval[-\s]+packet|"
+    r"approval[-\s]+packet"
+    r")\b"
+    r"|\.groundtruth[\\/]+formal-artifact-approvals(?:[\\/][^\s`),]+)?",
+    re.IGNORECASE,
+)
+APPROVAL_EVIDENCE_NEGATION_RE = re.compile(
+    r"\b(?:"
+    r"no|not|without|does\s+not|do\s+not|performs?\s+no|creates?\s+no|writes?\s+no|updates?\s+no|"
+    r"requires?\s+no|omits?|excludes?"
+    r")\b",
+    re.IGNORECASE,
+)
+APPROVAL_EVIDENCE_TARGET_DIR = ".groundtruth/formal-artifact-approvals"
 
 ADVISORY_REPORT_HEADER_FIELDS = ("bridge_kind", "Document", "Version", "Author", "Date")
 ADVISORY_REPORT_SECTIONS = (
@@ -287,6 +470,8 @@ ADVISORY_REPORT_SECTIONS = (
     "Classification Slot",
 )
 AUDIT_OUTPUT_RELATIVE_PATH = Path(".codex") / "gtkb-hooks" / "last-bridge-audit.json"
+PENDING_TARGET_CACHE_RELATIVE_PATH = Path(".gtkb-state") / "bridge-compliance" / "pending-proposal-targets.json"
+PENDING_TARGET_CACHE_SCHEMA_VERSION = 1
 
 
 def _record_gate_denial(pattern_id: str, subject: str, reason: str, *, root: Path | None = None) -> None:
@@ -369,7 +554,13 @@ def _git_common_dir_root(cwd_path: Path) -> Path | None:
         ["git", "rev-parse", "--git-common-dir"],
     ):
         try:
-            out = subprocess.check_output(args, cwd=str(cwd_path), text=True, stderr=subprocess.DEVNULL).strip()
+            out = subprocess.check_output(
+                args,
+                cwd=str(cwd_path),
+                text=True,
+                stderr=subprocess.DEVNULL,
+                **_no_window_subprocess_kwargs(),
+            ).strip()
         except (OSError, subprocess.SubprocessError):
             continue
         if not out:
@@ -414,87 +605,62 @@ def _canonical_project_root(cwd_path: Path) -> Path:
     return cwd_path
 
 
-def _parse_bridge_index(index_path: Path) -> dict[str, str]:
-    """
-    Returns {document_name: latest_status} from versioned bridge files.
-    The argument is retained for older call sites and may be either the bridge
-    directory or any path inside it.
-    """
-    bridge_dir = index_path if index_path.is_dir() else index_path.parent
-    if not bridge_dir.is_dir():
-        return {}
-    latest: dict[str, tuple[int, str]] = {}
-    status_re = re.compile(
-        r"^[#>*\-\s`]*(" + "|".join(re.escape(status) for status in BRIDGE_INDEX_STATUS_TOKENS) + r")\b",
-        re.IGNORECASE,
-    )
-    for path in bridge_dir.glob("*.md"):
-        match = re.match(r"(?P<doc>.+)-(?P<version>\d{3})\.md$", path.name)
-        if not match:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        status = ""
-        for line in text.splitlines():
+def _status_from_versioned_bridge_file(path: Path) -> str | None:
+    try:
+        handle = path.open("r", encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return None
+    with handle:
+        for line in handle:
             stripped = line.strip()
             if not stripped:
                 continue
-            status_match = status_re.match(stripped)
-            status = status_match.group(1).upper() if status_match else ""
-            break
-        version = int(match.group("version"))
-        doc = match.group("doc")
-        if status and version > latest.get(doc, (-1, ""))[0]:
-            latest[doc] = (version, status)
-    return {doc: status for doc, (_, status) in latest.items()}
-
-
-def _bridge_index_well_formedness_error(content: str) -> str | None:
-    """Return a hard-block reason for malformed retired bridge-state content."""
-    if "\\n" in content:
-        return "retired bridge-index content contains literal escaped newline text (\\n)."
-
-    seen_documents: set[str] = set()
-    current_doc: str | None = None
-    current_doc_status_seen = False
-    for lineno, raw_line in enumerate(content.splitlines(), start=1):
-        line = raw_line.strip()
-        if line.startswith("Document:"):
-            if current_doc is not None and not current_doc_status_seen:
-                return f"Document {current_doc!r} has no status line before line {lineno}."
-            document = line.removeprefix("Document:").strip()
-            if not document:
-                return f"line {lineno}: Document line is missing a bridge document id."
-            if document in seen_documents:
-                return f"line {lineno}: duplicate Document entry {document!r}."
-            seen_documents.add(document)
-            current_doc = document
-            current_doc_status_seen = False
-            continue
-
-        if current_doc is None:
-            continue
-
-        if not line:
-            if not current_doc_status_seen:
-                return f"Document {current_doc!r} has a blank line before its first status line."
-            current_doc = None
-            current_doc_status_seen = False
-            continue
-
-        if BRIDGE_INDEX_STATUS_RE.match(line):
-            current_doc_status_seen = True
-            continue
-
-        if BRIDGE_INDEX_STATUS_LIKE_RE.match(line):
-            return f"line {lineno}: malformed bridge status line {line!r}."
-        return f"line {lineno}: unexpected non-status content inside Document {current_doc!r}: {line!r}."
-
-    if current_doc is not None and not current_doc_status_seen:
-        return f"Document {current_doc!r} has no status line."
+            match = BRIDGE_FILE_STATUS_RE.match(stripped)
+            return match.group(0).strip().split()[0].upper() if match else None
     return None
+
+
+def _project_relative_path(path: Path, project_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except (OSError, ValueError):
+        return path.as_posix()
+
+
+def _versioned_bridge_file_groups(project_root: Path) -> dict[str, list[tuple[int, Path]]]:
+    bridge_dir = project_root / "bridge"
+    groups: dict[str, list[tuple[int, Path]]] = {}
+    try:
+        candidates = list(bridge_dir.iterdir())
+    except OSError:
+        return groups
+    for path in candidates:
+        if not path.is_file():
+            continue
+        match = BRIDGE_VERSIONED_FILE_RE.match(path.name)
+        if not match:
+            continue
+        groups.setdefault(match.group(1), []).append((int(match.group(2)), path))
+    for values in groups.values():
+        values.sort(key=lambda row: row[0], reverse=True)
+    return groups
+
+
+def _versioned_bridge_entries(project_root: Path) -> dict[str, list[tuple[int, str, str, Path]]]:
+    entries: dict[str, list[tuple[int, str, str, Path]]] = {}
+    for slug, values in _versioned_bridge_file_groups(project_root).items():
+        if not values:
+            continue
+        version, path = values[0]
+        status = _status_from_versioned_bridge_file(path)
+        if status is None:
+            continue
+        entries[slug] = [(version, status, _project_relative_path(path, project_root), path)]
+    return entries
+
+
+def _latest_bridge_statuses(project_root: Path) -> dict[str, str]:
+    return {slug: values[0][1] for slug, values in _versioned_bridge_entries(project_root).items() if values}
 
 
 def _first_nonblank_line(content: str) -> str:
@@ -505,11 +671,27 @@ def _first_nonblank_line(content: str) -> str:
     return ""
 
 
+_RETIRED_BRIDGE_AGGREGATE_NAME = "INDEX.md"
+
+
+def _is_retired_bridge_aggregate_file(file_path: str) -> bool:
+    path = Path(file_path.replace("\\", "/"))
+    parts = tuple(path.parts)
+    return len(parts) >= 2 and parts[-2].lower() == "bridge" and parts[-1] == _RETIRED_BRIDGE_AGGREGATE_NAME
+
+
 def _is_bridge_markdown_file(file_path: str) -> bool:
     normalized = file_path.replace("\\", "/")
     if not normalized.endswith(".md"):
         return False
-    return "/bridge/" in f"/{normalized}" and not normalized.endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
+    return "/bridge/" in f"/{normalized}" and bool(BRIDGE_VERSIONED_FILE_RE.match(Path(normalized).name))
+
+
+def _is_lo_verdict_bridge_file(file_path: str) -> bool:
+    normalized = file_path.replace("\\", "/")
+    if not normalized.endswith(".md"):
+        return False
+    return "/bridge/" in f"/{normalized}" and bool(LO_VERDICT_BRIDGE_FILE_RE.match(Path(normalized).name))
 
 
 def _extract_bridge_id_from_path(file_path: str) -> str | None:
@@ -597,13 +779,7 @@ def _first_line_is_recognized_status(first_line: str) -> bool:
     verdicts) so the body-status-token rule never false-blocks a line the rest
     of the gate would recognize.
     """
-    return (
-        first_line == "ADVISORY"
-        or first_line == "DEFERRED"
-        or first_line == "WITHDRAWN"
-        or first_line in PENDING_PREFLIGHT_STATUSES
-        or first_line.startswith(("GO", "NO-GO", "VERIFIED"))
-    )
+    return first_line in BRIDGE_STATUS_TOKENS or first_line.startswith(("GO", "NO-GO", "VERIFIED"))
 
 
 def _ondisk_first_nonblank_line(file_path: str) -> str | None:
@@ -625,6 +801,20 @@ def _ondisk_first_nonblank_line(file_path: str) -> str | None:
         return None
 
 
+def _versioned_bridge_file_exists_on_disk(file_path: str) -> bool:
+    """Return True when a versioned bridge file already exists on disk.
+
+    Fail-open: returns False on any OS error so a filesystem issue cannot
+    create a spurious hard-block.
+    """
+    if _extract_bridge_id_from_path(file_path) is None:
+        return False
+    try:
+        return Path(file_path).is_file()
+    except OSError:
+        return False
+
+
 def _body_status_token_violation(file_path: str, content: str) -> bool:
     """True when a versioned bridge file's first non-blank line is not a
     recognized status token AND the file is not grandfathered.
@@ -632,8 +822,7 @@ def _body_status_token_violation(file_path: str, content: str) -> bool:
     New files (and overwrites of files that currently have a canonical first
     line) must keep a canonical first line. Files that already exist on disk
     with a non-canonical first line are grandfathered. Non-versioned bridge
-    markdown (no ``-NNN`` suffix, e.g. retired bridge-index artifacts are already excluded by
-    ``_is_bridge_markdown_file``) is not subject to the rule.
+    markdown (no ``-NNN`` suffix) is not subject to the rule.
     """
     if _extract_bridge_id_from_path(file_path) is None:
         return False
@@ -735,6 +924,9 @@ def _ask_reason_for_content(file_path: str, content: str) -> str | None:
         kb_mutation_reason = _kb_mutation_target_paths_ask_reason(content)
         if kb_mutation_reason:
             return kb_mutation_reason
+        approval_evidence_reason = _approval_evidence_target_paths_ask_reason(content)
+        if approval_evidence_reason:
+            return approval_evidence_reason
     if _has_concrete_spec_links(content):
         return None
     if not _specification_links_heading_misdetected(content):
@@ -768,6 +960,17 @@ def _target_paths_from_content(content: str) -> list[str]:
     return paths
 
 
+def _normalise_target_path(path: str) -> str:
+    norm = path.replace("\\", "/").strip().strip("\"'`")
+    while norm.startswith("./"):
+        norm = norm[2:]
+    return norm.rstrip("/")
+
+
+def _target_path_set_from_content(content: str) -> set[str]:
+    return {_normalise_target_path(path) for path in _target_paths_from_content(content)}
+
+
 def _declares_kb_mutation(content: str) -> bool:
     """Return True when proposal text declares its own KB/MemBase mutation."""
     if KB_MUTATION_NEGATION_RE.search(content):
@@ -784,7 +987,7 @@ def _kb_mutation_target_paths_ask_reason(content: str) -> str | None:
         return None
     if not _declares_kb_mutation(content):
         return None
-    target_paths = {path.replace("\\", "/").lstrip("./") for path in _target_paths_from_content(content)}
+    target_paths = _target_path_set_from_content(content)
     if "groundtruth.db" in target_paths:
         return None
     return (
@@ -795,12 +998,78 @@ def _kb_mutation_target_paths_ask_reason(content: str) -> str | None:
     )
 
 
+def _declares_approval_evidence_scope(content: str) -> bool:
+    """Return True when proposal text declares approval-packet evidence work."""
+    for segment in re.split(r"(?<=[.!?])\s+|\n+", content):
+        if not segment.strip():
+            continue
+        if not APPROVAL_EVIDENCE_DECLARATION_RE.search(segment):
+            continue
+        if APPROVAL_EVIDENCE_NEGATION_RE.search(segment):
+            continue
+        return True
+    return False
+
+
+def _target_paths_include_approval_evidence_packet(target_paths: set[str]) -> bool:
+    for path in target_paths:
+        if path == APPROVAL_EVIDENCE_TARGET_DIR:
+            return True
+        if path.startswith(f"{APPROVAL_EVIDENCE_TARGET_DIR}/"):
+            return True
+    return False
+
+
+def _approval_evidence_target_paths_ask_reason(content: str) -> str | None:
+    """Checkpoint approval-evidence work that omits its packet path envelope."""
+    first_line = _first_nonblank_line(content)
+    if first_line not in PENDING_PREFLIGHT_STATUSES:
+        return None
+    if _bridge_kind_is_metadata_exempt(content):
+        return None
+    if BRIDGE_KIND_LINE_RE.search(content) and not _bridge_kind_is_implementation_proposal(content):
+        return None
+    if not _declares_approval_evidence_scope(content):
+        return None
+    target_paths = _target_path_set_from_content(content)
+    if _target_paths_include_approval_evidence_packet(target_paths):
+        return None
+    return (
+        "[Governance] This bridge proposal appears to declare formal/narrative artifact "
+        "approval evidence or approval-packet work, but target_paths does not include "
+        "a concrete `.groundtruth/formal-artifact-approvals/<packet>.json` path or the "
+        "`.groundtruth/formal-artifact-approvals/**` envelope. Add the approval-packet "
+        "path to target_paths, or confirm the proposal performs no approval-evidence work. "
+        "(Ask checkpoint per bridge target_paths approval-evidence completeness check.)"
+    )
+
+
 def _has_spec_derived_verification(content: str) -> bool:
     return bool(
         _has_concrete_spec_links(content)
         and SPEC_TEST_HEADING_RE.search(content)
         and COMMAND_EVIDENCE_RE.search(content)
     )
+
+
+def _has_commit_finalization_evidence(content: str) -> bool:
+    lines = content.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if COMMIT_FINALIZATION_HEADING_RE.match(line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        return False
+    section = "\n".join(_collect_section_lines(lines, start))
+    return bool(SAME_TRANSACTION_PATH_SET_RE.search(section) and FINALIZATION_PATH_BULLET_RE.search(section))
+
+
+def _synthetic_session_context_id_for_content(content: str) -> str | None:
+    session_context_id = extract_author_metadata(content).get("author_session_context_id")
+    if is_synthetic_session_context_id(session_context_id):
+        return str(session_context_id).strip().strip("`")
+    return None
 
 
 def _proposal_claims_owner_approval(content: str) -> bool:
@@ -831,6 +1100,106 @@ def _has_concrete_owner_decisions_section(content: str) -> bool:
         return False
     nonblank_lines = [line for line in (ln.strip() for ln in section) if line]
     return any(not OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(line) for line in nonblank_lines)
+
+
+def _target_paths_touch_harness_surface(content: str) -> bool:
+    """Return True when any declared target path is a harness-behavioral surface.
+
+    Realizes the PARITY-DISPOSITION-GATE trigger: a proposal whose target_paths
+    touch ``.claude/settings.json``, ``.codex/hooks.json``, ``.claude/hooks/**``,
+    ``.codex/gtkb-hooks/**``, ``.claude/skills/**``, or ``.codex/skills/**`` is a
+    harness-surface change. Paths are normalized by ``_target_path_set_from_content``.
+    """
+    for path in _target_path_set_from_content(content):
+        for marker in HARNESS_SURFACE_PATH_MARKERS:
+            normalized_marker = marker.rstrip("/")
+            if path == normalized_marker or path.startswith(marker):
+                return True
+    return False
+
+
+def _has_concrete_cross_harness_disposition_section(content: str) -> bool:
+    """Heading present AND at least one substantive (non-placeholder, non-bullet) line.
+
+    Mirrors ``_has_concrete_owner_decisions_section`` but additionally rejects
+    lines that are only bullet/punctuation markers (a bare ``-`` or blank bullet)
+    so a disposition section must carry real per-harness content, not a token.
+    """
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if CROSS_HARNESS_DISPOSITION_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+    for raw in _collect_section_lines(lines, start):
+        stripped = raw.strip()
+        if not stripped or OWNER_DECISIONS_PLACEHOLDER_LINE_RE.match(stripped):
+            continue
+        residue = DISPOSITION_NONCONTENT_PREFIX_RE.sub("", stripped)
+        if re.search(r"[A-Za-z0-9]", residue):
+            return True
+    return False
+
+
+def _nonimpairment_value_is_concrete(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() not in NONIMPAIRMENT_PLACEHOLDERS
+    if isinstance(value, list):
+        return bool(value) and all(_nonimpairment_value_is_concrete(item) for item in value)
+    if isinstance(value, dict):
+        return bool(value) and all(_nonimpairment_value_is_concrete(item) for item in value.values())
+    return value is not None
+
+
+def _nonimpairment_disposition_gap(content: str) -> str | None:
+    """Validate the structured Intuitiveness/Non-Impairment Disposition."""
+    lines = content.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if NONIMPAIRMENT_DISPOSITION_HEADING_RE.match(line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        return "section absent"
+    section = "\n".join(_collect_section_lines(lines, start)).strip()
+    fenced_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", section, flags=re.IGNORECASE)
+    if len(fenced_blocks) != 1:
+        return "section must contain exactly one fenced JSON object"
+    try:
+        disposition = json.loads(fenced_blocks[0])
+    except json.JSONDecodeError as exc:
+        return f"disposition JSON is malformed: {exc.msg}"
+    if not isinstance(disposition, dict):
+        return "disposition JSON root must be an object"
+    if disposition.get("schema_version") != 1:
+        return "schema_version must be 1"
+    if disposition.get("applicability") not in {"applicable", "not_applicable"}:
+        return "applicability must be applicable or not_applicable"
+    missing = sorted(NONIMPAIRMENT_REQUIRED_FIELDS - disposition.keys())
+    if missing:
+        return "missing fields: " + ", ".join(missing)
+    nonconcrete = sorted(
+        field for field in NONIMPAIRMENT_REQUIRED_FIELDS if not _nonimpairment_value_is_concrete(disposition.get(field))
+    )
+    if nonconcrete:
+        return "placeholder or empty fields: " + ", ".join(nonconcrete)
+    return None
+
+
+def _prior_deliberations_has_unedited_placeholder(content: str) -> bool:
+    """True when ## Prior Deliberations still has the helper placeholder."""
+    lines = content.splitlines()
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if PRIOR_DELIBERATIONS_HEADING_RE.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return False
+    section = _collect_section_lines(lines, start)
+    return any(line.strip() == NO_PRIOR_DELIBS_PLACEHOLDER for line in section)
 
 
 def _owner_decisions_section_text(content: str) -> str:
@@ -920,16 +1289,22 @@ def _requirement_sufficiency_section_gap(content: str) -> str | None:
         return "section placeholder-only"
     joined = "\n".join(section)
     states_present = sum(1 for state_re in REQUIREMENT_SUFFICIENCY_OPERATIVE_STATES if state_re.search(joined))
-    if states_present == 0:
+    state = _implementation_requirement_sufficiency_state(content)
+    if state == "unrecognized" or states_present == 0:
         return (
             "no operative state ('Existing requirements sufficient' or "
             "'New or revised requirement required before implementation')"
         )
-    if states_present > 1:
+    if states_present > 1 and state != "sufficient":
         return (
             "multiple operative states (exactly one required: 'Existing "
             "requirements sufficient' XOR 'New or revised requirement required "
             "before implementation')"
+        )
+    if state not in {"sufficient", "gap"}:
+        return (
+            "no operative state ('Existing requirements sufficient' or "
+            "'New or revised requirement required before implementation')"
         )
     return None
 
@@ -985,9 +1360,9 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     warning) so the gate never blocks on infrastructure failure. The check only
     runs when all three metadata lines are present (the metadata-presence gate
     handles absence). Condition tokens, in evaluation order:
-    wi-not-found-in-project, wi-membership-inactive, authorization-not-found,
-    authorization-inactive, authorization-expired, wi-excluded-from-authorization,
-    wi-not-included-by-authorization.
+    authorization-not-found, authorization-inactive, authorization-expired,
+    wi-excluded-from-authorization, wi-not-included-by-authorization,
+    wi-not-found-in-project, wi-membership-inactive.
     """
     authorization_id, project_id, work_item_id = _extract_project_metadata(content)
     if not (authorization_id and project_id and work_item_id):
@@ -999,14 +1374,6 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
         conn.row_factory = sqlite3.Row
-        membership = conn.execute(
-            "SELECT status FROM current_project_work_item_memberships WHERE work_item_id = ? AND project_id = ?",
-            (work_item_id, project_id),
-        ).fetchone()
-        if membership is None:
-            return "wi-not-found-in-project"
-        if membership["status"] != "active":
-            return "wi-membership-inactive"
         auth = conn.execute(
             "SELECT project_id, status, "
             "(expires_at IS NOT NULL AND expires_at <= datetime('now')) AS is_expired, "
@@ -1023,8 +1390,18 @@ def _wi_project_membership_gap(content: str, cwd_path: Path) -> str | None:
         if work_item_id in _parse_json_id_list(auth["excluded_work_item_ids"]):
             return "wi-excluded-from-authorization"
         included = _parse_json_id_list(auth["included_work_item_ids"])
-        if included and work_item_id not in included:
-            return "wi-not-included-by-authorization"
+        if included:
+            if work_item_id not in included:
+                return "wi-not-included-by-authorization"
+            return None
+        membership = conn.execute(
+            "SELECT status FROM current_project_work_item_memberships WHERE work_item_id = ? AND project_id = ?",
+            (work_item_id, project_id),
+        ).fetchone()
+        if membership is None:
+            return "wi-not-found-in-project"
+        if membership["status"] != "active":
+            return "wi-membership-inactive"
     except (sqlite3.Error, OSError) as exc:
         print(f"[Governance] WI-project membership check warning: {exc}", file=sys.stderr)
         return None
@@ -1067,6 +1444,148 @@ def _has_clean_applicability_preflight(content: str) -> bool:
     return bool(PREFLIGHT_PACKET_HASH_RE.search(section_text) and PREFLIGHT_MISSING_REQUIRED_RE.search(section_text))
 
 
+def _applicability_preflight_section(content: str) -> str | None:
+    lines = content.splitlines()
+    for idx, line in enumerate(lines):
+        if APPLICABILITY_PREFLIGHT_HEADING_RE.match(line.strip()):
+            return "\n".join(_collect_section_lines(lines, idx + 1))
+    return None
+
+
+def _preflight_field(section: str, field_name: str) -> str | None:
+    wanted = field_name.lower()
+    for match in PREFLIGHT_FIELD_LINE_RE.finditer(section):
+        if match.group("name").lower() == wanted:
+            return match.group("value").strip()
+    return None
+
+
+def _root_relative_path(raw_path: str, project_root: Path) -> tuple[str, Path] | None:
+    cleaned = raw_path.strip().strip("`").replace("\\", "/")
+    if not cleaned:
+        return None
+    candidate = Path(cleaned)
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    try:
+        resolved = candidate.resolve(strict=False)
+        relative = resolved.relative_to(project_root.resolve())
+    except (OSError, ValueError):
+        return None
+    return relative.as_posix(), resolved
+
+
+def _candidate_evidence_hash(file_path: str, content: str, project_root: Path) -> str | None:
+    candidate_path = _root_relative_path(file_path, project_root)
+    if candidate_path is None:
+        return None
+    normalized_content = content.replace("\r\n", "\n").replace("\r", "\n")
+    normalized_content, replacements = CANDIDATE_EVIDENCE_HASH_LINE_RE.subn(
+        lambda match: match.group("prefix") + CANDIDATE_EVIDENCE_HASH_SENTINEL + match.group("suffix"),
+        normalized_content,
+    )
+    if replacements != 1:
+        return None
+    payload = candidate_path[0] + "\n" + normalized_content
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _verdict_preflight_freshness_deny_reason(
+    *,
+    cwd_path: Path,
+    file_path: str,
+    content: str,
+) -> str | None:
+    status = _first_nonblank_line(content)
+    if status not in VERDICT_PREFLIGHT_FRESHNESS_STATUSES:
+        return None
+    section = _applicability_preflight_section(content)
+    if section is None:
+        return None
+
+    project_root = _canonical_project_root(cwd_path)
+    bridge_id = _extract_bridge_id_from_path(file_path)
+    if bridge_id is None:
+        return "[Governance] Verdict applicability freshness check could not resolve the candidate bridge thread."
+
+    responds_match = RESPONDS_TO_BRIDGE_PATH_RE.search(content)
+    if responds_match is None:
+        return (
+            "[Governance] Verdict applicability freshness check requires an exact root-contained "
+            "`Responds to:` bridge artifact."
+        )
+    responds_to = _root_relative_path(responds_match.group("path"), project_root)
+    if responds_to is None:
+        return (
+            "[Governance] Verdict applicability freshness check rejected an out-of-root or invalid `Responds to:` path."
+        )
+    responds_relative, responds_path = responds_to
+    responds_version = BRIDGE_VERSIONED_FILE_RE.match(responds_path.name)
+    if (
+        not responds_path.is_file()
+        or responds_path.parent != (project_root / "bridge").resolve()
+        or responds_version is None
+        or responds_version.group(1) != bridge_id
+    ):
+        return (
+            "[Governance] Verdict applicability freshness check requires `Responds to:` to name an "
+            "existing canonical version of the same bridge thread."
+        )
+
+    packet_hash = _preflight_field(section, "packet_hash")
+    packet_bridge_id = _preflight_field(section, "bridge_document_name")
+    source_anchor = _preflight_field(section, "content_file")
+    if source_anchor in {None, "", "(none)"}:
+        source_anchor = _preflight_field(section, "operative_file")
+    anchored_source = _root_relative_path(source_anchor or "", project_root)
+    if anchored_source is None or anchored_source[0] != responds_relative:
+        return (
+            "[Governance] Verdict applicability freshness check rejected a source mismatch: "
+            "`content_file`/`operative_file` must equal the exact `Responds to:` artifact."
+        )
+    if packet_bridge_id != bridge_id:
+        return (
+            "[Governance] Verdict applicability freshness check rejected a bridge-document mismatch: "
+            "`bridge_document_name` must match the candidate thread."
+        )
+    if packet_hash is None or re.fullmatch(r"sha256:[0-9a-f]{64}", packet_hash, re.IGNORECASE) is None:
+        return "[Governance] Verdict applicability freshness check requires a valid `packet_hash` anchor."
+
+    try:
+        from scripts.bridge_applicability_preflight import build_packet
+
+        expected_packet = build_packet(
+            bridge_id=bridge_id,
+            bridge_dir=project_root / "bridge",
+            config_path=project_root / "config" / "governance" / "spec-applicability.toml",
+            db_path=project_root / "groundtruth.db",
+            content_file=responds_path,
+        )
+    except (Exception, SystemExit) as exc:
+        return f"[Governance] Verdict applicability freshness check could not rebuild the source packet: {exc}"
+    expected_packet_hash = str(expected_packet.get("packet_hash") or "")
+    if packet_hash.lower() != expected_packet_hash.lower():
+        return (
+            "[Governance] Verdict applicability freshness check rejected a stale packet_hash; "
+            f"expected `{expected_packet_hash}` for `{responds_relative}`."
+        )
+
+    embedded_candidate_hash = _preflight_field(section, "candidate_evidence_hash")
+    expected_candidate_hash = _candidate_evidence_hash(file_path, content, project_root)
+    if (
+        embedded_candidate_hash is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", embedded_candidate_hash, re.IGNORECASE) is None
+        or expected_candidate_hash is None
+        or embedded_candidate_hash.lower() != expected_candidate_hash.lower()
+    ):
+        expected = expected_candidate_hash or "<unavailable>"
+        return (
+            "[Governance] Verdict applicability freshness check rejected a stale or missing "
+            f"`candidate_evidence_hash`; expected `{expected}` for the final normalized candidate bytes."
+        )
+    return None
+
+
 def _root_contained_scratch_path(cwd: Path, bridge_id: str) -> Path:
     root = cwd.resolve()
     scratch_dir = root / ".tmp" / "bridge-preflight-hook"
@@ -1104,6 +1623,7 @@ def _run_pending_applicability_preflight(
             errors="replace",
             timeout=10,
             check=False,
+            **_no_window_subprocess_kwargs(),
         )
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         print(f"[Governance] Bridge applicability preflight warning for {file_path}: {exc}", file=sys.stderr)
@@ -1131,30 +1651,90 @@ def _run_pending_applicability_preflight(
         )
         return True, ""
     missing_required = packet.get("missing_required_specs") or []
-    if missing_required:
-        return False, json.dumps(missing_required)
+    blocking_errors = packet.get("blocking_errors") or []
+    if packet.get("preflight_passed") is False or missing_required or blocking_errors:
+        return False, json.dumps(
+            {
+                "missing_required_specs": missing_required,
+                "blocking_errors": blocking_errors,
+            },
+            sort_keys=True,
+        )
     return True, ""
 
 
-def _read_proposal_target_paths(bridge_dir: Path, doc_name: str) -> list[str]:
-    """Read target_paths from the latest proposal file's frontmatter."""
-    latest_path: Path | None = None
-    latest_version = -1
-    pattern = re.compile(rf"^{re.escape(doc_name)}-(\d{{3}})\.md$")
-    for path in bridge_dir.glob(f"{doc_name}-*.md"):
-        match = pattern.match(path.name)
-        if not match:
-            continue
-        version = int(match.group(1))
-        if version > latest_version:
-            latest_path = path
-            latest_version = version
+def _trim_preflight_output(output: str, *, limit: int = 2400) -> str:
+    text = re.sub(r"\s+\n", "\n", output).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + " ... <truncated>"
 
-    if latest_path is None:
-        return []
 
+def _run_pending_clause_preflight(
+    *,
+    cwd: Path,
+    file_path: str,
+    bridge_id: str,
+    content: str,
+) -> tuple[bool, str]:
+    scratch_path: Path | None = None
     try:
-        content = latest_path.read_text(encoding="utf-8")
+        scratch_path = _root_contained_scratch_path(cwd, bridge_id)
+        scratch_path.write_text(content, encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/adr_dcl_clause_preflight.py",
+                "--bridge-id",
+                bridge_id,
+                "--content-file",
+                str(scratch_path),
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+            **_no_window_subprocess_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        print(f"[Governance] ADR/DCL clause preflight warning for {file_path}: {exc}", file=sys.stderr)
+        return True, ""
+    finally:
+        if scratch_path is not None:
+            try:
+                scratch_path.unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"[Governance] Could not remove bridge clause preflight scratch file: {exc}", file=sys.stderr)
+
+    combined_output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+    if result.returncode == 0:
+        return True, ""
+    if result.returncode == 5:
+        return False, _trim_preflight_output(combined_output)
+    print(f"[Governance] ADR/DCL clause preflight warning for {file_path}: {combined_output}", file=sys.stderr)
+    return True, ""
+
+
+def _read_proposal_target_paths(
+    project_root: Path,
+    doc_name: str,
+    file_groups: dict[str, list[tuple[int, Path]]] | None = None,
+) -> list[str]:
+    """Read target_paths from the latest Prime-authored proposal file."""
+    proposal_path: Path | None = None
+    groups = file_groups if file_groups is not None else _versioned_bridge_file_groups(project_root)
+    for _version, path in groups.get(doc_name, []):
+        status = _status_from_versioned_bridge_file(path)
+        if status in {"NEW", "REVISED"}:
+            proposal_path = path
+            break
+    if proposal_path is None:
+        return []
+    try:
+        content = proposal_path.read_text(encoding="utf-8")
     except OSError:
         return []
 
@@ -1180,21 +1760,112 @@ def _read_proposal_target_paths(bridge_dir: Path, doc_name: str) -> list[str]:
     return paths
 
 
-def _is_bridge_index_file(file_path: str) -> bool:
-    """True when file_path points at the retired bridge-index artifact."""
-    normalized = file_path.replace("\\", "/")
-    return f"/{normalized}".endswith(f"/{RETIRED_BRIDGE_INDEX_REL}")
+def _pending_target_cache_path(project_root: Path) -> Path:
+    return project_root / PENDING_TARGET_CACHE_RELATIVE_PATH
 
 
-def _pending_proposal_ask_reason(bridge_dir: Path, file_path: str) -> str | None:
-    """Return an ask-checkpoint reason when file_path matches a pending
-    proposal's target_paths, or None."""
-    doc_statuses = _parse_bridge_index(bridge_dir)
-    file_path_normalized = file_path.replace("\\", "/")
-    for doc_name, status in doc_statuses.items():
+def _bridge_dir_signature(project_root: Path) -> dict[str, int]:
+    bridge_dir = project_root / "bridge"
+    signature = {"file_count": 0, "max_mtime_ns": 0}
+    try:
+        with os.scandir(bridge_dir) as entries:
+            for entry in entries:
+                if not entry.is_file():
+                    continue
+                if not BRIDGE_VERSIONED_FILE_RE.match(entry.name):
+                    continue
+                signature["file_count"] += 1
+                try:
+                    stat_result = entry.stat()
+                except OSError:
+                    continue
+                mtime_ns = getattr(stat_result, "st_mtime_ns", int(stat_result.st_mtime * 1_000_000_000))
+                signature["max_mtime_ns"] = max(signature["max_mtime_ns"], int(mtime_ns))
+    except OSError:
+        pass
+    return signature
+
+
+def _read_pending_target_cache(project_root: Path, signature: dict[str, int]) -> list[dict[str, object]] | None:
+    try:
+        payload = json.loads(_pending_target_cache_path(project_root).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if payload.get("schema_version") != PENDING_TARGET_CACHE_SCHEMA_VERSION:
+        return None
+    if payload.get("bridge_signature") != signature:
+        return None
+    records = payload.get("records")
+    if not isinstance(records, list):
+        return None
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _write_pending_target_cache(
+    project_root: Path,
+    signature: dict[str, int],
+    records: list[dict[str, object]],
+) -> None:
+    cache_path = _pending_target_cache_path(project_root)
+    payload = {
+        "schema_version": PENDING_TARGET_CACHE_SCHEMA_VERSION,
+        "bridge_signature": signature,
+        "records": records,
+    }
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = cache_path.with_name(f"{cache_path.name}.{uuid4().hex}.tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp_path.replace(cache_path)
+    except OSError:
+        pass
+
+
+def _build_pending_proposal_targets(project_root: Path) -> list[dict[str, object]]:
+    file_groups = _versioned_bridge_file_groups(project_root)
+    records: list[dict[str, object]] = []
+    for doc_name, files in file_groups.items():
+        if not files:
+            continue
+        _version, latest_path = files[0]
+        status = _status_from_versioned_bridge_file(latest_path)
         if status not in ("NEW", "REVISED", "NO-GO"):
             continue
-        for tp in _read_proposal_target_paths(bridge_dir, doc_name):
+        records.append(
+            {
+                "document": doc_name,
+                "status": status,
+                "target_paths": _read_proposal_target_paths(project_root, doc_name, file_groups),
+            }
+        )
+    return records
+
+
+def _pending_proposal_target_records(project_root: Path) -> list[dict[str, object]]:
+    signature = _bridge_dir_signature(project_root)
+    cached = _read_pending_target_cache(project_root, signature)
+    if cached is not None:
+        return cached
+    records = _build_pending_proposal_targets(project_root)
+    _write_pending_target_cache(project_root, signature, records)
+    return records
+
+
+def _pending_proposal_ask_reason(project_root: Path, file_path: str) -> str | None:
+    """Return an ask-checkpoint reason when file_path matches a pending
+    proposal's target_paths, or None."""
+    file_path_normalized = file_path.replace("\\", "/")
+    for record in _pending_proposal_target_records(project_root):
+        doc_name = str(record.get("document") or "")
+        status = str(record.get("status") or "")
+        if status not in ("NEW", "REVISED", "NO-GO"):
+            continue
+        target_paths = record.get("target_paths")
+        if not isinstance(target_paths, list):
+            continue
+        for tp in target_paths:
+            if not isinstance(tp, str):
+                continue
             tp_norm = tp.replace("\\", "/")
             if file_path_normalized.endswith(tp_norm) or tp_norm == file_path_normalized:
                 if status == "NO-GO":
@@ -1235,6 +1906,137 @@ def _bridge_kind_validation_error(content: str) -> str | None:
     return None
 
 
+def _verdict_evidence_anchor_deny_reason(content: str, project_root: Path) -> str | None:
+    """Deny reason when a NO-GO/VERIFIED verdict cites fabricated evidence anchors.
+
+    WI-4520: an Antigravity (gemini) NO-GO cited a non-existent "Draft Template
+    Placeholder" at line 86 of a proposal whose line 86 was '## Implementation
+    Plan'. This gate validates that a gated verdict's cited line numbers and
+    quoted strings actually exist in the operative file(s) it references.
+
+    Fails OPEN: any import or runtime error returns None so this gate can never
+    block a verdict for an infrastructure reason (the bridge is top priority).
+    """
+    try:
+        from scripts.verdict_evidence_anchor_preflight import (
+            validate_verdict_evidence_anchors,
+            violation_summary,
+        )
+    except Exception:  # pragma: no cover - fail open on partial install
+        return None
+    try:
+        violations = validate_verdict_evidence_anchors(content, project_root=project_root)
+    except Exception:  # pragma: no cover - fail open on parser error
+        return None
+    if not violations:
+        return None
+    return (
+        "[Governance] This NO-GO/VERIFIED verdict cites evidence anchors that do not "
+        "exist in the operative file(s): "
+        + violation_summary(violations)
+        + ". Point the citation at real line numbers / quoted text, or mark the finding "
+        "[inference] / [no exact anchor] / [absent] if it is intentionally not an "
+        "exact-text claim. (Hard-block per WI-4520 verdict-evidence-anchor preflight; "
+        "see scripts/verdict_evidence_anchor_preflight.py.)"
+    )
+
+
+def _verdict_self_review_deny(file_path: str, content: str, cwd_path: Path) -> str | None:
+    """Block a self-review GO/NO-GO/VERIFIED verdict at write time (WI-4829).
+
+    A verdict is a self-review when its ``author_session_context_id`` equals the
+    ``author_session_context_id`` of the artifact it reviews (resolved via the
+    verdict's ``Responds to:`` reference). Such a verdict is invalid under the
+    session-context review-independence rule and must not reach disk. Fails closed
+    on any refusal reason (equal author, missing/unreadable author metadata).
+
+    The comparator import and evaluation are defensive: an unavailable module or an
+    unexpected comparator error must never break legitimate bridge writes, so this
+    returns ``None`` (allow) in those cases — the impl-start backstop remains.
+    """
+    bridge_id = _extract_bridge_id_from_path(file_path)
+    if not bridge_id:
+        return None
+    try:
+        from scripts.bridge_review_independence import verdict_self_review_reason
+
+        project_root = _canonical_project_root(cwd_path)
+        reason = verdict_self_review_reason(content, bridge_id, project_root)
+    except Exception:
+        return None
+    if reason is None:
+        return None
+    return (
+        f"[Governance] Self-review bridge verdict blocked ({reason}): a GO/NO-GO/VERIFIED "
+        "verdict's author_session_context_id must be present and distinct from the reviewed "
+        "artifact's author session. Review independence is session-context based; a verdict "
+        "authored by the same session that authored the reviewed proposal/report is invalid "
+        "and fails closed. File the verdict from a different session context. "
+        "(Hard-block per WI-4829; GOV-DOCUMENT-AUTHOR-PROVENANCE-001; review-independence rule.)"
+    )
+
+
+def _no_action_prior_verdict_deny(file_path: str, content: str) -> str | None:
+    """Block a NO-ACTION bridge write when the thread has no prior LO GO/NO-GO verdict.
+
+    Enforces DCL-NO-ACTION-STATUS-SEMANTICS-001: a NO-ACTION entry is a Prime
+    Builder rejection of a prior Loyal Opposition GO or NO-GO verdict, so it is
+    well-formed only when a prior GO/NO-GO exists in the same numbered bridge
+    thread. Advisory threads have no prior verdict, so writing NO-ACTION to close
+    an advisory is always ill-formed. Fires only on a Write whose first non-blank
+    line is exactly NO-ACTION; reads the thread's lower-numbered sibling versions
+    from the bridge directory and allows the write only when one carries GO or
+    NO-GO. Existing on-disk NO-ACTION files are not re-written, so the guard has
+    no retroactive effect (append-only bridge chain).
+    """
+    if not _is_bridge_markdown_file(file_path):
+        return None
+    if _first_nonblank_line(content) != "NO-ACTION":
+        return None
+    name_match = BRIDGE_VERSIONED_FILE_RE.match(Path(file_path).name)
+    if name_match is None:
+        return None
+    bridge_id = name_match.group(1)
+    this_version = int(name_match.group(2))
+    bridge_dir = Path(file_path).resolve().parent
+    try:
+        siblings = list(bridge_dir.glob(f"{bridge_id}-*.md"))
+    except OSError:
+        siblings = []
+    for sibling in siblings:
+        sib_match = BRIDGE_VERSIONED_FILE_RE.match(sibling.name)
+        if sib_match is None or sib_match.group(1) != bridge_id:
+            continue
+        if int(sib_match.group(2)) >= this_version:
+            continue
+        if _status_from_versioned_bridge_file(sibling) in {"GO", "NO-GO"}:
+            return None
+    return (
+        "[Governance] NO-ACTION bridge write blocked: a NO-ACTION entry is a Prime Builder "
+        "rejection of a prior Loyal Opposition GO or NO-GO verdict, so it is well-formed only when "
+        f"thread '{bridge_id}' already contains a GO or NO-GO verdict for Prime to reject; none was "
+        "found. Do NOT use NO-ACTION to close an ADVISORY thread or record a Prime 'no further "
+        "action' close -- keep the thread ADVISORY with a recorded disposition note, or move it to "
+        "a terminal WITHDRAWN status with cited rationale. (Hard-block per "
+        "DCL-NO-ACTION-STATUS-SEMANTICS-001; see .claude/rules/file-bridge-protocol.md section "
+        "'NO-ACTION Status'.)"
+    )
+
+
+def _bridge_envelope_head_deny_reason(content: str) -> str | None:
+    try:
+        validate_bridge_envelope_head(content, require_dispatchable=True)
+    except BridgeEnvelopeError as exc:
+        return (
+            "[Governance] Bridge artifact-head envelope invalid: "
+            f"{exc}. Status-bearing dispatchable bridge files must keep the status token on line 1, "
+            "then `::init gtkb <pb|lo>` on line 2 and `::open <activity>` on line 3. "
+            "(Hard-block per ADR-BRIDGE-ARTIFACT-HEAD-ENVELOPE-001 and "
+            "DCL-BRIDGE-ENVELOPE-LINE-AUTHORING-PLACEMENT-001.)"
+        )
+    return None
+
+
 def _deny_reason_for_content(
     *,
     cwd_path: Path,
@@ -1242,25 +2044,57 @@ def _deny_reason_for_content(
     content: str,
     run_pending_preflight: bool = True,
 ) -> str | None:
-    if _is_bridge_index_file(file_path) and content:
-        return "[Governance] Retired bridge-index artifacts must not be written or recreated."
+    if _is_retired_bridge_aggregate_file(file_path):
+        return (
+            "[Governance] Retired bridge aggregate files are not live or writable bridge surfaces. "
+            "Use dispatcher/TAFE state plus status-bearing versioned bridge files."
+        )
+    if _is_lo_verdict_bridge_file(file_path):
+        return (
+            "[Governance] Noncanonical bridge verdict files are not writable authority. "
+            "Write the next numbered bridge/<slug>-NNN.md file through the governed bridge path "
+            "instead of bridge/*.lo-verdict.md."
+        )
+
+    if _is_bridge_markdown_file(file_path) and _versioned_bridge_file_exists_on_disk(file_path):
+        bridge_id = _extract_bridge_id_from_path(file_path) or Path(file_path).name
+        return (
+            "[Governance] Bridge append-only boundary violation: "
+            f"{Path(file_path).name} already exists on disk. "
+            "Bridge thread state advances by writing the next numbered version, "
+            "never by rewriting an existing numbered file in place. "
+            f"Write bridge/{bridge_id}-NNN.md where NNN is the next version number. "
+            "(Hard-block per GOV-FILE-BRIDGE-AUTHORITY-001 append-only boundary guard; "
+            "WI-4740.)"
+        )
 
     if _is_bridge_markdown_file(file_path) and content:
         if _body_status_token_violation(file_path, content):
             return (
                 "[Governance] Versioned bridge files (bridge/<slug>-NNN.md) must begin with a "
                 "canonical status token on the first non-blank line: one of NEW, REVISED, GO, "
-                "NO-GO, VERIFIED, ADVISORY, DEFERRED, WITHDRAWN. The first non-blank line was "
+                "NO-GO, VERIFIED, NO-ACTION, ADVISORY, DEFERRED, WITHDRAWN. The first non-blank line was "
                 f"{_first_nonblank_line(content)!r}. Put the status token on line 1 (headings "
                 "and prose follow it). Existing files with a non-canonical first line are "
                 "grandfathered. (Hard-block per GTKB-GOV-PROPOSAL-STANDARDS Slice 1 "
                 "body-status-token rule; see .claude/rules/file-bridge-protocol.md "
                 "section 'Body Status-Token Rule'.)"
             )
+        envelope_deny = _bridge_envelope_head_deny_reason(content)
+        if envelope_deny:
+            return envelope_deny
         kind_err = _bridge_kind_validation_error(content)
         if kind_err:
             return kind_err
         first_line = _first_nonblank_line(content)
+        if first_line == "NO-ACTION":
+            no_action_deny = _no_action_prior_verdict_deny(file_path, content)
+            if no_action_deny:
+                return no_action_deny
+        if first_line in {"GO", "NO-GO", "VERIFIED"}:
+            self_review_deny = _verdict_self_review_deny(file_path, content, cwd_path)
+            if self_review_deny:
+                return self_review_deny
         if first_line == "ADVISORY" and not _is_template_shaped_advisory_report(content):
             return (
                 "[Governance] ADVISORY bridge reports must match the verified ADVISORY report template: "
@@ -1286,6 +2120,14 @@ def _deny_reason_for_content(
                 "python scripts/bridge_applicability_preflight.py --bridge-id <document-name>. "
                 "(Hard-block per mechanical cross-cutting specification applicability gate.)"
             )
+        if first_line in VERDICT_PREFLIGHT_FRESHNESS_STATUSES:
+            freshness_deny = _verdict_preflight_freshness_deny_reason(
+                cwd_path=cwd_path,
+                file_path=file_path,
+                content=content,
+            )
+            if freshness_deny:
+                return freshness_deny
         if first_line == "VERIFIED" and not _has_spec_derived_verification(content):
             return (
                 "[Governance] VERIFIED bridge reports must carry Specification Links, "
@@ -1293,6 +2135,17 @@ def _deny_reason_for_content(
                 "(Hard-block per DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 + "
                 "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001.)"
             )
+        if first_line == "VERIFIED" and not _has_commit_finalization_evidence(content):
+            return (
+                "[Governance] VERIFIED bridge verdicts must include Commit Finalization Evidence "
+                "with a Same-transaction path set. Use the atomic VERIFIED finalization helper "
+                "instead of writing terminal VERIFIED bridge files directly. "
+                "(Hard-block per the Mandatory VERIFIED Commit-Finalization Gate.)"
+            )
+        if first_line in {"NO-GO", "VERIFIED"}:
+            anchor_reason = _verdict_evidence_anchor_deny_reason(content, cwd_path)
+            if anchor_reason:
+                return anchor_reason
         if (
             first_line not in {"ADVISORY", "DEFERRED"}
             and not first_line.startswith(("GO", "NO-GO", "VERIFIED"))
@@ -1317,6 +2170,20 @@ def _deny_reason_for_content(
                 "(Hard-block per Sub-slice C of GTKB-GOV-AUQ-ENFORCEMENT-STACK; "
                 "see bridge/gtkb-gov-askuserquestion-enforcement-stack-slice-c-bridge-gate-003.md.)"
             )
+        if (
+            first_line in PENDING_PREFLIGHT_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _prior_deliberations_has_unedited_placeholder(content)
+        ):
+            return (
+                "[Governance] Implementation proposals must replace the helper-inserted "
+                "Prior Deliberations placeholder before bridge submission. The exact "
+                f"unedited line `{NO_PRIOR_DELIBS_PLACEHOLDER}` is still present in "
+                "## Prior Deliberations. Add relevant DELIB citations or replace it "
+                "with a substantive no-prior-deliberations reason. "
+                "(Hard-block per the Prior Deliberations section requirement in "
+                ".claude/rules/codex-review-gate.md.)"
+            )
         if first_line in PROJECT_METADATA_STATUSES and not _bridge_kind_is_metadata_exempt(content):
             metadata_gaps = _project_metadata_gaps(content)
             if metadata_gaps:
@@ -1324,6 +2191,7 @@ def _deny_reason_for_content(
                     "[Governance] Implementation bridge proposals must include "
                     "project-linkage metadata lines: missing "
                     f"{', '.join(metadata_gaps)}. Add the absent line(s), or set "
+                    f"{PROJECT_METADATA_FORMAT_HINT}"
                     "bridge_kind: spec_intake|governance_review|loyal_opposition_advisory "
                     "for a non-implementation proposal. "
                     "(Hard-block per DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001/"
@@ -1359,6 +2227,41 @@ def _deny_reason_for_content(
                     "(Hard-block per .claude/rules/file-bridge-protocol.md "
                     "'Mandatory Implementation-Start Authorization Metadata'; WI-3439.)"
                 )
+            nonimpairment_gap = _nonimpairment_disposition_gap(content) if NONIMPAIRMENT_GOV_ID in content else None
+            if nonimpairment_gap is not None:
+                _record_gate_denial(
+                    "modernization-nonimpairment-disposition-missing",
+                    file_path,
+                    nonimpairment_gap,
+                    root=cwd_path,
+                )
+                return (
+                    "[Governance] Cross-cutting implementation proposals must include one "
+                    "structured ## Intuitiveness/Non-Impairment Disposition JSON object. "
+                    f"Gap: {nonimpairment_gap}. "
+                    "(Hard-block per GOV-GTKB-MODERNIZATION-NONIMPAIRMENT-001.)"
+                )
+        if (
+            first_line in PROJECT_METADATA_STATUSES
+            and _bridge_kind_is_implementation_proposal(content)
+            and _target_paths_touch_harness_surface(content)
+            and not _has_concrete_cross_harness_disposition_section(content)
+        ):
+            _record_gate_denial(
+                "cross-harness-disposition-missing",
+                file_path,
+                "harness-surface target_paths without a Cross-Harness Disposition section",
+                root=cwd_path,
+            )
+            return (
+                "[Governance] Implementation proposals whose target_paths touch a harness-surface "
+                "file (.claude/settings.json, .codex/hooks.json, .claude/hooks/**, "
+                ".codex/gtkb-hooks/**, .claude/skills/**, .codex/skills/**) must include a "
+                "non-empty ## Cross-Harness Disposition section declaring, per applicable harness, "
+                "behavioral parity or an owner-approved typed waiver. "
+                "(Hard-block per DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 assertion "
+                "PARITY-DISPOSITION-GATE; ADR-CROSS-HARNESS-PARITY-001 Q8.)"
+            )
         if run_pending_preflight and first_line in PENDING_PREFLIGHT_STATUSES:
             bridge_id = _extract_bridge_id_from_path(file_path)
             if bridge_id:
@@ -1372,11 +2275,24 @@ def _deny_reason_for_content(
                     return (
                         "[Governance] Pre-filing applicability preflight failed: "
                         f"file_path={file_path}; "
-                        f"missing_required_specs={error_msg}. Run "
+                        f"preflight={error_msg}. Run "
                         f"python scripts/bridge_applicability_preflight.py --bridge-id {bridge_id} "
                         "for full output. (Hard-block per "
                         "DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001 "
                         "mechanical enforcement.)"
+                    )
+                clause_preflight_ok, clause_error_msg = _run_pending_clause_preflight(
+                    cwd=cwd_path,
+                    file_path=file_path,
+                    bridge_id=bridge_id,
+                    content=content,
+                )
+                if not clause_preflight_ok:
+                    return (
+                        "[Governance] ADR/DCL clause preflight failed for pending bridge write: "
+                        f"file_path={file_path}. {clause_error_msg} Run "
+                        f"python scripts/adr_dcl_clause_preflight.py --bridge-id {bridge_id} "
+                        "for full output. (Hard-block per the mandatory ADR/DCL clause-test preflight gate.)"
                     )
         if first_line in BRIDGE_AUTHOR_METADATA_STATUSES:
             author_metadata_gaps = author_metadata_gaps_for_content(content)
@@ -1388,6 +2304,15 @@ def _deny_reason_for_content(
                     f"{', '.join(REQUIRED_AUTHOR_METADATA_FIELDS)}. The authoring session must "
                     "supply accurate model, version, and configuration values; the dispatcher "
                     "must not guess. (Hard-block per owner emergency audit directive 2026-05-19.)"
+                )
+            synthetic_session_context_id = _synthetic_session_context_id_for_content(content)
+            if synthetic_session_context_id:
+                return (
+                    "[Governance] Bridge artifacts must include a real author_session_context_id, "
+                    f"not synthetic harness placeholder {synthetic_session_context_id!r}. The authoring "
+                    "session or dispatcher must provide the concrete session context id before the "
+                    "bridge file reaches disk. (Hard-block per WI-4940; "
+                    "GOV-DOCUMENT-AUTHOR-PROVENANCE-001.)"
                 )
     return None
 
@@ -1607,12 +2532,9 @@ def main() -> None:
         emit_ask("PreToolUse", heading_ask_reason)
         sys.exit(0)
 
-    bridge_dir = _canonical_project_root(cwd_path) / "bridge"
-    if not bridge_dir.is_dir():
-        emit_pass()
-        sys.exit(0)
-
-    ask_reason = _pending_proposal_ask_reason(bridge_dir, file_path)
+    ask_reason = None
+    if not (_is_bridge_markdown_file(file_path) or _is_lo_verdict_bridge_file(file_path)):
+        ask_reason = _pending_proposal_ask_reason(_canonical_project_root(cwd_path), file_path)
     if ask_reason:
         emit_ask("PreToolUse", ask_reason)
         sys.exit(0)

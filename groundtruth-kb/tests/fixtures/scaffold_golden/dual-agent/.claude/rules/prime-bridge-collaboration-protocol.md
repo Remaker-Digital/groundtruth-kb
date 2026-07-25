@@ -89,10 +89,9 @@ Prime Builder processes latest `GO` and `NO-GO` entries.
 Routine collaboration must not depend on manual owner prompting.
 
 - The dispatcher daemon
-  (`scripts/gtkb_dispatcher_daemon.py`) is registered as PostToolUse
-  and Stop hooks in `.claude/settings.json` and `.codex/hooks.json`.
-- The trigger fires on tool-use and Stop events: when bridge state changes or
-  the agent ends a turn, current GT-KB hosts inspect dispatcher/TAFE bridge
+  (`scripts/gtkb_dispatcher_daemon.py`) runs through the headless dispatcher
+  supervisor path.
+- On bounded daemon cycles, current GT-KB hosts inspect dispatcher/TAFE bridge
   state and dispatch the appropriate counterpart harness when its actionable
   queue signature has changed.
 - Manual bridge scans remain available as a fallback when the trigger is

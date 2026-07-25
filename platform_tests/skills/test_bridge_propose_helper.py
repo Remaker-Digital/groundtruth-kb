@@ -229,7 +229,7 @@ def test_propose_bridge_compliance_denial_precedes_claim_and_write(helper_module
 
     def deny(**_kwargs):
         events.append("audit")
-        assert _kwargs["content"].startswith("NEW\n::init gtkb lo\n::open build\n")
+        assert _kwargs["content"].startswith("NEW\n::init gtkb pb\n::open build\n")
         raise helper_module.BridgeComplianceError("project/work-item mismatch")
 
     def fail_acquire(*_args, **_kwargs):  # pragma: no cover - assertion helper
@@ -262,7 +262,7 @@ def test_propose_bridge_compliance_pass_keeps_single_claim_write_release(helper_
 
     def pass_audit(**_kwargs):
         events.append("audit")
-        assert _kwargs["content"].startswith("NEW\n::init gtkb lo\n::open build\n")
+        assert _kwargs["content"].startswith("NEW\n::init gtkb pb\n::open build\n")
         return {"decision": "pass"}
 
     def acquire(thread_slug, session_id, *, project_root):
@@ -296,7 +296,7 @@ def test_propose_bridge_compliance_pass_keeps_single_claim_write_release(helper_
 
     assert events == ["audit", "acquire", "release"]
     assert out == bridge_dir / "passing-topic-001.md"
-    assert out.read_text(encoding="utf-8").startswith("NEW\n::init gtkb lo\n::open build\n")
+    assert out.read_text(encoding="utf-8").startswith("NEW\n::init gtkb pb\n::open build\n")
 
 
 # --------------------------------------------------------------------------

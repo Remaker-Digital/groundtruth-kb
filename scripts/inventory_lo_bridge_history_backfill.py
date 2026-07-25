@@ -145,18 +145,20 @@ def _redact_survivor_count(content: str) -> int:
 
 
 def iter_lo_reports(repo_root: Path) -> list[tuple[str, Path]]:
-    """Class A: ``INSIGHTS-*.md`` under the LO insight dropbox.
+    """Class A: retired discovery route (WI-5589); always empty.
 
-    Returns (source_ref, path) tuples in deterministic sorted order.
+    The LO insight dropbox was a non-canonical filesystem carrier. Inventory
+    now enumerates only canonical status-bearing numbered bridge artifacts via
+    :func:`iter_bridge_files` (``DCL-CANONICAL-CARRIER-NONAUTHORITY-001``,
+    ``DELIB-20260717-CANONICAL-ARTIFACT-REFERENCE-BOUNDARY``).
+
+    Historical ``independent-progress-assessments/...`` ``source_ref`` values
+    already recorded in the archive stay queryable and are still classified by
+    :func:`classify_source_ref`; they are simply never re-resolved as live
+    filesystem inputs (``DCL-SUPERSEDED-SOT-LEAKAGE-001``).
     """
-    insight_dir = repo_root / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    if not insight_dir.exists():
-        return []
-    out: list[tuple[str, Path]] = []
-    for f in sorted(insight_dir.glob("INSIGHTS-*.md")):
-        source_ref = f"independent-progress-assessments/CODEX-INSIGHT-DROPBOX/{f.name}"
-        out.append((source_ref, f))
-    return out
+    del repo_root  # retired route: no filesystem discovery remains
+    return []
 
 
 def iter_bridge_files(repo_root: Path) -> list[tuple[str, Path]]:

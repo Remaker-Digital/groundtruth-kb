@@ -15,8 +15,8 @@
 
 The active bridge dispatch automation is the **dispatcher daemon** at
 `scripts/gtkb_dispatcher_daemon.py`, kept alive by the headless dispatcher
-supervisor path. On each daemon cycle it inspects dispatcher/TAFE state
-and dispatches the appropriate counterpart harness if a recipient's actionable
+supervisor path. On each daemon cycle it inspects dispatcher/TAFE state and
+dispatches the appropriate counterpart harness if a recipient's actionable
 queue signature has changed.
 
 ## See Instead
@@ -25,8 +25,8 @@ queue signature has changed.
   `bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`.
 - Slice 4 retirement:
   `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`.
-- Tutorial: `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (cross-harness
-  event-driven trigger setup is documented here per Slice 4 D5d).
+- Tutorial: `groundtruth-kb/docs/tutorials/dual-agent-setup.md` (dispatcher
+  daemon setup is documented there).
 - Doctor check: `_check_dispatcher_daemon_substrate_readiness` in
   `groundtruth-kb/src/groundtruth_kb/project/doctor.py`.
 

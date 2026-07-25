@@ -39,8 +39,8 @@ AGY_RESPONSE_STEP_TYPE = 15
 AGY_RECOVERY_LOOKBACK_SECONDS = 10.0
 PRINTABLE_BYTES_RE = re.compile(rb"[ -~]{4,}")
 VERDICT_ANCHOR_HELPER_PATHS = (
-    ".codex/skills/verify/helpers/write_verdict.py",
-    ".claude/skills/verify/helpers/write_verdict.py",
+    ".codex/skills/gtkb-verify/helpers/write_verdict.py",
+    ".claude/skills/gtkb-verify/helpers/write_verdict.py",
 )
 VERDICT_ANCHOR_VALIDATOR_PATH = "scripts/verdict_evidence_anchor_preflight.py"
 VERDICT_ANCHOR_GUARD_TOKENS = ("validate_verdict_evidence_anchors", "_assert_verdict_evidence_anchors")

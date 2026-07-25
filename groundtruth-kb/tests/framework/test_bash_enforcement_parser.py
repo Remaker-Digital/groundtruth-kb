@@ -92,3 +92,44 @@ def test_bash_parser_allows_harness_name_mentions() -> None:
     for command in allowed_commands:
         allowed, reason = check_bash_command(command, REPO_ROOT)
         assert allowed is True, f"{command}: {reason}"
+
+
+def test_bash_parser_allows_powershell_env_assignment_with_harness_valued_name() -> None:
+    """WI-5676: `$env:VAR='...'` is an assignment, not a harness launch.
+
+    Before the fix the whole assignment stayed one token, so `_command_name`
+    derived the head from the VALUE's last path segment -- making any value
+    ending in a harness name (notably the mandated `prime-builder/claude`
+    author identity) a false-positive denial.
+    """
+    allowed_commands = [
+        "$env:GTKB_AUTHOR_IDENTITY='prime-builder/claude'; python x.py",
+        '$env:GTKB_AUTHOR_IDENTITY="prime-builder/claude"; python x.py',
+        "$env:GTKB_AUTHOR_IDENTITY='loyal-opposition/codex'; python x.py",
+        "$env:GTKB_SESSION_ID='dbc5c1cd-13f2-4ff8-81a5-a80c06799bae'; python x.py",
+        "$env:GTKB_BRIDGE_DISPATCH_KEYWORD='::init gtkb pb'; python x.py",
+    ]
+
+    for command in allowed_commands:
+        allowed, reason = check_bash_command(command, REPO_ROOT)
+        assert allowed is True, f"{command}: {reason}"
+
+
+def test_bash_parser_still_blocks_harness_launch_after_powershell_assignment() -> None:
+    """WI-5676: stripping the assignment must not weaken the ban itself.
+
+    Only leading assignment tokens are dropped; the following command head is
+    still evaluated, so a real harness launch behind an assignment still fails.
+    """
+    blocked_commands = [
+        "$env:FOO='bar'; claude",
+        "$env:FOO='bar' claude",
+        "$env:GTKB_AUTHOR_IDENTITY='prime-builder/claude'; claude -p 'spoofed'",
+        "$env:FOO='bar'; codex exec 'spoofed'",
+    ]
+
+    for command in blocked_commands:
+        allowed, reason = check_bash_command(command, REPO_ROOT)
+        assert allowed is False, command
+        assert "Direct harness-to-harness launch is prohibited" in reason
+        assert "SPEC-INTAKE-21c5b3" in reason

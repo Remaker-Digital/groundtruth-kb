@@ -36,6 +36,11 @@ _MSYS_PATH_RE = re.compile(r"^/([a-zA-Z])/(.*)$")
 _COMMAND_SEGMENT_RE = re.compile(r"(?:&&|\|\||[;|\r\n])")
 _COMMAND_TOKEN_RE = re.compile(r"\"([^\"]*)\"|'([^']*)'|([^\s]+)")
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S+)$")
+# PowerShell assignment form (`$env:VAR='value'`). Without this, the whole
+# assignment stays one token and `_command_name` derives the head from the
+# VALUE's last path segment -- so a value ending in a harness name (e.g.
+# `prime-builder/claude`) is misread as a direct harness launch (WI-5676).
+_PS_ENV_ASSIGNMENT_RE = re.compile(r"^\$env:[A-Za-z_][A-Za-z0-9_]*\s*=\s*(?:\"[^\"]*\"|'[^']*'|\S+)$", re.IGNORECASE)
 _DIRECT_HARNESS_COMMANDS = frozenset(
     {
         "agy",
@@ -139,7 +144,9 @@ def _drop_leading_assignments(tokens: list[str]) -> list[str]:
         remaining = remaining[1:]
     if remaining and _command_name(remaining[0]) == "env":
         remaining = remaining[1:]
-    while remaining and _ENV_ASSIGNMENT_RE.match(remaining[0].strip()):
+    while remaining and (
+        _ENV_ASSIGNMENT_RE.match(remaining[0].strip()) or _PS_ENV_ASSIGNMENT_RE.match(remaining[0].strip())
+    ):
         remaining = remaining[1:]
     return remaining
 

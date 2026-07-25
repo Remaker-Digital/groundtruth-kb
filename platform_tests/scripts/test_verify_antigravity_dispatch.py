@@ -509,13 +509,13 @@ def test_inspect_verdict_anchor_guard_detects_helper_coverage(tmp_path):
     validator = tmp_path / "scripts" / "verdict_evidence_anchor_preflight.py"
     validator.parent.mkdir(parents=True, exist_ok=True)
     validator.write_text("# fixture\n", encoding="utf-8")
-    _write_guarded_verdict_helper(tmp_path, ".codex/skills/verify/helpers/write_verdict.py")
+    _write_guarded_verdict_helper(tmp_path, ".codex/skills/gtkb-verify/helpers/write_verdict.py")
 
     result = inspect_verdict_anchor_guard(tmp_path)
 
     assert result["ok"] is True
     assert result["validator"]["exists"] is True
-    assert ".codex/skills/verify/helpers/write_verdict.py" in result["guarded_helpers"]
+    assert ".codex/skills/gtkb-verify/helpers/write_verdict.py" in result["guarded_helpers"]
 
 
 def test_evaluate_readiness_reports_verdict_anchor_guard(tmp_path, monkeypatch):
@@ -527,13 +527,13 @@ def test_evaluate_readiness_reports_verdict_anchor_guard(tmp_path, monkeypatch):
     validator = tmp_path / "scripts" / "verdict_evidence_anchor_preflight.py"
     validator.parent.mkdir(parents=True, exist_ok=True)
     validator.write_text("# fixture\n", encoding="utf-8")
-    _write_guarded_verdict_helper(tmp_path, ".claude/skills/verify/helpers/write_verdict.py")
+    _write_guarded_verdict_helper(tmp_path, ".claude/skills/gtkb-verify/helpers/write_verdict.py")
 
     result = evaluate_readiness(project_root=tmp_path, recipient="C")
 
     assert result["ready"] is True
     assert result["verdict_anchor_guard"]["ok"] is True
-    assert ".claude/skills/verify/helpers/write_verdict.py" in result["verdict_anchor_guard"]["guarded_helpers"]
+    assert ".claude/skills/gtkb-verify/helpers/write_verdict.py" in result["verdict_anchor_guard"]["guarded_helpers"]
 
 
 def test_readiness_fails_closed_for_legacy_gemini_registry(tmp_path):

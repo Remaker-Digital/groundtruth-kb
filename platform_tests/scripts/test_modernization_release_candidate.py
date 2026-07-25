@@ -857,6 +857,68 @@ def test_cli_rejects_noncanonical_manifest_and_state_paths(checker, tmp_path, ca
     assert "canonical in-root release-candidate state directory" in capsys.readouterr().err
 
 
+# ---------------------------------------------------------------------------
+# WI-5567 / TEST-11619: validate --json machine-readable evidence contract
+# ---------------------------------------------------------------------------
+
+
+def test_validate_plain_output_remains_unchanged(checker, capsys):
+    """The human-readable form is untouched by the --json addition."""
+    assert checker.main(["validate"]) == 0
+    assert capsys.readouterr().out.strip() == "PASS modernization acceptance manifest (8 capabilities, 94 handles)"
+
+
+def test_validate_json_emits_frozen_scope_evidence(checker, capsys):
+    """--json emits the frozen digest and the inventory counts just validated."""
+    assert checker.main(["validate", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    manifest = checker.load_manifest(checker.DEFAULT_MANIFEST)
+
+    assert payload == {
+        "capability_count": len(manifest["capabilities"]),
+        "handle_count": manifest["program"]["expected_handle_count"],
+        "require_test_paths": False,
+        "result": "PASS",
+        "scope_digest": checker.scope_digest(manifest),
+    }
+    # The emitted digest must be the frozen contract digest, not a recomputation
+    # that silently drifted away from it.
+    assert payload["scope_digest"] == manifest["program"]["frozen_scope_digest_sha256"]
+
+
+def test_validate_json_is_deterministic_across_runs(checker, capsys):
+    """Repeated invocations emit byte-identical evidence (no clock, no receipt)."""
+    assert checker.main(["validate", "--json"]) == 0
+    first = capsys.readouterr().out
+    assert checker.main(["validate", "--json"]) == 0
+    second = capsys.readouterr().out
+
+    assert first == second
+
+
+def test_validate_json_records_require_test_paths_flag(checker, capsys, monkeypatch):
+    """The payload states which validation strictness produced the result."""
+    monkeypatch.setattr(checker, "validate_manifest", lambda *args, **kwargs: [])
+
+    assert checker.main(["validate", "--json", "--require-test-paths"]) == 0
+    assert json.loads(capsys.readouterr().out)["require_test_paths"] is True
+
+
+def test_validate_json_never_emits_pass_for_invalid_manifest(checker, capsys, monkeypatch):
+    """An invalid manifest fails closed in JSON mode instead of emitting PASS."""
+    monkeypatch.setattr(
+        checker,
+        "validate_manifest",
+        lambda *args, **kwargs: ["capability CAP-1 is missing"],
+    )
+
+    assert checker.main(["validate", "--json"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out.strip() == ""
+    assert "PASS" not in captured.out
+    assert "capability CAP-1 is missing" in captured.err
+
+
 def test_existing_release_gate_enforces_modernization_scope_paths(monkeypatch, capsys):
     import scripts.check_modernization_release_candidate as canonical_checker
 

@@ -64,6 +64,10 @@ class BridgeVersion:
     def is_malformed(self) -> bool:
         return self.classification == "malformed"
 
+    @property
+    def is_legacy(self) -> bool:
+        return self.classification == "legacy"
+
 
 @dataclass(frozen=True, slots=True)
 class LifecycleDiagnostic:
@@ -303,12 +307,6 @@ def _parse_version(
         rel_path=rel_path,
         version=version,
     )
-    author_identity = _required_metadata(
-        lines,
-        "author_identity",
-        rel_path=rel_path,
-        version=version,
-    )
     responds_values = _metadata_values(
         lines,
         "Responds to",
@@ -339,6 +337,32 @@ def _parse_version(
             f"Responds to metadata {responds_to!r} does not match {expected_response!r}: {rel_path}",
             path=rel_path,
             version=version,
+        )
+
+    # GOV-DOCUMENT-AUTHOR-PROVENANCE-001 is forward-only: pre-contract bridge
+    # files are grandfathered, not backfilled. A canonical-status version with
+    # structurally valid Document/Version/Responds-to but no author_identity
+    # header predates the provenance contract; callers that select this
+    # version as operative (implementation proposal or GO) re-validate
+    # provenance before relying on it.
+    author_identity_values = _metadata_values(
+        lines,
+        "author_identity",
+        rel_path=rel_path,
+        version=version,
+    )
+    author_identity = author_identity_values[0] if author_identity_values else None
+    if author_identity is None:
+        return BridgeVersion(
+            version=version,
+            path=rel_path,
+            status=line_one,
+            classification="legacy",
+            document=document,
+            responds_to=responds_to,
+            author_identity=None,
+            author_role=None,
+            observed_status=line_one,
         )
 
     role = _author_role(author_identity)
@@ -385,6 +409,15 @@ def _validate_ordinary_transitions(versions: tuple[BridgeVersion, ...]) -> None:
         allowed: set[str]
         if previous.status in {"NEW", "REVISED"}:
             allowed = {"GO", "NO-GO", "WITHDRAWN", "DEFERRED"}
+            # A Prime NEW filed after a GO is normally an implementation report.
+            # An owner may explicitly defer that report's VERIFIED because its
+            # intermediate worktree cannot be finalized, then require a fresh
+            # reviewed REVISED proposal for the corrective implementation that
+            # will make the single governed commit possible.  That edge still
+            # has no implementation authority: the REVISED remains LO-review
+            # actionable until a later independent GO.
+            if previous.status == "NEW" and prior_go_seen:
+                allowed.add("REVISED")
             if prior_go_seen:
                 allowed.add("VERIFIED")
         elif previous.status == "GO":
@@ -435,10 +468,17 @@ def _ordinary_resolution(
     if go_indexes:
         go_index = go_indexes[-1]
         go = versions[go_index]
-        statuses_after_go = [item.status for item in versions[go_index + 1 :]]
+        post_go_versions = versions[go_index + 1 :]
+        statuses_after_go = [item.status for item in post_go_versions]
         latest_status = latest.status
-        latest_is_resumable_report_no_go = latest_status == "NO-GO" and any(
-            status in {"NEW", "REVISED"} for status in statuses_after_go[:-1]
+        owner_deferred_reproposal = any(
+            previous.status == "NEW" and current.status == "REVISED"
+            for previous, current in zip(post_go_versions, post_go_versions[1:])
+        )
+        latest_is_resumable_report_no_go = (
+            latest_status == "NO-GO"
+            and any(status in {"NEW", "REVISED"} for status in statuses_after_go[:-1])
+            and not owner_deferred_reproposal
         )
         if latest_status == "GO" or latest_is_resumable_report_no_go:
             proposal = _nearest_prime_artifact(versions, go_index)
@@ -446,6 +486,24 @@ def _ordinary_resolution(
                 _fail(
                     "GO_WITHOUT_PRIME_ARTIFACT",
                     f"GO has no preceding Prime NEW or REVISED artifact: {go.path}",
+                    path=go.path,
+                    version=go.version,
+                )
+            # Implementation authority must never derive from a grandfathered
+            # (legacy) version: GOV-DOCUMENT-AUTHOR-PROVENANCE-001 tolerates
+            # missing provenance for non-operative history, not for the exact
+            # proposal/GO pair that authorizes implementation.
+            if proposal.is_legacy:
+                _fail(
+                    "OPERATIVE_VERSION_MISSING_PROVENANCE",
+                    f"Operative implementation proposal has no author_identity (legacy version): {proposal.path}",
+                    path=proposal.path,
+                    version=proposal.version,
+                )
+            if go.is_legacy:
+                _fail(
+                    "OPERATIVE_VERSION_MISSING_PROVENANCE",
+                    f"Operative GO verdict has no author_identity (legacy version): {go.path}",
                     path=go.path,
                     version=go.version,
                 )

@@ -21,7 +21,12 @@ if str(GT_SRC) not in sys.path:
     sys.path.insert(0, str(GT_SRC))
 if str(PROJECT_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
-VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "verify" / "helpers"
+VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers"
+if not VERIFY_HELPERS.is_dir():
+    # WI-5661: fall back to the pre-rename skill dir (WI-5651 renamed verify -> gtkb-verify).
+    _legacy_verify = PROJECT_ROOT / ".claude" / "skills" / "verify" / "helpers"
+    if _legacy_verify.is_dir():
+        VERIFY_HELPERS = _legacy_verify
 if str(VERIFY_HELPERS) not in sys.path:
     sys.path.insert(0, str(VERIFY_HELPERS))
 

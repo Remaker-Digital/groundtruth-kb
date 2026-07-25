@@ -21,7 +21,7 @@ bridge behavior, and recurring automation.
 
 | Path | Purpose | Trigger / invocation | Owner |
 |------|---------|----------------------|-------|
-| gt bridge dispatch + status-bearing bridge files | File bridge queue for Prime Builder and Loyal Opposition review handoffs | Headless dispatcher daemon invokes governed bridge dispatch | GoldenFixtureOwner |
+| gt bridge dispatch + status-bearing bridge files | File bridge queue for Prime Builder and Loyal Opposition review handoffs | Dispatcher daemon owns automated bridge dispatch | GoldenFixtureOwner |
 
 Include:
 - bridge entrypoints
@@ -90,7 +90,7 @@ file. Prompt text is operational configuration when it changes bridge behavior.
 
 | Name | Schedule / trigger | Executor | Defined in | Failure signal |
 |------|--------------------|----------|------------|----------------|
-| file-bridge-dispatcher-daemon | Event-driven on tool-use; manual fallback via 'Bridge' prompt | claude -p / codex exec invoked by the dispatcher daemon | Slice 3 hook registrations in .claude/settings.json + .codex/hooks.json | No dispatch-state updates after new bridge versions |
+| file-bridge-dispatcher-daemon | Daemon tick; manual fallback via owner assignment | dispatcher daemon invokes eligible harnesses | Dispatcher daemon control surface and numbered bridge files | No dispatch-state updates after new bridge versions |
 
 Include recurring tasks from:
 - app-native automations
@@ -101,7 +101,7 @@ Include recurring tasks from:
 ## Protocol rules
 
 - **Message model:** Dispatcher-backed latest-status queue over numbered bridge files.
-- **Reply rule:** Latest NEW/REVISED entries require Loyal Opposition verdicts; latest GO/NO-GO entries require Prime responses.
+- **Reply rule:** Latest NEW/REVISED/NO-ACTION entries require Loyal Opposition verdicts; latest GO/NO-GO entries require Prime responses.
 - **Retry rule:** Scheduled re-scan after the next interval; lock files prevent overlapping runs.
 - **Health check:** Run bridge dispatch health and scan versioned bridge files.
 - **Restart policy:** No long-running bridge process is required; update scheduled tasks after scanner or prompt changes.

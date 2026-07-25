@@ -20,7 +20,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 from _wrap_io import _atomic_write_bytes  # noqa: E402
 
-REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
+REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 CODEX_SKILLS_RELATIVE_PATH = Path(".codex") / "skills"
 GENERATED_MARKER = "<!-- GTKB-CODEX-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-CODEX-SKILL-ADAPTER -->"

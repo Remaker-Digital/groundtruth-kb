@@ -1542,6 +1542,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     validate_parser = subparsers.add_parser("validate", help="validate the frozen contract")
     validate_parser.add_argument("--require-test-paths", action="store_true")
+    validate_parser.add_argument("--json", action="store_true", dest="as_json")
     status_parser = subparsers.add_parser("status", help="report release-candidate completion status")
     status_parser.add_argument("--json", action="store_true", dest="as_json")
     subparsers.add_parser("digest", help="print the calculated frozen-scope digest")
@@ -1569,11 +1570,29 @@ def main(argv: list[str] | None = None) -> int:
             )
             if errors:
                 raise ManifestError("; ".join(errors))
-            print(
-                "PASS modernization acceptance manifest "
-                f"({len(manifest['capabilities'])} capabilities, "
-                f"{manifest['program']['expected_handle_count']} handles)"
-            )
+            capability_count = len(manifest["capabilities"])
+            handle_count = manifest["program"]["expected_handle_count"]
+            if args.as_json:
+                # Deterministic validation evidence only: the frozen scope digest
+                # plus the inventory counts just validated. No runtime receipt,
+                # timestamp, or release evidence is emitted here.
+                print(
+                    json.dumps(
+                        {
+                            "capability_count": capability_count,
+                            "handle_count": handle_count,
+                            "require_test_paths": args.require_test_paths,
+                            "result": "PASS",
+                            "scope_digest": scope_digest(manifest),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(
+                    f"PASS modernization acceptance manifest ({capability_count} capabilities, {handle_count} handles)"
+                )
             return 0
         if args.command == "status":
             status = evaluate_status(manifest, project_root=PROJECT_ROOT, state_dir=args.state_dir)

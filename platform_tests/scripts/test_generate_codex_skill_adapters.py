@@ -52,7 +52,7 @@ def _write_helper(project_root: Path, directory: str, relative_path: str, conten
 
 
 def _write_registry(project_root: Path) -> None:
-    registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path = project_root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text(
         """
@@ -293,8 +293,8 @@ def test_bridge_propose_skill_surfaces_document_semantic_search_opt_in() -> None
     db=None/db=False skip and db=True/explicit-DB opt-in contract.
     """
     paths = [
-        REPO_ROOT / ".claude/skills/bridge-propose/SKILL.md",
-        REPO_ROOT / ".codex/skills/bridge-propose/SKILL.md",
+        REPO_ROOT / ".claude/skills/gtkb-bridge-propose/SKILL.md",
+        REPO_ROOT / ".codex/skills/gtkb-bridge-propose/SKILL.md",
         REPO_ROOT / "groundtruth-kb/templates/skills/bridge-propose/SKILL.md",
     ]
     stale_patterns = [
@@ -406,7 +406,7 @@ def _write_registry_variant(
     otherwise the sub-table is written with the given status and (when
     ``codex_source_sha256`` is not None) a ``source_sha256`` line.
     """
-    registry_path = project_root / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path = project_root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     codex_block = ""
     if codex_status is not None:
@@ -440,7 +440,9 @@ status = "native"{codex_block}
 
 
 def _read_registry(project_root: Path) -> dict:
-    text = (project_root / "config" / "agent-control" / "harness-capability-registry.toml").read_text(encoding="utf-8")
+    text = (project_root / "config" / "agent-control" / "gtkb-harness-capability-registry.toml").read_text(
+        encoding="utf-8"
+    )
     return tomllib.loads(text)
 
 
@@ -474,7 +476,7 @@ def test_registry_refresh_does_not_insert_missing_codex_block(tmp_path: Path) ->
     adapters = module.build_adapters(tmp_path)
     changed = module.update_registry(tmp_path, adapters)
 
-    registry_text = (tmp_path / "config" / "agent-control" / "harness-capability-registry.toml").read_text(
+    registry_text = (tmp_path / "config" / "agent-control" / "gtkb-harness-capability-registry.toml").read_text(
         encoding="utf-8"
     )
     assert changed is False
@@ -602,7 +604,7 @@ def test_update_registry_emits_lf_only_line_endings(tmp_path: Path) -> None:
 
     module.update_registry(tmp_path, adapters)
 
-    registry_path = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path = tmp_path / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     assert b"\r" not in registry_path.read_bytes(), "registry contains CR after update_registry"
 
 
@@ -614,7 +616,7 @@ def test_update_registry_corrects_crlf_contamination(tmp_path: Path) -> None:
     adapters = module.build_adapters(tmp_path)
     # First call establishes the correct sha256 state.
     module.update_registry(tmp_path, adapters)
-    registry_path = tmp_path / "config" / "agent-control" / "harness-capability-registry.toml"
+    registry_path = tmp_path / "config" / "agent-control" / "gtkb-harness-capability-registry.toml"
     # Contaminate with CRLF.
     registry_path.write_bytes(registry_path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
     assert b"\r" in registry_path.read_bytes()

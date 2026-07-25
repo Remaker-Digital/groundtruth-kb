@@ -656,8 +656,14 @@ def main():
     parser.add_argument(
         "--report-dir",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX",
-        help="Directory containing INSIGHTS-*.md files",
+        required=True,
+        help=(
+            "Directory containing INSIGHTS-*.md files. Required: WI-5589 retired the "
+            "implicit LO insight-dropbox default so no run resolves a non-canonical "
+            "carrier by accident. Canonical Loyal Opposition findings arrive as ADVISORY "
+            "numbered bridge entries; pass an explicit directory only for operator-directed "
+            "historical import."
+        ),
     )
     parser.add_argument(
         "--kb-path",

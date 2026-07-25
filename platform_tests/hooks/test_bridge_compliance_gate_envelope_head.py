@@ -69,18 +69,18 @@ def test_missing_dispatchable_envelope_is_denied(gate, tmp_path: Path) -> None:
 
     assert reason is not None
     assert "artifact-head envelope" in reason
-    assert "::init gtkb lo" in reason
+    assert "::init gtkb pb" in reason
 
 
 def test_mismatched_responder_role_is_denied(gate, tmp_path: Path) -> None:
-    reason = _deny(gate, tmp_path, _body("NEW\n::init gtkb pb\n::open build\n"))
+    reason = _deny(gate, tmp_path, _body("NEW\n::init gtkb lo\n::open build\n"))
 
     assert reason is not None
     assert "responder-role mismatch" in reason
 
 
 def test_invalid_activity_is_denied(gate, tmp_path: Path) -> None:
-    reason = _deny(gate, tmp_path, _body("NEW\n::init gtkb lo\n::open unknown\n"))
+    reason = _deny(gate, tmp_path, _body("NEW\n::init gtkb pb\n::open unknown\n"))
 
     assert reason is not None
     assert "invalid" in reason
@@ -98,7 +98,7 @@ def test_unmapped_status_rejects_envelope_lines(gate, tmp_path: Path) -> None:
 
 
 def test_valid_dispatchable_envelope_reaches_later_checks(gate, tmp_path: Path) -> None:
-    reason = _deny(gate, tmp_path, _body("NEW\n::init gtkb lo\n::open build\n"))
+    reason = _deny(gate, tmp_path, _body("NEW\n::init gtkb pb\n::open build\n"))
 
     if reason is not None:
         assert "artifact-head envelope" not in reason

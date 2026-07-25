@@ -113,7 +113,7 @@ skill_adapter_manifest = ".api-harness/skills/MANIFEST.json"
         encoding="utf-8",
     )
     (root / ".codex" / "skills" / "MANIFEST.json").write_text('{"adapters": []}', encoding="utf-8")
-    (root / ".api-harness" / "skills" / "bridge").mkdir(parents=True)
+    (root / ".api-harness" / "skills" / "gtkb-bridge").mkdir(parents=True)
     (root / ".api-harness" / "skills" / "MANIFEST.json").write_text('{"adapters": []}', encoding="utf-8")
     (root / ".codex" / "hooks.json").write_text("{}", encoding="utf-8")
     (root / "scripts" / "check_codex_harness.py").write_text("# fixture\n", encoding="utf-8")

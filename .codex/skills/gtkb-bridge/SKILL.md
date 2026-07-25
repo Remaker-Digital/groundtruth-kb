@@ -23,7 +23,7 @@ dispatcher configuration and health, use the `bridge-config` skill and
 `gt bridge dispatch config|status|health`. Aggregate queue artifacts are not
 part of current operation.
 
-This skill body presents **identical content** to both Claude Code and Codex agents via the cross-harness skill-adapter pipeline (per `config/agent-control/harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). Operations described here behave the same way regardless of which harness invokes the skill.
+This skill body presents **identical content** to both Claude Code and Codex agents via the cross-harness skill-adapter pipeline (per `/config/agent-control/gtkb-harness-capability-registry.toml` + `scripts/generate_codex_skill_adapters.py`). Operations described here behave the same way regardless of which harness invokes the skill.
 
 ## Bridge protocol summary
 
@@ -38,7 +38,7 @@ Six operations, seven lifecycle states. Operations:
 | **Verify** | Prime Builder | Post-implementation report as the next numbered bridge file (status NEW; the post-impl report itself awaits VERIFIED) |
 | **Status** | Both harnesses | Read-only inspection of thread state without mutation |
 
-Lifecycle states (per `.claude/rules/file-bridge-protocol.md`):
+Lifecycle states (per `/config/agent-control/gtkb-file-bridge-protocol.md`):
 
 | State | Set by | Means |
 |---|---|---|
@@ -60,7 +60,7 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 
 **Action**:
 
-1. Draft proposal body containing required sections per `.claude/rules/file-bridge-protocol.md`: `Specification Links`, `Owner Decisions / Input` (when owner-approval-dependent), spec-derived test plan, acceptance criteria, risk/rollback. Per `.claude/rules/codex-review-gate.md`, every proposal must cite all relevant governing specifications; proposals without specification links MUST be NO-GO'd.
+1. Draft proposal body containing required sections per `/config/agent-control/gtkb-file-bridge-protocol.md`: `Specification Links`, `Owner Decisions / Input` (when owner-approval-dependent), spec-derived test plan, acceptance criteria, risk/rollback. Per `/config/agent-control/gtkb-review-gate.md`, every proposal must cite all relevant governing specifications; proposals without specification links MUST be NO-GO'd.
    - **Project-linkage metadata (per `DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`)**: every implementation-targeting NEW/REVISED proposal MUST include three machine-readable header lines near the top of the file:
 
      ```text
@@ -75,7 +75,7 @@ A complete thread cycle: `NEW` → (`NO-GO` → `REVISED`)* → `GO` → (implem
 4. Run pre-filing preflights:
    - `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>` — must report `preflight_passed: true`, no missing required/advisory specs.
    - `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` — must exit 0, no blocking gaps.
-5. Delegate the file write to the governed helper-mediated path (`gtkb-bridge-propose` skill — see `.claude/skills/bridge-propose/SKILL.md`) or its CLI successor. The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and publishes dispatcher/TAFE state.
+5. Delegate the file write to the governed helper-mediated path (`gtkb-bridge-propose` skill — see `.claude/skills/gtkb-bridge-propose/SKILL.md`) or its CLI successor. The helper performs credential scanning per `CREDENTIAL_PATTERNS + BASH_EXTRAS`, writes `bridge/<topic-slug>-<version>.md`, and publishes dispatcher/TAFE state.
 
 **Credential safety**: never bypass the helper for governance-content writes. Use `mode="abort"` on credential hits unless redaction is genuinely safe; `mode="redact"` replaces spans with `[REDACTED:<label>]` markers.
 
@@ -133,17 +133,17 @@ The helper creates drafts; it does not author the substantive correction. Prime 
 
 1. Read the full thread version chain.
 2. Run the mandatory applicability preflight: `python scripts/bridge_applicability_preflight.py --bridge-id <topic-slug>`. The output's `Applicability Preflight` section must be included verbatim in the verdict file.
-3. Run the mandatory clause preflight: `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` (no `--report-only`). Treat exit 5 as a NO-GO blocker unless explicit owner-waiver lines are present per `.claude/rules/file-bridge-protocol.md` "Clause-Test Preflight (Mandatory; Slice 2)".
+3. Run the mandatory clause preflight: `python scripts/adr_dcl_clause_preflight.py --bridge-id <topic-slug>` (no `--report-only`). Treat exit 5 as a NO-GO blocker unless explicit owner-waiver lines are present per `/config/agent-control/gtkb-file-bridge-protocol.md` "Clause-Test Preflight (Mandatory; Slice 2)".
 4. Optionally run the advisory ADR/DCL discovery helper:
    `python scripts/adr_dcl_applicability_discovery.py --bridge-id <topic-slug>`.
    Its `Candidate Applicable ADR/DCLs` output is review context only. It always
    exits 0 and must not be treated as a blocking gate; the registered clause
    preflight remains authoritative.
-5. Run a deliberation search: `db.search_deliberations(...)` per `.claude/rules/deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
+5. Run a deliberation search: `db.search_deliberations(...)` per `/config/agent-control/gtkb-deliberation-protocol.md`. Add a `Prior Deliberations` section to the verdict citing relevant DELIB-IDs.
 6. Before writing the verdict, run `python .codex/skills/verify/helpers/write_verdict.py --slug <topic-slug> --body-file <draft-body-file>` to seed `## Prior Deliberations`, then review and prune the helper-suggested candidates. If you opt out, keep an explicit `_No prior deliberations: <reason>._` line.
-7. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `.claude/rules/codex-review-gate.md`.
+7. For implementation reviews: confirm the proposal links all relevant specifications and the proposed tests derive from those specifications. **Issue NO-GO if any relevant specification is missing or test mapping is incomplete**, per `/config/agent-control/gtkb-review-gate.md`.
 8. For verification reviews (post-impl reports): confirm the implementation report carries forward the linked specifications, includes spec-to-test mapping, executes the tests, and reports observed results. **Issue NO-GO instead of VERIFIED for any untested linked specification** unless owner waiver is documented.
-9. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
+9. Write the verdict file `bridge/<topic-slug>-<next-version>.md` with the verdict on line 1 (`GO`, `NO-GO`, or `VERIFIED`); include the applicability preflight and clause applicability sections; cite findings with severity (P0-P4), evidence source, impact, and recommended action per `/config/agent-control/gtkb-loyal-opposition.md` and `/config/agent-control/gtkb-report-depth-prime-builder-context.md`.
 10. Publish the verdict through the governed bridge path.
 
 **Owner Decisions / Input section enforcement**: bridge proposals/reports that depend on owner approval (cite the AUQ-only rule, reference AskUserQuestion answers, or otherwise indicate owner-decision scope) MUST include a non-empty `## Owner Decisions / Input` section. Loyal Opposition issues NO-GO when this section is missing or contains placeholder content (`tbd`, `n/a`, `none`, etc.).
@@ -219,24 +219,24 @@ Use this when you need to know "what is the state of thread X?" without touching
 
 Before any operation:
 
-- `.claude/rules/file-bridge-protocol.md` — protocol/helper contract (status table, file naming, mandatory gates).
-- `.claude/rules/codex-review-gate.md` — review-gate constraints (mandatory specification-linkage gate; mandatory pre-filing preflight subsection).
-- `.claude/rules/deliberation-protocol.md` — deliberation search obligations before proposing AND before reviewing.
-- `.claude/rules/operating-model.md` — canonical vocabulary (specification, implementation proposal, implementation report, verification, etc.).
-- For Loyal Opposition: `.claude/rules/loyal-opposition.md` and `.claude/rules/report-depth-prime-builder-context.md`.
-- For Prime Builder: `.claude/rules/acting-prime-builder.md` and `.claude/rules/prime-builder-role.md`.
+- `/config/agent-control/gtkb-file-bridge-protocol.md` — protocol/helper contract (status table, file naming, mandatory gates).
+- `/config/agent-control/gtkb-review-gate.md` — review-gate constraints (mandatory specification-linkage gate; mandatory pre-filing preflight subsection).
+- `/config/agent-control/gtkb-deliberation-protocol.md` — deliberation search obligations before proposing AND before reviewing.
+- `/config/agent-control/gtkb-operating-model.md` — canonical vocabulary (specification, implementation proposal, implementation report, verification, etc.).
+- For Loyal Opposition: `/config/agent-control/gtkb-loyal-opposition.md` and `/config/agent-control/gtkb-report-depth-prime-builder-context.md`.
+- For Prime Builder: `/config/agent-control/gtkb-acting-prime-builder.md` and `/config/agent-control/gtkb-prime-builder-role.md`.
 
 ## Mandatory gates
 
 The bridge protocol carries several mandatory gates. Skipping any is a NO-GO trigger:
 
-- **Mandatory project root boundary** (`.claude/rules/project-root-boundary.md`): all live GT-KB files within `E:\GT-KB`. Bridge items depending on paths outside this root are NO-GO.
-- **Mandatory specification linkage gate** (`.claude/rules/file-bridge-protocol.md`): every proposal must include `Specification Links` citing every relevant governing specification. Absence = NO-GO.
-- **Mandatory pre-filing preflight subsection** (`.claude/rules/file-bridge-protocol.md`): preflights must run before filing; results must be cited; mechanically enforced by `.claude/hooks/bridge-compliance-gate.py`.
-- **Mandatory specification-derived verification gate** (`.claude/rules/file-bridge-protocol.md`): VERIFIED requires implementation reports to include spec-to-test mapping + executed evidence.
-- **Mandatory applicability preflight gate** (`.claude/rules/file-bridge-protocol.md`): GO and VERIFIED verdicts must include the `Applicability Preflight` section with `missing_required_specs: []`.
-- **Mandatory clause-test preflight gate** (Slice 2; `.claude/rules/file-bridge-protocol.md`): exit 5 from `scripts/adr_dcl_clause_preflight.py` is a NO-GO blocker unless explicit owner waiver per blocking gap.
-- **Mandatory Owner Decisions / Input section gate** (`.claude/rules/file-bridge-protocol.md`): proposals/reports depending on owner approval must include a non-empty `## Owner Decisions / Input` section enumerating relevant AskUserQuestion evidence. Hook-enforced via `.claude/hooks/bridge-compliance-gate.py`.
+- **Mandatory project root boundary** (`/config/agent-control/gtkb-project-root-boundary.md`): all live GT-KB files within `E:\GT-KB`. Bridge items depending on paths outside this root are NO-GO.
+- **Mandatory specification linkage gate** (`/config/agent-control/gtkb-file-bridge-protocol.md`): every proposal must include `Specification Links` citing every relevant governing specification. Absence = NO-GO.
+- **Mandatory pre-filing preflight subsection** (`/config/agent-control/gtkb-file-bridge-protocol.md`): preflights must run before filing; results must be cited; mechanically enforced by `/config/hooks/gtkb-bridge-compliance-gate.py`.
+- **Mandatory specification-derived verification gate** (`/config/agent-control/gtkb-file-bridge-protocol.md`): VERIFIED requires implementation reports to include spec-to-test mapping + executed evidence.
+- **Mandatory applicability preflight gate** (`/config/agent-control/gtkb-file-bridge-protocol.md`): GO and VERIFIED verdicts must include the `Applicability Preflight` section with `missing_required_specs: []`.
+- **Mandatory clause-test preflight gate** (Slice 2; `/config/agent-control/gtkb-file-bridge-protocol.md`): exit 5 from `scripts/adr_dcl_clause_preflight.py` is a NO-GO blocker unless explicit owner waiver per blocking gap.
+- **Mandatory Owner Decisions / Input section gate** (`/config/agent-control/gtkb-file-bridge-protocol.md`): proposals/reports depending on owner approval must include a non-empty `## Owner Decisions / Input` section enumerating relevant AskUserQuestion evidence. Hook-enforced via `/config/hooks/gtkb-bridge-compliance-gate.py`.
 
 ## Non-bypassable behaviors
 
@@ -253,7 +253,7 @@ For specific subactions, prefer the more focused skill:
 
 | Action | Specific skill | Path |
 |---|---|---|
-| File a proposal | `gtkb-bridge-propose` | `.claude/skills/bridge-propose/SKILL.md` |
+| File a proposal | `gtkb-bridge-propose` | `.claude/skills/gtkb-bridge-propose/SKILL.md` |
 | Review a proposal | `gtkb-proposal-review` | `.claude/skills/proposal-review/SKILL.md` |
 | Submit for review | `gtkb-send-review` | `.claude/skills/send-review/SKILL.md` |
 

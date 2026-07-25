@@ -34,6 +34,7 @@ def _write_version(
     metadata_version: str | None = None,
     responds_to: str | None = None,
     include_responds: bool = True,
+    include_author_identity: bool = True,
     raw_bytes: bytes | None = None,
 ) -> Path:
     path = root / "bridge" / f"{bridge_id}-{version:03d}.md"
@@ -44,12 +45,11 @@ def _write_version(
     if responds_to is None and version > 1:
         responds_to = f"bridge/{bridge_id}-{version - 1:03d}.md"
     version_value = metadata_version if metadata_version is not None else f"{version:03d}"
-    lines = [
-        status,
-        f"author_identity: {author_identity or _role_for(status)}",
-        f"Document: {document or bridge_id}",
-        f"Version: {version_value}",
-    ]
+    lines = [status]
+    if include_author_identity:
+        lines.append(f"author_identity: {author_identity or _role_for(status)}")
+    lines.append(f"Document: {document or bridge_id}")
+    lines.append(f"Version: {version_value}")
     if include_responds and version > 1:
         lines.append(f"Responds to: {responds_to}")
     lines.extend(("", f"# Fixture {bridge_id} v{version}", ""))
@@ -173,6 +173,45 @@ def test_post_go_report_awaiting_review_exposes_only_review_artifact(tmp_path: P
     result = resolve_bridge_lifecycle(tmp_path, slug)
 
     assert result.review_artifact.version == 3
+    assert result.implementation_artifact is None
+    assert result.implementation_verdict is None
+
+
+def test_owner_deferred_post_go_report_can_be_followed_by_revised_proposal(tmp_path: Path) -> None:
+    """A deferred report can hand off to a newly reviewed corrective proposal."""
+
+    slug = "deferred-report-reproposal"
+    _simple_go(tmp_path, slug)
+    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 4, "REVISED")
+
+    awaiting_go = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert awaiting_go.latest_strict_state.version == 4
+    assert awaiting_go.review_artifact.version == 4
+    assert awaiting_go.implementation_artifact is None
+    assert awaiting_go.implementation_verdict is None
+
+    _write_version(tmp_path, slug, 5, "GO")
+    approved = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert approved.implementation_artifact.version == 4
+    assert approved.implementation_verdict.version == 5
+
+
+def test_no_go_on_owner_deferred_corrective_proposal_does_not_resume_old_go(tmp_path: Path) -> None:
+    """The old GO cannot authorize work after the new proposal receives NO-GO."""
+
+    slug = "deferred-report-reproposal-no-go"
+    _simple_go(tmp_path, slug)
+    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 4, "REVISED")
+    _write_version(tmp_path, slug, 5, "NO-GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert result.latest_strict_state.status == "NO-GO"
+    assert result.review_artifact is None
     assert result.implementation_artifact is None
     assert result.implementation_verdict is None
 
@@ -585,3 +624,112 @@ def test_legacy_no_suffix_file_is_ignored_beside_exact_chain(tmp_path: Path) -> 
     after = _signature(resolve_bridge_lifecycle(tmp_path, slug))
 
     assert after == before
+
+
+# GOV-DOCUMENT-AUTHOR-PROVENANCE-001 grandfathering (WI-5670): a canonical-status
+# version with structurally valid Document/Version/Responds-to but no
+# author_identity header predates the provenance contract. Non-operative legacy
+# versions must not block resolution; the operative proposal/GO pair must still
+# be provenance-complete.
+
+
+def test_legacy_non_operative_verdict_is_grandfathered(tmp_path: Path) -> None:
+    """A non-operative legacy NO-GO (no author_identity) does not block an
+    otherwise-strict thread from resolving to its strict operative pair."""
+
+    slug = "legacy-grandfathered"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "NO-GO", include_author_identity=False)
+    _write_version(tmp_path, slug, 3, "REVISED")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert result.implementation_artifact.version == 3
+    assert result.implementation_verdict.version == 4
+    assert result.audit_versions[1].classification == "legacy"
+
+
+def test_legacy_version_is_not_malformed(tmp_path: Path) -> None:
+    """A legacy (missing author_identity) version is a distinct, non-malformed
+    classification: the single-malformed correction path is unaffected."""
+
+    slug = "legacy-not-malformed"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "NO-GO", include_author_identity=False)
+    _write_version(tmp_path, slug, 3, "REVISED")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    legacy_version = result.audit_versions[1]
+    assert legacy_version.is_legacy is True
+    assert legacy_version.is_malformed is False
+    assert legacy_version.is_strict is False
+    assert legacy_version.status == "NO-GO"
+    assert legacy_version.author_identity is None
+    assert legacy_version.author_role is None
+
+
+def test_operative_go_missing_provenance_fails_closed(tmp_path: Path) -> None:
+    """Implementation authority must never derive from a legacy GO, even though
+    non-operative legacy versions are tolerated elsewhere in the same chain."""
+
+    slug = "legacy-operative-go"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "GO", include_author_identity=False)
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "OPERATIVE_VERSION_MISSING_PROVENANCE"
+
+
+def test_operative_proposal_missing_provenance_fails_closed(tmp_path: Path) -> None:
+    """Implementation authority must never derive from a legacy proposal, even
+    when the GO itself is strict."""
+
+    slug = "legacy-operative-proposal"
+    _write_version(tmp_path, slug, 1, "NEW", include_author_identity=False)
+    _write_version(tmp_path, slug, 2, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "OPERATIVE_VERSION_MISSING_PROVENANCE"
+
+
+def test_corrected_go_operative_proposal_legacy_fails_closed_via_role_check(
+    tmp_path: Path,
+) -> None:
+    """`_correction_resolution`'s direct implementation_artifact/verdict branch
+    needs no separate OPERATIVE_VERSION_MISSING_PROVENANCE check: a legacy
+    (author_role=None) Prime predecessor already fails the existing
+    MALFORMED_CORRECTION_WRONG_PREDECESSOR role check before that branch is
+    reached, so the fail-closed guarantee holds without redundant code."""
+
+    slug = "corrected-legacy-proposal"
+    _write_version(tmp_path, slug, 1, "NEW", include_author_identity=False)
+    _write_malformed(tmp_path, slug, 2)
+    _write_version(tmp_path, slug, 3, "NO-ACTION")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "MALFORMED_CORRECTION_WRONG_PREDECESSOR"
+
+
+def test_corrected_go_operative_verdict_legacy_fails_closed_via_role_check(
+    tmp_path: Path,
+) -> None:
+    """Symmetric to the predecessor case: a legacy (author_role=None) verdict
+    standing in the corrected-tail GO/NO-GO/VERIFIED slot already fails the
+    existing MALFORMED_CORRECTION_INVALID_VERDICT role check."""
+
+    slug = "corrected-legacy-verdict"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_malformed(tmp_path, slug, 2)
+    _write_version(tmp_path, slug, 3, "NO-ACTION")
+    _write_version(tmp_path, slug, 4, "GO", include_author_identity=False)
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "MALFORMED_CORRECTION_INVALID_VERDICT"

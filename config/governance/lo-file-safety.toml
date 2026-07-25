@@ -5,4 +5,6 @@ approval_env_var = "GTKB_LO_FILE_SAFETY_APPROVAL_PACKET"
 
 allow_patterns = [
   "memory/MEMORY.md",
+  ".gtkb-state/propose-drafts/**",
+  ".gtkb-state/owner-decisions/**",
 ]

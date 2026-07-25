@@ -1,0 +1,3 @@
+paths = [".claude/hooks/old.py", ".claude\\hooks\\old.py"]
+glob = ".claude/hooks/*.py"
+regex = ".claude[/\\\\]hooks[/\\\\]old\\.py"

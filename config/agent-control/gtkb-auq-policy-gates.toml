@@ -1,0 +1,72 @@
+schema_version = 1
+registry_id = "gtkb-auq-policy-gates"
+
+[actions.status]
+outcome = "ALLOW"
+message = "Deterministic status checks may proceed without owner input."
+adapter_installed = false
+
+[actions.test]
+outcome = "WARN"
+message = "Tests may proceed; review failures before claiming completion."
+adapter_installed = false
+
+[actions.build]
+outcome = "WARN"
+message = "Local builds may proceed; do not deploy or publish from this action."
+adapter_installed = false
+
+[actions.deploy-staging]
+outcome = "ASK"
+message = "Staging deployment needs a bounded owner approval receipt."
+adapter_installed = false
+ask_options = [
+  "Approve this staging deploy once",
+  "Defer staging deploy",
+  "Deny and revise scope",
+]
+
+[actions.deploy-production]
+outcome = "DENY"
+message = "Production deployment is outside this first-slice policy gate."
+adapter_installed = false
+
+[actions.requirements-update]
+outcome = "ASK"
+message = "Requirements/specification mutation needs bounded owner confirmation."
+adapter_installed = false
+ask_options = [
+  "Approve this requirements update once",
+  "Defer and file a proposal",
+  "Deny and keep requirements unchanged",
+]
+
+[actions.commit]
+outcome = "ASK"
+message = "Commit policy is modeled but no commit adapter is installed in this slice."
+adapter_installed = false
+ask_options = [
+  "Approve this commit once",
+  "Defer commit",
+  "Deny and revise changes",
+]
+
+[actions.push]
+outcome = "ASK"
+message = "Push policy is modeled but no push adapter is installed in this slice."
+adapter_installed = false
+ask_options = [
+  "Approve this push once",
+  "Defer push",
+  "Deny and keep local only",
+]
+
+[actions.platform-write]
+outcome = "ASK"
+message = "Platform-write policy is modeled but no write adapter is installed in this slice."
+adapter_installed = false
+ask_options = [
+  "Approve this platform write once",
+  "Defer and file a proposal",
+  "Deny and use an application-scope path",
+]

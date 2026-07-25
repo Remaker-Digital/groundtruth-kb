@@ -2526,6 +2526,113 @@ def _check_untracked_terminal_verified_verdicts(target: Path) -> ToolCheck:
     )
 
 
+def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
+    """WI-5668: WARN while any pre-rename bare skill-directory references remain.
+
+    The GTKB-SKILL-RENAME-REFERENCE-SWEEP program renamed the ``.claude/skills/``
+    directories to a ``gtkb-`` prefix (``DELIB-202667105`` / ``DELIB-202667106``).
+    This deterministic completion gate (``GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001``)
+    counts remaining tracked references to the bare pre-rename skill dirs and WARNs
+    until the count reaches zero, so the sweep's "done" is objective rather than a
+    session judgment call.
+
+    Self-maintaining: the bare-name set is derived from the current ``gtkb-`` skill
+    dirs (for each ``gtkb-<name>`` dir, ``<name>`` is a stale bare name), so no
+    hardcoded list is needed and the check adapts to future renames.
+
+    ``required=False`` — a surfaced warning, never a hard release-block — while the
+    multi-slice sweep is in flight. Append-only / historical / runtime trees that
+    intentionally retain bare references are excluded.
+    """
+    name = "skill-rename reference sweep"
+    skills_dir = target / ".claude" / "skills"
+    if not skills_dir.is_dir():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="no .claude/skills/ directory; nothing to verify",
+        )
+
+    prefix = "gtkb-"
+    bare_names = sorted(
+        d.name[len(prefix) :]
+        for d in skills_dir.iterdir()
+        if d.is_dir() and d.name.startswith(prefix) and len(d.name) > len(prefix)
+    )
+    if not bare_names:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="no gtkb- skill dirs found; no bare pre-rename names to sweep",
+        )
+
+    alt = "|".join(re.escape(b) for b in bare_names)
+    grep_pattern = rf'skills/({alt})/|"skills"[ ]*/[ ]*"({alt})"'
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(target), "grep", "-n", "-E", grep_pattern],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="git grep unavailable; skill-rename reference scan skipped",
+        )
+    # git grep exit codes: 0 = matches found, 1 = no matches (a PASS), >1 = error.
+    if completed.returncode > 1:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="git grep error; skill-rename reference scan skipped",
+        )
+
+    excluded = ("bridge/", "RETIRED-", "BARRED-", "archive/", "archive-", ".gtkb-state/")
+    hits: list[str] = []
+    if completed.returncode == 0:
+        for line in completed.stdout.splitlines():
+            path_part, sep, rest = line.replace("\\", "/").partition(":")
+            if not sep:
+                continue
+            if any(path_part.startswith(p) for p in excluded):
+                continue
+            lineno_part = rest.partition(":")[0]
+            hits.append(f"{path_part}:{lineno_part}")
+
+    count = len(hits)
+    if count:
+        sample = ", ".join(hits[:8])
+        more = f" (+{count - 8} more)" if count > 8 else ""
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=(
+                f"{count} pre-rename bare skill-dir reference(s) remain; "
+                f"GTKB-SKILL-RENAME-REFERENCE-SWEEP incomplete: {sample}{more}"
+            ),
+        )
+
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message="0 pre-rename bare skill-dir references remain; sweep complete",
+    )
+
+
 def _check_parity_discovery_diff(target: Path) -> ToolCheck:
     """Cross-harness parity discovery-diff (Slice 3 of PROJECT-GTKB-CROSS-HARNESS-PARITY).
 
@@ -3912,8 +4019,8 @@ def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "decision-capture" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "decision-capture" / "helpers" / "record_decision.py"
+    skill_md = target / ".claude" / "skills" / "gtkb-decision-capture" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "gtkb-decision-capture" / "helpers" / "record_decision.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -3928,7 +4035,7 @@ def _check_skill_present(target: Path, profile_name: str) -> ToolCheck:
             found=False,
             status="warning",
             message=(
-                f".claude/skills/decision-capture/ missing: {', '.join(missing)}. "
+                f".claude/skills/gtkb-decision-capture/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -3962,8 +4069,8 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "bridge-propose" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+    skill_md = target / ".claude" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -3978,7 +4085,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             found=False,
             status="warning",
             message=(
-                f".claude/skills/bridge-propose/ missing: {', '.join(missing)}. "
+                f".claude/skills/gtkb-bridge-propose/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -4013,8 +4120,8 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "spec-intake" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "spec-intake" / "helpers" / "spec_intake.py"
+    skill_md = target / ".claude" / "skills" / "gtkb-spec-intake" / "SKILL.md"
+    helper_py = target / ".claude" / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -4029,7 +4136,7 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             found=False,
             status="warning",
             message=(
-                f".claude/skills/spec-intake/ missing: {', '.join(missing)}. "
+                f".claude/skills/gtkb-spec-intake/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -7144,6 +7251,7 @@ def run_doctor(
         checks.append(_check_spec_classifier_settings_registered(target))
         checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_untracked_terminal_verified_verdicts(target))
+        checks.append(_check_skill_rename_reference_sweep(target))
         checks.append(_check_spec_classifier_codex_parity(target))
         checks.append(_check_spec_classifier_test_exists(target))
         checks.append(_check_untriaged_prose_decisions(target))

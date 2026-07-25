@@ -20,6 +20,9 @@ on:
       - 'memory/**'
       - 'bridge/**'
       - '.claude/hooks/**'
+      # WI-5640: hooks relocated from .claude/hooks/ to config/hooks/; keep both so
+      # CI re-triggers on changes in either the legacy compat path or the canonical home.
+      - 'config/hooks/**'
   push:
     branches: [main, develop, 'hotfix/**']
     paths:
@@ -36,6 +39,8 @@ on:
       - 'memory/**'
       - 'bridge/**'
       - '.claude/hooks/**'
+      # WI-5640: hooks relocated from .claude/hooks/ to config/hooks/; keep both.
+      - 'config/hooks/**'
   workflow_dispatch:
 
 concurrency:

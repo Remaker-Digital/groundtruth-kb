@@ -16,7 +16,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_DIR = Path(__file__).resolve().parent
-REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
+REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 PROJECT_SKILLS_RELATIVE_PATH = Path(".claude") / "skills"
 
 
@@ -77,7 +77,7 @@ VALID_ENVELOPE_MODES = frozenset(
     }
 )
 
-# ── Cross-harness parity schema (Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY) ──
+# â”€â”€ Cross-harness parity schema (Slice 2 of PROJECT-GTKB-CROSS-HARNESS-PARITY) â”€â”€
 # Additive surface derived from ADR-CROSS-HARNESS-PARITY-001 +
 # DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001 (assertions PARITY-WAIVER-SCHEMA and
 # PARITY-APPLICABILITY-RULE). These accessors/validators are consumed by the
@@ -751,7 +751,7 @@ def _evaluate_capability_floor(harness_name: str, registry_data: dict[str, Any])
                 required_for_roles=["registered_no_role"],
                 configured_status="declared" if present else "missing",
                 state="PASS" if present else "MISSING",
-                evidence=f"config/agent-control/harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
+                evidence=f"config/agent-control/gtkb-harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
                 note=("" if present else f"Required capability-floor field '{field}' not declared"),
             )
         )
@@ -804,7 +804,7 @@ def _activity_envelope_projection_results(
                     required_for_roles=["prime-builder", "loyal-opposition"],
                     configured_status=value or "missing",
                     state="PASS" if valid else "MISSING",
-                    evidence=f"config/agent-control/harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
+                    evidence=f"config/agent-control/gtkb-harness-capability-registry.toml::[harnesses.{harness_name}].{field}",
                     note=("" if valid else f"Required activity-envelope field '{field}' is missing or invalid."),
                 )
             )
@@ -822,7 +822,7 @@ def _activity_envelope_projection_results(
                 else "missing",
                 state="PASS" if transcript_independent else "MISSING",
                 evidence=(
-                    "config/agent-control/harness-capability-registry.toml::"
+                    "config/agent-control/gtkb-harness-capability-registry.toml::"
                     f"[harnesses.{harness_name}].full_transcript_archive_required"
                 ),
                 note=(
@@ -979,7 +979,7 @@ def _fleet_role_coverage_results(
                 required_for_roles=[role],
                 configured_status="computed",
                 state=state,
-                evidence="harness-state/harness-registry.json + config/agent-control/harness-capability-registry.toml",
+                evidence="harness-state/harness-registry.json + config/agent-control/gtkb-harness-capability-registry.toml",
                 note=note,
             )
         )

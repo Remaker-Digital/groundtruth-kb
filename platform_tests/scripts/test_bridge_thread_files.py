@@ -40,7 +40,7 @@ def test_status_reader_ignores_envelope_lines_after_status(tmp_path: Path) -> No
     bridge = tmp_path / "bridge"
     bridge.mkdir()
     (bridge / "enveloped-thread-001.md").write_text(
-        "NEW\n::init gtkb lo\n::open build\n\n# Proposal\n",
+        "NEW\n::init gtkb pb\n::open build\n\n# Proposal\n",
         encoding="utf-8",
     )
     (bridge / "legacy-thread-001.md").write_text("NO-GO\n\n# Legacy verdict\n", encoding="utf-8")

@@ -111,11 +111,11 @@ def test_registry_class_counts_match_proposal() -> None:
 def test_bridge_skill_records_are_managed_for_dual_agent_profiles() -> None:
     """The bridge skill template is scaffolded and upgrade-managed as Tier A."""
     expected_targets = {
-        ".claude/skills/bridge/SKILL.md",
-        ".claude/skills/bridge/helpers/scan_bridge.py",
-        ".claude/skills/bridge/helpers/revise_bridge.py",
-        ".claude/skills/bridge/helpers/impl_report_bridge.py",
-        ".claude/skills/bridge/helpers/show_thread_bridge.py",
+        ".claude/skills/gtkb-bridge/SKILL.md",
+        ".claude/skills/gtkb-bridge/helpers/scan_bridge.py",
+        ".claude/skills/gtkb-bridge/helpers/revise_bridge.py",
+        ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+        ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py",
     }
 
     scaffold_targets = {

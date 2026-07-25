@@ -35,7 +35,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 import generate_codex_skill_adapters as codex_gen  # noqa: E402
 
 PROJECT_ROOT = _SCRIPT_DIR.parent
-REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "harness-capability-registry.toml"
+REGISTRY_RELATIVE_PATH = Path("config") / "agent-control" / "gtkb-harness-capability-registry.toml"
 ANTIGRAVITY_SKILLS_RELATIVE_PATH = Path(".agent") / "skills"
 GENERATED_MARKER = "<!-- GTKB-ANTIGRAVITY-SKILL-ADAPTER"
 GENERATED_END_MARKER = "GTKB-ANTIGRAVITY-SKILL-ADAPTER -->"

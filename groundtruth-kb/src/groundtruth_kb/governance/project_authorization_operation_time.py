@@ -168,7 +168,11 @@ def classify_target(path_text: str, taxonomy: OperationTaxonomy | None = None) -
         mutation_class = "runtime_state"
     elif lowered in {".gitattributes", ".gitignore", ".gitmodules"} or first == ".git":
         mutation_class = "repository_metadata"
-    elif first in {"platform_tests", "tests"} or lowered.startswith("groundtruth-kb/tests/"):
+    elif (
+        first in {"platform_tests", "tests"}
+        or lowered.startswith("groundtruth-kb/tests/")
+        or lowered == "groundtruth-kb/tests"
+    ):
         mutation_class = "test"
     elif (
         first
@@ -200,12 +204,19 @@ def classify_target(path_text: str, taxonomy: OperationTaxonomy | None = None) -
         or lowered.endswith((".toml", ".yaml", ".yml"))
     ):
         mutation_class = "configuration"
-    elif first in {"docs", "independent-progress-assessments", "memory"} or lowered.startswith("groundtruth-kb/docs/"):
+    elif (
+        first in {"docs", "independent-progress-assessments", "memory"}
+        or lowered.startswith("groundtruth-kb/docs/")
+        or lowered == "groundtruth-kb/docs"
+    ):
         mutation_class = "documentation"
     elif (
         first in {"scripts", "applications"}
         or lowered.startswith("groundtruth-kb/src/")
-        or lowered.endswith((".py", ".js", ".ts", ".tsx", ".jsx", ".ps1", ".sh"))
+        or lowered == "groundtruth-kb/src"
+        or lowered == "groundtruth-kb/templates"
+        or first == "dashboard"
+        or lowered.endswith((".py", ".js", ".ts", ".tsx", ".jsx", ".ps1", ".sh", ".csv"))
     ):
         mutation_class = "source"
     elif lowered.endswith((".md", ".json", ".jsonl")):

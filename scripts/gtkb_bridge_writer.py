@@ -62,12 +62,12 @@ VALID_STATUSES: frozenset[str] = frozenset(
 PRIME_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "NO-ACTION"})
 LOYAL_OPPOSITION_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "VERIFIED", "ADVISORY"})
 ENVELOPE_RESPONDER_BY_STATUS: Mapping[str, str] = {
-    "NEW": "lo",
-    "REVISED": "lo",
-    "NO-ACTION": "lo",
-    "GO": "pb",
-    "NO-GO": "pb",
-    "VERIFIED": "pb",
+    "NEW": "pb",
+    "REVISED": "pb",
+    "NO-ACTION": "pb",
+    "GO": "lo",
+    "NO-GO": "lo",
+    "VERIFIED": "lo",
 }
 ENVELOPE_ACTIVITY_VALUES: frozenset[str] = frozenset({"ops", "deliberation", "build", "test", "spec", "project"})
 LO_ENVELOPE_BRIDGE_KINDS: frozenset[str] = frozenset({"lo_verdict", "loyal_opposition_review", "verification_verdict"})
@@ -627,7 +627,13 @@ def _finalize_verified_provider_verdict(
     commit_message: str,
     env: Mapping[str, str],
 ) -> Mapping[str, object]:
-    helper = project_root / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
+    helper = project_root / ".claude" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py"
+    if not helper.is_file():
+        # WI-5661: fall back to the pre-rename skill dir for backward compatibility
+        # (WI-5651 renamed verify -> gtkb-verify; a future re-rename must not re-break this).
+        _legacy = project_root / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
+        if _legacy.is_file():
+            helper = _legacy
     if not helper.is_file():
         raise BridgePublicationError("canonical VERIFIED finalizer is unavailable")
     args = [

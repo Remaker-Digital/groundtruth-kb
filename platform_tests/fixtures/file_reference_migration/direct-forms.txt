@@ -1,0 +1,11 @@
+.claude/hooks/old.py
+.claude\hooks\old.py
+E:\GT-KB\.claude\hooks\old.py
+file:///E:/GT-KB/.claude/hooks/old.py
+$CLAUDE_PROJECT_DIR/.claude/hooks/old.py
+${CLAUDE_PROJECT_DIR}/.claude/hooks/old.py
+../../.claude/hooks/old.py
+.claude/hooks/*.py
+.claude[/\\]hooks[/\\]old\.py
+.claude[\\/]hooks[\\/]old\.py
+.claude(?:/|\\)hooks(?:/|\\)old\.py

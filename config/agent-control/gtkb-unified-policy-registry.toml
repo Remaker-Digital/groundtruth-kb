@@ -1,0 +1,155 @@
+schema_version = 1
+registry_id = "gtkb-unified-policy-registry"
+
+# WI-4551 Slice 1: inventory and validation only. Existing hooks remain
+# load-bearing until a later bridge thread migrates an adapter explicitly.
+
+[actions.auq-status]
+action_class = "status"
+outcome = "ALLOW"
+message = "Deterministic status checks may proceed without owner input."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-test]
+action_class = "test"
+outcome = "WARN"
+message = "Tests may proceed; review failures before claiming completion."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-build]
+action_class = "build"
+outcome = "WARN"
+message = "Local builds may proceed; do not deploy or publish from this action."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-deploy-staging]
+action_class = "deploy-staging"
+outcome = "ASK"
+message = "Staging deployment needs a bounded owner approval receipt."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-deploy-production]
+action_class = "deploy-production"
+outcome = "DENY"
+message = "Production deployment is outside the first-slice policy gate."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-requirements-update]
+action_class = "requirements-update"
+outcome = "ASK"
+message = "Requirements/specification mutation needs bounded owner confirmation."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-commit]
+action_class = "commit"
+outcome = "ASK"
+message = "Commit policy is modeled but no commit adapter is installed in this slice."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-push]
+action_class = "push"
+outcome = "ASK"
+message = "Push policy is modeled but no push adapter is installed in this slice."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.auq-platform-write]
+action_class = "platform-write"
+outcome = "ASK"
+message = "Platform-write policy is modeled but no write adapter is installed in this slice."
+enforcement_status = "engine_backed"
+decision_source = "groundtruth_kb.policy.engine"
+adapter_installed = false
+adapter_surfaces = ["gt policy check", "config/agent-control/auq-policy-gates.toml"]
+harnesses = ["all"]
+
+[actions.bridge-compliance-write]
+action_class = "bridge-compliance-write"
+outcome = "DENY"
+message = "Bridge proposal writes are governed by the existing bridge-compliance gate."
+enforcement_status = "external_gate"
+decision_source = ".claude/hooks/bridge-compliance-gate.py"
+adapter_installed = true
+adapter_surfaces = [".claude/hooks/bridge-compliance-gate.py", "bridge-propose helper audit"]
+harnesses = ["claude", "codex-helper-audit"]
+
+[actions.implementation-start]
+action_class = "implementation-start"
+outcome = "DENY"
+message = "Protected implementation edits require the implementation-start gate."
+enforcement_status = "external_gate"
+decision_source = ".claude/hooks/implementation-start-gate.py"
+adapter_installed = true
+adapter_surfaces = [".claude/hooks/implementation-start-gate.py", "scripts/implementation_authorization.py"]
+harnesses = ["claude", "codex-helper-audit"]
+
+[actions.scanner-safe-write]
+action_class = "scanner-safe-write"
+outcome = "DENY"
+message = "Credential-shaped bridge writes are blocked by scanner-safe-writer."
+enforcement_status = "external_gate"
+decision_source = ".claude/hooks/scanner-safe-writer.py"
+adapter_installed = true
+adapter_surfaces = [".claude/hooks/scanner-safe-writer.py", "bridge-propose helper credential scan"]
+harnesses = ["claude", "codex-helper-audit"]
+
+[actions.narrative-artifact-write]
+action_class = "narrative-artifact-write"
+outcome = "DENY"
+message = "Narrative-artifact writes remain governed by the existing approval gate."
+enforcement_status = "external_gate"
+decision_source = ".claude/hooks/narrative-artifact-approval-gate.py"
+adapter_installed = true
+adapter_surfaces = [".claude/hooks/narrative-artifact-approval-gate.py", "scripts/check_narrative_artifact_evidence.py"]
+harnesses = ["claude", "pre-commit-floor"]
+
+[actions.sot-read-discipline]
+action_class = "sot-read-discipline"
+outcome = "WARN"
+message = "Source-of-truth read discipline remains an existing hook-managed advisory/blocking surface."
+enforcement_status = "external_gate"
+decision_source = ".claude/hooks/sot-read-discipline.py"
+adapter_installed = true
+adapter_surfaces = [".claude/hooks/sot-read-discipline.py"]
+harnesses = ["claude"]
+
+[actions.owner-decision-tracking]
+action_class = "owner-decision-tracking"
+outcome = "ASK"
+message = "Owner-decision tracking remains a hook-managed capture surface."
+enforcement_status = "external_gate"
+decision_source = ".claude/hooks/owner-decision-tracker.py"
+adapter_installed = true
+adapter_surfaces = [".claude/hooks/owner-decision-tracker.py"]
+harnesses = ["claude"]
