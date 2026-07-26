@@ -13,9 +13,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 HELPER_COPIES: dict[str, Path] = {
-    "claude": REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py",
-    "codex": REPO_ROOT / ".codex" / "skills" / "verify" / "helpers" / "write_verdict.py",
-    "cursor": REPO_ROOT / ".cursor" / "skills" / "verify" / "helpers" / "write_verdict.py",
+    "claude": REPO_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py",
+    "codex": REPO_ROOT / ".codex" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py",
+    "cursor": REPO_ROOT / ".cursor" / "skills" / "gtkb-verify" / "helpers" / "write_verdict.py",
 }
 
 
@@ -303,9 +303,9 @@ target_paths: ["scripts/feature.py", "scripts/unrelated_authorized.py"]
 def test_claimed_repo_path_parser_preserves_dot_directories(harness_name: str) -> None:
     helper = _load_helper(HELPER_COPIES[harness_name], f"write_verdict_{harness_name}_dot_paths")
 
-    assert helper._looks_like_claimed_repo_path(".codex/skills/verify/helpers/write_verdict.py")
-    assert helper._looks_like_claimed_repo_path("./.claude/skills/verify/helpers/write_verdict.py")
-    assert helper._looks_like_claimed_repo_path(".cursor/skills/verify/helpers/write_verdict.py,")
+    assert helper._looks_like_claimed_repo_path(".codex/skills/gtkb-verify/helpers/write_verdict.py")
+    assert helper._looks_like_claimed_repo_path("./.claude/skills/gtkb-verify/helpers/write_verdict.py")
+    assert helper._looks_like_claimed_repo_path(".cursor/skills/gtkb-verify/helpers/write_verdict.py,")
     assert helper._looks_like_claimed_repo_path(".github/workflows/test.yml")
     assert helper._looks_like_claimed_repo_path(".githooks/pre-commit")
 
@@ -315,14 +315,14 @@ def test_claimed_repo_path_parser_preserves_dot_directories(harness_name: str) -
 
 ## Files Changed
 
-- .codex/skills/verify/helpers/write_verdict.py
-- ./.claude/skills/verify/helpers/write_verdict.py
-- .cursor/skills/verify/helpers/write_verdict.py,
+- .codex/skills/gtkb-verify/helpers/write_verdict.py
+- ./.claude/skills/gtkb-verify/helpers/write_verdict.py
+- .cursor/skills/gtkb-verify/helpers/write_verdict.py,
 """
     assert helper._claimed_paths_from_report(report, REPO_ROOT) == (
-        ".codex/skills/verify/helpers/write_verdict.py",
-        ".claude/skills/verify/helpers/write_verdict.py",
-        ".cursor/skills/verify/helpers/write_verdict.py",
+        ".codex/skills/gtkb-verify/helpers/write_verdict.py",
+        ".claude/skills/gtkb-verify/helpers/write_verdict.py",
+        ".cursor/skills/gtkb-verify/helpers/write_verdict.py",
     )
 
 

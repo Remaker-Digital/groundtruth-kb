@@ -8,8 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from scripts import gtkb_bridge_writer
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "bridge" / "helpers" / "revise_bridge.py"
+HELPER_PATH = REPO_ROOT / ".claude" / "skills" / "gtkb-bridge" / "helpers" / "revise_bridge.py"
 
 
 def _load_helper_module():
@@ -35,6 +37,11 @@ def author_metadata_env(monkeypatch):
     monkeypatch.setenv("GTKB_AUTHOR_MODEL", "GPT-5.5")
     monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "5.5")
     monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "Extra High")
+    monkeypatch.setattr(
+        gtkb_bridge_writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
+    )
 
 
 def _stage_thread(tmp_path: Path, *, latest_status: str = "NO-GO", slug: str = "test-revision") -> Path:

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+HELPER_PATH = PROJECT_ROOT / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
 
 
 def _load_helper() -> ModuleType:
@@ -47,6 +47,10 @@ def _synthetic_aws_key() -> str:
 def _proposal_body(text: str) -> str:
     return "\n".join(
         [
+            "NEW",
+            "",
+            "bridge_kind: governance_advisory",
+            "",
             text,
             "",
             "## Specification Links",
@@ -54,6 +58,22 @@ def _proposal_body(text: str) -> str:
             "- .claude/rules/file-bridge-protocol.md",
             "",
         ]
+    )
+
+
+@pytest.fixture(autouse=True)
+def _central_writer_unit_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scripts import gtkb_bridge_writer
+
+    monkeypatch.setenv("GTKB_AUTHOR_IDENTITY", "prime-builder/test")
+    monkeypatch.setenv("GTKB_AUTHOR_HARNESS_ID", "test-harness")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL", "fixture-model")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_VERSION", "fixture-version")
+    monkeypatch.setenv("GTKB_AUTHOR_MODEL_CONFIGURATION", "unit-test")
+    monkeypatch.setattr(
+        gtkb_bridge_writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
     )
 
 
@@ -99,7 +119,11 @@ def test_propose_bridge_writes_numbered_file(tmp_path: Path) -> None:
     )
 
     assert result_path == bridge_dir / "clean-topic-001.md"
-    assert result_path.read_text(encoding="utf-8") == body
+    written = result_path.read_text(encoding="utf-8")
+    assert written.startswith("NEW\n::init gtkb pb\n::open build\n")
+    assert "author_session_context_id:" in written
+    assert "Clean proposal body with no credentials." in written
+    assert written.endswith("- .claude/rules/file-bridge-protocol.md\n")
 
 
 def test_propose_bridge_refuses_silent_overwrite(tmp_path: Path) -> None:
@@ -109,7 +133,7 @@ def test_propose_bridge_refuses_silent_overwrite(tmp_path: Path) -> None:
     target = bridge_dir / "occupied-topic-001.md"
     target.write_text("Previous content that must not be overwritten.", encoding="utf-8")
 
-    with pytest.raises(helper.BridgeFileAlreadyExistsError):
+    with pytest.raises(helper.BridgeComplianceError, match="append-only"):
         helper.propose_bridge(
             "occupied-topic",
             _proposal_body("New body that should not be written."),

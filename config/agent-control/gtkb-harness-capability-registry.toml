@@ -133,7 +133,7 @@ status = "native"
 surface = ".codex/skills/gtkb-bridge/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-bridge/SKILL.md"
-source_sha256 = "3ed3631f79cb2348ac2fd184304978851b7543a4edaa52bae8fd2dc7c97f8f64"
+source_sha256 = "2748c05afa97d733bf9e9d0b3adbdff248a374d275cfd8407eb4ff01d15ae426"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-bridge/SKILL.md"
@@ -872,7 +872,7 @@ status = "native"
 surface = ".codex/skills/gtkb-proposal-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-proposal-review/SKILL.md"
-source_sha256 = "af5b84ee08bd1c54707ddba54b57cedcfc39288a95874b01cdf54056c98d7eed"
+source_sha256 = "2fa418d270b95d5c03995720375bacba6a6d3250475298c39918c30db95b9ec8"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-proposal-review/SKILL.md"
@@ -928,7 +928,7 @@ status = "native"
 surface = ".codex/skills/gtkb-send-review/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-send-review/SKILL.md"
-source_sha256 = "0dd7b431ddeb0df8e7379b50ad0593d029b605dc3f96f0001411b92edcb197d9"
+source_sha256 = "aa6437097d9fdcbb5b2368367e48b93b805b7082703edcc0fe4f720ae98eb7b2"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-send-review/SKILL.md"
@@ -1276,7 +1276,7 @@ status = "native"
 surface = ".codex/skills/gtkb-verify/SKILL.md"
 status = "adapter"
 adapter_source = ".claude/skills/gtkb-verify/SKILL.md"
-source_sha256 = "57b1863c131f81676f84fd497695e7f4333f9481473e58abc9f827ea351c0271"
+source_sha256 = "9d54afdc92f5ad5e20650fd7f1da72187816daf8975805dedfb30e1d7d4e5f1f"
 
 [capabilities.antigravity]
 surface = ".agent/skills/gtkb-verify/SKILL.md"

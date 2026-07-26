@@ -11,8 +11,17 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project.registry_control_plane import (
+    apply_registry_transaction,
+    consume_observation_capability,
+    mint_observation_capability,
+    serialize_registry,
+)
+from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection
 
 from scripts import implementation_authorization
 
@@ -27,6 +36,61 @@ def _load_module():
     sys.modules["check_protected_commit_authorization"] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _seed_registered_commit_fixture(root: Path) -> Path:
+    member = root / "registered.txt"
+    member.write_text("before\n", encoding="utf-8")
+    records = [
+        SoTArtifact(
+            id="registered-member",
+            domain="control_surface",
+            lifecycle="active",
+            storage_path="registered.txt",
+            authority_spec_id="GOV-PLATFORM-SOT-REGISTRY-001",
+            mutation_api="fixture",
+            versioning_policy="git_tracked",
+            backup_policy="git_tracked",
+            health_check_function="",
+            owner_role="shared",
+            restore_action="git_restore",
+            coverage_mode="exact",
+        )
+    ]
+    registry = root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    registry.parent.mkdir(parents=True)
+    packaged.parent.mkdir(parents=True)
+    payload = serialize_registry(records)
+    registry.write_bytes(payload)
+    packaged.write_bytes(payload)
+    db_path = root / "groundtruth.db"
+    knowledge = KnowledgeDB(db_path=db_path)
+    knowledge.close()
+    sync_projection(records, db_path, changed_by="test", change_reason="fixture")
+    apply_registry_transaction(
+        records,
+        operation="legacy_bootstrap",
+        actor_session="pb-session",
+        changed_by="test/prime-builder",
+        change_reason="WI-5441 commit fixture",
+        start_packet_hash="sha256:packet",
+        pauth_id="PAUTH-WI5441-TEST",
+        bridge_id="gtkb-wi5441-registry-control-plane-reverse-coverage",
+        project_root=root,
+    )
+    return member
 
 
 def _author(role: str, session_id: str) -> str:
@@ -2458,3 +2522,105 @@ def test_wi5659_tampering_with_tracked_gtkb_state_file_is_detected(tmp_path: Pat
     (out_root / tracked_state).write_text("tampered payload", encoding="utf-8")
     with pytest.raises(module.GateError):
         module._verify_snapshot_ledger(module._BridgeSnapshot(root=out_root, ledger=ledger))
+
+
+def test_registry_commit_accepts_coherent_journal_bound_member(tmp_path: Path) -> None:
+    module = _load_module()
+    _seed_registered_commit_fixture(tmp_path)
+
+    assert module._registry_commit_findings(tmp_path, ["registered.txt"], None) == []
+
+
+def test_registry_commit_blocks_stale_registered_digest(tmp_path: Path) -> None:
+    module = _load_module()
+    member = _seed_registered_commit_fixture(tmp_path)
+    member.write_text("changed without observation\n", encoding="utf-8")
+
+    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], None)
+
+    assert findings == [{"path": "registered.txt", "reason": "registered artifact digest is not current"}]
+
+
+def test_registry_commit_blocks_incomplete_journal(tmp_path: Path) -> None:
+    module = _load_module()
+    _seed_registered_commit_fixture(tmp_path)
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "UPDATE sot_registry_transaction_journal SET journal_state = 'prepared' "
+            "WHERE operation = 'legacy_bootstrap'"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], None)
+
+    assert len(findings) == 1
+    assert "coherent registry authority unavailable" in findings[0]["reason"]
+    assert "prepared" in findings[0]["reason"]
+
+
+def test_registry_commit_blocks_registered_identity_change(tmp_path: Path) -> None:
+    module = _load_module()
+    _seed_registered_commit_fixture(tmp_path)
+    snapshot = SimpleNamespace(status_by_path={"registered.txt": "D"})
+
+    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], snapshot)
+
+    assert findings == [
+        {
+            "path": "registered.txt",
+            "reason": "registered identity delete/move/rename requires separately authorized transition",
+        }
+    ]
+
+
+def test_registry_commit_rejects_mismatched_capability_start_packet(tmp_path: Path) -> None:
+    module = _load_module()
+    member = _seed_registered_commit_fixture(tmp_path)
+    capability = mint_observation_capability(
+        target_paths=["registered.txt"],
+        session_id="pb-session",
+        tool_event_id="event-1",
+        bridge_id="gtkb-wi5441-registry-control-plane-reverse-coverage",
+        start_packet_hash="sha256:packet",
+        pauth_decision={"allowed": True},
+        operation="Edit",
+        authorized=True,
+        project_root=tmp_path,
+    )
+    member.write_text("observed change\n", encoding="utf-8")
+    consume_observation_capability(
+        capability=capability["capability"],
+        target_paths=["registered.txt"],
+        preimage_digests=capability["preimage_digests"],
+        session_id="pb-session",
+        tool_event_id="event-1",
+        bridge_id="gtkb-wi5441-registry-control-plane-reverse-coverage",
+        start_packet_hash="sha256:packet",
+        operation="Edit",
+        tool_succeeded=True,
+        tool_result={"ok": True},
+        changed_by="test/prime-builder",
+        change_reason="WI-5441 observation",
+        project_root=tmp_path,
+    )
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "UPDATE sot_registry_observation_capabilities SET start_packet_hash = 'sha256:mismatch' "
+            "WHERE tool_event_id = 'event-1'"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], None)
+
+    assert findings == [
+        {
+            "path": "registered.txt",
+            "reason": "registered artifact lacks authorized observation or transaction evidence",
+        }
+    ]

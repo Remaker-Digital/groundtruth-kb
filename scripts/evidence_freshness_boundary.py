@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
+from groundtruth_kb.project.registry_control_plane import RegistryControlPlaneError, load_registry_snapshot
+
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "evidence-freshness-boundaries.toml"
 DEFAULT_REPORT_PATH: Final[Path] = (
@@ -105,14 +107,16 @@ def _age_minutes(observed_at: Any, *, now: datetime) -> float | None:
 def load_forbidden_substitutes(registry_path: Path) -> dict[str, dict[str, str]]:
     if not registry_path.is_file():
         return {}
-    registry = _load_toml(registry_path)
+    project_root = registry_path.resolve().parents[2]
+    try:
+        registry = load_registry_snapshot(project_root=project_root, registry_path=registry_path)
+    except RegistryControlPlaneError as exc:
+        raise EvidenceFreshnessError(f"cannot load coherent registry snapshot: {exc}") from exc
     substitutes: dict[str, dict[str, str]] = {}
-    for artifact in registry.get("artifacts", []):
-        if not isinstance(artifact, dict):
-            continue
-        artifact_id = str(artifact.get("id", ""))
-        canonical = str(artifact.get("storage_path", ""))
-        for substitute in artifact.get("forbidden_substitutes", []) or []:
+    for artifact in registry.records:
+        artifact_id = artifact.id
+        canonical = artifact.storage_path
+        for substitute in artifact.forbidden_substitutes:
             substitutes[_normal_path(substitute)] = {
                 "artifact_id": artifact_id,
                 "canonical_path": canonical,

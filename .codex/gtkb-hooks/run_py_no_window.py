@@ -50,6 +50,7 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
     "posttooluse-bash": (
         ("cmd", ".codex/gtkb-hooks/bridge-compliance-audit.cmd"),
         ("py", ".claude/hooks/spec-event-surfacer.py"),
+        ("py", "scripts/registry_observation_hook.py"),
         (
             "py",
             "scripts/bridge_verified_backlog_reconciler.py",
@@ -61,6 +62,7 @@ BATCHES: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
     "posttooluse-apply-patch": (
         ("py", ".claude/hooks/spec-event-surfacer.py"),
+        ("py", "scripts/registry_observation_hook.py"),
         (
             "py",
             "scripts/bridge_verified_backlog_reconciler.py",

@@ -1749,10 +1749,29 @@ def registered_artifact_paths(root: Path) -> tuple[set[str], list[dict[str, Any]
         sys.path.insert(0, str(package_root))
     try:
         from groundtruth_kb.inventory.string_scan import _artifact_inventory
+        from groundtruth_kb.project.registry_control_plane import (
+            load_registry_snapshot,
+            registry_currentness,
+            require_current_registry_receipt,
+        )
     except ImportError as exc:
         raise MigrationError("ARTIFACT_REGISTRY_READER_UNAVAILABLE", str(exc)) from exc
 
-    _artifacts, by_path, missing, _expansions = _artifact_inventory(root)
+    try:
+        snapshot = load_registry_snapshot(project_root=root)
+        currentness = registry_currentness(snapshot, project_root=root, db_path=root / "groundtruth.db")
+        if not currentness["current"]:
+            raise MigrationError(
+                "ARTIFACT_REGISTRY_STALE",
+                json.dumps(currentness, sort_keys=True, separators=(",", ":")),
+            )
+        require_current_registry_receipt(snapshot, db_path=root / "groundtruth.db")
+    except MigrationError:
+        raise
+    except Exception as exc:
+        raise MigrationError("ARTIFACT_REGISTRY_AUTHORITY_INVALID", str(exc)) from exc
+
+    _artifacts, by_path, missing, _expansions = _artifact_inventory(root, snapshot=snapshot)
     if missing:
         raise MigrationError("ARTIFACT_REGISTRY_INCOMPLETE", json.dumps(missing, sort_keys=True))
     paths = set(by_path)
@@ -3061,6 +3080,23 @@ def analyze(root: Path, policy_path: Path = DEFAULT_POLICY) -> tuple[Analysis, l
     csv_path = root / str(policy["manifest_path"])
     csv_bytes = csv_path.read_bytes()
     mappings = load_manifest(root, policy)
+    package_root = root / "groundtruth-kb" / "src"
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+    from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
+
+    transition_snapshot = load_registry_snapshot(project_root=root)
+    for mapping in mappings:
+        for label, relative_path in (("source", mapping.source), ("destination", mapping.destination)):
+            try:
+                registered = transition_snapshot.resolver.resolve(relative_path)
+            except Exception as exc:
+                raise MigrationError("ARTIFACT_REGISTRY_MEMBERSHIP_INVALID", str(exc)) from exc
+            if registered is None:
+                raise MigrationError(
+                    "ARTIFACT_REGISTRY_UNREGISTERED_TRANSITION",
+                    f"Manifest {label} is not registered in the coherent generation: {relative_path}",
+                )
     if csv_path.read_bytes() != csv_bytes:
         raise MigrationError("MANIFEST_CHANGED_DURING_PARSE", "CSV changed while it was being parsed")
     validate_policy_contract(policy, mappings)
@@ -3100,6 +3136,16 @@ def analyze(root: Path, policy_path: Path = DEFAULT_POLICY) -> tuple[Analysis, l
         root, resolved_policy, policy, mappings, catalog, files, hits, operation_manifest
     )
     blockers.extend(write_blockers)
+    for operation in operation_manifest:
+        candidate_paths = [operation.target]
+        if operation.source:
+            candidate_paths.append(operation.source)
+        for relative_path in candidate_paths:
+            if transition_snapshot.resolver.resolve_operation_path(relative_path) is None:
+                blockers.append({"code": "UNREGISTERED_OPERATION_PATH", "path": relative_path})
+    for write in writes:
+        if transition_snapshot.resolver.resolve_operation_path(write.path) is None:
+            blockers.append({"code": "UNREGISTERED_WRITE_PATH", "path": write.path})
     runtime = root / RUNTIME_RELATIVE
     (runtime / "payload").mkdir(parents=True, exist_ok=True)
     desired_payloads: dict[str, bytes] = {}

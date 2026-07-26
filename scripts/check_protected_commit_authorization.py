@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -164,7 +165,7 @@ def _is_narrative_artifact(rel_path: str) -> bool:
     return rel_path.startswith(".claude/rules/") and rel_path.endswith(".md")
 
 
-def is_protected_path(rel_path: str) -> bool:
+def is_protected_path(rel_path: str, *, project_root: Path | None = None) -> bool:
     rel = _normalize_rel(rel_path)
     if _is_narrative_artifact(rel):
         return False
@@ -172,7 +173,7 @@ def is_protected_path(rel_path: str) -> bool:
         return True
     if is_versioned_bridge_status_file(rel):
         return False
-    return classify_controlled_artifact(rel).is_controlled
+    return classify_controlled_artifact(rel, project_root=project_root).is_controlled
 
 
 def _windows_authority_git_candidates() -> tuple[Path, ...]:
@@ -1918,19 +1919,126 @@ def _evaluate_protected_path(
     return finding
 
 
+def _registry_commit_findings(
+    root: Path,
+    selected_paths: list[str],
+    index_snapshot: _IndexSnapshot | None,
+) -> list[dict[str, Any]]:
+    """Enforce coherent, current, capability-bound registry evidence."""
+    package_src = root / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    registry_path = root / "config" / "registry" / "sot-artifacts.toml"
+    if not registry_path.is_file():
+        return []
+    try:
+        from groundtruth_kb.project.registry_control_plane import (
+            load_registry_snapshot,
+            registry_currentness,
+        )
+
+        registry = load_registry_snapshot(project_root=root)
+        currentness = registry_currentness(registry, project_root=root, db_path=root / "groundtruth.db")
+    except Exception as exc:  # noqa: BLE001 - commit authority fails closed
+        return [
+            {
+                "path": "config/registry/sot-artifacts.toml",
+                "reason": f"coherent registry authority unavailable: {exc}",
+            }
+        ]
+
+    stale_ids = {item["id"] for item in currentness["stale"]}
+    missing_ids = set(currentness["missing_revisions"])
+    conn = sqlite3.connect(str(root / "groundtruth.db"))
+    conn.row_factory = sqlite3.Row
+    findings: list[dict[str, Any]] = []
+    try:
+        for rel_path in selected_paths:
+            record = registry.resolver.resolve(rel_path)
+            if record is None:
+                continue
+            staged_status = index_snapshot.status_by_path.get(rel_path, "") if index_snapshot is not None else ""
+            if staged_status == "D" or staged_status.endswith("-source"):
+                findings.append(
+                    {
+                        "path": rel_path,
+                        "reason": "registered identity delete/move/rename requires separately authorized transition",
+                    }
+                )
+                continue
+            if record.id in stale_ids or record.id in missing_ids:
+                findings.append({"path": rel_path, "reason": "registered artifact digest is not current"})
+                continue
+            revision = conn.execute(
+                "SELECT * FROM sot_artifact_revisions WHERE entry_id = ? ORDER BY rowid DESC LIMIT 1",
+                (record.id,),
+            ).fetchone()
+            if revision is None:
+                findings.append({"path": rel_path, "reason": "registered artifact lacks revision evidence"})
+                continue
+            capability_bound = False
+            if revision["capability_hash"]:
+                capability = conn.execute(
+                    "SELECT * FROM sot_registry_observation_capabilities WHERE capability_hash = ?",
+                    (revision["capability_hash"],),
+                ).fetchone()
+                if capability is not None:
+                    try:
+                        capability_paths = {_normalize_rel(path) for path in json.loads(capability["paths_json"])}
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        capability_paths = set()
+                    capability_bound = bool(
+                        capability["capability_state"] == "consumed"
+                        and capability["consumed_at"]
+                        and capability["result_digest"]
+                        and rel_path in capability_paths
+                        and capability["bridge_id"] == revision["bridge_id"]
+                        and capability["start_packet_hash"] == revision["start_packet_hash"]
+                        and capability["pauth_decision_json"] == revision["pauth_decision"]
+                    )
+            journal_bound = False
+            if revision["journal_id"]:
+                journal = conn.execute(
+                    "SELECT journal_state, start_packet_hash, pauth_id, bridge_id, receipt_digest "
+                    "FROM sot_registry_transaction_journal WHERE journal_id = ?",
+                    (revision["journal_id"],),
+                ).fetchone()
+                journal_bound = bool(
+                    journal
+                    and journal["journal_state"] == "committed"
+                    and journal["start_packet_hash"]
+                    and journal["pauth_id"]
+                    and journal["bridge_id"]
+                    and journal["receipt_digest"]
+                    and journal["bridge_id"] == revision["bridge_id"]
+                    and journal["start_packet_hash"] == revision["start_packet_hash"]
+                )
+            if not capability_bound and not journal_bound:
+                findings.append(
+                    {
+                        "path": rel_path,
+                        "reason": "registered artifact lacks authorized observation or transaction evidence",
+                    }
+                )
+    finally:
+        conn.close()
+    return findings
+
+
 def _evaluate_selected(
     root: Path,
     selected_paths: list[str],
     snapshot: _IndexSnapshot | None,
     head_oid: str | None,
 ) -> dict[str, Any]:
-    protected_paths = [path for path in selected_paths if is_protected_path(path)]
+    protected_paths = [path for path in selected_paths if is_protected_path(path, project_root=root)]
     skipped_unprotected = [path for path in selected_paths if path not in protected_paths]
     bridge_findings = [
         finding
         for path in selected_paths
         if (finding := _verified_bridge_finalization_finding(root, path, snapshot)) is not None
     ]
+    bridge_findings.extend(_registry_commit_findings(root, selected_paths, snapshot))
 
     if not protected_paths and not bridge_findings:
         return {

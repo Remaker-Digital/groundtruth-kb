@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.inventory import (
     InventoryScanError,
     build_refresh_report,
@@ -13,6 +14,7 @@ from groundtruth_kb.inventory import (
     load_match_file,
     scan_inventory_strings,
 )
+from groundtruth_kb.project.sot_registry import load_toml, sync_projection
 
 
 def _git(root: Path, *args: str) -> None:
@@ -35,6 +37,15 @@ def _artifact_toml(
         else "git_tracked"
     )
     backup = "regenerable_from_source" if lifecycle == "generated" else "git_tracked"
+    coverage_mode = (
+        "virtual"
+        if ":" in storage_path
+        else "glob"
+        if any(character in storage_path for character in "*?[")
+        else "recursive"
+        if storage_path.endswith(("/", "\\"))
+        else "exact"
+    )
     restore = (
         "regenerate_from_source" if lifecycle == "generated" else "noop" if lifecycle == "archive" else "git_restore"
     )
@@ -44,6 +55,7 @@ domain = "{domain}"
 lifecycle = "{lifecycle}"
 storage_path = "{storage_path}"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+coverage_mode = "{coverage_mode}"
 mutation_api = "{mutation_api}"
 versioning_policy = "{versioning}"
 backup_policy = "{backup}"
@@ -51,6 +63,26 @@ restore_action = "{restore}"
 health_check_function = ""
 owner_role = "shared"
 '''
+
+
+def _sync_registry(root: Path) -> None:
+    registry = root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    packaged.parent.mkdir(parents=True, exist_ok=True)
+    packaged.write_bytes(registry.read_bytes())
+    KnowledgeDB(db_path=root / "groundtruth.db")
+    sync_projection(load_toml(registry), root / "groundtruth.db", changed_by="test", change_reason="fixture")
 
 
 def _write_project(root: Path) -> None:
@@ -65,6 +97,7 @@ def _write_project(root: Path) -> None:
         + _artifact_toml("runtime-state", "runtime_state", "active", "runtime/*.txt"),
         encoding="utf-8",
     )
+    _sync_registry(root)
 
 
 def test_scan_inventory_strings_includes_gitignored_registered_artifact(tmp_path: Path) -> None:
@@ -76,6 +109,7 @@ def test_scan_inventory_strings_includes_gitignored_registered_artifact(tmp_path
         + _artifact_toml("owner-local-env", "runtime_state", "active", ".env.local"),
         encoding="utf-8",
     )
+    _sync_registry(tmp_path)
     (tmp_path / ".gitignore").write_text(".env.local\n", encoding="utf-8")
     (tmp_path / ".env.local").write_text("REGISTERED_LOCAL_SENTINEL\n", encoding="utf-8")
     _git(tmp_path, "init")
@@ -170,6 +204,7 @@ def test_refresh_is_lifecycle_aware_and_does_not_expand_generated_tree(tmp_path:
         ),
         encoding="utf-8",
     )
+    _sync_registry(tmp_path)
 
     report = build_refresh_report(tmp_path)
 
@@ -201,6 +236,21 @@ def test_typed_registry_rejects_incomplete_records(tmp_path: Path) -> None:
         '[[artifacts]]\nid = "broken"\ndomain = "runtime_state"\n',
         encoding="utf-8",
     )
+    packaged = (
+        tmp_path
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    packaged.parent.mkdir(parents=True)
+    packaged.write_bytes(registry_dir.joinpath("sot-artifacts.toml").read_bytes())
+    KnowledgeDB(db_path=tmp_path / "groundtruth.db")
 
     with pytest.raises(InventoryScanError, match="missing required field"):
         build_refresh_report(tmp_path)

@@ -5,12 +5,16 @@ from __future__ import annotations
 import fnmatch
 import json
 import re
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from groundtruth_kb.project.sot_registry import InvalidSoTRecord, SoTArtifact, UnknownDomain, load_toml
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryControlPlaneError,
+    RegistrySnapshot,
+    load_registry_snapshot,
+)
+from groundtruth_kb.project.sot_registry import InvalidSoTRecord, SoTArtifact, UnknownDomain
 
 REGISTRY_RELATIVE_PATH = Path("config") / "registry" / "sot-artifacts.toml"
 DEFAULT_CRITICAL_CLASSES = {
@@ -80,11 +84,21 @@ def _rel(path: Path, project_root: Path) -> str:
     return path.relative_to(project_root).as_posix()
 
 
-def _load_registry(project_root: Path, registry_path: Path | None = None) -> list[ArtifactRecord]:
+def _load_registry(
+    project_root: Path,
+    registry_path: Path | None = None,
+    *,
+    snapshot: RegistrySnapshot | None = None,
+) -> list[ArtifactRecord]:
     path = registry_path or project_root / REGISTRY_RELATIVE_PATH
     try:
-        return [ArtifactRecord.from_sot(record) for record in load_toml(path)]
-    except (FileNotFoundError, InvalidSoTRecord, UnknownDomain, tomllib.TOMLDecodeError, OSError) as exc:
+        coherent = snapshot or load_registry_snapshot(
+            project_root=project_root,
+            registry_path=path,
+            db_path=project_root / "groundtruth.db",
+        )
+        return [ArtifactRecord.from_sot(record) for record in coherent.records]
+    except (FileNotFoundError, InvalidSoTRecord, RegistryControlPlaneError, UnknownDomain, OSError) as exc:
         raise InventoryScanError(f"SoT artifact registry could not be loaded from {path}: {exc}") from exc
 
 
@@ -178,14 +192,14 @@ def _expand_artifact_files(
 
 
 def _artifact_inventory(
-    project_root: Path, registry_path: Path | None = None
+    project_root: Path, registry_path: Path | None = None, *, snapshot: RegistrySnapshot | None = None
 ) -> tuple[
     list[ArtifactRecord],
     dict[str, list[ArtifactRecord]],
     list[dict[str, Any]],
     list[ArtifactExpansion],
 ]:
-    artifacts = _load_registry(project_root, registry_path)
+    artifacts = _load_registry(project_root, registry_path, snapshot=snapshot)
     by_path: dict[str, list[ArtifactRecord]] = {}
     missing: list[dict[str, Any]] = []
     expansions: list[ArtifactExpansion] = []

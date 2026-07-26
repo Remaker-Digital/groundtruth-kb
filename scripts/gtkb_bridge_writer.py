@@ -491,13 +491,22 @@ def _claim_holder(project_root: Path, document_name: str) -> Mapping[str, object
         raise BridgePublicationError(f"provider verdict claim lookup failed: {exc}") from exc
 
 
-def _release_claim(project_root: Path, document_name: str, session_id: str) -> None:
+def _release_claim(
+    project_root: Path,
+    document_name: str,
+    session_id: str,
+    *,
+    claim_registry: Any | None = None,
+) -> None:
     try:
-        from scripts.bridge_work_intent_registry import release
+        if claim_registry is None:
+            from scripts.bridge_work_intent_registry import release
+        else:
+            release = claim_registry.release
 
         release(document_name, session_id, project_root=project_root)
     except Exception as exc:
-        raise BridgePublicationError(f"provider verdict was published but claim release failed: {exc}") from exc
+        raise BridgePublicationError(f"bridge publication claim release failed: {exc}") from exc
 
 
 def _thread_state(project_root: Path, document_name: str) -> tuple[Path, int, str, str]:
@@ -561,7 +570,8 @@ def _run_provider_verdict_guards(
     content: str,
     session_id: str,
     author_metadata: Mapping[str, object],
-) -> None:
+) -> tuple[dict[str, object], ...]:
+    evidence: list[dict[str, object]] = []
     payload = {
         "cwd": str(project_root),
         "project_root": str(project_root),
@@ -614,7 +624,9 @@ def _run_provider_verdict_guards(
             raise BridgePublicationError(f"provider verdict guard output is not an object: {relative_guard.as_posix()}")
         reason = _hook_block_reason(data)
         if reason:
-            raise BridgePublicationError(f"provider verdict guard denied publication: {reason}")
+            raise BridgePublicationError(f"bridge publication guard denied publication: {reason}")
+        evidence.append({"guard": relative_guard.as_posix(), "result": dict(data)})
+    return tuple(evidence)
 
 
 def _finalize_verified_provider_verdict(
@@ -866,6 +878,123 @@ def _hunk_patch_covered_paths(
     return covered
 
 
+@dataclass(frozen=True)
+class _PendingBridgePublication:
+    capability: str
+    target_path: str
+    session_id: str
+
+
+_PENDING_BRIDGE_PUBLICATIONS: dict[str, _PendingBridgePublication] = {}
+
+
+def _registry_publication_enabled(project_root: Path) -> bool:
+    canonical = project_root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        project_root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    if not canonical.exists():
+        return False
+    missing = [path for path in (packaged, project_root / "groundtruth.db") if not path.is_file()]
+    if missing:
+        rendered = ", ".join(_relative_to_project(path, project_root) for path in missing)
+        raise BridgePublicationError(f"configured registry publication control plane is incomplete: {rendered}")
+    return True
+
+
+def _publication_compliance_digest(
+    *,
+    audit: Mapping[str, object],
+    guards: Sequence[Mapping[str, object]],
+) -> str:
+    payload = json.dumps(
+        {"bridge_compliance": dict(audit), "guards": [dict(item) for item in guards]},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _publication_author_session(content: str) -> tuple[str, Mapping[str, object]]:
+    metadata = extract_author_metadata(content)
+    session_id = str(metadata.get("author_session_context_id") or "").strip().strip(chr(96))
+    if not session_id:
+        raise BridgePublicationError("bridge publication requires author_session_context_id")
+    return session_id, metadata
+
+
+def _compensate_publication(
+    *,
+    publication: _PendingBridgePublication,
+    project_root: Path,
+    reason: str,
+) -> None:
+    try:
+        from groundtruth_kb.project.registry_control_plane import compensate_bridge_publication
+
+        compensate_bridge_publication(
+            capability=publication.capability,
+            target_path=publication.target_path,
+            session_id=publication.session_id,
+            reason=reason,
+            changed_by="bridge-publication-writer",
+            project_root=project_root,
+        )
+    except Exception as exc:
+        raise BridgePublicationError(
+            "BRIDGE_PUBLICATION_REPAIR_REQUIRED: compensation could not restore the "
+            f"aggregate preimage; file and claim are retained: {exc}"
+        ) from exc
+
+
+def finalize_pending_bridge_publication(target: Path, project_root: Path) -> None:
+    """Release the exact claim only after an outer VERIFIED commit succeeds."""
+
+    key = str(target.resolve())
+    publication = _PENDING_BRIDGE_PUBLICATIONS.get(key)
+    if publication is None:
+        content = target.read_text(encoding="utf-8")
+        session_id, _ = _publication_author_session(content)
+        holder = _claim_holder(project_root, target.name.rsplit("-", 1)[0])
+        if holder is not None and str(holder.get("session_id") or "") == session_id:
+            _release_claim(project_root, target.name.rsplit("-", 1)[0], session_id)
+        return
+    document_name = Path(publication.target_path).name.rsplit("-", 1)[0]
+    _release_claim(project_root, document_name, publication.session_id)
+    _PENDING_BRIDGE_PUBLICATIONS.pop(key, None)
+
+
+def rollback_pending_bridge_publication(
+    target: Path,
+    project_root: Path,
+    *,
+    reason: str,
+) -> None:
+    """Compensate an uncommitted VERIFIED verdict while retaining its claim."""
+
+    key = str(target.resolve())
+    publication = _PENDING_BRIDGE_PUBLICATIONS.get(key)
+    if publication is None:
+        if not _registry_publication_enabled(project_root):
+            target.unlink(missing_ok=True)
+            return
+        raise BridgePublicationError(
+            "BRIDGE_PUBLICATION_REPAIR_REQUIRED: pending capability context is unavailable; file and claim are retained"
+        )
+    _compensate_publication(publication=publication, project_root=project_root, reason=reason)
+    _PENDING_BRIDGE_PUBLICATIONS.pop(key, None)
+
+
 def write_bridge_file(
     document_name: str,
     version: int,
@@ -874,6 +1003,8 @@ def write_bridge_file(
     *,
     author_metadata: Mapping[str, object] | None = None,
     require_author_metadata: bool = True,
+    release_claim: bool = True,
+    claim_registry: Any | None = None,
 ) -> Path:
     """Write ``bridge/<document>-<NNN>.md`` and re-read to verify.
 
@@ -906,24 +1037,143 @@ def write_bridge_file(
     )
     content_to_write = normalize_bridge_envelope_head(content_to_write)
     _reject_synthetic_session_context_id(content_to_write)
-    run_bridge_compliance_audit(
+    audit = run_bridge_compliance_audit(
         file_path=target,
         content=content_to_write,
         project_root=project_root,
     )
+    typed_publication = _registry_publication_enabled(project_root)
+    publication: _PendingBridgePublication | None = None
+    status = _first_status(content_to_write)
+    if typed_publication:
+        if status not in VALID_STATUSES:
+            raise BridgePublicationError("typed bridge publication requires a canonical first-line status")
+        session_id, metadata = _publication_author_session(content_to_write)
+        guards = _run_provider_verdict_guards(
+            project_root=project_root,
+            target=target,
+            content=content_to_write,
+            session_id=session_id,
+            author_metadata=metadata,
+        )
+        compliance_digest = _publication_compliance_digest(audit=audit, guards=guards)
+        try:
+            from groundtruth_kb.project.registry_control_plane import (
+                mint_bridge_publication_capability,
+            )
+
+            minted = mint_bridge_publication_capability(
+                document_name=document_name,
+                version=version,
+                status=status,
+                target_path=target,
+                content=content_to_write.encode("utf-8"),
+                session_id=session_id,
+                compliance_digest=compliance_digest,
+                project_root=project_root,
+            )
+        except Exception as exc:
+            raise BridgePublicationError(f"typed bridge publication authorization failed: {exc}") from exc
+        publication = _PendingBridgePublication(
+            capability=str(minted["capability"]),
+            target_path=str(minted["target_path"]),
+            session_id=session_id,
+        )
+
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         with target.open("x", encoding="utf-8", newline="") as handle:
             handle.write(content_to_write)
     except FileExistsError as exc:
+        if publication is not None:
+            _compensate_publication(
+                publication=publication,
+                project_root=project_root,
+                reason="exclusive create lost a publication race",
+            )
         raise BridgeConflictError(f"{target} already exists; refusing to overwrite") from exc
-    except OSError:
+    except OSError as exc:
+        if publication is not None:
+            _compensate_publication(
+                publication=publication,
+                project_root=project_root,
+                reason=f"exclusive bridge write failed: {exc}",
+            )
+        else:
+            target.unlink(missing_ok=True)
+        raise
+
+    try:
+        written = target.read_text(encoding="utf-8")
+    except OSError as exc:
+        if publication is not None:
+            _compensate_publication(
+                publication=publication,
+                project_root=project_root,
+                reason=f"post-write bridge reread failed: {exc}",
+            )
+            raise BridgePublicationError(
+                f"post-write verification failed for {target} and was compensated: {exc}"
+            ) from exc
         target.unlink(missing_ok=True)
         raise
-    written = target.read_text(encoding="utf-8")
     if written != content_to_write:
-        target.unlink(missing_ok=True)
+        if publication is not None:
+            _compensate_publication(
+                publication=publication,
+                project_root=project_root,
+                reason="post-write byte verification failed",
+            )
+        else:
+            target.unlink(missing_ok=True)
         raise BridgeConflictError(f"post-write verification failed for {target}: content on disk differs")
+
+    if publication is not None:
+        try:
+            from groundtruth_kb.project.registry_control_plane import (
+                consume_bridge_publication_capability,
+            )
+
+            consume_bridge_publication_capability(
+                capability=publication.capability,
+                target_path=publication.target_path,
+                content=content_to_write.encode("utf-8"),
+                session_id=publication.session_id,
+                changed_by="bridge-publication-writer",
+                change_reason=f"Publish {document_name} version {version:03d} status {status}",
+                project_root=project_root,
+            )
+            if release_claim:
+                _release_claim(
+                    project_root,
+                    document_name,
+                    publication.session_id,
+                    claim_registry=claim_registry,
+                )
+            else:
+                _PENDING_BRIDGE_PUBLICATIONS[str(target.resolve())] = publication
+        except Exception as exc:
+            _compensate_publication(
+                publication=publication,
+                project_root=project_root,
+                reason=f"publication observation or claim release failed: {exc}",
+            )
+            raise BridgePublicationError(
+                f"bridge publication failed after exclusive create and was compensated: {exc}"
+            ) from exc
+    elif release_claim:
+        session_id, _ = _publication_author_session(content_to_write)
+        if claim_registry is not None:
+            _release_claim(
+                project_root,
+                document_name,
+                session_id,
+                claim_registry=claim_registry,
+            )
+        else:
+            holder = _claim_holder(project_root, document_name)
+            if holder is not None and str(holder.get("session_id") or "") == session_id:
+                _release_claim(project_root, document_name, session_id)
     return target
 
 
@@ -1059,7 +1309,6 @@ def publish_lo_verdict(
         )
         verdict_path = _provider_relative_path(path, root)
 
-    _release_claim(root, document_name, session_id)
     return PublishedBridgeVerdict(
         document_name=document_name,
         verdict=normalized_verdict,

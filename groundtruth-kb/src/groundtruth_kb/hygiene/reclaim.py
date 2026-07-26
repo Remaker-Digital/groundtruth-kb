@@ -13,7 +13,6 @@ import hashlib
 import json
 import os
 import re
-import sqlite3
 import stat
 import subprocess
 from collections.abc import Iterator
@@ -24,15 +23,12 @@ from pathlib import Path
 from typing import Any
 
 from groundtruth_kb.inventory import InventoryScanError, build_refresh_report
-from groundtruth_kb.project.sot_registry import (
-    InvalidSoTRecord,
-    SoTArtifact,
-    UnknownDomain,
-    default_registry_path,
-    load_projection,
-    load_toml,
-    validate_projection_parity,
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryControlPlaneError,
+    RegistryProjectionMismatch,
+    load_registry_snapshot,
 )
+from groundtruth_kb.project.sot_registry import SoTArtifact, default_registry_path
 
 _SCHEMA_VERSION = 1
 _GENESIS_HASH = "GENESIS"
@@ -545,10 +541,19 @@ def _collect_registry(root: Path) -> dict[str, Any]:
         "toml_count": 0,
     }
     try:
-        records = load_toml(path)
-    except (FileNotFoundError, InvalidSoTRecord, UnknownDomain, OSError) as exc:
+        snapshot = load_registry_snapshot(project_root=root)
+        records = list(snapshot.records)
+    except RegistryProjectionMismatch as exc:
+        defects.append({"code": "registry_projection_out_of_sync", "detail": str(exc)})
+    except (FileNotFoundError, RegistryControlPlaneError, OSError) as exc:
         defects.append({"code": "registry_load_failed", "detail": str(exc)})
     else:
+        parity = {
+            "checked": True,
+            "in_sync": True,
+            "projection_count": len(records),
+            "toml_count": len(records),
+        }
         unsafe_records = False
         for record in records:
             storage = _registry_local_path(record.storage_path)
@@ -592,33 +597,6 @@ def _collect_registry(root: Path) -> dict[str, Any]:
                     }
                     for finding in blocking_findings
                 )
-
-        projection_path = root / "groundtruth.db"
-        if not projection_path.is_file():
-            defects.append({"code": "registry_projection_missing", "detail": str(projection_path)})
-        else:
-            try:
-                projection_records = load_projection(projection_path)
-                parity_report = validate_projection_parity(records, projection_records)
-            except (OSError, sqlite3.Error, TypeError, ValueError) as exc:
-                defects.append({"code": "registry_projection_check_failed", "detail": str(exc)})
-            else:
-                parity = {
-                    "checked": True,
-                    "in_sync": parity_report.in_sync,
-                    "projection_count": parity_report.projection_count,
-                    "toml_count": parity_report.toml_count,
-                    "missing_in_projection": list(parity_report.missing_in_projection),
-                    "missing_in_toml": list(parity_report.missing_in_toml),
-                    "field_divergences": [list(item) for item in parity_report.field_divergences],
-                }
-                if not parity_report.in_sync:
-                    defects.append(
-                        {
-                            "code": "registry_projection_out_of_sync",
-                            "detail": json.dumps(parity, sort_keys=True, separators=(",", ":")),
-                        }
-                    )
 
     serialized = [asdict(record) for record in sorted(records, key=lambda item: item.id)]
     public = {

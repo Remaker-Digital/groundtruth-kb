@@ -24,7 +24,19 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
 DEFAULT_DRAFT_DIR = PROJECT_ROOT / ".gtkb-state" / "bridge-revisions" / "drafts"
-BRIDGE_PROPOSE_HELPER = PROJECT_ROOT / ".claude" / "skills" / "bridge-propose" / "helpers" / "write_bridge.py"
+
+
+def _resolve_bridge_propose_helper(root: Path) -> Path:
+    """Prefer the canonical gtkb- prefixed helper, falling back to the pre-rename
+    name for backward compatibility (WI-5651 skill-rename path canonicalization)."""
+    for name in ("gtkb-bridge-propose", "bridge-propose"):
+        candidate = root / ".claude" / "skills" / name / "helpers" / "write_bridge.py"
+        if candidate.is_file():
+            return candidate
+    return root / ".claude" / "skills" / "gtkb-bridge-propose" / "helpers" / "write_bridge.py"
+
+
+BRIDGE_PROPOSE_HELPER = _resolve_bridge_propose_helper(PROJECT_ROOT)
 
 if str(PROJECT_ROOT / "groundtruth-kb" / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))

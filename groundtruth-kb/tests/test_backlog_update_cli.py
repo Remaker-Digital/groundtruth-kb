@@ -100,6 +100,89 @@ def _seed_db(project_dir: Path) -> None:
         db.close()
 
 
+_REOPEN_BRIDGE_ID = "gtkb-wi5441-registry-control-plane-reverse-coverage"
+_REOPEN_PAUTH_ID = "PAUTH-PROJECT-GTKB-HOUSEKEEPING-HARDENING-WI5441-REGISTRY-CONTROL-PLANE-20260724"
+_REOPEN_THREADS = json.dumps(
+    [
+        f"bridge/{_REOPEN_BRIDGE_ID}-007.md",
+        f"bridge/{_REOPEN_BRIDGE_ID}-008.md",
+    ]
+)
+_REOPEN_REASON = f"WI-5441 owner-approved terminal repair under {_REOPEN_PAUTH_ID}"
+
+
+def _seed_terminal_reopen(project_dir: Path) -> None:
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        db.insert_project(
+            id="PROJECT-GTKB-HOUSEKEEPING-HARDENING",
+            name="Housekeeping hardening",
+            status="active",
+            changed_by="test",
+            change_reason="seed project",
+        )
+        db.insert_deliberation(
+            id="DELIB-WI5441-OWNER-REPAIR",
+            source_type="owner_conversation",
+            title="Owner-approved terminal repair",
+            summary="Repair WI-5441 forward before WI-5640 resumes.",
+            content="Owner approved the bounded repair.",
+            changed_by="test",
+            change_reason="seed decision",
+        )
+        db.insert_spec(
+            id="GOV-PLATFORM-SOT-REGISTRY-001",
+            title="Registry authority",
+            status="verified",
+            changed_by="test",
+            change_reason="seed governing spec",
+        )
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="platform",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+            project_name="PROJECT-GTKB-HOUSEKEEPING-HARDENING",
+        )
+        db.insert_project_authorization(
+            "PROJECT-GTKB-HOUSEKEEPING-HARDENING",
+            "WI-5441 registry control plane",
+            "DELIB-WI5441-OWNER-REPAIR",
+            "Bounded terminal repair",
+            "test",
+            "seed authorization",
+            id=_REOPEN_PAUTH_ID,
+            status="active",
+            included_work_item_ids=["WI-5441"],
+            included_spec_ids=["GOV-PLATFORM-SOT-REGISTRY-001"],
+        )
+    finally:
+        db.close()
+
+    bridge = project_dir / "bridge"
+    bridge.mkdir(exist_ok=True)
+    statuses = ("NEW", "NO-GO", "REVISED", "NO-GO", "REVISED", "NO-GO", "REVISED", "GO")
+    for version, status in enumerate(statuses, start=1):
+        role = "prime-builder" if status in {"NEW", "REVISED"} else "loyal-opposition"
+        lines = [
+            status,
+            "",
+            f"author_identity: {role}/fixture-{version}",
+            f"author_session_context_id: fixture-{role}-{version}",
+            f"bridge_kind: {'prime_proposal' if role == 'prime-builder' else 'lo_verdict'}",
+            f"Document: {_REOPEN_BRIDGE_ID}",
+            f"Version: {version:03d}",
+        ]
+        if version > 1:
+            lines.append(f"Responds to: bridge/{_REOPEN_BRIDGE_ID}-{version - 1:03d}.md")
+        lines.extend(["Work Item: WI-5441", "", f"# Version {version}", ""])
+        (bridge / f"{_REOPEN_BRIDGE_ID}-{version:03d}.md").write_text("\n".join(lines), encoding="utf-8")
+
+
 def _config_args(project_dir: Path) -> list[str]:
     return ["--config", str(project_dir / "groundtruth.toml")]
 
@@ -113,6 +196,7 @@ def test_backlog_update_help(runner: CliRunner, project_dir: Path) -> None:
     assert "--owner-approved" in result.output
     assert "--change-reason" in result.output
     assert "--dry-run" in result.output
+    assert "--reopen-terminal" in result.output
     assert "--json" in result.output
 
 
@@ -631,5 +715,113 @@ def test_update_description_file_missing_path_errors(runner: CliRunner, project_
     db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
     try:
         assert len(db.get_work_item_history("WI-IMPROVEMENT")) == 1
+    finally:
+        db.close()
+
+
+def _reopen_args(project_dir: Path) -> list[str]:
+    return [
+        *_config_args(project_dir),
+        "backlog",
+        "update",
+        "WI-5441",
+        "--resolution-status",
+        "open",
+        "--stage",
+        "backlogged",
+        "--related-bridge-threads",
+        _REOPEN_THREADS,
+        "--owner-approved",
+        "--reopen-terminal",
+        "--change-reason",
+        _REOPEN_REASON,
+        "--json",
+    ]
+
+
+def test_backlog_update_reopen_terminal_appends_one_version_and_event(runner: CliRunner, project_dir: Path) -> None:
+    _seed_terminal_reopen(project_dir)
+
+    result = runner.invoke(main, _reopen_args(project_dir))
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["reopen_terminal"] is True
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        row = db.get_work_item("WI-5441")
+        assert row is not None
+        assert row["version"] == 2
+        assert row["stage"] == "backlogged"
+        assert row["resolution_status"] == "open"
+        assert len(db.get_work_item_history("WI-5441")) == 2
+        assert (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+            == 1
+        )
+    finally:
+        db.close()
+
+
+def test_backlog_update_reopen_terminal_dry_run_writes_nothing(runner: CliRunner, project_dir: Path) -> None:
+    _seed_terminal_reopen(project_dir)
+    args = _reopen_args(project_dir)
+    args.insert(-1, "--dry-run")
+
+    result = runner.invoke(main, args)
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["dry_run"] is True
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        assert len(db.get_work_item_history("WI-5441")) == 1
+        assert (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+            == 0
+        )
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(
+    "removed_option",
+    ["--owner-approved", "--reopen-terminal", "--related-bridge-threads", "--stage", "--resolution-status"],
+)
+def test_backlog_update_reopen_terminal_rejects_incomplete_requests_without_writes(
+    runner: CliRunner, project_dir: Path, removed_option: str
+) -> None:
+    _seed_terminal_reopen(project_dir)
+    args = _reopen_args(project_dir)
+    index = args.index(removed_option)
+    del args[index]
+    if removed_option in {"--related-bridge-threads", "--stage", "--resolution-status"}:
+        del args[index]
+
+    result = runner.invoke(main, args)
+
+    assert result.exit_code != 0
+    db = KnowledgeDB(db_path=project_dir / "groundtruth.db")
+    try:
+        assert len(db.get_work_item_history("WI-5441")) == 1
+        assert (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+            == 0
+        )
     finally:
         db.close()

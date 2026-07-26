@@ -1487,6 +1487,124 @@ def _post_verified_finalization_clearance(root: Path, payload: dict[str, Any]) -
     )
 
 
+def _registry_observation_intent(
+    root: Path,
+    payload: dict[str, Any],
+    protected: list[str],
+    *,
+    session_id: str,
+    bridge_id: str,
+    packet: dict[str, Any],
+    project_authorization: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Mint and persist one exact post-tool capability for registered targets."""
+
+    if payload.get("__gtkb_registry_diagnostic__") is True:
+        return None
+    registry_path = root / "config" / "registry" / "sot-artifacts.toml"
+    if not registry_path.exists():
+        return None
+    package_src = root / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    try:
+        from groundtruth_kb.project.registry_control_plane import (
+            RegistryControlPlaneError,
+            load_registry_snapshot,
+            mint_observation_capability,
+            registry_currentness,
+        )
+
+        from scripts.registry_observation_hook import intent_path
+    except ImportError as exc:
+        raise AuthorizationError(f"registry control plane is unavailable: {exc}") from exc
+    try:
+        snapshot = load_registry_snapshot(project_root=root, db_path=root / "groundtruth.db")
+        registered: dict[str, Any] = {}
+        registered_paths: list[str] = []
+        for path in protected:
+            record = snapshot.resolver.resolve(path)
+            if record is not None:
+                registered[record.id] = record
+                registered_paths.append(path)
+        if not registered:
+            return None
+        currentness = registry_currentness(snapshot, project_root=root, db_path=root / "groundtruth.db")
+        if not currentness["current"]:
+            raise AuthorizationError(
+                "registered target mutation requires current registry revision evidence: "
+                f"missing={currentness['missing_revisions']}, stale={currentness['stale']}"
+            )
+        denied_roles = sorted(
+            record.id for record in registered.values() if record.owner_role not in {"shared", "prime_builder"}
+        )
+        if denied_roles:
+            raise AuthorizationError(f"registered targets are not Prime Builder writable: {denied_roles}")
+        missing_api = sorted(record.id for record in registered.values() if not record.mutation_api.strip())
+        if missing_api:
+            raise AuthorizationError(f"registered targets have no mutation API: {missing_api}")
+        tool = _tool_name(payload).strip() or "unknown"
+        data = _tool_input(payload)
+        command = str(data.get("command") or payload.get("command") or "") if isinstance(data, dict) else ""
+        patch_text = str(data.get("patch") or "") if isinstance(data, dict) else ""
+        identity_change = (
+            tool.casefold() in {"delete", "move"}
+            or bool(re.search(r"\b(?:remove-item|move-item|git\s+(?:mv|rm)|rm|del)\b", command, re.IGNORECASE))
+            or bool(re.search(r"^\*\*\* (?:Delete File:|Move to:)", patch_text, re.MULTILINE))
+        )
+        if identity_change:
+            raise AuthorizationError(
+                "registered deletion, move, rename, or locator change requires separately reviewed transition authority"
+            )
+        event_id = str(
+            payload.get("tool_use_id")
+            or payload.get("toolUseID")
+            or payload.get("tool_event_id")
+            or payload.get("event_id")
+            or ""
+        ).strip()
+        if not session_id or not event_id:
+            raise AuthorizationError("registered target mutation requires session and tool event identifiers")
+        start_packet_hash = str(packet.get("packet_hash") or "")
+        if not start_packet_hash:
+            start_packet_hash = (
+                "sha256:"
+                + hashlib.sha256(json.dumps(packet, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            )
+        minted = mint_observation_capability(
+            target_paths=registered_paths,
+            session_id=session_id,
+            tool_event_id=event_id,
+            bridge_id=bridge_id,
+            start_packet_hash=start_packet_hash,
+            pauth_decision=project_authorization,
+            operation=tool,
+            authorized=True,
+            project_root=root,
+            db_path=root / "groundtruth.db",
+        )
+        intent = {
+            "capability": minted["capability"],
+            "capability_hash": minted["capability_hash"],
+            "target_paths": minted["paths"],
+            "preimage_digests": minted["preimage_digests"],
+            "session_id": session_id,
+            "tool_event_id": event_id,
+            "bridge_id": bridge_id,
+            "start_packet_hash": start_packet_hash,
+            "operation": tool,
+            "change_reason": f"authorized observation for bridge {bridge_id}",
+        }
+        destination = intent_path(root, session_id, event_id)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_suffix(".tmp")
+        temporary.write_text(json.dumps(intent, sort_keys=True), encoding="utf-8")
+        os.replace(temporary, destination)
+        return {"capability_hash": minted["capability_hash"], "tool_event_id": event_id}
+    except RegistryControlPlaneError as exc:
+        raise AuthorizationError(f"registry control plane denied mutation: {exc}") from exc
+
+
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     invalid_payload_reason = payload.get(INVALID_HOOK_PAYLOAD_KEY)
     if isinstance(invalid_payload_reason, str) and invalid_payload_reason:
@@ -1597,6 +1715,15 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if peer_report_reason:
             raise AuthorizationError(peer_report_reason)
+        observation_intent = _registry_observation_intent(
+            root,
+            payload,
+            protected,
+            session_id=session_id or "",
+            bridge_id=bridge_id,
+            packet=packet,
+            project_authorization=project_authorization,
+        )
     except AuthorizationError as exc:
         classifications = ", ".join(sorted({_protected_path_classification(path) for path in protected}))
         return {
@@ -1610,6 +1737,8 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
                 "`python scripts/implementation_authorization.py begin --bridge-id <id>` before mutating protected targets."
             ),
         }
+    if observation_intent is not None:
+        return {"registryObservationIntent": observation_intent}
     return {}
 
 
@@ -1629,6 +1758,8 @@ def _read_payload() -> dict[str, Any]:
 def main() -> int:
     diagnostic = "--diagnostic" in sys.argv[1:]
     payload = _read_payload()
+    if diagnostic:
+        payload["__gtkb_registry_diagnostic__"] = True
     result = gate_decision(payload)
     if diagnostic:
         print(
@@ -1660,7 +1791,7 @@ def main() -> int:
             )
         )
     else:
-        print("{}")
+        print(json.dumps(result, sort_keys=True))
     return 0
 
 

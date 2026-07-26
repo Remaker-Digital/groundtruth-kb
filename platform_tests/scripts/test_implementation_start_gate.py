@@ -12,6 +12,11 @@ from pathlib import Path
 
 import pytest
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project.registry_control_plane import (
+    apply_registry_transaction,
+    serialize_registry,
+)
+from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection
 
 ROOT = Path(__file__).resolve().parents[2]
 TAXONOMY_PATH = ROOT / "config" / "governance" / "project-authorization-operation-taxonomy.toml"
@@ -20,6 +25,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import implementation_authorization as auth  # noqa: E402
 from scripts import implementation_start_gate as gate  # noqa: E402
+from scripts import registry_observation_hook as observer  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -40,11 +46,14 @@ def _proposal(
         [
             "NEW",
             "",
+            f"author_identity: prime-builder/fixture-{bridge_id}",
             f"author_session_context_id: fixture-proposal-session-{bridge_id}",
+            "bridge_kind: implementation_proposal",
+            f"Document: {bridge_id}",
+            "Version: 001",
             "",
             "# Implementation Proposal",
             "",
-            f"Document: {bridge_id}",
             f"target_paths: {json.dumps(targets)}",
             "",
             "## Specification Links",
@@ -79,7 +88,12 @@ def _go_verdict_body(bridge_id: str = "sample-implementation") -> str:
         [
             "GO",
             "",
+            f"author_identity: loyal-opposition/fixture-{bridge_id}",
             f"author_session_context_id: fixture-go-session-{bridge_id}",
+            "bridge_kind: lo_verdict",
+            f"Document: {bridge_id}",
+            "Version: 002",
+            f"Responds to: bridge/{bridge_id}-001.md",
             "",
             "# Review",
             "",
@@ -93,8 +107,12 @@ def _write_implementation_report(root: Path, bridge_id: str, paths: list[str]) -
             [
                 "NEW",
                 "",
+                f"author_identity: prime-builder/fixture-{bridge_id}",
+                f"author_session_context_id: fixture-report-session-{bridge_id}",
                 "bridge_kind: implementation_report",
                 f"Document: {bridge_id}",
+                "Version: 003",
+                f"Responds to: bridge/{bridge_id}-002.md",
                 "",
                 "## Files Changed",
                 "",
@@ -118,11 +136,6 @@ def _write_thread(
     proposal_name = f"{bridge_id}-001.md"
     go_name = f"{bridge_id}-002.md"
     proposal_body = proposal or _proposal(bridge_id=bridge_id)
-    if latest_status != "GO":
-        proposal_lines = proposal_body.splitlines()
-        if proposal_lines:
-            proposal_lines[0] = latest_status
-            proposal_body = "\n".join(proposal_lines) + "\n"
     (bridge / proposal_name).write_text(proposal_body, encoding="utf-8")
     if latest_status == "GO":
         (bridge / go_name).write_text(_go_verdict_body(bridge_id), encoding="utf-8")
@@ -131,11 +144,27 @@ def _write_thread(
             f"GO: bridge/{go_name}",
             f"NEW: bridge/{proposal_name}",
         ]
+    elif latest_status == "REVISED":
+        no_go_name = f"{bridge_id}-002.md"
+        revised_name = f"{bridge_id}-003.md"
+        no_go = _go_verdict_body(bridge_id).replace("GO", "NO-GO", 1)
+        revised = proposal_body.replace("NEW", "REVISED", 1)
+        revised = revised.replace("Version: 001", "Version: 003", 1)
+        revised = revised.replace(
+            f"author_session_context_id: fixture-proposal-session-{bridge_id}",
+            f"author_session_context_id: fixture-revised-session-{bridge_id}",
+            1,
+        )
+        revised = revised.replace(
+            "bridge_kind: implementation_proposal",
+            f"Responds to: bridge/{no_go_name}\nbridge_kind: implementation_proposal",
+            1,
+        )
+        (bridge / no_go_name).write_text(no_go, encoding="utf-8")
+        (bridge / revised_name).write_text(revised, encoding="utf-8")
+        lines = [f"Document: {bridge_id}", f"REVISED: bridge/{revised_name}"]
     else:
-        lines = [
-            f"Document: {bridge_id}",
-            f"{latest_status}: bridge/{proposal_name}",
-        ]
+        lines = [f"Document: {bridge_id}", f"NEW: bridge/{proposal_name}"]
     (bridge / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -305,6 +334,76 @@ def _apply_patch_payload(
         "tool_name": "apply_patch",
         "tool_input": {"patch": f"*** Begin Patch\n*** Update File: {target}\n@@\n+pass\n*** End Patch\n"},
     }
+
+
+def _seed_registered_target(root: Path, target: str = "scripts/sample.py") -> None:
+    member = root / target
+    member.parent.mkdir(parents=True, exist_ok=True)
+    member.write_text("before\n", encoding="utf-8")
+    record = SoTArtifact(
+        id="fixture-registered-target",
+        domain="control_surface",
+        lifecycle="active",
+        storage_path=target,
+        authority_spec_id="GOV-PLATFORM-SOT-REGISTRY-001",
+        mutation_api="governed implementation edit",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function="",
+        owner_role="shared",
+        restore_action="git_restore",
+        coverage_mode="exact",
+    )
+    registry = root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    packaged.parent.mkdir(parents=True, exist_ok=True)
+    payload = serialize_registry([record])
+    registry.write_bytes(payload)
+    packaged.write_bytes(payload)
+    db_path = root / "groundtruth.db"
+    KnowledgeDB(db_path=db_path)
+    sync_projection([record], db_path, changed_by="test", change_reason="registry fixture")
+    apply_registry_transaction(
+        [record],
+        operation="legacy_bootstrap",
+        actor_session="fixture-registry",
+        changed_by="test",
+        change_reason="seed current registry fixture",
+        start_packet_hash="sha256:fixture",
+        pauth_id="PAUTH-AUTH",
+        bridge_id="sample-implementation",
+        project_root=root,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+
+
+def _authorize_registered_target(root: Path, target: str = "scripts/sample.py") -> None:
+    _seed_project_authorization(root)
+    _write_thread(root, proposal=_pauth_proposal(target_paths=[target]))
+    packet = auth.create_authorization_packet(root, "sample-implementation")
+    auth.write_packet(root, packet)
+    _claim_bridge(root)
+    _seed_registered_target(root, target)
+
+
+def _registered_payload(root: Path, target: str = "scripts/sample.py") -> dict[str, object]:
+    payload = _apply_patch_payload(root, target=target)
+    payload["tool_use_id"] = "fixture-tool-event"
+    return payload
 
 
 def test_go_authorization_packet_without_pauth_blocks_in_scope_apply_patch(tmp_path: Path) -> None:
@@ -580,7 +679,24 @@ def test_existing_packet_blocks_when_bridge_becomes_latest_deferred(tmp_path: Pa
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     auth.write_packet(tmp_path, packet)
     bridge = tmp_path / "bridge"
-    (bridge / "sample-implementation-003.md").write_text("DEFERRED\n\n# Owner deferral\n", encoding="utf-8")
+    (bridge / "sample-implementation-003.md").write_text(
+        "\n".join(
+            [
+                "DEFERRED",
+                "",
+                "author_identity: prime-builder/fixture-sample-implementation",
+                "author_session_context_id: fixture-deferred-session-sample-implementation",
+                "bridge_kind: prime_proposal",
+                "Document: sample-implementation",
+                "Version: 003",
+                "Responds to: bridge/sample-implementation-002.md",
+                "",
+                "# Owner deferral",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     (bridge / "INDEX.md").write_text(
         "\n".join(
             [
@@ -636,12 +752,17 @@ def test_emergency_bridge_repair_allows_bridge_function_edit_without_packet(
     assert record["paths"] == ["scripts/dispatcher_runtime.py"]
 
 
-def test_emergency_env_does_not_exempt_non_bridge_protected_edit(
+def test_emergency_env_does_not_exempt_registry_control_plane_edit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(gate.EMERGENCY_BRIDGE_REPAIR_ENV_VAR, "1")
 
-    result = gate.gate_decision(_apply_patch_payload(tmp_path, target="scripts/sample.py"))
+    result = gate.gate_decision(
+        _apply_patch_payload(
+            tmp_path,
+            target="groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py",
+        )
+    )
 
     assert result["decision"] == "block"
     assert "authorization packet" in result["reason"]
@@ -711,10 +832,10 @@ def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) 
         (".claude/rules/x.md", ".claude/rules/"),
         (".codex/gtkb-hooks/a.py", ".codex/gtkb-hooks/"),
         (".github/workflows/ci.yml", ".github/"),
-        (".claude/settings.json", ".claude/settings.json"),
+        (".claude/settings.json", "registry:wi5441-claude-settings-json"),
         (".codex/hooks.json", ".codex/hooks.json"),
         (".env", ".env"),
-        ("./.env.local", ".env.*"),
+        ("./.env.local", "registry:owner-local-env"),
         ("env.local", "env.local"),
         ("env.staging", "env.staging"),
         ("bridge/example-001.md", "bridge/<slug>-NNN.md"),
@@ -863,7 +984,10 @@ def test_start_finalizer_denial_writes_no_packet(tmp_path: Path) -> None:
     packet = auth.create_authorization_packet(tmp_path, "sample-implementation")
     _claim_bridge(tmp_path)
 
-    with pytest.raises(auth.AuthorizationError, match="denied implementation_start"):
+    with pytest.raises(
+        auth.AuthorizationError,
+        match=r"forbidden_operation: Operation 'implementation_start' is forbidden\.",
+    ):
         auth.finalize_implementation_start_packet(tmp_path, packet, session_id="session-1")
 
     assert not auth.packet_path(tmp_path).exists()
@@ -887,7 +1011,7 @@ def test_gate_rechecks_live_project_authorization_before_protected_effect(
     result = gate.gate_decision(_apply_patch_payload(tmp_path))
 
     assert result["decision"] == "block"
-    assert f"denied {forbidden_operation}" in result["reason"]
+    assert f"Operation '{forbidden_operation}' is forbidden." in result["reason"]
     assert "forbidden_operation" in result["reason"]
 
 
@@ -1222,7 +1346,7 @@ def test_shell_mutation_blocks_controlled_authority_state(path: str, reason_code
     assert "controlled artifact" in result["reason"]
 
 
-def test_memory_only_mutating_shell_payload_allowed_without_authorization(tmp_path: Path) -> None:
+def test_registered_memory_mutation_requires_authorization(tmp_path: Path) -> None:
     payload = {
         "cwd": str(tmp_path),
         "tool_name": "Bash",
@@ -1230,7 +1354,9 @@ def test_memory_only_mutating_shell_payload_allowed_without_authorization(tmp_pa
     }
 
     assert gate.changed_paths(payload) == (["memory/pending-owner-decisions.md"], True)
-    assert gate.gate_decision(payload) == {}
+    result = gate.gate_decision(payload)
+    assert result["decision"] == "block"
+    assert "registry:pending-owner-decisions" in result["reason"]
 
 
 def test_deliberation_search_query_with_patch_word_is_allowed_without_authorization(tmp_path: Path) -> None:
@@ -2270,3 +2396,76 @@ def test_finalization_git_add_targets_parses_and_rejects() -> None:
     assert gate._finalization_git_add_targets("git add a.py && rm b") is None
     assert gate._finalization_git_add_targets("git commit -m x") is None
     assert gate._finalization_git_add_targets("git rm scripts/a.py") is None
+
+
+def test_registered_target_requires_registry_currentness(tmp_path: Path) -> None:
+    _authorize_registered_target(tmp_path)
+    (tmp_path / "scripts" / "sample.py").write_text("stale\n", encoding="utf-8")
+
+    result = gate.gate_decision(_registered_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert "current registry revision evidence" in result["reason"]
+    assert not observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
+
+
+def test_incomplete_registry_journal_blocks_mutation(tmp_path: Path) -> None:
+    _authorize_registered_target(tmp_path)
+    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
+        conn.execute(
+            """
+            INSERT INTO sot_registry_transaction_journal (
+                journal_id, operation, intent_recorded_at, journal_state,
+                actor_session, changed_by, changed_at, change_reason
+            ) VALUES ('fixture-incomplete', 'amend', '2026-07-25T00:00:00Z',
+                      'prepared', 'fixture', 'test', '2026-07-25T00:00:00Z', 'fixture')
+            """
+        )
+        conn.commit()
+
+    result = gate.gate_decision(_registered_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert "registry control plane denied mutation" in result["reason"]
+    assert "fixture-incomplete" in result["reason"]
+
+
+def test_registered_identity_change_requires_transition(tmp_path: Path) -> None:
+    _authorize_registered_target(tmp_path)
+    payload = _registered_payload(tmp_path)
+    payload["tool_input"] = {"patch": "*** Begin Patch\n*** Delete File: scripts/sample.py\n*** End Patch\n"}
+
+    result = gate.gate_decision(payload)
+
+    assert result["decision"] == "block"
+    assert "separately reviewed transition authority" in result["reason"]
+    assert not observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
+
+
+def test_authorized_write_mints_observation_intent(tmp_path: Path) -> None:
+    _authorize_registered_target(tmp_path)
+
+    result = gate.gate_decision(_registered_payload(tmp_path))
+
+    assert "registryObservationIntent" in result
+    intent = observer.intent_path(tmp_path, "session-1", "fixture-tool-event")
+    assert intent.exists()
+    intent_payload = json.loads(intent.read_text(encoding="utf-8"))
+    assert intent_payload["target_paths"] == ["scripts/sample.py"]
+    assert intent_payload["session_id"] == "session-1"
+    assert intent_payload["tool_event_id"] == "fixture-tool-event"
+    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
+        row = conn.execute("SELECT capability_state FROM sot_registry_observation_capabilities").fetchone()
+    assert row == ("minted",)
+
+
+def test_unauthorized_write_mints_no_observation_intent(tmp_path: Path) -> None:
+    _seed_registered_target(tmp_path)
+
+    result = gate.gate_decision(_registered_payload(tmp_path))
+
+    assert result["decision"] == "block"
+    assert not observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
+    with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
+        count = conn.execute("SELECT COUNT(*) FROM sot_registry_observation_capabilities").fetchone()[0]
+    assert count == 0

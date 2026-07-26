@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.project import registry_control_plane
 
 from scripts import gtkb_bridge_writer as writer
 from scripts.gtkb_bridge_writer import (
@@ -164,6 +165,36 @@ def _stage_reviewed_file(tmp_path: Path, slug: str, version: int = 1, status: st
     )
 
 
+def _enable_typed_publication(tmp_path: Path) -> None:
+    canonical = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        tmp_path
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    canonical.parent.mkdir(parents=True)
+    packaged.parent.mkdir(parents=True)
+    canonical.write_text("schema_version = 1\n", encoding="utf-8")
+    packaged.write_bytes(canonical.read_bytes())
+    (tmp_path / "groundtruth.db").write_bytes(b"fixture")
+
+
+def _typed_publication_content(status: str, document_name: str, version: int) -> str:
+    return (
+        f"{status}\n"
+        + _author_metadata_lines("session-123")
+        + "\n# Typed Publication\n\n"
+        + f"bridge_kind: fixture\nDocument: {document_name}\nVersion: {version:03d}\n"
+    )
+
+
 def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(writer, "run_bridge_compliance_audit", lambda **_kwargs: {"decision": "pass"})
 
@@ -176,6 +207,221 @@ def test_write_bridge_file_creates_numbered_file_with_metadata(tmp_path: Path, m
     assert "author_session_context_id: session-123\n" in written
     assert "## Requirement Sufficiency\n\nExisting requirements sufficient." in written
     assert not (tmp_path / "bridge" / "INDEX.md").exists()
+
+
+@pytest.mark.parametrize(
+    "status",
+    ("NEW", "REVISED", "NO-ACTION", "GO", "NO-GO", "VERIFIED"),
+)
+def test_typed_publication_observes_before_claim_release(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = f"typed-{status.lower().replace('-', '')}"
+    target = tmp_path / "bridge" / f"{document_name}-001.md"
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
+    )
+    monkeypatch.setattr(
+        writer,
+        "_run_provider_verdict_guards",
+        lambda **_kwargs: ({"decision": "pass"},),
+    )
+
+    def mint(**kwargs: object) -> dict[str, object]:
+        assert kwargs["status"] == status
+        assert kwargs["target_path"] == target
+        events.append("mint")
+        return {"capability": "typed-capability", "target_path": str(target)}
+
+    def consume(**kwargs: object) -> None:
+        assert target.read_bytes() == kwargs["content"]
+        assert events == ["mint"]
+        events.append("consume-current")
+
+    def release(*_args: object, **_kwargs: object) -> None:
+        assert events == ["mint", "consume-current"]
+        events.append("release")
+
+    monkeypatch.setattr(registry_control_plane, "mint_bridge_publication_capability", mint)
+    monkeypatch.setattr(registry_control_plane, "consume_bridge_publication_capability", consume)
+    monkeypatch.setattr(writer, "_release_claim", release)
+
+    path = write_bridge_file(
+        document_name,
+        1,
+        _typed_publication_content(status, document_name, 1),
+        tmp_path,
+        require_author_metadata=False,
+    )
+
+    assert path == target
+    assert events == ["mint", "consume-current", "release"]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ("create", "reread", "consume", "currentness", "release"),
+)
+def test_typed_publication_failures_compensate_and_retain_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = f"typed-failure-{failure}"
+    target = tmp_path / "bridge" / f"{document_name}-001.md"
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
+    )
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+
+    def mint(**_kwargs: object) -> dict[str, object]:
+        events.append("mint")
+        return {"capability": "typed-capability", "target_path": str(target)}
+
+    def consume(**_kwargs: object) -> None:
+        events.append("consume")
+        if failure in {"consume", "currentness"}:
+            raise RuntimeError(f"forced {failure} failure")
+
+    def compensate(**_kwargs: object) -> None:
+        events.append("compensate")
+        target.unlink(missing_ok=True)
+
+    def release(*_args: object, **_kwargs: object) -> None:
+        events.append("release-attempt")
+        if failure == "release":
+            raise RuntimeError("forced release failure")
+        events.append("release-success")
+
+    monkeypatch.setattr(registry_control_plane, "mint_bridge_publication_capability", mint)
+    monkeypatch.setattr(registry_control_plane, "consume_bridge_publication_capability", consume)
+    monkeypatch.setattr(registry_control_plane, "compensate_bridge_publication", compensate)
+    monkeypatch.setattr(writer, "_release_claim", release)
+
+    if failure == "create":
+        original_open = Path.open
+
+        def fail_create(path: Path, *args: object, **kwargs: object):
+            if path == target and args and args[0] == "x":
+                raise OSError("forced create failure")
+            return original_open(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", fail_create)
+    elif failure == "reread":
+        original_read_text = Path.read_text
+
+        def fail_reread(path: Path, *args: object, **kwargs: object) -> str:
+            if path == target:
+                raise OSError("forced reread failure")
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", fail_reread)
+
+    with pytest.raises((OSError, BridgePublicationError), match=failure):
+        write_bridge_file(
+            document_name,
+            1,
+            _typed_publication_content("NEW", document_name, 1),
+            tmp_path,
+            require_author_metadata=False,
+        )
+
+    assert events[0] == "mint"
+    assert events.count("compensate") == 1
+    assert "release-success" not in events
+    assert not target.exists()
+
+
+def test_typed_publication_compensation_failure_retains_repair_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = "typed-repair-required"
+    target = tmp_path / "bridge" / f"{document_name}-001.md"
+
+    monkeypatch.setattr(
+        writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: {"decision": "pass"},
+    )
+    monkeypatch.setattr(writer, "_run_provider_verdict_guards", lambda **_kwargs: ())
+    monkeypatch.setattr(
+        registry_control_plane,
+        "mint_bridge_publication_capability",
+        lambda **_kwargs: {
+            "capability": "typed-capability",
+            "target_path": str(target),
+        },
+    )
+    monkeypatch.setattr(
+        registry_control_plane,
+        "consume_bridge_publication_capability",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("forced consume failure")),
+    )
+    monkeypatch.setattr(
+        registry_control_plane,
+        "compensate_bridge_publication",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("forced compensation failure")),
+    )
+    monkeypatch.setattr(
+        writer,
+        "_release_claim",
+        lambda *_args, **_kwargs: pytest.fail("claim must remain held"),
+    )
+
+    with pytest.raises(BridgePublicationError, match="REPAIR_REQUIRED"):
+        write_bridge_file(
+            document_name,
+            1,
+            _typed_publication_content("NEW", document_name, 1),
+            tmp_path,
+            require_author_metadata=False,
+        )
+
+    assert target.is_file()
+
+
+def test_typed_publication_compliance_failure_precedes_mint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_typed_publication(tmp_path)
+    document_name = "typed-compliance-denial"
+    target = tmp_path / "bridge" / f"{document_name}-001.md"
+    monkeypatch.setattr(
+        writer,
+        "run_bridge_compliance_audit",
+        lambda **_kwargs: (_ for _ in ()).throw(BridgeComplianceError("forced compliance failure")),
+    )
+    monkeypatch.setattr(
+        registry_control_plane,
+        "mint_bridge_publication_capability",
+        lambda **_kwargs: pytest.fail("mint must follow successful compliance"),
+    )
+
+    with pytest.raises(BridgeComplianceError, match="compliance failure"):
+        write_bridge_file(
+            document_name,
+            1,
+            _typed_publication_content("NEW", document_name, 1),
+            tmp_path,
+            require_author_metadata=False,
+        )
+
+    assert not target.exists()
 
 
 def test_write_bridge_file_rejects_existing_numbered_file(tmp_path: Path) -> None:

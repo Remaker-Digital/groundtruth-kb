@@ -16,9 +16,8 @@ Two-surface harness-specific contract:
 Bypass: set GTKB_SOT_READ_DISCIPLINE_BYPASS=1 for owner-authorized single-command
 exceptions per .claude/rules/sot-read-discipline.md.
 
-Fail-open: any unexpected error logs to stderr and emits {} so the hook never
-blocks legitimate operations on its own bugs. The doctor check surfaces coverage
-gaps.
+Fail-closed: registry authority failures emit an explicit block. A missing,
+mixed-generation, or unreadable registry cannot silently disable read discipline.
 """
 
 from __future__ import annotations
@@ -32,6 +31,11 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PACKAGE_ROOT = PROJECT_ROOT / "groundtruth-kb" / "src"
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
+
+from groundtruth_kb.project.registry_control_plane import load_registry_snapshot  # noqa: E402
 
 BYPASS_ENV_VAR = "GTKB_SOT_READ_DISCIPLINE_BYPASS"
 
@@ -136,38 +140,18 @@ def _normalize_relative(raw_path: str, root: Path) -> str | None:
 
 
 def _load_registry_projection(root: Path) -> list[dict[str, Any]]:
-    """Load `current_sot_artifacts` rows as plain dicts; tolerant of missing DB.
-
-    Returns [] if the DB is absent or unreadable so the hook never blocks on
-    its own infrastructure issue (fail-open).
-    """
-    try:
-        import sqlite3
-
-        db_path = root / "groundtruth.db"
-        if not db_path.is_file():
-            return []
-        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-        try:
-            cur = con.cursor()
-            cur.execute(
-                "SELECT id, storage_path, forbidden_substitutes "
-                "FROM current_sot_artifacts "
-                "WHERE forbidden_substitutes IS NOT NULL AND forbidden_substitutes != ''"
-            )
-            rows = cur.fetchall()
-        finally:
-            con.close()
-    except Exception:  # noqa: BLE001 - fail-open per contract
-        return []
+    """Load one coherent registry generation as hook-friendly dictionaries."""
+    snapshot = load_registry_snapshot(project_root=root)
     out: list[dict[str, Any]] = []
-    for rid, storage, substitutes in rows:
-        try:
-            sub_list = json.loads(substitutes) if substitutes else []
-        except json.JSONDecodeError:
-            sub_list = []
-        if sub_list:
-            out.append({"id": rid, "storage_path": storage, "forbidden_substitutes": sub_list})
+    for record in snapshot.records:
+        if record.forbidden_substitutes:
+            out.append(
+                {
+                    "id": record.id,
+                    "storage_path": record.storage_path,
+                    "forbidden_substitutes": list(record.forbidden_substitutes),
+                }
+            )
     return out
 
 
@@ -282,9 +266,11 @@ def main() -> int:
         payload = {}
     try:
         decision = gate_decision(payload)
-    except Exception as exc:  # noqa: BLE001 - fail-open per contract
-        print(f"sot-read-discipline: unexpected error: {exc}", file=sys.stderr)
-        decision = {}
+    except Exception as exc:  # noqa: BLE001 - every authority failure blocks
+        decision = {
+            "decision": "block",
+            "reason": (f"BLOCKED (DCL-SOT-READ-HOOK-CONTRACT-001): coherent registry authority unavailable: {exc}"),
+        }
     _emit(decision)
     return 0
 

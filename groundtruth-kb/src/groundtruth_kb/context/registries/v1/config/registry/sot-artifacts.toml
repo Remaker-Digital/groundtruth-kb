@@ -1,31 +1,15 @@
-# © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+# Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 #
-# Platform SoT Artifact Registry — single source of truth for every SoT class in GT-KB.
-#
-# Authority: GOV-PLATFORM-SOT-REGISTRY-001 (registration mandatory).
-# Schema:    DCL-SOT-REGISTRY-RECORD-SCHEMA-001 (per-record fields).
-# Parity:    DCL-SOT-REGISTRY-PROJECTION-PARITY-001 (TOML ↔ MemBase sot_artifacts table).
-#
-# Bootstrap inventory derived from memory/research_sot_consolidation_2026_06_04.md §2
-# (22 SoT classes identified during umbrella research). Row 1 IS the registry itself.
-#
-# This file is the human-edit surface. MemBase sot_artifacts table is the projection.
-# Mutate via: edit this TOML → `gt registry sync` → next SessionStart confirms parity.
-#
-# Per-record schema (DCL-SOT-REGISTRY-RECORD-SCHEMA-001):
-#   Required: id, domain, lifecycle, storage_path, authority_spec_id, mutation_api,
-#             versioning_policy, backup_policy, restore_action, health_check_function, owner_role
-#   Optional: depends_on, forbidden_substitutes, notes
-
-# =========================================================================
-# Row 1: registry self-reference (bootstrap guarantee per DCL-SOT-REGISTRY-PROJECTION-PARITY-001)
-# =========================================================================
+# Platform SoT Artifact Registry - canonical human-edit declaration.
+# Mutate only through `gt registry register` or `gt registry amend`.
+# The packaged mirror and MemBase projection are one journalled generation.
 
 [[artifacts]]
 id = "sot-registry-toml"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "config/registry/sot-artifacts.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "gt registry sync; or direct TOML edit + commit"
 versioning_policy = "git_tracked"
@@ -37,15 +21,12 @@ depends_on = []
 forbidden_substitutes = []
 notes = "Registry row 1: the registry itself. Required by DCL-SOT-REGISTRY-PROJECTION-PARITY-001 bootstrap guarantee."
 
-# =========================================================================
-# MemBase canonical-record SoT classes
-# =========================================================================
-
 [[artifacts]]
 id = "membase-specifications"
 domain = "specifications"
 lifecycle = "active"
 storage_path = "membase:specifications"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-08"
 mutation_api = "gt spec record; gt spec update; KnowledgeDB.insert_spec/update_spec"
 versioning_policy = "append_only_versioned"
@@ -53,6 +34,8 @@ backup_policy = "membase_export"
 restore_action = "membase_export_restore"
 health_check_function = "_check_db_schema"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Canonical specifications table (SPEC/GOV/DCL/ADR/PB/REQ). Append-only per UNIQUE(id,version)."
 
 [[artifacts]]
@@ -60,6 +43,7 @@ id = "membase-work-items"
 domain = "specifications"
 lifecycle = "active"
 storage_path = "membase:work_items"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-STANDING-BACKLOG-001"
 mutation_api = "gt backlog add-work-item; gt backlog update; gt backlog resolve"
 versioning_policy = "append_only_versioned"
@@ -67,6 +51,8 @@ backup_policy = "membase_export"
 restore_action = "membase_export_restore"
 health_check_function = "_check_standing_backlog_health"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Atomic units of known work. WI-NNNN ids."
 
 [[artifacts]]
@@ -74,6 +60,7 @@ id = "membase-tests"
 domain = "specifications"
 lifecycle = "active"
 storage_path = "membase:tests"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-12"
 mutation_api = "Created via gt backlog add-work-item (GOV-12 linked test); KnowledgeDB.insert_test"
 versioning_policy = "append_only_versioned"
@@ -81,6 +68,8 @@ backup_policy = "membase_export"
 restore_action = "membase_export_restore"
 health_check_function = "_check_db_schema"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Test artifacts linked to work items per GOV-12."
 
 [[artifacts]]
@@ -88,6 +77,7 @@ id = "membase-deliberations"
 domain = "specifications"
 lifecycle = "active"
 storage_path = "membase:deliberations"
+coverage_mode = "virtual"
 authority_spec_id = "SPEC-2098"
 mutation_api = "gt deliberations record; gt deliberations add; KnowledgeDB.insert_deliberation"
 versioning_policy = "append_only_versioned"
@@ -95,6 +85,8 @@ backup_policy = "membase_export"
 restore_action = "membase_export_restore"
 health_check_function = "_check_da_harvest_coverage"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Deliberation Archive (DA): design-reasoning tier per ADR-0001."
 
 [[artifacts]]
@@ -102,6 +94,7 @@ id = "membase-projects"
 domain = "specifications"
 lifecycle = "active"
 storage_path = "membase:projects"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-STANDING-BACKLOG-001"
 mutation_api = "gt projects create; gt projects update; gt projects retire"
 versioning_policy = "append_only_versioned"
@@ -109,6 +102,8 @@ backup_policy = "membase_export"
 restore_action = "membase_export_restore"
 health_check_function = "_check_standing_backlog_health"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "First-class project records grouping work items."
 
 [[artifacts]]
@@ -116,6 +111,7 @@ id = "membase-pauths"
 domain = "specifications"
 lifecycle = "active"
 storage_path = "membase:project_authorizations"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001"
 mutation_api = "gt projects authorize; gt projects revoke-authorization"
 versioning_policy = "append_only_versioned"
@@ -123,6 +119,8 @@ backup_policy = "membase_export"
 restore_action = "membase_export_restore"
 health_check_function = "_check_standing_backlog_health"
 owner_role = "owner_only"
+depends_on = []
+forbidden_substitutes = []
 notes = "Project implementation authorization envelopes; cited as PAUTH-* in bridge proposals."
 
 [[artifacts]]
@@ -130,6 +128,7 @@ id = "membase-assertion-runs"
 domain = "runtime_state"
 lifecycle = "active"
 storage_path = "membase:assertion_runs"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-18"
 mutation_api = "gt assert; assertion-check hook on SessionStart"
 versioning_policy = "append_only_versioned"
@@ -137,17 +136,16 @@ backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
 health_check_function = "_check_db_schema"
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
 notes = "Historical assertion execution records; retention governed by assertion-runs-retention.toml."
-
-# =========================================================================
-# Owner-managed local runtime state
-# =========================================================================
 
 [[artifacts]]
 id = "owner-local-env"
 domain = "runtime_state"
 lifecycle = "active"
 storage_path = ".env.local"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ENV-LOCAL-AUTHORITY-001"
 mutation_api = "owner-managed local file; GT-KB records path authority only"
 versioning_policy = "overwrite_single_writer"
@@ -155,17 +153,16 @@ backup_policy = "gitignored_runtime"
 restore_action = "visibility_only"
 health_check_function = ""
 owner_role = "owner_only"
+depends_on = []
+forbidden_substitutes = []
 notes = ".env.local is an owner-managed local credential/config artifact. The registry preserves path authority and cleanup essentiality only; credential values are not serialized or managed by GT-KB."
-
-# =========================================================================
-# Narrative authority files
-# =========================================================================
 
 [[artifacts]]
 id = "claude-md"
 domain = "narrative_authority"
 lifecycle = "active"
 storage_path = "CLAUDE.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
 mutation_api = "Bridge proposal + formal-artifact-approval packet (narrative_artifact_approval_gate)"
 versioning_policy = "git_tracked"
@@ -173,13 +170,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_canonical_terminology"
 owner_role = "shared"
-notes = "Top-level platform rules; GOV-01 ≤300-line cap."
+depends_on = []
+forbidden_substitutes = []
+notes = "Top-level platform rules; GOV-01 \u2264300-line cap."
 
 [[artifacts]]
 id = "agents-md"
 domain = "narrative_authority"
 lifecycle = "active"
 storage_path = "AGENTS.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
 mutation_api = "Bridge proposal + formal-artifact-approval packet"
 versioning_policy = "git_tracked"
@@ -187,6 +187,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_canonical_terminology"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Codex-side startup contract; dispatcher/default role disclosure."
 
 [[artifacts]]
@@ -194,6 +196,7 @@ id = "rule-canonical-terminology"
 domain = "narrative_authority"
 lifecycle = "active"
 storage_path = ".claude/rules/canonical-terminology.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-GLOSSARY-AS-DA-READ-SURFACE-001"
 mutation_api = "Bridge proposal + formal-artifact-approval packet"
 versioning_policy = "git_tracked"
@@ -201,6 +204,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_canonical_terminology"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Canonical glossary; loaded explicitly at SessionStart in both roles."
 
 [[artifacts]]
@@ -208,6 +213,7 @@ id = "rule-operating-model"
 domain = "narrative_authority"
 lifecycle = "active"
 storage_path = ".claude/rules/operating-model.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
 mutation_api = "Bridge proposal + formal-artifact-approval packet"
 versioning_policy = "git_tracked"
@@ -215,6 +221,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Canonical operating-model artifact; rule-cited soft authority."
 
 [[artifacts]]
@@ -222,6 +230,7 @@ id = "rule-file-bridge-protocol"
 domain = "narrative_authority"
 lifecycle = "active"
 storage_path = ".claude/rules/file-bridge-protocol.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = "Bridge proposal + formal-artifact-approval packet"
 versioning_policy = "git_tracked"
@@ -229,17 +238,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_file_bridge_setup"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Bridge statuses, gates, claim/preflight contract."
-
-# =========================================================================
-# Bridge protocol state
-# =========================================================================
 
 [[artifacts]]
 id = "bridge-versioned-files"
 domain = "bridge_protocol"
 lifecycle = "active"
 storage_path = "bridge/*-[0-9][0-9][0-9].md"
+coverage_mode = "glob"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = "Governed bridge helper/CLI path gated by bridge-compliance-gate.py + bridge_claim_cli.py claim"
 versioning_policy = "git_tracked"
@@ -247,6 +255,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_file_bridge_setup"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Canonical bridge workflow state; both agents read/write."
 
 [[artifacts]]
@@ -254,6 +264,7 @@ id = "bridge-dir"
 domain = "bridge_protocol"
 lifecycle = "active"
 storage_path = "bridge/"
+coverage_mode = "opaque_container"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = "Direct Write gated by bridge-compliance-gate.py + claim required"
 versioning_policy = "git_tracked"
@@ -261,6 +272,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_file_bridge_setup"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Append-only versioned bridge files (NEW/REVISED/GO/NO-GO/VERIFIED/ADVISORY/DEFERRED/WITHDRAWN)."
 
 [[artifacts]]
@@ -268,6 +281,7 @@ id = "bridge-work-intent-claims"
 domain = "bridge_protocol"
 lifecycle = "active"
 storage_path = "membase:work_intent_claims"
+coverage_mode = "virtual"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = "scripts/bridge_claim_cli.py claim/release"
 versioning_policy = "overwrite_single_writer"
@@ -275,6 +289,8 @@ backup_policy = "membase_export"
 restore_action = "noop"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
 notes = "Single-writer claims with TTL; transient runtime state in the MemBase work_intent_claims table."
 
 [[artifacts]]
@@ -282,6 +298,7 @@ id = "bridge-dispatch-state"
 domain = "bridge_protocol"
 lifecycle = "active"
 storage_path = ".gtkb-state/bridge-poller/dispatch-state.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = "gt bridge dispatch daemon"
 versioning_policy = "overwrite_single_writer"
@@ -289,6 +306,8 @@ backup_policy = "gitignored_runtime"
 restore_action = "ensure_alive"
 health_check_function = "_check_bridge_dispatch_liveness"
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
 notes = "Per-recipient dispatch state for the dispatcher daemon."
 
 [[artifacts]]
@@ -296,6 +315,7 @@ id = "dispatcher-supervisor-task"
 domain = "runtime_state"
 lifecycle = "active"
 storage_path = "windows-scheduled-task:GTKB-DispatcherDaemon"
+coverage_mode = "virtual"
 authority_spec_id = "DCL-DISPATCHER-DAEMON-SUPERVISION-CONTRACT-001"
 mutation_api = "gt bridge dispatch daemon supervisor install|enable|disable|uninstall"
 versioning_policy = "overwrite_single_writer"
@@ -312,6 +332,7 @@ id = "dispatcher-storm-watchdog-task"
 domain = "runtime_state"
 lifecycle = "active"
 storage_path = "windows-scheduled-task:GTKB-HarnessStormWatchdog"
+coverage_mode = "virtual"
 authority_spec_id = "ADR-DISPATCHER-COMPLEX-CLI-001"
 mutation_api = "gt bridge dispatch daemon watchdog install|enable|disable|uninstall; gt bridge dispatch complex enable|disable"
 versioning_policy = "overwrite_single_writer"
@@ -323,15 +344,12 @@ depends_on = ["dispatcher-supervisor-task"]
 forbidden_substitutes = []
 notes = "Windows scheduled-task watchdog for harness storm detection; registered separately so complex disable cannot leave it silently unhealed."
 
-# =========================================================================
-# Harness state
-# =========================================================================
-
 [[artifacts]]
 id = "harness-identities"
 domain = "harness_state"
 lifecycle = "active"
 storage_path = "harness-state/harness-identities.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ACTING-PRIME-BUILDER-001"
 mutation_api = "scripts/harness_identity.py set --owner-requested"
 versioning_policy = "overwrite_single_writer"
@@ -339,6 +357,8 @@ backup_policy = "git_tracked"
 restore_action = "manual"
 health_check_function = "_check_role_set_topology_consistency"
 owner_role = "owner_only"
+depends_on = []
+forbidden_substitutes = []
 notes = "Persistent harness IDs (A/B/C/...); installation-stable."
 
 [[artifacts]]
@@ -346,6 +366,7 @@ id = "harness-registry"
 domain = "harness_state"
 lifecycle = "active"
 storage_path = "harness-state/harness-registry.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-HARNESS-ROLE-PORTABILITY-001"
 mutation_api = "gt mode set-role (transaction component)"
 versioning_policy = "regenerated_from_source"
@@ -353,6 +374,7 @@ backup_policy = "git_tracked"
 restore_action = "regenerate_from_source"
 health_check_function = "_check_role_set_topology_consistency"
 owner_role = "owner_only"
+depends_on = []
 forbidden_substitutes = [".claude/rules/operating-role.md"]
 notes = "Canonical role registry; MemBase projection. forbidden_substitutes per DELIB-20260670 Instance 2/4: rule-file prose paraphrases role state."
 
@@ -361,6 +383,7 @@ id = "harness-bridge-substrate"
 domain = "harness_state"
 lifecycle = "active"
 storage_path = "harness-state/bridge-substrate.json"
+coverage_mode = "exact"
 authority_spec_id = "ADR-SINGLE-HARNESS-OPERATING-MODE-001"
 mutation_api = "gt mode set-bridge-substrate (transaction component)"
 versioning_policy = "overwrite_single_writer"
@@ -368,18 +391,16 @@ backup_policy = "git_tracked"
 restore_action = "manual"
 health_check_function = "_check_dispatcher_only_bridge_automation"
 owner_role = "owner_only"
+depends_on = []
 forbidden_substitutes = [".claude/rules/bridge-essential.md"]
 notes = "Bridge dispatch substrate selection. forbidden_substitutes per DELIB-20260670 Instance 1: rule-file prose describes design, not live substrate state."
-
-# =========================================================================
-# Control / capability registries
-# =========================================================================
 
 [[artifacts]]
 id = "harness-capability-registry"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "config/agent-control/harness-capability-registry.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
 mutation_api = "Bridge proposal + manual TOML edit; SHA-256 pinned per adapter"
 versioning_policy = "git_tracked"
@@ -387,6 +408,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Capability parity across Claude/Codex/Antigravity harnesses; SHA-pinned adapters."
 
 [[artifacts]]
@@ -394,6 +417,7 @@ id = "session-startup-control-map"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "config/agent-control/SESSION-STARTUP-CONTROL-MAP.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-SESSION-SELF-INITIALIZATION-001"
 mutation_api = "Bridge proposal + manual edit (markdown classified table)"
 versioning_policy = "git_tracked"
@@ -401,6 +425,8 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Startup-control surface inventory with 4-state lifecycle classification."
 
 [[artifacts]]
@@ -408,6 +434,7 @@ id = "managed-artifacts-registry"
 domain = "scaffold_lifecycle"
 lifecycle = "active"
 storage_path = "groundtruth-kb/templates/managed-artifacts.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-ARTIFACT-APPROVAL-001"
 mutation_api = "Bridge proposal + Python loader validation (InvalidArtifactRecord)"
 versioning_policy = "git_tracked"
@@ -415,17 +442,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_managed_artifact_drift"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Scaffolded-artifact lifecycle registry (67 records, 3 lifecycle axes); precedent pattern for this registry."
-
-# =========================================================================
-# Effective worker-loading authorities
-# =========================================================================
 
 [[artifacts]]
 id = "generated-runtime-state-tree"
 domain = "runtime_state"
 lifecycle = "generated"
 storage_path = ".gtkb-state/"
+coverage_mode = "opaque_container"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "GT-KB runtime services"
 versioning_policy = "regenerated_from_source"
@@ -433,12 +459,16 @@ backup_policy = "gitignored_runtime"
 restore_action = "regenerate_from_source"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "generated-session-state-tree"
 domain = "runtime_state"
 lifecycle = "generated"
 storage_path = ".claude/session/"
+coverage_mode = "opaque_container"
 authority_spec_id = "GOV-SESSION-SELF-INITIALIZATION-001"
 mutation_api = "GT-KB session services"
 versioning_policy = "regenerated_from_source"
@@ -446,12 +476,16 @@ backup_policy = "gitignored_runtime"
 restore_action = "regenerate_from_source"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "scanner-safe-writer-log"
 domain = "runtime_state"
 lifecycle = "generated"
 storage_path = ".claude/hooks/scanner-safe-writer.log"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "scanner-safe-writer hook"
 versioning_policy = "overwrite_single_writer"
@@ -459,12 +493,16 @@ backup_policy = "gitignored_runtime"
 restore_action = "regenerate_from_source"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "api-skill-adapter-manifest"
 domain = "control_surface"
 lifecycle = "generated"
 storage_path = ".api-harness/skills/MANIFEST.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "scripts/generate_api_skill_adapters.py"
 versioning_policy = "regenerated_from_source"
@@ -472,12 +510,16 @@ backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "codex-skill-adapter-manifest"
 domain = "control_surface"
 lifecycle = "generated"
 storage_path = ".codex/skills/MANIFEST.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "scripts/generate_codex_skill_adapters.py"
 versioning_policy = "regenerated_from_source"
@@ -485,12 +527,16 @@ backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "api-harness-routing"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = ".api-harness/routing.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -498,12 +544,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "canonical-terminology-machine-registry"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = ".claude/rules/canonical-terminology.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-GLOSSARY-AS-DA-READ-SURFACE-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -511,12 +561,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_canonical_terminology"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "project-resource-alias-registry"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "config/agent-control/project-resource-aliases.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -524,12 +578,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "project-resource-alias-pointer"
 domain = "control_surface"
 lifecycle = "generated"
 storage_path = ".claude/rules/project-resource-aliases.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "groundtruth_kb.operating_state optional delegation pointer"
 versioning_policy = "regenerated_from_source"
@@ -537,12 +595,16 @@ backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "dependabot-configuration"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = ".github/dependabot.yml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -550,12 +612,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "directive-registry"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = ".gtkb/directive-registry.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved registry edit"
 versioning_policy = "git_tracked"
@@ -563,12 +629,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "agent-red-api-version-probe"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "applications/Agent_Red/src/multi_tenant/api_versioning.py"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "Agent Red lifecycle"
 versioning_policy = "git_tracked"
@@ -576,12 +646,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "application-registry"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "applications/registry.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved registry edit"
 versioning_policy = "git_tracked"
@@ -589,12 +663,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "dispatcher-rules"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "config/dispatcher/rules.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -602,12 +680,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = "_check_dispatcher_daemon_supervisor_task"
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "governance-config-tree"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "config/governance/"
+coverage_mode = "recursive"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -615,12 +697,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "development-environment-inventory"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "docs/release/dev-environment-inventory.json"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "environment inventory refresh"
 versioning_policy = "git_tracked"
@@ -628,12 +714,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "groundtruth-package-metadata"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "groundtruth-kb/pyproject.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved source edit"
 versioning_policy = "git_tracked"
@@ -641,12 +731,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "groundtruth-version-source"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "groundtruth-kb/src/groundtruth_kb/__init__.py"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved source edit"
 versioning_policy = "git_tracked"
@@ -654,12 +748,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "groundtruth-root-config"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "groundtruth.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -667,12 +765,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "pending-owner-decisions"
 domain = "runtime_state"
 lifecycle = "active"
 storage_path = "memory/pending-owner-decisions.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "owner-decision tracker"
 versioning_policy = "overwrite_single_writer"
@@ -680,12 +782,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "workspace-python-config"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "pyproject.toml"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -693,12 +799,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "cursor-harness-source"
 domain = "harness_state"
 lifecycle = "active"
 storage_path = "scripts/cursor_harness.py"
+coverage_mode = "exact"
 authority_spec_id = "GOV-HARNESS-ROLE-PORTABILITY-001"
 mutation_api = "approved source edit"
 versioning_policy = "git_tracked"
@@ -706,12 +816,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "sonar-project-config"
 domain = "control_surface"
 lifecycle = "active"
 storage_path = "sonar-project.properties"
+coverage_mode = "exact"
 authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
 mutation_api = "approved configuration edit"
 versioning_policy = "git_tracked"
@@ -719,16 +833,16 @@ backup_policy = "git_tracked"
 restore_action = "git_restore"
 health_check_function = ""
 owner_role = "shared"
-
-# =========================================================================
-# Retired/archived SoT classes
-# =========================================================================
+depends_on = []
+forbidden_substitutes = []
+notes = ""
 
 [[artifacts]]
 id = "bridge-index"
 domain = "retired"
 lifecycle = "archive"
 storage_path = "bridge/INDEX.md"
+coverage_mode = "exact"
 authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
 mutation_api = ""
 versioning_policy = "immutable_archive"
@@ -736,4 +850,1621 @@ backup_policy = "git_tracked"
 restore_action = "noop"
 health_check_function = ""
 owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
 notes = "Retired bridge index; replaced by direct versioned files discovery."
+
+[[artifacts]]
+id = "registry-control-plane-module"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "gt registry register; gt registry amend"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = "_check_sot_registry_completeness"
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Canonical registry transaction, snapshot, resolver, observation, and census service."
+
+[[artifacts]]
+id = "registry-control-plane-tests"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_registry_control_plane.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "governed source edit under bridge GO"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = "pytest groundtruth-kb/tests/test_registry_control_plane.py"
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Specification-derived tests for the canonical registry control plane."
+
+[[artifacts]]
+id = "registry-observation-hook"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/registry_observation_hook.py"
+coverage_mode = "exact"
+authority_spec_id = "DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001"
+mutation_api = "governed source edit under bridge GO"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = "registry observation hook tests"
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Capability-consuming post-tool observer for registered artifacts."
+
+[[artifacts]]
+id = "registry-observation-hook-tests"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_registry_observation_hook.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "governed source edit under bridge GO"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = "pytest platform_tests/scripts/test_registry_observation_hook.py"
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Cross-harness negative and positive observation-authority tests."
+
+[[artifacts]]
+id = "wi5441-claude-hooks-sot-read-discipline-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/sot-read-discipline.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-claude-settings-json"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/settings.json"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-bridge-propose-helpers-write-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-bridge-helpers-impl-report-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-bridge/helpers/impl_report_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-bridge-helpers-revise-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-bridge/helpers/revise_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-verify-helpers-write-verdict-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-verify/helpers/write_verdict.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-gtkb-hooks-run-py-no-window-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".codex/gtkb-hooks/run_py_no_window.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-bridge-propose-helpers-write-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-bridge-skill-md"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-bridge/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-bridge-helpers-impl-report-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-bridge/helpers/impl_report_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-bridge-helpers-revise-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-bridge/helpers/revise_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-proposal-review-skill-md"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-proposal-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-send-review-skill-md"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-send-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-verify-skill-md"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-verify/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-codex-skills-gtkb-verify-helpers-write-verdict-py"
+domain = "bridge_protocol"
+lifecycle = "generated"
+storage_path = ".codex/skills/gtkb-verify/helpers/write_verdict.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "groundtruth-kb/.venv/Scripts/python.exe scripts/generate_codex_skill_adapters.py"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = ""
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-config-hooks-gtkb-sot-read-discipline-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-sot-read-discipline.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-artifact-lifecycle-decontamination-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/decontamination.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-bridge-proposal-filing-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/bridge/proposal_filing.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-cli-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/cli.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-cli-backlog-update-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/cli_backlog_update.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-cli-bridge-propose-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/cli_bridge_propose.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-context-registries-v1-config-registry-sot-artifacts-toml"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-db-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/db.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-hygiene-reclaim-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/hygiene/reclaim.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-inventory-string-scan-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/inventory/string_scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-project-doctor-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/project/doctor.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-project-sot-registry-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/project/sot_registry.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-templates-skills-bridge-propose-helpers-write-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-templates-skills-bridge-helpers-impl-report-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/bridge/helpers/impl_report_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-templates-skills-bridge-helpers-revise-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/bridge/helpers/revise_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-propose-helpers-write-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/gtkb-bridge-propose/helpers/write_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-helpers-impl-report-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/gtkb-bridge/helpers/impl_report_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-templates-skills-gtkb-bridge-helpers-revise-bridge-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/templates/skills/gtkb-bridge/helpers/revise_bridge.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-backlog-update-cli-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_backlog_update_cli.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-bridge-propose-helper-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_bridge_propose_helper.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-cli-bridge-propose-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_cli_bridge_propose.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-db-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_db.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-hygiene-reclaim-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_hygiene_reclaim.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-inventory-string-scan-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_inventory_string_scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-sot-registry-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_sot_registry.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-groundtruth-kb-test-cli-bridge-propose-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/groundtruth_kb/test_cli_bridge_propose.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-check-protected-commit-authorization-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_check_protected_commit_authorization.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-check-sot-registry-completeness-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_check_sot_registry_completeness.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-gtkb-bridge-writer-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_gtkb_bridge_writer.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-gtkb-file-reference-migration-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_gtkb_file_reference_migration.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-implementation-start-gate-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_implementation_start_gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-modernization-artifact-decontamination-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_modernization_artifact_decontamination.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-provider-verdict-status-consistency-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_provider_verdict_status_consistency.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-release-candidate-gate-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_release_candidate_gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-skills-test-bridge-impl-report-helper-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/skills/test_bridge_impl_report_helper.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-skills-test-bridge-propose-helper-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/skills/test_bridge_propose_helper.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-skills-test-bridge-propose-helper-work-intent-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/skills/test_bridge_propose_helper_work_intent.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-skills-test-bridge-revise-helper-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/skills/test_bridge_revise_helper.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-skills-test-verified-finalization-validation-hardening-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/skills/test_verified_finalization_validation_hardening.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-check-protected-commit-authorization-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/check_protected_commit_authorization.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-controlled-artifact-paths-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/controlled_artifact_paths.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-evidence-freshness-boundary-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/evidence_freshness_boundary.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-gtkb-bridge-writer-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/gtkb_bridge_writer.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-gtkb-file-reference-migration-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/gtkb_file_reference_migration.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-implementation-start-gate-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/implementation_start_gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-scripts-release-candidate-gate-py"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "scripts/release_candidate_gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 registry control-plane or bridge-publication chokepoint; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-claude-hooks-bridge-compliance-gate-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/hooks/bridge-compliance-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-claude-hooks-scanner-safe-writer-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/hooks/scanner-safe-writer.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-bridge-propose-skill-md"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-bridge-propose/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-bridge-skill-md"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-bridge/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-proposal-review-skill-md"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-proposal-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-send-review-skill-md"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-send-review/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-claude-skills-gtkb-verify-skill-md"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = ".claude/skills/gtkb-verify/SKILL.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-src-groundtruth-kb-session-envelope-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/session/envelope.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-bridge-author-metadata-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_bridge_author_metadata.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-bridge-claim-cli-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_bridge_claim_cli.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-bridge-lifecycle-resolver-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_bridge_lifecycle_resolver.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-bridge-thread-files-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_bridge_thread_files.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-bridge-author-metadata-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/bridge_author_metadata.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-bridge-claim-cli-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/bridge_claim_cli.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-bridge-lifecycle-resolver-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/bridge_lifecycle_resolver.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-bridge-thread-files-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/bridge_thread_files.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-bridge-work-intent-registry-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/bridge_work_intent_registry.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-verdict-evidence-anchor-preflight-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/verdict_evidence_anchor_preflight.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-scripts-windows-subprocess-py"
+domain = "bridge_protocol"
+lifecycle = "active"
+storage_path = "scripts/windows_subprocess.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 direct bridge-publication dependency or enforcement test; exact registration required."
+
+[[artifacts]]
+id = "wi5441-config-agent-control-gtkb-harness-capability-registry-toml"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-harness-capability-registry.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-config-agent-control-skill-rename-map-toml"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/skill-rename-map.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-sot-duplicate-audit-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_sot_duplicate_audit.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-groundtruth-kb-tests-test-sot-registry-forbidden-substitutes-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_sot_registry_forbidden_substitutes.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-groundtruth-kb-cli-test-inventory-string-scan-cli-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/groundtruth_kb/cli/test_inventory_string_scan_cli.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-check-sot-duplicate-guard-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_check_sot_duplicate_guard.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-check-sot-read-discipline-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_check_sot_read_discipline.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-gtkb-service-sot-restore-registry-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_gtkb_service_sot_restore_registry.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-hygiene-strays-cli-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_hygiene_strays_cli.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-modernization-repository-interface-clause-exactness-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_modernization_repository_interface_clause_exactness.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5441-platform-tests-scripts-test-worktree-finalization-triage-py"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "platform_tests/scripts/test_worktree_finalization_triage.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."

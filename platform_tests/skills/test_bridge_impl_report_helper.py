@@ -258,6 +258,8 @@ def test_scaffold_content_is_compatible_with_report_validator(helper, tmp_path):
     live_text = live.read_text(encoding="utf-8")
     assert ("bridge_kind: " + "implementation_report") in live_text
     assert ("Recommended commit " + "type:") in live_text
+    assert "\nVersion: 003\n" in live_text
+    assert "\nResponds to: bridge/test-impl-report-002.md\n" in live_text
 
 
 def test_non_go_latest_status_refuses_write_mode(helper, tmp_path):

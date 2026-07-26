@@ -1350,6 +1350,11 @@ CREATE TABLE IF NOT EXISTS sot_artifact_revisions (
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
+    capability_hash TEXT,
+    bridge_id TEXT,
+    start_packet_hash TEXT,
+    pauth_decision TEXT,
+    journal_id TEXT,
     UNIQUE(revision_id)
 );
 
@@ -1377,10 +1382,46 @@ CREATE TABLE IF NOT EXISTS sot_registry_transaction_journal (
     changed_by TEXT NOT NULL,
     changed_at TEXT NOT NULL,
     change_reason TEXT NOT NULL,
+    old_canonical_digest TEXT,
+    new_canonical_digest TEXT,
+    old_packaged_digest TEXT,
+    new_packaged_digest TEXT,
+    old_projection_digest TEXT,
+    new_projection_digest TEXT,
+    request_digest TEXT,
+    payload_json TEXT,
+    expected_record_count INTEGER,
+    start_packet_hash TEXT,
+    pauth_id TEXT,
+    bridge_id TEXT,
+    receipt_seed TEXT,
+    error_message TEXT,
     UNIQUE(journal_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_state ON sot_registry_transaction_journal(journal_state);
+
+CREATE TABLE IF NOT EXISTS sot_registry_observation_capabilities (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    capability_hash TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tool_event_id TEXT NOT NULL,
+    paths_json TEXT NOT NULL,
+    preimage_digests_json TEXT NOT NULL,
+    bridge_id TEXT NOT NULL,
+    start_packet_hash TEXT NOT NULL,
+    pauth_decision_json TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    capability_state TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    consumed_at TEXT,
+    result_digest TEXT,
+    UNIQUE(capability_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sot_registry_observation_state
+    ON sot_registry_observation_capabilities(capability_state, expires_at);
 
 -- WI-5441 Phase 1B: quarantine receipts. Each receipt binds identity, source stat,
 -- digests, and immutable quarantined_at/expires_at plus restore_pending
@@ -1828,6 +1869,45 @@ class KnowledgeDB:
             conn.execute("ALTER TABLE sot_artifacts ADD COLUMN coverage_mode TEXT")
             conn.commit()
             _log.debug("Applied migration: add coverage_mode column to sot_artifacts")
+
+        registry_journal_columns = {
+            "old_canonical_digest": "TEXT",
+            "new_canonical_digest": "TEXT",
+            "old_packaged_digest": "TEXT",
+            "new_packaged_digest": "TEXT",
+            "old_projection_digest": "TEXT",
+            "new_projection_digest": "TEXT",
+            "request_digest": "TEXT",
+            "payload_json": "TEXT",
+            "expected_record_count": "INTEGER",
+            "start_packet_hash": "TEXT",
+            "pauth_id": "TEXT",
+            "bridge_id": "TEXT",
+            "receipt_seed": "TEXT",
+            "error_message": "TEXT",
+        }
+        journal_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(sot_registry_transaction_journal)").fetchall()
+        }
+        for column_name, declaration in registry_journal_columns.items():
+            if column_name not in journal_columns:
+                conn.execute(f"ALTER TABLE sot_registry_transaction_journal ADD COLUMN {column_name} {declaration}")
+        registry_revision_columns = {
+            "capability_hash": "TEXT",
+            "bridge_id": "TEXT",
+            "start_packet_hash": "TEXT",
+            "pauth_decision": "TEXT",
+            "journal_id": "TEXT",
+        }
+        revision_columns = {row[1] for row in conn.execute("PRAGMA table_info(sot_artifact_revisions)").fetchall()}
+        for column_name, declaration in registry_revision_columns.items():
+            if column_name not in revision_columns:
+                conn.execute(f"ALTER TABLE sot_artifact_revisions ADD COLUMN {column_name} {declaration}")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sot_registry_txn_journal_request "
+            "ON sot_registry_transaction_journal(operation, request_digest)"
+        )
+        conn.commit()
 
         # Migration 7: first-class project layer over canonical work_items.
         self._backfill_project_artifacts_from_work_items()
@@ -4894,6 +4974,131 @@ class KnowledgeDB:
                         "source_test_id": source_test_id,
                     },
                 )
+            if commit:
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.get_work_item(id)
+
+    def reopen_terminal_work_item(
+        self,
+        id: str,
+        changed_by: str,
+        change_reason: str,
+        *,
+        resolution_status: str,
+        stage: str,
+        related_bridge_threads: str,
+        owner_approved: bool,
+        bridge_evidence_validated: bool,
+        commit: bool = True,
+    ) -> dict[str, Any] | None:
+        """Append one narrowly authorized terminal-reopen version and event.
+
+        This is intentionally separate from ``_VALID_STAGE_TRANSITIONS``.  The
+        governed backlog service must validate the live bridge evidence first;
+        this primitive repeats all structural checks before one atomic append.
+        """
+        if not owner_approved:
+            raise ValueError("Terminal reopen requires explicit owner approval")
+        if not bridge_evidence_validated:
+            raise ValueError("Terminal reopen requires validated bridge evidence")
+        if not change_reason or id not in change_reason:
+            raise ValueError("Terminal reopen reason must identify the work item")
+        reason_folded = change_reason.casefold()
+        if "pauth-" not in reason_folded or "owner-approved" not in reason_folded:
+            raise ValueError("Terminal reopen reason must cite active PAUTH and owner-approved repair evidence")
+        if "terminal" not in reason_folded or "repair" not in reason_folded:
+            raise ValueError("Terminal reopen reason must identify the owner-approved terminal repair")
+        if resolution_status in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
+            raise ValueError("Terminal reopen requires an explicit nonterminal resolution status")
+        if stage not in {"created", "tested", "backlogged", "implementing"}:
+            raise ValueError("Terminal reopen requires an explicit nonterminal stage")
+        try:
+            bridge_threads = json.loads(related_bridge_threads)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Terminal reopen requires valid related bridge JSON") from exc
+        if (
+            not isinstance(bridge_threads, list)
+            or not bridge_threads
+            or any(not isinstance(value, str) for value in bridge_threads)
+        ):
+            raise ValueError("Terminal reopen requires a non-empty related bridge string array")
+        required_threads = {
+            "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-007.md",
+            "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-008.md",
+        }
+        if not required_threads.issubset(set(bridge_threads)):
+            raise ValueError("Terminal reopen requires the controlling WI-5441 v007 and v008 bridge files")
+
+        conn = self._get_conn()
+        try:
+            current_row = conn.execute("SELECT * FROM current_work_items WHERE id = ?", (id,)).fetchone()
+            if current_row is None:
+                raise ValueError(f"Work item {id} not found")
+            current = _row_to_dict(current_row)
+            if current.get("stage") != "resolved":
+                raise ValueError(f"Terminal reopen requires current stage 'resolved', got {current.get('stage')!r}")
+
+            version = self._next_work_item_version(id)
+            backlog_values = {field: current.get(field) for field in WORK_ITEM_BACKLOG_FIELDS}
+            backlog_values["related_bridge_threads"] = related_bridge_threads
+            columns = [
+                "id",
+                "version",
+                "title",
+                "description",
+                "origin",
+                "component",
+                "source_spec_id",
+                "source_test_id",
+                "failure_description",
+                "resolution_status",
+                "priority",
+                "stage",
+                *WORK_ITEM_BACKLOG_FIELDS,
+                "changed_by",
+                "changed_at",
+                "change_reason",
+            ]
+            values = [
+                id,
+                version,
+                current["title"],
+                current.get("description"),
+                current["origin"],
+                current["component"],
+                current.get("source_spec_id"),
+                current.get("source_test_id"),
+                current.get("failure_description"),
+                resolution_status,
+                current.get("priority"),
+                stage,
+                *(backlog_values[field] for field in WORK_ITEM_BACKLOG_FIELDS),
+                changed_by,
+                _now(),
+                change_reason,
+            ]
+            conn.execute(
+                f"INSERT INTO work_items ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})",
+                values,
+            )
+            self._record_event(
+                conn,
+                "wi_reopened",
+                changed_by,
+                artifact_id=id,
+                artifact_type="work_item",
+                artifact_version=version,
+                metadata={
+                    "previous_resolution_status": current.get("resolution_status"),
+                    "previous_stage": current.get("stage"),
+                    "resolution_status": resolution_status,
+                    "stage": stage,
+                    "related_bridge_threads": bridge_threads,
+                },
+            )
             if commit:
                 conn.commit()
         except Exception:

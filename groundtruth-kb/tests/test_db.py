@@ -716,6 +716,108 @@ class TestWorkItems:
         assert "WI-001" in open_ids
         assert "WI-002" not in open_ids
 
+    @staticmethod
+    def _reopen_threads() -> str:
+        return json.dumps(
+            [
+                "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-007.md",
+                "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-008.md",
+            ]
+        )
+
+    @staticmethod
+    def _reopen_reason() -> str:
+        return (
+            "WI-5441 owner-approved terminal repair under "
+            "PAUTH-PROJECT-GTKB-HOUSEKEEPING-HARDENING-WI5441-REGISTRY-CONTROL-PLANE-20260724"
+        )
+
+    def test_reopen_terminal_work_item_appends_one_version_and_event(self, db):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+        before_events = (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+        )
+
+        row = db.reopen_terminal_work_item(
+            "WI-5441",
+            "prime-builder/codex",
+            self._reopen_reason(),
+            resolution_status="open",
+            stage="backlogged",
+            related_bridge_threads=self._reopen_threads(),
+            owner_approved=True,
+            bridge_evidence_validated=True,
+        )
+
+        assert row is not None
+        assert row["version"] == 2
+        assert row["resolution_status"] == "open"
+        assert row["stage"] == "backlogged"
+        assert len(db.get_work_item_history("WI-5441")) == 2
+        events = (
+            db._get_conn()
+            .execute(
+                "SELECT * FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchall()
+        )
+        assert len(events) == before_events + 1
+        assert events[-1]["artifact_version"] == 2
+
+    @pytest.mark.parametrize(
+        ("owner_approved", "bridge_evidence_validated"),
+        [(False, True), (True, False)],
+    )
+    def test_reopen_terminal_work_item_rejects_incomplete_authority_without_writes(
+        self, db, owner_approved, bridge_evidence_validated
+    ):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+        with pytest.raises(ValueError, match="Terminal reopen requires"):
+            db.reopen_terminal_work_item(
+                "WI-5441",
+                "prime-builder/codex",
+                self._reopen_reason(),
+                resolution_status="open",
+                stage="backlogged",
+                related_bridge_threads=self._reopen_threads(),
+                owner_approved=owner_approved,
+                bridge_evidence_validated=bridge_evidence_validated,
+            )
+        assert len(db.get_work_item_history("WI-5441")) == 1
+        assert (
+            db._get_conn()
+            .execute(
+                "SELECT COUNT(*) FROM pipeline_events WHERE artifact_id = ? AND event_type = 'wi_reopened'",
+                ("WI-5441",),
+            )
+            .fetchone()[0]
+            == 0
+        )
+
 
 class TestTests:
     """Tests for test artifact CRUD."""

@@ -96,16 +96,23 @@ from groundtruth_kb.project.lifecycle import (
     ProjectLifecycleError,
     ProjectLifecycleService,
 )
-from groundtruth_kb.project.sot_registry import (
-    InvalidSoTRecord,
-    UnknownDomain,
-    default_registry_path,
-    load_projection,
-    sync_projection,
-    validate_projection_parity,
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryControlPlaneError,
+    amend_artifact,
+    consume_observation_capability,
+    inspect_registry,
+    load_registry_snapshot,
+    recover_registry,
+    register_artifacts,
+)
+from groundtruth_kb.project.registry_control_plane import (
+    validate_registry as validate_registry_control_plane,
 )
 from groundtruth_kb.project.sot_registry import (
-    load_toml as load_sot_toml,
+    InvalidSoTRecord,
+    SoTArtifact,
+    UnknownDomain,
+    default_registry_path,
 )
 from groundtruth_kb.typed_artifact_flow import (
     TypedArtifactFlowService,
@@ -5166,6 +5173,11 @@ def backlog_status(
 )
 @click.option("--source-spec-id", default=None, help="New source specification id (set, backfill, or correct).")
 @click.option("--owner-approved", is_flag=True, help="Flag proving owner approval.")
+@click.option(
+    "--reopen-terminal",
+    is_flag=True,
+    help="Use the narrowly governed owner-approved terminal-repair path.",
+)
 @click.option("--change-reason", required=True, help="History reason for the update.")
 @click.option("--dry-run", is_flag=True, help="Validate and report would-be changes without writing.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
@@ -5183,6 +5195,7 @@ def backlog_update(
     description_file: Path | None,
     source_spec_id: str | None,
     owner_approved: bool,
+    reopen_terminal: bool,
     change_reason: str,
     dry_run: bool,
     json_output: bool,
@@ -5206,6 +5219,7 @@ def backlog_update(
         title=title,
         description=description,
         source_spec_id=source_spec_id,
+        reopen_terminal=reopen_terminal,
     )
     try:
         result = update_backlog_item(config, request)
@@ -5282,6 +5296,11 @@ def _registry_paths(ctx: click.Context) -> tuple[Path, Path]:
     return default_registry_path(config.project_root), config.db_path
 
 
+def _registry_control_kwargs(ctx: click.Context) -> dict[str, Path]:
+    config = _resolve_config(ctx)
+    return {"project_root": Path(config.project_root), "db_path": Path(config.db_path)}
+
+
 def _record_to_dict(rec: Any) -> dict[str, Any]:
     return {
         "id": rec.id,
@@ -5294,6 +5313,8 @@ def _record_to_dict(rec: Any) -> dict[str, Any]:
         "backup_policy": rec.backup_policy,
         "health_check_function": rec.health_check_function,
         "owner_role": rec.owner_role,
+        "restore_action": rec.restore_action,
+        "coverage_mode": rec.coverage_mode,
         "depends_on": list(rec.depends_on),
         "forbidden_substitutes": list(rec.forbidden_substitutes),
         "notes": rec.notes,
@@ -5306,11 +5327,10 @@ def _record_to_dict(rec: Any) -> dict[str, Any]:
 @click.option("--lifecycle", default=None, help="Filter by lifecycle value.")
 @click.pass_context
 def registry_list(ctx: click.Context, json_output: bool, domain: str | None, lifecycle: str | None) -> None:
-    """List all SoT artifact records from the TOML registry."""
-    toml_path, _db = _registry_paths(ctx)
+    """List all SoT artifact records from one coherent generation."""
     try:
-        records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        records = list(load_registry_snapshot(**_registry_control_kwargs(ctx)).records)
+    except (RegistryControlPlaneError, InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
         raise click.ClickException(str(exc)) from exc
     if domain:
         records = [r for r in records if r.domain == domain]
@@ -5329,10 +5349,9 @@ def registry_list(ctx: click.Context, json_output: bool, domain: str | None, lif
 @click.pass_context
 def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
     """Show details of a single SoT artifact record by id."""
-    toml_path, _db = _registry_paths(ctx)
     try:
-        records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
+        records = load_registry_snapshot(**_registry_control_kwargs(ctx)).records
+    except (RegistryControlPlaneError, InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
         raise click.ClickException(str(exc)) from exc
     for rec in records:
         if rec.id == entry_id:
@@ -5349,39 +5368,177 @@ def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
 def registry_validate(ctx: click.Context, json_output: bool) -> None:
-    """Check parity between TOML registry and MemBase projection."""
-    toml_path, db_path = _registry_paths(ctx)
-    try:
-        toml_records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
-        raise click.ClickException(str(exc)) from exc
-    proj_records = load_projection(db_path)
-    report = validate_projection_parity(toml_records, proj_records)
-    result: dict[str, Any] = {
-        "in_sync": report.in_sync,
-        "toml_count": report.toml_count,
-        "projection_count": report.projection_count,
-        "missing_in_projection": list(report.missing_in_projection),
-        "missing_in_toml": list(report.missing_in_toml),
-        "field_divergences": [[pair[0], pair[1]] for pair in report.field_divergences],
-    }
+    """Validate coherent schema, parity, currentness, journal, and reverse coverage."""
+    result = validate_registry_control_plane(**_registry_control_kwargs(ctx))
     if json_output:
-        click.echo(json.dumps(result, indent=2))
-        return
-    status = "IN SYNC" if report.in_sync else "OUT OF SYNC"
-    click.echo(f"Registry parity: {status}")
-    click.echo(f"  TOML records:       {report.toml_count}")
-    click.echo(f"  Projection records: {report.projection_count}")
-    if report.missing_in_projection:
-        click.echo(f"  Missing in projection: {', '.join(report.missing_in_projection)}")
-    if report.missing_in_toml:
-        click.echo(f"  Missing in TOML:       {', '.join(report.missing_in_toml)}")
-    if report.field_divergences:
-        click.echo(f"  Field divergences ({len(report.field_divergences)}):")
-        for rec_id, field in report.field_divergences:
-            click.echo(f"    {rec_id}.{field}")
-    if not report.in_sync:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        status = "VALID" if result["valid"] else "INVALID"
+        click.echo(f"Registry control plane: {status}")
+        for error in result["errors"]:
+            click.echo(f"  {error}")
+    if not result["valid"]:
         raise SystemExit(1)
+
+
+@registry_cmd.command("inspect")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.option("--no-census", is_flag=True, help="Skip the deterministic whole-root census.")
+@click.pass_context
+def registry_inspect(ctx: click.Context, json_output: bool, no_census: bool) -> None:
+    """Inspect coherent declaration, projection, journal, currentness, and coverage state."""
+    result = inspect_registry(include_census=not no_census, **_registry_control_kwargs(ctx))
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Registry coherent: {result.get('coherent', False)}")
+        if result.get("record_count") is not None:
+            click.echo(f"Records: {result['record_count']}")
+        if result.get("error"):
+            click.echo(f"Error: {result['error']}")
+
+
+@registry_cmd.command("recover")
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+@click.pass_context
+def registry_recover(ctx: click.Context, json_output: bool) -> None:
+    """Run locked deterministic recovery for the latest incomplete transaction."""
+    try:
+        receipt = recover_registry(**_registry_control_kwargs(ctx))
+    except RegistryControlPlaneError as exc:
+        raise click.ClickException(str(exc)) from exc
+    result = vars(receipt) if receipt is not None else {"recovered": False, "state": "old_generation_intact"}
+    if json_output:
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo(f"Registry recovery: {result}")
+
+
+def _artifact_from_payload(payload: dict[str, Any]) -> SoTArtifact:
+    normalized = dict(payload)
+    normalized["depends_on"] = tuple(normalized.get("depends_on") or ())
+    normalized["forbidden_substitutes"] = tuple(normalized.get("forbidden_substitutes") or ())
+    return SoTArtifact(**normalized)
+
+
+def _registry_authority_options(function: Any) -> Any:
+    options = [
+        click.option("--bridge-id", required=True),
+        click.option("--session-id", required=True),
+        click.option("--start-packet-hash", required=True),
+        click.option("--pauth-id", required=True),
+        click.option("--changed-by", required=True),
+        click.option("--change-reason", required=True),
+    ]
+    for option in reversed(options):
+        function = option(function)
+    return function
+
+
+@registry_cmd.command("register")
+@click.option("--record-json", default=None, help="One explicit declaration as JSON.")
+@click.option(
+    "--batch-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="In-root JSON array of exact declarations.",
+)
+@_registry_authority_options
+@click.pass_context
+def registry_register(
+    ctx: click.Context,
+    record_json: str | None,
+    bridge_id: str,
+    batch_file: Path | None,
+    session_id: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Register one declaration or an exact in-root batch transactionally."""
+    if (record_json is None) == (batch_file is None):
+        raise click.ClickException("provide exactly one of --record-json or --batch-file")
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    try:
+        if batch_file is not None:
+            resolved = batch_file.resolve()
+            resolved.relative_to(root)
+            raw = json.loads(resolved.read_text(encoding="utf-8"))
+            if not isinstance(raw, list):
+                raise ValueError("batch file must contain a JSON array")
+        else:
+            raw = [json.loads(record_json or "")]
+        records = [_artifact_from_payload(item) for item in raw]
+        receipt = register_artifacts(
+            records,
+            actor_session=session_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            **_registry_control_kwargs(ctx),
+        )
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+
+
+@registry_cmd.command("amend")
+@click.argument("entry_id")
+@click.option("--changes-json", required=True, help="Non-identity field changes as JSON.")
+@_registry_authority_options
+@click.pass_context
+def registry_amend(
+    ctx: click.Context,
+    entry_id: str,
+    bridge_id: str,
+    changes_json: str,
+    session_id: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    changed_by: str,
+    change_reason: str,
+) -> None:
+    """Amend non-identity declaration fields through one journalled generation."""
+    try:
+        changes = json.loads(changes_json)
+        if not isinstance(changes, dict):
+            raise ValueError("--changes-json must be a JSON object")
+        receipt = amend_artifact(
+            entry_id,
+            changes,
+            actor_session=session_id,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            **_registry_control_kwargs(ctx),
+        )
+    except (RegistryControlPlaneError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(vars(receipt), indent=2, sort_keys=True))
+
+
+@registry_cmd.command("observe", hidden=True)
+@click.option(
+    "--event-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Internal capability-bound post-tool event JSON.",
+)
+@click.pass_context
+def registry_observe(ctx: click.Context, event_file: Path) -> None:
+    """Consume one internal observation capability; direct calls without it fail closed."""
+    try:
+        event = json.loads(event_file.read_text(encoding="utf-8"))
+        revisions = consume_observation_capability(**event, **_registry_control_kwargs(ctx))
+    except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps({"revision_ids": revisions}, indent=2, sort_keys=True))
 
 
 @registry_cmd.command("sync")
@@ -5390,25 +5547,16 @@ def registry_validate(ctx: click.Context, json_output: bool) -> None:
 @click.option("--change-reason", default="gt registry sync", show_default=True)
 @click.pass_context
 def registry_sync(ctx: click.Context, json_output: bool, changed_by: str, change_reason: str) -> None:
-    """Sync MemBase sot_artifacts projection from the TOML registry."""
-    toml_path, db_path = _registry_paths(ctx)
-    try:
-        toml_records = load_sot_toml(toml_path)
-    except (InvalidSoTRecord, UnknownDomain, FileNotFoundError) as exc:
-        raise click.ClickException(str(exc)) from exc
-    report = sync_projection(toml_records, db_path, changed_by=changed_by, change_reason=change_reason)
-    result: dict[str, Any] = {
-        "inserted": list(report.inserted),
-        "updated": list(report.updated),
-        "unchanged": list(report.unchanged),
-    }
+    """Run read-only diagnostics; projection repair is transaction-only."""
+    _ = changed_by, change_reason
+    result = inspect_registry(include_census=False, **_registry_control_kwargs(ctx))
     if json_output:
-        click.echo(json.dumps(result, indent=2))
-        return
-    click.echo(
-        f"Registry sync: {len(report.inserted)} inserted, "
-        f"{len(report.updated)} updated, {len(report.unchanged)} unchanged."
-    )
+        click.echo(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        click.echo("gt registry sync is diagnostic-only; use register/amend/recover for mutations.")
+        click.echo(f"Registry coherent: {result.get('coherent', False)}")
+    if not result.get("coherent"):
+        raise SystemExit(1)
 
 
 @registry_cmd.command("diff")

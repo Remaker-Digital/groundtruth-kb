@@ -17,6 +17,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from groundtruth_kb.project.registry_control_plane import RegistryControlPlaneError, load_registry_snapshot
+
 CURRENT_STATES = frozenset({"active", "current"})
 HISTORICAL_STATES = frozenset({"archive", "deprecated", "historical", "retired", "superseded"})
 PROJECTION_STATES = frozenset({"generated"})
@@ -344,17 +346,23 @@ def load_repository_snapshot(project_root: Path) -> tuple[ArtifactAuthorityIndex
     references: list[WorkerReference] = []
 
     sot_path = root / "config" / "registry" / "sot-artifacts.toml"
-    sot = _load_toml(sot_path)
-    for row in sot.get("artifacts", []):
-        raw_path = row.get("storage_path")
-        declaration = _repository_path_declaration(raw_path) if isinstance(raw_path, str) else None
+    try:
+        registry = load_registry_snapshot(project_root=root)
+    except RegistryControlPlaneError as exc:
+        raise ArtifactLifecycleError(f"cannot load coherent registry snapshot: {exc}") from exc
+    for row in registry.records:
+        if row.coverage_mode == "virtual":
+            continue
+        declaration = _repository_path_declaration(row.storage_path)
         if declaration is not None:
             path, scope = declaration
+            if row.coverage_mode in {"recursive", "opaque_container"}:
+                scope = "tree"
             records.append(
                 ArtifactRecord(
-                    logical_id=f"sot:{row.get('id', '')}",
+                    logical_id=f"sot:{row.id}",
                     path=path,
-                    lifecycle=str(row.get("lifecycle", "")),
+                    lifecycle=row.lifecycle,
                     source=_relative_source(sot_path, root),
                     scope=scope,
                 )

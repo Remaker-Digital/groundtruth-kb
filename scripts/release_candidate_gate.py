@@ -362,6 +362,22 @@ def _check_project_resource_registry() -> None:
     )
 
 
+def _check_sot_registry_authority() -> None:
+    """Fail release on mixed, stale, unmirrored, or reverse-incomplete authority."""
+    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
+    if str(package_src) not in sys.path:
+        sys.path.insert(0, str(package_src))
+    try:
+        from groundtruth_kb.project.registry_control_plane import validate_registry
+
+        report = validate_registry(project_root=PROJECT_ROOT, require_reverse_closure=True)
+    except Exception as exc:  # noqa: BLE001 - release must fail closed on authority errors
+        raise GateFailure(f"SoT registry authority unavailable: {exc}") from exc
+    if not report.get("valid"):
+        raise GateFailure("SoT registry validation failed: " + json.dumps(report, sort_keys=True, default=str))
+    print(f"PASS SoT registry authority ({report['record_count']} records, generation={report['generation_digest']})")
+
+
 def _standing_backlog_health_helpers():
     package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
     if str(package_src) not in sys.path:
@@ -606,6 +622,7 @@ def main() -> int:
 
     try:
         _check_python_version(args.require_python or None)
+        _check_sot_registry_authority()
         _check_secret_manifest_removed()
         _check_secret_gate_present()
         _check_secret_ci_workflow_present()

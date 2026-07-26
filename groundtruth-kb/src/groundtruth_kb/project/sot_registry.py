@@ -77,6 +77,8 @@ RestoreAction = Literal[
     "noop",
 ]
 
+CoverageMode = Literal["exact", "recursive", "glob", "opaque_container", "virtual"]
+
 OwnerRole = Literal[
     "prime_builder",
     "loyal_opposition",
@@ -138,6 +140,8 @@ _VALID_OWNER_ROLES: frozenset[str] = frozenset(
     {"prime_builder", "loyal_opposition", "owner_only", "shared", "automated_only"}
 )
 
+_VALID_COVERAGE_MODES: frozenset[str] = frozenset({"exact", "recursive", "glob", "opaque_container", "virtual"})
+
 _DEFAULT_RESTORE_ACTION = "manual"
 
 _REQUIRED_FIELDS: frozenset[str] = frozenset(
@@ -152,6 +156,7 @@ _REQUIRED_FIELDS: frozenset[str] = frozenset(
         "backup_policy",
         "health_check_function",
         "owner_role",
+        "coverage_mode",
     }
 )
 
@@ -196,6 +201,7 @@ class SoTArtifact:
     depends_on: tuple[str, ...] = ()
     forbidden_substitutes: tuple[str, ...] = ()
     notes: str = ""
+    coverage_mode: CoverageMode | None = None
 
 
 @dataclass(frozen=True)
@@ -257,16 +263,29 @@ def _validate_unknown_fields(record: dict[str, Any], record_id: str) -> None:
         raise InvalidSoTRecord(f"record {record_id!r}: unknown field(s): {sorted(unknown)}")
 
 
-def _parse_record(record: dict[str, Any]) -> SoTArtifact:
+def _parse_record(record: dict[str, Any], *, allow_missing_coverage: bool = False) -> SoTArtifact:
     record_id = str(record.get("id", "<missing-id>"))
 
     _validate_unknown_fields(record, record_id)
-    _validate_required(record, record_id)
+    if allow_missing_coverage and "coverage_mode" not in record:
+        missing = (_REQUIRED_FIELDS - {"coverage_mode"}) - set(record)
+        if missing:
+            raise InvalidSoTRecord(f"record {record_id!r}: missing required field(s): {sorted(missing)}")
+        record = {**record, "coverage_mode": None}
+    else:
+        _validate_required(record, record_id)
     _validate_enum(record, "domain", _VALID_DOMAINS, record_id)
     _validate_enum(record, "lifecycle", _VALID_LIFECYCLES, record_id)
     _validate_enum(record, "versioning_policy", _VALID_VERSIONING, record_id)
     _validate_enum(record, "backup_policy", _VALID_BACKUP, record_id)
     _validate_enum(record, "owner_role", _VALID_OWNER_ROLES, record_id)
+    coverage_mode = record.get("coverage_mode")
+    if coverage_mode is not None and coverage_mode not in _VALID_COVERAGE_MODES:
+        raise InvalidSoTRecord(
+            f"record {record_id!r} field coverage_mode={coverage_mode!r}: not in enum {sorted(_VALID_COVERAGE_MODES)}"
+        )
+    if coverage_mode is None and not allow_missing_coverage:
+        raise InvalidSoTRecord(f"record {record_id!r}: coverage_mode is required")
     restore_action = record.get("restore_action", _DEFAULT_RESTORE_ACTION)
     if restore_action not in _VALID_RESTORE_ACTIONS:
         raise InvalidSoTRecord(
@@ -302,10 +321,11 @@ def _parse_record(record: dict[str, Any]) -> SoTArtifact:
             record.get("forbidden_substitutes"), record_id, "forbidden_substitutes"
         ),
         notes=str(record.get("notes", "")),
+        coverage_mode=coverage_mode,
     )
 
 
-def load_toml(path: Path) -> list[SoTArtifact]:
+def _load_toml_unlocked(path: Path, *, allow_missing_coverage: bool = False) -> list[SoTArtifact]:
     """Load and validate the SoT artifact registry from a TOML file.
 
     Raises :class:`InvalidSoTRecord` or :class:`UnknownDomain` on schema
@@ -328,13 +348,22 @@ def load_toml(path: Path) -> list[SoTArtifact]:
     for raw in raw_records:
         if not isinstance(raw, dict):
             raise InvalidSoTRecord(f"each artifacts entry must be a table, got {type(raw).__name__}")
-        record = _parse_record(raw)
+        record = _parse_record(raw, allow_missing_coverage=allow_missing_coverage)
         if record.id in seen_ids:
             raise InvalidSoTRecord(f"duplicate id: {record.id!r}")
         seen_ids.add(record.id)
         records.append(record)
 
     return records
+
+
+def load_toml(path: Path) -> list[SoTArtifact]:
+    """Load one coherent declaration generation through the registry barrier."""
+
+    from groundtruth_kb.project.registry_control_plane import registry_read_barrier
+
+    with registry_read_barrier(registry_path=path):
+        return _load_toml_unlocked(path)
 
 
 # ---------------------------------------------------------------------------
@@ -440,7 +469,11 @@ def validate_projection_parity(
 # ---------------------------------------------------------------------------
 
 
-def load_projection(db_path: Path | str) -> list[SoTArtifact]:
+def _load_projection_unlocked(
+    db_path: Path | str,
+    *,
+    allow_missing_coverage: bool = False,
+) -> list[SoTArtifact]:
     """Load all ``current_sot_artifacts`` rows from MemBase as SoTArtifact records.
 
     Returns an empty list if the table or view doesn't exist yet (fresh DB).
@@ -454,13 +487,14 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
         cur.execute("PRAGMA table_info(sot_artifacts)")
         columns = {row[1] for row in cur.fetchall()}
         restore_expr = "restore_action" if "restore_action" in columns else "NULL"
+        coverage_expr = "coverage_mode" if "coverage_mode" in columns else "NULL"
         # Tolerate fresh DBs where the view doesn't yet exist.
         try:
             cur.execute(
                 "SELECT id, domain, lifecycle, storage_path, authority_spec_id, "
                 "mutation_api, versioning_policy, backup_policy, "
                 f"health_check_function, owner_role, {restore_expr}, depends_on, "
-                "forbidden_substitutes, notes "
+                f"forbidden_substitutes, notes, {coverage_expr} "
                 "FROM current_sot_artifacts ORDER BY id"
             )
         except sqlite3.OperationalError:
@@ -472,6 +506,11 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
     for row in rows:
         depends_on = tuple(json.loads(row[11])) if row[11] else ()
         forbidden = tuple(json.loads(row[12])) if row[12] else ()
+        coverage_mode = row[14]
+        if coverage_mode is None and not allow_missing_coverage:
+            raise InvalidSoTRecord(f"projection record {row[0]!r}: coverage_mode is required")
+        if coverage_mode is not None and coverage_mode not in _VALID_COVERAGE_MODES:
+            raise InvalidSoTRecord(f"projection record {row[0]!r}: invalid coverage_mode {coverage_mode!r}")
         records.append(
             SoTArtifact(
                 id=row[0],
@@ -496,9 +535,19 @@ def load_projection(db_path: Path | str) -> list[SoTArtifact]:
                 depends_on=depends_on,
                 forbidden_substitutes=forbidden,
                 notes=row[13] or "",
+                coverage_mode=coverage_mode,
             )
         )
     return records
+
+
+def load_projection(db_path: Path | str) -> list[SoTArtifact]:
+    """Load one coherent projection generation through the registry barrier."""
+
+    from groundtruth_kb.project.registry_control_plane import registry_read_barrier
+
+    with registry_read_barrier(db_path=Path(db_path)):
+        return _load_projection_unlocked(db_path)
 
 
 def _ensure_restore_action_column(cur: Any) -> None:
@@ -508,6 +557,13 @@ def _ensure_restore_action_column(cur: Any) -> None:
         cur.execute(
             f"ALTER TABLE sot_artifacts ADD COLUMN restore_action TEXT NOT NULL DEFAULT '{_DEFAULT_RESTORE_ACTION}'"
         )
+
+
+def _ensure_coverage_mode_column(cur: Any) -> None:
+    cur.execute("PRAGMA table_info(sot_artifacts)")
+    columns = {row[1] for row in cur.fetchall()}
+    if "coverage_mode" not in columns:
+        cur.execute("ALTER TABLE sot_artifacts ADD COLUMN coverage_mode TEXT")
 
 
 def sync_projection(
@@ -536,8 +592,9 @@ def sync_projection(
     try:
         cur = conn.cursor()
         _ensure_restore_action_column(cur)
+        _ensure_coverage_mode_column(cur)
         conn.commit()
-        proj_by_id = {r.id: r for r in load_projection(db_path)}
+        proj_by_id = {r.id: r for r in _load_projection_unlocked(db_path, allow_missing_coverage=True)}
         for rec in toml_records:
             existing = proj_by_id.get(rec.id)
             if existing is not None:
@@ -559,9 +616,9 @@ def sync_projection(
                     authority_spec_id, mutation_api, versioning_policy,
                     backup_policy, health_check_function, owner_role,
                     restore_action,
-                    depends_on, forbidden_substitutes, notes,
+                    depends_on, forbidden_substitutes, notes, coverage_mode,
                     changed_by, changed_at, change_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     rec.id,
@@ -579,6 +636,7 @@ def sync_projection(
                     json.dumps(list(rec.depends_on)) if rec.depends_on else None,
                     json.dumps(list(rec.forbidden_substitutes)) if rec.forbidden_substitutes else None,
                     rec.notes or None,
+                    rec.coverage_mode,
                     changed_by,
                     now,
                     change_reason,

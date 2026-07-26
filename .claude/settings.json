@@ -163,6 +163,11 @@
             "type": "command",
             "command": "pythonw \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-event-surfacer.py\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "pythonw \"$CLAUDE_PROJECT_DIR/scripts/registry_observation_hook.py\"",
+            "timeout": 10
           }
         ]
       },

@@ -512,14 +512,18 @@ def propose_bridge(
     if bridge_file.exists():
         raise BridgeFileAlreadyExistsError(
             f"{bridge_file} already exists — pick a fresh slug or bump to "
-            f"-002 for a REVISED version. The skill never silently overwrites."
+            f"-002 only after a controlling NO-GO. The skill never silently overwrites."
         )
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
-    bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    bridge_file.write_bytes(body_to_write.encode("utf-8"))
-    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-    return bridge_file
+    return _bridge_writer.write_bridge_file(
+        topic_slug,
+        1,
+        body_to_write,
+        project_root,
+        require_author_metadata=False,
+        claim_registry=work_intent_registry,
+    )
 
 
 def propose_bridge_codex_non_bypass(
@@ -583,10 +587,14 @@ def propose_bridge_codex_non_bypass(
         )
     session_id = resolve_work_intent_session_id()
     work_intent_registry = _acquire_bridge_work_intent(topic_slug, session_id, project_root=project_root)
-    bridge_file.parent.mkdir(parents=True, exist_ok=True)
-    bridge_file.write_bytes(body_to_write.encode("utf-8"))
-    _release_bridge_work_intent(work_intent_registry, topic_slug, session_id, project_root=project_root)
-    return bridge_file
+    return _bridge_writer.write_bridge_file(
+        topic_slug,
+        version,
+        body_to_write,
+        project_root,
+        require_author_metadata=False,
+        claim_registry=work_intent_registry,
+    )
 
 
 __all__ = [

@@ -52,6 +52,8 @@ from groundtruth_kb.context.manifest import (  # noqa: E402
     ContextManifestError,
     assemble_context_manifest,
 )
+from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.project.sot_registry import load_toml, sync_projection  # noqa: E402
 from groundtruth_kb.runtime_recovery import RecoveryStore  # noqa: E402
 from groundtruth_kb.session.envelope import (  # noqa: E402
     EnvelopeError,
@@ -106,17 +108,34 @@ def _write_artifact_repository(
     rules = root / "rules"
     for directory in (registry, control, scripts, rules):
         directory.mkdir(parents=True, exist_ok=True)
-    (registry / "sot-artifacts.toml").write_text(
+    registry_payload = (
         "[[artifacts]]\n"
         'id = "current"\n'
+        'domain = "narrative_authority"\n'
         'storage_path = "rules/current.md"\n'
-        'lifecycle = "active"\n\n'
+        'coverage_mode = "exact"\n'
+        'lifecycle = "active"\n'
+        'authority_spec_id = "GOV-X"\n'
+        'mutation_api = "test fixture"\n'
+        'versioning_policy = "git_tracked"\n'
+        'backup_policy = "git_tracked"\n'
+        'health_check_function = ""\n'
+        'owner_role = "shared"\n\n'
         "[[artifacts]]\n"
         'id = "history"\n'
+        'domain = "narrative_authority"\n'
         'storage_path = "rules/history.md"\n'
-        'lifecycle = "superseded"\n',
-        encoding="utf-8",
+        'coverage_mode = "exact"\n'
+        'lifecycle = "archive"\n'
+        'authority_spec_id = "GOV-X"\n'
+        'mutation_api = "test fixture"\n'
+        'versioning_policy = "git_tracked"\n'
+        'backup_policy = "git_tracked"\n'
+        'health_check_function = ""\n'
+        'owner_role = "shared"\n'
     )
+    canonical_registry = registry / "sot-artifacts.toml"
+    canonical_registry.write_text(registry_payload, encoding="utf-8")
     (registry / "context-manifests.toml").write_text("items = []\n", encoding="utf-8")
     (control / "SESSION-STARTUP-CONTROL-MAP.md").write_text(
         "| Startup service | `scripts/session_self_initialization.py` | active | loaded |\n"
@@ -141,6 +160,28 @@ def _write_artifact_repository(
     )
     (rules / "current.md").write_text(current_content, encoding="utf-8")
     (rules / "history.md").write_text("historical\n", encoding="utf-8")
+    packaged_registry = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    packaged_registry.parent.mkdir(parents=True)
+    packaged_registry.write_text(registry_payload, encoding="utf-8")
+    db_path = root / "groundtruth.db"
+    KnowledgeDB(db_path=db_path)
+    sync_projection(
+        load_toml(canonical_registry),
+        db_path,
+        changed_by="test",
+        change_reason="fixture sync",
+    )
 
 
 def _freshness_record(**overrides: object) -> dict[str, object]:

@@ -3598,20 +3598,17 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     """Validate the platform SoT artifact registry (GOV-PLATFORM-SOT-REGISTRY-001).
 
     Two sub-checks per DCL-SOT-REGISTRY-PROJECTION-PARITY-001 and the umbrella
-    Slice-1 scope:
+    WI-5441 control-plane scope:
 
-    1. **Parity** — the TOML edit-surface at ``config/registry/sot-artifacts.toml``
-       and the MemBase ``sot_artifacts`` projection must agree. A projection that
-       has never been synced (empty) or that diverges is reported as drift.
-    2. **Reality** — every active record whose ``storage_path`` is a concrete
+    1. **Coherence/currentness** — canonical TOML, packaged mirror, MemBase
+       projection, and per-identity revision evidence must agree.
+    2. **Reverse coverage/reality** — every non-disposable repository object
+       must resolve through the registry, and every active record whose ``storage_path`` is a concrete
        (non-``membase:``, non-glob) path must resolve on disk under ``target``.
 
-    Severity is **WARN-only** during Slice 1 per owner decision Q6 of
-    ``DELIB-20260671`` (the check ships at WARN; promotion to ERROR is a separate
-    downstream owner decision). The check never returns ``fail`` for drift; it
-    returns ``fail`` only when the registry file itself cannot be parsed (a
-    structural defect, not inventory drift). When the registry is absent (e.g.
-    an adopter project before Slice 7 rollout), it returns ``info`` (skip).
+    Any authority, currentness, reverse-coverage, or active-path defect fails
+    closed. A missing registry remains an informational skip for adopters that
+    have not enabled the platform registry.
     """
     check_name = "SoT registry completeness"
     registry_path = target / "config" / "registry" / "sot-artifacts.toml"
@@ -3626,56 +3623,43 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         )
 
     try:
-        from groundtruth_kb.project import sot_registry
+        from groundtruth_kb.project.registry_control_plane import inspect_registry, load_registry_snapshot
     except Exception as exc:  # pragma: no cover - defensive import boundary  # intentional-catch: quality gate waiver
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"sot_registry module unavailable: {exc}",
-        )
-
-    try:
-        toml_records = sot_registry.load_toml(registry_path)
-    except Exception as exc:  # intentional-catch: InvalidSoTRecord / UnknownDomain / parse error
         return ToolCheck(
             name=check_name,
             required=True,
             found=True,
             status="fail",
-            message=f"sot-artifacts.toml failed to load: {exc}",
+            message=f"registry control plane unavailable: {exc}",
+        )
+
+    try:
+        snapshot = load_registry_snapshot(project_root=target)
+        toml_records = list(snapshot.records)
+        authority_report = inspect_registry(project_root=target, include_census=True)
+    except Exception as exc:  # intentional-catch: authority failures are ERROR severity
+        return ToolCheck(
+            name=check_name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"coherent registry snapshot failed to load: {exc}",
         )
 
     warnings: list[str] = []
 
-    # Sub-check 1: TOML / MemBase projection parity.
-    db_path = target / "groundtruth.db"
-    if db_path.is_file():
-        try:
-            projection = sot_registry.load_projection(db_path)
-        except Exception as exc:  # pragma: no cover - defensive DB boundary  # intentional-catch: quality gate waiver
-            projection = []
-            warnings.append(f"projection load failed: {exc}")
-        if not projection:
-            warnings.append(
-                f"MemBase sot_artifacts projection empty — run `gt registry sync` "
-                f"({len(toml_records)} TOML records unsynced)"
-            )
-        else:
-            parity = sot_registry.validate_projection_parity(toml_records, projection)
-            if not parity.in_sync:
-                bits: list[str] = []
-                if parity.missing_in_projection:
-                    bits.append(f"missing in projection: {', '.join(parity.missing_in_projection[:5])}")
-                if parity.missing_in_toml:
-                    bits.append(f"missing in TOML: {', '.join(parity.missing_in_toml[:5])}")
-                if parity.field_divergences:
-                    diverged = ", ".join(f"{i}.{f}" for i, f in parity.field_divergences[:5])
-                    bits.append(f"field drift: {diverged}")
-                warnings.append("TOML/MemBase parity drift — " + "; ".join(bits))
+    if not authority_report.get("coherent"):
+        warnings.append(f"registry generation is not coherent: {authority_report.get('error')}")
     else:
-        warnings.append("groundtruth.db not present — parity sub-check skipped")
+        currentness = authority_report["currentness"]
+        if not currentness["current"]:
+            warnings.append(
+                f"registry currentness failed: {len(currentness['missing_revisions'])} missing revisions, "
+                f"{len(currentness['stale'])} stale records"
+            )
+        gaps = authority_report["reverse_coverage"]["gaps"]
+        if gaps:
+            warnings.append(f"reverse coverage incomplete: {len(gaps)} unregistered or invalid objects")
 
     # Sub-check 2: registry / on-disk reality for active concrete paths.
     unresolved: list[str] = []
@@ -3699,9 +3683,9 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         suffix = "" if len(warnings) <= 3 else f"; +{len(warnings) - 3} more"
         return ToolCheck(
             name=check_name,
-            required=False,
+            required=True,
             found=True,
-            status="warning",
+            status="fail",
             message=f"{len(toml_records)} SoT records — " + "; ".join(warnings[:3]) + suffix,
         )
 
@@ -3817,35 +3801,22 @@ def _check_sot_read_discipline(target: Path) -> ToolCheck:
     else:
         warnings.append(".codex/hooks.json absent — cannot verify Codex registration")
 
-    # Layer 5: Registry referential integrity (best-effort)
-    db_path = target / "groundtruth.db"
-    if db_path.is_file():
-        try:
-            import sqlite3
+    # Layer 5: Registry referential integrity from one coherent generation.
+    try:
+        from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 
-            con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-            try:
-                cur = con.cursor()
-                cur.execute("SELECT id, storage_path, forbidden_substitutes FROM current_sot_artifacts")
-                rows = cur.fetchall()
-            finally:
-                con.close()
-            known_paths = {row[1] for row in rows if row[1]}
-            for rid, _, subs in rows:
-                try:
-                    sub_list = json.loads(subs) if subs else []
-                except json.JSONDecodeError:
-                    continue
-                for sub in sub_list:
-                    # Substitute paths SHOULD match some registry storage_path (referential)
-                    if sub and not any(known.endswith(sub) or sub in known for known in known_paths):
-                        warnings.append(
-                            f"forbidden_substitutes on {rid!r} references {sub!r} "
-                            "which does not match any known SoT storage_path"
-                        )
-                        break  # one warning per record is enough
-        except Exception:  # intentional-catch: defensive
-            pass
+        rows = load_registry_snapshot(project_root=target).records
+        known_paths = {row.storage_path for row in rows if row.storage_path}
+        for row in rows:
+            for substitute in row.forbidden_substitutes:
+                if substitute and not any(known.endswith(substitute) or substitute in known for known in known_paths):
+                    warnings.append(
+                        f"forbidden_substitutes on {row.id!r} references {substitute!r} "
+                        "which does not match any known SoT storage_path"
+                    )
+                    break
+    except Exception as exc:  # intentional-catch: authority failure must be visible
+        warnings.append(f"coherent registry authority unavailable: {exc}")
 
     if warnings:
         return ToolCheck(

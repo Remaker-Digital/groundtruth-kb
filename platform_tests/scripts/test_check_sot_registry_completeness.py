@@ -19,18 +19,55 @@ import textwrap
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.project import registry_control_plane
 from groundtruth_kb.project.doctor import _check_sot_registry_completeness
 
 
+def _authority_report(*, current: bool = True, gaps: list[dict[str, str]] | None = None) -> dict:
+    return {
+        "coherent": True,
+        "currentness": {
+            "current": current,
+            "missing_revisions": [] if current else ["rec-1"],
+            "stale": [],
+        },
+        "reverse_coverage": {"gaps": list(gaps or [])},
+    }
+
+
+@pytest.fixture(autouse=True)
+def _coherent_current_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        registry_control_plane,
+        "inspect_registry",
+        lambda **_kwargs: _authority_report(),
+    )
+
+
 def _write_registry(target: Path, body: str) -> Path:
-    """Write ``config/registry/sot-artifacts.toml`` under ``target`` with body."""
+    """Write one byte-identical declaration and packaged mirror."""
     registry_path = target / "config" / "registry" / "sot-artifacts.toml"
+    packaged_path = (
+        target
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
     registry_path.parent.mkdir(parents=True, exist_ok=True)
-    registry_path.write_text(textwrap.dedent(body), encoding="utf-8")
+    packaged_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = textwrap.dedent(body)
+    registry_path.write_text(payload, encoding="utf-8")
+    packaged_path.write_text(payload, encoding="utf-8")
     return registry_path
 
 
-def _minimal_valid_record(record_id: str, storage_path: str) -> str:
+def _minimal_valid_record(record_id: str, storage_path: str, *, coverage_mode: str = "exact") -> str:
     return textwrap.dedent(
         f"""
         [[artifacts]]
@@ -39,6 +76,7 @@ def _minimal_valid_record(record_id: str, storage_path: str) -> str:
         lifecycle = "active"
         storage_path = "{storage_path}"
         authority_spec_id = "GOV-X"
+        coverage_mode = "{coverage_mode}"
         mutation_api = "n/a"
         versioning_policy = "git_tracked"
         backup_policy = "git_tracked"
@@ -67,6 +105,7 @@ def _init_sot_artifacts_table(db_path: Path) -> None:
                 versioning_policy TEXT NOT NULL,
                 backup_policy TEXT NOT NULL,
                 restore_action TEXT NOT NULL DEFAULT 'manual',
+                coverage_mode TEXT NOT NULL,
                 health_check_function TEXT,
                 owner_role TEXT NOT NULL,
                 depends_on TEXT,
@@ -89,7 +128,14 @@ def _init_sot_artifacts_table(db_path: Path) -> None:
         conn.close()
 
 
-def _insert_projection_row(db_path: Path, record_id: str, storage_path: str, lifecycle: str = "active") -> None:
+def _insert_projection_row(
+    db_path: Path,
+    record_id: str,
+    storage_path: str,
+    lifecycle: str = "active",
+    *,
+    coverage_mode: str = "exact",
+) -> None:
     """Insert one current-version projection row."""
     conn = sqlite3.connect(str(db_path))
     try:
@@ -98,9 +144,9 @@ def _insert_projection_row(db_path: Path, record_id: str, storage_path: str, lif
             INSERT INTO sot_artifacts (
                 id, version, domain, lifecycle, storage_path, authority_spec_id,
                 mutation_api, versioning_policy, backup_policy, health_check_function,
-                owner_role, restore_action, depends_on, forbidden_substitutes, notes,
+                owner_role, restore_action, coverage_mode, depends_on, forbidden_substitutes, notes,
                 changed_by, changed_at, change_reason
-            ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
+            ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
             """,
             (
                 record_id,
@@ -114,6 +160,7 @@ def _insert_projection_row(db_path: Path, record_id: str, storage_path: str, lif
                 "",
                 "shared",
                 "manual",
+                coverage_mode,
                 "test",
                 "2026-06-04T00:00:00Z",
                 "fixture",
@@ -136,19 +183,15 @@ def test_registry_missing_returns_info_skip(tmp_path: Path) -> None:
     assert "not present" in result.message
 
 
-def test_check_runs_at_warn_severity_on_empty_projection(tmp_path: Path) -> None:
-    """When the registry exists but MemBase projection is empty, status is warning.
-
-    This is the WARN severity acceptance for GOV-PLATFORM-SOT-REGISTRY-001:
-    drift is reported, never fail.
-    """
+def test_check_fails_on_empty_projection(tmp_path: Path) -> None:
+    """An empty MemBase projection cannot authorize registry reads."""
     _write_registry(tmp_path, _minimal_valid_record("rec-1", "x"))
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
     result = _check_sot_registry_completeness(tmp_path)
-    assert result.status == "warning"
-    assert "projection empty" in result.message or "parity drift" in result.message
-    assert result.required is False
+    assert result.status == "fail"
+    assert "coherent registry snapshot failed" in result.message
+    assert result.required is True
 
 
 def test_check_passes_when_toml_and_projection_match(tmp_path: Path) -> None:
@@ -163,29 +206,29 @@ def test_check_passes_when_toml_and_projection_match(tmp_path: Path) -> None:
     assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
 
 
-def test_check_warns_on_unresolved_active_storage_path(tmp_path: Path) -> None:
-    """When an active record's storage_path doesn't resolve, status is warning."""
+def test_check_fails_on_unresolved_active_storage_path(tmp_path: Path) -> None:
+    """An unresolved active storage path is an authority failure."""
     _write_registry(tmp_path, _minimal_valid_record("rec-1", "missing-path"))
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
     _insert_projection_row(db_path, "rec-1", "missing-path")
     result = _check_sot_registry_completeness(tmp_path)
-    assert result.status == "warning"
+    assert result.status == "fail"
     assert "unresolved" in result.message
 
 
 def test_check_skips_membase_prefix_storage_paths(tmp_path: Path) -> None:
     """Storage paths prefixed ``membase:`` are not point-resolvable; skip them."""
-    _write_registry(tmp_path, _minimal_valid_record("rec-1", "membase:some_table"))
+    _write_registry(tmp_path, _minimal_valid_record("rec-1", "membase:some_table", coverage_mode="virtual"))
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
-    _insert_projection_row(db_path, "rec-1", "membase:some_table")
+    _insert_projection_row(db_path, "rec-1", "membase:some_table", coverage_mode="virtual")
     result = _check_sot_registry_completeness(tmp_path)
     assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
 
 
-def test_check_warns_on_field_divergence(tmp_path: Path) -> None:
-    """Field-level drift between TOML and projection raises warning."""
+def test_check_fails_on_field_divergence(tmp_path: Path) -> None:
+    """Field-level declaration/projection drift is an authority failure."""
     target_file = tmp_path / "x"
     target_file.write_text("present", encoding="utf-8")
     _write_registry(tmp_path, _minimal_valid_record("rec-1", "x"))
@@ -194,8 +237,8 @@ def test_check_warns_on_field_divergence(tmp_path: Path) -> None:
     # Insert a projection row with mismatched lifecycle.
     _insert_projection_row(db_path, "rec-1", "x", lifecycle="deprecated")
     result = _check_sot_registry_completeness(tmp_path)
-    assert result.status == "warning"
-    assert "parity drift" in result.message or "field drift" in result.message
+    assert result.status == "fail"
+    assert "coherent registry snapshot failed" in result.message
 
 
 def test_check_fails_on_unparseable_toml(tmp_path: Path) -> None:
@@ -225,10 +268,10 @@ def test_check_fails_on_unparseable_toml(tmp_path: Path) -> None:
 
 def test_check_skips_glob_storage_paths(tmp_path: Path) -> None:
     """Glob-pattern storage paths (containing * ? [ ]) are not point-resolvable."""
-    _write_registry(tmp_path, _minimal_valid_record("rec-1", "config/governance/*.toml"))
+    _write_registry(tmp_path, _minimal_valid_record("rec-1", "config/governance/*.toml", coverage_mode="glob"))
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
-    _insert_projection_row(db_path, "rec-1", "config/governance/*.toml")
+    _insert_projection_row(db_path, "rec-1", "config/governance/*.toml", coverage_mode="glob")
     result = _check_sot_registry_completeness(tmp_path)
     assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
 
@@ -245,14 +288,44 @@ def test_check_skips_deprecated_lifecycle_records(tmp_path: Path) -> None:
     assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
 
 
-def test_check_warning_message_includes_record_count(tmp_path: Path) -> None:
-    """Warning message should report the number of SoT records loaded."""
+def test_check_failure_message_includes_record_count_for_reverse_gap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A reverse-coverage failure reports both records and gap count."""
+    (tmp_path / "x").write_text("present", encoding="utf-8")
     _write_registry(tmp_path, _minimal_valid_record("rec-1", "x"))
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
+    _insert_projection_row(db_path, "rec-1", "x")
+    monkeypatch.setattr(
+        registry_control_plane,
+        "inspect_registry",
+        lambda **_kwargs: _authority_report(gaps=[{"relative_path": "unregistered.txt"}]),
+    )
     result = _check_sot_registry_completeness(tmp_path)
-    assert result.status == "warning"
+    assert result.status == "fail"
     assert "1 SoT records" in result.message
+    assert "reverse coverage incomplete: 1" in result.message
+
+
+def test_check_fails_when_registry_revisions_are_stale(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "x").write_text("present", encoding="utf-8")
+    _write_registry(tmp_path, _minimal_valid_record("rec-1", "x"))
+    db_path = tmp_path / "groundtruth.db"
+    _init_sot_artifacts_table(db_path)
+    _insert_projection_row(db_path, "rec-1", "x")
+    monkeypatch.setattr(
+        registry_control_plane,
+        "inspect_registry",
+        lambda **_kwargs: _authority_report(current=False),
+    )
+    result = _check_sot_registry_completeness(tmp_path)
+    assert result.status == "fail"
+    assert "registry currentness failed" in result.message
 
 
 @pytest.mark.parametrize(
@@ -265,10 +338,19 @@ def test_check_warning_message_includes_record_count(tmp_path: Path) -> None:
 )
 def test_check_does_not_assert_storage_path_for_non_concrete(tmp_path: Path, lifecycle: str, storage_path: str) -> None:
     """Archive lifecycle + non-file storage paths are not asserted on disk."""
-    body = _minimal_valid_record("rec-1", storage_path).replace('lifecycle = "active"', f'lifecycle = "{lifecycle}"')
+    coverage_mode = "virtual" if ":" in storage_path else "exact"
+    body = _minimal_valid_record("rec-1", storage_path, coverage_mode=coverage_mode).replace(
+        'lifecycle = "active"', f'lifecycle = "{lifecycle}"'
+    )
     _write_registry(tmp_path, body)
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
-    _insert_projection_row(db_path, "rec-1", storage_path, lifecycle=lifecycle)
+    _insert_projection_row(
+        db_path,
+        "rec-1",
+        storage_path,
+        lifecycle=lifecycle,
+        coverage_mode=coverage_mode,
+    )
     result = _check_sot_registry_completeness(tmp_path)
     assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"

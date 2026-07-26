@@ -690,6 +690,7 @@ def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypa
 
     # Stub out lanes that come earlier in the pipeline so they pass quickly.
     monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_sot_registry_authority", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
@@ -697,6 +698,7 @@ def test_narrative_artifact_lane_reached_before_inventory_drift_failure(monkeypa
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
+    monkeypatch.setattr(gate, "_check_no_window_spawn_audit", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory_drift", fake_inventory_drift)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
@@ -745,6 +747,7 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
         print("PASS narrative-artifact evidence (no protected paths in staged set)")
 
     monkeypatch.setattr(gate, "_check_python_version", lambda *a, **kw: None)
+    monkeypatch.setattr(gate, "_check_sot_registry_authority", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_manifest_removed", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_gate_present", lambda: None)
     monkeypatch.setattr(gate, "_check_secret_ci_workflow_present", lambda: None)
@@ -752,6 +755,7 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     monkeypatch.setattr(gate, "_check_project_resource_registry", lambda: None)
     monkeypatch.setattr(gate, "_check_standing_backlog_health", lambda: None)
     monkeypatch.setattr(gate, "_check_agent_red_app_root_minimization", lambda: None)
+    monkeypatch.setattr(gate, "_check_no_window_spawn_audit", lambda: None)
     monkeypatch.setattr(gate, "_check_dev_environment_inventory", lambda *a, **kw: None)
     monkeypatch.setattr(gate, "_check_narrative_artifact_evidence", fake_narrative_lane)
 
@@ -774,3 +778,43 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     captured = capsys.readouterr()
     assert "PASS narrative-artifact evidence" in captured.out
     assert "RELEASE GATE: PASS" in captured.out
+
+
+def test_sot_registry_authority_requires_reverse_closed_validation(monkeypatch, capsys):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import registry_control_plane
+
+    calls = []
+
+    def valid_registry(**kwargs):
+        calls.append(kwargs)
+        return {
+            "valid": True,
+            "record_count": 50,
+            "generation_digest": "sha256:test-generation",
+        }
+
+    monkeypatch.setattr(registry_control_plane, "validate_registry", valid_registry)
+
+    gate._check_sot_registry_authority()
+
+    assert calls == [{"project_root": gate.PROJECT_ROOT, "require_reverse_closure": True}]
+    assert "PASS SoT registry authority (50 records, generation=sha256:test-generation)" in capsys.readouterr().out
+
+
+def test_sot_registry_authority_fails_closed_on_reverse_gap(monkeypatch):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import registry_control_plane
+
+    monkeypatch.setattr(
+        registry_control_plane,
+        "validate_registry",
+        lambda **_kwargs: {
+            "valid": False,
+            "coherent": True,
+            "errors": ["reverse_coverage_incomplete"],
+        },
+    )
+
+    with pytest.raises(gate.GateFailure, match="reverse_coverage_incomplete"):
+        gate._check_sot_registry_authority()

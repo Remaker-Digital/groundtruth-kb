@@ -43,6 +43,7 @@ def _write_registry(tmp_path: Path, *, restore_action: str = "ensure_alive") -> 
             domain = "bridge_protocol"
             lifecycle = "active"
             storage_path = ".gtkb-state/bridge-poller/dispatch-state.json"
+            coverage_mode = "exact"
             authority_spec_id = "GOV-FILE-BRIDGE-AUTHORITY-001"
             mutation_api = "gt bridge dispatch daemon"
             versioning_policy = "overwrite_single_writer"

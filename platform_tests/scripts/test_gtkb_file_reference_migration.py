@@ -10,6 +10,15 @@ import sys
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project.registry_control_plane import (
+    apply_registry_transaction,
+    serialize_registry,
+)
+from groundtruth_kb.project.sot_registry import (
+    SoTArtifact,
+    sync_projection,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "gtkb_file_reference_migration.py"
@@ -28,6 +37,71 @@ def _load_module():
 def _write(path: Path, content: str = "content\n") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="")
+
+
+def _registry_record(record_id: str, storage_path: str, coverage_mode: str) -> SoTArtifact:
+    return SoTArtifact(
+        id=record_id,
+        domain="control_surface",
+        lifecycle="active",
+        storage_path=storage_path,
+        authority_spec_id="GOV-PLATFORM-SOT-REGISTRY-001",
+        mutation_api="fixture",
+        versioning_policy="git_tracked",
+        backup_policy="git_tracked",
+        health_check_function="",
+        owner_role="shared",
+        restore_action="regenerate_from_source",
+        coverage_mode=coverage_mode,
+    )
+
+
+def _seed_registry_authority(root: Path) -> None:
+    records = [
+        _registry_record("fixture-claude-tree", ".claude/", "recursive"),
+        _registry_record("fixture-codex-tree", ".codex/", "recursive"),
+        _registry_record("fixture-config-tree", "config/", "recursive"),
+        _registry_record("fixture-cursor-tree", ".cursor/", "recursive"),
+        _registry_record("fixture-runtime-state", ".gtkb-state/", "opaque_container"),
+        _registry_record("fixture-packaged-tree", "groundtruth-kb/", "recursive"),
+        _registry_record("fixture-database", "groundtruth.db", "exact"),
+        _registry_record("fixture-manifest", "moves.csv", "exact"),
+        _registry_record("fixture-policy", "policy.toml", "exact"),
+        _registry_record("fixture-consumer", "consumer.py", "exact"),
+    ]
+    registry = root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    packaged.parent.mkdir(parents=True, exist_ok=True)
+    payload = serialize_registry(records)
+    registry.write_bytes(payload)
+    packaged.write_bytes(payload)
+    db_path = root / "groundtruth.db"
+    knowledge = KnowledgeDB(db_path=db_path)
+    knowledge.close()
+    sync_projection(records, db_path, changed_by="test", change_reason="fixture")
+    apply_registry_transaction(
+        records,
+        operation="legacy_bootstrap",
+        actor_session="test-session",
+        changed_by="test/prime-builder",
+        change_reason="WI-5441 migration fixture authority",
+        start_packet_hash="sha256:test-start",
+        pauth_id="PAUTH-WI5441-TEST",
+        bridge_id="gtkb-wi5441-registry-control-plane-reverse-coverage",
+        project_root=root,
+    )
 
 
 def _fixture(root: Path, *, sqlite_scans: bool = False) -> Path:
@@ -182,6 +256,7 @@ def _fixture(root: Path, *, sqlite_scans: bool = False) -> Path:
             ]
         )
     policy.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _seed_registry_authority(root)
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     return policy
 

@@ -4,6 +4,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
+
+from groundtruth_kb.project.registry_control_plane import (
+    RegistryControlPlaneError,
+    load_registry_snapshot,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 PROTECTED_EXACT = frozenset(
     {
@@ -96,7 +104,22 @@ def is_runtime_authority_state_path(relative_path: str) -> bool:
     return rel in ROOT_MEMBASE_EXACT or any(rel.startswith(prefix) for prefix in RUNTIME_AUTHORITY_PREFIXES)
 
 
-def classify_controlled_artifact(relative_path: str) -> ControlledArtifactClassification:
+def _registry_classification(rel: str, project_root: Path) -> ControlledArtifactClassification | None:
+    registry_path = project_root / "config" / "registry" / "sot-artifacts.toml"
+    if not registry_path.exists():
+        return None
+    try:
+        record = load_registry_snapshot(project_root=project_root).resolver.resolve(rel)
+    except RegistryControlPlaneError:
+        return ControlledArtifactClassification(rel, True, True, "registry_authority_unavailable", "registry/error")
+    if record is None:
+        return None
+    return ControlledArtifactClassification(rel, True, False, "registered_artifact", f"registry:{record.id}")
+
+
+def classify_controlled_artifact(
+    relative_path: str, *, project_root: Path | None = None
+) -> ControlledArtifactClassification:
     rel = normalize_relative_path_text(relative_path)
     if rel == "<unknown-mutating-target>":
         return ControlledArtifactClassification(rel, True, False, "unknown_mutating_target", rel)
@@ -133,6 +156,9 @@ def classify_controlled_artifact(relative_path: str) -> ControlledArtifactClassi
                 "runtime_authority_state_direct_mutation",
                 prefix,
             )
+    registered = _registry_classification(rel, (project_root or PROJECT_ROOT).resolve())
+    if registered is not None:
+        return registered
     if rel in PROTECTED_EXACT:
         return ControlledArtifactClassification(rel, True, False, "protected_path", rel)
     if rel.startswith(".env."):

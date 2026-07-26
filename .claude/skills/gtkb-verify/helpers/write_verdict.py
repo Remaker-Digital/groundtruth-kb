@@ -994,14 +994,9 @@ def _apply_hunk_patch_to_index(project_root: Path, patch: HunkPatch, *, env: dic
     )
 
 
-def _cleanup_failed_verdict(project_root: Path, verdict_rel_path: str, staged_paths: tuple[str, ...]) -> None:
+def _cleanup_failed_staging(project_root: Path, staged_paths: tuple[str, ...]) -> None:
     if staged_paths:
         _run_git(["restore", "--staged", "--", *staged_paths], cwd=project_root)
-    verdict_path = project_root / verdict_rel_path
-    try:
-        verdict_path.unlink()
-    except FileNotFoundError:
-        pass
 
 
 def _append_commit_finalization_evidence(body: str, *, commit_message: str, paths: tuple[str, ...]) -> str:
@@ -1180,9 +1175,19 @@ def finalize_verified_commit(
     )
     _assert_verdict_author_session_context_is_real(body_to_write)
 
-    from scripts.gtkb_bridge_writer import write_bridge_file
+    from scripts.gtkb_bridge_writer import (
+        finalize_pending_bridge_publication,
+        rollback_pending_bridge_publication,
+        write_bridge_file,
+    )
 
-    write_bridge_file(slug, next_version, body_to_write, root)
+    publication_path = write_bridge_file(
+        slug,
+        next_version,
+        body_to_write,
+        root,
+        release_claim=False,
+    )
     temp_env: dict[str, str] | None = None
     temp_index: Path | None = None
     old_head = _git_lines(["rev-parse", "HEAD"], cwd=root)[0]
@@ -1222,6 +1227,7 @@ def finalize_verified_commit(
                 f"committed={sorted(committed)}; expected={sorted(temp_staged)}"
             )
         _realign_real_index_after_temp_commit(root, realignment_plan)
+        finalize_pending_bridge_publication(publication_path, root)
     except Exception as exc:
         if created_commit is not None:
             rollback = _run_git_with_lock_retry(
@@ -1234,7 +1240,12 @@ def finalize_verified_commit(
                     "VERIFIED finalization created a commit but could not atomically roll HEAD back after "
                     f"realignment failure; verdict retained for diagnosis: {(rollback.stderr or rollback.stdout).strip()}"
                 ) from exc
-        _cleanup_failed_verdict(root, verdict_rel_path, ())
+        _cleanup_failed_staging(root, ())
+        rollback_pending_bridge_publication(
+            publication_path,
+            root,
+            reason=f"VERIFIED finalization failed before durable commit: {exc}",
+        )
         raise
     finally:
         if temp_index is not None:

@@ -76,6 +76,23 @@ def _init_projection(root: Path) -> None:
         )
 
 
+def _write_registry_mirror(root: Path, registry: Path) -> None:
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    packaged.parent.mkdir(parents=True, exist_ok=True)
+    packaged.write_bytes(registry.read_bytes())
+
+
 def _write_registry(root: Path, storage_path: str | None = None, *, sync: bool = True) -> None:
     registry = root / "config" / "registry" / "sot-artifacts.toml"
     registry.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +108,7 @@ def _write_registry(root: Path, storage_path: str | None = None, *, sync: bool =
                     'lifecycle = "active"',
                     f'storage_path = "{storage_path}"',
                     'authority_spec_id = "TEST-SPEC"',
+                    'coverage_mode = "exact"',
                     'mutation_api = "fixture"',
                     'versioning_policy = "overwrite_single_writer"',
                     'backup_policy = "gitignored_runtime"',
@@ -102,6 +120,7 @@ def _write_registry(root: Path, storage_path: str | None = None, *, sync: bool =
             ),
             encoding="utf-8",
         )
+    _write_registry_mirror(root, registry)
     _init_projection(root)
     if sync:
         sync_projection(load_toml(registry), root / "groundtruth.db", changed_by="test", change_reason="fixture")
@@ -116,8 +135,9 @@ def _write_generated_state_registry(root: Path) -> None:
                 'id = "generated-runtime-state-tree"',
                 'domain = "runtime_state"',
                 'lifecycle = "generated"',
-                'storage_path = ".gtkb-state/"',
+                'storage_path = ".gtkb-state/pytest-basetemp/"',
                 'authority_spec_id = "TEST-SPEC"',
+                'coverage_mode = "recursive"',
                 'mutation_api = "test runtime generator"',
                 'versioning_policy = "regenerated_from_source"',
                 'backup_policy = "gitignored_runtime"',
@@ -131,6 +151,7 @@ def _write_generated_state_registry(root: Path) -> None:
                 'lifecycle = "active"',
                 'storage_path = ".gtkb-state/bridge-poller/dispatch-state.json"',
                 'authority_spec_id = "TEST-SPEC"',
+                'coverage_mode = "exact"',
                 'mutation_api = "fixture"',
                 'versioning_policy = "overwrite_single_writer"',
                 'backup_policy = "gitignored_runtime"',
@@ -142,6 +163,7 @@ def _write_generated_state_registry(root: Path) -> None:
         ),
         encoding="utf-8",
     )
+    _write_registry_mirror(root, registry)
     sync_projection(load_toml(registry), root / "groundtruth.db", changed_by="test", change_reason="fixture")
 
 
@@ -720,6 +742,7 @@ def test_projection_drift_blocks_execution_but_preserves_candidates(repo: Path) 
         registry.read_text(encoding="utf-8").replace('mutation_api = "fixture"', 'mutation_api = "changed"'),
         encoding="utf-8",
     )
+    _write_registry_mirror(repo, registry)
 
     plan, _item_id = _single_plan(repo)
 
