@@ -4992,6 +4992,9 @@ class KnowledgeDB:
         related_bridge_threads: str,
         owner_approved: bool,
         bridge_evidence_validated: bool,
+        required_bridge_threads: set[str],
+        exact_related_bridge_threads: bool,
+        expected_current_version: int,
         commit: bool = True,
     ) -> dict[str, Any] | None:
         """Append one narrowly authorized terminal-reopen version and event.
@@ -5025,19 +5028,31 @@ class KnowledgeDB:
             or any(not isinstance(value, str) for value in bridge_threads)
         ):
             raise ValueError("Terminal reopen requires a non-empty related bridge string array")
-        required_threads = {
-            "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-007.md",
-            "bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-008.md",
-        }
-        if not required_threads.issubset(set(bridge_threads)):
-            raise ValueError("Terminal reopen requires the controlling WI-5441 v007 and v008 bridge files")
+        if not required_bridge_threads or any(
+            not isinstance(value, str) or not value for value in required_bridge_threads
+        ):
+            raise ValueError("Terminal reopen requires an explicit non-empty required bridge path policy")
+        if len(set(bridge_threads)) != len(bridge_threads):
+            raise ValueError("Terminal reopen related bridge paths must be unique")
+        observed_threads = set(bridge_threads)
+        if exact_related_bridge_threads:
+            if observed_threads != required_bridge_threads:
+                raise ValueError("Terminal reopen requires the exact related bridge path policy")
+        elif not required_bridge_threads.issubset(observed_threads):
+            raise ValueError("Terminal reopen requires every required bridge path")
 
         conn = self._get_conn()
         try:
+            conn.execute("BEGIN IMMEDIATE")
             current_row = conn.execute("SELECT * FROM current_work_items WHERE id = ?", (id,)).fetchone()
             if current_row is None:
                 raise ValueError(f"Work item {id} not found")
             current = _row_to_dict(current_row)
+            if current.get("version") != expected_current_version:
+                raise ValueError(
+                    "Terminal reopen work-item version changed after live validation: "
+                    f"expected {expected_current_version}, got {current.get('version')}"
+                )
             if current.get("stage") != "resolved":
                 raise ValueError(f"Terminal reopen requires current stage 'resolved', got {current.get('stage')!r}")
 

@@ -203,62 +203,16 @@ normalized_checker_findings = [
   "wrap-up dispatcher forces a role profile",
 ]
 
-[allowed_baseline_failures.governance]
-owner_project = "PROJECT-GTKB-BRIDGE-PROTOCOL-RELIABILITY"
-owner_work_item = "WI-5648"
-observed_collected_node_count = 205
-proposal_claimed_collected_node_count = 215
-passing_node_count = 164
-failing_node_count = 41
-missing_version_failure_count = 37
-other_failure_count = 4
-uniform_root_cause = false
-node_list_lf_sha256 = "sha256:31cd76c57a3d6070965aebda83e31ea66a4a0d2a0e9454ffd36f51db6ced3338"
+[observed_residual_failures.governance]
+owner_project = "PROJECT-GTKB-PLATFORM-MODERNIZATION-AUTHORITY-FOUNDATIONS"
+owner_work_item = "WI-5178"
+observed_collected_node_count = 475
+passing_node_count = 471
+failing_node_count = 4
+node_list_lf_sha256 = "sha256:3ddb040eacb28b101c93a45f59707e20e6ea84aff199a733d50854569ce7868b"
+allowed_for_stage_b = false
 stage_b_requires_all_pass = true
 node_ids = [
-  "platform_tests/scripts/test_implementation_start_gate.py::test_authorization_accepts_bold_target_paths_metadata",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_bootstrap_bridge_id_does_not_exempt_missing_pauth",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_bootstrap_packet_blocks_unrelated_source_apply_patch",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_collision_ignores_expired_claim_for_overlapping_packet",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_collision_ignores_same_session_overlapping_claim",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_direct_git_effect_cannot_be_enabled_by_implementation_packet",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_dispatcher_rules_toml_direct_apply_patch_blocked_even_with_go",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_exact_file_target_path_authorizes_exact_protected_file",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_existing_packet_blocks_when_bridge_becomes_latest_deferred",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_allows_concurrent_authorized_implementers",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_allows_when_holder_is_dispatch_id",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_allows_when_no_other_session_reserves_target",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_blocks_ambiguous_named_packet_fallback",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_blocks_dirty_path_claimed_by_nonterminal_peer_report",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_blocks_on_work_intent_registry_error",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_blocks_when_other_session_claim_packet_reserves_target",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_blocks_when_other_session_glob_packet_reserves_target",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_rechecks_live_project_authorization_before_protected_effect[implementation_start]",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_rechecks_live_project_authorization_before_protected_effect[protected_mutation]",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_gate_uses_unique_named_packet_when_current_json_absent",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_go_authorization_packet_without_pauth_blocks_in_scope_apply_patch",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_lapsed_claim_blocks_mutation",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_non_go_bridge_entry_cannot_create_authorization",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_owner_sufficiency_deliberation_packet_allows_gate_authorization",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_pauth_backed_go_authorization_allows_in_scope_apply_patch",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_project_authorization_does_not_broaden_target_scope",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_project_authorization_load_revalidates_current_spec_exclusions",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_project_authorization_metadata_is_carried_in_packet",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_project_authorization_requires_work_item_membership_or_inclusion",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_requirement_gap_blocks_authorization",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_requirement_sufficiency_are_sufficient_allows_gate_authorization",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_start_finalizer_binds_live_pauth_claim_and_worker_evidence",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_start_finalizer_denial_writes_no_packet",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_start_finalizer_rejects_missing_pauth_for_protected_targets",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_target_mismatch_blocks_even_with_valid_packet",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_valid_packet_blocks_when_claim_held_by_other_session",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_valid_packet_blocks_when_work_intent_claim_missing",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_acquire_denial_creates_no_claim",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_extension_denial_leaves_claim_unchanged",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_reclassify_denial_leaves_draft_claim_unchanged",
-  "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_renew_denial_leaves_go_claim_unchanged",
-]
-other_failure_nodes = [
   "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_acquire_denial_creates_no_claim",
   "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_extension_denial_leaves_claim_unchanged",
   "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_reclassify_denial_leaves_draft_claim_unchanged",

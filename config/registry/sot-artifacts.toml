@@ -2468,3 +2468,2859 @@ owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
 notes = "WI-5441 load-bearing control or enforcement artifact; exact registration required before mutation."
+
+[[artifacts]]
+id = "wi5640-source-001"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/_delib_common.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-001"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb_delib_common.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-002"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/advisory-router-scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-002"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-advisory-router-scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-003"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/assertion-check.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-003"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-assertion-check.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-004"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/bridge-axis-2-surface.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-004"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-bridge-axis-2-surface.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-005"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-bridge-compliance-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-006"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/bridge-proposal-wi-id-collision-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-006"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-bridge-proposal-wi-id-collision-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-007"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/code-quality-baseline-proposal-check.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-007"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-code-quality-baseline-proposal-check.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-008"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/credential-scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-008"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-credential-scan.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-009"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/delib-search-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-009"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-delib-search-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-010"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/delib-search-tracker.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-010"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-delib-search-tracker.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-011"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/destructive-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-011"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-destructive-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-012"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/directive-enforcement-claude-adapter.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-012"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-directive-enforcement-claude-adapter.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-013"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/document_author_provenance_gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-013"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-document_author_provenance_gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-014"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/formal-artifact-approval-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-014"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-formal-artifact-approval-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-015"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/glossary-expansion.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-015"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-glossary-expansion.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-016"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/gov09-capture.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-016"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-gov-capture.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-017"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/implementation-start-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-017"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-implementation-start-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-018"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/intake-classifier.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-018"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-intake-classifier.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-019"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/kb-not-markdown.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-019"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-not-markdown.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-020"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/lo-file-safety-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-020"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-lo-file-safety-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-021"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/narrative-artifact-approval-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-021"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-narrative-artifact-approval-gate.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-022"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/owner-decision-capture.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-022"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-owner-decision-capture.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-023"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/owner-decision-tracker.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-023"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-owner-decision-tracker.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-024"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/spec-before-code.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-024"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-spec-before-code.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-025"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/project-completion-surface.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-025"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-project-completion-surface.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-026"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-scanner-safe-writer.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-027"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/session_start_dispatch.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-027"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-session_start_dispatch.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-028"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/session-start-governance.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-028"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-session-start-governance.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-029"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/session-topic-envelope-router.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-029"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-session-topic-envelope-router.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-031"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/spec-classifier.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-031"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-spec-classifier.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-032"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/spec-event-surfacer.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-032"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-spec-event-surfacer.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-033"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/hooks/workstream-focus.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-033"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/hooks/gtkb-workstream-focus.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-034"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/acting-prime-builder.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-034"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-acting-prime-builder.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-035"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/active-workspace.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-035"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-active-workspace.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-036"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/auto-finalization-sweep.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-036"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-auto-finalization-sweep.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-037"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/backlog-approval-state.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-037"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-backlog-approval-state.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-038"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/bridge-essential.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-038"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-bridge-essential.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-039"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/bridge-permanent-operations-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-039"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-bridge-permanent-operations-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-040"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/bridge-poller-canonical.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-040"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-bridge-poller-canonical.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-041"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-canonical-terminology.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-042"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-canonical-terminology.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-043"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-dead-ends-and-false-positives.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-043"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-dead-ends-and-false-positives.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-044"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-decision-ledger.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-044"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-decision-ledger.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-045"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-knowledge-base-index.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-045"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-knowledge-base-index.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-046"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-loyal-opposition-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-046"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-loyal-opposition-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-047"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-review-checklists.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-047"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-review-checklists.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-048"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-review-gate.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-048"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-review-gate.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-049"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-review-operating-contract.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-049"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-review-operating-contract.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-050"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-session-bootstrap.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-050"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-session-bootstrap.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-051"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-standing-priorities.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-051"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-standing-priorities.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-052"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/codex-way-of-working.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-052"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-way-of-working.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-053"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/deliberation-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-053"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-deliberation-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-054"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/dispatcher-daemon-substrate-rollback-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-054"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-dispatcher-daemon-substrate-rollback-runbook.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-055"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-file-bridge-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-056"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/governance-emergency-bootstrap-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-056"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-governance-emergency-bootstrap-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-057"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/groundtruth-kb-vision.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-057"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-vision.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-058"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/gtkb-capability-import-policy.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-058"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-capability-import-policy.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-059"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/loyal-opposition.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-059"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-loyal-opposition.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-060"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-operating-model.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-061"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/operating-role.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-061"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-operating-role.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-062"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/peer-solution-advisory-loop.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-062"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-peer-solution-advisory-loop.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-063"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/prime-bridge-collaboration-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-063"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-prime-bridge-collaboration-protocol.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-064"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/prime-builder.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-064"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-prime-builder.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-065"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/prime-builder-role.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-065"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-prime-builder-role.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-066"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/project-root-boundary.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-066"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-project-root-boundary.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-067"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/report-depth.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-067"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-report-depth.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-068"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/report-depth-prime-builder-context.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-068"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-report-depth-prime-builder-context.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-069"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/sot-read-discipline.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-069"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-sot-read-discipline.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-070"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/template-code-review.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-070"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-template-code-review.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-071"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = ".claude/rules/template-decision-memo.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-071"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-template-decision-memo.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-072"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/activity-disposition-profiles.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-072"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-activity-disposition-profiles.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-073"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/activity-envelope-sharding.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-073"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-activity-envelope-sharding.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-074"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/auq-policy-gates.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-074"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-auq-policy-gates.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-075"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/command-surface.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-075"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-command-surface.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-076"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/CONTROL-MAP.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-076"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-control-map.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-077"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/declarative-agent-role-manifest.yaml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-077"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-declarative-agent-role-manifest.yaml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-079"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/harness-model-pin-confirmations.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-079"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-harness-model-pin-confirmations.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-080"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/skill-scenarios.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-080"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-skill-scenarios.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-081"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/LOYAL-OPPOSITION-STARTUP-OVERLAY.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-081"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-lo-startup-overlay.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-082"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/PRIME-BUILDER-STARTUP-OVERLAY.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-082"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-pb-startup-overlay.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-083"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-project-resource-aliases.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-084"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/REVIEW-MODE-SETUP.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-084"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-review-mode-setup.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-085"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/ROLE-CAPABILITY-MANIFEST.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-085"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-role-capability-manifest.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-086"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-session-startup-control-map.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-087"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/SESSION-STARTUP-INDEX.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-087"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-session-startup-index.md"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-destination-088"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-skill-rename-map.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-089"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/system-interface-map.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-089"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-system-interface-map.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-source-090"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/unified-policy-registry.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 retained obsolete source; exact registration required during repeated deterministic migration verification."
+
+[[artifacts]]
+id = "wi5640-destination-090"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/agent-control/gtkb-unified-policy-registry.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 canonical destination; exact registration required before consumer reference migration."
+
+[[artifacts]]
+id = "wi5640-config-file-reference-migration-wi5640-toml"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "config/file-reference-migration/wi5640.toml"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "WI-5640 load-bearing deterministic migration policy; exact registration required because DEFAULT_POLICY loads this file for analyze, preflight, recover, and plan generation."

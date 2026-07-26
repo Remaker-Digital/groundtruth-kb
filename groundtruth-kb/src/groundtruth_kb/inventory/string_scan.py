@@ -38,6 +38,7 @@ class ArtifactRecord:
     domain: str
     lifecycle: str
     storage_path: str
+    coverage_mode: str
     mutation_api: str
     health_check_function: str | None
 
@@ -52,6 +53,7 @@ class ArtifactRecord:
             domain=record.domain,
             lifecycle=record.lifecycle,
             storage_path=record.storage_path,
+            coverage_mode=record.coverage_mode,
             mutation_api=record.mutation_api,
             health_check_function=record.health_check_function,
         )
@@ -111,6 +113,8 @@ _EXTERNAL_STORAGE_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 
 def _path_class(artifact: ArtifactRecord, project_root: Path) -> str:
     storage = artifact.storage_path.strip()
+    if artifact.coverage_mode == "opaque_container":
+        return "opaque_container"
     if storage.startswith("membase:"):
         return "membase"
     if _EXTERNAL_STORAGE_RE.match(storage) and not Path(storage).is_absolute():
@@ -146,6 +150,17 @@ def _expand_artifact_files(
         return ArtifactExpansion(artifact, path_class, "absolute_path_unsupported", (), False, blocking)
 
     candidate = project_root / storage
+    if path_class == "opaque_container":
+        exists = candidate.is_dir()
+        blocking = artifact.lifecycle == "active" and not exists
+        return ArtifactExpansion(
+            artifact,
+            path_class,
+            "opaque_present" if exists else "missing_active_opaque_container" if blocking else "absent_nonactive",
+            (),
+            exists,
+            blocking,
+        )
     if path_class == "generated":
         exists = candidate.exists()
         files = (candidate,) if candidate.is_file() else ()
@@ -191,7 +206,7 @@ def _expand_artifact_files(
     )
 
 
-def _artifact_inventory(
+def registered_artifact_inventory(
     project_root: Path, registry_path: Path | None = None, *, snapshot: RegistrySnapshot | None = None
 ) -> tuple[
     list[ArtifactRecord],
@@ -211,6 +226,10 @@ def _artifact_inventory(
         for file_path in expansion.files:
             by_path.setdefault(_rel(file_path, project_root), []).append(artifact)
     return artifacts, by_path, missing, expansions
+
+
+# Compatibility only. New consumers must use the public API above.
+_artifact_inventory = registered_artifact_inventory
 
 
 def load_match_file(path: Path) -> list[str]:
@@ -282,7 +301,7 @@ def scan_inventory_strings(
     literal_matches = [match for match in matches if match]
     if not literal_matches:
         raise InventoryScanError("at least one --match or --match-file value is required")
-    artifacts, by_path, missing, _ = _artifact_inventory(project_root, registry_path)
+    artifacts, by_path, missing, _ = registered_artifact_inventory(project_root, registry_path)
     critical = DEFAULT_CRITICAL_CLASSES | set(critical_classes or set())
     warn = DEFAULT_WARN_CLASSES | set(warn_classes or set())
     match_ids = {value: f"M{index:03d}" for index, value in enumerate(literal_matches, start=1)}
@@ -340,7 +359,7 @@ def scan_inventory_strings(
 
 def build_refresh_report(project_root: Path, *, registry_path: Path | None = None) -> dict[str, Any]:
     project_root = project_root.resolve()
-    artifacts, by_path, missing, expansions = _artifact_inventory(project_root, registry_path)
+    artifacts, by_path, missing, expansions = registered_artifact_inventory(project_root, registry_path)
     path_class_counts: dict[str, int] = {}
     lifecycle_counts: dict[str, int] = {}
     status_counts: dict[str, int] = {}

@@ -13,7 +13,9 @@ from groundtruth_kb.inventory import (
     emit_markdown_ledger,
     load_match_file,
     scan_inventory_strings,
+    string_scan,
 )
+from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 from groundtruth_kb.project.sot_registry import load_toml, sync_projection
 
 
@@ -254,3 +256,37 @@ def test_typed_registry_rejects_incomplete_records(tmp_path: Path) -> None:
 
     with pytest.raises(InventoryScanError, match="missing required field"):
         build_refresh_report(tmp_path)
+
+
+def test_public_inventory_reuses_snapshot_and_preserves_opaque_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = tmp_path / "config" / "registry" / "sot-artifacts.toml"
+    registry.parent.mkdir(parents=True)
+    opaque = _artifact_toml("runtime-opaque", "runtime_state", "active", ".gtkb-state/").replace(
+        'coverage_mode = "recursive"', 'coverage_mode = "opaque_container"'
+    )
+    registry.write_text(
+        opaque + "\n" + _artifact_toml("missing-active", "control_surface", "active", "config/missing.toml"),
+        encoding="utf-8",
+    )
+    disposable = tmp_path / ".gtkb-state" / "disposable" / "scratch.txt"
+    disposable.parent.mkdir(parents=True)
+    disposable.write_text("must not be scanned\n", encoding="utf-8")
+    _sync_registry(tmp_path)
+    snapshot = load_registry_snapshot(project_root=tmp_path)
+
+    def unexpected_reload(*_args, **_kwargs):
+        raise AssertionError("public inventory reloaded an already-coherent snapshot")
+
+    monkeypatch.setattr(string_scan, "load_registry_snapshot", unexpected_reload)
+    artifacts, by_path, missing, expansions = string_scan.registered_artifact_inventory(tmp_path, snapshot=snapshot)
+
+    assert {artifact.id for artifact in artifacts} == {"runtime-opaque", "missing-active"}
+    assert by_path == {}
+    assert [item["artifact_id"] for item in missing] == ["missing-active"]
+    opaque_expansion = next(item for item in expansions if item.artifact.id == "runtime-opaque")
+    assert opaque_expansion.path_class == "opaque_container"
+    assert opaque_expansion.status == "opaque_present"
+    assert opaque_expansion.files == ()
+    assert string_scan._artifact_inventory is string_scan.registered_artifact_inventory

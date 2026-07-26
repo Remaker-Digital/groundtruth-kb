@@ -761,6 +761,9 @@ class TestWorkItems:
             related_bridge_threads=self._reopen_threads(),
             owner_approved=True,
             bridge_evidence_validated=True,
+            required_bridge_threads=set(json.loads(self._reopen_threads())),
+            exact_related_bridge_threads=False,
+            expected_current_version=1,
         )
 
         assert row is not None
@@ -806,6 +809,9 @@ class TestWorkItems:
                 related_bridge_threads=self._reopen_threads(),
                 owner_approved=owner_approved,
                 bridge_evidence_validated=bridge_evidence_validated,
+                required_bridge_threads=set(json.loads(self._reopen_threads())),
+                exact_related_bridge_threads=False,
+                expected_current_version=1,
             )
         assert len(db.get_work_item_history("WI-5441")) == 1
         assert (
@@ -817,6 +823,94 @@ class TestWorkItems:
             .fetchone()[0]
             == 0
         )
+
+    def test_reopen_terminal_work_item_requires_explicit_non_empty_path_policy(self, db):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+
+        with pytest.raises(ValueError, match="explicit non-empty required bridge path policy"):
+            db.reopen_terminal_work_item(
+                "WI-5441",
+                "prime-builder/codex",
+                self._reopen_reason(),
+                resolution_status="open",
+                stage="backlogged",
+                related_bridge_threads=self._reopen_threads(),
+                owner_approved=True,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(),
+                exact_related_bridge_threads=False,
+                expected_current_version=1,
+            )
+
+        assert len(db.get_work_item_history("WI-5441")) == 1
+
+    def test_reopen_terminal_work_item_enforces_exact_path_policy(self, db):
+        db.insert_work_item(
+            id="WI-5640",
+            title="File move canonicalization",
+            origin="defect",
+            component="core",
+            resolution_status="resolved",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+        supplied = [*json.loads(self._reopen_threads()), "bridge/unrelated-001.md"]
+
+        with pytest.raises(ValueError, match="exact related bridge path policy"):
+            db.reopen_terminal_work_item(
+                "WI-5640",
+                "prime-builder/codex",
+                "WI-5640 owner-approved terminal repair under PAUTH-WI5640-TEST",
+                resolution_status="open",
+                stage="implementing",
+                related_bridge_threads=json.dumps(supplied),
+                owner_approved=True,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(json.loads(self._reopen_threads())),
+                exact_related_bridge_threads=True,
+                expected_current_version=1,
+            )
+
+        assert len(db.get_work_item_history("WI-5640")) == 1
+
+    def test_reopen_terminal_work_item_rejects_stale_expected_version(self, db):
+        db.insert_work_item(
+            id="WI-5441",
+            title="Registry control plane",
+            origin="defect",
+            component="core",
+            resolution_status="open",
+            changed_by="test",
+            change_reason="seed false terminal state",
+            stage="resolved",
+        )
+
+        with pytest.raises(ValueError, match="version changed after live validation"):
+            db.reopen_terminal_work_item(
+                "WI-5441",
+                "prime-builder/codex",
+                self._reopen_reason(),
+                resolution_status="open",
+                stage="backlogged",
+                related_bridge_threads=self._reopen_threads(),
+                owner_approved=True,
+                bridge_evidence_validated=True,
+                required_bridge_threads=set(json.loads(self._reopen_threads())),
+                exact_related_bridge_threads=False,
+                expected_current_version=999,
+            )
+
+        assert len(db.get_work_item_history("WI-5441")) == 1
 
 
 class TestTests:

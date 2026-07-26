@@ -789,7 +789,6 @@ def validate_policy_contract(policy: dict[str, Any], mappings: list[MappingRow])
             )
         baseline = policy.get("allowed_baseline_failures", {})
         cross = baseline.get("cross_harness", {}) if isinstance(baseline, dict) else {}
-        governance = baseline.get("governance", {}) if isinstance(baseline, dict) else {}
         cross_nodes = [str(item) for item in cross.get("node_ids", [])]
         if (
             len(cross_nodes) != 6
@@ -801,18 +800,36 @@ def validate_policy_contract(policy: dict[str, Any], mappings: list[MappingRow])
                 "CROSS_HARNESS_BASELINE_POLICY_DRIFT",
                 "Cross-harness frozen no-regression baseline drifted",
             )
+        if "governance" in baseline:
+            raise MigrationError(
+                "GOVERNANCE_BASELINE_POLICY_DRIFT",
+                "The obsolete WI-5648 governance failure allowance must not be present",
+            )
+        expected_governance_nodes = {
+            "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_acquire_denial_creates_no_claim",
+            "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_extension_denial_leaves_claim_unchanged",
+            "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_reclassify_denial_leaves_draft_claim_unchanged",
+            "platform_tests/scripts/test_implementation_start_gate.py::test_work_intent_renew_denial_leaves_go_claim_unchanged",
+        }
+        residuals = policy.get("observed_residual_failures", {})
+        governance = residuals.get("governance", {}) if isinstance(residuals, dict) else {}
         governance_nodes = sorted(str(item) for item in governance.get("node_ids", []))
         governance_hash = "sha256:" + hashlib.sha256(("\n".join(governance_nodes) + "\n").encode("utf-8")).hexdigest()
         if (
-            len(governance_nodes) != 41
-            or governance_hash != "sha256:31cd76c57a3d6070965aebda83e31ea66a4a0d2a0e9454ffd36f51db6ced3338"
+            set(governance_nodes) != expected_governance_nodes
             or governance.get("node_list_lf_sha256") != governance_hash
-            or governance.get("owner_work_item") != "WI-5648"
-            or governance.get("observed_collected_node_count") != 205
-            or governance.get("uniform_root_cause") is not False
+            or governance.get("owner_work_item") != "WI-5178"
+            or governance.get("owner_project") != "PROJECT-GTKB-PLATFORM-MODERNIZATION-AUTHORITY-FOUNDATIONS"
+            or governance.get("observed_collected_node_count") != 475
+            or governance.get("passing_node_count") != 471
+            or governance.get("failing_node_count") != 4
+            or governance.get("allowed_for_stage_b") is not False
             or governance.get("stage_b_requires_all_pass") is not True
         ):
-            raise MigrationError("GOVERNANCE_BASELINE_POLICY_DRIFT", "Governance baseline evidence drifted")
+            raise MigrationError(
+                "GOVERNANCE_RESIDUAL_EVIDENCE_DRIFT",
+                "The non-waiving WI-5178 residual evidence drifted",
+            )
     retention = policy.get("retention", {})
     if (
         retention.get("retain_all_old_paths") is not True
@@ -1748,7 +1765,7 @@ def registered_artifact_paths(root: Path) -> tuple[set[str], list[dict[str, Any]
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
     try:
-        from groundtruth_kb.inventory.string_scan import _artifact_inventory
+        from groundtruth_kb.inventory.string_scan import registered_artifact_inventory
         from groundtruth_kb.project.registry_control_plane import (
             load_registry_snapshot,
             registry_currentness,
@@ -1771,7 +1788,7 @@ def registered_artifact_paths(root: Path) -> tuple[set[str], list[dict[str, Any]
     except Exception as exc:
         raise MigrationError("ARTIFACT_REGISTRY_AUTHORITY_INVALID", str(exc)) from exc
 
-    _artifacts, by_path, missing, _expansions = _artifact_inventory(root, snapshot=snapshot)
+    _artifacts, by_path, missing, _expansions = registered_artifact_inventory(root, snapshot=snapshot)
     if missing:
         raise MigrationError("ARTIFACT_REGISTRY_INCOMPLETE", json.dumps(missing, sort_keys=True))
     paths = set(by_path)

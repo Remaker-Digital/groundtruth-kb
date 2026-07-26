@@ -177,7 +177,7 @@ def test_snapshot_reports_projection_drift_as_typed_failure(tmp_path: Path) -> N
     ("phase", "outcome"),
     [
         ("after_prepare", "old"),
-        ("after_canonical_replace", "repair"),
+        ("after_canonical_replace", "new"),
         ("after_packaged_replace", "new"),
         ("after_db_update", "new"),
         ("after_journal_commit", "new"),
@@ -209,15 +209,6 @@ def test_fault_phases_never_expose_mixed_generation(tmp_path: Path, phase: str, 
                 packaged_registry_path=packaged,
                 db_path=db_path,
             )
-    if outcome == "repair":
-        with pytest.raises(RegistryRecoveryRequired):
-            recover_registry(
-                project_root=tmp_path,
-                registry_path=registry,
-                packaged_registry_path=packaged,
-                db_path=db_path,
-            )
-        return
     recover_registry(
         project_root=tmp_path,
         registry_path=registry,
@@ -231,6 +222,46 @@ def test_fault_phases_never_expose_mixed_generation(tmp_path: Path, phase: str, 
         db_path=db_path,
     )
     assert {record.id for record in snapshot.records} == ({"one"} if outcome == "old" else {"one", "two"})
+
+
+def test_registry_recovery_marks_unknown_digest_combination_repair_required(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "one.txt").write_text("one", encoding="utf-8")
+    (tmp_path / "two.txt").write_text("two", encoding="utf-8")
+    old = [_record("one", "one.txt")]
+    desired = [*old, _record("two", "two.txt")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, old)
+
+    def fail_after_canonical(observed: str) -> None:
+        if observed == "after_canonical_replace":
+            raise RuntimeError(observed)
+
+    with pytest.raises(RuntimeError, match="after_canonical_replace"):
+        apply_registry_transaction(
+            desired,
+            operation="register",
+            failure_injector=fail_after_canonical,
+            **_transaction_kwargs(tmp_path, registry, packaged, db_path),
+        )
+    packaged.write_text("unknown generation\n", encoding="utf-8")
+
+    with pytest.raises(RegistryRecoveryRequired, match="mixed or unknown generation"):
+        recover_registry(
+            project_root=tmp_path,
+            registry_path=registry,
+            packaged_registry_path=packaged,
+            db_path=db_path,
+        )
+
+    conn = sqlite3.connect(db_path)
+    try:
+        state = conn.execute(
+            "SELECT journal_state FROM sot_registry_transaction_journal ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert state == "repair_required"
 
 
 def test_identical_transaction_retry_returns_same_receipt(tmp_path: Path) -> None:

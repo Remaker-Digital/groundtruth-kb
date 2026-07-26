@@ -1461,8 +1461,10 @@ def recover_registry(
                     "WHERE journal_state = 'committed' ORDER BY rowid DESC LIMIT 1"
                 ).fetchone()
                 return _receipt_from_row(latest, idempotent_retry=True) if latest else None
-            canonical_digest = _sha256_bytes(paths.registry_path.read_bytes())
-            packaged_digest = _sha256_bytes(paths.packaged_registry_path.read_bytes())
+            canonical_payload = paths.registry_path.read_bytes()
+            packaged_payload = paths.packaged_registry_path.read_bytes()
+            canonical_digest = _sha256_bytes(canonical_payload)
+            packaged_digest = _sha256_bytes(packaged_payload)
             projection = _load_projection_unlocked(paths.db_path, allow_missing_coverage=True)
             projection_digest = _projection_digest(projection)
             old_files = (
@@ -1481,6 +1483,26 @@ def recover_registry(
                 )
                 conn.commit()
                 return None
+            canonical_new_packaged_old = (
+                canonical_digest == row["new_canonical_digest"]
+                and packaged_digest == row["old_packaged_digest"]
+                and projection_digest == row["old_projection_digest"]
+            )
+            if canonical_new_packaged_old:
+                payload = json.loads(row["payload_json"])
+                records = tuple(_record_from_payload(item) for item in payload["records"])
+                reviewed_payload = serialize_registry(records)
+                payload_is_journal_bound = (
+                    reviewed_payload == canonical_payload
+                    and _sha256_bytes(reviewed_payload) == row["new_canonical_digest"]
+                    and _sha256_bytes(reviewed_payload) == row["new_packaged_digest"]
+                    and _projection_digest(records) == row["new_projection_digest"]
+                    and len(records) == row["expected_record_count"]
+                )
+                if payload_is_journal_bound:
+                    _atomic_replace(paths.packaged_registry_path, reviewed_payload)
+                    return _commit_prepared_generation(conn, row, records, paths=paths)
+
             if new_files and projection_digest == row["old_projection_digest"]:
                 payload = json.loads(row["payload_json"])
                 records = tuple(_record_from_payload(item) for item in payload["records"])

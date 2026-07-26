@@ -1127,11 +1127,23 @@ def test_rollback_rechecks_after_intent_and_preserves_concurrent_bytes(tmp_path:
     assert any(item["status"] == "rollback_mutation_failed" for item in outcomes)
 
 
-def test_governance_baseline_node_hash_is_bound_in_live_policy() -> None:
+def test_governance_residual_evidence_is_non_waiving_and_bound() -> None:
     module = _load_module()
     _path, policy = module.load_policy(ROOT, module.DEFAULT_POLICY)
-    nodes = sorted(policy["allowed_baseline_failures"]["governance"]["node_ids"])
+    assert "governance" not in policy["allowed_baseline_failures"]
+    governance = policy["observed_residual_failures"]["governance"]
+    nodes = sorted(governance["node_ids"])
     digest = "sha256:" + hashlib.sha256(("\n".join(nodes) + "\n").encode()).hexdigest()
-    assert len(nodes) == 41
-    assert digest == policy["allowed_baseline_failures"]["governance"]["node_list_lf_sha256"]
-    assert policy["allowed_baseline_failures"]["governance"]["uniform_root_cause"] is False
+    assert len(nodes) == 4
+    assert governance["owner_work_item"] == "WI-5178"
+    assert governance["failing_node_count"] == 4
+    assert governance["allowed_for_stage_b"] is False
+    assert governance["stage_b_requires_all_pass"] is True
+    assert digest == governance["node_list_lf_sha256"]
+    assert "WI-5648" not in str(governance)
+
+
+def test_migration_source_consumes_only_public_registered_inventory_api() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "import _artifact_inventory" not in source
+    assert "registered_artifact_inventory(root, snapshot=snapshot)" in source
