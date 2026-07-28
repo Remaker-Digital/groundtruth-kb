@@ -8,6 +8,7 @@ operations run in isolation (no real pre-commit hooks fire there).
 
 from __future__ import annotations
 
+import importlib
 import json
 import subprocess
 import sys
@@ -160,6 +161,15 @@ def repo(tmp_path, monkeypatch):
 def _head_files(repo: Path) -> set[str]:
     out = _git(repo, "show", "--name-only", "--format=", "HEAD").stdout
     return {line.strip() for line in out.splitlines() if line.strip()}
+
+
+def test_canonical_verified_validator_import_root_is_live() -> None:
+    expected = _REPO_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers"
+    assert expected == sweep_mod._VERIFY_HELPERS
+
+    validator = importlib.import_module("write_verdict")
+    assert Path(validator.__file__).resolve() == (expected / "write_verdict.py").resolve()
+    assert callable(validator.validate_verified_body)
 
 
 def test_sweep_finalizes_eligible_verdict(repo):

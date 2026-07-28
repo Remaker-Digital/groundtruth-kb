@@ -387,6 +387,101 @@ def load_registry(project_root: Path) -> tuple[dict[str, Any], Path]:
     return _load_toml(registry_path), registry_path
 
 
+def capability_artifact_observations(project_root: Path) -> list[dict[str, str]]:
+    """Return deterministic path observations from the canonical capability registry.
+
+    This is the public inventory surface used by registry reconciliation.  A
+    capability row proves that a declared source or operative native/adapter
+    surface is load-bearing; it does not grant registry membership.
+    """
+
+    registry, registry_path = load_registry(project_root)
+    rows: list[dict[str, str]] = [
+        {
+            "path": _relative_path(project_root, registry_path),
+            "source": "capability_registry",
+            "reason": "canonical capability inventory declaration",
+        }
+    ]
+    capabilities = registry.get("capabilities")
+    for capability in capabilities if isinstance(capabilities, list) else []:
+        if not isinstance(capability, dict):
+            continue
+        capability_id = str(capability.get("id") or "unknown")
+        canonical_source = capability.get("canonical_source")
+        if isinstance(canonical_source, str) and canonical_source.strip():
+            rows.append(
+                {
+                    "path": canonical_source.strip(),
+                    "source": f"capability:{capability_id}:canonical_source",
+                    "reason": "canonical capability source",
+                }
+            )
+        for harness, configuration in sorted(capability.items()):
+            if not isinstance(configuration, dict):
+                continue
+            status = str(configuration.get("status") or "").strip().casefold()
+            if status not in {"native", "adapter", "generated-adapter"}:
+                continue
+            for field in ("surface", "adapter_source"):
+                value = configuration.get(field)
+                if isinstance(value, str) and value.strip():
+                    rows.append(
+                        {
+                            "path": value.strip(),
+                            "source": f"capability:{capability_id}:{harness}:{field}",
+                            "reason": f"operative {status} capability surface",
+                        }
+                    )
+
+    harnesses = registry.get("harnesses")
+    for harness, configuration in sorted(harnesses.items()) if isinstance(harnesses, dict) else []:
+        if not isinstance(configuration, dict):
+            continue
+        for field in (
+            "activity_envelope_manifest_source",
+            "skill_adapter_generator",
+            "skill_adapter_manifest",
+        ):
+            value = configuration.get(field)
+            if isinstance(value, str) and value.strip():
+                rows.append(
+                    {
+                        "path": value.strip(),
+                        "source": f"harness:{harness}:{field}",
+                        "reason": "declared harness capability support artifact",
+                    }
+                )
+        manifest_value = configuration.get("skill_adapter_manifest")
+        if not isinstance(manifest_value, str) or not manifest_value.strip():
+            continue
+        manifest_path = project_root / manifest_value
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        adapters = manifest.get("adapters") if isinstance(manifest, dict) else None
+        for adapter in adapters if isinstance(adapters, list) else []:
+            if not isinstance(adapter, dict):
+                continue
+            capability_id = str(adapter.get("capability_id") or "unknown")
+            for field in ("source_relative_path", "adapter_relative_path"):
+                value = adapter.get(field)
+                if isinstance(value, str) and value.strip():
+                    rows.append(
+                        {
+                            "path": value.strip(),
+                            "source": f"manifest:{harness}:{capability_id}:{field}",
+                            "reason": "generated adapter manifest member",
+                        }
+                    )
+
+    unique = {(row["path"].casefold(), row["source"], row["reason"]): row for row in rows}
+    return sorted(unique.values(), key=lambda row: (row["path"].casefold(), row["source"], row["reason"]))
+
+
 def _selected_harnesses(harness: str, known_harnesses: tuple[str, ...]) -> list[str]:
     normalized = _normalize_harness(harness, known_harnesses)
     if normalized == "all":

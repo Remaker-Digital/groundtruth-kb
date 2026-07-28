@@ -1766,9 +1766,11 @@ def registered_artifact_paths(root: Path) -> tuple[set[str], list[dict[str, Any]
         sys.path.insert(0, str(package_root))
     try:
         from groundtruth_kb.inventory.string_scan import registered_artifact_inventory
+        from groundtruth_kb.project.artifact_membership_reconciliation import (
+            reconcile_artifact_membership,
+        )
         from groundtruth_kb.project.registry_control_plane import (
             load_registry_snapshot,
-            registry_currentness,
             require_current_registry_receipt,
         )
     except ImportError as exc:
@@ -1776,11 +1778,22 @@ def registered_artifact_paths(root: Path) -> tuple[set[str], list[dict[str, Any]
 
     try:
         snapshot = load_registry_snapshot(project_root=root)
-        currentness = registry_currentness(snapshot, project_root=root, db_path=root / "groundtruth.db")
-        if not currentness["current"]:
+        reconciliation = reconcile_artifact_membership(
+            root,
+            snapshot=snapshot,
+            db_path=root / "groundtruth.db",
+        )
+        if not reconciliation["membership_complete"]:
             raise MigrationError(
-                "ARTIFACT_REGISTRY_STALE",
-                json.dumps(currentness, sort_keys=True, separators=(",", ":")),
+                "ARTIFACT_REGISTRY_MEMBERSHIP_INCOMPLETE",
+                json.dumps(
+                    {
+                        "counts": reconciliation["counts"],
+                        "candidate_manifest_sha256": reconciliation["candidate_manifest_sha256"],
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
             )
         require_current_registry_receipt(snapshot, db_path=root / "groundtruth.db")
     except MigrationError:

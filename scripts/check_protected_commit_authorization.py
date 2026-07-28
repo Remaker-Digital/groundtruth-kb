@@ -58,6 +58,7 @@ VERSIONED_BRIDGE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 VERSIONED_BRIDGE_CAPTURE_RE = re.compile(r"^bridge/(?P<bridge_id>[A-Za-z0-9][A-Za-z0-9_.-]*)-(?P<version>\d{3})\.md$")
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
 IMPLEMENTATION_REPORT_RE = re.compile(r"(?mi)^bridge_kind:\s*implementation_report\s*$")
+CONTROLLING_GO_RE = re.compile(r"(?mi)^Controlling GO:\s*`?(bridge/[A-Za-z0-9][A-Za-z0-9_.-]*-\d{3}\.md)`?\s*$")
 MANIFEST_PATH_RE = re.compile(r"^-\s+`([^`]+)`\s*$")
 GLOB_META_RE = re.compile(r"[*?\[\]]")
 AUTHOR_SESSION_RE = re.compile(r"(?mi)^author_session_context_id:\s*(\S+)\s*$")
@@ -1362,6 +1363,13 @@ def _version_by_path(resolution: Any, rel_path: str | None) -> Any | None:
     return next((version for version in resolution.audit_versions if version.path == rel_path), None)
 
 
+def _controlling_go_path(report_text: str) -> str | None:
+    matches = CONTROLLING_GO_RE.findall(report_text)
+    if len(matches) > 1:
+        raise GateError("implementation report declares more than one Controlling GO")
+    return matches[0] if matches else None
+
+
 def _approved_chain(snapshot_root: Path, resolution: Any) -> _ApprovedChain:
     latest = resolution.latest_strict_state
     if latest.status != "VERIFIED" or not latest.responds_to:
@@ -1376,7 +1384,14 @@ def _approved_chain(snapshot_root: Path, resolution: Any) -> _ApprovedChain:
     if IMPLEMENTATION_REPORT_RE.search(report_text) is None:
         raise GateError("linked Prime artifact is not an implementation report")
 
-    go = _version_by_path(resolution, report.responds_to)
+    direct_go = _version_by_path(resolution, report.responds_to)
+    explicit_go_path = _controlling_go_path(report_text)
+    if direct_go is not None and direct_go.status == "GO" and direct_go.author_role == "loyal-opposition":
+        if explicit_go_path is not None and explicit_go_path != direct_go.path:
+            raise GateError("implementation report's Controlling GO conflicts with its Responds to GO")
+        go = direct_go
+    else:
+        go = _version_by_path(resolution, explicit_go_path)
     if go is None or go.status != "GO" or go.author_role != "loyal-opposition":
         raise GateError("implementation report is not linked to its approving GO")
     proposal = _version_by_path(resolution, go.responds_to)
@@ -2051,39 +2066,37 @@ def _bridge_publication_capability_clearance(
     return True, ""
 
 
-def _registry_commit_findings(
+def _registry_commit_assessment(
     root: Path,
     selected_paths: list[str],
     index_snapshot: _IndexSnapshot | None,
-) -> list[dict[str, Any]]:
-    """Enforce coherent, current, capability-bound registry evidence."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Enforce identity controls and report content-observation gaps separately."""
     package_src = root / "groundtruth-kb" / "src"
     if str(package_src) not in sys.path:
         sys.path.insert(0, str(package_src))
     registry_path = root / "config" / "registry" / "sot-artifacts.toml"
     if not registry_path.is_file():
-        return []
+        return [], []
     try:
-        from groundtruth_kb.project.registry_control_plane import (
-            load_registry_snapshot,
-            registry_currentness,
-        )
+        from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 
         registry = load_registry_snapshot(project_root=root)
-        currentness = registry_currentness(registry, project_root=root, db_path=root / "groundtruth.db")
     except Exception as exc:  # noqa: BLE001 - commit authority fails closed
-        return [
-            {
-                "path": "config/registry/sot-artifacts.toml",
-                "reason": f"coherent registry authority unavailable: {exc}",
-            }
-        ]
+        return (
+            [
+                {
+                    "path": "config/registry/sot-artifacts.toml",
+                    "reason": f"coherent registry authority unavailable: {exc}",
+                }
+            ],
+            [],
+        )
 
-    stale_ids = {item["id"] for item in currentness["stale"]}
-    missing_ids = set(currentness["missing_revisions"])
     conn = sqlite3.connect(str(root / "groundtruth.db"))
     conn.row_factory = sqlite3.Row
     findings: list[dict[str, Any]] = []
+    audit_gaps: list[dict[str, Any]] = []
     try:
         for rel_path in selected_paths:
             record = registry.resolver.resolve(rel_path)
@@ -2098,15 +2111,12 @@ def _registry_commit_findings(
                     }
                 )
                 continue
-            if record.id in stale_ids or record.id in missing_ids:
-                findings.append({"path": rel_path, "reason": "registered artifact digest is not current"})
-                continue
             publication_capability = _newest_exact_bridge_publication_capability(
                 conn,
                 record_id=record.id,
                 rel_path=rel_path,
             )
-            if publication_capability is not None:
+            if VERSIONED_BRIDGE_CAPTURE_RE.fullmatch(rel_path):
                 publication_bound, publication_reason = _bridge_publication_capability_clearance(
                     conn,
                     root=root,
@@ -2123,8 +2133,32 @@ def _registry_commit_findings(
                 (record.id,),
             ).fetchone()
             if revision is None:
-                findings.append({"path": rel_path, "reason": "registered artifact lacks revision evidence"})
+                audit_gaps.append(
+                    {
+                        "path": rel_path,
+                        "registry_id": record.id,
+                        "reason": "registered artifact lacks content-observation revision evidence",
+                    }
+                )
                 continue
+            if record.coverage_mode == "exact":
+                staged_digest, staged_error = _staged_index_content_digest(root, rel_path, index_snapshot)
+                if staged_error is not None:
+                    audit_gaps.append(
+                        {
+                            "path": rel_path,
+                            "registry_id": record.id,
+                            "reason": staged_error,
+                        }
+                    )
+                elif revision["content_digest"] != staged_digest:
+                    audit_gaps.append(
+                        {
+                            "path": rel_path,
+                            "registry_id": record.id,
+                            "reason": "staged bytes are newer than the latest registry observation",
+                        }
+                    )
             capability_bound = False
             if revision["capability_hash"]:
                 capability = conn.execute(
@@ -2163,14 +2197,34 @@ def _registry_commit_findings(
                     and journal["start_packet_hash"] == revision["start_packet_hash"]
                 )
             if not capability_bound and not journal_bound:
-                findings.append(
+                audit_gaps.append(
                     {
                         "path": rel_path,
-                        "reason": "registered artifact lacks authorized observation or transaction evidence",
+                        "registry_id": record.id,
+                        "reason": "registered artifact lacks automatic observation or transaction evidence",
                     }
                 )
+    except sqlite3.Error as exc:
+        findings.append(
+            {
+                "path": "groundtruth.db",
+                "reason": f"registry evidence store is unavailable: {exc}",
+            }
+        )
     finally:
         conn.close()
+    unique_gaps = {(gap["path"], gap["registry_id"], gap["reason"]): gap for gap in audit_gaps}
+    return findings, list(unique_gaps.values())
+
+
+def _registry_commit_findings(
+    root: Path,
+    selected_paths: list[str],
+    index_snapshot: _IndexSnapshot | None,
+) -> list[dict[str, Any]]:
+    """Compatibility view containing only commit-blocking registry findings."""
+
+    findings, _audit_gaps = _registry_commit_assessment(root, selected_paths, index_snapshot)
     return findings
 
 
@@ -2187,7 +2241,8 @@ def _evaluate_selected(
         for path in selected_paths
         if (finding := _verified_bridge_finalization_finding(root, path, snapshot)) is not None
     ]
-    bridge_findings.extend(_registry_commit_findings(root, selected_paths, snapshot))
+    registry_findings, registry_audit_gaps = _registry_commit_assessment(root, selected_paths, snapshot)
+    bridge_findings.extend(registry_findings)
 
     if not protected_paths and not bridge_findings:
         return {
@@ -2196,6 +2251,7 @@ def _evaluate_selected(
             "cleared": [],
             "skipped_unprotected": skipped_unprotected,
             "protected_paths": [],
+            "audit_gaps": registry_audit_gaps,
             "evidence_summary": {
                 "live_go_packets_scanned": 0,
                 "live_go_packets_valid": 0,
@@ -2257,6 +2313,7 @@ def _evaluate_selected(
         "cleared": cleared,
         "skipped_unprotected": skipped_unprotected,
         "protected_paths": protected_paths,
+        "audit_gaps": registry_audit_gaps,
         "evidence_summary": {
             "live_go_packets_scanned": live_go_count,
             "live_go_packets_valid": len(live_go_packets),
@@ -2278,9 +2335,15 @@ def evaluate(root: Path, *, paths: list[str] | None = None) -> dict[str, Any]:
 
 def _format_human(result: dict[str, Any], *, transaction_available: bool = False) -> str:
     if result["status"] == "pass":
+        audit_suffix = (
+            f"; {len(result.get('audit_gaps', []))} registry audit gap(s) recorded" if result.get("audit_gaps") else ""
+        )
         if result["cleared"]:
-            return f"PASS protected-commit authorization ({len(result['cleared'])} protected path(s) cleared)"
-        return "PASS protected-commit authorization (no protected paths in staged set)"
+            return (
+                f"PASS protected-commit authorization ({len(result['cleared'])} protected path(s) cleared"
+                f"{audit_suffix})"
+            )
+        return f"PASS protected-commit authorization (no protected paths in staged set{audit_suffix})"
 
     lines = ["FAIL protected-commit authorization"]
     for finding in result["findings"]:

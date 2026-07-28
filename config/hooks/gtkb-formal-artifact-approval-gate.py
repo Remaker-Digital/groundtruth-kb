@@ -16,6 +16,9 @@ Protected by:
 Stdin:  JSON {"tool_name": "Bash", "tool_input": {"command": "..."}, ...}
 Stdout: JSON {"decision": "block", "reason": "..."} or {}
 Exit:   Always 0
+
+This hook governs only the intercepted Bash call. Direct editor saves carry no
+required notation; hook-mechanism failures are recorded and allowed forward.
 """
 
 from __future__ import annotations
@@ -315,6 +318,23 @@ def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
         pass
 
 
+def _record_repair_forward_gap(reason: str) -> None:
+    path = _project_root() / ".gtkb-state" / "governance" / "audit-gaps.jsonl"
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "kind": "approval_hook_mechanism_gap",
+        "gate": "formal-artifact-approval-gate",
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 def _load_packet(path_text: str) -> tuple[dict[str, Any] | None, str | None]:
     try:
         packet_path = Path(path_text).expanduser()
@@ -405,7 +425,8 @@ def main() -> None:
     try:
         data = json.loads(sys.stdin.read())
     except Exception as exc:  # noqa: BLE001
-        _block(f"Hook input could not be parsed: {exc}", pattern_id="hook-input")
+        _record_repair_forward_gap(f"Hook input could not be parsed: {exc}")
+        print(json.dumps({}))
         return
 
     if data.get("tool_name") != "Bash":

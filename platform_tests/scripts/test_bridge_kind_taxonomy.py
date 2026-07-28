@@ -12,6 +12,7 @@ def test_bridge_kind_enum_values():
     assert BridgeKind.PRIME_PROPOSAL == "prime_proposal"
     assert BridgeKind.LO_VERDICT == "lo_verdict"
     assert BridgeKind.IMPLEMENTATION_REPORT == "implementation_report"
+    assert BridgeKind.GOVERNANCE_REVIEW == "governance_review"
     assert BridgeKind.GOVERNANCE_ADVISORY == "governance_advisory"
     assert BridgeKind.INDEX_RECONCILIATION == "index_reconciliation"
     assert BridgeKind.OPERATIONAL_STATE_CHANGE == "operational_state_change"
@@ -63,7 +64,7 @@ def test_map_bridge_kind():
     assert map_bridge_kind("post_implementation_report", "NEW") == "implementation_report"
 
     # Governance & Advisory mapping
-    assert map_bridge_kind("governance_review", "NEW") == "governance_advisory"
+    assert map_bridge_kind("governance_review", "NEW") == "governance_review"
     assert map_bridge_kind("loyal_opposition_advisory", "NEW") == "governance_advisory"
 
     # Heuristic fallback

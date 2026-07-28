@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -89,11 +90,11 @@ def consume_payload(payload: dict[str, Any], *, project_root: Path = PROJECT_ROO
         path.unlink(missing_ok=True)
 
 
-def _registered_intent_required(payload: dict[str, Any], project_root: Path) -> bool:
+def _registered_intent_required(payload: dict[str, Any], project_root: Path) -> bool | None:
     try:
         snapshot = load_registry_snapshot(project_root=project_root, db_path=project_root / "groundtruth.db")
     except (RegistryControlPlaneError, FileNotFoundError):
-        return False
+        return None
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return False
@@ -111,24 +112,65 @@ def _registered_intent_required(payload: dict[str, Any], project_root: Path) -> 
     return False
 
 
+def _record_audit_gap(payload: dict[str, Any], *, code: str, detail: str) -> dict[str, Any]:
+    row = {
+        "schema_version": 1,
+        "kind": "registry_observation_gap",
+        "code": code,
+        "detail": detail,
+        "session_id": str(payload.get("session_id") or payload.get("sessionId") or "") or None,
+        "tool_event_id": str(
+            payload.get("tool_use_id")
+            or payload.get("toolUseID")
+            or payload.get("tool_event_id")
+            or payload.get("event_id")
+            or ""
+        )
+        or None,
+        "observed_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    try:
+        target = PROJECT_ROOT / ".gtkb-state" / "sot-registry" / "audit-gaps.jsonl"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+    return row
+
+
 def main() -> int:
+    payload: dict[str, Any] = {}
     try:
         raw = sys.stdin.read()
-        payload = json.loads(raw) if raw.strip() else {}
-        if not isinstance(payload, dict):
+        decoded = json.loads(raw) if raw.strip() else {}
+        if not isinstance(decoded, dict):
             raise RegistryAuthorizationError("post-tool payload must be a JSON object")
+        payload = decoded
         try:
             revisions = consume_payload(payload)
         except RegistryAuthorizationError as exc:
-            if _registered_intent_required(payload, PROJECT_ROOT):
-                raise
-            print(json.dumps({"registry_observation": "not_required", "detail": str(exc)}, sort_keys=True))
+            required = _registered_intent_required(payload, PROJECT_ROOT)
+            if required is False:
+                print(json.dumps({"registry_observation": "not_required", "detail": str(exc)}, sort_keys=True))
+                return 0
+            gap = _record_audit_gap(
+                payload,
+                code="missing_or_invalid_observation_intent",
+                detail=str(exc),
+            )
+            print(json.dumps({"registry_observation": "audit_gap", "gap": gap}, sort_keys=True))
             return 0
         print(json.dumps({"registry_observation": "consumed", "revision_ids": revisions}, sort_keys=True))
         return 0
     except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        print(f"registry observation denied: {exc}", file=sys.stderr)
-        return 1
+        gap = _record_audit_gap(
+            payload,
+            code="observation_hook_failure",
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+        print(json.dumps({"registry_observation": "audit_gap", "gap": gap}, sort_keys=True))
+        return 0
 
 
 if __name__ == "__main__":

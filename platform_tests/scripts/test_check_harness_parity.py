@@ -139,6 +139,49 @@ def _write_registry(project_root: Path, body: str) -> None:
     )
 
 
+def test_capability_artifact_observations_expose_typed_sources_and_surfaces(tmp_path: Path) -> None:
+    module = _load_module()
+    _write_registry(
+        tmp_path,
+        """
+[[capabilities]]
+id = "hook.sample"
+kind = "hook"
+canonical_name = "sample"
+canonical_purpose = "fixture"
+canonical_source = "config/hooks/sample.py"
+required_for_roles = ["prime-builder"]
+parity_class = "baseline"
+
+[capabilities.claude]
+surface = ".claude/hooks/sample.py"
+status = "native"
+
+[capabilities.codex]
+surface = ".codex/gtkb-hooks/sample.py"
+status = "adapter"
+adapter_source = "config/hooks/sample.py"
+source_sha256 = "fixture"
+
+[harnesses.codex]
+skill_adapter_generator = "scripts/generate_codex_skill_adapters.py"
+skill_adapter_manifest = ".codex/skills/MANIFEST.json"
+""",
+    )
+
+    rows = module.capability_artifact_observations(tmp_path)
+
+    assert {row["path"] for row in rows} == {
+        ".claude/hooks/sample.py",
+        ".codex/gtkb-hooks/sample.py",
+        ".codex/skills/MANIFEST.json",
+        "config/agent-control/gtkb-harness-capability-registry.toml",
+        "config/hooks/sample.py",
+        "scripts/generate_codex_skill_adapters.py",
+    }
+    assert rows == sorted(rows, key=lambda row: (row["path"].casefold(), row["source"], row["reason"]))
+
+
 def test_alibaba_managed_skill_adoption_review_is_truthfully_unsupported(monkeypatch, tmp_path: Path) -> None:
     module = _load_module()
     _write_projection(

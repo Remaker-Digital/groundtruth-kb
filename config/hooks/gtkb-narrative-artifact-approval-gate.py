@@ -13,11 +13,14 @@ Specs:     GOV-ARTIFACT-APPROVAL-001 (extended), DCL-ARTIFACT-APPROVAL-HOOK-001 
 Harness scope: Claude only (PreToolUse on Write|Edit). Codex template parity at
 groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py is
 forward-compatible-only per ADR-CODEX-HOOK-PARITY-FALLBACK-001; it is NOT a
-live Windows interception boundary. Slice C's pre-commit hook is the
-universal enforcement floor.
+live Windows interception boundary. Slice C's pre-commit hook is a
+harness-agnostic repair-forward audit.
 
 Stdin:  JSON {"tool_name": "Write|Edit", "tool_input": {"file_path": "...", ...}, ...}
 Stdout: JSON {"decision": "block", "reason": "..."} or {} (allow)
+
+This hook governs only the intercepted tool call. Direct editor saves carry no
+required notation and the commit-time audit remains repair-forward.
 Exit:   Always 0 (Claude Code hook contract: hook always returns 0; decision is in stdout)
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -101,13 +104,32 @@ def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
         pass
 
 
+def _record_repair_forward_gap(root: Path, reason: str) -> None:
+    path = root / ".gtkb-state" / "governance" / "audit-gaps.jsonl"
+    record = {
+        "schema_version": 1,
+        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
+        "kind": "approval_hook_mechanism_gap",
+        "gate": "narrative-artifact-approval-gate",
+        "reason": reason,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 def _load_config(root: Path) -> dict[str, Any] | None:
     config_path = root / DEFAULT_CONFIG_PATH
     if not config_path.exists():
+        _record_repair_forward_gap(root, f"approval configuration is missing: {DEFAULT_CONFIG_PATH}")
         return None
     try:
         return tomllib.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        _record_repair_forward_gap(root, f"approval configuration is unreadable: {exc}")
         return None
 
 
@@ -320,7 +342,8 @@ def main() -> None:
 
     try:
         payload = json.loads(sys.stdin.read())
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        _record_repair_forward_gap(_project_root(), f"hook input could not be parsed: {exc}")
         _emit_pass()
         return
 

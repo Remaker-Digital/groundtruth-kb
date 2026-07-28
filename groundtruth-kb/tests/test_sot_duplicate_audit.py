@@ -3,10 +3,29 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from groundtruth_kb.cli import main
+from groundtruth_kb.project import sot_audit
 from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit
+
+
+@pytest.fixture(autouse=True)
+def _complete_registry_membership(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sot_audit,
+        "reconcile_artifact_membership",
+        lambda _root: {
+            "membership_complete": True,
+            "counts": {
+                "registered": 3,
+                "unregistered_load_bearing": 0,
+                "unregistered_disposable": 0,
+                "invalid_unknown": 0,
+            },
+        },
+    )
 
 
 def _registry_record(record_id: str, storage_path: str, *, domain: str = "control_surface") -> str:

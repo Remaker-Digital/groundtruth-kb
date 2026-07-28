@@ -11,10 +11,12 @@
 #        is forward-compatible-only per ADR-CODEX-HOOK-PARITY-FALLBACK-001; it is NOT a
 #        live Windows interception boundary.
 #   2. Slice C: scripts/check_narrative_artifact_evidence.py (.githooks/pre-commit)
-#      - Universal harness-agnostic enforcement floor; hard-blocks both Claude and Codex
-#        paths because git commit runs regardless of which harness produced the staged change.
+#      - Harness-agnostic best-effort audit. Missing or stale evidence is reported as a
+#        repair-forward audit gap and does not reject an otherwise valid commit.
 #
 # Both layers share this registry as the single source of truth for protected-path matching.
+# Direct editor saves require no notation, marker, packet, or actor inference. Tool-context
+# hooks may guide or deny a worker while functioning; they are not a filesystem security boundary.
 
 schema_version = 1
 

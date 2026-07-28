@@ -397,6 +397,79 @@ Responds to: {report}
     return selected_paths, report, verdict
 
 
+def _corrected_report_resolution(tmp_path: Path, *, controlling_go: str | None):
+    bridge_id = "gtkb-corrected-report-fixture"
+    proposal = f"bridge/{bridge_id}-001.md"
+    go = f"bridge/{bridge_id}-002.md"
+    first_report = f"bridge/{bridge_id}-003.md"
+    no_go = f"bridge/{bridge_id}-004.md"
+    corrected_report = f"bridge/{bridge_id}-005.md"
+    verdict = f"bridge/{bridge_id}-006.md"
+    protected_paths = ["scripts/authority.py", "platform_tests/scripts/test_authority.py"]
+    (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
+    (tmp_path / proposal).write_text(
+        f"NEW\n\ntarget_paths: {json.dumps(protected_paths)}\n",
+        encoding="utf-8",
+    )
+    controlling_line = f"Controlling GO: {controlling_go}\n" if controlling_go else ""
+    (tmp_path / corrected_report).write_text(
+        f"REVISED\n\nbridge_kind: implementation_report\nResponds to: {no_go}\n{controlling_line}",
+        encoding="utf-8",
+    )
+    versions = (
+        SimpleNamespace(path=proposal, status="NEW", author_role="prime-builder", responds_to=None),
+        SimpleNamespace(path=go, status="GO", author_role="loyal-opposition", responds_to=proposal),
+        SimpleNamespace(path=first_report, status="NEW", author_role="prime-builder", responds_to=go),
+        SimpleNamespace(path=no_go, status="NO-GO", author_role="loyal-opposition", responds_to=first_report),
+        SimpleNamespace(path=corrected_report, status="REVISED", author_role="prime-builder", responds_to=no_go),
+        SimpleNamespace(path=verdict, status="VERIFIED", author_role="loyal-opposition", responds_to=corrected_report),
+    )
+    return SimpleNamespace(latest_strict_state=versions[-1], audit_versions=versions), (proposal, go, corrected_report)
+
+
+def test_approved_chain_accepts_explicit_controlling_go_after_report_no_go(tmp_path: Path) -> None:
+    module = _load_module()
+    go = "bridge/gtkb-corrected-report-fixture-002.md"
+    resolution, (proposal, _, report) = _corrected_report_resolution(tmp_path, controlling_go=go)
+
+    chain = module._approved_chain(tmp_path, resolution)
+
+    assert chain.proposal_path == proposal
+    assert chain.go_path == go
+    assert chain.report_path == report
+    assert chain.target_paths == ("scripts/authority.py", "platform_tests/scripts/test_authority.py")
+
+
+@pytest.mark.parametrize(
+    "controlling_go",
+    [
+        None,
+        "bridge/gtkb-corrected-report-fixture-004.md",
+        "bridge/gtkb-corrected-report-fixture-099.md",
+    ],
+)
+def test_approved_chain_rejects_missing_or_non_go_controlling_link(
+    tmp_path: Path,
+    controlling_go: str | None,
+) -> None:
+    module = _load_module()
+    resolution, _ = _corrected_report_resolution(tmp_path, controlling_go=controlling_go)
+
+    with pytest.raises(module.GateError, match="implementation report is not linked to its approving GO"):
+        module._approved_chain(tmp_path, resolution)
+
+
+def test_approved_chain_rejects_duplicate_controlling_go_headers(tmp_path: Path) -> None:
+    module = _load_module()
+    go = "bridge/gtkb-corrected-report-fixture-002.md"
+    resolution, (_, _, report) = _corrected_report_resolution(tmp_path, controlling_go=go)
+    report_path = tmp_path / report
+    report_path.write_text(report_path.read_text(encoding="utf-8") + f"Controlling GO: `{go}`\n", encoding="utf-8")
+
+    with pytest.raises(module.GateError, match="more than one Controlling GO"):
+        module._approved_chain(tmp_path, resolution)
+
+
 def _stage_transaction(root: Path, selected_paths: list[str], report: str, verdict: str) -> None:
     hooks = root / "empty-hooks"
     hooks.mkdir()
@@ -883,6 +956,7 @@ def test_json_shape_for_cli_paths(tmp_path: Path, capsys, monkeypatch: pytest.Mo
         "cleared",
         "skipped_unprotected",
         "protected_paths",
+        "audit_gaps",
         "evidence_summary",
     }
     assert "transaction-local" not in parsed["findings"][0]["reason"]
@@ -2678,14 +2752,15 @@ def test_registry_commit_accepts_coherent_journal_bound_member(tmp_path: Path) -
     assert module._registry_commit_findings(tmp_path, ["registered.txt"], None) == []
 
 
-def test_registry_commit_blocks_stale_registered_digest(tmp_path: Path) -> None:
+def test_registry_commit_reports_stale_registered_content_without_blocking(tmp_path: Path) -> None:
     module = _load_module()
     member = _seed_registered_commit_fixture(tmp_path)
     member.write_text("changed without observation\n", encoding="utf-8")
 
-    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], None)
+    findings, audit_gaps = module._registry_commit_assessment(tmp_path, ["registered.txt"], None)
 
-    assert findings == [{"path": "registered.txt", "reason": "registered artifact digest is not current"}]
+    assert findings == []
+    assert any(gap["path"] == "registered.txt" for gap in audit_gaps)
 
 
 def test_registry_commit_blocks_incomplete_journal(tmp_path: Path) -> None:
@@ -2763,14 +2838,10 @@ def test_registry_commit_rejects_mismatched_capability_start_packet(tmp_path: Pa
     finally:
         conn.close()
 
-    findings = module._registry_commit_findings(tmp_path, ["registered.txt"], None)
+    findings, audit_gaps = module._registry_commit_assessment(tmp_path, ["registered.txt"], None)
 
-    assert findings == [
-        {
-            "path": "registered.txt",
-            "reason": "registered artifact lacks authorized observation or transaction evidence",
-        }
-    ]
+    assert findings == []
+    assert any("lacks automatic observation" in gap["reason"] for gap in audit_gaps)
 
 
 def _staged_registry_findings(module, root: Path, rel_paths: list[str]) -> list[dict[str, object]]:
@@ -2816,7 +2887,7 @@ def test_newest_aggregate_revision_cannot_authorize_predecessor_without_exact_ca
     assert findings == [
         {
             "path": rel_paths[0],
-            "reason": "registered artifact lacks authorized observation or transaction evidence",
+            "reason": "registered bridge path lacks exact publication capability evidence",
         }
     ]
 
@@ -2864,7 +2935,7 @@ def test_registry_commit_rejects_nonterminal_bridge_publication_attempts(
     assert len(findings) == 1
     assert findings[0]["path"] == rel_path
     if mutation == "missing":
-        assert findings[0]["reason"] == "registered artifact lacks authorized observation or transaction evidence"
+        assert findings[0]["reason"] == "registered bridge path lacks exact publication capability evidence"
     else:
         assert "publication" in str(findings[0]["reason"])
 
@@ -3098,7 +3169,7 @@ def test_near_match_publication_path_never_authorizes_exact_staged_path(tmp_path
     assert findings == [
         {
             "path": rel_path,
-            "reason": "registered artifact lacks authorized observation or transaction evidence",
+            "reason": "registered bridge path lacks exact publication capability evidence",
         }
     ]
 

@@ -1,0 +1,2375 @@
+REVISED
+::init gtkb pb
+::open build
+author_identity: prime-builder/codex
+author_harness_id: A
+author_session_context_id: 019f863a-acd3-7320-80c0-1831f0936cc0
+author_model: gpt-5
+author_model_version: gpt-5
+author_model_configuration: reasoning_effort=high; thread_source=user
+author_metadata_source: x-codex-turn-metadata
+
+# GT-KB Bridge Implementation Report - gtkb-wi5441-global-registry-membership-reconciliation - 013
+
+bridge_kind: implementation_report
+Document: gtkb-wi5441-global-registry-membership-reconciliation
+Version: 013
+Responds to: bridge/gtkb-wi5441-global-registry-membership-reconciliation-012.md
+Controlling GO: bridge/gtkb-wi5441-global-registry-membership-reconciliation-008.md
+Prior implementation report: bridge/gtkb-wi5441-global-registry-membership-reconciliation-011.md
+Approved proposal: bridge/gtkb-wi5441-global-registry-membership-reconciliation-007.md
+Project Authorization: PAUTH-PROJECT-GTKB-HOUSEKEEPING-HARDENING-WI5441-NOTATION-FREE-DIRECT-EDIT-20260726
+Project: PROJECT-GTKB-HOUSEKEEPING-HARDENING
+Work Item: WI-5441
+Recommended commit type: feat:
+
+## Response To v012 NO-GO
+
+The v012 implementation finding is accepted. The registry reconciliation,
+registry transactions, admission evidence, formatting, and all previously
+verified implementation bytes were not re-run or re-derived.
+
+- **F1 closed mechanically.** This report preserves strict lifecycle continuity
+  by responding to the immediately preceding v012 NO-GO and names v008 in one
+  unambiguous `Controlling GO:` header. The finalization checker previously
+  ignored that field and only followed `Responds to`, so the header-only remedy
+  proposed in v012 could not satisfy both gates: the lifecycle resolver requires
+  v013 to point at v012, while the checker required the same field to point at
+  v008. The already-authorized checker now accepts either the legacy direct-GO
+  form or one explicit resolver-known Loyal Opposition GO. Missing, non-GO,
+  unknown, duplicate, and conflicting links fail closed.
+- **F2 carried to its existing advisory.** No finalization exit-status behavior
+  changes in this revision.
+
+The checker and its focused test were already declared in the v007 target set
+and in this report's `## Files Changed`; no path scope was added. The complete
+focused checker file passes 146/146 tests, including the corrected
+GO -> report -> NO-GO -> REVISED report -> VERIFIED chain.
+
+## Implementation Claim
+
+WI-5441 is implemented for the approved parent scope. The platform now has one
+typed reconciliation service with five provenance-bearing observers, exact
+membership and traversal classes, a bounded public CLI, additive transaction
+binding, and shared doctor/release/migration/hygiene consumers. Content audit
+evidence is best-effort and nonblocking; registered identity changes and
+irreversible operations retain their separate controls. Plain direct content
+edits require no notation or editor integration.
+
+The registry postimage contains 2,346 records and is coherent across canonical
+TOML, packaged TOML, and MemBase projection. The fixed-point postimage reports
+`membership_complete: true`, zero `unregistered_load_bearing`, zero
+`invalid_unknown`, zero candidates, and 395 explicit pruned disposable
+envelopes. Audit was deliberately not performed in that hot-path run and is
+reported as `audit_complete: false` plus `audit_not_performed`; this does not
+impair membership, edit/build/test liveness, or WI-5640 Stage B eligibility.
+
+## Response To v010 NO-GO
+
+The v010 implementation findings are accepted. The registry reconciliation,
+both registry transactions, and their admission evidence were not re-run or
+re-derived.
+
+- **F1 closed.** Ruff's deterministic formatter was applied to the thirteen
+  paths named by v010. `ruff check` and `ruff format --check` were then run on
+  all 29 Python paths in `## Files Changed`: both pass, with `29 files already
+  formatted`. `git diff --check` also passes. The first complete lint run found
+  two errors in `scripts/migrate_bridge_kind_taxonomy.py`; both reproduce
+  unchanged on `HEAD`. Two line-local `# noqa` comments now make that
+  already-declared file pass the complete-file gate without changing executable
+  behavior. The taxonomy regression remains 6/6.
+- **F2 closed.** All three functional taxonomy hunks predate the v008 GO:
+  `groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py` adds the
+  `GOVERNANCE_REVIEW` enum member;
+  `scripts/migrate_bridge_kind_taxonomy.py` preserves `governance_review`
+  instead of remapping it to `governance_advisory`; and
+  `platform_tests/scripts/test_bridge_kind_taxonomy.py` asserts the enum and
+  mapping. This response adds only the two non-executable line-local Ruff
+  suppressions disclosed above.
+- **F3 closed.** The canonical registry reader plus `RegistryResolver` returned
+  no membership for `.gtkb-index-b8nhvvny/`. After resolving the absolute path
+  inside `E:/GT-KB`, that disposable transient reconciliation index was removed.
+- **F4 closed.** The exact excluded dirty paths are
+  `.claude/rules/project-root-boundary.md`, `memory/MEMORY.md`,
+  `scripts/auto_finalize_sweep.py`, and
+  `platform_tests/hooks/test_auto_finalize_verified_verdicts.py`. They remain
+  outside the finalization include set.
+
+## Specification Links
+
+- `GOV-PLATFORM-SOT-REGISTRY-001`
+- `DCL-SOT-REGISTRY-RECORD-SCHEMA-001`
+- `DCL-SOT-REGISTRY-PROJECTION-PARITY-001`
+- `DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001`
+- `GOV-ARTIFACT-APPROVAL-001`
+- `DCL-ARTIFACT-APPROVAL-HOOK-001`
+- `SPEC-INTAKE-97538b`
+- `GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001`
+- `GOV-SOURCE-OF-TRUTH-FRESHNESS-001`
+- `GOV-WORK-TREE-HYGIENE-001`
+- `ADR-CODEX-HOOK-PARITY-FALLBACK-001`
+- `ADR-CROSS-HARNESS-PARITY-001`
+- `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001`
+- `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
+- `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`
+- `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`
+- `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`
+- `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001`
+- `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`
+- `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`
+- `GOV-FILE-BRIDGE-AUTHORITY-001`
+- `ADR-ISOLATION-APPLICATION-PLACEMENT-001`
+
+## Owner Decisions / Input
+
+No new owner decision is required. This implementation carries forward WI-5441
+version 11 and the approved PAUTH: direct editor changes need no notation;
+worker evidence is automatic on the easy path; missing audit evidence is
+preferable to platform failure; registry identity and irreversible operations
+remain governed. The authoritative-hygiene and obsolete-source-retention
+directions remain `DELIB-20260722-ARTIFACT-REGISTRY-AUTHORITATIVE-HYGIENE-SWEEP`
+and `DELIB-20260722-WI5640-OBSOLETE-FILE-RETENTION`.
+
+## Prior Deliberations
+
+- `DELIB-20260722-ARTIFACT-REGISTRY-AUTHORITATIVE-HYGIENE-SWEEP`
+- `DELIB-20260722-WI5640-OBSOLETE-FILE-RETENTION`
+- `DELIB-20260724-WI5668-DUAL-AUTHORITY-COMPLETION-SCOPE`
+- `DELIB-20260726-WI5441-REGISTRY-OBSERVATION-BOOTSTRAP-APPROVAL`
+- `bridge/gtkb-wi5441-owner-liveness-spec-amendments-012.md`
+- `bridge/gtkb-wi5441-bridge-publication-capability-commit-clearance-010.md`
+- `bridge/gtkb-wi5441-global-registry-membership-reconciliation-007.md`
+- `bridge/gtkb-wi5441-global-registry-membership-reconciliation-008.md`
+
+## Transaction Evidence
+
+The initial exact plan contained 2,031 candidates:
+
+- plan SHA-256: `sha256:c4422ee36feb23f2320dc5d40104c98251eff4edeabb6ec062442acb5153ad74`
+- starting generation: `sha256:a4513e8cc3c1535ecc2059e1847b4db9214567d3c09cd3ef925504423a68f6e7`
+- candidate manifest: `sha256:d9cb879d4ee7bf4ccb9d8e693935ef7d6798f99ceb14d7537c840acdc73bcc34`
+- reconciliation evidence: `sha256:b5934ccb94c8dccfe09c22263192ce027301a1a509c4b547cd62cbd7314dbdc4`
+- observer inputs: capability `sha256:3d97752dc650c5a2b9647592788cc50346f15f06daaadab2857340a36fdea955`; governed `sha256:3d853afb77d62a33d39acdd17b47d3e9bd6e9110af87f4e8bcab125b358f31c9`; package `sha256:5b57695ca2d130a7767ce0e74cd6debe3607b4c3f0b45bfe0473147b36759e44`; dependency `sha256:c111dfe64d5416cf251dc18b09d962415ca12be560295d9ac8cd18414f92396e`; physical `sha256:569d7841d0a860c51955e32ab451b56a203ede9db5c9d1b2eec823cbf364915c`
+- dry-run receipt: `sha256:457db89d1f6d6f54408d172386b01a8793a00784537f94b7208dcaa272726478`
+- journal: `SOTTXN-002E9C9578CD4837B82D5B5F4C33AAA8`
+- transaction receipt: `sha256:4d60a42c7eb80e59ae4da901f07be8de3617fe82eb6fb85e7b92d029164d577c`
+
+The first postimage exposed a fixed-point defect: text inside the newly admitted
+immutable approval container was not scanned until the container existed in the
+registry. It revealed exactly two additional tracked scripts. Removing the
+2,031 valid additions would have violated the additive-only GO, so Prime repaired
+forward after changing the observer to scan proposed managed-container text.
+The bounded closure plan contained exactly those two candidates:
+
+- plan SHA-256: `sha256:546746c5110bd8693a4fd8a0d97d3ce706d740e8faa7465598f2d2e0bf414276`
+- starting generation: `sha256:a725e90968e43b9ead90a186fc4323b8149a62fe336338ea968a0ea8388d483c`
+- candidate manifest: `sha256:6ee1d090588a1f9298b43d7e128424f825414b4887cbfce3addfe8eeb7c6271a`
+- reconciliation evidence: `sha256:afff6f00055ef505eb3823ad4e99fef3c8a2aa8f7c62b04afa425bceeae304fa`
+- dependency input: `sha256:8ab085e891a8a0cc041ac23f93a2425c2eee295a56553ef3c0aad93334e98716`
+- dry-run receipt: `sha256:6a9b7c7ad5a3dfc4b6907d44345dbfc6c652f5fc0a453f7c95e9bada5a56b0d5`
+- journal: `SOTTXN-CEA352791701430C875FC1B2E80AC57F`
+- transaction receipt: `sha256:205825d3fb555fe24af5ea5a33e6be9da8a8d52b1e66eadd303a7e6674fbdbd1`
+- exact retry: `idempotent_retry: true`, same journal and receipt
+
+Both transactions were additions only. No member was deleted, moved, renamed,
+retired, narrowed, or replaced by a broad glob. The postimage declaration is
+`sha256:e72d44edbcb368d22a1ea52e8966a1a368d1ec65c85d76766bbbe729295b6350`,
+the projection is
+`sha256:53dcc53de4f4638eedad58516bc08fc725265efa21b0507953492c072cab3392`,
+and the coherent generation is
+`sha256:0cc3fa92a869206b2b7aee6aaf98c368df671faa820eb86a6f566a3e81d10849`.
+
+## Exact Added Member Manifest
+
+The following sorted TSV is the exact 2,032-member path/observer-class set
+excluding the separately waived database identity. Together with the one path
+in the waiver section, it accounts for all 2,033 additions. The two candidate
+manifest digests above bind full record metadata, evidence sources, and reasons.
+
+```text
+storage_path	observer_classes
+.agent/skills/gtkb-adr/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-advisory-disposition/SKILL.md	registered_dependency_closure
+.agent/skills/gtkb-advisory-intake/SKILL.md	registered_dependency_closure
+.agent/skills/gtkb-advisory-proposal/SKILL.md	registered_dependency_closure
+.agent/skills/gtkb-alternatives-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-arch-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-assert/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-assertion-triage/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-batch/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-benchmarks/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-bridge-config/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-bridge-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-bridge-reconciliation/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-bridge/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-check-deliberations/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-code-review-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-decision-capture/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-dispatcher-control/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-formal-artifact-packet-helper/SKILL.md	registered_dependency_closure
+.agent/skills/gtkb-grill-me-for-clarification/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-harness-parity-review/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-hygiene-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-hygiene-reclaim/SKILL.md	registered_dependency_closure
+.agent/skills/gtkb-hygiene-sweep/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-lo-hygiene-assessment/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-lo-opportunity-radar/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-loyal-opposition-report/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-managed-skill-adoption-review/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-projects/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-promote/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-proposal-review/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-query/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-release-candidate-gate/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-send-review/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-session-wrap-scan/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-session-wrap/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-skill-governance-lifecycle/SKILL.md	registered_dependency_closure
+.agent/skills/gtkb-spec-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-spec/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-structural-hygiene-review/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-sweep-commit/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-verify/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/gtkb-work-item/SKILL.md	capability_inventory,registered_dependency_closure
+.agent/skills/MANIFEST.json	registered_dependency_closure
+.api-harness/skills/gtkb-adr/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-advisory-disposition/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-advisory-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-advisory-proposal/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-alternatives-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-arch-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-assert/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-assertion-triage/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-batch/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-benchmarks/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-bridge-config/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-bridge-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-bridge-reconciliation/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-bridge/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-check-deliberations/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-code-review-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-decision-capture/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-dispatcher-control/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-formal-artifact-packet-helper/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-grill-me-for-clarification/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-harness-parity-review/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-hygiene-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-hygiene-reclaim/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-hygiene-sweep/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-lo-hygiene-assessment/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-lo-opportunity-radar/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-loyal-opposition-report/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-managed-skill-adoption-review/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-projects/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-promote/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-proposal-review/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-query/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-release-candidate-gate/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-send-review/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-session-wrap-scan/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-session-wrap/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-skill-governance-lifecycle/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-spec-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-spec/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-structural-hygiene-review/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-sweep-commit/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-verify/SKILL.md	capability_inventory,registered_dependency_closure
+.api-harness/skills/gtkb-work-item/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/commands/registry.json	registered_dependency_closure
+.claude/skills/gtkb-adr/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-advisory-disposition/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-advisory-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-advisory-proposal/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-alternatives-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-arch-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-assert/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-assertion-triage/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-batch/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-benchmarks/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-bridge-config/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-bridge-reconciliation/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-bridge/helpers/protected_write.py	registered_dependency_closure
+.claude/skills/gtkb-bridge/helpers/scan_bridge.py	registered_dependency_closure
+.claude/skills/gtkb-bridge/helpers/show_thread_bridge.py	registered_dependency_closure
+.claude/skills/gtkb-check-deliberations/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-code-review-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-decision-capture/helpers/record_decision.py	registered_dependency_closure
+.claude/skills/gtkb-decision-capture/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-dispatcher-control/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-formal-artifact-packet-helper/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-grill-me-for-clarification/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-harness-parity-review/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-hygiene-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-hygiene-reclaim/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-hygiene-sweep/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-lo-hygiene-assessment/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-lo-opportunity-radar/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-loyal-opposition-report/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-managed-skill-adoption-review/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-projects/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-promote/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-query/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-release-candidate-gate/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-session-wrap-scan/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-session-wrap/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-skill-governance-lifecycle/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-spec-intake/helpers/spec_intake.py	registered_dependency_closure
+.claude/skills/gtkb-spec-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-spec/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-structural-hygiene-review/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-sweep-commit/SKILL.md	capability_inventory,registered_dependency_closure
+.claude/skills/gtkb-work-item/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/config.toml	registered_dependency_closure
+.codex/gtkb-hooks/bridge-compliance-audit.cmd	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/bridge-compliance-gate-apply-patch-adapter.cmd	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/bridge-compliance-gate.cmd	registered_dependency_closure
+.codex/gtkb-hooks/code-quality-baseline-proposal-check.cmd	registered_dependency_closure
+.codex/gtkb-hooks/codex-mcp-worker-guard.cmd	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/credential-scan.cmd	registered_dependency_closure
+.codex/gtkb-hooks/destructive-gate.cmd	registered_dependency_closure
+.codex/gtkb-hooks/directive-enforcement.cmd	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/document_author_provenance_gate.py	registered_dependency_closure
+.codex/gtkb-hooks/formal-artifact-approval.cmd	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/glossary-expansion.py	registered_dependency_closure
+.codex/gtkb-hooks/implementation-start-gate.cmd	registered_dependency_closure
+.codex/gtkb-hooks/lo-file-safety-gate-bash-adapter.py	registered_dependency_closure
+.codex/gtkb-hooks/lo-file-safety-gate.cmd	registered_dependency_closure
+.codex/gtkb-hooks/project-completion-surface.py	registered_dependency_closure
+.codex/gtkb-hooks/run_cmd_no_window.py	registered_dependency_closure
+.codex/gtkb-hooks/session-start.cmd	registered_dependency_closure
+.codex/gtkb-hooks/session-stop.cmd	registered_dependency_closure
+.codex/gtkb-hooks/session_start_dispatch.py	capability_inventory,governed_knowledge,registered_dependency_closure
+.codex/gtkb-hooks/session_stop_dispatch.py	registered_dependency_closure
+.codex/gtkb-hooks/session_wrapup_trigger_dispatch.py	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/sot-read-discipline-bash-adapter.py	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/wi-id-collision-gate.cmd	capability_inventory,registered_dependency_closure
+.codex/gtkb-hooks/workstream-focus.cmd	registered_dependency_closure
+.codex/hooks.json	governed_knowledge,registered_dependency_closure
+.codex/skills/gtkb-adr/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-advisory-disposition/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-advisory-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-advisory-proposal/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-alternatives-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-arch-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-assert/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-assertion-triage/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-batch/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-benchmarks/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-bridge-config/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-bridge-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-bridge-reconciliation/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-bridge/helpers/protected_write.py	registered_dependency_closure
+.codex/skills/gtkb-bridge/helpers/scan_bridge.py	registered_dependency_closure
+.codex/skills/gtkb-bridge/helpers/show_thread_bridge.py	registered_dependency_closure
+.codex/skills/gtkb-check-deliberations/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-code-review-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-decision-capture/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-dispatcher-control/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-formal-artifact-packet-helper/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-grill-me-for-clarification/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-harness-parity-review/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-hygiene-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-hygiene-reclaim/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-hygiene-sweep/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-lo-hygiene-assessment/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-lo-opportunity-radar/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-loyal-opposition-report/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-managed-skill-adoption-review/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-projects/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-promote/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-query/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-release-candidate-gate/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-session-wrap-scan/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-session-wrap/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-skill-governance-lifecycle/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-spec-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-spec/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-structural-hygiene-review/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-sweep-commit/SKILL.md	capability_inventory,registered_dependency_closure
+.codex/skills/gtkb-work-item/SKILL.md	capability_inventory,registered_dependency_closure
+.cursor/gtkb-hooks/cursor-hook-env.cmd	registered_dependency_closure
+.cursor/gtkb-hooks/session_start_dispatch.py	registered_dependency_closure
+.cursor/hooks.json	registered_dependency_closure
+.cursor/skills/gtkb-benchmarks/SKILL.md	registered_dependency_closure
+.cursor/skills/gtkb-hygiene-investigation/SKILL.md	registered_dependency_closure
+.cursor/skills/gtkb-hygiene-sweep/SKILL.md	registered_dependency_closure
+.cursor/skills/gtkb-propose/SKILL.md	registered_dependency_closure
+.cursor/skills/gtkb-sweep-commit/SKILL.md	registered_dependency_closure
+.gitattributes	governed_knowledge,registered_dependency_closure
+.githooks/pre-commit	registered_dependency_closure
+.githooks/pre-commit-ps1-parse.ps1	registered_dependency_closure
+.githooks/pre-commit.ps1	registered_dependency_closure
+.githooks/pre-push	registered_dependency_closure
+.githooks/setup-hooks.sh	registered_dependency_closure
+.github/ISSUE_TEMPLATE/bug_report.md	registered_dependency_closure
+.github/ISSUE_TEMPLATE/feature_request.md	registered_dependency_closure
+.github/pull_request_template.md	registered_dependency_closure
+.github/workflows/accessibility.yml	registered_dependency_closure
+.github/workflows/build-agent-containers.yml	registered_dependency_closure
+.github/workflows/build-api-gateway.yml	registered_dependency_closure
+.github/workflows/build-slim-gateway.yml	registered_dependency_closure
+.github/workflows/build-test-host.yml	registered_dependency_closure
+.github/workflows/chromatic.yml	registered_dependency_closure
+.github/workflows/deploy-docs.yml	registered_dependency_closure
+.github/workflows/docs-quality.yml	registered_dependency_closure
+.github/workflows/groundtruth-kb-tests.yml	governed_knowledge,registered_dependency_closure
+.github/workflows/gtkb-secrets-scan.yml	registered_dependency_closure
+.github/workflows/lint.yml	registered_dependency_closure
+.github/workflows/python-tests.yml	registered_dependency_closure
+.github/workflows/release-candidate-gate.yml	governed_knowledge,registered_dependency_closure
+.github/workflows/security-scan.yml	registered_dependency_closure
+.github/workflows/sonarcloud.yml	registered_dependency_closure
+.github/workflows/visual-regression.yml	registered_dependency_closure
+.gitignore	registered_dependency_closure
+.goose/skills/gtkb-adr/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-advisory-disposition/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-advisory-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-advisory-proposal/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-alternatives-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-arch-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-assert/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-assertion-triage/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-batch/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-benchmarks/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-bridge-config/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-bridge-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-bridge-reconciliation/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-bridge/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-check-deliberations/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-code-review-audit/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-codex-report/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-decision-capture/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-dispatcher-control/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-formal-artifact-packet-helper/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-grill-me-for-clarification/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-harness-parity-review/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-hygiene-investigation/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-hygiene-reclaim/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-hygiene-sweep/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-kb-work-item/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-lo-hygiene-assessment/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-lo-opportunity-radar/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-loyal-opposition-report/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-managed-skill-adoption-review/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-projects/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-promote/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-proposal-review/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-propose/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-query/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-release-candidate-gate/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-send-review/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-session-wrap-scan/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-session-wrap/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-skill-governance-lifecycle/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-spec-intake/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-spec/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-structural-hygiene-review/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-sweep-commit/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-verify/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/gtkb-work-item/SKILL.md	capability_inventory,registered_dependency_closure
+.goose/skills/MANIFEST.json	capability_inventory,registered_dependency_closure
+.groundtruth/formal-artifact-approvals/	registered_dependency_closure
+assets/css/styles.53193427.css	registered_dependency_closure
+assets/js/0058b4c6.1c4521a0.js	registered_dependency_closure
+assets/js/066b94f5.ebe2d518.js	registered_dependency_closure
+assets/js/0e384e19.957cf23c.js	registered_dependency_closure
+assets/js/1000.9d4ea6ec.js	registered_dependency_closure
+assets/js/1026b538.fd0677e9.js	registered_dependency_closure
+assets/js/1169.aad6fafa.js	registered_dependency_closure
+assets/js/1203.8b9b8ce9.js	registered_dependency_closure
+assets/js/14a4fd85.5327edb6.js	registered_dependency_closure
+assets/js/165.df49b9f9.js	registered_dependency_closure
+assets/js/165.df49b9f9.js.LICENSE.txt	registered_dependency_closure
+assets/js/1741.a38f4c7e.js	registered_dependency_closure
+assets/js/1746.099ef434.js	registered_dependency_closure
+assets/js/17896441.b1c35060.js	registered_dependency_closure
+assets/js/1c3987ad.24cc5fe1.js	registered_dependency_closure
+assets/js/202bb6d6.b460a0a1.js	registered_dependency_closure
+assets/js/2130.5b294bdb.js	registered_dependency_closure
+assets/js/2237.64cc3c7c.js	registered_dependency_closure
+assets/js/2279.76880577.js	registered_dependency_closure
+assets/js/2279.76880577.js.LICENSE.txt	registered_dependency_closure
+assets/js/2291.b228dfa9.js	registered_dependency_closure
+assets/js/2325.a5095d8c.js	registered_dependency_closure
+assets/js/2492.834407d5.js	registered_dependency_closure
+assets/js/2821.2887df54.js	registered_dependency_closure
+assets/js/291.7309a06a.js	registered_dependency_closure
+assets/js/2bd07ed8.3b1bf007.js	registered_dependency_closure
+assets/js/2c683e56.fe8366e9.js	registered_dependency_closure
+assets/js/3490.c7fffd79.js	registered_dependency_closure
+assets/js/3815.767d62b4.js	registered_dependency_closure
+assets/js/4250.420b2a58.js	registered_dependency_closure
+assets/js/4616.85ddb1dd.js	registered_dependency_closure
+assets/js/46270cec.82c59455.js	registered_dependency_closure
+assets/js/4801.8d33ee4f.js	registered_dependency_closure
+assets/js/4802.8b8fed11.js	registered_dependency_closure
+assets/js/4981.84950fdf.js	registered_dependency_closure
+assets/js/530ea7a0.7ae16abb.js	registered_dependency_closure
+assets/js/535ce2c0.ad1cd217.js	registered_dependency_closure
+assets/js/5433c7fa.231e0323.js	registered_dependency_closure
+assets/js/5433c7fa.cf3482c4.js	registered_dependency_closure
+assets/js/5480.e40f24c5.js	registered_dependency_closure
+assets/js/58ef4688.2642aa4d.js	registered_dependency_closure
+assets/js/5901.a2bd72c1.js	registered_dependency_closure
+assets/js/5955.3880215e.js	registered_dependency_closure
+assets/js/5996.bc38182f.js	registered_dependency_closure
+assets/js/5b8dc148.ade23bff.js	registered_dependency_closure
+assets/js/5e95c892.15f2a9bd.js	registered_dependency_closure
+assets/js/6097.fe40c45f.js	registered_dependency_closure
+assets/js/617.499933c0.js	registered_dependency_closure
+assets/js/6241.bf93f3a4.js	registered_dependency_closure
+assets/js/6319.00585905.js	registered_dependency_closure
+assets/js/6366.a565b60a.js	registered_dependency_closure
+assets/js/6567.f15a1b06.js	registered_dependency_closure
+assets/js/6992.3e56350c.js	registered_dependency_closure
+assets/js/6c899bc8.910f6948.js	registered_dependency_closure
+assets/js/6fe5281f.7f71e229.js	registered_dependency_closure
+assets/js/7331222f.b28d4ab6.js	registered_dependency_closure
+assets/js/7465.56ea1732.js	registered_dependency_closure
+assets/js/7592.209b9c08.js	registered_dependency_closure
+assets/js/7873.d75720d7.js	registered_dependency_closure
+assets/js/791857dc.38d05718.js	registered_dependency_closure
+assets/js/7928.7a9d4635.js	registered_dependency_closure
+assets/js/7a96ca3d.ac2483f3.js	registered_dependency_closure
+assets/js/8142.f302b3e1.js	registered_dependency_closure
+assets/js/8249.28226b31.js	registered_dependency_closure
+assets/js/86778c43.76f20748.js	registered_dependency_closure
+assets/js/8731.6b200c83.js	registered_dependency_closure
+assets/js/8756.8c30eb77.js	registered_dependency_closure
+assets/js/9032.9561231b.js	registered_dependency_closure
+assets/js/9051.20070f68.js	registered_dependency_closure
+assets/js/9412.a1dc69c4.js	registered_dependency_closure
+assets/js/9510.44d4e097.js	registered_dependency_closure
+assets/js/9717.0480e29f.js	registered_dependency_closure
+assets/js/9beb87c2.57927c2c.js	registered_dependency_closure
+assets/js/9beb87c2.7595be5e.js	registered_dependency_closure
+assets/js/a29604e9.a3c42759.js	registered_dependency_closure
+assets/js/a538116f.a07df551.js	registered_dependency_closure
+assets/js/a538116f.c37f8cf6.js	registered_dependency_closure
+assets/js/a730a604.6d6bf5c2.js	registered_dependency_closure
+assets/js/a7456010.84ff0f8c.js	registered_dependency_closure
+assets/js/a7bd4aaa.9ce4b743.js	registered_dependency_closure
+assets/js/a7bdbce4.1879974a.js	registered_dependency_closure
+assets/js/a94703ab.89c110b6.js	registered_dependency_closure
+assets/js/aa34e839.7289d62e.js	registered_dependency_closure
+assets/js/aba21aa0.1adbc08c.js	registered_dependency_closure
+assets/js/c0beb7ae.f616eaa5.js	registered_dependency_closure
+assets/js/c4f5d8e4.f3bc4dae.js	registered_dependency_closure
+assets/js/db5dfd8d.828ecf9e.js	registered_dependency_closure
+assets/js/de548442.f73e0b59.js	registered_dependency_closure
+assets/js/e603a4ef.f28c2f35.js	registered_dependency_closure
+assets/js/ece4ad06.8fa594d6.js	registered_dependency_closure
+assets/js/ee68df09.799cd38c.js	registered_dependency_closure
+assets/js/fc7bdaec.d0eb1a3a.js	registered_dependency_closure
+assets/js/main.44619f4d.js	registered_dependency_closure
+assets/js/main.44619f4d.js.LICENSE.txt	registered_dependency_closure
+CHANGELOG.md	governed_knowledge,registered_dependency_closure
+config/agent-control/README.md	registered_dependency_closure
+config/registry/context-manifests.toml	governed_knowledge,registered_dependency_closure
+CONTRIBUTING.md	registered_dependency_closure
+dashboard/dashboard-data.json	registered_dependency_closure
+dashboard/session-startup-report.md	registered_dependency_closure
+docs/gtkb-dashboard/bridge-swimlane.json	registered_dependency_closure
+docs/gtkb-dashboard/dashboard-data.json	governed_knowledge,registered_dependency_closure
+docs/gtkb-dashboard/grafana/provisioning/alerting/contact-points.yaml	governed_knowledge
+docs/gtkb-dashboard/grafana/provisioning/alerting/notification-policies.yaml	governed_knowledge
+docs/gtkb-dashboard/index.html	governed_knowledge,registered_dependency_closure
+docs/gtkb-dashboard/session-startup-report.md	governed_knowledge,registered_dependency_closure
+docs/gtkb-dashboard/session-wrapup-report.md	governed_knowledge,registered_dependency_closure
+docs/gtkb-systems-and-tools.md	registered_dependency_closure
+docs/release/dev-environment-inventory.md	registered_dependency_closure
+docs/specification-scaffold/initial-specifications.json	registered_dependency_closure
+docs/specification-scaffold/intake-checklist.md	registered_dependency_closure
+docs/specification-scaffold/README.md	registered_dependency_closure
+docs/specification-scaffold/SPEC-TEMPLATE.md	registered_dependency_closure
+groundtruth-kb/.github/workflows/ci.yml	registered_dependency_closure
+groundtruth-kb/CONTRIBUTING.md	registered_dependency_closure
+groundtruth-kb/docs/announcements/v0.7.0-rc1.md	registered_dependency_closure
+groundtruth-kb/docs/architecture/isolation.md	registered_dependency_closure
+groundtruth-kb/docs/architecture/product-split.md	registered_dependency_closure
+groundtruth-kb/docs/day-in-the-life.md	registered_dependency_closure
+groundtruth-kb/docs/method/12-file-bridge-automation.md	registered_dependency_closure
+groundtruth-kb/docs/method/14-lifecycle.md	registered_dependency_closure
+groundtruth-kb/docs/reference/canonical-terminology-detail.md	registered_dependency_closure
+groundtruth-kb/docs/reference/cli.md	registered_dependency_closure
+groundtruth-kb/docs/reports/agent-red-classification.md	registered_dependency_closure
+groundtruth-kb/docs/reports/non-disruptive-upgrade-audit.md	registered_dependency_closure
+groundtruth-kb/docs/start-here.md	registered_dependency_closure
+groundtruth-kb/docs/tutorials/bridge-os-scheduler.md	registered_dependency_closure
+groundtruth-kb/docs/tutorials/bridge-smart-poller.md	registered_dependency_closure
+groundtruth-kb/docs/tutorials/dual-agent-setup.md	registered_dependency_closure
+groundtruth-kb/docs/wiki/release-health.md	registered_dependency_closure
+groundtruth-kb/LICENSE	registered_dependency_closure
+groundtruth-kb/scripts/audit_adr_dcl_metadata.py	registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/__main__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/_azure_adr_instance_templates.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/_azure_cicd_templates.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/_azure_iac_templates.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/_azure_spec_templates.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/_logging.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/_phase_y_loop_probe.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/active_workspace.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/activity/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/activity/ops.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/activity/profiles.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/adoption/deployability_preservation_gate.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/adr_harness.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/adr_scaffold.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/agent_role_manifest.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/artifact_lifecycle/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/assertion_schema.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/assertions.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/authority.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/backlog.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/backlog/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/backlog/approval_state.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/backlog/query.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bootstrap.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/__init__.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/audit.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/checkpoint.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/context.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/detector.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/disposition.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/handshake.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/launcher.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/notify.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/paths.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/poller.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/prior_deliberations.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/proposal_autoload.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/read_commands.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/registry.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/role_state.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/routing.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/runtime.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/state_report.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/status_driver.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/versioned_files.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge/wait_commands.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge/worker.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/bridge_dispatch_config.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge_dispatch_report.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge_dispatch_reset.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge_dispatch_rules.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge_dispatch_transactions.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/bridge_dispatch_worker_context.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/canonical_terms.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cicd_scaffold.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_approval_packet.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_backlog_add.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_backlog_add_work_item.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_backlog_authorize_implementation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_backlog_status.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_deliberations_record.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_projects_reconcile.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_session_handoff.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_skills.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_spec_record.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/cli_spec_update.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/codex_no_window_verification.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/coherence/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/coherence/checker.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/config.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/freshness.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/context/manifest.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-disposition-profiles.toml	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/activity-envelope-sharding.toml	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/command-surface.toml	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/agent-control/system-interface-map.toml	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/governance/canonical-terms-sync.toml	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/registries/v1/context-manifests.toml	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/context/resource_routing.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dashboard.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dashboard_service.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/db_snapshot.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/design_import.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatch_default_metrics.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatch_tuning_advisory.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher/lane_scoring.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher/rules_loader.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher/scheduler.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_complex.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_disable_guard.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_next/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_next/capacity.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_next/foundation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_next/protocol.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_supervisor.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/dispatcher_watchdog.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/enforcement/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/env_sot.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/gates.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/gates_transport.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/__init__.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/__main__.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/commands.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/maintenance.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/models.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/quiescence.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/repository.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/service.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/git_lifecycle/state.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/governance/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/approval_packet.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/commit_preflight.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/context.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/credential_patterns.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/mutation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/narrative_artifact_packet.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/output.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/preflight_evidence.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/project_authorization_operation_time.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/push_preflight.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/governance/push_readiness.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/harness_diagnostic.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/harness_lifecycle.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/harness_ops.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/harness_projection.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/health.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/hooks/code_quality_baseline_proposal_check.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/hygiene/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/hygiene/auto_resolve.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/hygiene/strays.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/hygiene/supersession.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/iac_scaffold.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/impact.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/intake.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/inventory/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/allowlist.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/app_root_minimization.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/doctor_verdicts.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/occupancy_detector.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/registry_check.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/strong_markers.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/isolation/validation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mcp_surface/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mcp_surface/authority.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mcp_surface/boundary.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mcp_surface/roles.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mcp_surface/server.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/membase_effective_use_audit.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/audit.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/bridge_substrate.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/derive.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/invariants.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/pending.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/transaction.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/mode_switch/validation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/modernization/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/modernization/__main__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/modernization/workflow.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/operating_state.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/owner_approval_surface.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/owner_decision/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/owner_decision/auto_archive.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/owner_decision/resolution_signals.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/policy/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/policy/engine.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/policy/registry.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/application_scope.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/authorization.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/baseline_audit.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/checks/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/checks/gt_cli_availability.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/checks/stale_test_slots.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/chroma.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/core_spec_intake.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/doctor_isolation.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/project/lifecycle.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/project/managed_registry.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/manifest.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/ownership.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/preflight.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/profiles.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/rollback.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/scaffold.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/project/session_start_orientation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/sot_audit.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/project/upgrade.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/providers/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/providers/schema.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/reconciliation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/reporting/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/reporting/harvest_coverage.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/runtime_recovery/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/runtime_recovery/store.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/secrets/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/secrets/allowlist.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/secrets/patterns.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/secrets/redaction.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/secrets/scanner.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/seed.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/session/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/session/handoff.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/session/packet.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/session/topic_router.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/session/wrap.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/shim_dispatch_telemetry.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/spec_scaffold.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/src/groundtruth_kb/tafe_dispatch_policy.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/tafe_dispatch_runtime.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/tafe_stuck_flow.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/term_disambiguation.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/typed_artifact_flow.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/watchdog/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/watchdog/resource_limits.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/watchdog/restore_policy.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/watchdog/service_sot.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/__init__.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/app.py	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/static/style.css	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/assertions.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/base.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/dashboard.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/env.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/env_detail.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/history.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/op_detail.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/ops.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/pipeline.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/spec_detail.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/specs.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/test_detail.html	package_and_entrypoint
+groundtruth-kb/src/groundtruth_kb/web/templates/tests.html	package_and_entrypoint
+groundtruth-kb/templates/BRIDGE-INVENTORY.md	package_and_entrypoint
+groundtruth-kb/templates/bridge-os-poller-setup-prompt.md	package_and_entrypoint
+groundtruth-kb/templates/ci/build.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/deploy.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/full/build.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/full/deploy.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/full/test.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/integrations/.coderabbitai.yaml	package_and_entrypoint
+groundtruth-kb/templates/ci/integrations/dependabot.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/minimal/test.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/standard/test.yml	package_and_entrypoint
+groundtruth-kb/templates/ci/test.yml	package_and_entrypoint
+groundtruth-kb/templates/CLAUDE.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/hooks/_delib_common.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/assertion-check.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/bridge-compliance-gate.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/hooks/code-quality-baseline-proposal-check.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/credential-scan.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/delib-search-gate.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/delib-search-tracker.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/destructive-gate.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/gov09-capture.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/intake-classifier.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/kb-not-markdown.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/narrative-artifact-approval-gate.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/hooks/owner-decision-capture.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/scanner-safe-writer.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/session-health.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/session-start-governance.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/spec-before-code.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/spec-classifier.py	package_and_entrypoint
+groundtruth-kb/templates/hooks/spec-event-surfacer.py	package_and_entrypoint
+groundtruth-kb/templates/MEMORY.md	package_and_entrypoint
+groundtruth-kb/templates/project/.editorconfig	package_and_entrypoint
+groundtruth-kb/templates/project/.pre-commit-config.yaml	package_and_entrypoint
+groundtruth-kb/templates/project/AGENTS.md	package_and_entrypoint
+groundtruth-kb/templates/project/codex-bootstrap/CODEX-REVIEW-OPERATING-CONTRACT.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md	package_and_entrypoint
+groundtruth-kb/templates/project/codex-bootstrap/CODEX-WAY-OF-WORKING.md	package_and_entrypoint
+groundtruth-kb/templates/project/codex-bootstrap/LOYAL-OPPOSITION-LOG.md	package_and_entrypoint
+groundtruth-kb/templates/project/docker-compose.yml	package_and_entrypoint
+groundtruth-kb/templates/project/Dockerfile	package_and_entrypoint
+groundtruth-kb/templates/project/env.example	package_and_entrypoint
+groundtruth-kb/templates/project/Makefile	package_and_entrypoint
+groundtruth-kb/templates/project/README-quickstart.md	package_and_entrypoint
+groundtruth-kb/templates/project/release-readiness-banner.md	package_and_entrypoint
+groundtruth-kb/templates/project/settings.local.json	package_and_entrypoint
+groundtruth-kb/templates/project/upgrade-rehearsal-recipe.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/README.md	package_and_entrypoint
+groundtruth-kb/templates/rules/bridge-essential.md	package_and_entrypoint
+groundtruth-kb/templates/rules/bridge-poller-canonical.md	package_and_entrypoint
+groundtruth-kb/templates/rules/canonical-terminology-policy.toml	package_and_entrypoint
+groundtruth-kb/templates/rules/canonical-terminology.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/rules/canonical-terminology.toml	package_and_entrypoint
+groundtruth-kb/templates/rules/deliberation-protocol.md	package_and_entrypoint
+groundtruth-kb/templates/rules/file-bridge-protocol.md	package_and_entrypoint
+groundtruth-kb/templates/rules/loyal-opposition.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/rules/prime-bridge-collaboration-protocol.md	package_and_entrypoint
+groundtruth-kb/templates/rules/prime-builder.md	package_and_entrypoint
+groundtruth-kb/templates/rules/report-depth.md	package_and_entrypoint
+groundtruth-kb/templates/rules/session-start-orientation.md	package_and_entrypoint
+groundtruth-kb/templates/scaffold-ownership.toml	package_and_entrypoint
+groundtruth-kb/templates/skills/baseline-audit/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/bridge-propose/SKILL.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/skills/bridge/helpers/scan_bridge.py	package_and_entrypoint
+groundtruth-kb/templates/skills/bridge/helpers/show_thread_bridge.py	package_and_entrypoint
+groundtruth-kb/templates/skills/bridge/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/decision-capture/helpers/record_decision.py	package_and_entrypoint
+groundtruth-kb/templates/skills/decision-capture/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-bridge-propose/SKILL.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/templates/skills/gtkb-bridge/helpers/scan_bridge.py	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-bridge/helpers/show_thread_bridge.py	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-bridge/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-decision-capture/helpers/record_decision.py	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-decision-capture/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-spec-intake/helpers/spec_intake.py	package_and_entrypoint
+groundtruth-kb/templates/skills/gtkb-spec-intake/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/release-candidate-gate/scripts/release_candidate_gate.py	package_and_entrypoint
+groundtruth-kb/templates/skills/release-candidate-gate/SKILL.md	package_and_entrypoint
+groundtruth-kb/templates/skills/spec-intake/helpers/spec_intake.py	package_and_entrypoint
+groundtruth-kb/templates/skills/spec-intake/SKILL.md	package_and_entrypoint
+groundtruth-kb/tests/__init__.py	package_and_entrypoint
+groundtruth-kb/tests/_print_guard.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/__init__.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/conftest.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_app_subject_cannot_mutate_product_artifacts.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_clean_adopter_packaging.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_doctor_detects_isolation_violations.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_existing_adopter_migration_kit.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/adopter/test_golden_fixture_diff_per_version.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_init_defaults_to_application_subject.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_init_refuses_to_overwrite_existing_adopter.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_init_scaffolds_adopter_owned_paths.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_overlay_disposability.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_overlay_refresh.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_overlay_stale_detection.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_registry_entry_present_for_every_scaffolded_file.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/adopter/test_upgrade_applies_registry_diff_under_receipts.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_upgrade_preserves_adopter_owned_files.py	package_and_entrypoint
+groundtruth-kb/tests/adopter/test_upgrade_rollback_restores_prior_state.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/adopter/test_workstream_focus_retired_hook_stays_absent.py	package_and_entrypoint
+groundtruth-kb/tests/conftest.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_minimal/.claude/hooks/.workstream-focus-state.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_minimal/.claude/hooks/workstream-focus.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_minimal/groundtruth.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_minimal/memory/release-readiness.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_with_managed_drift/.claude/hooks/.workstream-focus-state.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_with_managed_drift/.claude/hooks/workstream-focus.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_with_managed_drift/groundtruth.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/adopter/pre_isolation_with_managed_drift/memory/release-readiness.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/bridge_index_live_snapshot.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/credential_scan.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/formal_artifact_approval_gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/README.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/sentinel_marker.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/credential_pattern_source_inventory_pre_migration.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/owner_decision_tracker/regex_negative_fixtures.txt	package_and_entrypoint
+groundtruth-kb/tests/fixtures/owner_decision_tracker/regex_positive_fixtures.txt	package_and_entrypoint
+groundtruth-kb/tests/fixtures/registry-id-set.txt	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/fixtures/registry-ownership-snapshot.tsv	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/_delib_common.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/assertion-check.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/bridge-compliance-gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/code-quality-baseline-proposal-check.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/credential-scan.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/delib-search-gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/delib-search-tracker.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/destructive-gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/gov09-capture.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/intake-classifier.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/kb-not-markdown.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/owner-decision-capture.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/scanner-safe-writer.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/session-health.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/session-start-governance.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/spec-before-code.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/spec-classifier.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/hooks/spec-event-surfacer.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/bridge-essential.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/bridge-poller-canonical.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/canonical-terminology-policy.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/canonical-terminology.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/canonical-terminology.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/deliberation-protocol.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/file-bridge-protocol.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/loyal-opposition.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/prime-bridge-collaboration-protocol.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/prime-builder.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/rules/report-depth.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/settings.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/settings.local.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge-propose/helpers/write_bridge.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge-propose/SKILL.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/impl_report_bridge.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/revise_bridge.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/scan_bridge.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/helpers/show_thread_bridge.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/bridge/SKILL.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/decision-capture/helpers/record_decision.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/decision-capture/SKILL.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/spec-intake/helpers/spec_intake.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.claude/skills/spec-intake/SKILL.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.codex/hooks.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.editorconfig	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.gitignore	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/.pre-commit-config.yaml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/AGENTS.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/BRIDGE-INVENTORY.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/bridge-os-poller-setup-prompt.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/bridge/.gitkeep	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/CLAUDE.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/docs/upgrade-rehearsal-recipe.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/groundtruth.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/independent-progress-assessments/LOYAL-OPPOSITION-LOG.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/Makefile	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/MEMORY.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/memory/release-readiness.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/pyproject-sections.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/dual-agent/README.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/assertion-check.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/bridge-compliance-gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/credential-scan.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/delib-search-gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/delib-search-tracker.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/destructive-gate.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/intake-classifier.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/kb-not-markdown.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/scanner-safe-writer.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/session-health.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/session-start-governance.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/spec-before-code.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/hooks/spec-classifier.py	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/rules/canonical-terminology-policy.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/rules/canonical-terminology.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/rules/canonical-terminology.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.claude/rules/prime-builder.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.codex/hooks.json	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.editorconfig	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.gitignore	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/.pre-commit-config.yaml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/CLAUDE.md	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/docs/upgrade-rehearsal-recipe.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/groundtruth.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/Makefile	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/MEMORY.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/memory/release-readiness.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/pyproject-sections.toml	package_and_entrypoint
+groundtruth-kb/tests/fixtures/scaffold_golden/local-only/README.md	package_and_entrypoint
+groundtruth-kb/tests/fixtures/spec_lifecycle_slice1_populated_fixture.json	package_and_entrypoint
+groundtruth-kb/tests/framework/test_application_register_validation.py	package_and_entrypoint
+groundtruth-kb/tests/framework/test_bash_enforcement_parser.py	package_and_entrypoint
+groundtruth-kb/tests/framework/test_claude_directive_adapter.py	package_and_entrypoint
+groundtruth-kb/tests/framework/test_directive_registry_schema.py	package_and_entrypoint
+groundtruth-kb/tests/framework/test_occupancy_detection.py	package_and_entrypoint
+groundtruth-kb/tests/framework/test_platform_doctor_matrix.py	package_and_entrypoint
+groundtruth-kb/tests/test_adr_harness_azure.py	package_and_entrypoint
+groundtruth-kb/tests/test_adr_scaffold_azure.py	package_and_entrypoint
+groundtruth-kb/tests/test_agent_role_manifest.py	package_and_entrypoint
+groundtruth-kb/tests/test_ar_web_shim.py	package_and_entrypoint
+groundtruth-kb/tests/test_assertion_schema.py	package_and_entrypoint
+groundtruth-kb/tests/test_assertions.py	package_and_entrypoint
+groundtruth-kb/tests/test_azure_cicd_scaffold.py	package_and_entrypoint
+groundtruth-kb/tests/test_azure_iac_scaffold.py	package_and_entrypoint
+groundtruth-kb/tests/test_backlog.py	package_and_entrypoint
+groundtruth-kb/tests/test_backlog_update_source_spec_id.py	package_and_entrypoint
+groundtruth-kb/tests/test_baseline_audit_skill.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_audit.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_checkpoint.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_codex_hook_sample_status.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_bridge_context.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_detector.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_dispatch_reset.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_handshake.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_import_hygiene.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_launcher.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_logging.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_notify.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_bridge_paths.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_poller.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_poller_spike_runner.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_registry.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_routing.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_runtime.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_status_driver.py	package_and_entrypoint
+groundtruth-kb/tests/test_bridge_worker.py	package_and_entrypoint
+groundtruth-kb/tests/test_canonical_terms_collisions.py	package_and_entrypoint
+groundtruth-kb/tests/test_canonical_terms_schema.py	package_and_entrypoint
+groundtruth-kb/tests/test_canonical_terms_seed.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_classify_tree_cli.py	package_and_entrypoint
+groundtruth-kb/tests/test_classify_tree_read_only.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_approval_packet.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_authority.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_cli_core_spec_intake.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_deliberations.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_design.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_discoverability.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_projects.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_subset_list.py	package_and_entrypoint
+groundtruth-kb/tests/test_cli_utf8_portability.py	package_and_entrypoint
+groundtruth-kb/tests/test_codex_no_window_verification.py	package_and_entrypoint
+groundtruth-kb/tests/test_community_feedback_spec1875.py	package_and_entrypoint
+groundtruth-kb/tests/test_config.py	package_and_entrypoint
+groundtruth-kb/tests/test_constraint_propagation.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_context_manifest.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_core_spec_intake.py	package_and_entrypoint
+groundtruth-kb/tests/test_credential_patterns.py	package_and_entrypoint
+groundtruth-kb/tests/test_dashboard.py	package_and_entrypoint
+groundtruth-kb/tests/test_db_busy_timeout.py	package_and_entrypoint
+groundtruth-kb/tests/test_db_snapshot.py	package_and_entrypoint
+groundtruth-kb/tests/test_decision_capture_helper.py	package_and_entrypoint
+groundtruth-kb/tests/test_deliberation_index_embedding_timeout.py	package_and_entrypoint
+groundtruth-kb/tests/test_deliberations.py	package_and_entrypoint
+groundtruth-kb/tests/test_design_import.py	package_and_entrypoint
+groundtruth-kb/tests/test_docs_cli_coverage.py	package_and_entrypoint
+groundtruth-kb/tests/test_docs_harness_role_configuration.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_doctor_adoption_drift.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_bridge_accuracy.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_bridge_dispatch_liveness.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_doctor_canonical_authority_guard.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_canonical_terminology.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_cli_no_smart_poller_guidance.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_doctor_harness_state_sot.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_doctor_isolation.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_doctor_legacy_root.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_ollama.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_registry_parity.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_skills.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_stale_test_slots.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_standing_backlog.py	package_and_entrypoint
+groundtruth-kb/tests/test_doctor_unchanged_without_classify_flag.py	package_and_entrypoint
+groundtruth-kb/tests/test_env_sot_cli.py	package_and_entrypoint
+groundtruth-kb/tests/test_examples_pass_doctor.py	package_and_entrypoint
+groundtruth-kb/tests/test_exception_markers.py	package_and_entrypoint
+groundtruth-kb/tests/test_full_tree_type_checks.py	package_and_entrypoint
+groundtruth-kb/tests/test_gap_28_bridge_rule_repair.py	package_and_entrypoint
+groundtruth-kb/tests/test_gates.py	package_and_entrypoint
+groundtruth-kb/tests/test_gates_transport.py	package_and_entrypoint
+groundtruth-kb/tests/test_governance_hooks.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_governance_mutation.py	package_and_entrypoint
+groundtruth-kb/tests/test_harness_lifecycle.py	package_and_entrypoint
+groundtruth-kb/tests/test_harness_ops.py	package_and_entrypoint
+groundtruth-kb/tests/test_harness_projection.py	package_and_entrypoint
+groundtruth-kb/tests/test_harness_state_reader_migration.py	package_and_entrypoint
+groundtruth-kb/tests/test_harvest_coverage_doctor.py	package_and_entrypoint
+groundtruth-kb/tests/test_harvest_coverage_helper.py	package_and_entrypoint
+groundtruth-kb/tests/test_health.py	package_and_entrypoint
+groundtruth-kb/tests/test_hygiene_sweep_patterns.py	package_and_entrypoint
+groundtruth-kb/tests/test_impact.py	package_and_entrypoint
+groundtruth-kb/tests/test_impl_start_target_paths_preflight.py	package_and_entrypoint
+groundtruth-kb/tests/test_intake.py	package_and_entrypoint
+groundtruth-kb/tests/test_internal_helpers_type_checks.py	package_and_entrypoint
+groundtruth-kb/tests/test_lifecycle_metrics.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_logging_config.py	package_and_entrypoint
+groundtruth-kb/tests/test_managed_registry.py	package_and_entrypoint
+groundtruth-kb/tests/test_manifest_project.py	package_and_entrypoint
+groundtruth-kb/tests/test_mcp_surface_foundation.py	package_and_entrypoint
+groundtruth-kb/tests/test_no_bare_print.py	package_and_entrypoint
+groundtruth-kb/tests/test_no_parallel_manifests.py	package_and_entrypoint
+groundtruth-kb/tests/test_operating_state.py	package_and_entrypoint
+groundtruth-kb/tests/test_owner_approval_surface.py	package_and_entrypoint
+groundtruth-kb/tests/test_owner_decision_tracker_regex_tightening.py	package_and_entrypoint
+groundtruth-kb/tests/test_owner_decision_tracker_structural_guards.py	package_and_entrypoint
+groundtruth-kb/tests/test_owner_decisions_section_gate.py	package_and_entrypoint
+groundtruth-kb/tests/test_ownership_loader_agreement.py	package_and_entrypoint
+groundtruth-kb/tests/test_ownership_resolver.py	package_and_entrypoint
+groundtruth-kb/tests/test_pending_owner_decisions_audit.py	package_and_entrypoint
+groundtruth-kb/tests/test_phase_a_metrics_collector.py	package_and_entrypoint
+groundtruth-kb/tests/test_phase_y_loop_probe.py	package_and_entrypoint
+groundtruth-kb/tests/test_pipeline_events.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_policy_gates.py	package_and_entrypoint
+groundtruth-kb/tests/test_preflight_checks.py	package_and_entrypoint
+groundtruth-kb/tests/test_prime_builder_auq_only_rule.py	package_and_entrypoint
+groundtruth-kb/tests/test_project_artifacts.py	package_and_entrypoint
+groundtruth-kb/tests/test_project_authorization_operation_time_enforcement.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_project_dependency_ordering.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_projects_remove_item.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_public_api_docstrings.py	package_and_entrypoint
+groundtruth-kb/tests/test_public_api_type_checks.py	package_and_entrypoint
+groundtruth-kb/tests/test_quality_gate.py	package_and_entrypoint
+groundtruth-kb/tests/test_reconciliation.py	package_and_entrypoint
+groundtruth-kb/tests/test_registry_ast_coverage.py	package_and_entrypoint
+groundtruth-kb/tests/test_registry_db_schema.py	package_and_entrypoint
+groundtruth-kb/tests/test_registry_drift_detection.py	package_and_entrypoint
+groundtruth-kb/tests/test_registry_rationale_discipline.py	package_and_entrypoint
+groundtruth-kb/tests/test_registry_schema_and_ci.py	package_and_entrypoint
+groundtruth-kb/tests/test_registry_target_path_round_trip.py	package_and_entrypoint
+groundtruth-kb/tests/test_release_candidate_gate_template.py	package_and_entrypoint
+groundtruth-kb/tests/test_release_gate_metrics.py	package_and_entrypoint
+groundtruth-kb/tests/test_rollback_receipts.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_bridge_index.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_bridge_rules.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_ci_tiers.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_consumes_resolver.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_isolation.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_project.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_scaffold_provider_templates.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_settings.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_skills.py	package_and_entrypoint
+groundtruth-kb/tests/test_scaffold_smoke.py	package_and_entrypoint
+groundtruth-kb/tests/test_scanner_safe_writer.py	package_and_entrypoint
+groundtruth-kb/tests/test_search_deliberations_always_on_like_merge.py	package_and_entrypoint
+groundtruth-kb/tests/test_session_kickoff_prompt_templates.py	package_and_entrypoint
+groundtruth-kb/tests/test_session_start_orientation_doctor.py	package_and_entrypoint
+groundtruth-kb/tests/test_settings_merge_drift.py	package_and_entrypoint
+groundtruth-kb/tests/test_slice_4_doctor_test_layout.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_spec_classifier_canonical_triggers.py	governed_knowledge,package_and_entrypoint
+groundtruth-kb/tests/test_spec_event_surfacer.py	package_and_entrypoint
+groundtruth-kb/tests/test_spec_intake_helper.py	package_and_entrypoint
+groundtruth-kb/tests/test_spec_scaffold.py	package_and_entrypoint
+groundtruth-kb/tests/test_spec_scaffold_azure.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_agent_capability_snapshots.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_dispatch_policy.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_dispatch_runtime.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_doctor.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_flow_cli.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_flow_definition_seed_records.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_flow_definitions.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_flow_type_lifecycle.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_runtime_tables.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_stage_attempt_telemetry.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_stage_leases.py	package_and_entrypoint
+groundtruth-kb/tests/test_tafe_stuck_flow.py	package_and_entrypoint
+groundtruth-kb/tests/test_term_disambiguation.py	package_and_entrypoint
+groundtruth-kb/tests/test_unified_policy_registry.py	package_and_entrypoint
+groundtruth-kb/tests/test_upgrade.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_upgrade_dispatches_by_policy.py	package_and_entrypoint
+groundtruth-kb/tests/test_upgrade_isolation.py	package_and_entrypoint
+groundtruth-kb/tests/test_upgrade_rollback.py	package_and_entrypoint,registered_dependency_closure
+groundtruth-kb/tests/test_upgrade_skills.py	package_and_entrypoint
+groundtruth-kb/tests/test_web.py	package_and_entrypoint
+groundtruth-kb/tests/test_web_pipeline.py	package_and_entrypoint
+groundtruth-kb/tests/test_wi5266_resource_routing.py	package_and_entrypoint
+gtkb-file-move-and-rename-list.csv	registered_dependency_closure
+harness-state/codex/session-startup-preferences.json	registered_dependency_closure
+infrastructure/terraform/dr_security.tf	registered_dependency_closure
+infrastructure/terraform/keyvault_diagnostics.tf	registered_dependency_closure
+infrastructure/terraform/langfuse.tf	registered_dependency_closure
+infrastructure/terraform/main.tf	registered_dependency_closure
+infrastructure/terraform/monitoring.tf	registered_dependency_closure
+infrastructure/terraform/production.tfvars.example	registered_dependency_closure
+infrastructure/terraform/scaling_profiles.tf	registered_dependency_closure
+infrastructure/terraform/variables.tf	registered_dependency_closure
+platform_tests/__init__.py	package_and_entrypoint
+platform_tests/cli/test_backlog_update_title_desc.py	package_and_entrypoint
+platform_tests/fixtures/file_reference_migration/direct-forms.txt	package_and_entrypoint
+platform_tests/fixtures/file_reference_migration/segmented.ps1	package_and_entrypoint
+platform_tests/fixtures/file_reference_migration/segmented.py	package_and_entrypoint
+platform_tests/fixtures/file_reference_migration/structured.toml	package_and_entrypoint
+platform_tests/fixtures/modernization/agent-red-prior-supported-package.json	package_and_entrypoint
+platform_tests/fixtures/modernization/groundtruth_kb-0.7.0rc1-py3-none-any.whl	package_and_entrypoint
+platform_tests/governance/__init__.py	package_and_entrypoint
+platform_tests/governance/test_index_md_classification_contract.py	package_and_entrypoint
+platform_tests/governance/test_isolation_018_e1_rollback_completeness.py	package_and_entrypoint
+platform_tests/governance/test_isolation_018_e1_step_order.py	package_and_entrypoint
+platform_tests/governance/test_platform_tests_rename.py	package_and_entrypoint
+platform_tests/groundtruth_kb/__init__.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_config_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_black_box_closure_cli.py	governed_knowledge,package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_complex.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_config_transactions_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_daemon_supervisor.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_daemon_watchdog.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_eligibility_precedence.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_report_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_tuning_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_dispatch_worker_context_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_bridge_state_report_cli.py	governed_knowledge,package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_deliberations_record.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_env_sot_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_harness_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_session_envelope_packet_cli.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_spec_record.py	package_and_entrypoint
+platform_tests/groundtruth_kb/cli/test_spec_update.py	package_and_entrypoint
+platform_tests/groundtruth_kb/governance/test_approval_packet.py	package_and_entrypoint
+platform_tests/groundtruth_kb/governance/test_commit_preflight.py	package_and_entrypoint
+platform_tests/groundtruth_kb/governance/test_preflight_evidence.py	package_and_entrypoint
+platform_tests/groundtruth_kb/governance/test_push_preflight.py	package_and_entrypoint
+platform_tests/groundtruth_kb/governance/test_push_readiness.py	package_and_entrypoint
+platform_tests/groundtruth_kb/specs/__init__.py	package_and_entrypoint
+platform_tests/groundtruth_kb/specs/test_adr_peer_solution_workflow_contract.py	package_and_entrypoint
+platform_tests/groundtruth_kb/specs/test_dcl_advisory_routing.py	package_and_entrypoint
+platform_tests/groundtruth_kb/specs/test_dcl_peer_solution_owner_gate.py	package_and_entrypoint
+platform_tests/groundtruth_kb/specs/test_spec_advisory_dashboard_counters.py	package_and_entrypoint
+platform_tests/groundtruth_kb/specs/test_spec_advisory_report_template.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_bridge_dispatch_cap_authority.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_bridge_dispatch_reset_stale_runs.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_cross_harness_parity_foundation.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_dispatch_default_metrics.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_dispatch_lane_scoring_projection.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_dispatch_tuning_advisory.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_dispatcher_disable_guard.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_dispatcher_next_foundation.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_doctor_cursor_dispatch.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_doctor_dispatcher_substrate.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_harness_diagnostic.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_harness_projection.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mcp_dependency_contract.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate_pending.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_bridge_substrate_validation.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_derive_role_slot.py	governed_knowledge,package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_invariants.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_pending.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_transaction.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_mode_switch_validation.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_pytest_timeout_dependency.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_secrets_scanner.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_session_envelope_packet.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_shim_dispatch_telemetry.py	package_and_entrypoint
+platform_tests/groundtruth_kb/test_spec_auto_backlog.py	package_and_entrypoint
+platform_tests/hooks/__init__.py	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_multiple_askuserquestion.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_prose_auq_correlated_substring.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_prose_auq_uncorrelated_boilerplate.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_truncated.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_with_askuserquestion_answered.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_with_askuserquestion_pending.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_with_many_prose_decisions.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_with_prose_and_askuserquestion.jsonl	package_and_entrypoint
+platform_tests/hooks/fixtures/owner_decision_tracker/turn_with_prose_decision.jsonl	package_and_entrypoint
+platform_tests/hooks/test_assertion_check_prune.py	package_and_entrypoint
+platform_tests/hooks/test_auto_finalize_verified_verdicts.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_author_metadata_gate.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_axis_2_role_aware.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_axis_2_surface_governance_review_terminal.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_bridge_axis_2_surface_work_intent.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_body_status_token.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_envelope_head.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_finalization_evidence.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_bridge_compliance_gate_hard_block_workspace.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_index_exemption.py	governed_knowledge,package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_kb_mutation_target_paths.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_bridge_compliance_gate_lo_verdict_candidate_preflight.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_magic_content_guidance.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_bridge_compliance_gate_no_action_prior_verdict.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_overwrite_guard.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_prior_deliberations.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_bridge_compliance_gate_project_metadata.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_spec_test_heading.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_w4_calibration.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_wi_project_membership.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_work_intent.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_compliance_gate_worktree_root.py	package_and_entrypoint
+platform_tests/hooks/test_bridge_proposal_wi_id_collision_gate.py	package_and_entrypoint
+platform_tests/hooks/test_claude_settings_hook_no_window.py	package_and_entrypoint
+platform_tests/hooks/test_credential_scan.py	package_and_entrypoint
+platform_tests/hooks/test_formal_artifact_approval_gate.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_glossary_expansion.py	package_and_entrypoint
+platform_tests/hooks/test_modernization_nonimpairment_proposal_gate.py	package_and_entrypoint
+platform_tests/hooks/test_narrative_artifact_approval.py	governed_knowledge,package_and_entrypoint
+platform_tests/hooks/test_owner_decision_capture.py	package_and_entrypoint
+platform_tests/hooks/test_owner_decision_tracker.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_project_completion_surface.py	package_and_entrypoint
+platform_tests/hooks/test_session_role_resolution.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_session_start_dispatch_role_cache.py	package_and_entrypoint
+platform_tests/hooks/test_session_start_governance_shell_hint.py	package_and_entrypoint
+platform_tests/hooks/test_session_start_marker_invalidation.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_wi5266_prompt_resource_routing.py	package_and_entrypoint
+platform_tests/hooks/test_workstream_focus.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/hooks/test_workstream_focus_session_role_marker.py	package_and_entrypoint
+platform_tests/multi_tenant/test_s153_batch5_spec_verification.py	package_and_entrypoint
+platform_tests/owner_decision/__init__.py	package_and_entrypoint
+platform_tests/owner_decision/test_auto_archive.py	package_and_entrypoint
+platform_tests/owner_decision/test_resolution_signals.py	package_and_entrypoint
+platform_tests/scripts/__init__.py	package_and_entrypoint
+platform_tests/scripts/conftest.py	package_and_entrypoint
+platform_tests/scripts/test_activity_disposition_profiles.py	package_and_entrypoint
+platform_tests/scripts/test_adr_dcl_applicability_discovery.py	package_and_entrypoint
+platform_tests/scripts/test_adr_dcl_clause_preflight.py	package_and_entrypoint
+platform_tests/scripts/test_advisory_backlog_router.py	package_and_entrypoint
+platform_tests/scripts/test_advisory_candidate_promote.py	package_and_entrypoint
+platform_tests/scripts/test_advisory_grilling_gate_lint.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_advisory_intake_scanner.py	package_and_entrypoint
+platform_tests/scripts/test_advisory_proposal_envelope_scaffold.py	package_and_entrypoint
+platform_tests/scripts/test_agent_red_partition_in_place.py	package_and_entrypoint
+platform_tests/scripts/test_alibaba_cloud_studio_governance_artifacts.py	package_and_entrypoint
+platform_tests/scripts/test_alibaba_cloud_studio_harness.py	package_and_entrypoint
+platform_tests/scripts/test_antigravity_hook_adapter.py	package_and_entrypoint
+platform_tests/scripts/test_antigravity_startup_overlay_integration.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_api_harness_stewardship_monitor.py	package_and_entrypoint
+platform_tests/scripts/test_api_skill_adapters.py	package_and_entrypoint
+platform_tests/scripts/test_application_scope_doctor.py	package_and_entrypoint
+platform_tests/scripts/test_ar_isolation_status_reconciliation.py	package_and_entrypoint
+platform_tests/scripts/test_ar_readiness_phase_1_1_governance_foundation.py	package_and_entrypoint
+platform_tests/scripts/test_ar_readiness_phase_1_2_app_root_minimization_validator.py	package_and_entrypoint
+platform_tests/scripts/test_archive_claude_design_handoff.py	package_and_entrypoint
+platform_tests/scripts/test_assertion_categorize.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_assertion_retirement_workflow.py	package_and_entrypoint
+platform_tests/scripts/test_audit_adr_dcl_metadata.py	package_and_entrypoint
+platform_tests/scripts/test_audit_gtkb_triad_completeness.py	package_and_entrypoint
+platform_tests/scripts/test_audit_orphan_verdict_files.py	package_and_entrypoint
+platform_tests/scripts/test_auto_retire_on_resolve.py	package_and_entrypoint
+platform_tests/scripts/test_auto_retire_on_verified.py	package_and_entrypoint
+platform_tests/scripts/test_autonomous_dispatch_loop_health.py	package_and_entrypoint
+platform_tests/scripts/test_backfill_implements_links.py	package_and_entrypoint
+platform_tests/scripts/test_backlog_triage_benchmark.py	package_and_entrypoint
+platform_tests/scripts/test_batch_archive_terminal_verdicts.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_activity_envelope_load.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_advisory_latency.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_assertion_signal_noise.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_deliberation_recall.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_effectiveness_observatory.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_harness_observed_scorecard.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_linkage_heatmap.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_recall_coverage.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_tool_identification.py	package_and_entrypoint
+platform_tests/scripts/test_benchmark_versions_per_landed_change.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_applicability_preflight.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_applicability_preflight_gfr_slice_a.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_automation_role_authority.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_axis_2_surface.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_bridge_citation_freshness_preflight.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_compliance_gate_apply_patch_adapter.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_compliance_gate_disposition.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_compliance_requirement_sufficiency.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_dispatch_concurrency.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_dispatch_config.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_bridge_dispatch_lo_quality_floor.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_dispatch_per_document_lease.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_dispatch_priority.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_dispatch_starvation_telemetry.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_dispatch_transactions.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_helper_no_window.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_kind_taxonomy.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_lane_classifier.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_metadata_audit.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_proposal_duplicate_thread_guard.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_proposal_pattern_lint.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_proposal_wi_id_collision_check.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_read_commands.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_reconciliation_skill.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_report_test_claim_rerun_verifier.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_review_independence.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_scheduler_leases.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_verified_backlog_reconciler.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_verify_embedded_evidence.py	package_and_entrypoint
+platform_tests/scripts/test_bridge_work_intent_registry.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_build_auto_push_gate.py	package_and_entrypoint
+platform_tests/scripts/test_canonical_init_keyword_assertions.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_canonical_init_keyword_syntax.py	package_and_entrypoint
+platform_tests/scripts/test_check_artifact_evaluability.py	package_and_entrypoint
+platform_tests/scripts/test_check_assertion_ratchet.py	package_and_entrypoint
+platform_tests/scripts/test_check_canonical_terminology_doctor_integration.py	package_and_entrypoint
+platform_tests/scripts/test_check_code_quality_baseline_parity.py	package_and_entrypoint
+platform_tests/scripts/test_check_code_quality_baseline_source_scan.py	package_and_entrypoint
+platform_tests/scripts/test_check_codex_hook_parity.py	package_and_entrypoint
+platform_tests/scripts/test_check_codex_hook_parity_resolution_table.py	package_and_entrypoint
+platform_tests/scripts/test_check_commit_pathspec_safety.py	package_and_entrypoint
+platform_tests/scripts/test_check_commit_scope_bundling.py	package_and_entrypoint
+platform_tests/scripts/test_check_dev_environment_inventory_drift.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_check_environment_isolation.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_check_gt_cli_availability.py	package_and_entrypoint
+platform_tests/scripts/test_check_harness_parity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_check_harness_parity_entrypoint_import.py	package_and_entrypoint
+platform_tests/scripts/test_check_harness_state_sot_consistency.py	package_and_entrypoint
+platform_tests/scripts/test_check_legacy_harness_language.py	package_and_entrypoint
+platform_tests/scripts/test_check_local_settings_hygiene.py	package_and_entrypoint
+platform_tests/scripts/test_check_narrative_artifact_evidence.py	package_and_entrypoint
+platform_tests/scripts/test_check_obsolete_reference_purge.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_check_ruff_format.py	package_and_entrypoint
+platform_tests/scripts/test_check_skill_health.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_check_whole_file_reformat.py	package_and_entrypoint
+platform_tests/scripts/test_chromadb_py314_gate.py	package_and_entrypoint
+platform_tests/scripts/test_claude_session_start_dispatcher.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_clause_in_root_disclosure_exempt.py	package_and_entrypoint
+platform_tests/scripts/test_cli_artifact_read_verbs.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_cli_backlog_add.py	package_and_entrypoint
+platform_tests/scripts/test_cli_backlog_add_work_item.py	package_and_entrypoint
+platform_tests/scripts/test_cli_backlog_add_work_item_project_flag.py	package_and_entrypoint
+platform_tests/scripts/test_cli_backlog_authorize_implementation.py	package_and_entrypoint
+platform_tests/scripts/test_cli_backlog_list.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_cli_backlog_list_phases.py	package_and_entrypoint
+platform_tests/scripts/test_cli_backlog_status.py	package_and_entrypoint
+platform_tests/scripts/test_cli_projects_authorizations_covers_path.py	package_and_entrypoint
+platform_tests/scripts/test_cli_projects_reconcile.py	package_and_entrypoint
+platform_tests/scripts/test_cloud_harness_base.py	package_and_entrypoint
+platform_tests/scripts/test_codex_backlog_cleanup_inventory.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_codex_bridge_compliance_gate.py	package_and_entrypoint
+platform_tests/scripts/test_codex_dotdir_acl_repair.py	package_and_entrypoint
+platform_tests/scripts/test_codex_hook_batch_output.py	package_and_entrypoint
+platform_tests/scripts/test_codex_hook_parity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_codex_hook_parity_resolution_table_drift.py	package_and_entrypoint
+platform_tests/scripts/test_codex_hook_runtime_containment.py	package_and_entrypoint
+platform_tests/scripts/test_codex_mcp_worker_guard.py	package_and_entrypoint
+platform_tests/scripts/test_codex_no_window_smoke_probe.py	package_and_entrypoint
+platform_tests/scripts/test_codex_no_window_timeout_alignment.py	package_and_entrypoint
+platform_tests/scripts/test_codex_session_start_dispatcher.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_codex_shell_no_window_wrapper.py	package_and_entrypoint
+platform_tests/scripts/test_codex_skill_load_smoke.py	package_and_entrypoint
+platform_tests/scripts/test_codex_snapshot_window_hider.py	package_and_entrypoint
+platform_tests/scripts/test_collect_dev_environment_inventory.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_collect_modernization_semantic_evidence.py	package_and_entrypoint
+platform_tests/scripts/test_command_registry_tracking.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_command_surface_disposition.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_command_surface_env.py	package_and_entrypoint
+platform_tests/scripts/test_commit_foreign_verdict_bundling_guard.py	package_and_entrypoint
+platform_tests/scripts/test_controlled_artifact_paths.py	package_and_entrypoint
+platform_tests/scripts/test_cross_harness_parity_schema.py	package_and_entrypoint
+platform_tests/scripts/test_cross_harness_protocol_parity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_cursor_harness.py	package_and_entrypoint
+platform_tests/scripts/test_cursor_hook_headless_parity.py	package_and_entrypoint
+platform_tests/scripts/test_dashboard_subject_selector.py	package_and_entrypoint
+platform_tests/scripts/test_db_snapshot_doctor_checks.py	package_and_entrypoint
+platform_tests/scripts/test_db_snapshot_launcher_in_root.py	package_and_entrypoint
+platform_tests/scripts/test_dcl_role_resolution_authority_001.py	package_and_entrypoint
+platform_tests/scripts/test_deliberation_archive_spec2098_coverage.py	package_and_entrypoint
+platform_tests/scripts/test_deliberation_search_backend_doctor.py	package_and_entrypoint
+platform_tests/scripts/test_deliberation_search_fail_loud.py	package_and_entrypoint
+platform_tests/scripts/test_deliberation_search_stale_segment.py	package_and_entrypoint
+platform_tests/scripts/test_deploy_fqdn_spec1882.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_discover_orphan_wi_memberships.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_author_meets_reviewer.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_blackbox_boundary_scanner.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_blackbox_gate.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_blackbox_gate_activation.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_chaos_harness.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_concurrency_cap.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_cost_budget.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_env_local_auth_loader.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_monitor.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_non_transient_fast_trip.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_parity.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_post_dispatch_poll.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_previous_launch_failed_cooldown.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_sandbox_plan.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_session_unaware_guard.py	package_and_entrypoint
+platform_tests/scripts/test_dispatch_suppression_routing.py	package_and_entrypoint
+platform_tests/scripts/test_dispatched_role_bootstrap.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_budget_constants_regression.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_complex_control.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_daemon_supervision.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_envelope_runtime.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_generation_admission.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_dispatcher_runtime_concurrent_writes.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_diagnose.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_drains_pending_before_recipient_resolution.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_durable_keyed_regression.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_import_repair.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_rename_retry.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_work_intent.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_runtime_worker_delivery.py	package_and_entrypoint
+platform_tests/scripts/test_dispatcher_watchdog_control.py	package_and_entrypoint
+platform_tests/scripts/test_doctor_registered_hook_tracked.py	package_and_entrypoint
+platform_tests/scripts/test_doctor_registry_dynamic_import_contract.py	package_and_entrypoint
+platform_tests/scripts/test_doctor_session_role_marker.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_doctor_skill_health.py	package_and_entrypoint
+platform_tests/scripts/test_doctor_skill_rename_sweep.py	package_and_entrypoint
+platform_tests/scripts/test_doctor_untracked_verified_verdicts.py	package_and_entrypoint
+platform_tests/scripts/test_document_author_metadata.py	package_and_entrypoint
+platform_tests/scripts/test_dora_001b_track1_writer.py	package_and_entrypoint
+platform_tests/scripts/test_dora_001b_track2_ingest.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_dora_four_keys_panels.py	package_and_entrypoint
+platform_tests/scripts/test_draft_lint.py	package_and_entrypoint
+platform_tests/scripts/test_drift_hook_remediation_text.py	package_and_entrypoint
+platform_tests/scripts/test_emergency_bootstrap_protocol_doc.py	package_and_entrypoint
+platform_tests/scripts/test_evidence_freshness_boundary.py	package_and_entrypoint
+platform_tests/scripts/test_external_harness_exec_boundary.py	package_and_entrypoint
+platform_tests/scripts/test_external_mutation_guard.py	package_and_entrypoint
+platform_tests/scripts/test_fab05_rule_file_retirement.py	package_and_entrypoint
+platform_tests/scripts/test_fab06_narrative_correctness.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_fab07_doctor_false_signals.py	package_and_entrypoint
+platform_tests/scripts/test_fab08_slot_leak_fix.py	package_and_entrypoint
+platform_tests/scripts/test_fab09_safety_gate_registration.py	package_and_entrypoint
+platform_tests/scripts/test_fab10_index_well_formedness.py	package_and_entrypoint
+platform_tests/scripts/test_fab11_regression_signal_revival.py	package_and_entrypoint
+platform_tests/scripts/test_fab12_agent_red_residue_sweep.py	package_and_entrypoint
+platform_tests/scripts/test_fab13_retention_policy.py	package_and_entrypoint
+platform_tests/scripts/test_fab14_directive_hook_coverage.py	package_and_entrypoint
+platform_tests/scripts/test_fab14_formal_autodiscovery.py	package_and_entrypoint
+platform_tests/scripts/test_fab14_gate_denial_telemetry.py	package_and_entrypoint
+platform_tests/scripts/test_fab14_narrative_autodiscovery.py	package_and_entrypoint
+platform_tests/scripts/test_fab14_path_token_dedup.py	package_and_entrypoint
+platform_tests/scripts/test_fab14_requirement_sufficiency.py	package_and_entrypoint
+platform_tests/scripts/test_fab15_role_narrative.py	package_and_entrypoint
+platform_tests/scripts/test_fab17_chroma_read_path.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_fab18_backlog_dignity.py	package_and_entrypoint
+platform_tests/scripts/test_fab21_rules_payload_profile.py	package_and_entrypoint
+platform_tests/scripts/test_file_bridge_protocol_advisory_status.py	package_and_entrypoint
+platform_tests/scripts/test_gate_fp_corpus.py	package_and_entrypoint
+platform_tests/scripts/test_generate_antigravity_skill_adapters.py	package_and_entrypoint
+platform_tests/scripts/test_generate_api_skill_adapters.py	package_and_entrypoint
+platform_tests/scripts/test_generate_bridge_swimlane.py	package_and_entrypoint
+platform_tests/scripts/test_generate_codex_skill_adapters.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_generate_cursor_skill_adapters.py	package_and_entrypoint
+platform_tests/scripts/test_generate_rule_compatibility_projections.py	package_and_entrypoint
+platform_tests/scripts/test_git_lifecycle_exact_restore.py	package_and_entrypoint
+platform_tests/scripts/test_git_lifecycle_maintenance.py	package_and_entrypoint
+platform_tests/scripts/test_git_warnings_env.py	package_and_entrypoint
+platform_tests/scripts/test_gitattributes_lf_policy.py	package_and_entrypoint
+platform_tests/scripts/test_gitignore_codex_pytest_tmp.py	package_and_entrypoint
+platform_tests/scripts/test_gitignore_session_snapshots.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_gitignore_tree_stabilization_scratch.py	package_and_entrypoint
+platform_tests/scripts/test_go_impl_claim_timebox.py	package_and_entrypoint
+platform_tests/scripts/test_gov_requirements_collection_hook_tags.py	package_and_entrypoint
+platform_tests/scripts/test_governance_hygiene_bundle.py	package_and_entrypoint
+platform_tests/scripts/test_governing_specs_preserved.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_groundtruth_governance_adoption.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_groundtruth_kb_ruff_clean.py	package_and_entrypoint
+platform_tests/scripts/test_groundtruth_kb_tests_workflow.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_dashboard_alerting.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_gtkb_dashboard_clean_checkout.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_dashboard_control_plane.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_gtkb_dashboard_grafana.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_dispatcher_daemon.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_gtkb_dispatcher_heartbeat.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_hygiene_investigation.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_overlay.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_gtkb_propose_scaffold.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_gtkb_scoped_client.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_gtkb_service_sot_resource_limits.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_service_sot_restore_policy.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_service_sot_watchdog.py	package_and_entrypoint
+platform_tests/scripts/test_gtkb_session_id.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_harness_adaptation_impact.py	package_and_entrypoint
+platform_tests/scripts/test_harness_benchmark_cli.py	package_and_entrypoint
+platform_tests/scripts/test_harness_envelope_equivalence.py	package_and_entrypoint
+platform_tests/scripts/test_harness_identity.py	package_and_entrypoint
+platform_tests/scripts/test_harness_local_scratchpad_boundary.py	package_and_entrypoint
+platform_tests/scripts/test_harness_model_pin_reconfirmation.py	package_and_entrypoint
+platform_tests/scripts/test_harness_parity_phase2.py	package_and_entrypoint
+platform_tests/scripts/test_harness_projection_reader.py	package_and_entrypoint
+platform_tests/scripts/test_harness_quality_fixture_corpus.py	package_and_entrypoint
+platform_tests/scripts/test_harness_quality_manifest.py	package_and_entrypoint
+platform_tests/scripts/test_harness_quality_reporting.py	package_and_entrypoint
+platform_tests/scripts/test_harness_quality_runner.py	package_and_entrypoint
+platform_tests/scripts/test_harness_quality_scoring.py	package_and_entrypoint
+platform_tests/scripts/test_harness_quality_telemetry.py	package_and_entrypoint
+platform_tests/scripts/test_harness_registry_reader_migration.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_harness_role_protocol_smoke.py	package_and_entrypoint
+platform_tests/scripts/test_harness_roles.py	package_and_entrypoint
+platform_tests/scripts/test_harness_skill_effectiveness.py	package_and_entrypoint
+platform_tests/scripts/test_harness_storm_watchdog.py	package_and_entrypoint
+platform_tests/scripts/test_harvest_loud_wrap.py	package_and_entrypoint
+platform_tests/scripts/test_harvest_session_thread_level.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_hook_registration_parity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_hygiene_reclaim_cli.py	package_and_entrypoint
+platform_tests/scripts/test_hygiene_supersession_cli.py	package_and_entrypoint
+platform_tests/scripts/test_hygiene_sweep_cli.py	package_and_entrypoint
+platform_tests/scripts/test_hygiene_sweep_skill.py	package_and_entrypoint
+platform_tests/scripts/test_implementation_authorization.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_implementation_authorization_extract_spec_links_table.py	package_and_entrypoint
+platform_tests/scripts/test_implementation_authorization_gfr_slice_a.py	package_and_entrypoint
+platform_tests/scripts/test_implementation_authorization_harness_selector.py	package_and_entrypoint
+platform_tests/scripts/test_implementation_start_gate_diagnostic_write_envelope.py	package_and_entrypoint
+platform_tests/scripts/test_implementation_start_gate_verb_aware.py	package_and_entrypoint
+platform_tests/scripts/test_install_gt_path_shim.py	package_and_entrypoint
+platform_tests/scripts/test_inventory_lo_bridge_history_backfill.py	package_and_entrypoint
+platform_tests/scripts/test_inventory_project_membership_reconciliation.py	package_and_entrypoint
+platform_tests/scripts/test_inventory_verified_untested_spec_hygiene_cluster.py	package_and_entrypoint
+platform_tests/scripts/test_isolation_017_citation_backfill_audit.py	package_and_entrypoint
+platform_tests/scripts/test_isolation_program_backstop.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_kb_attribution.py	package_and_entrypoint
+platform_tests/scripts/test_kb_attribution_session_role.py	package_and_entrypoint
+platform_tests/scripts/test_kb_session_wrap_skill.py	package_and_entrypoint
+platform_tests/scripts/test_lifecycle_metrics_spec2100_coverage.py	package_and_entrypoint
+platform_tests/scripts/test_lifecycle_reference.py	package_and_entrypoint
+platform_tests/scripts/test_live_dispatch_capacity_benchmark.py	package_and_entrypoint
+platform_tests/scripts/test_lo_file_safety_gate_role_resolution.py	package_and_entrypoint
+platform_tests/scripts/test_lo_file_safety_payloads.py	package_and_entrypoint
+platform_tests/scripts/test_lo_harness_turn_budget.py	package_and_entrypoint
+platform_tests/scripts/test_lo_investigation_methodology.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_lo_startup_text.py	package_and_entrypoint
+platform_tests/scripts/test_lo_verified_commit_atomicity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_membase_effective_use_audit.py	package_and_entrypoint
+platform_tests/scripts/test_memory_md_ceiling.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_migrate_work_item_priority_canonical.py	package_and_entrypoint
+platform_tests/scripts/test_mirror_retirement_role_assignments.py	package_and_entrypoint
+platform_tests/scripts/test_mirror_retirement_root_surfaces.py	package_and_entrypoint
+platform_tests/scripts/test_modernization_agent_red_portability.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_authority_foundations.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_context_manifests.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_end_to_end_workflow.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_fresh_worker.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_git_lifecycle.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_hard_invariants.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_harness_assurance_clause_exactness.py	package_and_entrypoint
+platform_tests/scripts/test_modernization_harness_parity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_nonimpairment.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_release_candidate.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_runtime_recovery.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_modernization_scope_semantics.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_no_action_documentation.py	package_and_entrypoint
+platform_tests/scripts/test_no_phantom_spec_citation.py	package_and_entrypoint
+platform_tests/scripts/test_no_tracked_pyc_artifacts.py	package_and_entrypoint
+platform_tests/scripts/test_no_tracked_skill_helper_scratch.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_dispatch_prompt_restructure.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_governance_artifacts.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_harness.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_harness_numeric_args.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_provider_scoped_routing.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_role_promotion.py	package_and_entrypoint
+platform_tests/scripts/test_ollama_routing_config.py	package_and_entrypoint
+platform_tests/scripts/test_openrouter_harness.py	package_and_entrypoint
+platform_tests/scripts/test_openrouter_routing_deepseek.py	package_and_entrypoint
+platform_tests/scripts/test_ops_activity_context.py	package_and_entrypoint
+platform_tests/scripts/test_orphan_citation_audit.py	package_and_entrypoint
+platform_tests/scripts/test_parity_coverage_complete.py	package_and_entrypoint
+platform_tests/scripts/test_parity_discovery_diff.py	package_and_entrypoint
+platform_tests/scripts/test_parity_strict_on_rename.py	package_and_entrypoint
+platform_tests/scripts/test_pauth_included_wi_ids_gate_parity.py	package_and_entrypoint
+platform_tests/scripts/test_peer_solution_advisory_loop_procedure.py	package_and_entrypoint
+platform_tests/scripts/test_per_thread_finalization_repair.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_perrole_concurrency_cap_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_pipeline_events_spec2099_coverage.py	package_and_entrypoint
+platform_tests/scripts/test_post_action_receipt.py	package_and_entrypoint
+platform_tests/scripts/test_prefix_split_detector.py	package_and_entrypoint
+platform_tests/scripts/test_project_authorization.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_project_child_wi_checklist.py	package_and_entrypoint
+platform_tests/scripts/test_project_id_from_names_idempotent.py	package_and_entrypoint
+platform_tests/scripts/test_project_resource_aliases.py	package_and_entrypoint
+platform_tests/scripts/test_project_root_boundary_authority_carriers.py	package_and_entrypoint
+platform_tests/scripts/test_project_root_resolver_consolidation.py	package_and_entrypoint
+platform_tests/scripts/test_project_verified_completion_scanner.py	package_and_entrypoint
+platform_tests/scripts/test_projects_cli.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_projects_skill_adapter.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_proposal_target_paths_coverage_preflight.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_protected_mutation_guard.py	package_and_entrypoint
+platform_tests/scripts/test_protocol_enforcement_health.py	package_and_entrypoint
+platform_tests/scripts/test_pytest_basetemp_isolation.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_backlog_split.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_chromadb_regen.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_ci_inventory.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_common_validation.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_rehearse_db_filter_dryrun.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_driver_wave_banner.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_isolation.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_rehearse_lint_clean.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_membase_export.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_path_rewrite.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_production_effects.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_release_readiness_split.py	package_and_entrypoint
+platform_tests/scripts/test_rehearse_split_helper.py	package_and_entrypoint
+platform_tests/scripts/test_remediate_por_step_16e.py	package_and_entrypoint
+platform_tests/scripts/test_repair_codex_dotdir_acl.py	package_and_entrypoint
+platform_tests/scripts/test_resolve_orphan_wi_memberships.py	package_and_entrypoint
+platform_tests/scripts/test_restore_fleet_membase_carriers.py	package_and_entrypoint
+platform_tests/scripts/test_retired_dispatch_substrate_residue.py	package_and_entrypoint
+platform_tests/scripts/test_role_set_schema.py	package_and_entrypoint
+platform_tests/scripts/test_router_corpus_dispose.py	package_and_entrypoint
+platform_tests/scripts/test_rule_files_role_assignments_cleanup.py	package_and_entrypoint
+platform_tests/scripts/test_run_spec_derived_tests.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_run_with_status.py	package_and_entrypoint
+platform_tests/scripts/test_scaffold_upgrade_tier_a_apply.py	package_and_entrypoint
+platform_tests/scripts/test_scan_bridge.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_scope_transition_project_template.py	package_and_entrypoint
+platform_tests/scripts/test_scripts_source_entrypoint_migration.py	package_and_entrypoint
+platform_tests/scripts/test_sdk_bridge_bash_guard.py	package_and_entrypoint
+platform_tests/scripts/test_secret_at_rest_guard.py	package_and_entrypoint
+platform_tests/scripts/test_seed_harness_registry.py	package_and_entrypoint
+platform_tests/scripts/test_self_review_write_time_gate.py	package_and_entrypoint
+platform_tests/scripts/test_session_continuation_sources_parity.py	package_and_entrypoint
+platform_tests/scripts/test_session_envelope_cli_choice.py	package_and_entrypoint
+platform_tests/scripts/test_session_envelope_cli_provenance.py	package_and_entrypoint
+platform_tests/scripts/test_session_envelope_git_disposition.py	package_and_entrypoint
+platform_tests/scripts/test_session_envelope_runtime.py	package_and_entrypoint
+platform_tests/scripts/test_session_handoff.py	package_and_entrypoint
+platform_tests/scripts/test_session_handoff_service.py	package_and_entrypoint
+platform_tests/scripts/test_session_init_keyword_matching.py	package_and_entrypoint
+platform_tests/scripts/test_session_role_marker_invalidation_both_harnesses.py	package_and_entrypoint
+platform_tests/scripts/test_session_role_resolution.py	package_and_entrypoint
+platform_tests/scripts/test_session_role_resolution_table.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_session_self_initialization.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_session_self_initialization_applies_pending_mode_switches.py	package_and_entrypoint
+platform_tests/scripts/test_session_self_initialization_canonical_consistency.py	package_and_entrypoint
+platform_tests/scripts/test_session_self_initialization_disclosure_shape.py	package_and_entrypoint
+platform_tests/scripts/test_session_self_initialization_imports.py	package_and_entrypoint
+platform_tests/scripts/test_session_self_initialization_spec_citation_existence.py	package_and_entrypoint
+platform_tests/scripts/test_session_self_initialization_startup_gate_rearm.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_session_self_initialization_topology_derive.py	package_and_entrypoint
+platform_tests/scripts/test_session_start_dispatch_core.py	package_and_entrypoint
+platform_tests/scripts/test_session_start_dispatch_core_stdlib_light.py	package_and_entrypoint
+platform_tests/scripts/test_session_start_dispatch_drains_bridge_substrate_pending.py	package_and_entrypoint
+platform_tests/scripts/test_session_start_dispatch_drains_pending_before_role_resolution.py	package_and_entrypoint
+platform_tests/scripts/test_session_startup_control_map.py	package_and_entrypoint
+platform_tests/scripts/test_session_startup_index.py	package_and_entrypoint
+platform_tests/scripts/test_session_startup_review_independence_rationale.py	package_and_entrypoint
+platform_tests/scripts/test_session_topic_envelope_router.py	package_and_entrypoint
+platform_tests/scripts/test_session_wrapup_trigger_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_settings_hook_path_robustness.py	package_and_entrypoint
+platform_tests/scripts/test_shim_toolcall_arg_resilience.py	package_and_entrypoint
+platform_tests/scripts/test_show_thread_bridge.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_single_harness_bridge_automation.py	package_and_entrypoint
+platform_tests/scripts/test_single_harness_dispatcher_task_installer.py	package_and_entrypoint
+platform_tests/scripts/test_single_harness_doctor_check_upgrade.py	package_and_entrypoint
+platform_tests/scripts/test_single_harness_governance_artifacts.py	package_and_entrypoint
+platform_tests/scripts/test_skill_disclosure.py	package_and_entrypoint
+platform_tests/scripts/test_skill_usage_router.py	package_and_entrypoint
+platform_tests/scripts/test_slice8_memory_reconciliation.py	package_and_entrypoint
+platform_tests/scripts/test_slice_3_hook_registrations.py	package_and_entrypoint
+platform_tests/scripts/test_sot_compactness_audit.py	package_and_entrypoint
+platform_tests/scripts/test_sot_read_discipline_hook.py	package_and_entrypoint
+platform_tests/scripts/test_sot_read_discipline_narrative_completion.py	package_and_entrypoint
+platform_tests/scripts/test_source_of_truth_freshness.py	package_and_entrypoint
+platform_tests/scripts/test_spec_coherence_cli.py	package_and_entrypoint
+platform_tests/scripts/test_spec_to_test_mapper.py	package_and_entrypoint
+platform_tests/scripts/test_standing_backlog_harvest.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_start_local_dashboard_headless.py	package_and_entrypoint
+platform_tests/scripts/test_startup_focus_role_awareness.py	package_and_entrypoint
+platform_tests/scripts/test_startup_payload_budget_report.py	package_and_entrypoint
+platform_tests/scripts/test_storm_watchdog_reap.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_strict_drop_misdirected_headless_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_swarm_worktree_review_plan.py	package_and_entrypoint
+platform_tests/scripts/test_sweep_commit_helpers.py	package_and_entrypoint
+platform_tests/scripts/test_system_interface_map.py	package_and_entrypoint
+platform_tests/scripts/test_tafe_dashboard_refresh.py	package_and_entrypoint
+platform_tests/scripts/test_testing_service_integrations_work_subject_aware.py	package_and_entrypoint
+platform_tests/scripts/test_topic_router_operator_context.py	package_and_entrypoint
+platform_tests/scripts/test_update_wiki_pages.py	package_and_entrypoint
+platform_tests/scripts/test_validate_formal_artifact_packet.py	package_and_entrypoint
+platform_tests/scripts/test_verdict_evidence_anchor_preflight.py	package_and_entrypoint
+platform_tests/scripts/test_verify_antigravity_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_verify_claude_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_verify_codex_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_verify_cursor_dispatch.py	package_and_entrypoint
+platform_tests/scripts/test_verify_ollama_dispatch.py	governed_knowledge,package_and_entrypoint
+platform_tests/scripts/test_verify_slice8_5_ci_green.py	package_and_entrypoint
+platform_tests/scripts/test_versioned_files_archival_invariant.py	package_and_entrypoint
+platform_tests/scripts/test_wi4348_rule_state_strip_phase1.py	package_and_entrypoint
+platform_tests/scripts/test_wi5266_envelope_resource_routing.py	package_and_entrypoint
+platform_tests/scripts/test_windows_no_window_spawn_audit.py	package_and_entrypoint
+platform_tests/scripts/test_windows_subprocess.py	package_and_entrypoint
+platform_tests/scripts/test_work_intent_auto_extend.py	package_and_entrypoint
+platform_tests/scripts/test_work_intent_role_eligibility.py	governed_knowledge,package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_work_tree_hygiene_doctor.py	package_and_entrypoint
+platform_tests/scripts/test_work_tree_stray_detector.py	package_and_entrypoint
+platform_tests/scripts/test_worker_packet_authorization_envelope.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_workstream_focus_hook_parity.py	package_and_entrypoint
+platform_tests/scripts/test_wrap_capture_transcript.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_wrap_scan_consistency.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_wrap_scan_consistency_allowlist.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_wrap_scan_hygiene.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_wrap_scan_hygiene_skip_dirs.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/scripts/test_wrap_scan_reconciliation.py	package_and_entrypoint
+platform_tests/scripts/test_wrap_scan_report_relocation.py	package_and_entrypoint
+platform_tests/secrets/fixtures/allowlist.toml	package_and_entrypoint
+platform_tests/secrets/test_cli.py	package_and_entrypoint
+platform_tests/secrets/test_redaction.py	package_and_entrypoint
+platform_tests/secrets/test_scanner.py	package_and_entrypoint
+platform_tests/security/test_ci_tooling.py	package_and_entrypoint
+platform_tests/skills/__init__.py	package_and_entrypoint
+platform_tests/skills/test_advisory_disposition_skill.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_advisory_intake_profile_surfacing.py	package_and_entrypoint
+platform_tests/skills/test_advisory_intake_skill.py	package_and_entrypoint
+platform_tests/skills/test_advisory_proposal_skill.py	package_and_entrypoint
+platform_tests/skills/test_auto_retire_actuation_helper_parity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_decision_capture_skill.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_dispatcher_control_skill.py	package_and_entrypoint
+platform_tests/skills/test_formal_artifact_packet_helper_skill.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_grill_me_for_clarification_skill.py	package_and_entrypoint
+platform_tests/skills/test_gtkb_hygiene_reclaim_skill.py	package_and_entrypoint
+platform_tests/skills/test_lo_advisory_owner_grilling_gate.py	package_and_entrypoint
+platform_tests/skills/test_lo_opportunity_radar_skill.py	package_and_entrypoint
+platform_tests/skills/test_managed_skill_adoption_review_skill.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_protected_write_helper.py	package_and_entrypoint
+platform_tests/skills/test_skill_catalog_contract.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_skill_governance_lifecycle_skill.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/skills/test_verify_prior_deliberations_pre_population.py	package_and_entrypoint
+platform_tests/skills/test_verify_skill_scaffolding.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/test_groundtruth_kb_import_budget.py	package_and_entrypoint
+platform_tests/test_loyal_opposition_file_safety_clarification.py	package_and_entrypoint
+platform_tests/test_no_active_smart_poller_wording.py	package_and_entrypoint
+platform_tests/transport/test_governance_integrity.py	package_and_entrypoint,registered_dependency_closure
+platform_tests/unit/test_destructive_gate_hook.py	package_and_entrypoint
+platform_tests/unit/test_knowledge_db_artifacts.py	package_and_entrypoint
+platform_tests/unit/test_lo_report_backfill.py	package_and_entrypoint
+preflight-validation.ps1	registered_dependency_closure
+README.md	registered_dependency_closure
+scripts/__init__.py	registered_dependency_closure
+scripts/_bootstrap_cursor_harness.py	capability_inventory,registered_dependency_closure
+scripts/_capture_scaffold_golden.py	registered_dependency_closure
+scripts/_defect_reporter.py	registered_dependency_closure
+scripts/_env.py	registered_dependency_closure
+scripts/_insert_doc194.py	registered_dependency_closure
+scripts/_kb_attribution.py	governed_knowledge,registered_dependency_closure
+scripts/_self_provision.py	registered_dependency_closure
+scripts/_session_init_keyword.py	registered_dependency_closure
+scripts/_subprocess_stream.py	registered_dependency_closure
+scripts/_verify_slice8_closeout.py	registered_dependency_closure
+scripts/_wrap_io.py	registered_dependency_closure
+scripts/_write_helper.py	registered_dependency_closure
+scripts/add_copyright_headers.py	registered_dependency_closure
+scripts/adr_dcl_applicability_discovery.py	registered_dependency_closure
+scripts/adr_dcl_clause_preflight.py	registered_dependency_closure
+scripts/advisory_backlog_router.py	registered_dependency_closure
+scripts/advisory_grilling_gate_lint.py	registered_dependency_closure
+scripts/advisory_intake_scanner.py	registered_dependency_closure
+scripts/agent-container-template.yaml	registered_dependency_closure
+scripts/alibaba_cloud_studio_harness.py	registered_dependency_closure
+scripts/analyze_test_phases.py	registered_dependency_closure
+scripts/archive_claude_design_handoff.py	registered_dependency_closure
+scripts/assertion_categorize.py	registered_dependency_closure
+scripts/assertion_retirement_workflow.py	registered_dependency_closure
+scripts/assign_tests_to_phases_s129.py	registered_dependency_closure
+scripts/audit_gtkb_triad_completeness.py	governed_knowledge,registered_dependency_closure
+scripts/audit_standing_backlog_sources.py	registered_dependency_closure
+scripts/auto_finalize_sweep.py	registered_dependency_closure
+scripts/autonomous_dispatch_loop_health.py	registered_dependency_closure
+scripts/backfill_implements_links.py	registered_dependency_closure
+scripts/backfill_lo_reports.py	registered_dependency_closure
+scripts/batch_archive_terminal_verdicts.py	registered_dependency_closure
+scripts/batch_assertions_round2.py	registered_dependency_closure
+scripts/batch_assertions_round3.py	registered_dependency_closure
+scripts/benchmarks/activity_envelope_load.py	registered_dependency_closure
+scripts/benchmarks/advisory_latency.py	registered_dependency_closure
+scripts/benchmarks/cli.py	registered_dependency_closure
+scripts/benchmarks/common.py	registered_dependency_closure
+scripts/benchmarks/fixture_corpus.py	registered_dependency_closure
+scripts/benchmarks/harness_adaptation_impact.py	registered_dependency_closure
+scripts/benchmarks/harness_quality_manifest.py	registered_dependency_closure
+scripts/benchmarks/harness_quality_reporting.py	registered_dependency_closure
+scripts/benchmarks/harness_quality_runner.py	registered_dependency_closure
+scripts/benchmarks/harness_quality_scoring.py	registered_dependency_closure
+scripts/benchmarks/harness_quality_telemetry.py	registered_dependency_closure
+scripts/benchmarks/linkage_heatmap.py	registered_dependency_closure
+scripts/bridge_applicability_preflight.py	registered_dependency_closure
+scripts/bridge_citation_freshness_preflight.py	registered_dependency_closure
+scripts/bridge_dispatch_concurrency.py	registered_dependency_closure
+scripts/bridge_dispatch_priority.py	registered_dependency_closure
+scripts/bridge_dispatch_starvation_telemetry.py	registered_dependency_closure
+scripts/bridge_lane_classifier.py	registered_dependency_closure
+scripts/bridge_lease_registry.py	registered_dependency_closure
+scripts/bridge_metadata_audit.py	registered_dependency_closure
+scripts/bridge_proposal_duplicate_thread_guard.py	registered_dependency_closure
+scripts/bridge_proposal_wi_id_collision_check.py	registered_dependency_closure
+scripts/bridge_report_test_claim_rerun_verifier.py	registered_dependency_closure
+scripts/bridge_review_independence.py	registered_dependency_closure
+scripts/bridge_verified_backlog_reconciler.py	registered_dependency_closure
+scripts/build.py	registered_dependency_closure
+scripts/build_agent_containers.py	registered_dependency_closure
+scripts/build_orchestrator.py	registered_dependency_closure
+scripts/capture_screenshots.py	registered_dependency_closure
+scripts/check_artifact_decontamination.py	registered_dependency_closure
+scripts/check_artifact_evaluability.py	governed_knowledge,registered_dependency_closure
+scripts/check_codex_hook_parity.py	governed_knowledge,registered_dependency_closure
+scripts/check_commit_pathspec_safety.py	registered_dependency_closure
+scripts/check_commit_scope_bundling.py	registered_dependency_closure
+scripts/check_context_manifests.py	governed_knowledge,registered_dependency_closure
+scripts/check_dev_environment_inventory_drift.py	registered_dependency_closure
+scripts/check_dispatched_role_bootstrap.py	governed_knowledge,registered_dependency_closure
+scripts/check_document_author_metadata.py	registered_dependency_closure
+scripts/check_environment_isolation.py	registered_dependency_closure
+scripts/check_harness_parity.py	registered_dependency_closure
+scripts/check_legacy_harness_language.py	registered_dependency_closure
+scripts/check_local_settings_hygiene.py	registered_dependency_closure
+scripts/check_locale_parity.py	registered_dependency_closure
+scripts/check_modernization_git_lifecycle.py	registered_dependency_closure
+scripts/check_modernization_nonimpairment.py	governed_knowledge,registered_dependency_closure
+scripts/check_modernization_release_candidate.py	registered_dependency_closure
+scripts/check_modernization_scope_semantics.py	governed_knowledge,registered_dependency_closure
+scripts/check_narrative_artifact_evidence.py	registered_dependency_closure
+scripts/check_pending_owner_decisions_parity.py	registered_dependency_closure
+scripts/check_project_dependency_ordering.py	governed_knowledge,registered_dependency_closure
+scripts/check_ruff_format.py	registered_dependency_closure
+scripts/check_scoped_service_boundary.py	registered_dependency_closure
+scripts/check_session_overlay_policy.py	registered_dependency_closure
+scripts/check_skill_health.py	registered_dependency_closure
+scripts/check_source_of_truth_freshness.py	governed_knowledge
+scripts/check_whole_file_reformat.py	registered_dependency_closure
+scripts/clean_adopter_validation.py	registered_dependency_closure
+scripts/cleanup_demo_data.py	registered_dependency_closure
+scripts/cleanup_orphaned_conversations.py	registered_dependency_closure
+scripts/cloud_harness_base.py	registered_dependency_closure
+scripts/codex_mcp_worker_guard.py	registered_dependency_closure
+scripts/collect_dev_environment_inventory.py	registered_dependency_closure
+scripts/container_load_test.py	registered_dependency_closure
+scripts/create_code_quality_wis_s132.py	registered_dependency_closure
+scripts/create_contact_messages_container.py	registered_dependency_closure
+scripts/create_pii_container.py	registered_dependency_closure
+scripts/create_s119_specs.py	registered_dependency_closure
+scripts/create_s119_wis_tests.py	registered_dependency_closure
+scripts/create_shopify_pages.py	registered_dependency_closure
+scripts/create_shopify_products.py	registered_dependency_closure
+scripts/create_test_stubs.py	registered_dependency_closure
+scripts/create_test_tenant.py	registered_dependency_closure
+scripts/create_tests_for_untested_specs.py	registered_dependency_closure
+scripts/create_tests_s129.py	registered_dependency_closure
+scripts/create_tier_tests_s130.py	registered_dependency_closure
+scripts/create_untested_spec_work_items.py	registered_dependency_closure
+scripts/cursor_hook_adapter.py	registered_dependency_closure
+scripts/debug_kb_context.py	registered_dependency_closure
+scripts/deduplicate_kb_entries.py	registered_dependency_closure
+scripts/deliberation_health.py	registered_dependency_closure
+scripts/deploy.py	registered_dependency_closure
+scripts/deploy/api-gateway-restore.yaml	registered_dependency_closure
+scripts/deploy/build-and-deploy-staging.ps1	registered_dependency_closure
+scripts/deploy/build-context.ps1	registered_dependency_closure
+scripts/deploy/cosmos-pitr-restore.ps1	registered_dependency_closure
+scripts/deploy/create-build-context.ps1	registered_dependency_closure
+scripts/deploy/PRODUCTION-ENV-CHANGES.md	registered_dependency_closure
+scripts/deploy/restore-api-gateway.ps1	registered_dependency_closure
+scripts/deploy/restore-production-gateway.ps1	registered_dependency_closure
+scripts/deploy/rollback.ps1	registered_dependency_closure
+scripts/deploy/upgrade.ps1	registered_dependency_closure
+scripts/deploy_agent_containers.py	registered_dependency_closure
+scripts/deploy_config.py	registered_dependency_closure
+scripts/deploy_orchestrator.py	registered_dependency_closure
+scripts/deploy_pipeline.py	registered_dependency_closure
+scripts/deploy_ui.py	registered_dependency_closure
+scripts/detect_import_cycles.py	registered_dependency_closure
+scripts/diagnose_kr_quality.py	registered_dependency_closure
+scripts/discover_orphan_wi_memberships.py	registered_dependency_closure
+scripts/dispatch_blackbox_gate.py	capability_inventory,registered_dependency_closure
+scripts/dispatcher_runtime.py	governed_knowledge,registered_dependency_closure
+scripts/document_author_metadata.py	registered_dependency_closure
+scripts/draft_lint.py	registered_dependency_closure
+scripts/embed_knowledge_base.py	registered_dependency_closure
+scripts/ensure_dispatcher_daemon.py	registered_dependency_closure
+scripts/external_mutation_guard.py	registered_dependency_closure
+scripts/extract_owner_messages.py	registered_dependency_closure
+scripts/extract_phase2_specs.py	registered_dependency_closure
+scripts/fab11_assertion_corpus_remediation.py	registered_dependency_closure
+scripts/fix_devmode_encryption.py	registered_dependency_closure
+scripts/fix_lost_dek_encryption.py	registered_dependency_closure
+scripts/fix_s119_assertions.py	registered_dependency_closure
+scripts/generate_agentred_report.py	registered_dependency_closure
+scripts/generate_antigravity_skill_adapters.py	registered_dependency_closure
+scripts/generate_api_skill_adapters.py	capability_inventory,registered_dependency_closure
+scripts/generate_assessment_docx.py	registered_dependency_closure
+scripts/generate_codex_skill_adapters.py	registered_dependency_closure
+scripts/generate_cursor_skill_adapters.py	registered_dependency_closure
+scripts/generate_goose_manifest.py	registered_dependency_closure
+scripts/generate_key_benefit_slides.py	registered_dependency_closure
+scripts/generate_orbatech_charts.py	registered_dependency_closure
+scripts/generate_orbatech_report.py	registered_dependency_closure
+scripts/generate_orbatech_report_v2.py	registered_dependency_closure
+scripts/generate_rule_compatibility_projections.py	registered_dependency_closure
+scripts/goose_harness.py	registered_dependency_closure
+scripts/gtkb_dashboard/generate_bridge_swimlane.py	registered_dependency_closure
+scripts/gtkb_dashboard/refresh_dashboard_db.py	registered_dependency_closure
+scripts/gtkb_dispatcher_daemon.py	governed_knowledge,registered_dependency_closure
+scripts/gtkb_dispatcher_heartbeat.py	registered_dependency_closure
+scripts/gtkb_propose_scaffold.py	registered_dependency_closure
+scripts/gtkb_service_sot_watchdog.py	registered_dependency_closure
+scripts/gtkb_session_id.py	registered_dependency_closure
+scripts/guardrails/assertion-baseline.json	registered_dependency_closure
+scripts/guardrails/check_arch_guards.py	registered_dependency_closure
+scripts/guardrails/check_assertion_ratchet.py	registered_dependency_closure
+scripts/guardrails/check_hardcoded_env.py	registered_dependency_closure
+scripts/guardrails/check_test_deletion.py	registered_dependency_closure
+scripts/guardrails/check_tsx_gate.py	registered_dependency_closure
+scripts/guardrails/generate_assertion_baseline.py	registered_dependency_closure
+scripts/guardrails/pre-commit	registered_dependency_closure
+scripts/harness_identity.py	registered_dependency_closure
+scripts/harness_parity_phase2.py	registered_dependency_closure
+scripts/harness_projection_reader.py	registered_dependency_closure
+scripts/harness_roles.py	registered_dependency_closure
+scripts/harvest_session_deliberations.py	registered_dependency_closure
+scripts/harvest_warning_baseline.json	registered_dependency_closure
+scripts/hygiene/advisory_candidate_promote.py	registered_dependency_closure
+scripts/hygiene/hygiene_baseline.py	registered_dependency_closure
+scripts/hygiene/hygiene_report.py	registered_dependency_closure
+scripts/hygiene/stray_detector.py	governed_knowledge
+scripts/impl_start_target_paths_preflight.py	registered_dependency_closure
+scripts/implementation_authorization.py	governed_knowledge,registered_dependency_closure
+scripts/init_cosmos_containers.py	registered_dependency_closure
+scripts/insert_api_endpoint_coverage_s112.py	registered_dependency_closure
+scripts/insert_batch2_coverage_s112.py	registered_dependency_closure
+scripts/insert_batch3_coverage_s112.py	registered_dependency_closure
+scripts/insert_batch4_coverage_s112.py	registered_dependency_closure
+scripts/insert_batch5_coverage_s112.py	registered_dependency_closure
+scripts/insert_batch6_coverage_s112.py	registered_dependency_closure
+scripts/insert_e2e_phase1_coverage_s112.py	registered_dependency_closure
+scripts/insert_phase2_specs.py	registered_dependency_closure
+scripts/insert_test_coverage_s112.py	registered_dependency_closure
+scripts/install_codex_exec_shim.ps1	registered_dependency_closure
+scripts/install_db_snapshot_task.ps1	registered_dependency_closure
+scripts/install_dispatcher_daemon_task.ps1	registered_dependency_closure
+scripts/install_gt_path_shim.py	registered_dependency_closure
+scripts/install_service_sot_watchdog_task.ps1	registered_dependency_closure
+scripts/install_storm_watchdog_task.ps1	registered_dependency_closure
+scripts/integrity_scan.py	registered_dependency_closure
+scripts/inventory_tests.py	registered_dependency_closure
+scripts/inventory_verified_untested_spec_hygiene_cluster.py	registered_dependency_closure
+scripts/isolation_program_backstop.py	registered_dependency_closure
+scripts/kb_crossref.py	registered_dependency_closure
+scripts/kb_linkage_repair.py	registered_dependency_closure
+scripts/key_vault_audit.py	registered_dependency_closure
+scripts/load_test_progressive.py	registered_dependency_closure
+scripts/map_tests_to_specs.py	registered_dependency_closure
+scripts/membase_ci_seed.py	registered_dependency_closure
+scripts/merge_specs.py	registered_dependency_closure
+scripts/migrate_artifacts_s114.py	registered_dependency_closure
+scripts/migrate_canonical_identity.py	registered_dependency_closure
+scripts/migrate_docs_to_kb.py	registered_dependency_closure
+scripts/migrate_domain_index.py	registered_dependency_closure
+scripts/migrate_memory_to_kb_s140.py	registered_dependency_closure
+scripts/migrate_work_item_priority_canonical.py	registered_dependency_closure
+scripts/ollama_harness.py	registered_dependency_closure
+scripts/openrouter_harness.py	registered_dependency_closure
+scripts/ops/harness_storm_watchdog.ps1	governed_knowledge,registered_dependency_closure
+scripts/ops/harness_storm_watchdog_launcher.py	registered_dependency_closure
+scripts/ops/storm_watchdog_reap.py	registered_dependency_closure
+scripts/p1_framework_research.txt	registered_dependency_closure
+scripts/parity_discovery_diff.py	registered_dependency_closure
+scripts/poll_run.py	registered_dependency_closure
+scripts/poll_run_failures.py	registered_dependency_closure
+scripts/populate_feature_backlog.py	registered_dependency_closure
+scripts/por_step_16_exit_verification.py	registered_dependency_closure
+scripts/post_action_receipt.py	registered_dependency_closure
+scripts/pre_flight_checklist.py	registered_dependency_closure
+scripts/project_child_wi_checklist.py	registered_dependency_closure
+scripts/project_verified_completion_scanner.py	governed_knowledge,registered_dependency_closure
+scripts/proposal_target_paths_coverage_preflight.py	registered_dependency_closure
+scripts/protected_mutation_guard.py	governed_knowledge,registered_dependency_closure
+scripts/protocol_enforcement_health.py	registered_dependency_closure
+scripts/provision_agent_apps.py	registered_dependency_closure
+scripts/provision_app_insights.py	registered_dependency_closure
+scripts/provision_remaker_digital.py	registered_dependency_closure
+scripts/provision_staging.ps1	registered_dependency_closure
+scripts/provision_tenant_one.py	registered_dependency_closure
+scripts/ramp_to_overload.py	registered_dependency_closure
+scripts/refresh_test_credentials.py	registered_dependency_closure
+scripts/rehearse_isolation.py	registered_dependency_closure
+scripts/release_governance_metrics.py	registered_dependency_closure
+scripts/release_pipeline.py	registered_dependency_closure
+scripts/remediate_por_step_16e.py	registered_dependency_closure
+scripts/remediation-inventory-20260407-102648.json	registered_dependency_closure
+scripts/repair_widget_hash.py	registered_dependency_closure
+scripts/reset_api_key.py	registered_dependency_closure
+scripts/reset_production_tenants.py	registered_dependency_closure
+scripts/resolve_batch_wis_s117.py	registered_dependency_closure
+scripts/resolve_project_resource.py	registered_dependency_closure
+scripts/restore_fleet_membase_carriers.py	registered_dependency_closure
+scripts/rollback_e1_write_set.py	registered_dependency_closure
+scripts/run-integration-tests.py	registered_dependency_closure
+scripts/run-tests-thermal-safe.ps1	registered_dependency_closure
+scripts/run_mutation_tests.py	registered_dependency_closure
+scripts/run_platform_tests_rename.py	registered_dependency_closure
+scripts/run_spec_derived_tests.py	governed_knowledge,registered_dependency_closure
+scripts/run_staging_fuzz.py	registered_dependency_closure
+scripts/run_with_status.py	registered_dependency_closure
+scripts/s159_drift_remediation.py	registered_dependency_closure
+scripts/s159_integrity_fixes.py	registered_dependency_closure
+scripts/s159_test_spec_audit.py	registered_dependency_closure
+scripts/s160_record_account_billing_specs.py	registered_dependency_closure
+scripts/s161_record_quality_eval.py	registered_dependency_closure
+scripts/s164_migrate_fixtures.py	registered_dependency_closure
+scripts/s166_bootstrap.py	registered_dependency_closure
+scripts/s166_write_mock_tests.py	registered_dependency_closure
+scripts/s168_record_conflict_specs.py	registered_dependency_closure
+scripts/s168_record_ui_restructure.py	registered_dependency_closure
+scripts/s169_fix_module_access.py	registered_dependency_closure
+scripts/s169_split_monolith.py	registered_dependency_closure
+scripts/s170_kb_artifacts.py	registered_dependency_closure
+scripts/s173_docs_audit.py	registered_dependency_closure
+scripts/s174_kb_artifacts.py	registered_dependency_closure
+scripts/s175_kb_artifacts.py	registered_dependency_closure
+scripts/s178_create_specs.py	registered_dependency_closure
+scripts/s181_kb_artifacts.py	registered_dependency_closure
+scripts/s182_kb_artifacts.py	registered_dependency_closure
+scripts/s182_wi1107_kb.py	registered_dependency_closure
+scripts/scaffold_upgrade_tier_a_apply.py	registered_dependency_closure
+scripts/scan_secrets.py	registered_dependency_closure
+scripts/seed_conversations.py	registered_dependency_closure
+scripts/seed_demo_data.py	registered_dependency_closure
+scripts/seed_entitlements.py	registered_dependency_closure
+scripts/seed_harness_registry.py	registered_dependency_closure
+scripts/seed_knowledge_base.py	registered_dependency_closure
+scripts/seed_midflight.py	registered_dependency_closure
+scripts/seed_platform_admin.py	registered_dependency_closure
+scripts/seed_production_keys.py	registered_dependency_closure
+scripts/session_role_resolution.py	governed_knowledge,registered_dependency_closure
+scripts/session_self_initialization.py	capability_inventory,governed_knowledge,registered_dependency_closure
+scripts/session_start_dispatch_core.py	registered_dependency_closure
+scripts/setup-integration-testing.py	registered_dependency_closure
+scripts/setup/initialize_cosmos_containers.py	registered_dependency_closure
+scripts/skill_disclosure.py	registered_dependency_closure
+scripts/skill_usage_router.py	registered_dependency_closure
+scripts/spec_to_test_mapper.py	registered_dependency_closure
+scripts/startup_payload_budget_report.py	registered_dependency_closure
+scripts/stripe/create_product_catalog.py	registered_dependency_closure
+scripts/stripe/update_tax_codes.py	registered_dependency_closure
+scripts/sync-admin-env.ps1	registered_dependency_closure
+scripts/test_admin_ui_validation.py	registered_dependency_closure
+scripts/test_chat_battery.py	registered_dependency_closure
+scripts/test_chat_quality_metrics.py	registered_dependency_closure
+scripts/test_e2e_conversation_flows.py	registered_dependency_closure
+scripts/test_openai_quick.py	registered_dependency_closure
+scripts/test_pipeline.py	registered_dependency_closure
+scripts/test_run.py	registered_dependency_closure
+scripts/trigger_run.py	registered_dependency_closure
+scripts/uninstall_dispatcher_daemon_task.ps1	registered_dependency_closure
+scripts/update_homepage.py	registered_dependency_closure
+scripts/update_plan001_s133.py	registered_dependency_closure
+scripts/update_shopify_navigation.py	registered_dependency_closure
+scripts/update_wiki_pages.py	registered_dependency_closure
+scripts/upgrade_verification.py	registered_dependency_closure
+scripts/validate_formal_artifact_packet.py	registered_dependency_closure
+scripts/verify-agntcy-local.ps1	registered_dependency_closure
+scripts/verify-agntcy-production.ps1	registered_dependency_closure
+scripts/verify_all_specs.py	registered_dependency_closure
+scripts/verify_antigravity_dispatch.py	registered_dependency_closure
+scripts/verify_claude_dispatch.py	registered_dependency_closure
+scripts/verify_codex_dispatch.py	registered_dependency_closure
+scripts/verify_cursor_dispatch.py	registered_dependency_closure
+scripts/verify_ollama_dispatch.py	registered_dependency_closure
+scripts/verify_production_decrypt.py	registered_dependency_closure
+scripts/verify_s115.py	registered_dependency_closure
+scripts/verify_zk_pillars.py	registered_dependency_closure
+scripts/windows_no_window_spawn_audit.py	registered_dependency_closure
+scripts/wire_tests_to_phases.py	registered_dependency_closure
+scripts/workstream_focus.py	governed_knowledge,registered_dependency_closure
+scripts/wrap_capture_transcript.py	registered_dependency_closure
+scripts/wrap_clear_impl_start_packet.py	registered_dependency_closure
+scripts/wrap_scan_consistency.py	registered_dependency_closure
+scripts/wrap_scan_hygiene.py	registered_dependency_closure
+scripts/wrap_scan_reconciliation.py	registered_dependency_closure
+tools/knowledge-db/app.py	registered_dependency_closure
+tools/knowledge-db/assertions.py	registered_dependency_closure
+tools/knowledge-db/create_s259_wis.py	registered_dependency_closure
+tools/knowledge-db/db.py	registered_dependency_closure
+tools/knowledge-db/groundtruth.toml	registered_dependency_closure
+tools/knowledge-db/seed.py	registered_dependency_closure
+```
+
+## Specification-Derived Verification Plan
+
+| Spec / governing surface | Executed verification evidence | Result |
+| --- | --- | --- |
+| `GOV-PLATFORM-SOT-REGISTRY-001` | Final `gt registry reconcile`; `gt registry inspect --json --no-census`; 2,346 records, zero gaps/unknown/candidates | PASS |
+| `DCL-SOT-REGISTRY-RECORD-SCHEMA-001` | 10 reconciliation tests; 29 registry-control tests; opaque and recursive records parsed | PASS |
+| `DCL-SOT-REGISTRY-PROJECTION-PARITY-001` | Canonical/package SHA-256 both `e72d44ed...b6350`; projection digest `53dcc53d...3392` | PASS |
+| `DCL-ARTIFACT-REGISTRY-MUTATION-AUTHORIZATION-001` | Two exact generation/manifest/observer/evidence/receipt-bound additive journals; exact retry | PASS with disclosed repair-forward second journal |
+| `GOV-ARTIFACT-APPROVAL-001` | Immutable approval archive represented by one narrow recursive service container; approval-hook suite 12 pass / 1 baseline | PASS, baseline disclosed |
+| `DCL-ARTIFACT-APPROVAL-HOOK-001` | Direct-edit and missing-evidence fixtures retain bytes and report audit gaps; narrative checker focused suite previously passed | PASS |
+| `SPEC-INTAKE-97538b` | Notation-free direct edit, unattributed passive observation, and governance self-repair fixtures | PASS |
+| `GOV-CROSS-CUTTING-REQUIREMENTS-MECHANICAL-ENFORCEMENT-001` | Doctor, release, migration, hygiene, implementation-start, observation, and commit consumers use shared result | PASS |
+| `GOV-SOURCE-OF-TRUTH-FRESHNESS-001` | Default reconciliation reports audit unperformed/nonblocking; explicit audit mode remains available | PASS |
+| `GOV-WORK-TREE-HYGIENE-001` | 23 hygiene CLI tests previously passed; 395 pruned envelopes keep sweep false | PASS |
+| `ADR-CODEX-HOOK-PARITY-FALLBACK-001` | Harness parity suite 43 pass / 1 pre-existing capability-registry extra | PASS with baseline disclosed |
+| `ADR-CROSS-HARNESS-PARITY-001` | Capability observer emits canonical/native/adapter provenance; same parity suite | PASS with baseline disclosed |
+| `DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001` | Capability inventory and adapter parity assertions exercised | PASS with baseline disclosed |
+| `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` | Exact candidate artifacts and journal receipts preserved; no inferred actor requirement | PASS |
+| `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` | Registry artifacts, projection, tests, and bridge report form the durable result | PASS |
+| `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` | Add-only lifecycle verified; no removal/retirement transition | PASS |
+| `GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001` | Live GO claim and packet `sha256:bee4e499...91dd8`; PAUTH operation decisions allowed all 41 targets | PASS |
+| `DCL-PROJECT-AUTHORIZATION-OPERATION-TIME-ENFORCEMENT-001` | Both registry applies carried exact session, packet, PAUTH, bridge, and dry-run receipt | PASS |
+| `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001` | All proposal/GO links carried into this report and mapped here | PASS |
+| `DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001` | This table plus executable results and known-baseline disclosure | PASS |
+| `GOV-FILE-BRIDGE-AUTHORITY-001` | v007 proposal, independent v008 GO, v010 NO-GO, live Prime claim, helper-mediated v011 filing | PASS |
+| `ADR-ISOLATION-APPLICATION-PLACEMENT-001` | Shared reconciler deep-census fixture proves hosted application roots are not descended | PASS |
+
+## Commands Run
+
+- `gt registry reconcile --batch-output <plan>` for the initial and closure plans.
+- `gt registry register --batch-file <plan> --dry-run ...` and exact receipt-bound apply for both plans.
+- `gt registry reconcile` postimage: 20.956 seconds, membership complete, zero load-bearing gaps, zero unknown, zero candidates, 395 pruned.
+- `gt registry inspect --json --no-census`: coherent, identity current, 2,346 records.
+- `python -m pytest groundtruth-kb/tests/test_artifact_membership_reconciliation.py -q --tb=short`: 10 passed.
+- `python -m pytest groundtruth-kb/tests/test_registry_control_plane.py -q --tb=short`: 29 passed before the final bounded audit optimization; 3 currentness/preview/opaque tests passed afterward.
+- `python -m pytest groundtruth-kb/tests/test_sot_registry.py groundtruth-kb/tests/test_sot_duplicate_audit.py platform_tests/scripts/test_check_sot_registry_completeness.py -q --tb=short`: 37 passed.
+- `python -m pytest platform_tests/scripts/test_release_candidate_gate.py -q --tb=short`: 36 passed.
+- `python -m pytest platform_tests/scripts/test_check_harness_parity.py -q --tb=short`: 43 passed, 1 pre-existing failure.
+- `python -m pytest platform_tests/hooks/test_narrative_artifact_approval.py -q --tb=short`: 12 passed, 1 pre-existing CRLF/LF parity failure.
+- Earlier completed focused runs, before the final reconciliation-only refinements: migration 53 passed; hygiene 23 passed; doctor/registry 65 passed; protected-commit affected set 16 passed; implementation-start affected set 5 passed; release 36 passed.
+- `ruff check` across all 29 Python paths in `## Files Changed`: PASS.
+- `ruff format --check` across the same 29 paths: PASS, `29 files already formatted`.
+- `git diff --check`: PASS. `py_compile` was already completed for the substantive implementation.
+- `python -m pytest platform_tests/scripts/test_bridge_kind_taxonomy.py -q --tb=short`: 6 passed after the two line-local lint suppressions.
+- `python -m pytest platform_tests/scripts/test_check_protected_commit_authorization.py -q --tb=short`: 146 passed after the v012 provenance correction.
+- `ruff check` and `ruff format --check` on `scripts/check_protected_commit_authorization.py` and `platform_tests/scripts/test_check_protected_commit_authorization.py`: PASS.
+
+## Observed Results And Baselines
+
+- Final membership closure: PASS.
+- Canonical/package/projection coherence and object identity: PASS.
+- Exact retry: PASS and side-effect free.
+- Complete changed-Python quality gates: PASS for all 29 declared Python paths.
+- No destructive operation, dispatcher activation, Stage B apply, push, release, deployment, credential action, or history rewrite occurred.
+- The full aggregate pytest invocation was attempted twice but the host command wrapper terminated it near 30 seconds without a failure summary; bounded suites were used instead.
+- Pre-existing baseline 1: `gtkb-skill-rollout` exists as a project skill but is absent from the harness capability registry. This is not SoT membership drift and is unchanged by WI-5441.
+- Pre-existing baseline 2: the active narrative hook materializes CRLF while its packaged template is LF because `.gitattributes` covers the template path but not the active ignored hook path. The raw-byte parity assertion remains 12 pass / 1 fail and neither compared file is changed here.
+- Four WI-5178 claim-policy fixtures remain outside this parent and were already disclosed in the approved chain.
+
+## Files Changed
+
+- `config/governance/narrative-artifact-approval.toml`
+- `config/hooks/gtkb-formal-artifact-approval-gate.py`
+- `config/hooks/gtkb-narrative-artifact-approval-gate.py`
+- `config/registry/sot-artifacts.toml`
+- `groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py`
+- `groundtruth-kb/src/groundtruth_kb/cli.py`
+- `groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml`
+- `groundtruth-kb/src/groundtruth_kb/db.py`
+- `groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py`
+- `groundtruth-kb/src/groundtruth_kb/project/doctor.py`
+- `groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py`
+- `groundtruth-kb/src/groundtruth_kb/project/sot_audit.py`
+- `groundtruth-kb/tests/test_db.py`
+- `groundtruth-kb/tests/test_registry_control_plane.py`
+- `groundtruth-kb/tests/test_sot_duplicate_audit.py`
+- `platform_tests/scripts/test_bridge_kind_taxonomy.py`
+- `platform_tests/scripts/test_check_harness_parity.py`
+- `platform_tests/scripts/test_check_narrative_artifact_evidence.py`
+- `platform_tests/scripts/test_check_protected_commit_authorization.py`
+- `platform_tests/scripts/test_check_sot_registry_completeness.py`
+- `platform_tests/scripts/test_implementation_start_gate.py`
+- `platform_tests/scripts/test_release_candidate_gate.py`
+- `scripts/check_harness_parity.py`
+- `scripts/check_narrative_artifact_evidence.py`
+- `scripts/check_protected_commit_authorization.py`
+- `scripts/gtkb_file_reference_migration.py`
+- `scripts/implementation_start_gate.py`
+- `scripts/migrate_bridge_kind_taxonomy.py`
+- `scripts/registry_observation_hook.py`
+- `scripts/release_candidate_gate.py`
+- `groundtruth-kb/src/groundtruth_kb/project/artifact_membership_reconciliation.py`
+- `groundtruth-kb/tests/test_artifact_membership_reconciliation.py`
+
+The excluded dirty paths are `.claude/rules/project-root-boundary.md`,
+`memory/MEMORY.md`, `scripts/auto_finalize_sweep.py`, and
+`platform_tests/hooks/test_auto_finalize_verified_verdicts.py`; all remain
+outside the finalization include set. The unregistered transient
+`.gtkb-index-b8nhvvny/` was removed after canonical registry resolution returned
+no member. The service ledger is not a Git include and is handled only by the
+waiver below.
+
+## By-Reference Finalization Waiver
+
+target_paths: ["config/governance/narrative-artifact-approval.toml","config/hooks/gtkb-formal-artifact-approval-gate.py","config/hooks/gtkb-narrative-artifact-approval-gate.py","config/registry/sot-artifacts.toml","groundtruth-kb/src/groundtruth_kb/bridge/taxonomy.py","groundtruth-kb/src/groundtruth_kb/cli.py","groundtruth-kb/src/groundtruth_kb/context/registries/v1/config/registry/sot-artifacts.toml","groundtruth-kb/src/groundtruth_kb/db.py","groundtruth-kb/src/groundtruth_kb/hygiene/sweep.py","groundtruth-kb/src/groundtruth_kb/project/artifact_membership_reconciliation.py","groundtruth-kb/src/groundtruth_kb/project/doctor.py","groundtruth-kb/src/groundtruth_kb/project/registry_control_plane.py","groundtruth-kb/src/groundtruth_kb/project/sot_audit.py","groundtruth-kb/src/groundtruth_kb/project/sot_registry.py","groundtruth-kb/tests/test_artifact_membership_reconciliation.py","groundtruth-kb/tests/test_db.py","groundtruth-kb/tests/test_doctor.py","groundtruth-kb/tests/test_registry_control_plane.py","groundtruth-kb/tests/test_sot_duplicate_audit.py","groundtruth-kb/tests/test_sot_registry.py","groundtruth.db","platform_tests/hooks/test_formal_artifact_approval_gate.py","platform_tests/hooks/test_narrative_artifact_approval.py","platform_tests/scripts/test_bridge_kind_taxonomy.py","platform_tests/scripts/test_check_harness_parity.py","platform_tests/scripts/test_check_narrative_artifact_evidence.py","platform_tests/scripts/test_check_protected_commit_authorization.py","platform_tests/scripts/test_check_sot_registry_completeness.py","platform_tests/scripts/test_gtkb_file_reference_migration.py","platform_tests/scripts/test_hygiene_sweep_cli.py","platform_tests/scripts/test_implementation_start_gate.py","platform_tests/scripts/test_registry_observation_hook.py","platform_tests/scripts/test_release_candidate_gate.py","scripts/check_harness_parity.py","scripts/check_narrative_artifact_evidence.py","scripts/check_protected_commit_authorization.py","scripts/gtkb_file_reference_migration.py","scripts/implementation_start_gate.py","scripts/migrate_bridge_kind_taxonomy.py","scripts/registry_observation_hook.py","scripts/release_candidate_gate.py"]
+
+By-reference waiver under
+`DELIB-20260722-ARTIFACT-REGISTRY-AUTHORITATIVE-HYGIENE-SWEEP` and the approved
+v007/v008 contract: the opaque service-owned database identity declared in the
+line above MUST NOT be force-added, staged, placed in `## Files Changed`, or
+included in a finalizer commit. Its content/version/status and projection checks
+remain reviewable by reference; this is a finalization mechanics waiver, not an
+evidence waiver.
+
+## Acceptance Criteria Status
+
+- [x] Plain direct content edits need no notation and are not rejected for missing audit evidence.
+- [x] Worker observation is automatic when context is trustworthy; unknown provenance stays honest and nonblocking.
+- [x] Final reconciliation has zero load-bearing gaps and zero true unknowns with membership complete.
+- [x] Both exact manifests, candidate/evidence/observer digests, starting generations, and dry-run receipts are reproduced above.
+- [x] All registry mutations were additive; no delete/move/rename/retirement/shrink/broad-glob substitution occurred.
+- [x] Five typed observer classes control traversal and cannot grant membership themselves.
+- [x] `coverage_complete` is the shared exact membership predicate, not a count-only shortcut.
+- [x] Pruned envelopes state descendants uninspected and keep destructive sweep/release ineligible.
+- [x] Shared consumers use the same reconciliation semantics without unconditional hot-path content hashing.
+- [x] The six owner-liveness specifications were not mutated by this parent.
+- [x] The opaque service ledger identity is by-reference only and absent from staging/include scope.
+- [x] The exact 2,033-member addition set is accounted for by the TSV plus waiver; 2,032 exact paths and one service identity.
+- [x] No WI-5640 Stage B apply, obsolete-source deletion, dispatcher activation, push, release, or deployment occurred.
+- [x] `governance_review` remains a distinct bridge taxonomy value in the absorbed three-file slice.
+
+## Risk And Rollback
+
+The material residual is procedural: the initial transaction needed a two-row
+repair-forward closure because proposed-container text had not participated in
+the pre-admission fixed point. That defect is now covered by a regression test,
+and the final census is closed. The report does not conceal the second journal.
+
+Registry transactions remain journaled and recover forward. Because the GO
+forbids membership removal and the postimage is coherent, rollback is not an
+in-band delete; any requested removal or coverage change requires separate
+oversight. Source changes remain normal Git-restorable files. The 395 pruned
+disposable envelopes prevent destructive sweep/release but do not block
+membership closure or ordinary work.
+
+## Loyal Opposition Asks
+
+1. Independently regenerate the five-observer postimage and confirm zero gaps, zero unknowns, and membership complete.
+2. Verify both additive journals and the repair-forward fixed-point disclosure against live MemBase.
+3. Re-run the bounded spec-derived tests and confirm only the disclosed pre-existing baselines remain.
+4. Return VERIFIED only if the exact member appendix, by-reference waiver, and no-destruction claims reproduce.

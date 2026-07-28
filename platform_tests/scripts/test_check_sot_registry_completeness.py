@@ -23,15 +23,35 @@ from groundtruth_kb.project import registry_control_plane
 from groundtruth_kb.project.doctor import _check_sot_registry_completeness
 
 
-def _authority_report(*, current: bool = True, gaps: list[dict[str, str]] | None = None) -> dict:
+def _authority_report(
+    *,
+    current: bool = True,
+    gaps: list[dict[str, str]] | None = None,
+    identity_current: bool = True,
+) -> dict:
+    gap_rows = list(gaps or [])
     return {
         "coherent": True,
+        "identity_state": {
+            "current": identity_current,
+            "missing": [] if identity_current else [{"id": "rec-1", "path": "missing-path"}],
+            "object_kind_mismatches": [],
+        },
+        "membership_reconciliation": {
+            "membership_complete": not gap_rows,
+            "counts": {
+                "registered": 1,
+                "unregistered_load_bearing": len(gap_rows),
+                "unregistered_disposable": 0,
+                "invalid_unknown": 0,
+            },
+        },
         "currentness": {
             "current": current,
             "missing_revisions": [] if current else ["rec-1"],
             "stale": [],
         },
-        "reverse_coverage": {"gaps": list(gaps or [])},
+        "reverse_coverage": {"gaps": gap_rows},
     }
 
 
@@ -206,15 +226,23 @@ def test_check_passes_when_toml_and_projection_match(tmp_path: Path) -> None:
     assert result.status == "pass", f"expected pass, got {result.status}: {result.message}"
 
 
-def test_check_fails_on_unresolved_active_storage_path(tmp_path: Path) -> None:
+def test_check_fails_on_unresolved_active_storage_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """An unresolved active storage path is an authority failure."""
     _write_registry(tmp_path, _minimal_valid_record("rec-1", "missing-path"))
     db_path = tmp_path / "groundtruth.db"
     _init_sot_artifacts_table(db_path)
     _insert_projection_row(db_path, "rec-1", "missing-path")
+    monkeypatch.setattr(
+        registry_control_plane,
+        "inspect_registry",
+        lambda **_kwargs: _authority_report(identity_current=False),
+    )
     result = _check_sot_registry_completeness(tmp_path)
     assert result.status == "fail"
-    assert "unresolved" in result.message
+    assert "registry identity failed" in result.message
 
 
 def test_check_skips_membase_prefix_storage_paths(tmp_path: Path) -> None:
@@ -306,10 +334,10 @@ def test_check_failure_message_includes_record_count_for_reverse_gap(
     result = _check_sot_registry_completeness(tmp_path)
     assert result.status == "fail"
     assert "1 SoT records" in result.message
-    assert "reverse coverage incomplete: 1" in result.message
+    assert "registry membership incomplete: 1 load-bearing gaps" in result.message
 
 
-def test_check_fails_when_registry_revisions_are_stale(
+def test_check_warns_when_registry_revisions_are_stale(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -324,8 +352,8 @@ def test_check_fails_when_registry_revisions_are_stale(
         lambda **_kwargs: _authority_report(current=False),
     )
     result = _check_sot_registry_completeness(tmp_path)
-    assert result.status == "fail"
-    assert "registry currentness failed" in result.message
+    assert result.status == "warning"
+    assert "registry audit incomplete" in result.message
 
 
 @pytest.mark.parametrize(

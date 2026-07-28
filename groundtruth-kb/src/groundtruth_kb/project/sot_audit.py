@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from groundtruth_kb.project.artifact_membership_reconciliation import reconcile_artifact_membership
 from groundtruth_kb.project.sot_registry import SoTArtifact, default_registry_path, load_toml
 
 Classification = Literal[
@@ -87,6 +88,8 @@ class DuplicateSoTAuditReport:
     registered_file_count: int
     missing_registry_artifacts: tuple[dict[str, str], ...]
     candidates: tuple[AuditCandidate, ...]
+    registry_membership_complete: bool
+    membership_counts: dict[str, int]
     coverage_phases: tuple[str, ...] = field(
         default=(
             "typed_registry_inventory",
@@ -112,7 +115,7 @@ class DuplicateSoTAuditReport:
 
     @property
     def coverage_complete(self) -> bool:
-        return self.registry_count > 0 and self.persistent_file_count >= self.registered_file_count
+        return self.registry_membership_complete
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -123,6 +126,7 @@ class DuplicateSoTAuditReport:
             "persistent_file_count": self.persistent_file_count,
             "registered_file_count": self.registered_file_count,
             "missing_registry_artifacts": list(self.missing_registry_artifacts),
+            "membership_counts": dict(self.membership_counts),
             "coverage_phases": list(self.coverage_phases),
             "coverage_complete": self.coverage_complete,
             "violation_count": self.violation_count,
@@ -350,6 +354,7 @@ def run_duplicate_sot_audit(project_root: Path, *, registry_path: Path | None = 
     dispatch_duplicate = _dispatch_duplicate_candidate(root)
     if dispatch_duplicate is not None:
         candidates.append(dispatch_duplicate)
+    membership = reconcile_artifact_membership(root)
 
     return DuplicateSoTAuditReport(
         generated_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -360,6 +365,8 @@ def run_duplicate_sot_audit(project_root: Path, *, registry_path: Path | None = 
         registered_file_count=len(registered_files),
         missing_registry_artifacts=tuple(missing),
         candidates=tuple(candidates),
+        registry_membership_complete=bool(membership["membership_complete"]),
+        membership_counts=dict(membership["counts"]),
     )
 
 

@@ -25,6 +25,7 @@ from groundtruth_kb.project.registry_control_plane import (
     RegistryResolver,
     RegistryTransactionInProgress,
     amend_artifact,
+    append_passive_observation,
     apply_registry_transaction,
     bootstrap_legacy_registry,
     census_registry,
@@ -34,8 +35,10 @@ from groundtruth_kb.project.registry_control_plane import (
     load_registry_snapshot,
     mint_bridge_publication_capability,
     mint_observation_capability,
+    preview_registry_registration,
     recover_registry,
     recover_wi5441_bridge_aggregate,
+    register_artifacts,
     registry_currentness,
     serialize_registry,
 )
@@ -370,6 +373,130 @@ def test_census_uses_only_git_and_application_root_boundaries(tmp_path: Path) ->
     assert "applications/Demo/hidden.py" not in paths
     assert "applications/registry.toml" in paths
     assert ".gtkb-state/runtime/visible.log" in paths
+
+
+def test_opaque_container_may_register_a_service_owned_file(tmp_path: Path) -> None:
+    records = [_record("database", "groundtruth.db", "opaque_container")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+
+    snapshot = load_registry_snapshot(
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+
+    assert snapshot.resolver.resolve("groundtruth.db") == records[0]
+
+
+def test_passive_observation_records_view_without_authorizing_content(tmp_path: Path) -> None:
+    member = tmp_path / "member.txt"
+    member.write_text("before", encoding="utf-8")
+    records = [_record("member", "member.txt")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    member.write_text("direct owner edit", encoding="utf-8")
+
+    revisions = append_passive_observation(
+        target_paths=["member.txt"],
+        evidence_view="working_tree",
+        evidence_source_reference="filesystem-audit:test",
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT * FROM sot_artifact_revisions WHERE revision_id = ?",
+            (revisions[0],),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert member.read_text(encoding="utf-8") == "direct owner edit"
+    assert row["actor_session"] == "unattributed_external"
+    assert row["evidence_view"] == "working_tree"
+    assert row["evidence_source_reference"] == "filesystem-audit:test"
+
+
+def test_registration_preview_binds_generation_manifest_and_authority(tmp_path: Path) -> None:
+    (tmp_path / "one.txt").write_text("one", encoding="utf-8")
+    (tmp_path / "two.txt").write_text("two", encoding="utf-8")
+    current = [_record("one", "one.txt")]
+    addition = _record("two", "two.txt")
+    registry, packaged, db_path = _fixture_generation(tmp_path, current)
+    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
+    observer_digests = {
+        "capability_inventory": f"sha256:{1:064x}",
+        "governed_knowledge": f"sha256:{2:064x}",
+        "package_and_entrypoint": f"sha256:{3:064x}",
+        "physical_census": f"sha256:{4:064x}",
+        "registered_dependency_closure": f"sha256:{5:064x}",
+    }
+    evidence_digest = f"sha256:{6:064x}"
+    preview = preview_registry_registration(
+        [addition],
+        actor_session=str(kwargs["actor_session"]),
+        start_packet_hash=str(kwargs["start_packet_hash"]),
+        pauth_id=str(kwargs["pauth_id"]),
+        bridge_id=str(kwargs["bridge_id"]),
+        candidate_manifest_sha256="sha256:manifest",
+        observer_input_digests=observer_digests,
+        reconciliation_evidence_digest=evidence_digest,
+        project_root=tmp_path,
+        registry_path=registry,
+        packaged_registry_path=packaged,
+        db_path=db_path,
+    )
+
+    receipt = register_artifacts(
+        [addition],
+        expected_generation_digest=preview.starting_generation_digest,
+        candidate_manifest_sha256=preview.candidate_manifest_sha256,
+        observer_input_digests=observer_digests,
+        reconciliation_evidence_digest=evidence_digest,
+        dry_run_receipt=preview.dry_run_receipt,
+        **kwargs,
+    )
+    retry = register_artifacts(
+        [addition],
+        expected_generation_digest=preview.starting_generation_digest,
+        candidate_manifest_sha256=preview.candidate_manifest_sha256,
+        observer_input_digests=observer_digests,
+        reconciliation_evidence_digest=evidence_digest,
+        dry_run_receipt=preview.dry_run_receipt,
+        **kwargs,
+    )
+
+    assert preview.candidate_count == 1
+    assert preview.observer_input_digests == dict(sorted(observer_digests.items()))
+    assert preview.reconciliation_evidence_digest == evidence_digest
+    assert preview.desired_record_count == 2
+    assert receipt.record_count == 2
+    assert retry.idempotent_retry is True
+    assert retry.journal_id == receipt.journal_id
+    assert {
+        record.id
+        for record in load_registry_snapshot(
+            project_root=tmp_path,
+            registry_path=registry,
+            packaged_registry_path=packaged,
+            db_path=db_path,
+        ).records
+    } == {"one", "two"}
+
+    with pytest.raises(RegistryAuthorizationError, match="exact dry-run receipt"):
+        register_artifacts(
+            [addition],
+            expected_generation_digest=preview.starting_generation_digest,
+            candidate_manifest_sha256=preview.candidate_manifest_sha256,
+            observer_input_digests={**observer_digests, "physical_census": f"sha256:{7:064x}"},
+            reconciliation_evidence_digest=evidence_digest,
+            dry_run_receipt=preview.dry_run_receipt,
+            **kwargs,
+        )
 
 
 def test_observation_capability_is_bound_single_use_and_updates_revision(tmp_path: Path) -> None:

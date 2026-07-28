@@ -780,7 +780,7 @@ def test_narrative_artifact_lane_runs_when_drift_lane_skipped(monkeypatch, capsy
     assert "RELEASE GATE: PASS" in captured.out
 
 
-def test_sot_registry_authority_requires_reverse_closed_validation(monkeypatch, capsys):
+def test_sot_registry_authority_requires_membership_closed_unpruned_validation(monkeypatch, capsys):
     gate = _load_gate_module()
     from groundtruth_kb.project import registry_control_plane
 
@@ -792,6 +792,11 @@ def test_sot_registry_authority_requires_reverse_closed_validation(monkeypatch, 
             "valid": True,
             "record_count": 50,
             "generation_digest": "sha256:test-generation",
+            "membership_reconciliation": {
+                "membership_complete": True,
+                "pruned_envelope_count": 0,
+                "release_eligible": True,
+            },
         }
 
     monkeypatch.setattr(registry_control_plane, "validate_registry", valid_registry)
@@ -799,10 +804,10 @@ def test_sot_registry_authority_requires_reverse_closed_validation(monkeypatch, 
     gate._check_sot_registry_authority()
 
     assert calls == [{"project_root": gate.PROJECT_ROOT, "require_reverse_closure": True}]
-    assert "PASS SoT registry authority (50 records, generation=sha256:test-generation)" in capsys.readouterr().out
+    assert "PASS SoT registry authority (50 records, generation=sha256:test-generation" in capsys.readouterr().out
 
 
-def test_sot_registry_authority_fails_closed_on_reverse_gap(monkeypatch):
+def test_sot_registry_authority_fails_closed_on_membership_gap(monkeypatch):
     gate = _load_gate_module()
     from groundtruth_kb.project import registry_control_plane
 
@@ -812,9 +817,32 @@ def test_sot_registry_authority_fails_closed_on_reverse_gap(monkeypatch):
         lambda **_kwargs: {
             "valid": False,
             "coherent": True,
-            "errors": ["reverse_coverage_incomplete"],
+            "errors": ["registry_membership_incomplete"],
         },
     )
 
-    with pytest.raises(gate.GateFailure, match="reverse_coverage_incomplete"):
+    with pytest.raises(gate.GateFailure, match="registry_membership_incomplete"):
+        gate._check_sot_registry_authority()
+
+
+def test_sot_registry_authority_blocks_pruned_release_census(monkeypatch):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import registry_control_plane
+
+    monkeypatch.setattr(
+        registry_control_plane,
+        "validate_registry",
+        lambda **_kwargs: {
+            "valid": True,
+            "record_count": 50,
+            "generation_digest": "sha256:test-generation",
+            "membership_reconciliation": {
+                "membership_complete": True,
+                "pruned_envelope_count": 2,
+                "release_eligible": False,
+            },
+        },
+    )
+
+    with pytest.raises(gate.GateFailure, match="pruned_envelope_count=2"):
         gate._check_sot_registry_authority()

@@ -1170,6 +1170,46 @@ def test_insert_spec_with_source_paths(tmp_path):
     assert stored == ["src/auth.py", "src/auth_utils.py"]
 
 
+def test_registry_path_observations_use_only_typed_current_fields(db):
+    db.insert_spec(
+        id="SPEC-PATH-OBS",
+        title="Path observation",
+        status="specified",
+        changed_by="test",
+        change_reason="fixture",
+        source_paths=["src/one.py", "src/*.toml"],
+    )
+    db.insert_test(
+        id="TEST-PATH-OBS",
+        title="Path observation test",
+        spec_id="SPEC-PATH-OBS",
+        test_type="unit",
+        expected_outcome="passes",
+        changed_by="test",
+        change_reason="fixture",
+        test_file="tests/test_one.py::test_one",
+    )
+    db.insert_document(
+        id="DOC-PATH-OBS",
+        title="Path observation document",
+        category="reference",
+        status="active",
+        changed_by="test",
+        change_reason="fixture",
+        source_path="docs/one.md",
+    )
+
+    rows = db.list_registry_path_observations()
+
+    assert {row["path"] for row in rows} == {
+        "docs/one.md",
+        "src/*.toml",
+        "src/one.py",
+        "tests/test_one.py",
+    }
+    assert all(set(row) == {"path", "source_kind", "source_id", "field"} for row in rows)
+
+
 def test_update_spec_preserves_source_paths(tmp_path):
     """update_spec carries forward source_paths when not explicitly changed (C1)."""
     db = KnowledgeDB(tmp_path / "test.db")

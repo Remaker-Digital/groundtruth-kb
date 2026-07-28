@@ -363,7 +363,7 @@ def _check_project_resource_registry() -> None:
 
 
 def _check_sot_registry_authority() -> None:
-    """Fail release on mixed, stale, unmirrored, or reverse-incomplete authority."""
+    """Fail release on incoherent identity, incomplete membership, or pruned census."""
     package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
     if str(package_src) not in sys.path:
         sys.path.insert(0, str(package_src))
@@ -375,7 +375,18 @@ def _check_sot_registry_authority() -> None:
         raise GateFailure(f"SoT registry authority unavailable: {exc}") from exc
     if not report.get("valid"):
         raise GateFailure("SoT registry validation failed: " + json.dumps(report, sort_keys=True, default=str))
-    print(f"PASS SoT registry authority ({report['record_count']} records, generation={report['generation_digest']})")
+    membership = report["membership_reconciliation"]
+    if not membership["release_eligible"]:
+        raise GateFailure(
+            "SoT registry release census is incomplete: "
+            f"membership_complete={membership['membership_complete']}, "
+            f"pruned_envelope_count={membership['pruned_envelope_count']}"
+        )
+    print(
+        "PASS SoT registry authority "
+        f"({report['record_count']} records, generation={report['generation_digest']}, "
+        "membership_complete=true, pruned=0)"
+    )
 
 
 def _standing_backlog_health_helpers():

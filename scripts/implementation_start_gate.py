@@ -1497,10 +1497,48 @@ def _registry_observation_intent(
     packet: dict[str, Any],
     project_authorization: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Mint and persist one exact post-tool capability for registered targets."""
+    """Best-effort observation setup for content edits; identity changes stay strict."""
 
     if payload.get("__gtkb_registry_diagnostic__") is True:
         return None
+    tool = _tool_name(payload).strip() or "unknown"
+    data = _tool_input(payload)
+    command = str(data.get("command") or payload.get("command") or "") if isinstance(data, dict) else ""
+    patch_text = str(data.get("patch") or "") if isinstance(data, dict) else ""
+    identity_change = (
+        tool.casefold() in {"delete", "move"}
+        or bool(re.search(r"\b(?:remove-item|move-item|git\s+(?:mv|rm)|rm|del)\b", command, re.IGNORECASE))
+        or bool(re.search(r"^\*\*\* (?:Delete File:|Move to:)", patch_text, re.MULTILINE))
+    )
+
+    def audit_gap(code: str, detail: str) -> dict[str, Any]:
+        row = {
+            "schema_version": 1,
+            "kind": "registry_observation_gap",
+            "code": code,
+            "detail": detail,
+            "target_paths": sorted(set(protected)),
+            "session_id": session_id or None,
+            "bridge_id": bridge_id or None,
+            "tool_event_id": str(
+                payload.get("tool_use_id")
+                or payload.get("toolUseID")
+                or payload.get("tool_event_id")
+                or payload.get("event_id")
+                or ""
+            )
+            or None,
+            "observed_at": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        try:
+            destination = root / ".gtkb-state" / "sot-registry" / "audit-gaps.jsonl"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with destination.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+        except OSError:
+            pass
+        return {"audit_gap": row}
+
     registry_path = root / "config" / "registry" / "sot-artifacts.toml"
     if not registry_path.exists():
         return None
@@ -1512,12 +1550,13 @@ def _registry_observation_intent(
             RegistryControlPlaneError,
             load_registry_snapshot,
             mint_observation_capability,
-            registry_currentness,
         )
 
         from scripts.registry_observation_hook import intent_path
     except ImportError as exc:
-        raise AuthorizationError(f"registry control plane is unavailable: {exc}") from exc
+        if identity_change:
+            raise AuthorizationError("registry identity check is unavailable for a delete, move, or rename") from exc
+        return audit_gap("registry_control_plane_unavailable", str(exc))
     try:
         snapshot = load_registry_snapshot(project_root=root, db_path=root / "groundtruth.db")
         registered: dict[str, Any] = {}
@@ -1529,32 +1568,23 @@ def _registry_observation_intent(
                 registered_paths.append(path)
         if not registered:
             return None
-        currentness = registry_currentness(snapshot, project_root=root, db_path=root / "groundtruth.db")
-        if not currentness["current"]:
+        if identity_change:
             raise AuthorizationError(
-                "registered target mutation requires current registry revision evidence: "
-                f"missing={currentness['missing_revisions']}, stale={currentness['stale']}"
+                "registered deletion, move, rename, or locator change requires separately reviewed transition authority"
             )
         denied_roles = sorted(
             record.id for record in registered.values() if record.owner_role not in {"shared", "prime_builder"}
         )
         if denied_roles:
-            raise AuthorizationError(f"registered targets are not Prime Builder writable: {denied_roles}")
+            return audit_gap(
+                "legacy_owner_role_metadata",
+                f"registered content targets carry non-Prime legacy owner metadata: {denied_roles}",
+            )
         missing_api = sorted(record.id for record in registered.values() if not record.mutation_api.strip())
         if missing_api:
-            raise AuthorizationError(f"registered targets have no mutation API: {missing_api}")
-        tool = _tool_name(payload).strip() or "unknown"
-        data = _tool_input(payload)
-        command = str(data.get("command") or payload.get("command") or "") if isinstance(data, dict) else ""
-        patch_text = str(data.get("patch") or "") if isinstance(data, dict) else ""
-        identity_change = (
-            tool.casefold() in {"delete", "move"}
-            or bool(re.search(r"\b(?:remove-item|move-item|git\s+(?:mv|rm)|rm|del)\b", command, re.IGNORECASE))
-            or bool(re.search(r"^\*\*\* (?:Delete File:|Move to:)", patch_text, re.MULTILINE))
-        )
-        if identity_change:
-            raise AuthorizationError(
-                "registered deletion, move, rename, or locator change requires separately reviewed transition authority"
+            return audit_gap(
+                "missing_mutation_api_metadata",
+                f"registered content targets have no mutation API metadata: {missing_api}",
             )
         event_id = str(
             payload.get("tool_use_id")
@@ -1564,7 +1594,10 @@ def _registry_observation_intent(
             or ""
         ).strip()
         if not session_id or not event_id:
-            raise AuthorizationError("registered target mutation requires session and tool event identifiers")
+            return audit_gap(
+                "missing_observation_identity",
+                "content edit has no session/tool-event pair for automatic observation",
+            )
         start_packet_hash = str(packet.get("packet_hash") or "")
         if not start_packet_hash:
             start_packet_hash = (
@@ -1602,7 +1635,17 @@ def _registry_observation_intent(
         os.replace(temporary, destination)
         return {"capability_hash": minted["capability_hash"], "tool_event_id": event_id}
     except RegistryControlPlaneError as exc:
-        raise AuthorizationError(f"registry control plane denied mutation: {exc}") from exc
+        if identity_change:
+            raise AuthorizationError(
+                "registry identity check failed for a delete, move, or rename: " + str(exc)
+            ) from exc
+        return audit_gap("registry_observation_unavailable", str(exc))
+    except (OSError, ValueError) as exc:
+        if identity_change:
+            raise AuthorizationError(
+                "registry identity check failed for a delete, move, or rename: " + str(exc)
+            ) from exc
+        return audit_gap("registry_observation_setup_failed", f"{type(exc).__name__}: {exc}")
 
 
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:

@@ -3600,15 +3600,16 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     Two sub-checks per DCL-SOT-REGISTRY-PROJECTION-PARITY-001 and the umbrella
     WI-5441 control-plane scope:
 
-    1. **Coherence/currentness** — canonical TOML, packaged mirror, MemBase
-       projection, and per-identity revision evidence must agree.
-    2. **Reverse coverage/reality** — every non-disposable repository object
-       must resolve through the registry, and every active record whose ``storage_path`` is a concrete
-       (non-``membase:``, non-glob) path must resolve on disk under ``target``.
+    1. **Coherence/identity** — canonical TOML, packaged mirror, MemBase
+       projection, and active identity locators must agree.
+    2. **Membership** — the shared five-observer reconciliation must classify
+       every load-bearing object as a registered member.
+    3. **Audit freshness** — stale or missing content observations are visible
+       as repair-forward warnings; they do not disable otherwise-valid work.
 
-    Any authority, currentness, reverse-coverage, or active-path defect fails
-    closed. A missing registry remains an informational skip for adopters that
-    have not enabled the platform registry.
+    Authority, identity, and membership defects fail closed. A missing registry
+    remains an informational skip for adopters that have not enabled the
+    platform registry.
     """
     check_name = "SoT registry completeness"
     registry_path = target / "config" / "registry" / "sot-artifacts.toml"
@@ -3646,47 +3647,50 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
             message=f"coherent registry snapshot failed to load: {exc}",
         )
 
-    warnings: list[str] = []
+    failures: list[str] = []
+    audit_notes: list[str] = []
 
     if not authority_report.get("coherent"):
-        warnings.append(f"registry generation is not coherent: {authority_report.get('error')}")
+        failures.append(f"registry generation is not coherent: {authority_report.get('error')}")
     else:
+        identity = authority_report["identity_state"]
+        if not identity["current"]:
+            failures.append(
+                f"registry identity failed: {len(identity['missing'])} missing locators, "
+                f"{len(identity['object_kind_mismatches'])} object-kind mismatches"
+            )
+        membership = authority_report["membership_reconciliation"]
+        if not membership["membership_complete"]:
+            counts = membership["counts"]
+            failures.append(
+                "registry membership incomplete: "
+                f"{counts['unregistered_load_bearing']} load-bearing gaps, "
+                f"{counts['invalid_unknown']} invalid unknowns"
+            )
         currentness = authority_report["currentness"]
         if not currentness["current"]:
-            warnings.append(
-                f"registry currentness failed: {len(currentness['missing_revisions'])} missing revisions, "
+            audit_notes.append(
+                f"registry audit incomplete: {len(currentness['missing_revisions'])} missing revisions, "
                 f"{len(currentness['stale'])} stale records"
             )
-        gaps = authority_report["reverse_coverage"]["gaps"]
-        if gaps:
-            warnings.append(f"reverse coverage incomplete: {len(gaps)} unregistered or invalid objects")
 
-    # Sub-check 2: registry / on-disk reality for active concrete paths.
-    unresolved: list[str] = []
-    for rec in toml_records:
-        if rec.lifecycle != "active":
-            continue
-        path = rec.storage_path
-        if path.startswith("membase:"):
-            continue
-        if path.startswith("windows-scheduled-task:"):
-            continue
-        if any(ch in path for ch in "*?[]"):
-            # Glob/pattern storage paths are not point-resolvable; skip.
-            continue
-        if not (target / path).exists():
-            unresolved.append(rec.id)
-    if unresolved:
-        warnings.append(f"{len(unresolved)} active record(s) with unresolved storage_path: {', '.join(unresolved[:5])}")
-
-    if warnings:
-        suffix = "" if len(warnings) <= 3 else f"; +{len(warnings) - 3} more"
+    if failures:
+        suffix = "" if len(failures) <= 3 else f"; +{len(failures) - 3} more"
         return ToolCheck(
             name=check_name,
             required=True,
             found=True,
             status="fail",
-            message=f"{len(toml_records)} SoT records — " + "; ".join(warnings[:3]) + suffix,
+            message=f"{len(toml_records)} SoT records — " + "; ".join(failures[:3]) + suffix,
+        )
+
+    if audit_notes:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"{len(toml_records)} SoT records — " + "; ".join(audit_notes),
         )
 
     return ToolCheck(
@@ -3694,7 +3698,7 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
         required=False,
         found=True,
         status="pass",
-        message=f"{len(toml_records)} SoT records registered; TOML/MemBase parity OK; all active paths resolve",
+        message=f"{len(toml_records)} SoT records registered; parity, identity, and membership complete",
     )
 
 

@@ -80,6 +80,9 @@ class SweepResult:
     patterns_loaded: int
     files_scanned: int
     findings: tuple[Finding, ...]
+    registry_membership_complete: bool | None = None
+    registry_pruned_envelope_count: int | None = None
+    destructive_action_eligible: bool = False
 
     @property
     def finding_count(self) -> int:
@@ -260,6 +263,18 @@ def run_sweep(
                 findings.extend(scan_file(file_path, pattern, root))
     generated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    membership_complete: bool | None = None
+    pruned_envelopes: int | None = None
+    destructive_eligible = False
+    if (root / "config" / "registry" / "sot-artifacts.toml").is_file() and (root / "groundtruth.db").is_file():
+        from groundtruth_kb.project.artifact_membership_reconciliation import (
+            reconcile_artifact_membership,
+        )
+
+        reconciliation = reconcile_artifact_membership(root)
+        membership_complete = bool(reconciliation["membership_complete"])
+        pruned_envelopes = int(reconciliation["pruned_envelope_count"])
+        destructive_eligible = bool(reconciliation["sweep_eligible"])
     return SweepResult(
         run_id=run_id,
         generated_at=generated_at,
@@ -268,6 +283,9 @@ def run_sweep(
         patterns_loaded=len(patterns),
         files_scanned=len(scanned_files),
         findings=tuple(findings),
+        registry_membership_complete=membership_complete,
+        registry_pruned_envelope_count=pruned_envelopes,
+        destructive_action_eligible=destructive_eligible,
     )
 
 
@@ -283,6 +301,9 @@ def emit_json(result: SweepResult, out_path: Path) -> None:
         "patterns_loaded": result.patterns_loaded,
         "files_scanned": result.files_scanned,
         "finding_count": result.finding_count,
+        "registry_membership_complete": result.registry_membership_complete,
+        "registry_pruned_envelope_count": result.registry_pruned_envelope_count,
+        "destructive_action_eligible": result.destructive_action_eligible,
         "findings": [asdict(f) for f in result.findings],
     }
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -301,6 +322,9 @@ def emit_markdown(result: SweepResult, out_path: Path) -> None:
         f"- Patterns loaded: {result.patterns_loaded}",
         f"- Files scanned: {result.files_scanned}",
         f"- Findings: {result.finding_count}",
+        f"- Registry membership complete: {result.registry_membership_complete}",
+        f"- Registry pruned envelopes: {result.registry_pruned_envelope_count}",
+        f"- Destructive action eligible: {result.destructive_action_eligible}",
         "",
     ]
     if not result.findings:

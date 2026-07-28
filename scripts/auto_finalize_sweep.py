@@ -51,7 +51,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-_VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "verify" / "helpers"
+_VERIFY_HELPERS = PROJECT_ROOT / ".claude" / "skills" / "gtkb-verify" / "helpers"
 if str(_VERIFY_HELPERS) not in sys.path:
     sys.path.insert(0, str(_VERIFY_HELPERS))
 from windows_subprocess import no_window_subprocess_kwargs  # noqa: E402

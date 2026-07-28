@@ -3993,6 +3993,70 @@ class KnowledgeDB:
         rows = self._get_conn().execute(query, params).fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def list_registry_path_observations(self) -> list[dict[str, str]]:
+        """Return current governed in-root path fields for registry reconciliation.
+
+        The result is deliberately limited to typed path-bearing columns.  It
+        does not mine narrative descriptions, change reasons, or deliberation
+        prose for path-looking strings.
+        """
+
+        observations: list[dict[str, str]] = []
+
+        def append(source_kind: str, source_id: Any, field: str, value: Any) -> None:
+            if not isinstance(value, str):
+                return
+            path = value.strip().split("::", 1)[0]
+            if not path:
+                return
+            observations.append(
+                {
+                    "path": path,
+                    "source_kind": source_kind,
+                    "source_id": str(source_id),
+                    "field": field,
+                }
+            )
+
+        for spec in self.list_specs():
+            values = spec.get("source_paths_parsed") or spec.get("_source_paths_parsed") or ()
+            if isinstance(values, str):
+                try:
+                    values = json.loads(values)
+                except json.JSONDecodeError:
+                    values = ()
+            for value in values if isinstance(values, list | tuple) else ():
+                append("specification", spec.get("id"), "source_paths", value)
+
+        for test in self.list_tests():
+            append("test", test.get("id"), "test_file", test.get("test_file"))
+
+        for document in self.list_documents():
+            append("document", document.get("id"), "source_path", document.get("source_path"))
+
+        conn = self._get_conn()
+        link_view_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = 'current_project_artifact_links'"
+        ).fetchone()
+        if link_view_exists:
+            rows = conn.execute(
+                "SELECT id, artifact_type, artifact_ref FROM current_project_artifact_links "
+                "WHERE status = 'active' ORDER BY id"
+            ).fetchall()
+            path_types = {"configuration", "document", "file", "path", "source_file", "test"}
+            for row in rows:
+                payload = _row_to_dict(row)
+                if str(payload.get("artifact_type") or "").casefold() in path_types:
+                    append("project_artifact_link", payload.get("id"), "artifact_ref", payload.get("artifact_ref"))
+
+        unique = {
+            (row["path"].casefold(), row["source_kind"], row["source_id"], row["field"]): row for row in observations
+        }
+        return sorted(
+            unique.values(),
+            key=lambda row: (row["path"].casefold(), row["source_kind"], row["source_id"], row["field"]),
+        )
+
     # ------------------------------------------------------------------
     # GOV-20: Architecture Decision Governance helpers
     # ------------------------------------------------------------------

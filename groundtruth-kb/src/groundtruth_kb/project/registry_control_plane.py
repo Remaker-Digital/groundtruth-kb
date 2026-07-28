@@ -22,6 +22,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Iterator, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -43,9 +44,20 @@ CoverageClass = Literal[
     "unregistered",
     "invalid_unknown",
 ]
+EvidenceView = Literal[
+    "working_tree",
+    "git_index",
+    "governed_tool",
+    "registry_transaction",
+    "bridge_publication",
+    "recovery",
+]
 
 TERMINAL_JOURNAL_STATES = frozenset({"committed", "aborted"})
 APPROVED_VIRTUAL_SCHEMES = frozenset({"membase", "windows-scheduled-task"})
+SUPPORTED_EVIDENCE_VIEWS: frozenset[str] = frozenset(
+    {"working_tree", "git_index", "governed_tool", "registry_transaction", "bridge_publication", "recovery"}
+)
 
 # Reviewed explicitly in bridge/gtkb-wi5441-registry-control-plane-reverse-coverage-007.md.
 # Do not infer or expand this map from punctuation or filesystem object type.
@@ -379,7 +391,7 @@ def _normalized_locator(record: SoTArtifact) -> str:
         raise RegistryCoverageError(f"record {record.id!r}: glob coverage requires a glob locator")
     if record.coverage_mode != "glob" and has_magic:
         raise RegistryCoverageError(f"record {record.id!r}: glob syntax requires coverage_mode='glob'")
-    if record.coverage_mode in {"recursive", "opaque_container"} and not locator.endswith("/"):
+    if record.coverage_mode == "recursive" and not locator.endswith("/"):
         raise RegistryCoverageError(f"record {record.id!r}: directory coverage locator must end in '/'")
     if record.coverage_mode == "exact" and locator.endswith("/"):
         raise RegistryCoverageError(f"record {record.id!r}: exact locator cannot end in '/'")
@@ -392,6 +404,9 @@ class RegistryResolver:
     def __init__(self, records: Sequence[SoTArtifact]) -> None:
         self.records = tuple(records)
         self._locators: dict[str, str] = {}
+        self._exact_records: dict[str, list[SoTArtifact]] = {}
+        self._recursive_records: list[tuple[str, SoTArtifact]] = []
+        self._glob_records: list[tuple[str, SoTArtifact]] = []
         for record in self.records:
             if record.coverage_mode is None:
                 raise RegistryCoverageError(f"record {record.id!r}: coverage_mode is required")
@@ -401,6 +416,12 @@ class RegistryResolver:
             if prior is not None and prior != locator:
                 raise RegistryCoverageError(f"Windows case-fold locator collision: {prior!r} and {locator!r}")
             self._locators[folded] = locator
+            if record.coverage_mode in {"exact", "opaque_container"}:
+                self._exact_records.setdefault(folded.rstrip("/"), []).append(record)
+            elif record.coverage_mode == "recursive":
+                self._recursive_records.append((folded.rstrip("/"), record))
+            elif record.coverage_mode == "glob":
+                self._glob_records.append((folded, record))
         self._validate_overlaps()
 
     def _validate_overlaps(self) -> None:
@@ -421,20 +442,15 @@ class RegistryResolver:
     def _matches(self, relative_path: str) -> list[SoTArtifact]:
         normalized = relative_path.replace("\\", "/").strip("/")
         folded = normalized.casefold()
-        matches: list[SoTArtifact] = []
-        for record in self.records:
-            mode = record.coverage_mode
-            if mode == "virtual":
-                continue
-            locator = record.storage_path.rstrip("/")
-            locator_folded = locator.casefold()
-            matches_exact = mode in {"exact", "opaque_container"} and folded == locator_folded
-            matches_recursive = mode == "recursive" and (
-                folded == locator_folded or folded.startswith(locator_folded + "/")
-            )
-            matches_glob = mode == "glob" and fnmatch.fnmatchcase(folded, locator_folded)
-            if matches_exact or matches_recursive or matches_glob:
-                matches.append(record)
+        matches = list(self._exact_records.get(folded, ()))
+        matches.extend(
+            record
+            for locator_folded, record in self._recursive_records
+            if folded == locator_folded or folded.startswith(locator_folded + "/")
+        )
+        matches.extend(
+            record for locator_folded, record in self._glob_records if fnmatch.fnmatchcase(folded, locator_folded)
+        )
         return matches
 
     def resolve(self, relative_path: str | Path) -> SoTArtifact | None:
@@ -497,6 +513,19 @@ class RegistryTransactionReceipt:
     projection_digest: str
     record_count: int
     idempotent_retry: bool = False
+
+
+@dataclass(frozen=True)
+class RegistryRegistrationPreview:
+    starting_generation_digest: str
+    candidate_manifest_sha256: str
+    observer_input_digests: dict[str, str]
+    reconciliation_evidence_digest: str | None
+    desired_declaration_digest: str
+    desired_projection_digest: str
+    desired_record_count: int
+    candidate_count: int
+    dry_run_receipt: str
 
 
 @dataclass(frozen=True)
@@ -572,6 +601,8 @@ def ensure_control_plane_schema(conn: sqlite3.Connection) -> None:
             start_packet_hash TEXT,
             pauth_decision TEXT,
             journal_id TEXT,
+            evidence_view TEXT NOT NULL DEFAULT 'working_tree',
+            evidence_source_reference TEXT,
             UNIQUE(revision_id)
         );
         CREATE INDEX IF NOT EXISTS idx_sot_artifact_revisions_entry
@@ -706,6 +737,8 @@ def ensure_control_plane_schema(conn: sqlite3.Connection) -> None:
         "start_packet_hash": "TEXT",
         "pauth_decision": "TEXT",
         "journal_id": "TEXT",
+        "evidence_view": "TEXT NOT NULL DEFAULT 'working_tree'",
+        "evidence_source_reference": "TEXT",
     }
     for name, declaration in revision_columns.items():
         _ensure_column(conn, "sot_artifact_revisions", name, declaration)
@@ -995,7 +1028,11 @@ def _append_revision(
     start_packet_hash: str | None = None,
     pauth_decision: str | None = None,
     journal_id: str | None = None,
+    evidence_view: EvidenceView,
+    evidence_source_reference: str | None = None,
 ) -> str:
+    if evidence_view not in SUPPORTED_EVIDENCE_VIEWS:
+        raise RegistryCoverageError(f"unsupported revision evidence_view: {evidence_view!r}")
     digest, object_kind, size = artifact_content_state(project_root, record)
     predecessor = conn.execute(
         "SELECT revision_id FROM sot_artifact_revisions WHERE entry_id = ? ORDER BY rowid DESC LIMIT 1",
@@ -1008,8 +1045,9 @@ def _append_revision(
             revision_id, entry_id, canonical_relative_path, object_kind, content_digest,
             size_bytes, observed_at, actor_session, operation, predecessor_revision_id,
             changed_by, changed_at, change_reason, capability_hash, bridge_id,
-            start_packet_hash, pauth_decision, journal_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            start_packet_hash, pauth_decision, journal_id, evidence_view,
+            evidence_source_reference
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             revision_id,
@@ -1030,6 +1068,8 @@ def _append_revision(
             start_packet_hash,
             pauth_decision,
             journal_id,
+            evidence_view,
+            evidence_source_reference,
         ),
     )
     return revision_id
@@ -1054,21 +1094,39 @@ def registry_currentness(
     *,
     project_root: Path,
     db_path: Path,
+    record_ids: set[str] | None = None,
 ) -> dict[str, Any]:
+    """Deep content-observation audit for selected declarations.
+
+    This is audit state, not membership authority. Hot mutation/publication
+    paths should select the exact records they need or use
+    :func:`registry_identity_state`.
+    """
+
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:
         latest = _latest_revision_rows(conn) if _table_exists(conn, "sot_artifact_revisions") else {}
     finally:
         conn.close()
+    selected_records = [record for record in snapshot.records if record_ids is None or record.id in record_ids]
+    missing = [record.id for record in selected_records if record.id not in latest]
+    selected = [record for record in selected_records if record.id in latest]
+
+    def content_state(record: SoTArtifact) -> tuple[SoTArtifact, str]:
+        digest, _, _ = artifact_content_state(project_root, record)
+        return record, digest
+
+    if len(selected) > 32:
+        with ThreadPoolExecutor(max_workers=min(32, len(selected))) as executor:
+            content_states = list(executor.map(content_state, selected))
+    else:
+        content_states = [content_state(record) for record in selected]
+
     stale: list[dict[str, str]] = []
-    missing: list[str] = []
-    for record in snapshot.records:
+    for record, current_digest in content_states:
         row = latest.get(record.id)
-        if row is None:
-            missing.append(record.id)
-            continue
-        current_digest, _, _ = artifact_content_state(project_root, record)
+        assert row is not None
         if row["content_digest"] != current_digest:
             stale.append(
                 {
@@ -1078,6 +1136,40 @@ def registry_currentness(
                 }
             )
     return {"current": not stale and not missing, "missing_revisions": missing, "stale": stale}
+
+
+def registry_identity_state(snapshot: RegistrySnapshot, *, project_root: Path) -> dict[str, Any]:
+    """Check declaration-backed filesystem identity without hashing content."""
+
+    root = project_root.resolve()
+    missing: list[dict[str, str]] = []
+    object_kind_mismatches: list[dict[str, str]] = []
+    for record in snapshot.records:
+        if record.lifecycle != "active" or record.coverage_mode == "virtual":
+            continue
+        locator = record.storage_path.rstrip("/")
+        if record.coverage_mode == "glob":
+            try:
+                present = any(root.glob(record.storage_path))
+            except (NotImplementedError, OSError, ValueError):
+                present = False
+            if not present:
+                missing.append({"id": record.id, "path": record.storage_path})
+            continue
+        target = root / locator
+        if not target.exists() and not target.is_symlink():
+            missing.append({"id": record.id, "path": record.storage_path})
+            continue
+        observed_kind = _path_object_kind(target)
+        if record.coverage_mode == "recursive" and observed_kind != "directory":
+            object_kind_mismatches.append(
+                {"id": record.id, "path": record.storage_path, "expected": "directory", "observed": observed_kind}
+            )
+    return {
+        "current": not missing and not object_kind_mismatches,
+        "missing": missing,
+        "object_kind_mismatches": object_kind_mismatches,
+    }
 
 
 def require_current_registry_receipt(snapshot: RegistrySnapshot, *, db_path: Path) -> str:
@@ -1225,6 +1317,8 @@ def _commit_prepared_generation(
                     bridge_id=row["bridge_id"],
                     start_packet_hash=row["start_packet_hash"],
                     journal_id=row["journal_id"],
+                    evidence_view="registry_transaction",
+                    evidence_source_reference=row["journal_id"],
                 )
         if failure_injector is not None:
             failure_injector("after_db_update")
@@ -1277,6 +1371,7 @@ def apply_registry_transaction(
     packaged_registry_path: Path | None = None,
     db_path: Path | None = None,
     allow_legacy_input: bool = False,
+    expected_prior_generation_digest: str | None = None,
     failure_injector: Any = None,
 ) -> RegistryTransactionReceipt:
     """Commit one declaration/mirror/projection generation under a prepared journal."""
@@ -1348,6 +1443,21 @@ def apply_registry_transaction(
             parity = validate_projection_parity(old_records, old_projection)
             if not parity.in_sync:
                 raise RegistryControlPlaneError("pre-transaction declaration/projection parity failure")
+            prior_generation_digest = _json_digest(
+                {
+                    "declaration": _sha256_bytes(old_canonical),
+                    "packaged": _sha256_bytes(old_packaged),
+                    "projection": _projection_digest(old_projection),
+                }
+            )
+            if (
+                expected_prior_generation_digest is not None
+                and prior_generation_digest != expected_prior_generation_digest
+            ):
+                raise RegistryAuthorizationError(
+                    "registry generation changed after dry-run: "
+                    f"expected {expected_prior_generation_digest}, observed {prior_generation_digest}"
+                )
             old_ids = {record.id for record in old_records}
             desired_ids = {record.id for record in desired}
             if old_ids - desired_ids:
@@ -1610,6 +1720,44 @@ def bootstrap_legacy_registry(
     )
 
 
+def _registration_dry_run_receipt(
+    *,
+    starting_generation_digest: str,
+    candidate_manifest_sha256: str,
+    record_manifest_sha256: str,
+    observer_input_digests: Mapping[str, str] | None,
+    reconciliation_evidence_digest: str | None,
+    desired_declaration_digest: str,
+    desired_projection_digest: str,
+    desired_record_count: int,
+    candidate_count: int,
+    actor_session: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    bridge_id: str,
+) -> str:
+    return _json_digest(
+        {
+            "operation": "register",
+            "starting_generation_digest": starting_generation_digest,
+            "candidate_manifest_sha256": candidate_manifest_sha256,
+            "record_manifest_sha256": record_manifest_sha256,
+            "observer_input_digests": dict(sorted((observer_input_digests or {}).items())),
+            "reconciliation_evidence_digest": reconciliation_evidence_digest,
+            "desired_declaration_digest": desired_declaration_digest,
+            "desired_projection_digest": desired_projection_digest,
+            "desired_record_count": desired_record_count,
+            "candidate_count": candidate_count,
+            "authorization": {
+                "actor_session": actor_session,
+                "start_packet_hash": start_packet_hash,
+                "pauth_id": pauth_id,
+                "bridge_id": bridge_id,
+            },
+        }
+    )
+
+
 def register_artifacts(
     records: Sequence[SoTArtifact],
     *,
@@ -1623,19 +1771,98 @@ def register_artifacts(
     registry_path: Path | None = None,
     packaged_registry_path: Path | None = None,
     db_path: Path | None = None,
+    expected_generation_digest: str | None = None,
+    candidate_manifest_sha256: str | None = None,
+    observer_input_digests: Mapping[str, str] | None = None,
+    reconciliation_evidence_digest: str | None = None,
+    dry_run_receipt: str | None = None,
 ) -> RegistryTransactionReceipt:
+    if (expected_generation_digest is None) != (dry_run_receipt is None):
+        raise RegistryAuthorizationError("expected generation and dry-run receipt must be supplied together")
+    if (observer_input_digests is None) != (reconciliation_evidence_digest is None):
+        raise RegistryAuthorizationError(
+            "observer input digests and reconciliation evidence digest must be supplied together"
+        )
     snapshot = load_registry_snapshot(
         project_root=project_root,
         registry_path=registry_path,
         packaged_registry_path=packaged_registry_path,
         db_path=db_path,
     )
-    existing_ids = {record.id for record in snapshot.records}
-    duplicates = existing_ids & {record.id for record in records}
-    if duplicates:
-        raise RegistryAuthorizationError(f"registry IDs already exist: {sorted(duplicates)}")
+    additions = tuple(records)
+    existing = {record.id: record for record in snapshot.records}
+    duplicate_ids = existing.keys() & {record.id for record in additions}
+    if duplicate_ids:
+        if duplicate_ids != {record.id for record in additions}:
+            raise RegistryAuthorizationError(f"registration batch mixes existing and new IDs: {sorted(duplicate_ids)}")
+        mismatched = [
+            record.id for record in additions if _record_payload(existing[record.id]) != _record_payload(record)
+        ]
+        if mismatched:
+            raise RegistryAuthorizationError(
+                f"existing registry IDs differ from the requested retry: {sorted(mismatched)}"
+            )
+        if expected_generation_digest is not None:
+            record_rows = [
+                _record_payload(record) for record in sorted(additions, key=lambda item: item.storage_path.casefold())
+            ]
+            record_manifest_digest = _json_digest(record_rows)
+            expected_retry_receipt = _registration_dry_run_receipt(
+                starting_generation_digest=expected_generation_digest,
+                candidate_manifest_sha256=candidate_manifest_sha256 or record_manifest_digest,
+                record_manifest_sha256=record_manifest_digest,
+                observer_input_digests=observer_input_digests,
+                reconciliation_evidence_digest=reconciliation_evidence_digest,
+                desired_declaration_digest=snapshot.declaration_digest,
+                desired_projection_digest=snapshot.projection_digest,
+                desired_record_count=len(snapshot.records),
+                candidate_count=len(additions),
+                actor_session=actor_session,
+                start_packet_hash=start_packet_hash,
+                pauth_id=pauth_id,
+                bridge_id=bridge_id,
+            )
+            if dry_run_receipt != expected_retry_receipt:
+                raise RegistryAuthorizationError("registration retry does not match the exact dry-run receipt")
+        # The transaction layer recognizes the exact full-generation request
+        # before checking the now-stale preimage digest, making an interrupted
+        # caller retry deterministic and side-effect free.
+        return apply_registry_transaction(
+            snapshot.records,
+            operation="register",
+            actor_session=actor_session,
+            changed_by=changed_by,
+            change_reason=change_reason,
+            start_packet_hash=start_packet_hash,
+            pauth_id=pauth_id,
+            bridge_id=bridge_id,
+            project_root=project_root,
+            registry_path=registry_path,
+            packaged_registry_path=packaged_registry_path,
+            db_path=db_path,
+            expected_prior_generation_digest=expected_generation_digest,
+        )
+    preview = preview_registry_registration(
+        additions,
+        actor_session=actor_session,
+        start_packet_hash=start_packet_hash,
+        pauth_id=pauth_id,
+        bridge_id=bridge_id,
+        candidate_manifest_sha256=candidate_manifest_sha256,
+        observer_input_digests=observer_input_digests,
+        reconciliation_evidence_digest=reconciliation_evidence_digest,
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    if expected_generation_digest is not None:
+        if expected_generation_digest != preview.starting_generation_digest:
+            raise RegistryAuthorizationError("batch plan starting generation does not match the live registry")
+        if dry_run_receipt != preview.dry_run_receipt:
+            raise RegistryAuthorizationError("batch apply does not match the exact dry-run receipt")
     return apply_registry_transaction(
-        (*snapshot.records, *records),
+        (*snapshot.records, *additions),
         operation="register",
         actor_session=actor_session,
         changed_by=changed_by,
@@ -1647,6 +1874,78 @@ def register_artifacts(
         registry_path=registry_path,
         packaged_registry_path=packaged_registry_path,
         db_path=db_path,
+        expected_prior_generation_digest=expected_generation_digest,
+    )
+
+
+def preview_registry_registration(
+    records: Sequence[SoTArtifact],
+    *,
+    actor_session: str,
+    start_packet_hash: str,
+    pauth_id: str,
+    bridge_id: str,
+    candidate_manifest_sha256: str | None = None,
+    observer_input_digests: Mapping[str, str] | None = None,
+    reconciliation_evidence_digest: str | None = None,
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> RegistryRegistrationPreview:
+    """Bind an additive batch and its authorization to one readable generation."""
+
+    if (observer_input_digests is None) != (reconciliation_evidence_digest is None):
+        raise RegistryAuthorizationError(
+            "observer input digests and reconciliation evidence digest must be supplied together"
+        )
+
+    snapshot = load_registry_snapshot(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    additions = tuple(records)
+    existing_ids = {record.id for record in snapshot.records}
+    duplicates = existing_ids & {record.id for record in additions}
+    if duplicates:
+        raise RegistryAuthorizationError(f"registry IDs already exist: {sorted(duplicates)}")
+    desired = (*snapshot.records, *additions)
+    RegistryResolver(desired)
+    record_rows = [
+        _record_payload(record) for record in sorted(additions, key=lambda item: item.storage_path.casefold())
+    ]
+    record_manifest_digest = _json_digest(record_rows)
+    manifest_digest = candidate_manifest_sha256 or record_manifest_digest
+    desired_declaration_digest = _sha256_bytes(serialize_registry(desired))
+    desired_projection_digest = _projection_digest(desired)
+    canonical_observer_digests = dict(sorted((observer_input_digests or {}).items()))
+    receipt = _registration_dry_run_receipt(
+        starting_generation_digest=snapshot.generation_digest,
+        candidate_manifest_sha256=manifest_digest,
+        record_manifest_sha256=record_manifest_digest,
+        observer_input_digests=canonical_observer_digests,
+        reconciliation_evidence_digest=reconciliation_evidence_digest,
+        desired_declaration_digest=desired_declaration_digest,
+        desired_projection_digest=desired_projection_digest,
+        desired_record_count=len(desired),
+        candidate_count=len(additions),
+        actor_session=actor_session,
+        start_packet_hash=start_packet_hash,
+        pauth_id=pauth_id,
+        bridge_id=bridge_id,
+    )
+    return RegistryRegistrationPreview(
+        starting_generation_digest=snapshot.generation_digest,
+        candidate_manifest_sha256=manifest_digest,
+        observer_input_digests=canonical_observer_digests,
+        reconciliation_evidence_digest=reconciliation_evidence_digest,
+        desired_declaration_digest=desired_declaration_digest,
+        desired_projection_digest=desired_projection_digest,
+        desired_record_count=len(desired),
+        candidate_count=len(additions),
+        dry_run_receipt=receipt,
     )
 
 
@@ -1935,6 +2234,8 @@ def consume_observation_capability(
                         bridge_id=bridge_id,
                         start_packet_hash=start_packet_hash,
                         pauth_decision=row["pauth_decision_json"],
+                        evidence_view="governed_tool",
+                        evidence_source_reference=capability_hash,
                     )
                 )
             conn.execute(
@@ -1944,6 +2245,77 @@ def consume_observation_capability(
             )
             conn.commit()
             return tuple(revision_ids)
+        except Exception:
+            if conn.in_transaction:
+                conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+def append_passive_observation(
+    *,
+    target_paths: Sequence[str | Path],
+    evidence_view: Literal["working_tree", "git_index"] = "working_tree",
+    evidence_source_reference: str | None = None,
+    actor_session: str = "unattributed_external",
+    changed_by: str = "registry-observer/unattributed",
+    change_reason: str = "passive direct in-place content observation",
+    project_root: Path | None = None,
+    registry_path: Path | None = None,
+    packaged_registry_path: Path | None = None,
+    db_path: Path | None = None,
+) -> tuple[str, ...]:
+    """Append best-effort audit evidence without granting mutation authority.
+
+    This API is intentionally capability-free because it is an after-the-fact
+    observer. It can record only present content at an already-registered
+    locator; identity transitions remain outside its authority.
+    """
+
+    paths = RegistryPaths.resolve(
+        project_root=project_root,
+        registry_path=registry_path,
+        packaged_registry_path=packaged_registry_path,
+        db_path=db_path,
+    )
+    with _RegistryFileLock(paths.lock_path):
+        _ensure_no_nonterminal_journal(paths.db_path)
+        snapshot = _load_snapshot_unlocked(paths)
+        normalized = _normalize_event_paths(paths.project_root, target_paths)
+        records: dict[str, SoTArtifact] = {}
+        for relative in normalized:
+            record = snapshot.resolver.resolve(relative)
+            if record is None:
+                raise RegistryAuthorizationError(f"passive observation target is unregistered: {relative}")
+            target = paths.project_root / relative
+            if not target.exists() and not target.is_symlink():
+                raise RegistryAuthorizationError(
+                    f"passive observation cannot record a missing identity transition: {relative}"
+                )
+            records[record.id] = record
+        conn = sqlite3.connect(str(paths.db_path))
+        try:
+            ensure_control_plane_schema(conn)
+            now = _utc_now()
+            conn.execute("BEGIN IMMEDIATE")
+            revision_ids = tuple(
+                _append_revision(
+                    conn,
+                    project_root=paths.project_root,
+                    record=record,
+                    actor_session=actor_session or "unattributed_external",
+                    operation="direct_in_place_content_change",
+                    changed_by=changed_by or "registry-observer/unattributed",
+                    changed_at=now,
+                    change_reason=change_reason,
+                    evidence_view=evidence_view,
+                    evidence_source_reference=evidence_source_reference,
+                )
+                for record in sorted(records.values(), key=lambda item: item.id)
+            )
+            conn.commit()
+            return revision_ids
         except Exception:
             if conn.in_transaction:
                 conn.rollback()
@@ -2184,10 +2556,12 @@ def mint_bridge_publication_capability(
     with _RegistryFileLock(paths.lock_path):
         _ensure_no_nonterminal_journal(paths.db_path)
         snapshot = _load_snapshot_unlocked(paths)
+        aggregate_record = _bridge_aggregate_record(snapshot, relative)
         currentness = registry_currentness(
             snapshot,
             project_root=paths.project_root,
             db_path=paths.db_path,
+            record_ids={aggregate_record.id},
         )
         if not currentness["current"]:
             raise RegistryAuthorizationError(
@@ -2195,7 +2569,6 @@ def mint_bridge_publication_capability(
             )
         if target.exists() or target.is_symlink():
             raise RegistryAuthorizationError(f"bridge publication target already exists: {relative}")
-        aggregate_record = _bridge_aggregate_record(snapshot, relative)
         author_session = _bridge_publication_author_session(content)
         if author_session != session_id:
             raise RegistryAuthorizationError("bridge author session and claim session differ")
@@ -2354,6 +2727,7 @@ def consume_bridge_publication_capability(
                 snapshot,
                 project_root=paths.project_root,
                 db_path=paths.db_path,
+                record_ids={aggregate_record.id},
             )
             expected_stale = [
                 {
@@ -2377,6 +2751,8 @@ def consume_bridge_publication_capability(
                 change_reason=change_reason,
                 capability_hash=capability_hash,
                 bridge_id=row["document_name"],
+                evidence_view="bridge_publication",
+                evidence_source_reference=capability_hash,
             )
             revision = conn.execute(
                 "SELECT content_digest FROM sot_artifact_revisions WHERE revision_id = ?",
@@ -2413,6 +2789,7 @@ def consume_bridge_publication_capability(
             snapshot,
             project_root=paths.project_root,
             db_path=paths.db_path,
+            record_ids={aggregate_record.id},
         )
         if not final_currentness["current"]:
             raise RegistryRecoveryRequired(
@@ -2533,6 +2910,8 @@ def compensate_bridge_publication(
                     change_reason=reason,
                     capability_hash=capability_hash,
                     bridge_id=row["document_name"],
+                    evidence_view="recovery",
+                    evidence_source_reference=capability_hash,
                 )
             compensation_digest = _json_digest(
                 {
@@ -2577,6 +2956,7 @@ def compensate_bridge_publication(
             snapshot,
             project_root=paths.project_root,
             db_path=paths.db_path,
+            record_ids={aggregate_record.id},
         )
         if not final_currentness["current"]:
             raise RegistryRecoveryRequired(
@@ -2813,6 +3193,8 @@ def recover_wi5441_bridge_aggregate(
                     {"authorization_id": pauth_id, "operation": "wi5441_bridge_aggregate_recovery"},
                     sort_keys=True,
                 ),
+                evidence_view="recovery",
+                evidence_source_reference=bridge_id,
             )
             revision = conn.execute(
                 "SELECT content_digest FROM sot_artifact_revisions WHERE revision_id = ?",
@@ -2908,7 +3290,7 @@ def inspect_registry(
         )
     except Exception as exc:  # noqa: BLE001 - inspect must report typed authority failures.
         return {"coherent": False, "error": type(exc).__name__, "detail": str(exc)}
-    currentness = registry_currentness(snapshot, project_root=paths.project_root, db_path=paths.db_path)
+    identity_state = registry_identity_state(snapshot, project_root=paths.project_root)
     report: dict[str, Any] = {
         "coherent": True,
         "record_count": len(snapshot.records),
@@ -2916,22 +3298,49 @@ def inspect_registry(
         "packaged_digest": snapshot.packaged_digest,
         "projection_digest": snapshot.projection_digest,
         "generation_digest": snapshot.generation_digest,
-        "currentness": currentness,
+        "identity_state": identity_state,
     }
     if include_census:
-        census = census_registry(snapshot, project_root=paths.project_root)
-        counts: dict[str, int] = {}
-        for entry in census:
-            counts[entry.coverage_class] = counts.get(entry.coverage_class, 0) + 1
-        report["reverse_coverage"] = {
-            "object_count": len(census),
-            "counts": counts,
-            "gaps": [
-                asdict(entry)
-                for entry in census
-                if entry.coverage_class in {"unregistered", "invalid_unknown"}
-                and entry.object_kind not in {"vcs_service_state", "hosted_application_root"}
+        from groundtruth_kb.project.artifact_membership_reconciliation import (
+            reconcile_artifact_membership,
+            reconciliation_summary,
+        )
+
+        reconciliation = reconcile_artifact_membership(
+            paths.project_root,
+            snapshot=snapshot,
+            db_path=paths.db_path,
+        )
+        summary = reconciliation_summary(reconciliation)
+        report["membership_reconciliation"] = summary
+        report["currentness"] = {
+            "current": summary["audit_complete"],
+            "audit_only": True,
+            "missing_revisions": [
+                gap["registry_id"] for gap in summary["audit_gaps"] if gap["kind"] == "missing_revision"
             ],
+            "stale": [
+                {key: value for key, value in gap.items() if key != "kind"}
+                for gap in summary["audit_gaps"]
+                if gap["kind"] == "stale_content_observation"
+            ],
+        }
+        report["reverse_coverage"] = {
+            "object_count": sum(summary["counts"].values()),
+            "counts": summary["counts"],
+            "gaps": [
+                entry
+                for entry in reconciliation["entries"]
+                if entry["membership_class"] in {"unregistered_load_bearing", "invalid_unknown"}
+            ],
+        }
+    else:
+        report["currentness"] = {
+            "current": None,
+            "audit_only": True,
+            "audit_performed": False,
+            "missing_revisions": [],
+            "stale": [],
         }
     return report
 
@@ -2955,9 +3364,8 @@ def validate_registry(
     if not report.get("coherent"):
         errors.append(str(report.get("error", "registry_not_coherent")))
     else:
-        currentness = report["currentness"]
-        if not currentness["current"]:
-            errors.append("registry_currentness_failure")
-        if require_reverse_closure and report["reverse_coverage"]["gaps"]:
-            errors.append("reverse_coverage_incomplete")
+        if not report["identity_state"]["current"]:
+            errors.append("registry_identity_failure")
+        if require_reverse_closure and not report["membership_reconciliation"]["membership_complete"]:
+            errors.append("registry_membership_incomplete")
     return {**report, "valid": not errors, "errors": errors}

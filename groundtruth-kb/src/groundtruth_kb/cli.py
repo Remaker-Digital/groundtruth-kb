@@ -11,9 +11,11 @@ Licensed under AGPL-3.0-or-later.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -102,6 +104,7 @@ from groundtruth_kb.project.registry_control_plane import (
     consume_observation_capability,
     inspect_registry,
     load_registry_snapshot,
+    preview_registry_registration,
     recover_registry,
     register_artifacts,
 )
@@ -5398,6 +5401,75 @@ def registry_inspect(ctx: click.Context, json_output: bool, no_census: bool) -> 
             click.echo(f"Error: {result['error']}")
 
 
+@registry_cmd.command("reconcile")
+@click.option("--json", "json_output", is_flag=True, help="Emit the complete machine-readable report.")
+@click.option("--deep", is_flag=True, help="Inspect disposable descendants instead of emitting pruned envelopes.")
+@click.option("--audit", is_flag=True, help="Perform the periodic deep content-observation audit.")
+@click.option(
+    "--batch-output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the exact additive batch plan inside the project root.",
+)
+@click.pass_context
+def registry_reconcile(
+    ctx: click.Context,
+    json_output: bool,
+    deep: bool,
+    audit: bool,
+    batch_output: Path | None,
+) -> None:
+    """Reconcile registry membership through all five typed observers."""
+
+    from groundtruth_kb.project.artifact_membership_reconciliation import (
+        reconcile_artifact_membership,
+    )
+
+    config = _resolve_config(ctx)
+    root = Path(config.project_root).resolve()
+    try:
+        report = reconcile_artifact_membership(
+            root,
+            db_path=Path(config.db_path),
+            deep=deep,
+            audit=audit,
+        )
+        if batch_output is not None:
+            output = batch_output if batch_output.is_absolute() else root / batch_output
+            output = output.resolve()
+            output.relative_to(root)
+            plan = {
+                "schema_version": 1,
+                "starting_registry_generation_digest": report["registry_generation_digest"],
+                "candidate_manifest_sha256": report["candidate_manifest_sha256"],
+                "observer_input_digests": report["observer_input_digests"],
+                "reconciliation_evidence_digest": report["reconciliation_evidence_digest"],
+                "admission_candidates": report["admission_candidates"],
+                "records": report["batch_records"],
+            }
+            plan_bytes = json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(plan_bytes)
+            report["batch_output"] = output.relative_to(root).as_posix()
+            report["batch_plan_sha256"] = "sha256:" + hashlib.sha256(plan_bytes).hexdigest()
+    except (OSError, RegistryControlPlaneError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        click.echo(json.dumps(report, indent=2, sort_keys=True))
+        return
+    click.echo(
+        "Registry reconciliation: "
+        f"membership_complete={str(report['membership_complete']).lower()}, "
+        f"load_bearing_gaps={report['counts']['unregistered_load_bearing']}, "
+        f"unknown={report['counts']['invalid_unknown']}, "
+        f"candidates={len(report['admission_candidates'])}, "
+        f"pruned={report['pruned_envelope_count']}"
+    )
+    if batch_output is not None:
+        click.echo(f"Batch plan: {report['batch_output']} ({report['batch_plan_sha256']})")
+
+
 @registry_cmd.command("recover")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.pass_context
@@ -5443,6 +5515,8 @@ def _registry_authority_options(function: Any) -> Any:
     default=None,
     help="In-root JSON array of exact declarations.",
 )
+@click.option("--dry-run", is_flag=True, help="Validate and bind the batch without mutating the registry.")
+@click.option("--dry-run-receipt", default=None, help="Exact receipt emitted by the preceding batch dry-run.")
 @_registry_authority_options
 @click.pass_context
 def registry_register(
@@ -5450,6 +5524,8 @@ def registry_register(
     record_json: str | None,
     bridge_id: str,
     batch_file: Path | None,
+    dry_run: bool,
+    dry_run_receipt: str | None,
     session_id: str,
     start_packet_hash: str,
     pauth_id: str,
@@ -5462,15 +5538,79 @@ def registry_register(
     config = _resolve_config(ctx)
     root = Path(config.project_root).resolve()
     try:
+        batch_metadata: dict[str, Any] = {}
         if batch_file is not None:
             resolved = batch_file.resolve()
             resolved.relative_to(root)
-            raw = json.loads(resolved.read_text(encoding="utf-8"))
+            loaded = json.loads(resolved.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                from groundtruth_kb.project.artifact_membership_reconciliation import (
+                    REQUIRED_OBSERVER_CLASSES,
+                )
+
+                batch_metadata = loaded
+                raw = loaded.get("records")
+                candidates = loaded.get("admission_candidates")
+                if not isinstance(candidates, list):
+                    raise ValueError("reconciliation plan must contain admission_candidates")
+                candidate_digest = (
+                    "sha256:"
+                    + hashlib.sha256(
+                        json.dumps(
+                            candidates,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest()
+                )
+                if candidate_digest != loaded.get("candidate_manifest_sha256"):
+                    raise ValueError("reconciliation candidate manifest digest mismatch")
+                if [item.get("record") for item in candidates if isinstance(item, dict)] != raw:
+                    raise ValueError("reconciliation records do not match the exact candidate manifest")
+                observer_digests = loaded.get("observer_input_digests")
+                if not isinstance(observer_digests, dict) or set(observer_digests) != set(REQUIRED_OBSERVER_CLASSES):
+                    raise ValueError("reconciliation plan must bind all five observer input digests")
+                if not all(
+                    isinstance(value, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+                    for value in observer_digests.values()
+                ):
+                    raise ValueError("reconciliation observer input digest is malformed")
+                evidence_digest = loaded.get("reconciliation_evidence_digest")
+                if (
+                    not isinstance(evidence_digest, str)
+                    or re.fullmatch(r"sha256:[0-9a-f]{64}", evidence_digest) is None
+                ):
+                    raise ValueError("reconciliation evidence digest is malformed")
+            else:
+                raw = loaded
             if not isinstance(raw, list):
-                raise ValueError("batch file must contain a JSON array")
+                raise ValueError("batch file must contain a JSON array or a reconciliation plan with records")
         else:
             raw = [json.loads(record_json or "")]
         records = [_artifact_from_payload(item) for item in raw]
+        candidate_manifest_sha256 = str(batch_metadata.get("candidate_manifest_sha256") or "") or None
+        expected_generation = str(batch_metadata.get("starting_registry_generation_digest") or "") or None
+        observer_input_digests = batch_metadata.get("observer_input_digests") or None
+        reconciliation_evidence_digest = str(batch_metadata.get("reconciliation_evidence_digest") or "") or None
+        if dry_run:
+            preview = preview_registry_registration(
+                records,
+                actor_session=session_id,
+                start_packet_hash=start_packet_hash,
+                pauth_id=pauth_id,
+                bridge_id=bridge_id,
+                candidate_manifest_sha256=candidate_manifest_sha256,
+                observer_input_digests=observer_input_digests,
+                reconciliation_evidence_digest=reconciliation_evidence_digest,
+                **_registry_control_kwargs(ctx),
+            )
+            if expected_generation is not None and expected_generation != preview.starting_generation_digest:
+                raise ValueError("batch plan was built from a different registry generation")
+            click.echo(json.dumps(vars(preview), indent=2, sort_keys=True))
+            return
+        if batch_file is not None and (expected_generation is None or not dry_run_receipt):
+            raise ValueError("batch apply requires a reconciliation generation and --dry-run-receipt")
         receipt = register_artifacts(
             records,
             actor_session=session_id,
@@ -5479,6 +5619,11 @@ def registry_register(
             start_packet_hash=start_packet_hash,
             pauth_id=pauth_id,
             bridge_id=bridge_id,
+            expected_generation_digest=expected_generation,
+            candidate_manifest_sha256=candidate_manifest_sha256,
+            observer_input_digests=observer_input_digests,
+            reconciliation_evidence_digest=reconciliation_evidence_digest,
+            dry_run_receipt=dry_run_receipt,
             **_registry_control_kwargs(ctx),
         )
     except (RegistryControlPlaneError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:

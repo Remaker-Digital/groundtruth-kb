@@ -2398,18 +2398,18 @@ def test_finalization_git_add_targets_parses_and_rejects() -> None:
     assert gate._finalization_git_add_targets("git rm scripts/a.py") is None
 
 
-def test_registered_target_requires_registry_currentness(tmp_path: Path) -> None:
+def test_registered_content_edit_can_refresh_stale_registry_observation(tmp_path: Path) -> None:
     _authorize_registered_target(tmp_path)
     (tmp_path / "scripts" / "sample.py").write_text("stale\n", encoding="utf-8")
 
     result = gate.gate_decision(_registered_payload(tmp_path))
 
-    assert result["decision"] == "block"
-    assert "current registry revision evidence" in result["reason"]
-    assert not observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
+    assert "decision" not in result
+    assert "capability_hash" in result["registryObservationIntent"]
+    assert observer.intent_path(tmp_path, "session-1", "fixture-tool-event").exists()
 
 
-def test_incomplete_registry_journal_blocks_mutation(tmp_path: Path) -> None:
+def test_incomplete_registry_journal_records_nonblocking_audit_gap(tmp_path: Path) -> None:
     _authorize_registered_target(tmp_path)
     with sqlite3.connect(tmp_path / "groundtruth.db") as conn:
         conn.execute(
@@ -2425,9 +2425,10 @@ def test_incomplete_registry_journal_blocks_mutation(tmp_path: Path) -> None:
 
     result = gate.gate_decision(_registered_payload(tmp_path))
 
-    assert result["decision"] == "block"
-    assert "registry control plane denied mutation" in result["reason"]
-    assert "fixture-incomplete" in result["reason"]
+    assert "decision" not in result
+    gap = result["registryObservationIntent"]["audit_gap"]
+    assert gap["code"] == "registry_observation_unavailable"
+    assert "fixture-incomplete" in gap["detail"]
 
 
 def test_registered_identity_change_requires_transition(tmp_path: Path) -> None:
