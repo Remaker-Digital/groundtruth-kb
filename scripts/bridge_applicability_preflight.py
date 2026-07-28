@@ -41,6 +41,24 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 DEFAULT_BRIDGE_DIR: Final[Path] = PROJECT_ROOT / "bridge"
 DEFAULT_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "config" / "governance" / "spec-applicability.toml"
 DEFAULT_DB_PATH: Final[Path] = PROJECT_ROOT / "groundtruth.db"
+PACKET_HASH_SCHEMA_VERSION: Final[int] = 2
+PACKET_HASH_MATERIAL_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "packet_hash_schema_version",
+        "bridge_document_name",
+        "source_identity",
+        "source_content_hash",
+        "rules_content_hash",
+        "cited_specs",
+        "target_paths",
+        "declared_target_paths",
+        "applicability_path_evidence",
+        "work_items",
+        "applicable_specs",
+        "missing_required_specs",
+        "missing_advisory_specs",
+    }
+)
 
 BRIDGE_FILE_STATUS_RE: Final[re.Pattern[str]] = re.compile(
     r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED)\b",
@@ -186,6 +204,10 @@ def _status_from_bridge_file(path: Path) -> str | None:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
+    return _status_from_content(text)
+
+
+def _status_from_content(text: str) -> str | None:
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
@@ -393,8 +415,8 @@ def compute_missing_parent_dir_warnings(project_root: Path, paths: set[str]) -> 
     return warnings
 
 
-def load_rules(config_path: Path) -> list[ApplicabilityRule]:
-    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+def _parse_rules(content: str) -> list[ApplicabilityRule]:
+    data = tomllib.loads(content)
     rules: list[ApplicabilityRule] = []
     for raw in data.get("rules", []):
         rules.append(
@@ -408,6 +430,10 @@ def load_rules(config_path: Path) -> list[ApplicabilityRule]:
             )
         )
     return rules
+
+
+def load_rules(config_path: Path) -> list[ApplicabilityRule]:
+    return _parse_rules(config_path.read_text(encoding="utf-8"))
 
 
 def _match_path(pattern: str, path: str) -> bool:
@@ -586,6 +612,101 @@ def _check_unclassified_target_paths(target_paths: set[str]) -> list[str]:
     return unclassified
 
 
+def _normalize_lf(content: str) -> str:
+    return content.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _text_sha256(content: str) -> str:
+    normalized = _normalize_lf(content).encode("utf-8")
+    return "sha256:" + hashlib.sha256(normalized).hexdigest()
+
+
+def _canonical_explicit_version(
+    *,
+    bridge_id: str,
+    bridge_dir: Path,
+    content_file: Path,
+    content: str,
+) -> BridgeVersion | None:
+    """Resolve an explicit canonical bridge source without scanning siblings."""
+    bridge_root = bridge_dir.resolve()
+    source_path = content_file.resolve()
+    if source_path.parent != bridge_root:
+        return None
+
+    versioned = re.fullmatch(r"(?P<document>.+)-(?P<version>\d+)\.md", source_path.name)
+    looks_canonical = versioned is not None or source_path.name.startswith(f"{bridge_id}-")
+    if versioned is None:
+        if looks_canonical:
+            raise SystemExit(
+                "ERR_EXPLICIT_BRIDGE_SOURCE_MISMATCH: canonical-looking source does not have a numeric version"
+            )
+        return None
+    if versioned.group("document") != bridge_id:
+        raise SystemExit(
+            "ERR_EXPLICIT_BRIDGE_SOURCE_MISMATCH: explicit versioned source belongs to another bridge thread"
+        )
+
+    status = _status_from_content(content)
+    if status is None:
+        raise SystemExit(
+            "ERR_EXPLICIT_BRIDGE_SOURCE_STATUS: canonical explicit source lacks a recognized first-line status"
+        )
+    try:
+        rel_path = source_path.relative_to(bridge_root.parent).as_posix()
+    except ValueError as exc:
+        raise SystemExit("ERR_EXPLICIT_BRIDGE_SOURCE_ESCAPE: canonical source escapes the project root") from exc
+    return BridgeVersion(
+        status=status,
+        rel_path=rel_path,
+        abs_path=source_path,
+        version_number=int(versioned.group("version")),
+    )
+
+
+def _source_identity(version: BridgeVersion | None) -> dict[str, Any] | None:
+    if version is None:
+        return None
+    return {
+        "path": version.rel_path,
+        "status": version.status,
+        "version_number": version.version_number,
+    }
+
+
+def _stable_applicable_specs(applicable: dict[str, ApplicableSpec]) -> dict[str, dict[str, Any]]:
+    return {
+        spec_id: {
+            "spec_id": item.spec_id,
+            "severity": item.severity,
+            "rationale": item.rationale,
+            "matched_by": list(item.matched_by),
+        }
+        for spec_id, item in sorted(applicable.items())
+    }
+
+
+def _packet_hash_material(packet: dict[str, Any], applicable: dict[str, ApplicableSpec]) -> dict[str, Any]:
+    material = {
+        "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
+        "bridge_document_name": packet["bridge_document_name"],
+        "source_identity": packet["source_identity"],
+        "source_content_hash": packet["source_content_hash"],
+        "rules_content_hash": packet["rules_content_hash"],
+        "cited_specs": packet["cited_specs"],
+        "target_paths": packet["target_paths"],
+        "declared_target_paths": packet["declared_target_paths"],
+        "applicability_path_evidence": packet["applicability_path_evidence"],
+        "work_items": packet["work_items"],
+        "applicable_specs": _stable_applicable_specs(applicable),
+        "missing_required_specs": packet["missing_required_specs"],
+        "missing_advisory_specs": packet["missing_advisory_specs"],
+    }
+    if set(material) != PACKET_HASH_MATERIAL_KEYS:  # pragma: no cover - construction invariant
+        raise RuntimeError("packet hash material key set drifted")
+    return material
+
+
 def build_packet(
     *,
     bridge_id: str,
@@ -595,20 +716,28 @@ def build_packet(
     content_file: Path | None = None,
 ) -> dict[str, Any]:
     versions = parse_index_for_document(bridge_dir, bridge_id)
-    operative = choose_operative_version(versions)
-    if operative is None and content_file is None:
+    scanned_operative = choose_operative_version(versions)
+    if scanned_operative is None and content_file is None:
         raise SystemExit(
             f"ERR_NO_BRIDGE_THREAD: no versioned bridge files found for bridge_id={bridge_id!r} under {bridge_dir}"
         )
-    if operative is not None and not operative.abs_path.is_file():
-        raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {operative.rel_path}")
+    if scanned_operative is not None and not scanned_operative.abs_path.is_file():
+        raise SystemExit(f"ERR_BRIDGE_FILE_MISSING: {scanned_operative.rel_path}")
     if content_file is not None:
         content = content_file.read_text(encoding="utf-8")
+        explicit_version = _canonical_explicit_version(
+            bridge_id=bridge_id,
+            bridge_dir=bridge_dir,
+            content_file=content_file,
+            content=content,
+        )
+        operative = explicit_version or scanned_operative
         content_source = {
             "mode": "pending_content",
             "path": _display_path(content_file),
         }
-    elif operative is not None:
+    elif scanned_operative is not None:
+        operative = scanned_operative
         content = operative.abs_path.read_text(encoding="utf-8")
         content_source = {
             "mode": "bridge_file_operative",
@@ -624,11 +753,12 @@ def build_packet(
     cited_implementation_paths = collect_cited_implementation_paths(content)
     project_root = bridge_dir.parent
     work_items = sorted(set(WORK_ITEM_RE.findall(content)))
+    rules_content = config_path.read_text(encoding="utf-8")
     applicable = compute_applicable_specs(
         bridge_id=bridge_id,
         content=content,
         target_paths=applicability_path_evidence,
-        rules=load_rules(config_path),
+        rules=_parse_rules(rules_content),
     )
     enrich_from_membase(applicable, db_path)
     required = {sid for sid, item in applicable.items() if item.severity == "blocking"}
@@ -638,8 +768,12 @@ def build_packet(
     )
     blocking_errors = _pauth_amendment_blocking_errors(content, project_root, db_path)
     packet: dict[str, Any] = {
+        "packet_hash_schema_version": PACKET_HASH_SCHEMA_VERSION,
         "bridge_document_name": bridge_id,
         "content_source": content_source,
+        "source_identity": _source_identity(operative),
+        "source_content_hash": _text_sha256(content),
+        "rules_content_hash": _text_sha256(rules_content),
         "operative_version": (
             {
                 "status": operative.status,
@@ -666,7 +800,8 @@ def build_packet(
         "blocking_errors": blocking_errors,
         "preflight_passed": not missing_required and not blocking_errors,
     }
-    canonical = json.dumps(packet, sort_keys=True, separators=(",", ":"))
+    packet["packet_hash_material"] = _packet_hash_material(packet, applicable)
+    canonical = json.dumps(packet["packet_hash_material"], sort_keys=True, separators=(",", ":"))
     packet["packet_hash"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return packet
 

@@ -1919,6 +1919,138 @@ def _evaluate_protected_path(
     return finding
 
 
+def _staged_index_content_digest(
+    root: Path,
+    rel_path: str,
+    index_snapshot: _IndexSnapshot | None,
+) -> tuple[str | None, str | None]:
+    """Return the SHA-256 digest of one exact blob from the copied Git index."""
+    if index_snapshot is None:
+        return None, "bridge publication evidence requires an immutable staged-index snapshot"
+
+    inventory = _run_index_git(
+        root,
+        index_snapshot,
+        "ls-files",
+        "--stage",
+        "-z",
+        "--",
+        f":(literal){rel_path}",
+    )
+    if inventory.returncode != 0:
+        return None, f"could not resolve staged bridge path from copied index: {inventory.stderr!r}"
+    try:
+        entries = _parse_index_inventory(inventory.stdout)
+    except GateError as exc:
+        return None, str(exc)
+    if len(entries) != 1 or entries[0].rel_path != rel_path:
+        return None, "staged bridge path does not resolve to one exact regular index blob"
+
+    entry = entries[0]
+    blob = _run_index_git(root, index_snapshot, "cat-file", "blob", entry.oid)
+    if blob.returncode != 0:
+        return None, f"could not read staged bridge blob from copied index: {blob.stderr!r}"
+    if len(blob.stdout) > MAX_BLOB_BYTES:
+        return None, f"staged bridge blob exceeds {MAX_BLOB_BYTES}-byte authorization limit"
+
+    object_hasher = hashlib.new(index_snapshot.object_format)
+    object_hasher.update(f"blob {len(blob.stdout)}\0".encode("ascii"))
+    object_hasher.update(blob.stdout)
+    if object_hasher.hexdigest().lower() != entry.oid.lower():
+        return None, "staged bridge blob does not hash to its copied-index object id"
+    return "sha256:" + hashlib.sha256(blob.stdout).hexdigest(), None
+
+
+def _newest_exact_bridge_publication_capability(
+    conn: sqlite3.Connection,
+    *,
+    record_id: str,
+    rel_path: str,
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM sot_registry_bridge_publication_capabilities "
+        "WHERE aggregate_entry_id = ? AND target_path = ? ORDER BY rowid DESC LIMIT 1",
+        (record_id, rel_path),
+    ).fetchone()
+
+
+def _bridge_publication_capability_clearance(
+    conn: sqlite3.Connection,
+    *,
+    root: Path,
+    record_id: str,
+    rel_path: str,
+    index_snapshot: _IndexSnapshot | None,
+    capability: sqlite3.Row | None = None,
+) -> tuple[bool, str]:
+    """Evaluate the newest exact publication attempt for one staged bridge path."""
+    if capability is None:
+        capability = _newest_exact_bridge_publication_capability(
+            conn,
+            record_id=record_id,
+            rel_path=rel_path,
+        )
+    if capability is None:
+        return False, "registered bridge path lacks exact publication capability evidence"
+
+    target = VERSIONED_BRIDGE_CAPTURE_RE.fullmatch(rel_path)
+    try:
+        version = int(capability["version"])
+    except (TypeError, ValueError):
+        version = -1
+    if (
+        target is None
+        or capability["document_name"] != target.group("bridge_id")
+        or version != int(target.group("version"))
+        or capability["target_path"] != rel_path
+        or capability["aggregate_entry_id"] != record_id
+    ):
+        return False, "bridge publication capability target identity mismatch"
+    if capability["authority_kind"] != "bridge_publication" or capability["operation"] != "bridge_publication":
+        return False, "bridge publication capability has the wrong authority type"
+
+    # expires_at bounds mint-to-consume use. Once consumed, the immutable row is
+    # archival commit evidence and remains valid after that short publication TTL.
+    try:
+        parse_iso(capability["expires_at"])
+        parse_iso(capability["consumed_at"])
+    except (TypeError, ValueError):
+        return False, "bridge publication capability has incomplete or invalid timestamps"
+    if (
+        capability["capability_state"] == "compensated"
+        or capability["compensation_revision_id"]
+        or capability["compensation_digest"]
+    ):
+        return False, "bridge publication capability was compensated or failed"
+    if capability["capability_state"] != "consumed":
+        return False, f"bridge publication capability is not consumed ({capability['capability_state']!r})"
+    if not capability["result_digest"] or not capability["revision_id"]:
+        return False, "bridge publication capability lacks consumed result or revision evidence"
+    if capability["failure_reason"]:
+        return False, "bridge publication capability was compensated or failed"
+
+    revision = conn.execute(
+        "SELECT * FROM sot_artifact_revisions WHERE revision_id = ?",
+        (capability["revision_id"],),
+    ).fetchone()
+    if revision is None:
+        return False, "bridge publication capability linked revision is missing"
+    if not (
+        revision["entry_id"] == record_id
+        and revision["operation"] == "bridge_publication"
+        and revision["capability_hash"] == capability["capability_hash"]
+        and revision["bridge_id"] == capability["document_name"]
+    ):
+        return False, "bridge publication capability revision linkage mismatch"
+
+    staged_digest, staged_error = _staged_index_content_digest(root, rel_path, index_snapshot)
+    if staged_error is not None:
+        return False, staged_error
+    if capability["content_digest"] != staged_digest:
+        return False, "bridge publication staged content digest mismatch"
+    return True, ""
+
+
 def _registry_commit_findings(
     root: Path,
     selected_paths: list[str],
@@ -1968,6 +2100,23 @@ def _registry_commit_findings(
                 continue
             if record.id in stale_ids or record.id in missing_ids:
                 findings.append({"path": rel_path, "reason": "registered artifact digest is not current"})
+                continue
+            publication_capability = _newest_exact_bridge_publication_capability(
+                conn,
+                record_id=record.id,
+                rel_path=rel_path,
+            )
+            if publication_capability is not None:
+                publication_bound, publication_reason = _bridge_publication_capability_clearance(
+                    conn,
+                    root=root,
+                    record_id=record.id,
+                    rel_path=rel_path,
+                    index_snapshot=index_snapshot,
+                    capability=publication_capability,
+                )
+                if not publication_bound:
+                    findings.append({"path": rel_path, "reason": publication_reason})
                 continue
             revision = conn.execute(
                 "SELECT * FROM sot_artifact_revisions WHERE entry_id = ? ORDER BY rowid DESC LIMIT 1",

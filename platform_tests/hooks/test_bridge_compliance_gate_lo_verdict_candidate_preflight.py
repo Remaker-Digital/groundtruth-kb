@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sqlite3
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
@@ -245,6 +246,45 @@ def test_active_writer_audit_path_denies_stale_candidate(
 
     assert reason is not None
     assert "candidate_evidence_hash" in reason
+
+
+def test_verdict_packet_hash_survives_membase_absence_between_phases(
+    gate: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, source = _project(tmp_path, monkeypatch)
+    (root / "config" / "governance" / "spec-applicability.toml").write_text(
+        """
+[[rules]]
+spec_id = "SPEC-ENVIRONMENT-DESCRIPTION-001"
+severity = "advisory"
+rationale = "Fixture environment description."
+applies_when_doc_matches = ["topic"]
+""",
+        encoding="utf-8",
+    )
+    db_path = root / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)")
+        conn.execute(
+            "INSERT INTO current_specifications VALUES (?, ?, ?, ?)",
+            (
+                "SPEC-ENVIRONMENT-DESCRIPTION-001",
+                "Worktree-only description",
+                "specified",
+                "specification",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    content = _candidate(gate, root, source, status="VERIFIED")
+    db_path.unlink()
+
+    assert _freshness_reason(gate, root, "bridge/topic-002.md", content) is None
 
 
 def test_active_and_template_hooks_remain_byte_identical() -> None:

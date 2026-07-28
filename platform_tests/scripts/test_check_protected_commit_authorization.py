@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
 import json
@@ -23,6 +24,7 @@ from groundtruth_kb.project.registry_control_plane import (
 )
 from groundtruth_kb.project.sot_registry import SoTArtifact, sync_projection
 
+from scripts import bridge_applicability_preflight as applicability_preflight
 from scripts import implementation_authorization
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -91,6 +93,151 @@ def _seed_registered_commit_fixture(root: Path) -> Path:
         project_root=root,
     )
     return member
+
+
+def _sha256(payload: bytes) -> str:
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _seed_bridge_publication_commit_fixture(root: Path, rel_paths: list[str]) -> dict[str, str]:
+    _init_committed_paths(root, ["baseline.txt"])
+    contents: dict[str, bytes] = {}
+    for rel_path in rel_paths:
+        payload = f"NEW\n# Synthetic publication for {rel_path}\n".encode()
+        target = root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        contents[rel_path] = payload
+
+    records = [
+        SoTArtifact(
+            id="bridge-versioned-files",
+            domain="bridge_protocol",
+            lifecycle="active",
+            storage_path="bridge/*-[0-9][0-9][0-9].md",
+            authority_spec_id="GOV-FILE-BRIDGE-AUTHORITY-001",
+            mutation_api="governed_bridge_writer",
+            versioning_policy="git_tracked",
+            backup_policy="git_tracked",
+            health_check_function="",
+            owner_role="shared",
+            restore_action="git_restore",
+            coverage_mode="glob",
+        )
+    ]
+    registry = root / "config" / "registry" / "sot-artifacts.toml"
+    packaged = (
+        root
+        / "groundtruth-kb"
+        / "src"
+        / "groundtruth_kb"
+        / "context"
+        / "registries"
+        / "v1"
+        / "config"
+        / "registry"
+        / "sot-artifacts.toml"
+    )
+    registry.parent.mkdir(parents=True)
+    packaged.parent.mkdir(parents=True)
+    payload = serialize_registry(records)
+    registry.write_bytes(payload)
+    packaged.write_bytes(payload)
+    db_path = root / "groundtruth.db"
+    knowledge = KnowledgeDB(db_path=db_path)
+    knowledge.close()
+    sync_projection(records, db_path, changed_by="test", change_reason="bridge fixture")
+    apply_registry_transaction(
+        records,
+        operation="legacy_bootstrap",
+        actor_session="pb-session",
+        changed_by="test/prime-builder",
+        change_reason="WI-5441 bridge publication fixture",
+        start_packet_hash="sha256:packet",
+        pauth_id="PAUTH-WI5441-TEST",
+        bridge_id="gtkb-wi5441-bridge-publication-capability-commit-clearance",
+        project_root=root,
+    )
+
+    capability_hashes: dict[str, str] = {}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        for index, rel_path in enumerate(rel_paths, start=1):
+            latest = conn.execute(
+                "SELECT * FROM sot_artifact_revisions WHERE entry_id = ? ORDER BY rowid DESC LIMIT 1",
+                ("bridge-versioned-files",),
+            ).fetchone()
+            assert latest is not None
+            stem = Path(rel_path).stem
+            document_name, version_text = stem.rsplit("-", 1)
+            revision_id = f"bridge-publication-revision-{index}"
+            capability_hash = _sha256(f"capability-{index}".encode())
+            capability_hashes[rel_path] = capability_hash
+            conn.execute(
+                """
+                INSERT INTO sot_artifact_revisions (
+                    revision_id, entry_id, canonical_relative_path, object_kind,
+                    content_digest, size_bytes, observed_at, actor_session,
+                    operation, predecessor_revision_id, changed_by, changed_at,
+                    change_reason, capability_hash, bridge_id, start_packet_hash,
+                    pauth_decision, journal_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
+                """,
+                (
+                    revision_id,
+                    latest["entry_id"],
+                    latest["canonical_relative_path"],
+                    latest["object_kind"],
+                    latest["content_digest"],
+                    latest["size_bytes"],
+                    "2026-01-01T00:01:00Z",
+                    "lo-session",
+                    "bridge_publication",
+                    latest["revision_id"],
+                    "test/loyal-opposition",
+                    "2026-01-01T00:01:00Z",
+                    "synthetic governed bridge publication",
+                    capability_hash,
+                    document_name,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO sot_registry_bridge_publication_capabilities (
+                    capability_hash, authority_kind, document_name, version, status,
+                    target_path, content_digest, compliance_digest, transition_digest,
+                    claim_session, author_session_context_id, aggregate_entry_id,
+                    aggregate_preimage_digest, operation, expires_at, capability_state,
+                    created_at, consumed_at, result_digest, revision_id,
+                    compensation_revision_id, compensation_digest, failure_reason
+                ) VALUES (
+                    ?, 'bridge_publication', ?, ?, 'NEW', ?, ?, ?, ?,
+                    'lo-session', 'lo-session', 'bridge-versioned-files', ?,
+                    'bridge_publication', '2026-01-01T00:02:00Z', 'consumed',
+                    '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', ?, ?,
+                    NULL, NULL, NULL
+                )
+                """,
+                (
+                    capability_hash,
+                    document_name,
+                    int(version_text),
+                    rel_path,
+                    _sha256(contents[rel_path]),
+                    _sha256(f"compliance-{index}".encode()),
+                    _sha256(f"transition-{index}".encode()),
+                    latest["content_digest"],
+                    _sha256(f"result-{index}".encode()),
+                    revision_id,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    subprocess.run(["git", "add", "--", *rel_paths], cwd=root, check=True)
+    return capability_hashes
 
 
 def _author(role: str, session_id: str) -> str:
@@ -2624,3 +2771,530 @@ def test_registry_commit_rejects_mismatched_capability_start_packet(tmp_path: Pa
             "reason": "registered artifact lacks authorized observation or transaction evidence",
         }
     ]
+
+
+def _staged_registry_findings(module, root: Path, rel_paths: list[str]) -> list[dict[str, object]]:
+    with module._index_snapshot(root) as snapshot:
+        return module._registry_commit_findings(root, rel_paths, snapshot)
+
+
+def test_registry_commit_accepts_consumed_bridge_publication_after_mint_ttl(tmp_path: Path) -> None:
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-fixture-001.md"
+    _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])
+
+    assert _staged_registry_findings(module, tmp_path, [rel_path]) == []
+
+
+def test_registry_commit_accepts_twelve_exact_bridge_publication_predecessors(tmp_path: Path) -> None:
+    module = _load_module()
+    rel_paths = [f"bridge/gtkb-publication-chain-{version:03d}.md" for version in range(1, 13)]
+    _seed_bridge_publication_commit_fixture(tmp_path, rel_paths)
+
+    assert _staged_registry_findings(module, tmp_path, rel_paths) == []
+
+
+def test_newest_aggregate_revision_cannot_authorize_predecessor_without_exact_capability(tmp_path: Path) -> None:
+    module = _load_module()
+    rel_paths = [
+        "bridge/gtkb-publication-predecessor-001.md",
+        "bridge/gtkb-publication-predecessor-002.md",
+    ]
+    capability_hashes = _seed_bridge_publication_commit_fixture(tmp_path, rel_paths)
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "DELETE FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+            (capability_hashes[rel_paths[0]],),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = _staged_registry_findings(module, tmp_path, rel_paths)
+
+    assert findings == [
+        {
+            "path": rel_paths[0],
+            "reason": "registered artifact lacks authorized observation or transaction evidence",
+        }
+    ]
+
+
+@pytest.mark.parametrize("mutation", ["missing", "minted", "expired", "compensated", "failed"])
+def test_registry_commit_rejects_nonterminal_bridge_publication_attempts(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-state-001.md"
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        if mutation == "missing":
+            conn.execute(
+                "DELETE FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+                (capability_hash,),
+            )
+        elif mutation in {"minted", "expired"}:
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities SET capability_state = ? "
+                "WHERE capability_hash = ?",
+                (mutation, capability_hash),
+            )
+        elif mutation == "compensated":
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities "
+                "SET capability_state = 'compensated', compensation_revision_id = 'compensation-revision', "
+                "compensation_digest = ?, failure_reason = 'rolled back' WHERE capability_hash = ?",
+                (_sha256(b"compensated"), capability_hash),
+            )
+        else:
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities SET failure_reason = 'publication failed' "
+                "WHERE capability_hash = ?",
+                (capability_hash,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = _staged_registry_findings(module, tmp_path, [rel_path])
+
+    assert len(findings) == 1
+    assert findings[0]["path"] == rel_path
+    if mutation == "missing":
+        assert findings[0]["reason"] == "registered artifact lacks authorized observation or transaction evidence"
+    else:
+        assert "publication" in str(findings[0]["reason"])
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["target_path", "aggregate_entry_id", "capability_hash", "revision_id", "bridge_id", "content_digest"],
+)
+def test_registry_commit_rejects_bridge_publication_binding_mismatch(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-binding-001.md"
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        capability = conn.execute(
+            "SELECT * FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+            (capability_hash,),
+        ).fetchone()
+        assert capability is not None
+        if mutation == "target_path":
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities SET target_path = ? WHERE capability_hash = ?",
+                ("bridge/gtkb-other-binding-001.md", capability_hash),
+            )
+        elif mutation == "aggregate_entry_id":
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities SET aggregate_entry_id = 'other-entry' "
+                "WHERE capability_hash = ?",
+                (capability_hash,),
+            )
+        elif mutation == "capability_hash":
+            conn.execute(
+                "UPDATE sot_artifact_revisions SET capability_hash = ? WHERE revision_id = ?",
+                (_sha256(b"wrong capability"), capability["revision_id"]),
+            )
+        elif mutation == "revision_id":
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities SET revision_id = 'missing-revision' "
+                "WHERE capability_hash = ?",
+                (capability_hash,),
+            )
+        elif mutation == "bridge_id":
+            conn.execute(
+                "UPDATE sot_artifact_revisions SET bridge_id = 'gtkb-other-binding' WHERE revision_id = ?",
+                (capability["revision_id"],),
+            )
+        else:
+            conn.execute(
+                "UPDATE sot_registry_bridge_publication_capabilities SET content_digest = ? WHERE capability_hash = ?",
+                (_sha256(b"wrong content"), capability_hash),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = _staged_registry_findings(module, tmp_path, [rel_path])
+
+    assert len(findings) == 1
+    assert findings[0]["path"] == rel_path
+
+
+def test_registry_commit_uses_newest_bridge_publication_attempt_before_filtering(tmp_path: Path) -> None:
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-retry-001.md"
+    original_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        original = conn.execute(
+            "SELECT * FROM sot_registry_bridge_publication_capabilities WHERE capability_hash = ?",
+            (original_hash,),
+        ).fetchone()
+        assert original is not None
+        columns = [
+            column[1] for column in conn.execute("PRAGMA table_info(sot_registry_bridge_publication_capabilities)")
+        ]
+        columns.remove("rowid")
+        newer = {column: original[column] for column in columns}
+        newer.update(
+            {
+                "capability_hash": _sha256(b"newer compensated attempt"),
+                "capability_state": "compensated",
+                "compensation_revision_id": "compensation-revision",
+                "compensation_digest": _sha256(b"compensation"),
+                "failure_reason": "newer attempt rolled back",
+            }
+        )
+        conn.execute(
+            f"INSERT INTO sot_registry_bridge_publication_capabilities ({', '.join(columns)}) "
+            f"VALUES ({', '.join('?' for _ in columns)})",
+            tuple(newer[column] for column in columns),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = _staged_registry_findings(module, tmp_path, [rel_path])
+
+    assert findings == [{"path": rel_path, "reason": "bridge publication capability was compensated or failed"}]
+
+
+def test_bridge_publication_digest_uses_index_when_worktree_differs(tmp_path: Path) -> None:
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-index-001.md"
+    _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])
+    (tmp_path / rel_path).write_text("NEW\n# Worktree-only replacement\n", encoding="utf-8")
+
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        with module._index_snapshot(tmp_path) as snapshot:
+            decision = module._bridge_publication_capability_clearance(
+                conn,
+                root=tmp_path,
+                record_id="bridge-versioned-files",
+                rel_path=rel_path,
+                index_snapshot=snapshot,
+            )
+    finally:
+        conn.close()
+
+    assert decision == (True, "")
+
+
+def test_real_git_commit_accepts_exact_bridge_publication_capabilities(tmp_path: Path) -> None:
+    rel_paths = [f"bridge/gtkb-publication-commit-{version:03d}.md" for version in range(1, 4)]
+    _seed_bridge_publication_commit_fixture(tmp_path, rel_paths)
+    hook = tmp_path / ".git" / "hooks" / "pre-commit"
+    hook.write_text(
+        "#!/bin/sh\n"
+        f'exec "{Path(sys.executable).as_posix()}" "{SCRIPT_PATH.as_posix()}" '
+        f'--staged --project-root "{tmp_path.as_posix()}"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    hook.chmod(0o755)
+
+    committed = subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-m",
+            "test: exact bridge publication capabilities",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert committed.returncode == 0, committed.stdout + committed.stderr
+    tracked = subprocess.run(
+        ["git", "show", "--pretty=format:", "--name-only", "HEAD"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert set(tracked.stdout.splitlines()) == set(rel_paths)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ("bridge_publication_compensation", "wi5441_bridge_aggregate_recovery", "amend", "register"),
+)
+def test_exact_publication_evidence_survives_unrelated_aggregate_head(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    module = _load_module()
+    rel_path = f"bridge/gtkb-publication-{operation.replace('_', '-')}-001.md"
+    _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        latest = conn.execute(
+            "SELECT * FROM sot_artifact_revisions WHERE entry_id = ? ORDER BY rowid DESC LIMIT 1",
+            ("bridge-versioned-files",),
+        ).fetchone()
+        assert latest is not None
+        columns = [column[1] for column in conn.execute("PRAGMA table_info(sot_artifact_revisions)")]
+        columns.remove("rowid")
+        successor = {column: latest[column] for column in columns}
+        successor.update(
+            {
+                "revision_id": f"aggregate-head-{operation}",
+                "operation": operation,
+                "predecessor_revision_id": latest["revision_id"],
+                "changed_at": "2026-01-01T00:02:00Z",
+                "change_reason": "unrelated aggregate head",
+                "capability_hash": None,
+                "bridge_id": None,
+                "journal_id": None,
+            }
+        )
+        conn.execute(
+            f"INSERT INTO sot_artifact_revisions ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})",
+            tuple(successor[column] for column in columns),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert _staged_registry_findings(module, tmp_path, [rel_path]) == []
+
+
+def test_near_match_publication_path_never_authorizes_exact_staged_path(tmp_path: Path) -> None:
+    module = _load_module()
+    rel_path = "bridge/gtkb-publication-near-match-001.md"
+    capability_hash = _seed_bridge_publication_commit_fixture(tmp_path, [rel_path])[rel_path]
+    conn = sqlite3.connect(tmp_path / "groundtruth.db")
+    try:
+        conn.execute(
+            "UPDATE sot_registry_bridge_publication_capabilities SET target_path = ? WHERE capability_hash = ?",
+            ("bridge/gtkb-publication-near-match-001.md.copy", capability_hash),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    findings = _staged_registry_findings(module, tmp_path, [rel_path])
+
+    assert findings == [
+        {
+            "path": rel_path,
+            "reason": "registered artifact lacks authorized observation or transaction evidence",
+        }
+    ]
+
+
+def test_schema_v2_verdict_hash_passes_live_and_real_index_only_audits(tmp_path: Path) -> None:
+    module = _load_module()
+    root = tmp_path
+    bridge_id = "gtkb-schema-v2-index-fixture"
+    authority_paths = [
+        ".claude/hooks/bridge-compliance-gate.py",
+        "scripts/__init__.py",
+        "scripts/bridge_applicability_preflight.py",
+        "scripts/implementation_authorization.py",
+        "scripts/bridge_lifecycle_resolver.py",
+        "scripts/bridge_work_intent_registry.py",
+        "scripts/gtkb_session_id.py",
+        "scripts/bridge_author_metadata.py",
+    ]
+    for rel_path in authority_paths:
+        target = root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / rel_path, target)
+
+    (root / "groundtruth.toml").write_text('[groundtruth]\ndb_path = "groundtruth.db"\n', encoding="utf-8")
+    (root / ".gitignore").write_text("groundtruth.db\n.gtkb-state/\n", encoding="utf-8")
+    config = root / "config" / "governance" / "spec-applicability.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        """
+[[rules]]
+spec_id = "SPEC-ENVIRONMENT-DESCRIPTION-001"
+severity = "advisory"
+rationale = "Fixture environment description."
+applies_when_doc_matches = ["gtkb-schema-v2-index-fixture"]
+""",
+        encoding="utf-8",
+    )
+    source_rel = f"bridge/{bridge_id}-001.md"
+    source = root / source_rel
+    source.parent.mkdir()
+    source_content = (
+        "NEW\n"
+        "::init gtkb pb\n"
+        "::open build\n\n"
+        f"{_author('prime-builder', 'pb-source-session')}"
+        "bridge_kind: prime_proposal\n"
+        f"Document: {bridge_id}\n"
+        "Version: 001\n"
+        'target_paths: ["scripts/example.py"]\n'
+        "\n## Specification Links\n\n- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+    )
+    source.write_text(source_content, encoding="utf-8")
+
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    committed_paths = [
+        *authority_paths,
+        "groundtruth.toml",
+        ".gitignore",
+        config.relative_to(root).as_posix(),
+        source_rel,
+    ]
+    subprocess.run(["git", "add", "--", *committed_paths], cwd=root, check=True)
+    hooks = root / "empty-hooks"
+    hooks.mkdir()
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            f"core.hooksPath={hooks}",
+            "commit",
+            "-qm",
+            "fixture authority",
+        ],
+        cwd=root,
+        check=True,
+    )
+
+    db_path = root / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)")
+        conn.execute(
+            "INSERT INTO current_specifications VALUES (?, ?, ?, ?)",
+            (
+                "SPEC-ENVIRONMENT-DESCRIPTION-001",
+                "Worktree-only description",
+                "specified",
+                "specification",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    packet = applicability_preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=root / "bridge",
+        config_path=config,
+        db_path=db_path,
+        content_file=source,
+    )
+    gate_spec = importlib.util.spec_from_file_location(
+        "wi5441_schema_v2_fixture_gate",
+        root / ".claude" / "hooks" / "bridge-compliance-gate.py",
+    )
+    assert gate_spec is not None and gate_spec.loader is not None
+    gate = importlib.util.module_from_spec(gate_spec)
+    gate_spec.loader.exec_module(gate)
+
+    candidate_rel = f"bridge/{bridge_id}-002.md"
+    candidate_path = root / candidate_rel
+    tick = chr(96)
+    candidate = (
+        "VERIFIED\n"
+        "::init gtkb lo\n"
+        "::open test\n\n"
+        f"{_author('loyal-opposition', 'lo-review-session')}"
+        "bridge_kind: lo_verdict\n"
+        f"Document: {bridge_id}\n"
+        "Version: 002\n"
+        f"Responds to: {source_rel}\n\n"
+        "## Applicability Preflight\n\n"
+        f"- packet_hash: {packet['packet_hash']}\n"
+        f"- bridge_document_name: {bridge_id}\n"
+        f"- content_file: {source_rel}\n"
+        f"- operative_file: {source_rel}\n"
+        "- missing_required_specs: []\n"
+        f"- candidate_evidence_hash: {gate.CANDIDATE_EVIDENCE_HASH_SENTINEL}\n\n"
+        "## Specification Links\n\n"
+        "- GOV-FILE-BRIDGE-AUTHORITY-001\n"
+        "- DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001\n\n"
+        "## Spec-to-Test Mapping\n\n"
+        "| Specification | Evidence |\n"
+        "| --- | --- |\n"
+        "| GOV-FILE-BRIDGE-AUTHORITY-001 | Real index-only audit |\n\n"
+        "## Verification Commands\n\n"
+        "pytest platform_tests/scripts/test_check_protected_commit_authorization.py\n\n"
+        "## Commit Finalization Evidence\n\n"
+        "- Same-transaction path set:\n"
+        f"- {tick}{candidate_rel}{tick}\n"
+    )
+    candidate_hash = gate._candidate_evidence_hash(candidate_rel, candidate, root)
+    assert candidate_hash is not None
+    candidate = candidate.replace(gate.CANDIDATE_EVIDENCE_HASH_SENTINEL, candidate_hash)
+
+    live_audit = module.run_bridge_compliance_audit(
+        file_path=candidate_path,
+        content=candidate,
+        project_root=root,
+    )
+    assert live_audit["decision"] == "pass"
+
+    candidate_path.write_text(candidate, encoding="utf-8")
+    subprocess.run(["git", "add", "--", candidate_rel], cwd=root, check=True)
+
+    with (
+        module._index_snapshot(root) as index_snapshot,
+        module._bridge_snapshot(root, bridge_id, index_snapshot) as bridge_snapshot,
+    ):
+        assert not (bridge_snapshot.root / "groundtruth.db").exists()
+        assert gate._canonical_project_root(bridge_snapshot.root / "bridge") == bridge_snapshot.root.resolve()
+        snapshot_audit = module._run_snapshot_compliance_audit(
+            snapshot=bridge_snapshot,
+            candidate_path=candidate_rel,
+            content=candidate,
+        )
+    assert snapshot_audit["decision"] == "pass"
+
+    source.write_text(source_content + "\nSource mutation.\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--", source_rel], cwd=root, check=True)
+    with (
+        module._index_snapshot(root) as index_snapshot,
+        module._bridge_snapshot(root, bridge_id, index_snapshot) as bridge_snapshot,
+        pytest.raises(module.BridgeComplianceError, match="stale packet_hash"),
+    ):
+        module._run_snapshot_compliance_audit(
+            snapshot=bridge_snapshot,
+            candidate_path=candidate_rel,
+            content=candidate,
+        )
+
+    source.write_text(source_content, encoding="utf-8")
+    candidate_mutation = candidate + "\nCandidate mutation.\n"
+    candidate_path.write_text(candidate_mutation, encoding="utf-8")
+    subprocess.run(["git", "add", "--", source_rel, candidate_rel], cwd=root, check=True)
+    with (
+        module._index_snapshot(root) as index_snapshot,
+        module._bridge_snapshot(root, bridge_id, index_snapshot) as bridge_snapshot,
+        pytest.raises(module.BridgeComplianceError, match="candidate_evidence_hash"),
+    ):
+        module._run_snapshot_compliance_audit(
+            snapshot=bridge_snapshot,
+            candidate_path=candidate_rel,
+            content=candidate_mutation,
+        )

@@ -13,6 +13,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import pytest
 from groundtruth_kb.governance.approval_packet import construct_approval_packet
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -962,3 +963,248 @@ target_paths: ["applications/Agent_Red/src/app.py"]
     diag = packet["warnings"]["spec_links_section"]
     assert diag["status"] == "heading_unrecognized"
     assert diag["candidate_heading"] == "## Carried-Forward Specification Links"
+
+
+def test_schema_v2_hash_is_stable_across_db_invocation_and_filesystem(tmp_path: Path) -> None:
+    bridge_id = "stable-packet"
+    target_path = "applications/missing/src/app.py"
+    _write_bridge(
+        tmp_path,
+        bridge_id,
+        f"""
+# Proposal
+
+WI-5441
+
+target_paths: ["{target_path}"]
+
+## Specification Links
+
+- ADR-ISOLATION-APPLICATION-PLACEMENT-001
+- GOV-ARTIFACT-ORIENTED-GOVERNANCE-001
+""",
+    )
+    source = tmp_path / "bridge" / f"{bridge_id}-001.md"
+    config = tmp_path / "spec-applicability.toml"
+    _write_config(config)
+    db_path = tmp_path / "groundtruth.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("CREATE TABLE current_specifications (id TEXT PRIMARY KEY, title TEXT, status TEXT, type TEXT)")
+        conn.execute(
+            "INSERT INTO current_specifications VALUES (?, ?, ?, ?)",
+            (
+                "ADR-ISOLATION-APPLICATION-PLACEMENT-001",
+                "Environment-only title",
+                "specified",
+                "architecture_decision",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    live = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+    )
+    explicit = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=db_path,
+        content_file=source,
+    )
+    no_db = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+
+    assert live["packet_hash_schema_version"] == 2
+    assert set(live["packet_hash_material"]) == preflight.PACKET_HASH_MATERIAL_KEYS
+    assert live["source_identity"] == {
+        "path": f"bridge/{bridge_id}-001.md",
+        "status": "NEW",
+        "version_number": 1,
+    }
+    assert live["packet_hash"] == explicit["packet_hash"] == no_db["packet_hash"]
+    assert live["content_source"]["mode"] != explicit["content_source"]["mode"]
+    assert live["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]["exists_in_membase"] is True
+    assert no_db["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]["exists_in_membase"] is None
+    assert set(live["packet_hash_material"]["applicable_specs"]["ADR-ISOLATION-APPLICATION-PLACEMENT-001"]) == {
+        "spec_id",
+        "severity",
+        "rationale",
+        "matched_by",
+    }
+    assert live["warnings"]["missing_parent_dirs"]
+
+    (tmp_path / "applications" / "missing" / "src").mkdir(parents=True)
+    parent_present = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+
+    assert parent_present["warnings"]["missing_parent_dirs"] == []
+    assert parent_present["packet_hash"] == live["packet_hash"]
+
+
+def test_schema_v2_hash_excludes_blocking_diagnostics_but_preserves_rejection(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    bridge_id = "diagnostic-boundary"
+    _write_bridge(tmp_path, bridge_id, "# Proposal\n")
+    source = tmp_path / "bridge" / f"{bridge_id}-001.md"
+    config = tmp_path / "spec-applicability.toml"
+    config.write_text("rules = []\n", encoding="utf-8")
+
+    monkeypatch.setattr(preflight, "_pauth_amendment_blocking_errors", lambda *args: [])
+    accepted = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    monkeypatch.setattr(
+        preflight,
+        "_pauth_amendment_blocking_errors",
+        lambda *args: ["environment-dependent PAUTH denial"],
+    )
+    rejected = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+
+    assert accepted["preflight_passed"] is True
+    assert rejected["preflight_passed"] is False
+    assert rejected["blocking_errors"] == ["environment-dependent PAUTH denial"]
+    assert rejected["packet_hash"] == accepted["packet_hash"]
+
+
+def test_explicit_canonical_source_ignores_newer_siblings_and_rejects_mismatch(
+    tmp_path: Path,
+) -> None:
+    bridge_id = "canonical-source"
+    _write_bridge(tmp_path, bridge_id, "# Proposal\n")
+    source = tmp_path / "bridge" / f"{bridge_id}-001.md"
+    config = tmp_path / "spec-applicability.toml"
+    config.write_text("rules = []\n", encoding="utf-8")
+
+    default = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+    )
+    explicit = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    assert explicit["packet_hash"] == default["packet_hash"]
+
+    _write_bridge_version(tmp_path, bridge_id, 2, "REVISED", "# Later revision\n")
+    explicit_after_sibling = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    latest_default = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+    )
+    assert explicit_after_sibling["source_identity"]["version_number"] == 1
+    assert explicit_after_sibling["packet_hash"] == explicit["packet_hash"]
+    assert latest_default["source_identity"]["version_number"] == 2
+    assert latest_default["packet_hash"] != explicit["packet_hash"]
+
+    wrong_thread = tmp_path / "bridge" / "different-source-001.md"
+    wrong_thread.write_text("NEW\n# Wrong thread\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="belongs to another bridge thread"):
+        preflight.build_packet(
+            bridge_id=bridge_id,
+            bridge_dir=tmp_path / "bridge",
+            config_path=config,
+            db_path=tmp_path / "absent.db",
+            content_file=wrong_thread,
+        )
+
+    bom_source = tmp_path / "bridge" / f"{bridge_id}-003.md"
+    bom_source.write_bytes(b"\xef\xbb\xbfNEW\n# BOM source\n")
+    with pytest.raises(SystemExit, match="recognized first-line status"):
+        preflight.build_packet(
+            bridge_id=bridge_id,
+            bridge_dir=tmp_path / "bridge",
+            config_path=config,
+            db_path=tmp_path / "absent.db",
+            content_file=bom_source,
+        )
+
+
+def test_schema_v2_hash_tracks_source_and_rules_bytes_with_lf_normalization(tmp_path: Path) -> None:
+    bridge_id = "mutation-sensitive"
+    _write_bridge(tmp_path, bridge_id, "# Proposal\n\nWI-5441\n")
+    source = tmp_path / "bridge" / f"{bridge_id}-001.md"
+    config = tmp_path / "spec-applicability.toml"
+    config.write_text("rules = []\n", encoding="utf-8")
+    original = source.read_text(encoding="utf-8")
+
+    baseline = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    source.write_bytes(original.replace("\n", "\r\n").encode("utf-8"))
+    crlf = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    assert crlf["source_content_hash"] == baseline["source_content_hash"]
+    assert crlf["packet_hash"] == baseline["packet_hash"]
+
+    source.write_text(original + "\nSource mutation.\n", encoding="utf-8")
+    source_changed = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    assert source_changed["source_content_hash"] != baseline["source_content_hash"]
+    assert source_changed["packet_hash"] != baseline["packet_hash"]
+
+    source.write_text(original, encoding="utf-8")
+    config.write_text("rules = []\n# tracked rules mutation\n", encoding="utf-8")
+    rules_changed = preflight.build_packet(
+        bridge_id=bridge_id,
+        bridge_dir=tmp_path / "bridge",
+        config_path=config,
+        db_path=tmp_path / "absent.db",
+        content_file=source,
+    )
+    assert rules_changed["rules_content_hash"] != baseline["rules_content_hash"]
+    assert rules_changed["packet_hash"] != baseline["packet_hash"]
