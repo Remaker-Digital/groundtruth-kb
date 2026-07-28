@@ -504,6 +504,9 @@ memory/MEMORY.md.backup-*
 # state — never a tracking candidate. Missed in S320 activation work.
 .gtkb-state/
 
+# Defensive fallback for transient commit-checker index snapshots.
+.gtkb-index-*/
+
 # =============================================================================
 # UA-Evaluation install scope (added 2026-06-03 WI-4280)
 # =============================================================================

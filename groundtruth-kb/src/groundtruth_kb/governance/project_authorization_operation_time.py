@@ -160,7 +160,9 @@ def classify_target(path_text: str, taxonomy: OperationTaxonomy | None = None) -
     lowered = path.lower()
     first = lowered.split("/", 1)[0]
 
-    if first == "bridge":
+    if re.fullmatch(r"\.gtkb-index-[a-z0-9_]{8}/index", path):
+        mutation_class = "repository_metadata"
+    elif first == "bridge":
         mutation_class = "bridge"
     elif lowered == "groundtruth.db" or first == ".groundtruth":
         mutation_class = "metadata"

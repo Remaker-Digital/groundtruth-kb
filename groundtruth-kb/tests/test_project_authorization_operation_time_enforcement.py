@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from datetime import UTC, datetime
 
 from groundtruth_kb.governance.project_authorization_operation_time import (
@@ -44,6 +45,41 @@ def test_target_taxonomy_assigns_one_stable_class() -> None:
     assert classify_target("config/example.toml").mutation_class == "configuration"
     assert classify_target(".gitattributes").mutation_class == "repository_metadata"
     assert classify_target("bridge/example-001.md").mutation_class == "bridge"
+
+
+def test_transient_index_target_classification_is_exact_and_case_preserving() -> None:
+    assert classify_target(".gtkb-index-hl705ij2/index").mutation_class == "repository_metadata"
+    assert classify_target(r".gtkb-index-hl705ij2\index").mutation_class == "repository_metadata"
+
+    expected = {
+        ".gtkb-index-HL705IJ2/index": "unclassified",
+        ".gtkb-index-short/index": "unclassified",
+        ".gtkb-index-hl705ij20/index": "unclassified",
+        ".gtkb-index-hl705ij2/": "unclassified",
+        "nested/.gtkb-index-hl705ij2/index": "unclassified",
+        ".gtkb-index-hl705ij2//index": "unclassified",
+        "../.gtkb-index-hl705ij2/index": "unclassified",
+        ".gtkb-index-hl705ij2/index.md": "governance_evidence",
+        ".gtkb-index-hl705ij2/index.json": "governance_evidence",
+        ".gtkb-index-hl705ij2/index.jsonl": "governance_evidence",
+    }
+    for path, expected_class in expected.items():
+        actual = classify_target(path).mutation_class
+        assert actual == expected_class, path
+        assert actual != "repository_metadata", path
+
+
+def test_transient_index_matcher_pins_cpython_private_name_contract() -> None:
+    expected_characters = "abcdefghijklmnopqrstuvwxyz0123456789_"
+    assert tempfile._RandomNameSequence.characters == expected_characters
+
+    sequence = tempfile._RandomNameSequence()
+    samples = [next(sequence) for _ in range(128)]
+    assert all(len(sample) == 8 for sample in samples)
+    assert all(set(sample) <= set(expected_characters) for sample in samples)
+    assert all(
+        classify_target(f".gtkb-index-{sample}/index").mutation_class == "repository_metadata" for sample in samples
+    )
 
 
 def test_bridge_metadata_only_envelope_cannot_authorize_source() -> None:

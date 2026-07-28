@@ -56,6 +56,7 @@ from scripts.verdict_evidence_anchor_preflight import validate_verdict_evidence_
 BY_BRIDGE_PACKETS_REL = Path(".gtkb-state/implementation-authorizations/by-bridge")
 VERSIONED_BRIDGE_RE = re.compile(r"^bridge/.+-\d{3}\.md$")
 VERSIONED_BRIDGE_CAPTURE_RE = re.compile(r"^bridge/(?P<bridge_id>[A-Za-z0-9][A-Za-z0-9_.-]*)-(?P<version>\d{3})\.md$")
+TRANSIENT_INDEX_PATH_RE = re.compile(r"\.gtkb-index-[a-z0-9_]{8}/index")
 STATUS_RE = re.compile(r"^(NEW|REVISED|GO|NO-GO|NO-ACTION|VERIFIED|DEFERRED|WITHDRAWN|ADVISORY)$")
 IMPLEMENTATION_REPORT_RE = re.compile(r"(?mi)^bridge_kind:\s*implementation_report\s*$")
 CONTROLLING_GO_RE = re.compile(r"(?mi)^Controlling GO:\s*`?(bridge/[A-Za-z0-9][A-Za-z0-9_.-]*-\d{3}\.md)`?\s*$")
@@ -898,7 +899,7 @@ def _index_snapshot(root: Path, head_oid: str | None = None) -> Iterator[_IndexS
     except OSError as exc:
         raise GateError(f"could not snapshot Git index {source_index}: {exc}") from exc
 
-    with tempfile.TemporaryDirectory(prefix=".gtkb-index-", dir=root) as tmp:
+    with tempfile.TemporaryDirectory(prefix=".gtkb-index-", dir=_scratch_root(root)) as tmp:
         snapshot_index = Path(tmp) / "index"
         snapshot_index.write_bytes(index_bytes)
         snapshot_index.chmod(0o444)
@@ -2076,7 +2077,19 @@ def _registry_commit_assessment(
     if str(package_src) not in sys.path:
         sys.path.insert(0, str(package_src))
     registry_path = root / "config" / "registry" / "sot-artifacts.toml"
+    transient_paths = [path for path in selected_paths if TRANSIENT_INDEX_PATH_RE.fullmatch(path)]
     if not registry_path.is_file():
+        if transient_paths:
+            return (
+                [
+                    {
+                        "path": path,
+                        "reason": "transient Git index deletion requires coherent registry authority",
+                    }
+                    for path in transient_paths
+                ],
+                [],
+            )
         return [], []
     try:
         from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
@@ -2100,9 +2113,20 @@ def _registry_commit_assessment(
     try:
         for rel_path in selected_paths:
             record = registry.resolver.resolve(rel_path)
+            staged_status = index_snapshot.status_by_path.get(rel_path, "") if index_snapshot is not None else ""
+            if TRANSIENT_INDEX_PATH_RE.fullmatch(rel_path):
+                if staged_status != "D":
+                    findings.append(
+                        {
+                            "path": rel_path,
+                            "reason": "transient Git index recurrence is forbidden; only an unregistered deletion is allowed",
+                        }
+                    )
+                    continue
+                if record is None:
+                    continue
             if record is None:
                 continue
-            staged_status = index_snapshot.status_by_path.get(rel_path, "") if index_snapshot is not None else ""
             if staged_status == "D" or staged_status.endswith("-source"):
                 findings.append(
                     {

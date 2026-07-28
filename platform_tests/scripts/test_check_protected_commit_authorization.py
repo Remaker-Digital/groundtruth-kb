@@ -40,15 +40,16 @@ def _load_module():
     return module
 
 
-def _seed_registered_commit_fixture(root: Path) -> Path:
-    member = root / "registered.txt"
+def _seed_registered_commit_fixture(root: Path, storage_path: str = "registered.txt") -> Path:
+    member = root / storage_path
+    member.parent.mkdir(parents=True, exist_ok=True)
     member.write_text("before\n", encoding="utf-8")
     records = [
         SoTArtifact(
             id="registered-member",
             domain="control_surface",
             lifecycle="active",
-            storage_path="registered.txt",
+            storage_path=storage_path,
             authority_spec_id="GOV-PLATFORM-SOT-REGISTRY-001",
             mutation_api="fixture",
             versioning_policy="git_tracked",
@@ -1674,6 +1675,55 @@ def test_index_snapshot_includes_deletions_and_both_rename_paths(
     }
 
 
+@pytest.mark.parametrize("exit_kind", ["normal", "exception", "interrupt"])
+def test_index_snapshot_uses_scratch_root_and_cleans_every_exit(
+    tmp_path: Path,
+    exit_kind: str,
+) -> None:
+    module = _load_module()
+    _init_committed_paths(tmp_path, ["tracked.txt"])
+    index_text = subprocess.run(
+        ["git", "rev-parse", "--git-path", "index"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    index_path = Path(index_text)
+    if not index_path.is_absolute():
+        index_path = tmp_path / index_path
+    index_preimage = index_path.read_bytes()
+
+    def exercise() -> None:
+        with module._index_snapshot(tmp_path) as snapshot:
+            assert snapshot.index_file.parent.parent == tmp_path / ".gtkb-state"
+            assert snapshot.index_file.parent.name.startswith(".gtkb-index-")
+            assert list(tmp_path.glob(".gtkb-index-*")) == []
+            if exit_kind == "exception":
+                raise RuntimeError("fixture exception")
+            if exit_kind == "interrupt":
+                raise KeyboardInterrupt
+
+    if exit_kind == "normal":
+        exercise()
+    elif exit_kind == "exception":
+        with pytest.raises(RuntimeError, match="fixture exception"):
+            exercise()
+    else:
+        with pytest.raises(KeyboardInterrupt):
+            exercise()
+
+    assert index_path.read_bytes() == index_preimage
+    assert list(tmp_path.glob(".gtkb-index-*")) == []
+    assert list((tmp_path / ".gtkb-state").glob(".gtkb-index-*")) == []
+
+
+def test_root_gitignore_defensively_ignores_transient_indexes() -> None:
+    lines = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+    assert lines.count(".gtkb-index-*/") == 1
+
+
 @pytest.mark.parametrize(
     ("mode", "stage", "expected"),
     [
@@ -2796,6 +2846,107 @@ def test_registry_commit_blocks_registered_identity_change(tmp_path: Path) -> No
             "reason": "registered identity delete/move/rename requires separately authorized transition",
         }
     ]
+
+
+@pytest.mark.parametrize("status", ["A", "M", "C-source", "C-destination", "R-source", "R-destination"])
+def test_registry_commit_rejects_transient_index_recurrence(
+    tmp_path: Path,
+    status: str,
+) -> None:
+    module = _load_module()
+    _seed_registered_commit_fixture(tmp_path)
+    transient = ".gtkb-index-hl705ij2/index"
+    snapshot = SimpleNamespace(status_by_path={transient: status})
+
+    findings = module._registry_commit_findings(tmp_path, [transient], snapshot)
+
+    assert findings == [
+        {
+            "path": transient,
+            "reason": "transient Git index recurrence is forbidden; only an unregistered deletion is allowed",
+        }
+    ]
+
+
+def test_registry_commit_allows_only_coherently_unregistered_transient_deletion(tmp_path: Path) -> None:
+    module = _load_module()
+    _seed_registered_commit_fixture(tmp_path)
+    transient = ".gtkb-index-hl705ij2/index"
+    snapshot = SimpleNamespace(status_by_path={transient: "D"})
+
+    assert module._registry_commit_findings(tmp_path, [transient], snapshot) == []
+
+
+def test_registry_commit_blocks_registered_transient_deletion(tmp_path: Path) -> None:
+    module = _load_module()
+    transient = ".gtkb-index-hl705ij2/index"
+    _seed_registered_commit_fixture(tmp_path, transient)
+    snapshot = SimpleNamespace(status_by_path={transient: "D"})
+
+    findings = module._registry_commit_findings(tmp_path, [transient], snapshot)
+
+    assert findings == [
+        {
+            "path": transient,
+            "reason": "registered identity delete/move/rename requires separately authorized transition",
+        }
+    ]
+
+
+def test_registry_commit_blocks_transient_deletion_without_registry_authority(tmp_path: Path) -> None:
+    module = _load_module()
+    transient = ".gtkb-index-hl705ij2/index"
+    snapshot = SimpleNamespace(status_by_path={transient: "D"})
+
+    findings = module._registry_commit_findings(tmp_path, [transient], snapshot)
+
+    assert findings == [
+        {
+            "path": transient,
+            "reason": "transient Git index deletion requires coherent registry authority",
+        }
+    ]
+
+
+def test_staged_transient_add_and_unregistered_delete_follow_recurrence_rule(tmp_path: Path) -> None:
+    module = _load_module()
+    transient = ".gtkb-index-hl705ij2/index"
+    _init_committed_paths(tmp_path, ["baseline.txt"])
+    _seed_registered_commit_fixture(tmp_path)
+    target = tmp_path / transient
+    target.parent.mkdir(parents=True)
+    target.write_text("transient\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--", transient], cwd=tmp_path, check=True)
+
+    with module._index_snapshot(tmp_path) as snapshot:
+        assert snapshot.status_by_path[transient] == "A"
+        assert module._registry_commit_findings(tmp_path, [transient], snapshot)
+
+    subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=tmp_path, check=True, capture_output=True)
+    target.parent.mkdir(parents=True)
+    target.write_text("transient\n", encoding="utf-8")
+    subprocess.run(["git", "add", "--", transient], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "core.hooksPath=empty-hooks",
+            "commit",
+            "-qm",
+            "transient fixture",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+    subprocess.run(["git", "rm", "-q", "--", transient], cwd=tmp_path, check=True)
+
+    with module._index_snapshot(tmp_path) as snapshot:
+        assert snapshot.status_by_path[transient] == "D"
+        assert module._registry_commit_findings(tmp_path, [transient], snapshot) == []
 
 
 def test_registry_commit_rejects_mismatched_capability_start_packet(tmp_path: Path) -> None:
