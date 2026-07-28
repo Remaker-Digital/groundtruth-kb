@@ -39885,3 +39885,37 @@ owner_role = "shared"
 depends_on = []
 forbidden_substitutes = []
 notes = "Deterministically admitted by WI-5441 observers: registered_dependency_closure."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-src-groundtruth-kb-project-artifa-6a340a56b3"
+domain = "control_surface"
+lifecycle = "active"
+storage_path = "groundtruth-kb/src/groundtruth_kb/project/artifact_membership_reconciliation.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."
+
+[[artifacts]]
+id = "wi5441-member-groundtruth-kb-tests-test-artifact-membership-re-6ea657818b"
+domain = "governance_policy"
+lifecycle = "active"
+storage_path = "groundtruth-kb/tests/test_artifact_membership_reconciliation.py"
+coverage_mode = "exact"
+authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
+mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
+versioning_policy = "git_tracked"
+backup_policy = "git_tracked"
+restore_action = "git_restore"
+health_check_function = ""
+owner_role = "shared"
+depends_on = []
+forbidden_substitutes = []
+notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint."

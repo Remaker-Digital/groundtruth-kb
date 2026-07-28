@@ -158,6 +158,7 @@ _BACKTICK_PATH_RE = re.compile(r"`([^`\r\n]+[/\\][^`\r\n]+)`")
 _PATH_KEY_RE = re.compile(r"(?:path|file|source|target|surface|manifest|template|script|config)", re.IGNORECASE)
 _TRACKED_INVENTORY_CACHE: dict[Path, frozenset[str]] = {}
 _TRACKED_CANONICAL_CACHE: dict[Path, dict[str, str]] = {}
+_GIT_MANAGED_INVENTORY_CACHE: dict[Path, frozenset[str] | None] = {}
 _REFERENCE_RESOLUTION_CACHE: dict[tuple[Path, str], tuple[tuple[str, ...], str | None]] = {}
 
 
@@ -204,6 +205,31 @@ def _tracked_canonical_paths(project_root: Path) -> dict[str, str]:
         cached = {item.casefold(): item for item in _tracked_inventory(root)}
         _TRACKED_CANONICAL_CACHE[root] = cached
     return cached
+
+
+def _git_managed_inventory(project_root: Path) -> frozenset[str] | None:
+    """Return tracked plus untracked nonignored paths, or None when Git is unavailable."""
+
+    root = project_root.resolve()
+    if root in _GIT_MANAGED_INVENTORY_CACHE:
+        return _GIT_MANAGED_INVENTORY_CACHE[root]
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            check=False,
+            capture_output=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        inventory = None
+    else:
+        inventory = (
+            frozenset(item for item in result.stdout.decode("utf-8").split("\0") if item)
+            if result.returncode == 0
+            else None
+        )
+    _GIT_MANAGED_INVENTORY_CACHE[root] = inventory
+    return inventory
 
 
 def _relative(root: Path, path: Path) -> str:
@@ -554,9 +580,9 @@ def observe_governed_knowledge(project_root: Path, _snapshot: RegistrySnapshot, 
         )
 
 
-def _tracked_files(project_root: Path, roots: Sequence[str]) -> tuple[str, ...] | None:
-    inventory = _tracked_inventory(project_root)
-    if not inventory and not (project_root / ".git").exists():
+def _package_worktree_files(project_root: Path, roots: Sequence[str]) -> tuple[str, ...] | None:
+    inventory = _git_managed_inventory(project_root)
+    if inventory is None:
         return None
     prefixes = tuple(root.rstrip("/") + "/" for root in roots)
     exact = set(roots)
@@ -566,25 +592,6 @@ def _tracked_files(project_root: Path, roots: Sequence[str]) -> tuple[str, ...] 
             key=str.casefold,
         )
     )
-
-
-def _physical_files_under(project_root: Path, roots: Sequence[str]) -> tuple[str, ...]:
-    files: list[str] = []
-    for relative_root in roots:
-        start = project_root / relative_root
-        if start.is_file():
-            files.append(relative_root)
-            continue
-        if not start.is_dir():
-            continue
-        for directory, names, filenames in os.walk(start, followlinks=False):
-            names[:] = sorted(
-                [name for name in names if name not in {"__pycache__", ".pytest_cache", ".ruff_cache"}],
-                key=str.casefold,
-            )
-            for name in sorted(filenames, key=str.casefold):
-                files.append(_relative(project_root, Path(directory) / name))
-    return tuple(sorted(set(files), key=str.casefold))
 
 
 def _package_selected_roots(project_root: Path) -> tuple[tuple[str, ...], list[dict[str, Any]]]:
@@ -630,12 +637,17 @@ def _package_selected_roots(project_root: Path) -> tuple[tuple[str, ...], list[d
 def observe_package_and_entrypoint(project_root: Path, _snapshot: RegistrySnapshot, _db_path: Path) -> ObserverResult:
     observer: ObserverClass = "package_and_entrypoint"
     try:
+        _GIT_MANAGED_INVENTORY_CACHE.pop(project_root.resolve(), None)
         selected_roots, inputs = _package_selected_roots(project_root)
-        files = _tracked_files(project_root, selected_roots)
-        source = "git_index_enumeration"
+        files = _package_worktree_files(project_root, selected_roots)
         if files is None:
-            files = _physical_files_under(project_root, selected_roots)
-            source = "no_follow_physical_fallback"
+            return _result(
+                observer,
+                input_rows={"metadata": inputs, "selected_roots": list(selected_roots)},
+                diagnostics=("Git-managed inventory unavailable; package admission is disabled",),
+                succeeded=False,
+            )
+        source = "git_index_and_untracked_nonignored_enumeration"
         observations: list[ArtifactObservation] = []
         for relative in selected_roots:
             paths, _ = _normalize_present_paths(project_root, relative)
@@ -960,6 +972,22 @@ def _membership_census(
             )
         return "unregistered_disposable", None, (), ()
 
+    def unreadable_entry(relative: str, exc: OSError) -> MembershipEntry:
+        membership, registry_id, observer_classes, evidence_sources = classify(relative, "unreadable")
+        if membership == "registered":
+            membership = "invalid_unknown"
+        return MembershipEntry(
+            relative,
+            "unreadable",
+            membership,
+            "inspected",
+            False,
+            registry_id,
+            observer_classes,
+            evidence_sources,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+
     def walk(directory: Path) -> None:
         try:
             iterator = os.scandir(directory)
@@ -967,16 +995,7 @@ def _membership_census(
             iterator.close()
         except OSError as exc:
             relative = _relative(project_root, directory)
-            entries.append(
-                MembershipEntry(
-                    relative,
-                    "unreadable",
-                    "invalid_unknown",
-                    "inspected",
-                    False,
-                    detail=f"{type(exc).__name__}: {exc}",
-                )
-            )
+            entries.append(unreadable_entry(relative, exc))
             seen.add(relative.casefold())
             return
         for child in children:
@@ -986,16 +1005,7 @@ def _membership_census(
             try:
                 info = child.stat(follow_symlinks=False)
             except OSError as exc:
-                entries.append(
-                    MembershipEntry(
-                        relative,
-                        "unreadable",
-                        "invalid_unknown",
-                        "inspected",
-                        False,
-                        detail=f"{type(exc).__name__}: {exc}",
-                    )
-                )
+                entries.append(unreadable_entry(relative, exc))
                 continue
             reparse = _is_reparse(info)
             kind = _object_kind(info.st_mode, reparse=reparse)
@@ -1162,8 +1172,11 @@ def _membership_census(
     return ordered, seen
 
 
-def _git_tracked_paths(project_root: Path) -> dict[str, str]:
-    return _tracked_canonical_paths(project_root)
+def _git_managed_paths(project_root: Path) -> dict[str, str]:
+    inventory = _git_managed_inventory(project_root)
+    if inventory is None:
+        return _tracked_canonical_paths(project_root)
+    return {item.casefold(): item for item in inventory}
 
 
 def _candidate_id(relative: str) -> str:
@@ -1187,7 +1200,7 @@ def _candidate_domain(relative: str) -> str:
     return "control_surface"
 
 
-def _candidate_record(relative: str, *, object_kind: str, tracked: bool, observers: Sequence[str]) -> SoTArtifact:
+def _candidate_record(relative: str, *, object_kind: str, git_managed: bool, observers: Sequence[str]) -> SoTArtifact:
     if relative == "groundtruth.db":
         return SoTArtifact(
             id=_candidate_id(relative),
@@ -1221,9 +1234,11 @@ def _candidate_record(relative: str, *, object_kind: str, tracked: bool, observe
             coverage_mode="recursive",
         )
     immutable_approval = relative.casefold().startswith(".groundtruth/formal-artifact-approvals/")
-    versioning = "git_tracked" if tracked else "immutable_archive" if immutable_approval else "overwrite_single_writer"
-    backup = "git_tracked" if tracked else "external_backup" if immutable_approval else "gitignored_runtime"
-    restore = "git_restore" if tracked else "manual" if immutable_approval else "regenerate_from_source"
+    versioning = (
+        "git_tracked" if git_managed else "immutable_archive" if immutable_approval else "overwrite_single_writer"
+    )
+    backup = "git_tracked" if git_managed else "external_backup" if immutable_approval else "gitignored_runtime"
+    restore = "git_restore" if git_managed else "manual" if immutable_approval else "regenerate_from_source"
     owner = "automated_only" if immutable_approval else "shared"
     mutation_api = (
         "formal artifact approval packet writer"
@@ -1253,22 +1268,24 @@ def _admission_candidates(
     *,
     project_root: Path,
 ) -> tuple[AdmissionCandidate, ...]:
-    tracked = _git_tracked_paths(project_root)
+    git_managed = _git_managed_paths(project_root)
     candidates: list[AdmissionCandidate] = []
     for entry in entries:
         if entry.membership_class != "unregistered_load_bearing":
+            continue
+        if entry.object_kind == "unreadable":
             continue
         evidence = observations.get(entry.relative_path.casefold(), ())
         observers = tuple(sorted({item.observer_class for item in evidence}))
         sources = tuple(sorted({item.evidence_source for item in evidence}))
         reasons = tuple(sorted({item.reason for item in evidence}))
-        canonical_relative = tracked.get(entry.relative_path.casefold(), entry.relative_path)
+        canonical_relative = git_managed.get(entry.relative_path.casefold(), entry.relative_path)
         candidates.append(
             AdmissionCandidate(
                 record=_candidate_record(
                     canonical_relative,
                     object_kind=entry.object_kind,
-                    tracked=entry.relative_path.casefold() in tracked,
+                    git_managed=entry.relative_path.casefold() in git_managed,
                     observers=observers,
                 ),
                 observer_classes=observers,
@@ -1302,6 +1319,7 @@ def reconcile_artifact_membership(
     root = project_root.resolve()
     _TRACKED_INVENTORY_CACHE.pop(root, None)
     _TRACKED_CANONICAL_CACHE.pop(root, None)
+    _GIT_MANAGED_INVENTORY_CACHE.pop(root, None)
     _REFERENCE_RESOLUTION_CACHE.clear()
     database = (db_path or root / "groundtruth.db").resolve()
     coherent = snapshot or load_registry_snapshot(project_root=root, db_path=database)

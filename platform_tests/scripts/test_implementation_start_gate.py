@@ -833,7 +833,7 @@ def test_exact_file_target_path_authorizes_exact_protected_file(tmp_path: Path) 
         (".codex/gtkb-hooks/a.py", ".codex/gtkb-hooks/"),
         (".github/workflows/ci.yml", ".github/"),
         (".claude/settings.json", "registry:wi5441-claude-settings-json"),
-        (".codex/hooks.json", ".codex/hooks.json"),
+        (".codex/hooks.json", "registry:wi5441-member-codex-hooks-json-82c735c2c8"),
         (".env", ".env"),
         ("./.env.local", "registry:owner-local-env"),
         ("env.local", "env.local"),

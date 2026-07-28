@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
+import groundtruth_kb.project.artifact_membership_reconciliation as membership
 from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project.artifact_membership_reconciliation import (
     ArtifactObservation,
     ObserverResult,
+    observe_package_and_entrypoint,
     observe_registered_dependency_closure,
     reconcile_artifact_membership,
 )
@@ -162,6 +166,133 @@ def test_all_required_observers_must_succeed_before_pruning_or_admission(tmp_pat
     assert report["counts"]["invalid_unknown"] == 1
     assert report["admission_candidates"] == []
     assert report["entries"][0]["relative_path"] == "."
+
+
+def test_package_observer_includes_untracked_nonignored_members(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
+        encoding="utf-8",
+    )
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "tracked.py").write_text("pass\n", encoding="utf-8")
+    (tests / "new.py").write_text("pass\n", encoding="utf-8")
+    (tests / "ignored.py").write_text("pass\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text("tests/ignored.py\n", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "add", "pyproject.toml", ".gitignore", "tests/tracked.py"],
+        cwd=tmp_path,
+        check=True,
+    )
+
+    result = observe_package_and_entrypoint(tmp_path, None, tmp_path / "groundtruth.db")  # type: ignore[arg-type]
+
+    observed = {item.relative_path: item for item in result.observations}
+    assert result.succeeded is True
+    assert "tests/tracked.py" in observed
+    assert "tests/new.py" in observed
+    assert "tests/ignored.py" not in observed
+    assert observed["tests/new.py"].evidence_source == "git_index_and_untracked_nonignored_enumeration"
+
+
+def test_untracked_nonignored_candidate_uses_git_managed_policy_fields(tmp_path: Path) -> None:
+    (tmp_path / "member.txt").write_text("registered", encoding="utf-8")
+    candidate = tmp_path / "tests" / "new.py"
+    candidate.parent.mkdir()
+    candidate.write_text("pass\n", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    snapshot = _snapshot(tmp_path, [_record("member", "member.txt")])
+    observation = ArtifactObservation(
+        "tests/new.py",
+        "package_and_entrypoint",
+        "git_index_and_untracked_nonignored_enumeration",
+        "untracked nonignored package member",
+    )
+
+    report = reconcile_artifact_membership(
+        tmp_path,
+        snapshot=snapshot,
+        db_path=tmp_path / "groundtruth.db",
+        observer_results=_observer_results(observation),
+    )
+    record = report["admission_candidates"][0]["record"]
+
+    assert record["storage_path"] == "tests/new.py"
+    assert record["versioning_policy"] == "git_tracked"
+    assert record["backup_policy"] == "git_tracked"
+    assert record["restore_action"] == "git_restore"
+
+
+def test_package_observer_fails_nonadmitting_when_git_inventory_is_unavailable(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
+        encoding="utf-8",
+    )
+    candidate = tmp_path / "tests" / "candidate.py"
+    candidate.parent.mkdir()
+    candidate.write_text("pass\n", encoding="utf-8")
+    monkeypatch.setattr(membership, "_git_managed_inventory", lambda _root: None)
+
+    observer = observe_package_and_entrypoint(tmp_path, None, tmp_path / "groundtruth.db")  # type: ignore[arg-type]
+
+    assert observer.succeeded is False
+    assert observer.observations == ()
+    assert observer.diagnostics == ("Git-managed inventory unavailable; package admission is disabled",)
+
+    snapshot = _snapshot(tmp_path, [_record("member", "pyproject.toml")])
+    report = reconcile_artifact_membership(
+        tmp_path,
+        snapshot=snapshot,
+        db_path=tmp_path / "groundtruth.db",
+        observer_results=(observer,),
+    )
+    assert report["membership_complete"] is False
+    assert report["counts"]["invalid_unknown"] == 1
+    assert report["admission_candidates"] == []
+
+
+def test_unreadable_paths_preserve_registry_and_observer_authority(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "member.txt").write_text("registered", encoding="utf-8")
+    for name in ("disposable", "observed", "registered"):
+        (tmp_path / name).mkdir()
+    snapshot = _snapshot(
+        tmp_path,
+        [
+            _record("member", "member.txt"),
+            _record("registered", "registered"),
+        ],
+    )
+    original_scandir = os.scandir
+
+    def blocked_scandir(path):
+        if Path(path).name in {"disposable", "observed", "registered"}:
+            raise PermissionError("fixture unreadable directory")
+        return original_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", blocked_scandir)
+    report = reconcile_artifact_membership(
+        tmp_path,
+        snapshot=snapshot,
+        db_path=tmp_path / "groundtruth.db",
+        observer_results=_observer_results(
+            ArtifactObservation(
+                "observed",
+                "capability_inventory",
+                "fixture:capability",
+                "fixture operative surface",
+            )
+        ),
+        deep=True,
+    )
+
+    entries = {entry["relative_path"]: entry for entry in report["entries"]}
+    assert entries["disposable"]["membership_class"] == "unregistered_disposable"
+    assert entries["observed"]["membership_class"] == "unregistered_load_bearing"
+    assert entries["registered"]["membership_class"] == "invalid_unknown"
+    assert report["counts"]["unregistered_load_bearing"] == 1
+    assert report["counts"]["invalid_unknown"] == 1
+    assert report["admission_candidates"] == []
 
 
 def test_service_boundaries_virtual_declarations_and_links_are_not_followed(tmp_path: Path) -> None:
