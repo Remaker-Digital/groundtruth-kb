@@ -650,6 +650,26 @@ def test_legacy_non_operative_verdict_is_grandfathered(tmp_path: Path) -> None:
     assert result.audit_versions[1].classification == "legacy"
 
 
+def test_roleless_identity_non_operative_verdict_is_grandfathered(tmp_path: Path) -> None:
+    """A present but role-unreadable historical identity remains audit-only."""
+
+    slug = "roleless-grandfathered"
+    roleless_identity = "codex/A"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "NO-GO", author_identity=roleless_identity)
+    _write_version(tmp_path, slug, 3, "REVISED")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    assert result.implementation_artifact.version == 3
+    assert result.implementation_verdict.version == 4
+    roleless = result.audit_versions[1]
+    assert roleless.classification == "legacy"
+    assert roleless.author_identity == roleless_identity
+    assert roleless.author_role is None
+
+
 def test_legacy_version_is_not_malformed(tmp_path: Path) -> None:
     """A legacy (missing author_identity) version is a distinct, non-malformed
     classification: the single-malformed correction path is unaffected."""
@@ -671,6 +691,43 @@ def test_legacy_version_is_not_malformed(tmp_path: Path) -> None:
     assert legacy_version.author_role is None
 
 
+def test_present_roleless_identity_is_legacy_not_malformed(tmp_path: Path) -> None:
+    slug = "roleless-not-malformed"
+    roleless_identity = "claude/B"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "NO-GO", author_identity=roleless_identity)
+    _write_version(tmp_path, slug, 3, "REVISED")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    result = resolve_bridge_lifecycle(tmp_path, slug)
+
+    roleless = result.audit_versions[1]
+    assert roleless.is_legacy is True
+    assert roleless.is_malformed is False
+    assert roleless.is_strict is False
+    assert roleless.author_identity == roleless_identity
+    assert roleless.author_role is None
+
+
+def test_roleless_terminal_verified_after_strict_report_fails_closed(tmp_path: Path) -> None:
+    """A present-but-roleless terminal verdict is never grandfathered.
+
+    The proposal, GO, and post-implementation report are strict.  A terminal
+    VERIFIED carrying an identity whose role cannot be resolved must still
+    pass the status-author-role check instead of becoming audit-only legacy.
+    """
+
+    slug = "roleless-terminal-verified"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "GO")
+    _write_version(tmp_path, slug, 3, "NEW")
+    _write_version(tmp_path, slug, 4, "VERIFIED", author_identity="codex/A")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "WRONG_STATUS_AUTHOR_ROLE"
+
+
 def test_operative_go_missing_provenance_fails_closed(tmp_path: Path) -> None:
     """Implementation authority must never derive from a legacy GO, even though
     non-operative legacy versions are tolerated elsewhere in the same chain."""
@@ -684,12 +741,32 @@ def test_operative_go_missing_provenance_fails_closed(tmp_path: Path) -> None:
     assert caught.value.code == "OPERATIVE_VERSION_MISSING_PROVENANCE"
 
 
+def test_operative_go_roleless_identity_fails_closed(tmp_path: Path) -> None:
+    slug = "roleless-operative-go"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_version(tmp_path, slug, 2, "GO", author_identity="codex/A")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "OPERATIVE_VERSION_MISSING_PROVENANCE"
+
+
 def test_operative_proposal_missing_provenance_fails_closed(tmp_path: Path) -> None:
     """Implementation authority must never derive from a legacy proposal, even
     when the GO itself is strict."""
 
     slug = "legacy-operative-proposal"
     _write_version(tmp_path, slug, 1, "NEW", include_author_identity=False)
+    _write_version(tmp_path, slug, 2, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "OPERATIVE_VERSION_MISSING_PROVENANCE"
+
+
+def test_operative_proposal_roleless_identity_fails_closed(tmp_path: Path) -> None:
+    slug = "roleless-operative-proposal"
+    _write_version(tmp_path, slug, 1, "NEW", author_identity="claude/B")
     _write_version(tmp_path, slug, 2, "GO")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
@@ -729,6 +806,42 @@ def test_corrected_go_operative_verdict_legacy_fails_closed_via_role_check(
     _write_malformed(tmp_path, slug, 2)
     _write_version(tmp_path, slug, 3, "NO-ACTION")
     _write_version(tmp_path, slug, 4, "GO", include_author_identity=False)
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "MALFORMED_CORRECTION_INVALID_VERDICT"
+
+
+def test_corrected_go_roleless_predecessor_fails_closed_via_role_check(tmp_path: Path) -> None:
+    slug = "corrected-roleless-proposal"
+    _write_version(tmp_path, slug, 1, "NEW", author_identity="codex/A")
+    _write_malformed(tmp_path, slug, 2)
+    _write_version(tmp_path, slug, 3, "NO-ACTION")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "MALFORMED_CORRECTION_WRONG_PREDECESSOR"
+
+
+def test_corrected_go_roleless_no_action_fails_closed_via_role_check(tmp_path: Path) -> None:
+    slug = "corrected-roleless-no-action"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_malformed(tmp_path, slug, 2)
+    _write_version(tmp_path, slug, 3, "NO-ACTION", author_identity="codex/A")
+    _write_version(tmp_path, slug, 4, "GO")
+
+    with pytest.raises(BridgeLifecycleResolutionError) as caught:
+        resolve_bridge_lifecycle(tmp_path, slug)
+    assert caught.value.code == "MALFORMED_CORRECTION_MISSING_NO_ACTION"
+
+
+def test_corrected_go_roleless_verdict_fails_closed_via_role_check(tmp_path: Path) -> None:
+    slug = "corrected-roleless-verdict"
+    _write_version(tmp_path, slug, 1, "NEW")
+    _write_malformed(tmp_path, slug, 2)
+    _write_version(tmp_path, slug, 3, "NO-ACTION")
+    _write_version(tmp_path, slug, 4, "GO", author_identity="claude/B")
 
     with pytest.raises(BridgeLifecycleResolutionError) as caught:
         resolve_bridge_lifecycle(tmp_path, slug)

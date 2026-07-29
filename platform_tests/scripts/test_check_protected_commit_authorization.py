@@ -441,6 +441,34 @@ def test_approved_chain_accepts_explicit_controlling_go_after_report_no_go(tmp_p
     assert chain.target_paths == ("scripts/authority.py", "platform_tests/scripts/test_authority.py")
 
 
+def test_approved_chain_rejects_fully_roleless_legacy_chain(tmp_path: Path) -> None:
+    module = _load_module()
+    bridge_id = "gtkb-roleless-legacy-chain"
+    proposal = f"bridge/{bridge_id}-001.md"
+    go = f"bridge/{bridge_id}-002.md"
+    report = f"bridge/{bridge_id}-003.md"
+    verdict = f"bridge/{bridge_id}-004.md"
+    (tmp_path / "bridge").mkdir(parents=True, exist_ok=True)
+    (tmp_path / proposal).write_text(
+        'NEW\n\ntarget_paths: ["scripts/authority.py"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / report).write_text(
+        f"NEW\n\nbridge_kind: implementation_report\nResponds to: {go}\n",
+        encoding="utf-8",
+    )
+    versions = (
+        SimpleNamespace(path=proposal, status="NEW", author_role=None, responds_to=None),
+        SimpleNamespace(path=go, status="GO", author_role=None, responds_to=proposal),
+        SimpleNamespace(path=report, status="NEW", author_role=None, responds_to=go),
+        SimpleNamespace(path=verdict, status="VERIFIED", author_role=None, responds_to=report),
+    )
+    resolution = SimpleNamespace(latest_strict_state=versions[-1], audit_versions=versions)
+
+    with pytest.raises(module.GateError, match="not linked to a Prime implementation report"):
+        module._approved_chain(tmp_path, resolution)
+
+
 @pytest.mark.parametrize(
     "controlling_go",
     [

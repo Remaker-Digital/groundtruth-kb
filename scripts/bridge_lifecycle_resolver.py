@@ -366,6 +366,18 @@ def _parse_version(
         )
 
     role = _author_role(author_identity)
+    if role is None and line_one != "VERIFIED":
+        return BridgeVersion(
+            version=version,
+            path=rel_path,
+            status=line_one,
+            classification="legacy",
+            document=document,
+            responds_to=responds_to,
+            author_identity=author_identity,
+            author_role=None,
+            observed_status=line_one,
+        )
     _validate_author_role(line_one, role, rel_path=rel_path, version=version)
     return BridgeVersion(
         version=version,
