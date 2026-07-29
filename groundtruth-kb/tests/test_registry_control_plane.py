@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import sqlite3
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -15,11 +16,13 @@ from scripts.bridge_work_intent_registry import release as release_claim
 
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.project import registry_control_plane
 from groundtruth_kb.project.registry_control_plane import (
     IMPLEMENTATION_ARTIFACTS,
     LEGACY_COVERAGE_MODES,
     RegistryAuthorizationError,
     RegistryCoverageError,
+    RegistryGenerationConflict,
     RegistryProjectionMismatch,
     RegistryRecoveryRequired,
     RegistryResolver,
@@ -105,6 +108,49 @@ def _transaction_kwargs(tmp_path: Path, registry: Path, packaged: Path, db_path:
         "packaged_registry_path": packaged,
         "db_path": db_path,
     }
+
+
+def _spawned_amend_worker(
+    artifact_id: str,
+    note: str,
+    project_root: str,
+    registry_path: str,
+    packaged_registry_path: str,
+    db_path: str,
+    barrier: object,
+    results: object,
+) -> None:
+    """Force each spawned writer to take its first snapshot at one generation."""
+
+    real_load = registry_control_plane.load_registry_snapshot
+    first_read = True
+
+    def synchronized_first_load(*args: object, **kwargs: object) -> object:
+        nonlocal first_read
+        snapshot = real_load(*args, **kwargs)
+        if first_read:
+            first_read = False
+            barrier.wait(timeout=30)  # type: ignore[attr-defined]
+        return snapshot
+
+    registry_control_plane.load_registry_snapshot = synchronized_first_load  # type: ignore[assignment]
+    kwargs = {
+        "actor_session": f"spawn-{artifact_id}",
+        "changed_by": "test/prime-builder",
+        "change_reason": "WI-5714 spawned writer",
+        "start_packet_hash": "sha256:test-start",
+        "pauth_id": "PAUTH-WI5714-TEST",
+        "bridge_id": "gtkb-wi5714-registry-write-linearizability",
+        "project_root": Path(project_root),
+        "registry_path": Path(registry_path),
+        "packaged_registry_path": Path(packaged_registry_path),
+        "db_path": Path(db_path),
+    }
+    try:
+        amend_artifact(artifact_id, {"notes": note}, **kwargs)
+        results.put(("ok", artifact_id))  # type: ignore[attr-defined]
+    except BaseException as exc:
+        results.put(("error", artifact_id, type(exc).__name__, str(exc)))  # type: ignore[attr-defined]
 
 
 def test_reviewed_legacy_map_is_exactly_fifty_and_explicit() -> None:
@@ -571,6 +617,188 @@ def test_amend_rejects_identity_locator_coverage_and_lifecycle_fields(tmp_path: 
     ):
         with pytest.raises(RegistryAuthorizationError, match="transition authority"):
             amend_artifact("member", {field: value}, **kwargs)
+
+
+def test_amend_spawned_disjoint_writers_preserve_every_accepted_delta(tmp_path: Path) -> None:
+    records = [_record(f"member-{index}", f"member-{index}.txt") for index in range(4)]
+    for record in records:
+        (tmp_path / record.storage_path).write_text(record.id, encoding="utf-8")
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
+    apply_registry_transaction(records, operation="legacy_bootstrap", **kwargs)
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(4)
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_spawned_amend_worker,
+            args=(
+                record.id,
+                f"accepted-{record.id}",
+                str(tmp_path),
+                str(registry),
+                str(packaged),
+                str(db_path),
+                barrier,
+                results,
+            ),
+        )
+        for record in records
+    ]
+
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=60)
+        assert process.exitcode == 0
+
+    outcomes = [results.get(timeout=5) for _ in processes]
+    assert sorted(outcomes) == sorted(("ok", record.id) for record in records)
+    snapshot = load_registry_snapshot(project_root=tmp_path)
+    assert {record.id: record.notes for record in snapshot.records} == {
+        record.id: f"accepted-{record.id}" for record in records
+    }
+    assert registry.read_bytes() == packaged.read_bytes()
+
+
+def test_amend_generation_mismatch_raises_exact_conflict_before_mutation(tmp_path: Path) -> None:
+    (tmp_path / "member.txt").write_text("member", encoding="utf-8")
+    records = [_record("member", "member.txt")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
+    apply_registry_transaction(records, operation="legacy_bootstrap", **kwargs)
+    stale = load_registry_snapshot(project_root=tmp_path)
+    desired = [replace(stale.records[0], notes="committed")]
+    apply_registry_transaction(
+        desired,
+        operation="amend",
+        expected_prior_generation_digest=stale.generation_digest,
+        **kwargs,
+    )
+    before_files = (registry.read_bytes(), packaged.read_bytes())
+    with sqlite3.connect(db_path) as conn:
+        before_rows = conn.execute("SELECT COUNT(*) FROM sot_registry_transaction_journal").fetchone()[0]
+
+    with pytest.raises(RegistryGenerationConflict) as raised:
+        apply_registry_transaction(
+            desired,
+            operation="amend",
+            expected_prior_generation_digest=stale.generation_digest,
+            **kwargs,
+        )
+
+    assert type(raised.value) is RegistryGenerationConflict
+    assert (registry.read_bytes(), packaged.read_bytes()) == before_files
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM sot_registry_transaction_journal").fetchone()[0] == before_rows
+
+
+def test_amend_rebases_declared_delta_after_deterministic_interposed_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records = [_record("first", "first.txt"), _record("second", "second.txt")]
+    for record in records:
+        (tmp_path / record.storage_path).write_text(record.id, encoding="utf-8")
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
+    apply_registry_transaction(records, operation="legacy_bootstrap", **kwargs)
+    real_apply = registry_control_plane.apply_registry_transaction
+    calls = 0
+
+    def interposed_apply(desired: object, **apply_kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            current = load_registry_snapshot(project_root=tmp_path)
+            interposed = [
+                replace(record, notes="accepted-second") if record.id == "second" else record
+                for record in current.records
+            ]
+            real_apply(
+                interposed,
+                operation="amend",
+                expected_prior_generation_digest=current.generation_digest,
+                **kwargs,
+            )
+        return real_apply(desired, **apply_kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(registry_control_plane, "apply_registry_transaction", interposed_apply)
+    amend_artifact("first", {"notes": "accepted-first"}, **kwargs)
+
+    assert calls == 2
+    snapshot = load_registry_snapshot(project_root=tmp_path)
+    assert {record.id: record.notes for record in snapshot.records} == {
+        "first": "accepted-first",
+        "second": "accepted-second",
+    }
+    assert registry.read_bytes() == packaged.read_bytes()
+
+
+def test_amend_retry_exhaustion_is_eight_attempts_and_has_no_side_effects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "member.txt").write_text("member", encoding="utf-8")
+    records = [_record("member", "member.txt")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
+    apply_registry_transaction(records, operation="legacy_bootstrap", **kwargs)
+    before_files = (registry.read_bytes(), packaged.read_bytes())
+    before_snapshot = load_registry_snapshot(project_root=tmp_path)
+    with sqlite3.connect(db_path) as conn:
+        before_rows = conn.execute("SELECT COUNT(*) FROM sot_registry_transaction_journal").fetchone()[0]
+    attempts = 0
+
+    def always_conflict(*args: object, **apply_kwargs: object) -> object:
+        nonlocal attempts
+        attempts += 1
+        raise RegistryGenerationConflict("forced conflict")
+
+    monkeypatch.setattr(registry_control_plane, "apply_registry_transaction", always_conflict)
+    with pytest.raises(RegistryGenerationConflict, match="forced conflict"):
+        amend_artifact("member", {"notes": "never committed"}, **kwargs)
+
+    assert attempts == 8
+    assert (registry.read_bytes(), packaged.read_bytes()) == before_files
+    after_snapshot = load_registry_snapshot(project_root=tmp_path)
+    assert after_snapshot.records == before_snapshot.records
+    assert after_snapshot.declaration_digest == before_snapshot.declaration_digest
+    assert after_snapshot.packaged_digest == before_snapshot.packaged_digest
+    assert after_snapshot.projection_digest == before_snapshot.projection_digest
+    assert after_snapshot.generation_digest == before_snapshot.generation_digest
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM sot_registry_transaction_journal").fetchone()[0] == before_rows
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        RegistryAuthorizationError("ordinary authorization failure"),
+        RegistryTransactionInProgress("transaction in progress"),
+        RegistryRecoveryRequired("recovery required"),
+        RegistryCoverageError("coverage failure"),
+        RuntimeError("unexpected failure"),
+    ],
+)
+def test_amend_retries_only_generation_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: BaseException
+) -> None:
+    (tmp_path / "member.txt").write_text("member", encoding="utf-8")
+    records = [_record("member", "member.txt")]
+    registry, packaged, db_path = _fixture_generation(tmp_path, records)
+    kwargs = _transaction_kwargs(tmp_path, registry, packaged, db_path)
+    apply_registry_transaction(records, operation="legacy_bootstrap", **kwargs)
+    attempts = 0
+
+    def fail_once(*args: object, **apply_kwargs: object) -> object:
+        nonlocal attempts
+        attempts += 1
+        raise failure
+
+    monkeypatch.setattr(registry_control_plane, "apply_registry_transaction", fail_once)
+    with pytest.raises(type(failure), match=str(failure)):
+        amend_artifact("member", {"notes": "not committed"}, **kwargs)
+
+    assert attempts == 1
 
 
 def test_registry_cli_exposes_governed_control_plane_commands() -> None:

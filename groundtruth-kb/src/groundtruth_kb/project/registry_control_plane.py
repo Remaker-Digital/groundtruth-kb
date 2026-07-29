@@ -202,6 +202,10 @@ class RegistryAuthorizationError(RegistryControlPlaneError):
     """Raised when mutation or observation authority is missing or mismatched."""
 
 
+class RegistryGenerationConflict(RegistryAuthorizationError):
+    """Raised when an amend snapshot is stale at the commit linearization point."""
+
+
 @dataclass(frozen=True)
 class RegistryPaths:
     project_root: Path
@@ -1406,6 +1410,34 @@ def apply_registry_transaction(
                 raise RegistryTransactionInProgress(
                     f"registry journal {incomplete['journal_id']} is {incomplete['journal_state']}"
                 )
+            if operation == "amend" and expected_prior_generation_digest is not None:
+                current_canonical = paths.registry_path.read_bytes()
+                current_packaged = paths.packaged_registry_path.read_bytes()
+                if current_canonical != current_packaged:
+                    raise RegistryControlPlaneError("pre-transaction canonical and packaged declarations differ")
+                current_records = _load_toml_unlocked(
+                    paths.registry_path,
+                    allow_missing_coverage=allow_legacy_input,
+                )
+                current_projection = _load_projection_unlocked(
+                    paths.db_path,
+                    allow_missing_coverage=allow_legacy_input,
+                )
+                current_parity = validate_projection_parity(current_records, current_projection)
+                if not current_parity.in_sync:
+                    raise RegistryControlPlaneError("pre-transaction declaration/projection parity failure")
+                current_generation_digest = _json_digest(
+                    {
+                        "declaration": _sha256_bytes(current_canonical),
+                        "packaged": _sha256_bytes(current_packaged),
+                        "projection": _projection_digest(current_projection),
+                    }
+                )
+                if current_generation_digest != expected_prior_generation_digest:
+                    raise RegistryGenerationConflict(
+                        "registry generation changed after amend snapshot: "
+                        f"expected {expected_prior_generation_digest}, observed {current_generation_digest}"
+                    )
             retry = conn.execute(
                 "SELECT * FROM sot_registry_transaction_journal "
                 "WHERE operation = ? AND request_digest = ? AND journal_state = 'committed' "
@@ -1454,7 +1486,8 @@ def apply_registry_transaction(
                 expected_prior_generation_digest is not None
                 and prior_generation_digest != expected_prior_generation_digest
             ):
-                raise RegistryAuthorizationError(
+                error_type = RegistryGenerationConflict if operation == "amend" else RegistryAuthorizationError
+                raise error_type(
                     "registry generation changed after dry-run: "
                     f"expected {expected_prior_generation_digest}, observed {prior_generation_digest}"
                 )
@@ -1987,40 +2020,49 @@ def amend_artifact(
             "identity, locator, coverage, lifecycle, move, rename, and deletion changes require transition authority: "
             f"{sorted(forbidden)}"
         )
-    snapshot = load_registry_snapshot(
-        project_root=project_root,
-        registry_path=registry_path,
-        packaged_registry_path=packaged_registry_path,
-        db_path=db_path,
-    )
-    found = False
-    desired: list[SoTArtifact] = []
-    for record in snapshot.records:
-        if record.id != artifact_id:
-            desired.append(record)
-            continue
-        found = True
-        normalized = dict(changes)
-        for field_name in ("depends_on", "forbidden_substitutes"):
-            if field_name in normalized:
-                normalized[field_name] = tuple(normalized[field_name])
-        desired.append(replace(record, **normalized))
-    if not found:
-        raise RegistryCoverageError(f"registry ID not found: {artifact_id}")
-    return apply_registry_transaction(
-        desired,
-        operation="amend",
-        actor_session=actor_session,
-        changed_by=changed_by,
-        change_reason=change_reason,
-        start_packet_hash=start_packet_hash,
-        pauth_id=pauth_id,
-        bridge_id=bridge_id,
-        project_root=project_root,
-        registry_path=registry_path,
-        packaged_registry_path=packaged_registry_path,
-        db_path=db_path,
-    )
+    normalized = dict(changes)
+    for field_name in ("depends_on", "forbidden_substitutes"):
+        if field_name in normalized:
+            normalized[field_name] = tuple(normalized[field_name])
+
+    for _attempt in range(8):
+        snapshot = load_registry_snapshot(
+            project_root=project_root,
+            registry_path=registry_path,
+            packaged_registry_path=packaged_registry_path,
+            db_path=db_path,
+        )
+        found = False
+        desired: list[SoTArtifact] = []
+        for record in snapshot.records:
+            if record.id != artifact_id:
+                desired.append(record)
+                continue
+            found = True
+            desired.append(replace(record, **normalized))
+        if not found:
+            raise RegistryCoverageError(f"registry ID not found: {artifact_id}")
+        try:
+            return apply_registry_transaction(
+                desired,
+                operation="amend",
+                actor_session=actor_session,
+                changed_by=changed_by,
+                change_reason=change_reason,
+                start_packet_hash=start_packet_hash,
+                pauth_id=pauth_id,
+                bridge_id=bridge_id,
+                project_root=project_root,
+                registry_path=registry_path,
+                packaged_registry_path=packaged_registry_path,
+                db_path=db_path,
+                expected_prior_generation_digest=snapshot.generation_digest,
+            )
+        except RegistryGenerationConflict:
+            if _attempt == 7:
+                raise
+
+    raise AssertionError("unreachable amend retry state")
 
 
 def _normalize_event_paths(project_root: Path, values: Sequence[str | Path]) -> tuple[str, ...]:
