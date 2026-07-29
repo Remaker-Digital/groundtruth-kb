@@ -32,7 +32,7 @@ def test_registry_is_valid_and_covers_required_sot_classes() -> None:
     assert "Deliberation Archive" in classes
     assert "Dispatcher daemon state" in classes
     assert "Harness-local transcript metadata" in classes
-    assert "LO advisory dropbox and bridge ADVISORY threads" in classes
+    assert "Bridge numbered ADVISORY chain" in classes
     assert "Bridge numbered file chain" in classes
     assert "MemBase project_authorizations" in classes
 
@@ -93,27 +93,16 @@ def test_rows_as_json_is_compact_and_omits_raw_payloads() -> None:
     assert "full_payload" not in encoded
 
 
-def test_write_report_is_limited_to_dropbox_prefix(tmp_path: Path) -> None:
-    report_path = (
-        tmp_path
-        / "independent-progress-assessments"
-        / "CODEX-INSIGHT-DROPBOX"
-        / "HARNESS-EQUIVALENCE-PHASE-3-SOT-COMPACTNESS-2026-07-06T04-40-00Z.md"
-    )
+def test_advisory_surface_is_bridge_only_and_report_writer_is_retired() -> None:
+    advisory = next(record for record in _h.default_registry() if record.surface_id == "advisory-router-output")
 
-    written = _h.write_report("report\n", report_path, project_root=tmp_path)
-
-    assert written == report_path.resolve()
-    assert written.read_text(encoding="utf-8") == "report\n"
-    assert not (tmp_path / "bridge").exists()
-    assert not (tmp_path / "groundtruth.db").exists()
+    assert advisory.sot_class == "Bridge numbered ADVISORY chain"
+    assert "--source bridge" in advisory.routine_command
+    assert "dropbox" not in advisory.routine_command.lower()
+    assert not hasattr(_h, "write_report")
+    assert not hasattr(_h, "default_report_path")
 
 
-def test_write_report_rejects_non_dropbox_and_wrong_prefix(tmp_path: Path) -> None:
-    bad_dir = tmp_path / "bridge" / "HARNESS-EQUIVALENCE-PHASE-3-SOT-COMPACTNESS-2026.md"
-    with pytest.raises(ValueError, match="CODEX-INSIGHT-DROPBOX"):
-        _h.write_report("report\n", bad_dir, project_root=tmp_path)
-
-    bad_prefix = tmp_path / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / "OTHER-2026.md"
-    with pytest.raises(ValueError, match="HARNESS-EQUIVALENCE-PHASE-3-SOT-COMPACTNESS-"):
-        _h.write_report("report\n", bad_prefix, project_root=tmp_path)
+def test_retired_report_writing_flag_is_rejected() -> None:
+    with pytest.raises(SystemExit):
+        _h.main(["--write-report"])

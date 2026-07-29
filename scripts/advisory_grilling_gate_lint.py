@@ -5,20 +5,19 @@ Deterministic, warning-phase lint implementing the machine-checkable contract in
 ``DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001`` for the LO Advisory Owner-Grilling
 Gate principle (``GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001``).
 
-It scans Loyal Opposition advisory reports under
-``independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-*.md`` and, for
+It scans live, status-bearing numbered bridge ``ADVISORY`` entries and, for
 advisories whose recommended disposition is ``adopt`` or ``adapt``, warns when
 the mandatory ``## Required Prime Builder Owner-Grilling Gate`` section is
-missing or structurally under-specified.
+missing or structurally under-specified. Retired dropbox reports and unnumbered
+files are never accepted as advisory discovery input.
 
 Phase 1 (this slice) is WARNING-ONLY and FAIL-OPEN: the lint never blocks a
 write or a turn. Phase 2 (blocking) is intentionally out of scope and requires a
 separate owner-approved bridge per the DCL's two-phase enforcement progression.
 
 Detection contract (all three required for advisory shape):
-  1. File name matches ``INSIGHTS-*.md``.
-  2. A ``Mode: advisory report`` line (or ``Mode: advisory``) appears within the
-     first 20 lines.
+  1. File name is a numbered bridge entry (``<slug>-NNN.md``).
+  2. The first non-empty line is the canonical ``ADVISORY`` status token.
   3. Exactly one of ``adopt``/``adapt``/``reject``/``defer``/``monitor`` is
      declared inside a ``## Classification`` / ``## Recommended Prime Builder
      Disposition`` / ``## Disposition`` section (``##`` or ``###``).
@@ -36,7 +35,7 @@ Waiver path:
 
 Usage:
     python scripts/advisory_grilling_gate_lint.py [PATHS...]   # lint specific files
-    python scripts/advisory_grilling_gate_lint.py              # scan the dropbox
+    python scripts/advisory_grilling_gate_lint.py              # scan live bridge advisories
     python scripts/advisory_grilling_gate_lint.py --json       # machine-readable
     python scripts/advisory_grilling_gate_lint.py --stop-hook  # Stop-hook (exit 0)
 
@@ -46,7 +45,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import os
 import re
@@ -55,18 +53,17 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-DROPBOX_RELATIVE = Path("independent-progress-assessments") / "CODEX-INSIGHT-DROPBOX"
-ADVISORY_GLOB = "INSIGHTS-*.md"
+BRIDGE_RELATIVE = Path("bridge")
 WAIVER_LOG_RELATIVE = Path(".gtkb-state") / "advisory-grilling-gate" / "waivers.jsonl"
 
-MODE_HEADER_SCAN_LINES = 20
 CLASSIFICATIONS = ("adopt", "adapt", "reject", "defer", "monitor")
 GATE_REQUIRING = frozenset({"adopt", "adapt"})
 MIN_GATE_ENUMERATIONS = 3
 
-# Advisory-shape: ``Mode: advisory report`` plus the shorter ``Mode: advisory``
-# variant, case-insensitive (per the DCL description's normalized variants).
-MODE_HEADER_RE = re.compile(r"^Mode:\s*advisory(?:\s+report)?\s*$", re.IGNORECASE)
+VERSIONED_BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d{3})\.md$")
+BRIDGE_STATUSES = frozenset(
+    {"NEW", "REVISED", "GO", "NO-GO", "VERIFIED", "ADVISORY", "WITHDRAWN", "DEFERRED", "NO-ACTION"}
+)
 
 # Disposition section heading (level 2 or 3).
 DISPOSITION_HEADING_RE = re.compile(
@@ -140,9 +137,14 @@ def _disposition_section(lines: list[str]) -> list[str] | None:
     return None
 
 
-def has_mode_header(text: str) -> bool:
-    """Return True when a ``Mode: advisory[ report]`` line is in the first lines."""
-    return any(MODE_HEADER_RE.match(line.strip()) for line in text.splitlines()[:MODE_HEADER_SCAN_LINES])
+def bridge_status(text: str) -> str | None:
+    """Return the canonical first-line bridge status, or ``None``."""
+    for line in text.splitlines():
+        token = line.strip()
+        if not token:
+            continue
+        return token if token in BRIDGE_STATUSES else None
+    return None
 
 
 def extract_classification(text: str) -> str | None:
@@ -196,9 +198,9 @@ def count_gate_enumerations(text: str) -> int:
 
 def is_advisory_shaped(text: str, *, file_name: str) -> bool:
     """Return True when all three advisory-shape conditions hold."""
-    if not fnmatch.fnmatch(file_name, ADVISORY_GLOB):
+    if VERSIONED_BRIDGE_FILE_RE.fullmatch(file_name) is None:
         return False
-    if not has_mode_header(text):
+    if bridge_status(text) != "ADVISORY":
         return False
     return extract_classification(text) is not None
 
@@ -269,10 +271,25 @@ def lint_file(path: Path, *, project_root: Path) -> FileResult:
 
 
 def discover_advisory_files(project_root: Path) -> list[Path]:
-    dropbox = project_root / DROPBOX_RELATIVE
-    if not dropbox.is_dir():
+    """Return only latest numbered bridge entries whose status is ADVISORY."""
+    bridge = project_root / BRIDGE_RELATIVE
+    if not bridge.is_dir():
         return []
-    return sorted(dropbox.glob(ADVISORY_GLOB))
+    latest: dict[str, tuple[int, str | None, Path]] = {}
+    for path in bridge.glob("*.md"):
+        match = VERSIONED_BRIDGE_FILE_RE.fullmatch(path.name)
+        if match is None:
+            continue
+        try:
+            status = bridge_status(path.read_text(encoding="utf-8-sig", errors="replace"))
+        except OSError:
+            continue
+        slug = match.group("slug")
+        version = int(match.group("version"))
+        prior = latest.get(slug)
+        if prior is None or version > prior[0]:
+            latest[slug] = (version, status, path)
+    return sorted(path for _version, status, path in latest.values() if status == "ADVISORY")
 
 
 def log_waiver(result: FileResult, *, project_root: Path, now: datetime | None = None) -> None:
@@ -362,7 +379,7 @@ def _results_to_json(results: list[FileResult]) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="*", help="Advisory files to lint (default: scan the dropbox).")
+    parser.add_argument("paths", nargs="*", help="Advisory files to lint (default: scan live bridge advisories).")
     parser.add_argument("--project-root", type=Path, default=None)
     parser.add_argument("--json", action="store_true", help="Emit machine-readable findings.")
     parser.add_argument(

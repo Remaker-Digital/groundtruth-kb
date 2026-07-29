@@ -29,11 +29,8 @@ def scanner():
 
 @pytest.fixture()
 def fake_project(tmp_path: Path) -> Path:
-    dropbox = tmp_path / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    dropbox.mkdir(parents=True)
-    bridge = tmp_path / "bridge"
-    bridge.mkdir()
-    (bridge / "INDEX.md").write_text("# Bridge Index\n", encoding="utf-8")
+    (tmp_path / "bridge").mkdir()
+    (tmp_path / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX").mkdir(parents=True)
     return tmp_path
 
 
@@ -49,151 +46,105 @@ def db_factory(tmp_path: Path):
     return factory
 
 
-def _write_advisory_file(
-    path: Path,
+def _advisory_body(
     *,
     title: str = "Test Advisory",
     classification: str = "adopt",
     has_gate: bool = True,
     date_str: str = "2026-07-07",
-    priority: str = "high",
-    is_bridge: bool = False,
-) -> None:
-    content_lines = []
-    if is_bridge:
-        content_lines.append("ADVISORY\n")
-        content_lines.append(f"Date: {date_str}\n")
-
-    content_lines.append("Mode: advisory report\n")
-    content_lines.append(f"# {title}\n")
-    content_lines.append(f"Date: {date_str}\n")
-    content_lines.append("## Classification\n")
-    content_lines.append(f"We recommend to {classification} this design.\n")
-    content_lines.append(f"Severity: {priority}\n")
-
+    priority: str = "P1",
+) -> str:
+    lines = [
+        f"# {title}",
+        "",
+        f"Date: {date_str}",
+        f"Severity: {priority}",
+        "",
+        "## Classification",
+        f"Recommended disposition: {classification}.",
+    ]
     if has_gate:
-        content_lines.append("\n## Required Prime Builder Owner-Grilling Gate\n")
-        content_lines.append("1. Implementation implied: Yes\n")
-        content_lines.append("2. Grill-the-owner questions: None\n")
-        content_lines.append("3. Required durable owner decisions: None\n")
+        lines.extend(
+            [
+                "",
+                "## Required Prime Builder Owner-Grilling Gate",
+                "1. Implementation implied: Yes",
+                "2. Grill-the-owner questions: None",
+                "3. Required durable owner decisions: None",
+            ]
+        )
+    return "\n".join(lines) + "\n"
 
-    path.write_text("\n".join(content_lines), encoding="utf-8")
 
-
-def _append_candidate_status(
+def _write_bridge_entry(
     project_root: Path,
-    source_key: str,
-    status: str,
-) -> None:
-    store = project_root / ".gtkb-state" / "advisory-candidates" / "candidates.jsonl"
-    store.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "event": status,
-        "status": status,
-        "source": "dropbox",
-        "source_key": source_key,
-        "relative_path": f"independent-progress-assessments/CODEX-INSIGHT-DROPBOX/{source_key}",
-        "proposed_title": f"Route LO advisory: {source_key}",
-        "priority": "high",
-    }
-    with store.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(record) + "\n")
+    slug: str,
+    *,
+    version: int = 1,
+    status: str = "ADVISORY",
+    **body_kwargs,
+) -> Path:
+    path = project_root / "bridge" / f"{slug}-{version:03d}.md"
+    path.write_text(f"{status}\n\n{_advisory_body(**body_kwargs)}", encoding="utf-8")
+    return path
 
 
-def test_scanner_selects_intake_ready_advisories(scanner, fake_project: Path, db_factory) -> None:
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-
-    # 1. Valid: adopt with gate
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-A.md", classification="adopt", has_gate=True)
-    # 2. Valid: adapt with gate
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-B.md", classification="adapt", has_gate=True)
-    # 3. Invalid: reject (even if it has a gate, not adopt/adapt)
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-C.md", classification="reject", has_gate=True)
-    # 4. Invalid: adopt but no gate
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-D.md", classification="adopt", has_gate=False)
-
-    results = scanner.scan_intake_advisories(fake_project, source="dropbox", db_factory=db_factory)
-
-    assert len(results) == 2
-    keys = [r.source_key for r in results]
-    assert "INSIGHTS-2026-07-07-A.md" in keys
-    assert "INSIGHTS-2026-07-07-B.md" in keys
-    assert "INSIGHTS-2026-07-07-C.md" not in keys
-    assert "INSIGHTS-2026-07-07-D.md" not in keys
+def _write_legacy_dropbox(project_root: Path, name: str, **body_kwargs) -> Path:
+    path = project_root / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / name
+    path.write_text(_advisory_body(**body_kwargs), encoding="utf-8")
+    return path
 
 
-def test_scanner_selects_live_bridge_advisory_threads(scanner, fake_project: Path, db_factory) -> None:
-    bridge = fake_project / "bridge"
-
-    _write_advisory_file(
-        bridge / "gtkb-live-adopt-001.md",
+def test_scanner_selects_only_live_bridge_advisories(scanner, fake_project: Path, db_factory) -> None:
+    _write_bridge_entry(
+        fake_project,
+        "gtkb-live-adopt",
         title="Live Adopt Advisory",
         classification="adopt",
-        has_gate=True,
         date_str="2026-07-06",
         priority="P1",
-        is_bridge=True,
     )
-    _write_advisory_file(
-        bridge / "gtkb-live-adapt-001.md",
+    _write_bridge_entry(
+        fake_project,
+        "gtkb-live-adapt",
         title="Live Adapt Advisory",
         classification="adapt",
-        has_gate=True,
         date_str="2026-07-07",
         priority="P2",
-        is_bridge=True,
     )
-    _write_advisory_file(
-        bridge / "gtkb-reject-001.md",
-        classification="reject",
-        has_gate=True,
-        is_bridge=True,
-    )
-    _write_advisory_file(
-        bridge / "gtkb-missing-gate-001.md",
+    _write_bridge_entry(fake_project, "gtkb-reject", classification="reject")
+    _write_bridge_entry(fake_project, "gtkb-missing-gate", classification="adopt", has_gate=False)
+    _write_bridge_entry(fake_project, "gtkb-superseded", classification="adopt")
+    _write_bridge_entry(fake_project, "gtkb-superseded", version=2, status="NEW")
+
+    results = scanner.scan_intake_advisories(fake_project, db_factory=db_factory)
+
+    assert [result.source_key for result in results] == ["gtkb-live-adopt", "gtkb-live-adapt"]
+    assert all(result.source == "bridge" for result in results)
+    assert all(result.has_grilling_gate is True for result in results)
+
+
+def test_scanner_rejects_legacy_and_unnumbered_inputs(scanner, fake_project: Path, db_factory) -> None:
+    _write_legacy_dropbox(
+        fake_project,
+        "INSIGHTS-2026-07-07-LEGACY.md",
         classification="adopt",
-        has_gate=False,
-        is_bridge=True,
-    )
-    _write_advisory_file(
-        bridge / "gtkb-superseded-001.md",
-        classification="adopt",
         has_gate=True,
-        is_bridge=True,
     )
-    (bridge / "gtkb-superseded-002.md").write_text(
-        "NEW\n\nDocument: gtkb-superseded\nVersion: 002\n",
+    (fake_project / "bridge" / "unnumbered-advisory.md").write_text(
+        f"ADVISORY\n\n{_advisory_body(classification='adapt')}",
         encoding="utf-8",
     )
+    _write_bridge_entry(fake_project, "gtkb-canonical", classification="adopt")
 
-    results = scanner.scan_intake_advisories(fake_project, source="bridge", db_factory=db_factory)
+    results = scanner.scan_intake_advisories(fake_project, db_factory=db_factory)
 
-    keys = [r.source_key for r in results]
-    assert keys == ["gtkb-live-adopt", "gtkb-live-adapt"]
-    assert all(r.source == "bridge" for r in results)
-    assert all(r.has_grilling_gate is True for r in results)
+    assert [result.source_key for result in results] == ["gtkb-canonical"]
 
 
-def test_scanner_filters_non_live_advisories(scanner, fake_project: Path, db_factory) -> None:
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-
-    # Ready but will be marked as promoted in candidate store
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-PROM.md", classification="adopt", has_gate=True)
-    _append_candidate_status(fake_project, "INSIGHTS-2026-07-07-PROM.md", "promoted")
-
-    # Ready but will be marked as rejected in candidate store
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-REJ.md", classification="adopt", has_gate=True)
-    _append_candidate_status(fake_project, "INSIGHTS-2026-07-07-REJ.md", "rejected")
-
-    # Ready and is only staged in candidate store (should be live)
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-STAGED.md", classification="adopt", has_gate=True)
-    _append_candidate_status(fake_project, "INSIGHTS-2026-07-07-STAGED.md", "staged")
-
-    # Ready and is not in candidate store at all (should be live)
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-NEW.md", classification="adopt", has_gate=True)
-
-    # Ready but already has work item row in DB
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-07-DB.md", classification="adopt", has_gate=True)
+def test_scanner_filters_advisories_already_linked_in_membase(scanner, fake_project: Path, db_factory) -> None:
+    _write_bridge_entry(fake_project, "gtkb-already-promoted", classification="adopt")
+    _write_bridge_entry(fake_project, "gtkb-still-live", classification="adapt")
     db = db_factory()
     db.insert_work_item(
         id="WI-9999",
@@ -204,66 +155,71 @@ def test_scanner_filters_non_live_advisories(scanner, fake_project: Path, db_fac
         changed_by="test",
         change_reason="promote advisory",
         source_spec_id="GOV-STANDING-BACKLOG-001",
-        related_deliberation_ids="INSIGHTS-2026-07-07-DB.md",
+        related_deliberation_ids="gtkb-already-promoted",
     )
 
-    results = scanner.scan_intake_advisories(fake_project, source="dropbox", db_factory=db_factory)
+    results = scanner.scan_intake_advisories(fake_project, db_factory=db_factory)
 
-    keys = [r.source_key for r in results]
-    assert "INSIGHTS-2026-07-07-PROM.md" not in keys
-    assert "INSIGHTS-2026-07-07-REJ.md" not in keys
-    assert "INSIGHTS-2026-07-07-DB.md" not in keys
-    assert "INSIGHTS-2026-07-07-STAGED.md" in keys
-    assert "INSIGHTS-2026-07-07-NEW.md" in keys
+    assert [result.source_key for result in results] == ["gtkb-still-live"]
 
 
 def test_scanner_preserves_summary_fields(scanner, fake_project: Path, db_factory) -> None:
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    _write_advisory_file(
-        dropbox / "INSIGHTS-2026-07-07-FIELDS.md",
+    _write_bridge_entry(
+        fake_project,
+        "gtkb-fields",
         title="My Custom Title",
         classification="adapt",
-        has_gate=True,
         date_str="2026-07-07",
         priority="P1",
     )
 
-    results = scanner.scan_intake_advisories(fake_project, source="dropbox", db_factory=db_factory)
+    results = scanner.scan_intake_advisories(fake_project, db_factory=db_factory)
 
     assert len(results) == 1
-    adv = results[0]
-    assert adv.source_key == "INSIGHTS-2026-07-07-FIELDS.md"
-    assert adv.source == "dropbox"
-    assert adv.relative_path == "independent-progress-assessments/CODEX-INSIGHT-DROPBOX/INSIGHTS-2026-07-07-FIELDS.md"
-    assert adv.title == "My Custom Title"
-    assert adv.classification == "adapt"
-    assert adv.priority == "high"  # mapped from P1
-    assert adv.advisory_date == "2026-07-07"
-    assert adv.has_grilling_gate is True
+    advisory = results[0]
+    assert advisory.source_key == "gtkb-fields"
+    assert advisory.source == "bridge"
+    assert advisory.relative_path == "bridge/gtkb-fields-001.md"
+    assert advisory.title == "My Custom Title"
+    assert advisory.classification == "adapt"
+    assert advisory.priority == "high"
+    assert advisory.advisory_date == "2026-07-07"
+    assert advisory.has_grilling_gate is True
 
 
 def test_scanner_sorts_presentation_order(scanner, fake_project: Path, db_factory) -> None:
-    dropbox = fake_project / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
+    _write_bridge_entry(fake_project, "gtkb-date-10", date_str="2026-07-10", priority="P1")
+    _write_bridge_entry(fake_project, "gtkb-date-05", date_str="2026-07-05", priority="P3")
+    _write_bridge_entry(fake_project, "gtkb-date-08-low", date_str="2026-07-08", priority="P3")
+    _write_bridge_entry(fake_project, "gtkb-date-08-high", date_str="2026-07-08", priority="P1")
+    _write_bridge_entry(fake_project, "gtkb-date-09-y", date_str="2026-07-09", priority="P1")
+    _write_bridge_entry(fake_project, "gtkb-date-09-x", date_str="2026-07-09", priority="P1")
 
-    # Oldest date should come first
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-10-A.md", date_str="2026-07-10", priority="P1")
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-05-A.md", date_str="2026-07-05", priority="P3")  # P3 = low
-    # Equal date: High priority (P1) comes before Low priority (P3)
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-08-LOW.md", date_str="2026-07-08", priority="P3")
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-08-HIGH.md", date_str="2026-07-08", priority="P1")
-    # Equal date and priority: alphabetical sort by source_key
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-09-Y.md", date_str="2026-07-09", priority="P1")
-    _write_advisory_file(dropbox / "INSIGHTS-2026-07-09-X.md", date_str="2026-07-09", priority="P1")
+    results = scanner.scan_intake_advisories(fake_project, db_factory=db_factory)
 
-    results = scanner.scan_intake_advisories(fake_project, source="dropbox", db_factory=db_factory)
-
-    keys = [r.source_key for r in results]
-    expected_order = [
-        "INSIGHTS-2026-07-05-A.md",  # 2026-07-05
-        "INSIGHTS-2026-07-08-HIGH.md",  # 2026-07-08 High
-        "INSIGHTS-2026-07-08-LOW.md",  # 2026-07-08 Low
-        "INSIGHTS-2026-07-09-X.md",  # 2026-07-09 High (X < Y)
-        "INSIGHTS-2026-07-09-Y.md",  # 2026-07-09 High
-        "INSIGHTS-2026-07-10-A.md",  # 2026-07-10
+    assert [result.source_key for result in results] == [
+        "gtkb-date-05",
+        "gtkb-date-08-high",
+        "gtkb-date-08-low",
+        "gtkb-date-09-x",
+        "gtkb-date-09-y",
+        "gtkb-date-10",
     ]
-    assert keys == expected_order
+
+
+def test_cli_defaults_to_bridge_and_rejects_legacy_source_option(
+    scanner,
+    fake_project: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _write_bridge_entry(fake_project, "gtkb-cli", classification="adopt")
+    _write_legacy_dropbox(fake_project, "INSIGHTS-2026-07-07-CLI.md", classification="adapt")
+
+    assert scanner.main(["--project-root", str(fake_project), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["scanned_count"] == 1
+    assert [item["source_key"] for item in payload["intake_ready"]] == ["gtkb-cli"]
+
+    with pytest.raises(SystemExit) as exc_info:
+        scanner.main(["--project-root", str(fake_project), "--source", "dropbox"])
+    assert exc_info.value.code == 2

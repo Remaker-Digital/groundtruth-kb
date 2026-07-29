@@ -21,8 +21,6 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REPORT_DIR = PROJECT_ROOT / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-REPORT_NAME_PREFIX = "HARNESS-EQUIVALENCE-PHASE-3-SOT-COMPACTNESS-"
 BRIDGE_ID = "gtkb-wi4966-cli-compactness-sot-size-controls"
 WORK_ITEM_ID = "WI-4966"
 PROJECT_ID = "PROJECT-HARNESS-EQUIVALENCE-PHASE-3"
@@ -202,20 +200,20 @@ def default_registry() -> tuple[SurfaceRecord, ...]:
         SurfaceRecord(
             surface_id="advisory-router-output",
             title="Advisory router scan output",
-            sot_class="LO advisory dropbox and bridge ADVISORY threads",
+            sot_class="Bridge numbered ADVISORY chain",
             routine_command=(
                 "groundtruth-kb/.venv/Scripts/python.exe scripts/advisory_backlog_router.py "
-                "--dry-run --source both --compact"
+                "--dry-run --source bridge --compact"
             ),
             read_mode=READ_MODE_COMPACT_FLAG,
             expected_default="Routine advisory scans should return counts and errors without full staged/skipped lists.",
             coverage_refs=("scripts/advisory_backlog_router.py",),
             governing_specs=("GOV-STANDING-BACKLOG-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
             archival_command=(
-                "groundtruth-kb/.venv/Scripts/python.exe scripts/advisory_backlog_router.py --dry-run --source both"
+                "groundtruth-kb/.venv/Scripts/python.exe scripts/advisory_backlog_router.py --dry-run --source bridge"
             ),
             follow_on_disposition="No new work for this slice; keep --compact in routine advisory-router guidance.",
-            notes="The router has an explicit compact JSON mode.",
+            notes="The router has an explicit compact JSON mode and numbered bridge is the sole advisory input.",
         ),
         SurfaceRecord(
             surface_id="envelope-sharding-surface",
@@ -450,32 +448,9 @@ def render_markdown_report(rows: tuple[AuditRow, ...], *, generated_at: str) -> 
     return "\n".join(lines)
 
 
-def default_report_path(project_root: Path, stamp: str) -> Path:
-    return (
-        project_root / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX" / f"{REPORT_NAME_PREFIX}{stamp}.md"
-    )
-
-
-def write_report(markdown: str, report_path: Path, *, project_root: Path = PROJECT_ROOT) -> Path:
-    resolved_root = project_root.resolve()
-    resolved = report_path.resolve()
-    expected_dir = resolved_root / "independent-progress-assessments" / "CODEX-INSIGHT-DROPBOX"
-    try:
-        resolved.relative_to(expected_dir)
-    except ValueError as exc:
-        raise ValueError(f"report path must be under {expected_dir}") from exc
-    if not resolved.name.startswith(REPORT_NAME_PREFIX) or resolved.suffix != ".md":
-        raise ValueError(f"report filename must match {REPORT_NAME_PREFIX}*.md")
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    resolved.write_text(markdown, encoding="utf-8")
-    return resolved
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--json", dest="json_output", action="store_true", help="emit machine-readable audit rows")
-    parser.add_argument("--write-report", action="store_true", help="write the markdown report to the approved dropbox")
-    parser.add_argument("--output", default=None, help="explicit report path for --write-report")
     parser.add_argument("--generated-at", default=None, help="fixed report timestamp for deterministic tests")
     args = parser.parse_args(argv)
 
@@ -492,12 +467,7 @@ def main(argv: list[str] | None = None) -> int:
         payload["generated_at"] = generated_at
         print(json.dumps(payload, indent=2, sort_keys=True))
 
-    if args.write_report:
-        report_path = Path(args.output) if args.output else default_report_path(PROJECT_ROOT, generated_at)
-        written = write_report(render_markdown_report(rows, generated_at=generated_at), report_path)
-        print(f"Report written: {written}")
-
-    if not args.json_output and not args.write_report:
+    if not args.json_output:
         print(render_markdown_report(rows, generated_at=generated_at))
 
     return 0

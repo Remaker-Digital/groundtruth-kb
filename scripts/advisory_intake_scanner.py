@@ -22,13 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 
-from scripts.advisory_backlog_router import (  # noqa: E402
-    _candidate_store_path,
-    _load_candidate_events,
-    collect_advisories,
-    current_candidate_status,
-    is_live_advisory,
-)
+from scripts.advisory_backlog_router import collect_bridge_advisories  # noqa: E402
 from scripts.advisory_grilling_gate_lint import (  # noqa: E402
     extract_classification,
     has_gate_heading,
@@ -50,15 +44,11 @@ class ScannedAdvisory:
 
 def scan_intake_advisories(
     project_root: Path,
-    source: str = "both",
     since: date | None = None,
     db_factory=None,
 ) -> list[ScannedAdvisory]:
-    """Scan and filter advisories matching intake criteria."""
-    advisories = collect_advisories(project_root, source=source, since=since)
-
-    store_path = _candidate_store_path(project_root)
-    status_map = current_candidate_status(_load_candidate_events(store_path))
+    """Scan current numbered bridge ADVISORY entries for Prime intake."""
+    advisories = collect_bridge_advisories(project_root, since=since)
 
     if db_factory is None:
         db = KnowledgeDB(str(project_root / "groundtruth.db"))
@@ -68,8 +58,10 @@ def scan_intake_advisories(
     results: list[ScannedAdvisory] = []
 
     for advisory in advisories:
-        # 1. Must be live (not promoted/rejected in candidate store, and not in DB)
-        if not is_live_advisory(db, status_map, advisory.source_key):
+        # A canonical MemBase work-item link means the advisory has already
+        # crossed the intake boundary.  Do not consult the retired candidate
+        # event store: numbered bridge state plus MemBase are the authorities.
+        if _existing_work_item_for_advisory(db, advisory.source_key) is not None:
             continue
 
         # Read the file to extract classification and gate heading presence
@@ -121,14 +113,24 @@ def scan_intake_advisories(
     return results
 
 
+def _existing_work_item_for_advisory(db, source_key: str) -> str | None:
+    """Return the work item already linked to ``source_key``, when present."""
+    row = (
+        db._get_conn()
+        .execute(
+            "SELECT id FROM current_work_items "
+            "WHERE related_deliberation_ids IS NOT NULL "
+            "AND related_deliberation_ids LIKE ? "
+            "ORDER BY id LIMIT 1",
+            (f"%{source_key}%",),
+        )
+        .fetchone()
+    )
+    return None if row is None else str(row[0])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--source",
-        choices=("dropbox", "bridge", "both"),
-        default="both",
-        help="which advisory surface(s) to scan (default: both)",
-    )
     parser.add_argument("--since", help="ISO date (YYYY-MM-DD); skip advisories dated before this")
     parser.add_argument("--project-root", default=None, help="override project root")
     parser.add_argument("--json", action="store_true", help="output JSON format")
@@ -148,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     try:
-        intake_ready = scan_intake_advisories(project_root, source=args.source, since=since_date)
+        intake_ready = scan_intake_advisories(project_root, since=since_date)
     except Exception as exc:
         print(f"Error during scan: {exc}", file=sys.stderr)
         return 1
@@ -169,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
                 }
                 for adv in intake_ready
             ],
-            "scanned_count": len(collect_advisories(project_root, source=args.source, since=since_date)),
+            "scanned_count": len(collect_bridge_advisories(project_root, since=since_date)),
             "intake_ready_count": len(intake_ready),
         }
         print(json.dumps(payload, indent=2, sort_keys=True))
